@@ -1,0 +1,42 @@
+{
+  "name": "daily-todo-app",
+  "version": "1.0.0",
+  "description": "Daily TODO desktop app with Jira integration and check-in reminders",
+  "main": "electron/main.js",
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "web": "node server.js",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --mac",
+    "share": "bash scripts/package-for-sharing.sh"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.dailytodo.app",
+    "productName": "Daily TODO",
+    "files": [
+      "electron/**/*",
+      "lib/**/*",
+      "public/**/*",
+      "server.js",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": ["dmg", "zip"],
+      "identity": null
+    }
+  }
+}

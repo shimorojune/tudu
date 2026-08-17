@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Daily TODO</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- Bird + envelope delivery (app hidden until envelope opens) -->
+  <div class="delivery-overlay hidden" id="deliveryOverlay" aria-hidden="true">
+    <div class="courier" id="courier">
+      <svg class="bird-svg bird-facing-right" viewBox="0 0 90 60" aria-hidden="true">
+        <path class="bird-wing bird-wing-up" d="M42 28 Q62 6 52 30 Q44 32 42 28" />
+        <ellipse class="bird-body" cx="38" cy="34" rx="16" ry="12" />
+        <circle class="bird-head" cx="52" cy="24" r="9" />
+        <circle class="bird-eye" cx="55" cy="22" r="2" />
+        <path class="bird-beak" d="M58 24 L68 25 L58 27 Z" />
+        <path class="bird-wing bird-wing-down" d="M34 32 Q14 20 24 38 Q32 40 34 32" />
+        <path class="bird-tail" d="M24 36 L8 32 L20 42 Z" />
+        <line class="envelope-string" x1="60" y1="27" x2="60" y2="42" stroke-width="1.5" />
+      </svg>
+      <div class="envelope-carry" id="envelopeCarry">
+        <div class="env-back"></div>
+        <div class="env-letter"></div>
+        <div class="env-flap-closed"></div>
+      </div>
+    </div>
+    <div class="envelope-stand hidden" id="envelopeStand">
+      <div class="envelope-carry envelope-carry--large" id="envelopeStandBox">
+        <div class="env-back"></div>
+        <div class="env-letter"></div>
+        <div class="env-flap-closed"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Full app — pops out from envelope -->
+  <div class="app" id="mainApp">
+    <div class="checkin-banner hidden" id="checkinBanner">
+      <span>⏰ Time to check in — mark what you've completed!</span>
+      <div class="checkin-banner-actions">
+        <button type="button" class="btn btn-secondary btn-sm" id="snoozeBtn">Snooze 15 min</button>
+        <button type="button" class="btn btn-primary btn-sm" id="dismissBtn">Got it</button>
+      </div>
+    </div>
+
+    <header class="header">
+      <div class="header-left">
+        <h1>Daily TODO</h1>
+        <p class="subtitle" id="todayLabel"></p>
+      </div>
+      <div class="header-right">
+        <div class="date-nav" id="dateNav">
+          <button type="button" class="date-nav-btn" data-offset="0">Today</button>
+          <button type="button" class="date-nav-btn" data-offset="-1">Yesterday</button>
+          <button type="button" class="date-nav-btn" data-offset="-2">2 days ago</button>
+        </div>
+        <label class="date-picker">
+          <span>Date</span>
+          <input type="date" id="datePicker" />
+        </label>
+        <button class="btn btn-secondary" id="settingsBtn" title="Jira settings">⚙ Settings</button>
+        <button class="btn btn-secondary" id="refreshJiraBtn" title="Refresh Jira issues">↻ Jira</button>
+        <span class="timer-badge" id="timerBadge" title="Next check-in">⏱ 15:00</span>
+      </div>
+    </header>
+
+    <div class="stats-bar" id="statsBar">
+      <div class="stat"><span class="stat-num" id="statPersonal">0</span><span class="stat-label">Personal</span></div>
+      <div class="stat"><span class="stat-num" id="statJira">0</span><span class="stat-label">Jira Open</span></div>
+      <div class="stat"><span class="stat-num" id="statDone">0</span><span class="stat-label">Done Today</span></div>
+    </div>
+
+    <main class="main-grid">
+      <section class="panel">
+        <div class="panel-header">
+          <h2>My Tasks</h2>
+          <span class="badge" id="personalCount">0</span>
+        </div>
+        <form class="add-form" id="addTaskForm">
+          <input type="text" id="taskInput" placeholder="Add a task for this day…" autocomplete="off" />
+          <button type="submit" class="btn btn-primary">Add</button>
+        </form>
+        <div id="carryOverSection" class="carry-over hidden">
+          <div class="carry-over-header">
+            <h3>Incomplete from past days</h3>
+            <span class="badge" id="carryOverCount">0</span>
+          </div>
+          <ul class="task-list" id="carryOverList"></ul>
+        </div>
+        <div id="pastDayBanner" class="past-day-banner hidden"></div>
+        <ul class="task-list" id="personalTaskList"></ul>
+      </section>
+
+      <section class="panel panel-jira">
+        <div class="panel-header">
+          <h2>Jira — Assigned to Me</h2>
+          <span class="badge badge-jira" id="jiraCount">0</span>
+        </div>
+        <p class="panel-note">Open issues created in the last 2 months · auto-syncs every hour</p>
+        <div id="jiraStatus" class="status-msg"></div>
+        <ul class="task-list" id="jiraTaskList"></ul>
+      </section>
+    </main>
+  </div>
+
+  <!-- Settings -->
+  <div class="overlay hidden" id="settingsOverlay">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h2 id="settingsTitle">Settings</h2>
+        <p id="settingsSubtitle">App preferences and Jira connection. Everything stays on your machine.</p>
+      </div>
+      <form class="modal-body settings-form" id="settingsForm">
+        <fieldset class="settings-section">
+          <legend>Check-in reminders</legend>
+          <label>
+            <span>Reminder interval (minutes)</span>
+            <input type="number" id="cfgCheckinInterval" min="1" max="240" step="1" value="15" required />
+            <small class="field-hint">How often the bird delivers a check-in (1–240 minutes).</small>
+          </label>
+        </fieldset>
+        <fieldset class="settings-section">
+          <legend>Jira</legend>
+        <label>
+          <span>Jira URL</span>
+          <input type="url" id="cfgBaseUrl" placeholder="https://your-company.atlassian.net" required />
+        </label>
+        <label>
+          <span>Jira type</span>
+          <select id="cfgType">
+            <option value="cloud">Jira Cloud</option>
+            <option value="server">Jira Server / Data Center</option>
+          </select>
+        </label>
+        <label>
+          <span id="cfgUserLabel">Username or email</span>
+          <input type="text" id="cfgUsername" placeholder="your.username" required autocomplete="username" />
+        </label>
+        <label>
+          <span id="cfgTokenLabel">API token or password</span>
+          <input type="password" id="cfgToken" placeholder="Enter token or password" autocomplete="current-password" />
+          <small class="field-hint" id="cfgTokenHint"></small>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="cfgSkipTls" />
+          <span>Allow self-signed SSL certificates (for internal Jira servers)</span>
+        </label>
+        </fieldset>
+        <p class="status-msg hidden" id="settingsStatus"></p>
+      </form>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary hidden" id="settingsSkipBtn">Skip for now</button>
+        <button type="button" class="btn btn-secondary" id="settingsTestBtn">Test connection</button>
+        <button type="submit" form="settingsForm" class="btn btn-primary" id="settingsSaveBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
