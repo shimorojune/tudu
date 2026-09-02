@@ -1,0 +1,31 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default capabilities",
+  "windows": ["main", "avatar"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-create",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-focus",
+    "core:window:allow-is-visible",
+    "core:window:allow-get-all-windows",
+    "core:window:allow-close",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-center",
+    "core:window:allow-set-position",
+    "core:window:allow-set-size",
+    "core:webview:allow-create-webview-window",
+    "core:event:default",
+    "core:event:allow-emit",
+    "core:event:allow-listen",
+    "shell:allow-open",
+    "notification:default",
+    "notification:allow-is-permission-granted",
+    "notification:allow-request-permission",
+    "notification:allow-notify",
+    "positioner:default",
+    "positioner:allow-move-window"
+  ]
+}

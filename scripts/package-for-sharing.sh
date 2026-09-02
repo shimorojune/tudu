@@ -1,36 +1,22 @@
-#!/bin/bash
-# Creates a shareable zip: Daily-TODO-macOS-v1.0.0.zip
-# Contains the app zip and INSTALL.md — no credentials.
+#!/usr/bin/env bash
+set -euo pipefail
 
-set -e
-cd "$(dirname "$0")/.."
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
 
-VERSION="1.0.0"
-SHARE_NAME="Daily-TODO-macOS-v${VERSION}"
-APP_ZIP="dist/Daily TODO-${VERSION}-arm64-mac.zip"
+echo "Building Daily TODO..."
+npm run tauri:build -- --bundles app
 
-if [ ! -f "$APP_ZIP" ]; then
-  echo "Building app first..."
-  CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist || true
-fi
+APP_PATH="src-tauri/target/release/bundle/macos/Tudu.app"
+ZIP_NAME="Daily-TODO-macOS-v2.0.0.zip"
+OUT_DIR="dist"
+mkdir -p "$OUT_DIR"
 
-if [ ! -f "$APP_ZIP" ]; then
-  echo "Build failed — expected: $APP_ZIP"
+if [ -d "$APP_PATH" ]; then
+  ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$OUT_DIR/$ZIP_NAME"
+  cp INSTALL.md "$OUT_DIR/"
+  echo "Created $OUT_DIR/$ZIP_NAME"
+else
+  echo "App bundle not found at $APP_PATH"
   exit 1
 fi
-
-STAGE="dist/${SHARE_NAME}"
-rm -rf "$STAGE"
-mkdir -p "$STAGE"
-cp "$APP_ZIP" "$STAGE/"
-cp INSTALL.md "$STAGE/"
-
-cd dist
-rm -f "${SHARE_NAME}.zip"
-zip -r "${SHARE_NAME}.zip" "${SHARE_NAME}"
-
-echo ""
-echo "✓ Ready to share:"
-echo "  $(pwd)/${SHARE_NAME}.zip"
-echo ""
-echo "Send this zip to anyone on Mac (Apple Silicon). They unzip and follow INSTALL.md."
