@@ -8,6 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@assets": path.resolve(__dirname, "./assets"),
     },
   },
   clearScreen: false,
@@ -20,11 +21,5 @@ export default defineConfig({
     target: "es2022",
     minify: !process.env.TAURI_ENV_DEBUG ? "esbuild" : false,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
-    rollupOptions: {
-      input: {
-        main: path.resolve(__dirname, "index.html"),
-        avatar: path.resolve(__dirname, "avatar.html"),
-      },
-    },
   },
 });

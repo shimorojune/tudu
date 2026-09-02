@@ -1,32 +1,31 @@
 [package]
-name = "daily-todo-app"
+name = "tudu"
 version = "2.0.0"
-description = "Daily TODO desktop app with Jira integration"
+description = "Tudu desktop app shell"
 authors = ["you"]
 edition = "2021"
+default-run = "Tudu"
+autobins = false
+
+[[bin]]
+name = "Tudu"
+path = "src/main.rs"
 
 [lib]
-name = "daily_todo_app_lib"
+name = "tudu_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["macos-private-api", "tray-icon"] }
-tauri-plugin-shell = "2"
-tauri-plugin-notification = "2"
+tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-positioner = { version = "2", features = ["tray-icon"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
-base64 = "0.22"
-uuid = { version = "1", features = ["v4", "serde"] }
-chrono = { version = "0.4", features = ["serde"] }
-tokio = { version = "1", features = ["time", "sync", "macros", "rt-multi-thread"] }
-anyhow = "1"
-thiserror = "2"
-parking_lot = "0.12"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = "0.3"
+objc2-foundation = "0.3"
 
 [profile.release]
 panic = "abort"

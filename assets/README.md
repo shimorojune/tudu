@@ -9,6 +9,8 @@
 | `tudu-lockup.svg` | Mark + Tudu wordmark, flush left |
 | `tudu-mark-{1024,512,256,64,32}.png` | Raster, transparent ground |
 | `tudu-icon-macos-1024.png` | App icon, padded on the ground color |
+| `tudu-icon-macos-dark-1024.png` | Generated macOS app icon (dark ground + safe padding) |
+| `icon-manifest.json` | Legacy Tauri icon manifest (prefer `npm run icons`) |
 
 The mark is geometry, not set type: the T is two rectangles, so the SVGs render identically without Archivo installed. The wordmark in `tudu-lockup.svg` is live text in Archivo 800 — install the font or convert it to outlines before handing it to print.
 

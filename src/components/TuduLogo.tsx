@@ -1,14 +1,17 @@
+import markLightUrl from "@assets/tudu-mark.svg?url";
+import markDarkUrl from "@assets/tudu-mark-reverse.svg?url";
+import lockupUrl from "@assets/tudu-lockup.svg?url";
 import { cn } from "@/lib/utils";
-
-export const TUDU_T_PATH = "M18 20h28v8H34v24h-8V28H18v-8z";
 
 interface TuduLogoProps {
   size?: "sm" | "md" | "lg";
   showText?: boolean;
+  /** Use reverse mark on dark grounds (default: auto from `.dark` on `<html>`). */
+  onDark?: boolean;
   className?: string;
 }
 
-const iconSizes = {
+const iconHeights = {
   sm: 28,
   md: 40,
   lg: 72,
@@ -20,37 +23,48 @@ const textSizes = {
   lg: "text-5xl",
 };
 
-export function TuduLogo({ size = "sm", showText = false, className }: TuduLogoProps) {
-  const iconSize = iconSizes[size];
+function resolveDarkGround(explicit?: boolean) {
+  return explicit ?? true;
+}
+
+export function TuduLogo({
+  size = "sm",
+  showText = false,
+  onDark,
+  className,
+}: TuduLogoProps) {
+  const height = iconHeights[size];
+  const darkGround = resolveDarkGround(onDark);
+
+  if (showText && !darkGround) {
+    return (
+      <img
+        src={lockupUrl}
+        alt="Tudu"
+        height={height}
+        className={cn("w-auto shrink-0", className)}
+        style={{ height }}
+      />
+    );
+  }
 
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
-      <svg
-        width={iconSize}
-        height={iconSize}
-        viewBox="0 0 64 64"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
+      <img
+        src={darkGround ? markDarkUrl : markLightUrl}
+        alt=""
         aria-hidden="true"
-        className="shrink-0"
-      >
-        <rect width="64" height="64" rx="14" className="fill-primary" />
-        <path
-          d={TUDU_T_PATH}
-          className="fill-primary-foreground"
-        />
-        <path
-          d="M20 22h24v4H20v-4z"
-          fill="white"
-          fillOpacity="0.15"
-        />
-      </svg>
+        height={height}
+        className="w-auto shrink-0"
+        style={{ height }}
+      />
       {showText && (
         <span
           className={cn(
-            "font-bold tracking-tight text-foreground",
+            "font-extrabold tracking-tight text-foreground",
             textSizes[size],
           )}
+          style={{ fontFamily: "var(--font-heading)" }}
         >
           Tudu
         </span>
@@ -59,20 +73,21 @@ export function TuduLogo({ size = "sm", showText = false, className }: TuduLogoP
   );
 }
 
-export function TuduMark({ className }: { className?: string }) {
+export function TuduMark({
+  className,
+  onDark,
+}: {
+  className?: string;
+  onDark?: boolean;
+}) {
+  const darkGround = resolveDarkGround(onDark);
+
   return (
-    <svg
-      viewBox="0 0 64 64"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
+    <img
+      src={darkGround ? markDarkUrl : markLightUrl}
+      alt=""
       aria-hidden="true"
       className={cn("shrink-0", className)}
-    >
-      <rect width="64" height="64" rx="14" className="fill-primary" />
-      <path
-        d={TUDU_T_PATH}
-        className="fill-primary-foreground"
-      />
-    </svg>
+    />
   );
 }

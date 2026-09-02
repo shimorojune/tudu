@@ -1,52 +1,53 @@
-mod commands;
-mod config;
-mod jira;
-mod scheduler;
-mod tasks;
+mod app_icon;
+mod cleanup;
 
-use commands::*;
-use scheduler::SchedulerState;
-use std::sync::Arc;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Emitter, Manager, WindowEvent,
+    Manager, WindowEvent,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let scheduler_state = Arc::new(SchedulerState::new());
-
     tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_positioner::init())
-        .manage(scheduler_state.clone())
-        .setup(move |app| {
-            let show_item = MenuItem::with_id(app, "show", "Show Tudu", true, None::<&str>)?;
-            let checkin_item = MenuItem::with_id(app, "checkin", "Check in now", true, None::<&str>)?;
-            let settings_item = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_item, &checkin_item, &settings_item, &quit_item])?;
+        .setup(|app| {
+            cleanup::cleanup_legacy_data(&app.handle());
 
-            let _tray = TrayIconBuilder::new()
+            #[cfg(target_os = "macos")]
+            {
+                if let Err(error) = app_icon::set_dock_icon() {
+                    eprintln!("Failed to set macOS dock icon: {error}");
+                }
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(400));
+                    let _ = handle.run_on_main_thread(|| {
+                        if let Err(error) = app_icon::set_dock_icon() {
+                            eprintln!("Failed to set macOS dock icon: {error}");
+                        }
+                    });
+                });
+            }
+
+            let show_item = MenuItem::with_id(app, "show", "Show Tudu", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+
+            let mut tray_builder = TrayIconBuilder::new()
                 .menu(&menu)
-                .tooltip("Tudu")
+                .tooltip("Tudu");
+
+            if let Some(icon) = app.default_window_icon() {
+                tray_builder = tray_builder.icon(icon.clone());
+            }
+
+            let _tray = tray_builder
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.show();
                             let _ = window.set_focus();
-                        }
-                    }
-                    "checkin" => {
-                        scheduler::trigger_manual_reminder(app);
-                    }
-                    "settings" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                            let _ = app.emit("open-settings", ());
                         }
                     }
                     "quit" => {
@@ -85,27 +86,8 @@ pub fn run() {
                 });
             }
 
-            scheduler::start_scheduler(app.handle().clone(), scheduler_state);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
-            get_config,
-            save_config,
-            test_jira_connection,
-            list_tasks,
-            add_task,
-            toggle_task,
-            delete_task,
-            move_task,
-            fetch_jira_issues,
-            get_jira_sync_status,
-            clear_jira_pending_changes,
-            hide_avatar,
-            show_main_window,
-            trigger_reminder,
-            trigger_jira_sync,
-            get_window_label,
-        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
