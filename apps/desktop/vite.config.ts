@@ -3,12 +3,14 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
+const uiRoot = path.resolve(__dirname, "../../packages/ui");
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
-      "@assets": path.resolve(__dirname, "./assets"),
+      "@": path.resolve(uiRoot, "./src"),
+      "@assets": path.resolve(uiRoot, "./assets"),
     },
   },
   clearScreen: false,
@@ -23,6 +25,6 @@ export default defineConfig({
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
   },
   optimizeDeps: {
-    include: ["@tudu/shared"],
+    include: ["@tudu/shared", "@tudu/ui"],
   },
 });

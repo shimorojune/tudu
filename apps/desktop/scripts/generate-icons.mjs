@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const assetsDir = path.join(root, "assets");
+const assetsDir = path.join(root, "..", "..", "packages", "ui", "assets");
 const iconsDir = path.join(root, "src-tauri", "icons");
 const publicDir = path.join(root, "public");
 const size = 1024;

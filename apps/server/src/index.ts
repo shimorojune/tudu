@@ -5,10 +5,12 @@ import { DEFAULT_SERVER_PORT, type HealthResponse } from "@tudu/shared";
 
 const app = new Hono();
 
+const DEV_ORIGINS = ["http://localhost:1420", "http://localhost:5173"];
+
 app.use(
   "*",
   cors({
-    origin: "http://localhost:1420",
+    origin: DEV_ORIGINS,
   }),
 );
 

@@ -2,11 +2,13 @@
   "name": "tudu",
   "version": "2.0.0",
   "private": true,
-  "description": "Tudu monorepo — desktop app and server",
+  "description": "Tudu monorepo — desktop app, web app, and server",
   "license": "MIT",
   "scripts": {
     "dev": "pnpm --parallel --filter @tudu/server --filter @tudu/desktop run dev",
+    "dev:all": "pnpm --parallel --filter @tudu/server --filter @tudu/desktop --filter @tudu/web run dev",
     "dev:desktop": "pnpm --filter @tudu/desktop dev",
+    "dev:web": "pnpm --filter @tudu/web dev",
     "dev:server": "pnpm --filter @tudu/server dev",
     "build": "pnpm -r build",
     "tauri:build": "pnpm --filter @tudu/desktop tauri:build"
