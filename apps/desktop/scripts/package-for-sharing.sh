@@ -8,7 +8,7 @@ echo "Building Tudu..."
 pnpm tauri:build -- --bundles app
 
 APP_PATH="src-tauri/target/release/bundle/macos/Tudu.app"
-ZIP_NAME="Tudu-macOS-v2.0.0.zip"
+ZIP_NAME="Tudu-macOS-v$(node -p "require('./package.json').version").zip"
 OUT_DIR="dist"
 mkdir -p "$OUT_DIR"
 

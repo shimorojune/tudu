@@ -1,6 +1,6 @@
 {
   "name": "@tudu/desktop",
-  "version": "2.0.0",
+  "version": "0.0.1",
   "description": "Tudu desktop app shell",
   "type": "module",
   "license": "MIT",
@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@tudu/shared": "workspace:*",
+    "@tudu/store": "workspace:*",
     "@tudu/ui": "workspace:*",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

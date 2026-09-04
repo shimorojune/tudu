@@ -6,6 +6,7 @@ import { defineConfig } from "vite";
 const uiRoot = path.resolve(__dirname, "../../packages/ui");
 
 export default defineConfig({
+  envDir: path.resolve(__dirname, "../.."),
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
@@ -23,6 +24,6 @@ export default defineConfig({
     minify: "esbuild",
   },
   optimizeDeps: {
-    include: ["@tudu/shared", "@tudu/ui"],
+    include: ["@tudu/shared", "@tudu/store", "@tudu/ui"],
   },
 });

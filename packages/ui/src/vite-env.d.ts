@@ -1,11 +1,10 @@
 /// <reference types="vite/client" />
 
-declare module "@assets/*?url" {
-  const src: string;
-  export default src;
+interface ImportMetaEnv {
+  readonly VITE_CLERK_PUBLISHABLE_KEY: string;
+  readonly VITE_API_URL?: string;
 }
 
-declare module "@assets/*" {
-  const src: string;
-  export default src;
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
 }

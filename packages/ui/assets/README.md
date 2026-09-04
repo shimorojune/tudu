@@ -12,14 +12,14 @@
 | `tudu-icon-macos-dark-1024.png` | Generated macOS app icon (dark ground + safe padding) |
 | `icon-manifest.json` | Legacy Tauri icon manifest (prefer `npm run icons`) |
 
-The mark is geometry, not set type: the T is two rectangles, so the SVGs render identically without Archivo installed. The wordmark in `tudu-lockup.svg` is live text in Archivo 800 — install the font or convert it to outlines before handing it to print.
+The mark is geometry, not set type: the T is two rectangles, so the SVGs render identically without Archivo installed. The wordmark in `tudu-lockup.svg` is live text in Archivo 800. Install the font or convert it to outlines before handing it to print.
 
 Clear space equals the width of the red offset square (26% of the plate) on all four sides. Never round the plate, never recolor the T, never put the red square anywhere but bottom-right.
 
 ## Theme
-- `theme.css` — shadcn/ui variables + Tailwind v4 `@theme inline`. Import after `@import "tailwindcss"`. Includes the Dusk dark variant under `.dark`.
-- `tailwind.config.js` — Tailwind v3 fallback for the same tokens.
-- `tokens.json` — raw design tokens, framework-agnostic.
+- `theme.css`: shadcn/ui variables + Tailwind v4 `@theme inline`. Import after `@import "tailwindcss"`. Includes the Dusk dark variant under `.dark`.
+- `tailwind.config.js`: Tailwind v3 fallback for the same tokens.
+- `tokens.json`: raw design tokens, framework-agnostic.
 
 Font: Archivo (400 body / 800 headings), `next/font` or `@fontsource/archivo`.
 

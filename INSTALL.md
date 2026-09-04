@@ -2,9 +2,9 @@
 
 ## Quick install
 
-1. Unzip `Tudu-macOS-v2.0.0.zip`
+1. Unzip `Tudu-macOS-v0.0.1.zip`
 2. Drag **Tudu.app** to Applications
-3. Right-click → **Open** on first launch (macOS security)
+3. Right-click, then **Open** on first launch (macOS security)
 
 ## Requirements
 
@@ -13,8 +13,8 @@
 
 ## First launch
 
-The app runs in your menu bar. Close the window to hide it — the app keeps running.
+The app runs in your menu bar. Close the window to hide it. The app keeps running.
 
-- **Tray icon** → click to show/hide the main window
-- **Show Tudu** → open the main window from the tray menu
-- **Quit** → exit the app
+- **Tray icon**: click to show/hide the main window
+- **Show Tudu**: open the main window from the tray menu
+- **Quit**: exit the app
