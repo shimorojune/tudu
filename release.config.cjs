@@ -1,6 +1,6 @@
 /** @type {import('semantic-release').GlobalConfig} */
 module.exports = {
-  branches: ["main"],
+  branches: ["master"],
   tagFormat: "v${version}",
   plugins: [
     [
