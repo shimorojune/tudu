@@ -49,6 +49,8 @@ jobs:
     needs: release
     if: needs.release.outputs.new_release_published == 'true'
     runs-on: macos-latest
+    env:
+      ZIP_NAME: Tudu-macOS-v${{ needs.release.outputs.new_release_version }}.zip
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -77,12 +79,9 @@ jobs:
 
       - name: Package app zip
         run: |
-          VERSION="${{ needs.release.outputs.new_release_version }}"
           APP_PATH="apps/desktop/src-tauri/target/release/bundle/macos/Tudu.app"
-          ZIP_NAME="Tudu-macOS-v${VERSION}.zip"
           mkdir -p dist
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "dist/$ZIP_NAME"
-          echo "ZIP_NAME=$ZIP_NAME" >> "$GITHUB_ENV"
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
