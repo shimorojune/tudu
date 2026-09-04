@@ -94,5 +94,8 @@ jobs:
           files: |
             apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
             dist/${{ env.ZIP_NAME }}
+
+      - name: Publish release
+        run: gh release edit "v${{ needs.release.outputs.new_release_version }}" --draft=false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
