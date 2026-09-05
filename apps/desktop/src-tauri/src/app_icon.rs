@@ -11,6 +11,9 @@ use objc2_foundation::{NSData, NSSize};
 const DOCK_ICON: &[u8] = include_bytes!("../icons/dock-dev.png");
 
 #[cfg(target_os = "macos")]
+const TRAY_ICON: &[u8] = include_bytes!("../icons/tray-template.png");
+
+#[cfg(target_os = "macos")]
 pub fn set_dock_icon() -> Result<(), String> {
     let marker = MainThreadMarker::new()
         .ok_or_else(|| "Dock icon update must run on the main thread".to_string())?;
@@ -33,4 +36,10 @@ pub fn set_dock_icon() -> Result<(), String> {
 #[cfg(not(target_os = "macos"))]
 pub fn set_dock_icon() -> Result<(), String> {
     Ok(())
+}
+
+#[cfg(target_os = "macos")]
+pub fn tray_icon() -> Result<tauri::image::Image<'static>, String> {
+    tauri::image::Image::from_bytes(TRAY_ICON)
+        .map_err(|error| format!("Failed to load macOS tray icon: {error}"))
 }

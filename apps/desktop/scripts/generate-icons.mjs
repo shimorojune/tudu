@@ -116,9 +116,55 @@ rmSync(iconset, { recursive: true, force: true });
 const dockDevIcon = await resizeIcon(roundedSource, 512);
 writeFileSync(path.join(iconsDir, "dock-dev.png"), dockDevIcon);
 
+async function buildTrayTemplateIcon(targetSize) {
+  const viewSize = 111;
+  const scale = targetSize / viewSize;
+  const blackRect = async (x, y, width, height) => {
+    const rectWidth = Math.max(1, Math.round(width * scale));
+    const rectHeight = Math.max(1, Math.round(height * scale));
+    return {
+      input: await sharp({
+        create: {
+          width: rectWidth,
+          height: rectHeight,
+          channels: 4,
+          background: { r: 0, g: 0, b: 0, alpha: 1 },
+        },
+      })
+        .png()
+        .toBuffer(),
+      left: Math.round(x * scale),
+      top: Math.round(y * scale),
+    };
+  };
+
+  const composites = await Promise.all([
+    blackRect(26, 20, 48, 14),
+    blackRect(42.5, 20, 15, 60),
+    blackRect(84.2, 84.2, 26.3, 26.3),
+  ]);
+
+  return sharp({
+    create: {
+      width: targetSize,
+      height: targetSize,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite(composites)
+    .png()
+    .toBuffer();
+}
+
+const trayTemplateIcon = await buildTrayTemplateIcon(44);
+writeFileSync(path.join(iconsDir, "tray-template.png"), trayTemplateIcon);
+
 copyFileSync(
   path.join(assetsDir, "tudu-mark-32.png"),
   path.join(publicDir, "tudu-mark-32.png"),
 );
 
-console.log(`Generated rounded macOS icons from ${path.relative(root, macIconPath)}`);
+console.log(
+  `Generated rounded macOS icons and tray template from ${path.relative(root, macIconPath)}`,
+);

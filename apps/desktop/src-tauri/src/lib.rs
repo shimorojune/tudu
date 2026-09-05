@@ -38,6 +38,14 @@ pub fn run() {
                 .menu(&menu)
                 .tooltip("Tudu");
 
+            #[cfg(target_os = "macos")]
+            {
+                if let Ok(icon) = app_icon::tray_icon() {
+                    tray_builder = tray_builder.icon(icon).icon_as_template(true);
+                }
+            }
+
+            #[cfg(not(target_os = "macos"))]
             if let Some(icon) = app.default_window_icon() {
                 tray_builder = tray_builder.icon(icon.clone());
             }
