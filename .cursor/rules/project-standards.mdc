@@ -1,0 +1,46 @@
+---
+description: Core Tudu repo standards - layout, tooling, commits, hard rules
+alwaysApply: true
+---
+
+# Tudu repo standards
+
+pnpm monorepo. Workspaces are `apps/*` and `packages/*`.
+
+| Path | Role |
+|------|------|
+| `apps/desktop` | Tauri 2 shell. Thin: bootstraps React only. |
+| `apps/web` | Vite web shell. Thin: bootstraps React only. |
+| `apps/server` | Hono API. |
+| `packages/ui` | All shared UI. Screens live here, not in apps. |
+| `packages/store` | Redux Toolkit store and RTK Query. |
+| `packages/db` | Drizzle schema and queries. |
+| `packages/shared` | Types and constants used by client and server. |
+
+## Hard rules
+
+1. **No em-dash (U+2014) anywhere in the repo.** `pnpm lint:copy` greps the whole
+   tree and fails the build. Use a hyphen, colon, or comma. Applies to code,
+   comments, markdown, and JSX copy.
+2. **Border radius is `0` everywhere.** All `--radius*` tokens are `0rem`. Never
+   add `rounded-*` classes.
+3. **New UI goes in `packages/ui`.** Do not add screens or components to
+   `apps/desktop` or `apps/web`.
+4. Cross-package imports use the workspace name: `@tudu/store`, `@tudu/shared`,
+   `@tudu/db`, `@tudu/ui`. Never reach across with a relative path.
+5. Conventional commits, enforced by commitlint on the `commit-msg` hook. Allowed
+   types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`,
+   `revert`, `style`, `test`.
+
+## Commands
+
+```bash
+pnpm dev          # server + desktop
+pnpm dev:all      # server + desktop + web
+pnpm test         # vitest run
+pnpm lint:copy    # em-dash check
+pnpm db:generate  # after any schema change
+```
+
+Add dependencies with `pnpm --filter <pkg> add <dep>`, never by editing
+`package.json` by hand.

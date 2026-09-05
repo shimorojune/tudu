@@ -1,0 +1,54 @@
+---
+description: TypeScript conventions for all Tudu packages
+globs: **/*.ts,**/*.tsx
+alwaysApply: false
+---
+
+# TypeScript conventions
+
+`strict` is on with `noUnusedLocals`, `noUnusedParameters`, and
+`verbatimModuleSyntax`. An unused import or parameter is a build failure, not a
+warning.
+
+## Exports
+
+Named exports everywhere. The only default export is `App` in `packages/ui`.
+Never add a barrel `index.ts` inside `packages/ui`; it uses the `@/` alias
+instead.
+
+## Type declarations
+
+Use `type` aliases, not `interface`. Props and inputs are declared as a named
+type right above the function.
+
+```ts
+// GOOD
+export type UpsertUserInput = {
+  userId: string;
+  email: string;
+};
+```
+
+## Imports
+
+`verbatimModuleSyntax` means type-only imports must say `type`:
+
+```ts
+import type { HealthResponse } from "@tudu/shared";
+import { eq, type SQL } from "drizzle-orm";
+```
+
+Inside `packages/db`, `packages/store`, `packages/shared`, and `apps/server`,
+relative imports carry the `.js` extension because these resolve as real ESM:
+
+```ts
+import { baseApi } from "./api/baseApi.js";  // GOOD
+import { baseApi } from "./api/baseApi";     // BAD
+```
+
+`packages/ui` is bundler-resolved: use the `@/` alias with no extension.
+
+## Style
+
+Prefer `function` declarations over arrow consts for module-level functions.
+Guard clauses with early returns over nested `if`. Use `??` for defaults.

@@ -9,5 +9,6 @@
       "@assets/*": ["./assets/*"]
     }
   },
-  "include": ["src", "assets"]
+  "include": ["src", "assets"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

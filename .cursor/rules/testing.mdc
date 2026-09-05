@@ -1,0 +1,53 @@
+---
+description: Vitest and Testing Library conventions
+globs: **/*.test.ts,**/*.test.tsx
+alwaysApply: false
+---
+
+# Testing conventions
+
+Vitest with jsdom and Testing Library. The root `vitest.config.ts` only picks up
+`packages/**/*.test.{ts,tsx}`, so tests outside `packages/` will not run.
+
+Tests are colocated next to their subject: `DayJump.tsx` and `DayJump.test.tsx`.
+
+## Shape
+
+Import globals explicitly from `vitest` even though `globals: true` is set.
+One `describe` per unit, and test names state the behavior, not the method.
+
+```tsx
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it } from "vitest";
+import { DayJump } from "./DayJump";
+
+describe("DayJump", () => {
+  it("selects today by default and jumps to tomorrow", async () => {
+    const store = makeStore();
+    const user = userEvent.setup();
+
+    render(
+      <Provider store={store}>
+        <DayJump />
+      </Provider>,
+    );
+
+    await user.click(screen.getByRole("radio", { name: "Tmr" }));
+
+    expect(store.getState().day.selectedDate).toBe(offsetIso(1));
+  });
+});
+```
+
+## Rules
+
+- Build a fresh store with `makeStore()` per test and wrap in `Provider`. Never
+  import the shared `store` singleton.
+- Query by accessible role and name (`getByRole("radio", { name: "Tmr" })`).
+  Avoid test ids and class selectors.
+- Drive interaction through `userEvent.setup()`, not `fireEvent`.
+- Assert against observable output: rendered text, ARIA state, or store state.
+  Never assert on internal component state.
+- Derive expected dates at runtime with a local helper. Never hardcode a date
+  string, or the test rots overnight.

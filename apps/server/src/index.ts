@@ -2,8 +2,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "dotenv";
 import { serve } from "@hono/node-server";
-import { clerkMiddleware, getAuth } from "@hono/clerk-auth";
-import { createDb, findActiveUser, upsertUser } from "@tudu/db";
+import { createDb } from "@tudu/db";
 import {
   DEFAULT_SERVER_PORT,
   type HealthResponse,
@@ -11,14 +10,19 @@ import {
 } from "@tudu/shared";
 import { cors } from "hono/cors";
 import { Hono } from "hono";
-import { createClerkWebhookRoute } from "./routes/clerk-webhook.js";
+import { createAuth } from "./auth.js";
+import { createSessionMiddleware, type SessionEnv } from "./session-middleware.js";
 
 const serverDir = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(serverDir, "../../../.env") });
 
-const app = new Hono();
+const app = new Hono<SessionEnv>();
 
-const DEV_ORIGINS = ["http://localhost:1420", "http://localhost:5173"];
+const DEV_ORIGINS = [
+  "http://localhost:1420",
+  "http://localhost:5173",
+  "tauri://localhost",
+];
 
 function resolveCorsOrigins(): string[] {
   const configured = process.env.CORS_ORIGINS?.split(",")
@@ -34,13 +38,14 @@ app.use(
     origin: resolveCorsOrigins(),
     allowHeaders: ["Content-Type", "Authorization"],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    credentials: true,
   }),
 );
 
 const databaseUrl = process.env.DATABASE_URL;
 const db = databaseUrl ? createDb(databaseUrl) : null;
-
-app.route("/", createClerkWebhookRoute(db));
+const trustedOrigins = resolveCorsOrigins();
+const auth = db ? createAuth(db, trustedOrigins) : null;
 
 app.get("/health", (c) => {
   const response: HealthResponse = {
@@ -50,43 +55,30 @@ app.get("/health", (c) => {
   return c.json(response);
 });
 
-app.use("*", clerkMiddleware());
-
-const allowJitProvisioning = process.env.ALLOW_JIT_PROVISIONING === "true";
-
-app.get("/me", async (c) => {
-  const auth = getAuth(c);
-
-  if (!auth?.userId) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-
-  if (!db) {
+app.all("/api/auth/*", (c) => {
+  if (!auth) {
     return c.json({ error: "Database not configured" }, 503);
   }
 
-  let user = await findActiveUser(db, auth.userId);
+  return auth.handler(c.req.raw);
+});
 
-  if (!user) {
-    if (!allowJitProvisioning) {
-      return c.json({ error: "User not provisioned" }, 404);
-    }
+if (auth) {
+  app.use("*", createSessionMiddleware(auth));
+}
 
-    const email =
-      (auth.sessionClaims?.email as string | undefined) ??
-      `${auth.userId}@users.clerk`;
+app.get("/me", async (c) => {
+  const session = c.get("session");
 
-    user = await upsertUser(db, {
-      clerkUserId: auth.userId,
-      email,
-    });
+  if (!session?.user) {
+    return c.json({ error: "Unauthorized" }, 401);
   }
 
   const response: MeResponse = {
-    id: user.id,
-    clerkUserId: user.clerkUserId,
-    email: user.email,
-    createdAt: user.createdAt.toISOString(),
+    id: session.user.id,
+    email: session.user.email,
+    name: session.user.name,
+    createdAt: new Date(session.user.createdAt).toISOString(),
   };
 
   return c.json(response);

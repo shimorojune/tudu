@@ -2,8 +2,8 @@ export type HealthResponse = { status: "ok"; version: string };
 
 export type MeResponse = {
   id: string;
-  clerkUserId: string;
   email: string;
+  name: string | null;
   createdAt: string;
 };
 

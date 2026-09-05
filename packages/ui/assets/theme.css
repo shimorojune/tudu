@@ -33,6 +33,14 @@
     --input: #bab6b6;
     --ring: #ec3013;
 
+    /* Ink tints from the design canvas. Ordered lightest to strongest.
+       hair: the quietest separator. ghost: idle grip dots and disabled marks.
+       faint: de-emphasised meta text. rule: the standard 1px divider. */
+    --hair: rgba(32, 30, 29, 0.1);
+    --ghost: rgba(32, 30, 29, 0.2);
+    --rule: rgba(32, 30, 29, 0.22);
+    --faint: rgba(32, 30, 29, 0.34);
+
     --radius: 0rem;
 
     --chart-1: #ec3013;
@@ -80,6 +88,11 @@
     --input: #5a554f;
     --ring: #ff563c;
 
+    --hair: rgba(240, 237, 232, 0.1);
+    --ghost: rgba(240, 237, 232, 0.2);
+    --rule: rgba(240, 237, 232, 0.22);
+    --faint: rgba(240, 237, 232, 0.34);
+
     --chart-1: #ff563c;
     --chart-2: #ffc4b8;
     --chart-3: #ec3013;
@@ -117,6 +130,10 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-hair: var(--hair);
+  --color-ghost: var(--ghost);
+  --color-rule: var(--rule);
+  --color-faint: var(--faint);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);

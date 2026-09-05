@@ -16,7 +16,12 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["../../packages/ui/src/*"],
+      "@assets/*": ["../../packages/ui/assets/*"]
+    }
   },
   "include": ["src"]
 }
