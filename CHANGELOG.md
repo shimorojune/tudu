@@ -1,3 +1,18 @@
+# [0.3.0](https://github.com/eGainDev/tudu/compare/v0.2.1...v0.3.0) (2026-09-05)
+
+
+### Bug Fixes
+
+* Exempt /health from Clerk auth and pass publishable key to server ([bb7ee9d](https://github.com/eGainDev/tudu/commit/bb7ee9d1dc44ad144b019510a154d848e8c1961b))
+* Harden Dokploy deploy with Docker build fixes and API retries ([a7de1da](https://github.com/eGainDev/tudu/commit/a7de1dac26fba50cf5dd13fdd3702ae3158a5d23))
+* Point workspace package exports at compiled JS in production ([2126d4b](https://github.com/eGainDev/tudu/commit/2126d4b7f37ed4750fe6f946512efcec0c7ce569))
+* Use pnpm deploy for production server Docker image ([90da0fb](https://github.com/eGainDev/tudu/commit/90da0fb3503e90ef0c13963c58746f6938c70d2d))
+
+
+### Features
+
+* replace Clerk with Better Auth and add UI foundations ([539a878](https://github.com/eGainDev/tudu/commit/539a8783652d9b1e4d972e65fc52f9b06a72ea5a))
+
 ## [0.2.1](https://github.com/eGainDev/tudu/compare/v0.2.0...v0.2.1) (2026-09-05)
 
 
