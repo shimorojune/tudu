@@ -1,3 +1,15 @@
+# [0.4.0](https://github.com/eGainDev/tudu/compare/v0.3.0...v0.4.0) (2026-09-05)
+
+
+### Bug Fixes
+
+* update icon generation logic and improve image resizing ([dc30cb7](https://github.com/eGainDev/tudu/commit/dc30cb7e37107d797e93c384b7705e4e8877c451))
+
+
+### Features
+
+* add task data model and API ([ba25c3b](https://github.com/eGainDev/tudu/commit/ba25c3be7323f507c269e9f8cdd3b685245b38ed))
+
 # [0.3.0](https://github.com/eGainDev/tudu/compare/v0.2.1...v0.3.0) (2026-09-05)
 
 
