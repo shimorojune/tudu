@@ -129,7 +129,7 @@ Prod deploys are triggered by the **Release** workflow after semantic-release pu
 | `DOKPLOY_API_KEY` | Dokploy API key (Settings → Profile → API/CLI) |
 | `DOKPLOY_COMPOSE_ID` | Compose service ID from the Tudu project |
 
-Compose env vars (`DATABASE_URL`, Clerk keys, `VITE_*`, `CORS_ORIGINS`) are set in Dokploy, not in the repo. Use your Neon `DATABASE_URL` for prod — no Dokploy Postgres needed.
+Compose env vars (`DATABASE_URL`, Clerk keys, `VITE_*`, `CORS_ORIGINS`) are set in Dokploy, not in the repo. Use your Neon `DATABASE_URL` for prod.
 
 **Compose ID:** `elyBV7tB7W-V4x3kF1oy9` (for `DOKPLOY_COMPOSE_ID` secret)
 
