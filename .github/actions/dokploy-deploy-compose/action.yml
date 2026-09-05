@@ -38,7 +38,28 @@ runs:
           --arg title "$DEPLOY_TITLE" \
           --arg description "$DEPLOY_DESCRIPTION" \
           '{composeId: $composeId, title: $title, description: $description}')
-        curl -fsS -X POST "${api_url}/api/compose.deploy" \
-          -H "Content-Type: application/json" \
-          -H "x-api-key: ${DOKPLOY_API_KEY}" \
-          -d "$payload"
+
+        max_attempts=5
+        attempt=1
+        while [ "$attempt" -le "$max_attempts" ]; do
+          echo "Triggering Dokploy deployment (attempt ${attempt}/${max_attempts})..."
+          if curl -fsS --retry 0 --connect-timeout 30 --max-time 120 \
+            -X POST "${api_url}/api/compose.deploy" \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: ${DOKPLOY_API_KEY}" \
+            -d "$payload"; then
+            echo "Deployment triggered successfully."
+            exit 0
+          fi
+
+          exit_code=$?
+          if [ "$attempt" -eq "$max_attempts" ]; then
+            echo "Dokploy deploy trigger failed after ${max_attempts} attempts (exit ${exit_code})."
+            exit "$exit_code"
+          fi
+
+          sleep_seconds=$((attempt * 15))
+          echo "Dokploy API unavailable (exit ${exit_code}). Retrying in ${sleep_seconds}s..."
+          sleep "$sleep_seconds"
+          attempt=$((attempt + 1))
+        done

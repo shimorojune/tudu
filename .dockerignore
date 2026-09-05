@@ -1,0 +1,12 @@
+.git
+node_modules
+**/node_modules
+**/dist
+**/target
+.env
+.env.*
+!.env.example
+apps/desktop
+**/*.md
+.cursor
+.husky
