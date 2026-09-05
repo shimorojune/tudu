@@ -25,6 +25,7 @@ Copy `.env.example` to `.env` and fill in the values:
 | `DATABASE_URL` | Server | Neon Postgres connection string |
 | `CLERK_SECRET_KEY` | Server | Clerk secret key |
 | `CLERK_WEBHOOK_SIGNING_SECRET` | Server | Clerk webhook signing secret (production) |
+| `CORS_ORIGINS` | Server | Comma-separated allowed origins (production) |
 | `ALLOW_JIT_PROVISIONING` | Server | Dev only: sync users on first `/me` (never set in production) |
 | `VITE_CLERK_PUBLISHABLE_KEY` | Web + Desktop | Clerk publishable key |
 | `VITE_API_URL` | Web + Desktop | API base URL (default `http://localhost:3456`) |
@@ -35,13 +36,13 @@ Add these URLs to your Clerk application:
 
 - `http://localhost:5173` (web dev)
 - `http://localhost:1420` (desktop dev)
-- Production URLs when deployed
+- `http://tudu.eternals.ezdev.net` (web production)
 
 ### User sync
 
 **Production:** users are written to the database by Clerk webhooks only. Set up a webhook endpoint pointing at your deployed server:
 
-- URL: `https://your-api.example.com/webhooks/clerk`
+- URL: `http://tuduapi.eternals.ezdev.net/webhooks/clerk`
 - Events: `user.created`, `user.updated`, `user.deleted`
 - Copy the signing secret to `CLERK_WEBHOOK_SIGNING_SECRET`
 
@@ -109,7 +110,39 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) on that branch 
 | `feat:` | Minor |
 | `feat!:` or `BREAKING CHANGE:` footer | Major |
 
-When a release is created, GitHub Actions builds a macOS `.app` and `.dmg` and uploads them to the GitHub Release.
+When a release is created, GitHub Actions builds a macOS `.app` and `.dmg`, uploads them to the GitHub Release, and deploys web + server to Dokploy.
+
+### Dokploy deployment
+
+Web and server run as a Docker Compose stack on [Dokploy](https://eternals.ezdev.net):
+
+| Service | URL |
+|---------|-----|
+| Web | `http://tudu.eternals.ezdev.net` |
+| API | `http://tuduapi.eternals.ezdev.net` |
+
+Prod deploys are triggered by the **Release** workflow after semantic-release publishes a new version. Add these GitHub secrets:
+
+| Secret | Description |
+|--------|-------------|
+| `DOKPLOY_API_URL` | `https://eternals.ezdev.net` |
+| `DOKPLOY_API_KEY` | Dokploy API key (Settings → Profile → API/CLI) |
+| `DOKPLOY_COMPOSE_ID` | Compose service ID from the Tudu project |
+
+Compose env vars (`DATABASE_URL`, Clerk keys, `VITE_*`, `CORS_ORIGINS`) are set in Dokploy, not in the repo. Use your Neon `DATABASE_URL` for prod — no Dokploy Postgres needed.
+
+**Compose ID:** `elyBV7tB7W-V4x3kF1oy9` (for `DOKPLOY_COMPOSE_ID` secret)
+
+### First deploy checklist
+
+1. Commit and push these changes to `master`
+2. Add GitHub secrets: `DOKPLOY_API_URL`, `DOKPLOY_API_KEY`, `DOKPLOY_COMPOSE_ID`
+3. Trigger deploy in Dokploy (or run Release workflow after a version bump)
+4. Push schema to Neon (if not already done): `pnpm db:push`
+5. In Clerk dashboard:
+   - Add `http://tudu.eternals.ezdev.net` to allowed origins
+   - Create webhook at `http://tuduapi.eternals.ezdev.net/webhooks/clerk`
+   - Set `CLERK_WEBHOOK_SIGNING_SECRET` in Dokploy compose env
 
 Versions start at `0.0.1` and stay in the `0.x` line until a breaking change. The repo is tagged at `v0.0.1` as the baseline. Each manual release run bumps from the last tag (`fix:` → patch, `feat:` → minor).
 

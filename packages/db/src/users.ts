@@ -1,9 +1,6 @@
 import { and, eq, isNull } from "drizzle-orm";
-import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
-import * as schema from "./schema.js";
+import type { Db } from "./index.js";
 import { users, type User } from "./schema.js";
-
-type Db = NeonHttpDatabase<typeof schema>;
 
 export type UpsertUserInput = {
   clerkUserId: string;

@@ -1,0 +1,44 @@
+name: Dokploy deploy compose
+description: Trigger a Dokploy compose.deploy for a compose ID
+
+inputs:
+  api_url:
+    description: Dokploy base URL
+    required: true
+  api_key:
+    description: Dokploy API key
+    required: true
+  compose_id:
+    description: Dokploy compose ID
+    required: true
+  title:
+    description: Deployment title
+    required: true
+  description:
+    description: Deployment description
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Trigger Dokploy deployment
+      shell: bash
+      env:
+        DOKPLOY_API_URL: ${{ inputs.api_url }}
+        DOKPLOY_API_KEY: ${{ inputs.api_key }}
+        DOKPLOY_COMPOSE_ID: ${{ inputs.compose_id }}
+        DEPLOY_TITLE: ${{ inputs.title }}
+        DEPLOY_DESCRIPTION: ${{ inputs.description }}
+      run: |
+        set -euo pipefail
+        api_url="${DOKPLOY_API_URL%/}"
+        payload=$(jq -n \
+          --arg composeId "$DOKPLOY_COMPOSE_ID" \
+          --arg title "$DEPLOY_TITLE" \
+          --arg description "$DEPLOY_DESCRIPTION" \
+          '{composeId: $composeId, title: $title, description: $description}')
+        curl -fsS -X POST "${api_url}/api/compose.deploy" \
+          -H "Content-Type: application/json" \
+          -H "x-api-key: ${DOKPLOY_API_KEY}" \
+          -d "$payload"

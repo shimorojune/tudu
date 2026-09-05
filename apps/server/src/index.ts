@@ -20,10 +20,18 @@ const app = new Hono();
 
 const DEV_ORIGINS = ["http://localhost:1420", "http://localhost:5173"];
 
+function resolveCorsOrigins(): string[] {
+  const configured = process.env.CORS_ORIGINS?.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  return configured?.length ? configured : DEV_ORIGINS;
+}
+
 app.use(
   "*",
   cors({
-    origin: DEV_ORIGINS,
+    origin: resolveCorsOrigins(),
     allowHeaders: ["Content-Type", "Authorization"],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   }),
