@@ -10,9 +10,11 @@ const assetsDir = path.join(root, "..", "..", "packages", "ui", "assets");
 const iconsDir = path.join(root, "src-tauri", "icons");
 const publicDir = path.join(root, "public");
 const size = 1024;
+const plateSize = 824;
+const plateMargin = Math.round((size - plateSize) / 2);
 const markScale = 0.76;
-const markSize = Math.round(size * markScale);
-const offset = Math.round((size - markSize) / 2);
+const markSize = Math.round(plateSize * markScale);
+const markOffset = Math.round((plateSize - markSize) / 2);
 const cornerFraction = 0.2237;
 
 mkdirSync(assetsDir, { recursive: true });
@@ -34,10 +36,14 @@ async function applySquircle(input, targetSize) {
     .toBuffer();
 }
 
+async function resizeIcon(input, targetSize) {
+  return sharp(input).resize(targetSize, targetSize).png().toBuffer();
+}
+
 const background = await sharp({
   create: {
-    width: size,
-    height: size,
+    width: plateSize,
+    height: plateSize,
     channels: 4,
     background: "#201e1d",
   },
@@ -49,12 +55,23 @@ const mark = await sharp(path.join(assetsDir, "tudu-mark-1024.png"))
   .resize(markSize, markSize)
   .toBuffer();
 
-const macIcon = await sharp(background)
-  .composite([{ input: mark, left: offset, top: offset }])
+const plate = await sharp(background)
+  .composite([{ input: mark, left: markOffset, top: markOffset }])
   .png()
   .toBuffer();
 
-const roundedSource = await applySquircle(macIcon, size);
+const roundedPlate = await applySquircle(plate, plateSize);
+const roundedSource = await sharp({
+  create: {
+    width: size,
+    height: size,
+    channels: 4,
+    background: { r: 0, g: 0, b: 0, alpha: 0 },
+  },
+})
+  .composite([{ input: roundedPlate, left: plateMargin, top: plateMargin }])
+  .png()
+  .toBuffer();
 const macIconPath = path.join(assetsDir, "tudu-icon-macos-dark-1024.png");
 writeFileSync(macIconPath, roundedSource);
 
@@ -63,7 +80,7 @@ execSync(`npx tauri icon "${macIconPath}" -o "${iconsDir}"`, {
   stdio: "inherit",
 });
 
-// tauri icon can flatten corners. Re-apply the mask to every PNG the dock uses.
+// tauri icon can flatten corners. Re-export from the padded source.
 const pngTargets = [
   ["32x32.png", 32],
   ["64x64.png", 64],
@@ -73,7 +90,7 @@ const pngTargets = [
 ];
 
 for (const [name, px] of pngTargets) {
-  writeFileSync(path.join(iconsDir, name), await applySquircle(roundedSource, px));
+  writeFileSync(path.join(iconsDir, name), await resizeIcon(roundedSource, px));
 }
 
 const iconset = path.join(os.tmpdir(), `tudu-iconset-${Date.now()}.iconset`);
@@ -91,12 +108,12 @@ const icnsEntries = [
   ["icon_512x512@2x.png", 1024],
 ];
 for (const [name, px] of icnsEntries) {
-  writeFileSync(path.join(iconset, name), await applySquircle(roundedSource, px));
+  writeFileSync(path.join(iconset, name), await resizeIcon(roundedSource, px));
 }
 execSync(`iconutil -c icns "${iconset}" -o "${path.join(iconsDir, "icon.icns")}"`);
 rmSync(iconset, { recursive: true, force: true });
 
-const dockDevIcon = await applySquircle(roundedSource, 512);
+const dockDevIcon = await resizeIcon(roundedSource, 512);
 writeFileSync(path.join(iconsDir, "dock-dev.png"), dockDevIcon);
 
 copyFileSync(
