@@ -41,7 +41,7 @@ export function DayJump() {
           key={option.value}
           value={option.value}
           aria-label={option.label}
-          className="px-[9px] py-[6px] text-muted-foreground data-[state=on]:bg-foreground"
+          className="px-[9px] py-[6px] text-muted-foreground data-[state=on]:bg-foreground data-[state=on]:text-card"
         >
           {option.label}
         </ToggleGroupItem>
