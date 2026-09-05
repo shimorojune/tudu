@@ -1,3 +1,15 @@
+# [0.2.0](https://github.com/eGainDev/tudu/compare/v0.1.1...v0.2.0) (2026-09-05)
+
+
+### Bug Fixes
+
+* Update README.md to clarify environment variable usage for production ([549ae0b](https://github.com/eGainDev/tudu/commit/549ae0bab8ab111276d6a4ca101d88949343dd24))
+
+
+### Features
+
+* Add Docker support and enhance environment configuration ([c1e2d3e](https://github.com/eGainDev/tudu/commit/c1e2d3ebf5b9ca40fbc5b2b9ad455f908ff2e65b))
+
 ## [0.1.1](https://github.com/eGainDev/tudu/compare/v0.1.0...v0.1.1) (2026-09-04)
 
 
