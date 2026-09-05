@@ -14,6 +14,7 @@ import { WeekRoute } from "@/routes/WeekRoute";
 import { InboxRoute } from "@/routes/InboxRoute";
 import { TeamRoute } from "@/routes/TeamRoute";
 import { SettingsRoute } from "@/routes/SettingsRoute";
+import { UnscheduledRoute } from "@/routes/UnscheduledRoute";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -67,6 +68,12 @@ const teamRoute = createRoute({
   component: TeamRoute,
 });
 
+const unscheduledRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/unscheduled",
+  component: UnscheduledRoute,
+});
+
 const settingsRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/settings",
@@ -79,6 +86,7 @@ const routeTree = rootRoute.addChildren([
     todayRoute,
     weekRoute,
     inboxRoute,
+    unscheduledRoute,
     teamRoute,
     settingsRoute,
   ]),

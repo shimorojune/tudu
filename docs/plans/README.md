@@ -1,9 +1,11 @@
 # Tudu implementation roadmap
 
-Source of truth for the design: `/Users/rraj/Documents/work/tudu_designs/Tudu.dc.html`.
-
-That file is the agreed direction. The six `Tudu Day *.dc.html` files are rejected
-alternates and must not be used as reference. The design system lives in
+Source of truth for the design:
+[Claude artifact](https://claude.ai/code/artifact/26712a88-3eed-429a-b4ed-6bc11c15b3fa)
+(Canva design `DAHUWPSU1Vk`, title "Tudu"). Open the artifact in a browser to read
+every screen. `/Users/rraj/Documents/work/tudu_designs/Tudu.dc.html` is superseded and
+must not be used as reference. The six `Tudu Day *.dc.html` files are rejected
+alternates. The design system lives in
 `/Users/rraj/Documents/work/tudu_designs/_ds/modernist-a66f2ef5-bc24-49ae-997b-e721e12e0c64/`.
 
 ## How these plans work
@@ -56,6 +58,13 @@ This exists because Later was carrying two meanings at once, low priority today 
 date at all. It now means only the first. You drag out of Unscheduled onto a day, which
 is also what makes the week view honest.
 
+### Unscheduled is a top-level nav tab
+
+Undated tasks live on their own route at `/unscheduled`, not inside the Today three pane
+layout. The nav tab sits between Inbox and Team and shows a plain faint count of
+backlog items (not Inbox's red badge). Step 7 drags from this route onto a day column.
+Step 4 makes the list editable.
+
 ### Now has a soft cap
 
 Three to five, nudged and never blocked. This is the whole ballgame. Without a cap,
@@ -90,7 +99,7 @@ JIRA knows when something is due, only you know whether you are touching it toda
 |---|------|------|--------|
 | 1 | Foundations: deps, router, theme, app shell chrome | [01-foundations.md](./01-foundations.md) | Done |
 | 2 | Task data model and API | [02-task-data-model.md](./02-task-data-model.md) | Done |
-| 3 | Today screen, read only | not written | Pending |
+| 3 | Today screen, read only | [03-today-screen.md](./03-today-screen.md) | Done |
 | 4 | Task CRUD and drag to reorder | not written | Pending |
 | 5 | Detail pane: Details, Comments, Timeline | not written | Pending |
 | 6 | Rollover, carry dots, slipping | not written | Pending |
@@ -129,42 +138,25 @@ Design screens covered: none visually. This is the spine for steps 3 to 12.
 
 The three pane layout from A1: task list (flex), JIRA column (296px), detail inspector
 (356px), with draggable dividers via `react-resizable-panels`. Now, Next and Later
-bucket sections. Task row anatomy: checkbox, title, meta line. Selected row treatment.
-Renders real tasks from step 2. Nothing is editable yet. The JIRA column renders the
-"No JIRA connected" empty state from C6b.
+bucket sections with context-aware labels. Task row anatomy: checkbox, title, meta
+line. Selected row treatment. Renders real tasks from step 2. Nothing is editable yet.
+The JIRA column renders the "No JIRA connected" empty state from C6b. A new
+`/unscheduled` route and nav tab list the backlog. When Now is empty but Next has
+tasks, a one-line prompt offers to pull the next thing in (inert until step 4).
 
 Design screens covered: A1 layout, C6 first run empty state, C6b JIRA not connected.
 
-#### Open questions for step 3
+#### Step 3 decisions (settled)
 
-Settled during step 2 planning that these are real decisions, and deliberately left
-open. Raise all three before writing `03-*.md`. Do not let an implementation default
-answer them silently.
+**1. Unscheduled lives on its own nav tab** at `/unscheduled`, between Inbox and Team,
+with a faint count badge. Not a fourth pane, not a strip under Today.
 
-**1. Where the Unscheduled list lives.** A1 has three panes and draws no backlog
-surface anywhere. Candidates: a fourth pane, a collapsible strip under the day list, or
-a popover. Whatever it is, step 7 drags out of it onto a day, so it cannot be
-Today-only.
+**2. Bucket labels are context-aware.** Today shows Now / Next / Later. Any other
+selected date shows Priority 1 / 2 / 3. Stored enum values stay `now | next | later`.
+One label resolver in `packages/ui` serves step 11's rename preference later.
 
-**2. What the buckets are called on a day that is not today.** "Now" and "Next" are
-today words and read wrong on tomorrow or last Tuesday. Something like Priority 1, 2, 3
-reads better there.
-
-This is a label problem, not a data problem, and the design already agrees: C1 has a
-"Bucket names" row reading "Now · Next · Later" with a "Rename…" affordance, so those
-words were always user-editable labels over three fixed slots. The stored enum values
-stay `now | next | later` as stable slot ids. Step 3 adds one label resolver, which
-then also serves step 11's rename preference.
-
-**3. What happens when Now empties.** Auto-pulling the top of Next into Now is the
-obvious move and it is probably wrong. The cap only works because moving something into
-Now forces something out; if Now refills itself the moment it clears, it stops being a
-commitment and becomes a queue that tops itself up. It would also write a surprise
-timeline event on every completion.
-
-The middle path is a prompt: Now is clear, pull the next thing in, one click, user still
-decides. Either way it is built on the reorder endpoint from step 2, so no schema
-change rides on this.
+**3. No auto-pull when Now empties.** Show a prompt: "Now is clear. Pull the next thing
+in?" Step 4 wires the button to the reorder endpoint. No schema change.
 
 ### Step 4: Task CRUD and drag to reorder
 
@@ -194,8 +186,9 @@ Design screens covered: A2 Rollover.
 ### Step 7: Week view and drag to reschedule
 
 Seven column grid, Monday to Sunday. Today column highlight. Task cards placed by
-scheduled day. Drag a card to another day to reschedule, option drag to copy. Week
-picker popover and jump to this week.
+scheduled day. Drag a card to another day to reschedule, option drag to copy. Drag from
+the Unscheduled route onto a day column to schedule. Week picker popover and jump to
+this week.
 
 Design screens covered: A5 Week.
 
@@ -247,15 +240,28 @@ The mockup is the source of truth, with these recorded exceptions. Do not "fix" 
 code back to the mockup on any of these points.
 
 1. **A5's footer copy is superseded.** It reads "Unscheduled tasks stay in Later until
-   you give them a day". Undated tasks now live in the Unscheduled backlog and never
+   you give them a day". Undated tasks now live on the Unscheduled route and never
    appear in a day's Later. See the product model above for why.
-2. **A1 gains an Unscheduled surface that the mockup does not draw.** Follows from the
-   point above. Step 3 decides its shape.
-3. **Now carries a soft cap the mockup does not show.** Three to five, nudge only.
-4. **The macOS title bar with traffic lights is not built.** A1 draws it for context.
+2. **Unscheduled is a nav tab, not drawn inside A1's three panes.** The latest artifact
+   shows the tab in the top bar with a faint count. The day list pane stays three
+   buckets only.
+3. **Per-bucket empty lines when a day has no tasks in one bucket.** Not drawn in A1.
+   Step 3 shows one faint placeholder line per empty bucket when the user has tasks
+   elsewhere.
+4. **Task row hover tint.** The mockup does not specify hover. Step 3 uses a 2% ink
+   tint (`bg-foreground/[0.02]`).
+5. **Context-aware bucket labels on non-today dates.** Priority 1 / 2 / 3 instead of
+   Now / Next / Later when `selectedDate !== today`.
+6. **The macOS title bar with traffic lights is not built.** A1 draws it for context.
    The operating system draws it in the real app.
-5. **Rollover preserves the bucket.** An unfinished Now returns as Now with a carry dot.
+7. **Rollover preserves the bucket.** An unfinished Now returns as Now with a carry dot.
    The mockup's A2 does not state this either way.
+8. **The first nav tab is a dynamic day label, not the fixed word "Today".** It reads
+   Today, Tomorrow, or Yesterday, and falls back to a short date such as "Sun 6 Sep"
+   further out, matching `DateNav`'s format. The mockup always draws it as "Today".
+   The tab width animates when the label changes so the tabs after it slide instead
+   of snapping. The Unscheduled count carries `min-w-[15px]` so Team does not nudge
+   when the count crosses two digits.
 
 ## Screens deliberately left out of the roadmap
 

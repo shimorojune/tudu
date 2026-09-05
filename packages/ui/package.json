@@ -33,6 +33,7 @@
     "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.3",
     "@tanstack/react-router": "^1.170.32",
+    "@tudu/shared": "workspace:*",
     "@tudu/store": "workspace:*",
     "better-auth": "^1.7.2",
     "class-variance-authority": "^0.7.1",

@@ -14,10 +14,12 @@ export function todayIso() {
 
 type DayState = {
   selectedDate: string;
+  selectedTaskId: string | null;
 };
 
 const initialState: DayState = {
   selectedDate: todayIso(),
+  selectedTaskId: null,
 };
 
 export const daySlice = createSlice({
@@ -25,18 +27,28 @@ export const daySlice = createSlice({
   initialState,
   reducers: {
     setSelectedDate(state, action: PayloadAction<string>) {
+      state.selectedTaskId = null;
       state.selectedDate = action.payload;
     },
     shiftSelectedDate(state, action: PayloadAction<number>) {
+      state.selectedTaskId = null;
       const date = new Date(`${state.selectedDate}T12:00:00`);
       date.setDate(date.getDate() + action.payload);
       state.selectedDate = isoDate(date);
     },
     goToToday(state) {
+      state.selectedTaskId = null;
       state.selectedDate = todayIso();
+    },
+    setSelectedTaskId(state, action: PayloadAction<string | null>) {
+      state.selectedTaskId = action.payload;
     },
   },
 });
 
-export const { setSelectedDate, shiftSelectedDate, goToToday } =
-  daySlice.actions;
+export const {
+  setSelectedDate,
+  shiftSelectedDate,
+  goToToday,
+  setSelectedTaskId,
+} = daySlice.actions;

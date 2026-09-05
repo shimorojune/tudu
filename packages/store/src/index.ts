@@ -15,6 +15,7 @@ export {
 export {
   daySlice,
   setSelectedDate,
+  setSelectedTaskId,
   shiftSelectedDate,
   goToToday,
   todayIso,
