@@ -12,10 +12,11 @@ COPY packages/db ./packages/db
 COPY packages/shared ./packages/shared
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @tudu/server build
+RUN pnpm deploy --filter=@tudu/server --prod /prod
 
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=build /app ./
+COPY --from=build /prod/ ./
 EXPOSE 3456
-CMD ["node", "apps/server/dist/index.js"]
+CMD ["node", "dist/index.js"]
