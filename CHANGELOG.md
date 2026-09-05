@@ -1,3 +1,10 @@
+## [0.2.1](https://github.com/eGainDev/tudu/compare/v0.2.0...v0.2.1) (2026-09-05)
+
+
+### Bug Fixes
+
+* Install ripgrep in release workflow ([f840020](https://github.com/eGainDev/tudu/commit/f840020b375b22b7e1300a5f462ed47c3f1f420b))
+
 # [0.2.0](https://github.com/eGainDev/tudu/compare/v0.1.1...v0.2.0) (2026-09-05)
 
 
