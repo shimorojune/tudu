@@ -27,6 +27,7 @@
   "types": "./src/index.ts",
   "dependencies": {
     "@neondatabase/serverless": "^1.0.1",
+    "@tudu/shared": "workspace:*",
     "drizzle-orm": "^0.44.5"
   },
   "devDependencies": {

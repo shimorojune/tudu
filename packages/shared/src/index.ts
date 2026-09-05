@@ -1,3 +1,5 @@
+export * from "./tasks.js";
+
 export type HealthResponse = { status: "ok"; version: string };
 
 export type MeResponse = {

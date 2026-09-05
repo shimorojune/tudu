@@ -132,6 +132,9 @@ importers:
       '@hono/node-server':
         specifier: ^1.14.4
         version: 1.19.17(hono@4.13.5)
+      '@hono/zod-validator':
+        specifier: ^0.7.6
+        version: 0.7.6(hono@4.13.5)(zod@4.5.4)
       '@tudu/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -150,6 +153,9 @@ importers:
       hono:
         specifier: ^4.8.3
         version: 4.13.5
+      zod:
+        specifier: ^4.5.4
+        version: 4.5.4
     devDependencies:
       '@types/node':
         specifier: ^26.4.0
@@ -212,6 +218,9 @@ importers:
       '@neondatabase/serverless':
         specifier: ^1.0.1
         version: 1.1.0
+      '@tudu/shared':
+        specifier: workspace:*
+        version: link:../shared
       drizzle-orm:
         specifier: ^0.44.5
         version: 0.44.7(@neondatabase/serverless@1.1.0)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0)
@@ -1190,6 +1199,12 @@ packages:
     engines: {node: '>=18.14.1'}
     peerDependencies:
       hono: ^4
+
+  '@hono/zod-validator@0.7.6':
+    resolution: {integrity: sha512-Io1B6d011Gj1KknV4rXYz4le5+5EubcWEU/speUjuw9XMMIaP3n78yXLhjd2A3PXaXaUwEAluOiAyLqhBEJgsw==}
+    peerDependencies:
+      hono: '>=3.9.0'
+      zod: ^3.25.0 || ^4.0.0
 
   '@hookform/resolvers@5.9.1':
     resolution: {integrity: sha512-7b7vsbraJxKgjVSA1Nur9tLwj539WGJUBLA7QNvXnFoT2pM5Z7G+6rlukk4B2/QrTZy6huRtH6wKeESPKuIr6w==}
@@ -5536,6 +5551,11 @@ snapshots:
   '@hono/node-server@1.19.17(hono@4.13.5)':
     dependencies:
       hono: 4.13.5
+
+  '@hono/zod-validator@0.7.6(hono@4.13.5)(zod@4.5.4)':
+    dependencies:
+      hono: 4.13.5
+      zod: 4.5.4
 
   '@hookform/resolvers@5.9.1(@standard-schema/spec@1.1.0)(ajv@8.20.0)(react-hook-form@7.87.0(react@19.2.8))(zod@4.5.4)':
     dependencies:

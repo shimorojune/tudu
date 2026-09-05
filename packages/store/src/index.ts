@@ -1,6 +1,18 @@
 export { setAuthTokenGetter, baseApi } from "./api/baseApi.js";
 export { healthApi, useGetHealthQuery, useGetMeQuery } from "./api/healthApi.js";
 export {
+  tasksApi,
+  useGetTasksForDayQuery,
+  useGetUnscheduledTasksQuery,
+  useCreateTaskMutation,
+  useUpdateTaskMutation,
+  useDeleteTaskMutation,
+  useReorderTasksMutation,
+  useCreateSubtaskMutation,
+  useUpdateSubtaskMutation,
+  useDeleteSubtaskMutation,
+} from "./api/tasksApi.js";
+export {
   daySlice,
   setSelectedDate,
   shiftSelectedDate,

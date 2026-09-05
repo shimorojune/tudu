@@ -11,6 +11,7 @@ import {
 import { cors } from "hono/cors";
 import { Hono } from "hono";
 import { createAuth } from "./auth.js";
+import { createTasksRoute } from "./routes/tasks.js";
 import { createSessionMiddleware, type SessionEnv } from "./session-middleware.js";
 
 const serverDir = dirname(fileURLToPath(import.meta.url));
@@ -83,6 +84,10 @@ app.get("/me", async (c) => {
 
   return c.json(response);
 });
+
+if (db) {
+  app.route("/", createTasksRoute(db));
+}
 
 const port = Number(process.env.PORT) || DEFAULT_SERVER_PORT;
 

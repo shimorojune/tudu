@@ -30,7 +30,7 @@ describe("DayJump", () => {
       "on",
     );
 
-    await user.click(screen.getByRole("radio", { name: "Tmr" }));
+    await user.click(screen.getByRole("radio", { name: "Tomorrow" }));
 
     expect(store.getState().day.selectedDate).toBe(offsetIso(1));
   });
