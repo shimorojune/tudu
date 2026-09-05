@@ -42,10 +42,6 @@ const db = databaseUrl ? createDb(databaseUrl) : null;
 
 app.route("/", createClerkWebhookRoute(db));
 
-app.use("*", clerkMiddleware());
-
-const allowJitProvisioning = process.env.ALLOW_JIT_PROVISIONING === "true";
-
 app.get("/health", (c) => {
   const response: HealthResponse = {
     status: "ok",
@@ -53,6 +49,10 @@ app.get("/health", (c) => {
   };
   return c.json(response);
 });
+
+app.use("*", clerkMiddleware());
+
+const allowJitProvisioning = process.env.ALLOW_JIT_PROVISIONING === "true";
 
 app.get("/me", async (c) => {
   const auth = getAuth(c);
