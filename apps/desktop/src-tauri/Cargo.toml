@@ -1,6 +1,6 @@
 [package]
 name = "tudu"
-version = "0.5.0"
+version = "0.5.1"
 description = "Tudu desktop app shell"
 authors = ["you"]
 edition = "2021"

@@ -1,3 +1,10 @@
+## [0.5.1](https://github.com/eGainDev/tudu/compare/v0.5.0...v0.5.1) (2026-09-05)
+
+
+### Bug Fixes
+
+* build @tudu/shared before web and desktop bundles ([651e0f8](https://github.com/eGainDev/tudu/commit/651e0f82453081e875d0359b3d6ce93902fe8951))
+
 # [0.5.0](https://github.com/eGainDev/tudu/compare/v0.4.0...v0.5.0) (2026-09-05)
 
 

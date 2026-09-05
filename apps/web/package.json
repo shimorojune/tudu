@@ -1,6 +1,6 @@
 {
   "name": "@tudu/web",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Tudu web app shell",
   "type": "module",
   "license": "MIT",
