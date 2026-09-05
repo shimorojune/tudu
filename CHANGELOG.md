@@ -1,3 +1,16 @@
+# [0.5.0](https://github.com/eGainDev/tudu/compare/v0.4.0...v0.5.0) (2026-09-05)
+
+
+### Features
+
+* add database migration step and new tray icon generation ([b72aa26](https://github.com/eGainDev/tudu/commit/b72aa267ac5ae7d4b2f81c6dcdc7e6564caa5e5a))
+* add read-only Today screen and dynamic day tab ([a76af6d](https://github.com/eGainDev/tudu/commit/a76af6d584f2106847a36dd84d780f72a2812cc3))
+
+
+### Reverts
+
+* Revert "refactor: clean up styles in BrandMark, DayJump, Calendar, and ToggleGroup components" ([de379a6](https://github.com/eGainDev/tudu/commit/de379a661619f7d81d9b46b6a3cf3ec02d3f9f58))
+
 # [0.4.0](https://github.com/eGainDev/tudu/compare/v0.3.0...v0.4.0) (2026-09-05)
 
 
