@@ -40,6 +40,7 @@ module.exports = {
           "packages/*/package.json",
           "apps/desktop/src-tauri/tauri.conf.json",
           "apps/desktop/src-tauri/Cargo.toml",
+          "apps/desktop/src-tauri/Cargo.lock",
         ],
         message:
           "chore(release): ${nextRelease.version}\n\n${nextRelease.notes}",

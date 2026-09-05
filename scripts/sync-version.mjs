@@ -66,4 +66,13 @@ cargoToml = cargoToml.replace(
 writeFileSync(cargoTomlPath, cargoToml);
 console.log(`Updated ${cargoTomlPath}`);
 
+const cargoLockPath = join(root, "apps/desktop/src-tauri/Cargo.lock");
+let cargoLock = readFileSync(cargoLockPath, "utf8");
+cargoLock = cargoLock.replace(
+  /(\[\[package\]\]\nname = "tudu"\n)version = ".*"/,
+  `$1version = "${version}"`,
+);
+writeFileSync(cargoLockPath, cargoLock);
+console.log(`Updated ${cargoLockPath}`);
+
 console.log(`Synced version ${version} across the monorepo.`);
