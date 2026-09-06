@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   daySlice,
   goToToday,
+  setInspectorTab,
   setSelectedDate,
   setSelectedTaskId,
   shiftSelectedDate,
@@ -22,5 +23,14 @@ describe("daySlice selection", () => {
     state = daySlice.reducer(state, setSelectedTaskId("ghi"));
     state = daySlice.reducer(state, goToToday());
     expect(state.selectedTaskId).toBeNull();
+  });
+
+  it("keeps the inspector tab when the selected task changes", () => {
+    let state = daySlice.reducer(undefined, setInspectorTab("timeline"));
+    state = daySlice.reducer(state, setSelectedTaskId("abc"));
+    expect(state.inspectorTab).toBe("timeline");
+
+    state = daySlice.reducer(state, setSelectedTaskId("def"));
+    expect(state.inspectorTab).toBe("timeline");
   });
 });

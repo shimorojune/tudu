@@ -167,6 +167,7 @@ export function createOptimisticTask(body: CreateTaskRequest, tempId: string): T
     createdAt: now,
     updatedAt: now,
     subtasks: [],
+    commentCount: 0,
   };
 }
 

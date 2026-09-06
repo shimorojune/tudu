@@ -29,6 +29,7 @@ function makeTask(
     createdAt: "2026-09-06T08:00:00.000Z",
     updatedAt: "2026-09-06T08:00:00.000Z",
     subtasks: [],
+    commentCount: 0,
   };
 }
 

@@ -56,6 +56,7 @@ export const taskSchema = z
     createdAt: z.iso.datetime({ offset: true }),
     updatedAt: z.iso.datetime({ offset: true }),
     subtasks: z.array(subtaskSchema),
+    commentCount: z.number().int(),
   })
   .refine(dayAndBucketPaired, { message: PAIRING_MESSAGE, path: ["bucket"] });
 

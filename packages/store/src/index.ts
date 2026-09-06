@@ -14,12 +14,23 @@ export {
   useReorderSubtasksMutation,
 } from "./api/tasksApi.js";
 export {
+  activityApi,
+  useGetCommentsQuery,
+  useCreateCommentMutation,
+  useUpdateCommentMutation,
+  useDeleteCommentMutation,
+  useGetTimelineQuery,
+  useLazyGetTimelineOlderQuery,
+} from "./api/activityApi.js";
+export {
   daySlice,
   setSelectedDate,
   setSelectedTaskId,
   shiftSelectedDate,
   goToToday,
+  setInspectorTab,
   todayIso,
+  type InspectorTab,
 } from "./slices/daySlice.js";
 export { makeStore, store } from "./store.js";
 export type { RootState, AppDispatch } from "./store.js";

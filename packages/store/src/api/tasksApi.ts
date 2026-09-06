@@ -76,12 +76,15 @@ export const tasksApi = baseApi.injectEndpoints({
             entry.undo();
           }
           replaceTaskInCaches(dispatch, () => readState(getState), data.task);
+          const { refetchTimelineFirstPage } = await import("./invalidateTimeline.js");
+          await refetchTimelineFirstPage(dispatch, id);
         } catch {
           for (const entry of patches) {
             entry.undo();
           }
         }
       },
+      invalidatesTags: (_result, _error, { id }) => [{ type: "Timeline", id }],
     }),
     deleteTask: builder.mutation<void, string>({
       query: (id) => ({ url: `/tasks/${id}`, method: "DELETE" }),
@@ -104,12 +107,22 @@ export const tasksApi = baseApi.injectEndpoints({
 
         try {
           await queryFulfilled;
+          const { refetchTimelineFirstPages } = await import("./invalidateTimeline.js");
+          await refetchTimelineFirstPages(
+            dispatch,
+            body.lanes.flatMap((lane) => lane.taskIds),
+          );
         } catch {
           for (const patch of patches) {
             patch.undo();
           }
         }
       },
+      invalidatesTags: (_result, _error, { lanes }) =>
+        [...new Set(lanes.flatMap((lane) => lane.taskIds))].map((id) => ({
+          type: "Timeline" as const,
+          id,
+        })),
     }),
     createSubtask: builder.mutation<
       TaskResponse,

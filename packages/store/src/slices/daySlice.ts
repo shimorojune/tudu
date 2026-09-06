@@ -12,14 +12,18 @@ export function todayIso() {
   return isoDate(new Date());
 }
 
+export type InspectorTab = "details" | "comments" | "timeline";
+
 type DayState = {
   selectedDate: string;
   selectedTaskId: string | null;
+  inspectorTab: InspectorTab;
 };
 
 const initialState: DayState = {
   selectedDate: todayIso(),
   selectedTaskId: null,
+  inspectorTab: "details",
 };
 
 export const daySlice = createSlice({
@@ -43,6 +47,9 @@ export const daySlice = createSlice({
     setSelectedTaskId(state, action: PayloadAction<string | null>) {
       state.selectedTaskId = action.payload;
     },
+    setInspectorTab(state, action: PayloadAction<InspectorTab>) {
+      state.inspectorTab = action.payload;
+    },
   },
 });
 
@@ -51,4 +58,5 @@ export const {
   shiftSelectedDate,
   goToToday,
   setSelectedTaskId,
+  setInspectorTab,
 } = daySlice.actions;

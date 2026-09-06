@@ -1,29 +1,43 @@
 ---
-description: Mandatory browser review step after any UI or UX change
-globs: packages/ui/**/*.tsx,packages/ui/**/*.css
+description: Mandatory browser review after any user-visible or behavioral change
+globs: packages/ui/**/*.tsx,packages/ui/**/*.css,packages/store/**/*.ts,apps/server/src/routes/**/*.ts
 alwaysApply: false
 ---
 
-# UI review is mandatory
+# Review is mandatory
 
-Any change to rendering, layout, styling, motion, or interaction is not done
-when the code compiles and tests pass. It is done after you open it in a real
-browser with the `chrome-devtools` MCP and verify it yourself. Never ask the
-user to be your first reviewer.
+Any change that affects what the user sees or how the app behaves is not done
+when the code compiles and tests pass. It is done after you verify it yourself
+in a real browser with the `chrome-devtools` MCP. Never ask the user to be
+your first reviewer.
+
+This applies to UI, UX, store/cache logic, API wiring, and any other change
+where the user would notice stale data, wrong state, or a crash. Unit tests
+alone are not enough.
 
 ## Steps
 
 1. Make sure the dev server is up: `pnpm dev:all`, app at `http://localhost:5173`.
-2. Navigate to the screen that owns the changed component, then reach the exact
-   state you changed. Expand the row, open the menu, enter the edit mode.
-3. `take_snapshot` for structure and `take_screenshot` for pixels. Read the
-   screenshot. Do not assume it looks right.
+2. Navigate to the screen that owns the changed behavior, then reach the exact
+   state you changed. Select the task, switch tabs, drag a row, submit a form.
+3. `take_snapshot` for structure and `take_screenshot` for pixels when UI changed.
+   Read the screenshot. Do not assume it looks right.
 4. Exercise the interaction end to end with `click`, `fill`, `press_key`,
-   `hover`. Confirm the observable result, not just that nothing threw.
+   `hover`, drag. Confirm the observable result, not just that nothing threw.
 5. `list_console_messages` must be clean. Any new warning or error is a defect
    of this change until proven otherwise.
 
-## Side effects to check every time
+## Functional changes to check every time
+
+- Cache and refetch: after a mutation, does the UI update without a full page
+  reload? Open the inspector, perform the action, confirm the new data appears.
+- React hooks: no hooks after early returns or inside conditionals. If a query
+  needs to be conditional, use `skip`, not an `if` guard around the hook call.
+- Cross-tab state: switching tabs or selecting another task must not crash or
+  leave stale panels visible.
+- Optimistic updates: on failure, does the UI roll back cleanly?
+
+## UI side effects to check every time
 
 - Neighboring states of the same component: selected and unselected, empty and
   populated, completed and active, dragging and idle.
@@ -39,4 +53,4 @@ user to be your first reviewer.
 
 State what you opened, what you clicked, what you saw, and what you ruled out.
 If devtools cannot reach a state, say so plainly and name the untested state.
-Never claim a UI change is verified from unit tests alone.
+Never claim a change is verified from unit tests alone.

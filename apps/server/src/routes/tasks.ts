@@ -88,6 +88,7 @@ function toTask(row: TaskRowWithSubtasks): Task {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     subtasks: row.subtasks.map(toSubtask),
+    commentCount: row.commentCount,
   };
 }
 

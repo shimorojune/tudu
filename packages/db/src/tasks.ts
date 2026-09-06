@@ -1,9 +1,20 @@
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { planTaskTimelineEvents } from "@tudu/shared";
 import type { Bucket, Lane } from "@tudu/shared";
 import type { Db } from "./index.js";
+import {
+  applyTaskPatch,
+  countCommentsForTasks,
+  insertTimelineEvents,
+  taskRowToSnapshot,
+} from "./activity.js";
+import { timelineEvents } from "./activity-schema.js";
 import { subtasks, tasks, type SubtaskRow, type TaskRow } from "./tasks-schema.js";
 
-export type TaskRowWithSubtasks = TaskRow & { subtasks: SubtaskRow[] };
+export type TaskRowWithSubtasks = TaskRow & {
+  subtasks: SubtaskRow[];
+  commentCount: number;
+};
 
 export type TaskPlacement = {
   taskId: string;
@@ -60,12 +71,27 @@ const liveSubtasks = {
   },
 };
 
+async function attachCommentCounts(
+  db: Db,
+  rows: (TaskRow & { subtasks: SubtaskRow[] })[],
+): Promise<TaskRowWithSubtasks[]> {
+  const counts = await countCommentsForTasks(
+    db,
+    rows.map((row) => row.id),
+  );
+
+  return rows.map((row) => ({
+    ...row,
+    commentCount: counts.get(row.id) ?? 0,
+  }));
+}
+
 export async function listTasksForDay(
   db: Db,
   userId: string,
   scheduledDate: string,
 ): Promise<TaskRowWithSubtasks[]> {
-  return db.query.tasks.findMany({
+  const rows = await db.query.tasks.findMany({
     where: and(
       eq(tasks.userId, userId),
       isNull(tasks.deletedAt),
@@ -75,13 +101,15 @@ export async function listTasksForDay(
     // Enum sorts in declaration order, so this is Now, Next, Later.
     orderBy: [asc(tasks.bucket), asc(tasks.position)],
   });
+
+  return attachCommentCounts(db, rows);
 }
 
 export async function listUnscheduledTasks(
   db: Db,
   userId: string,
 ): Promise<TaskRowWithSubtasks[]> {
-  return db.query.tasks.findMany({
+  const rows = await db.query.tasks.findMany({
     where: and(
       eq(tasks.userId, userId),
       isNull(tasks.deletedAt),
@@ -90,6 +118,8 @@ export async function listUnscheduledTasks(
     with: liveSubtasks,
     orderBy: [asc(tasks.position)],
   });
+
+  return attachCommentCounts(db, rows);
 }
 
 export async function findTaskById(
@@ -97,7 +127,7 @@ export async function findTaskById(
   userId: string,
   taskId: string,
 ): Promise<TaskRowWithSubtasks | undefined> {
-  return db.query.tasks.findFirst({
+  const row = await db.query.tasks.findFirst({
     where: and(
       eq(tasks.id, taskId),
       eq(tasks.userId, userId),
@@ -105,6 +135,13 @@ export async function findTaskById(
     ),
     with: liveSubtasks,
   });
+
+  if (!row) {
+    return undefined;
+  }
+
+  const [withCount] = await attachCommentCounts(db, [row]);
+  return withCount;
 }
 
 /** Next free position at the bottom of a lane. The design appends: a typed task and an
@@ -145,8 +182,15 @@ export async function createTask(
   );
 
   const rows = await db.insert(tasks).values({ ...input, position }).returning();
+  const row = rows[0]!;
 
-  return rows[0]!;
+  // Two round trips: partial failure leaves a task without a created row; the UI
+  // synthesizes Created from task.createdAt for old tasks.
+  await insertTimelineEvents(db, row.id, input.userId, [
+    { type: "created", data: {} },
+  ]);
+
+  return row;
 }
 
 type NewTaskFields = {
@@ -178,19 +222,45 @@ export async function updateTask(
   taskId: string,
   fields: UpdateTaskFields,
 ): Promise<TaskRow | undefined> {
+  const existing = await db.query.tasks.findFirst({
+    where: and(
+      eq(tasks.id, taskId),
+      eq(tasks.userId, userId),
+      isNull(tasks.deletedAt),
+    ),
+  });
+
+  if (!existing) {
+    return undefined;
+  }
+
   const patch: UpdateTaskFields & { position?: number } = { ...fields };
 
   // Moving a task into a different lane sends it to the bottom of that lane.
   if ("scheduledDate" in fields || "bucket" in fields) {
+    patch.scheduledDate =
+      "scheduledDate" in fields ? fields.scheduledDate ?? null : existing.scheduledDate;
+    patch.bucket =
+      "bucket" in fields ? fields.bucket ?? null : existing.bucket;
     patch.position = await nextPosition(
       db,
       userId,
-      fields.scheduledDate ?? null,
-      fields.bucket ?? null,
+      patch.scheduledDate ?? null,
+      patch.bucket ?? null,
     );
   }
 
-  const rows = await db
+  const afterRow = applyTaskPatch(existing, patch);
+  const drafts = planTaskTimelineEvents({
+    before: taskRowToSnapshot(existing),
+    after: taskRowToSnapshot(afterRow),
+  });
+
+  if (drafts.length === 0) {
+    return existing;
+  }
+
+  const updateStmt = db
     .update(tasks)
     .set(patch)
     .where(
@@ -202,6 +272,19 @@ export async function updateTask(
     )
     .returning();
 
+  const timelineInserts = drafts.map((draft) =>
+    db.insert(timelineEvents).values({
+      taskId,
+      actorId: userId,
+      type: draft.type,
+      data: draft.data,
+    }),
+  );
+
+  const [first, ...rest] = [updateStmt, ...timelineInserts];
+  const batchResult = await db.batch([first, ...rest]);
+  const rows = batchResult[0] as TaskRow[];
+
   return rows[0];
 }
 
@@ -210,6 +293,7 @@ export async function softDeleteTask(
   userId: string,
   taskId: string,
 ): Promise<boolean> {
+  // No timeline row: the task and its history cascade away on soft delete.
   const rows = await db
     .update(tasks)
     .set({ deletedAt: new Date() })
@@ -241,35 +325,62 @@ export async function reorderTasks(
 
   const ids = placements.map((placement) => placement.taskId);
 
-  const owned = await db
-    .select({ id: tasks.id })
-    .from(tasks)
-    .where(
-      and(
-        eq(tasks.userId, userId),
-        isNull(tasks.deletedAt),
-        inArray(tasks.id, ids),
-      ),
-    );
+  const ownedRows = await db.query.tasks.findMany({
+    where: and(
+      eq(tasks.userId, userId),
+      isNull(tasks.deletedAt),
+      inArray(tasks.id, ids),
+    ),
+  });
 
-  if (owned.length !== ids.length) {
+  if (ownedRows.length !== ids.length) {
     return false;
   }
 
-  const writes = placements.map((placement) =>
-    db
-      .update(tasks)
-      .set({
-        scheduledDate: placement.scheduledDate,
-        bucket: placement.bucket,
-        position: placement.position,
-      })
-      .where(and(eq(tasks.id, placement.taskId), eq(tasks.userId, userId))),
-  );
+  const beforeById = new Map(ownedRows.map((row) => [row.id, row]));
+  const writes = [];
+  const timelineInserts = [];
 
-  // Neon over HTTP has no interactive transactions, so `db.batch` is the substitute.
-  // Destructuring satisfies its non-empty tuple type without a cast.
-  const [first, ...rest] = writes;
+  for (const placement of placements) {
+    const before = beforeById.get(placement.taskId);
+    if (!before) {
+      continue;
+    }
+
+    const afterRow = applyTaskPatch(before, {
+      scheduledDate: placement.scheduledDate,
+      bucket: placement.bucket,
+    });
+
+    writes.push(
+      db
+        .update(tasks)
+        .set({
+          scheduledDate: placement.scheduledDate,
+          bucket: placement.bucket,
+          position: placement.position,
+        })
+        .where(and(eq(tasks.id, placement.taskId), eq(tasks.userId, userId))),
+    );
+
+    const drafts = planTaskTimelineEvents({
+      before: taskRowToSnapshot(before),
+      after: taskRowToSnapshot(afterRow),
+    });
+
+    for (const draft of drafts) {
+      timelineInserts.push(
+        db.insert(timelineEvents).values({
+          taskId: placement.taskId,
+          actorId: userId,
+          type: draft.type,
+          data: draft.data,
+        }),
+      );
+    }
+  }
+
+  const [first, ...rest] = [...writes, ...timelineInserts];
 
   if (first) {
     await db.batch([first, ...rest]);

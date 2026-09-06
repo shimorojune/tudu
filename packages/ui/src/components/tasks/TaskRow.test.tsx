@@ -55,6 +55,7 @@ const fixtureTask: Task = {
   isPrivate: false,
   createdAt: "2026-09-05T08:00:00.000Z",
   updatedAt: "2026-09-05T08:00:00.000Z",
+  commentCount: 0,
   subtasks: [
     {
       id: "22222222-2222-4222-8222-222222222222",

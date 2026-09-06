@@ -1,4 +1,6 @@
 export * from "./tasks.js";
+export * from "./activity.js";
+export * from "./timeline.js";
 
 export type HealthResponse = { status: "ok"; version: string };
 

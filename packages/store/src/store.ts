@@ -1,6 +1,9 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { baseApi } from "./api/baseApi.js";
 import { daySlice } from "./slices/daySlice.js";
+import "./api/healthApi.js";
+import "./api/tasksApi.js";
+import "./api/activityApi.js";
 
 export function makeStore() {
   return configureStore({

@@ -104,7 +104,7 @@ JIRA knows when something is due, only you know whether you are touching it toda
 | 2 | Task data model and API | [02-task-data-model.md](./02-task-data-model.md) | Done |
 | 3 | Today screen, read only | [03-today-screen.md](./03-today-screen.md) | Done |
 | 4 | Task CRUD and drag to reorder | [04-task-crud-and-drag.md](./04-task-crud-and-drag.md) | Done |
-| 5 | Detail pane: Details, Comments, Timeline | not written | Pending |
+| 5 | Detail pane: Details, Comments, Timeline | [05-detail-pane.md](./05-detail-pane.md) | Done |
 | 6 | Rollover, carry dots, slipping | not written | Pending |
 | 7 | Week view and drag to reschedule | not written | Pending |
 | 8 | Command palette and keyboard shortcuts | not written | Pending |
@@ -198,11 +198,52 @@ soft-deletes; there is no restore endpoint, so no Undo toast.
 
 ### Step 5: Detail pane: Details, Comments, Timeline
 
-Tables for `comments`, `timeline_events`, `attachments`. The three tabs from A3. The
-timeline is append only and every mutation from step 4 onward writes to it. Attachments
-support drop and paste. The visibility footer with "Make private".
+Tables for `comments` and `timeline_events`. The three inspector tabs become real:
+Details gains a "Latest" preview and a "Make private" footer; Comments is a working
+thread (single-player until step 9); Timeline is append-only and records every task-level
+change from this step onward. Attachments are deferred to their own later step (no file
+storage exists yet).
 
-Design screens covered: A1 detail pane, A3 Comments, A3 Timeline.
+Design screens covered: A1 detail pane (Latest block), A3 Comments, A3 Timeline.
+
+#### Step 5 decisions (settled)
+
+**1. Attachments deferred.** No S3, no disk volume in `docker-compose.yml`, Neon Postgres
+only. File upload, drop zone, and paste become their own step once real storage is chosen.
+
+**2. Comments built now, single-player.** The thread works for one user today. Step 9 adds
+the manager and the "notified in Tudu" footer.
+
+**3. Timeline records task-level changes only.** Created, renamed, completed, reopened,
+moved, rescheduled, deadline/start/privacy changed, commented, comment edited, comment
+deleted. Subtask ticks are ignored.
+
+**4. No JIRA row and no "Shared with" row in Details.** Those belong to steps 10 and 9.
+The "Latest" two-event preview and the "Make private" footer are built now.
+
+**5. `commentCount` on the task payload.** The Comments tab badge is correct the moment
+the pane opens, without a separate count fetch.
+
+**6. Tab choice is sticky across task selection.** If you are on Timeline and click
+another task, you stay on Timeline.
+
+**7. Comments can be edited and deleted.** Edit is in-place (same contentEditable pattern
+as task rename). A faint "edited" marker appears next to the timestamp. Delete asks first
+via `alert-dialog`. Both write timeline rows.
+
+**8. Synthetic "Created" for old tasks.** Tasks that existed before step 5 show a Created
+line built from `task.createdAt`. No backfill migration.
+
+**9. Timeline loads newest 50 with "Show older".** Keeps the pane fast on long-lived tasks.
+
+**10. Task change and timeline row go out as one `db.batch()`.** Neon HTTP has no
+interactive transactions; batch is the atomic substitute.
+
+**11. The X on the tab strip clears the selection.** Shows the empty inspector pane.
+
+**12. Composer placeholder is "Add a comment…".** Enter sends, Shift+Enter inserts a
+newline. One row per timeline change (no merging "set deadline and commented" into one
+sentence).
 
 ### Step 6: Rollover, carry dots, slipping
 
@@ -341,6 +382,30 @@ code back to the mockup on any of these points.
     it in place on the same contentEditable node, same as the parent task.
 14. **C6 first-run tip copy says Later, not Next.** The mockup's numbered tip originally
     said Next; product decision is Later for the add row default.
+15. **Attachments cut from step 5.** The mockup's ATTACHMENTS block and comment paste
+    affordance are deferred until a real storage backend exists. Step 5 builds Comments
+    and Timeline without file upload.
+16. **Comment composer says "Add a comment…".** The mockup draws "Reply to Marcus…".
+    Neutral copy until step 9 adds the manager.
+17. **No "Marcus is notified in Tudu" footer on Comments.** That line belongs to step 9.
+    Step 5 omits the Comments tab footer entirely.
+18. **Visibility footer reads "Only you can see this task".** The mockup draws "Marcus
+    can see this task" with a manager name. Step 5 uses owner-only copy until step 9.
+19. **No JIRA or Shared with rows in Details.** Those fields appear in steps 10 and 9.
+    Step 5 keeps Bucket, Start, Deadline, Carried, and the private badge only.
+20. **One timeline row per change.** The mockup merges "set the deadline to today 18:00,
+    and commented" into one sentence. Step 5 writes separate rows so the diff builder
+    stays simple and never wrong.
+21. **Comments are editable and deletable.** The mockup draws no edit or delete controls.
+    Step 5 adds in-place edit (contentEditable), a faint "edited" marker, delete with
+    confirm, and matching timeline rows.
+22. **Timeline pages at 50 with "Show older".** The mockup does not draw paging. Step 5
+    loads the newest 50 events and appends older pages on demand.
+23. **Synthetic Created line for pre-step-5 tasks.** No backfill migration. The UI
+    renders a Created event from `task.createdAt` when the timeline table has no
+    `created` row for that task.
+24. **The inspector close X is wired.** A1 draws an X on the tab strip. Step 3 left it
+    out. Step 5 clears `selectedTaskId` on click.
 
 ## Screens deliberately left out of the roadmap
 
