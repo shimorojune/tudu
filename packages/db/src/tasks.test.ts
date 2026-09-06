@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planReorder } from "./tasks.js";
+import { planReorder, planSubtaskReorder } from "./tasks.js";
 
 describe("planReorder", () => {
   it("numbers a lane contiguously from zero", () => {
@@ -45,5 +45,29 @@ describe("planReorder", () => {
         { scheduledDate: "2026-09-05", bucket: "next", taskIds: ["a"] },
       ]),
     ).toThrow();
+  });
+});
+
+describe("planSubtaskReorder", () => {
+  const liveIds = ["a", "b", "c"];
+
+  it("numbers subtasks contiguously from zero", () => {
+    const placements = planSubtaskReorder(["c", "a", "b"], liveIds);
+
+    expect(placements).toEqual(
+      new Map([
+        ["c", 0],
+        ["a", 1],
+        ["b", 2],
+      ]),
+    );
+  });
+
+  it("returns null when an id is unknown", () => {
+    expect(planSubtaskReorder(["a", "d"], liveIds)).toBeNull();
+  });
+
+  it("returns null when the list length does not match", () => {
+    expect(planSubtaskReorder(["a"], liveIds)).toBeNull();
   });
 });

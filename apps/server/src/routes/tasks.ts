@@ -12,6 +12,7 @@ import {
   listTasksForDay,
   listUnscheduledTasks,
   reorderTasks,
+  reorderSubtasks,
   softDeleteSubtask,
   softDeleteTask,
   updateSubtask,
@@ -21,6 +22,7 @@ import {
   createSubtaskRequestSchema,
   createTaskRequestSchema,
   reorderRequestSchema,
+  reorderSubtasksRequestSchema,
   updateSubtaskRequestSchema,
   updateTaskRequestSchema,
   type Subtask,
@@ -236,6 +238,30 @@ export function createTasksRoute(db: Db) {
       const response: TaskResponse = { task: toTask(row) };
 
       return c.json(response, 201);
+    },
+  );
+
+  app.patch(
+    "/tasks/:id/subtasks/reorder",
+    jsonBody(reorderSubtasksRequestSchema),
+    async (c) => {
+      const taskId = c.req.param("id");
+      const { subtaskIds } = c.req.valid("json");
+      const ok = await reorderSubtasks(db, userId(c), taskId, subtaskIds);
+
+      if (!ok) {
+        return c.json({ error: "Task or subtask not found" }, 404);
+      }
+
+      const row = await findTaskById(db, userId(c), taskId);
+
+      if (!row) {
+        return c.json({ error: "Task not found" }, 404);
+      }
+
+      const response: TaskResponse = { task: toTask(row) };
+
+      return c.json(response);
     },
   );
 

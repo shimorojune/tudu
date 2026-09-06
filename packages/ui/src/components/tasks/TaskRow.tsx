@@ -1,7 +1,53 @@
-import type { Bucket, Task } from "@tudu/shared";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  MeasuringStrategy,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragCancelEvent,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import type { DraggableAttributes } from "@dnd-kit/core";
+import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
+import { CSS } from "@dnd-kit/utilities";
+import type { Bucket, Subtask, Task } from "@tudu/shared";
 import { Check } from "lucide-react";
+import { useSlideOnReorder } from "@/hooks/useSlideOnReorder";
 import { cn } from "@/lib/utils";
 import { taskMetaSegments } from "@/lib/taskMeta";
+import { TaskDeleteDialog } from "@/components/tasks/TaskDeleteDialog";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+
+export type TaskRowActions = {
+  onComplete: (completed: boolean) => void;
+  onRename: (title: string) => void;
+  onDelete: () => void;
+  onMoveToBucket?: (bucket: Bucket) => void;
+  onUnschedule?: () => void;
+  onScheduleToToday?: () => void;
+  onToggleSubtask: (subtaskId: string, done: boolean) => void;
+  onRenameSubtask: (subtaskId: string, title: string) => void;
+  onAddSubtask: (title: string) => void;
+  onReorderSubtasks: (subtaskIds: string[]) => void;
+};
 
 export type TaskRowProps = {
   task: Task;
@@ -9,45 +55,92 @@ export type TaskRowProps = {
   selected: boolean;
   selectedDate: string;
   onSelect: () => void;
+  menuVariant: "day" | "unscheduled";
+  orderKey?: string;
+  actions?: TaskRowActions;
 };
 
-function TaskCheckbox({ checked }: { checked: boolean }) {
+function TaskCheckbox({
+  checked,
+  onToggle,
+}: {
+  checked: boolean;
+  onToggle: () => void;
+}) {
   return (
-    <div
-      aria-hidden
+    <button
+      type="button"
+      aria-label={checked ? "Mark incomplete" : "Mark complete"}
       className={cn(
-        "mt-px flex size-[18px] shrink-0 items-center justify-center border-[1.5px] bg-card",
+        "mt-px flex size-[18px] shrink-0 items-center justify-center border-[1.5px] bg-card transition-colors duration-150 ease-out",
         checked
           ? "border-foreground bg-foreground text-card"
           : "border-ghost",
       )}
+      onClick={(event) => {
+        event.stopPropagation();
+        onToggle();
+      }}
     >
-      {checked ? <Check size={12} strokeWidth={3} /> : null}
-    </div>
+      <Check
+        size={12}
+        strokeWidth={3}
+        className={cn(
+          "transition-opacity duration-150 ease-out",
+          checked ? "opacity-100" : "opacity-0",
+        )}
+      />
+    </button>
   );
 }
 
-function SubtaskCheckbox({ checked }: { checked: boolean }) {
+function SubtaskCheckbox({
+  checked,
+  onToggle,
+}: {
+  checked: boolean;
+  onToggle: () => void;
+}) {
   return (
-    <div
-      aria-hidden
+    <button
+      type="button"
+      aria-label={checked ? "Mark subtask incomplete" : "Mark subtask complete"}
       className={cn(
-        "flex size-[14px] shrink-0 items-center justify-center border-[1.5px]",
+        "flex size-[14px] shrink-0 items-center justify-center border-[1.5px] transition-colors duration-150 ease-out",
         checked
           ? "border-foreground bg-foreground text-card"
           : "border-ghost bg-card",
       )}
+      onClick={(event) => {
+        event.stopPropagation();
+        onToggle();
+      }}
     >
-      {checked ? <Check size={10} strokeWidth={3} /> : null}
-    </div>
+      <Check
+        size={10}
+        strokeWidth={3}
+        className={cn(
+          "transition-opacity duration-150 ease-out",
+          checked ? "opacity-100" : "opacity-0",
+        )}
+      />
+    </button>
   );
 }
 
-function DragHandleDots() {
+function DragHandleDots({
+  listeners,
+  attributes,
+}: {
+  listeners?: SyntheticListenerMap;
+  attributes?: DraggableAttributes;
+}) {
   return (
     <div
       aria-hidden
-      className="grid grid-cols-2 gap-[3px] pt-[6px] text-ghost"
+      className="mt-px grid h-[18px] w-[9px] shrink-0 cursor-grab touch-none grid-cols-2 content-center gap-[3px] text-ghost active:cursor-grabbing"
+      {...listeners}
+      {...attributes}
     >
       {Array.from({ length: 6 }).map((_, index) => (
         <span key={index} className="size-[3px] bg-current" />
@@ -56,16 +149,403 @@ function DragHandleDots() {
   );
 }
 
-function titleClass(bucket: Bucket, selected: boolean) {
-  if (bucket === "now") {
-    return selected
+function SubtaskDragHandle({
+  listeners,
+  attributes,
+}: {
+  listeners?: SyntheticListenerMap;
+  attributes?: DraggableAttributes;
+}) {
+  return (
+    <div
+      aria-hidden
+      data-subtask-drag-handle
+      className="absolute left-[-20px] top-1/2 grid h-[14px] w-[8px] -translate-y-1/2 cursor-grab touch-none grid-cols-2 content-center gap-[2px] text-ghost opacity-0 transition-opacity group-hover/subtask:opacity-100 focus-visible:opacity-100 active:cursor-grabbing motion-reduce:transition-none"
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
+      {...listeners}
+      {...attributes}
+    >
+      {Array.from({ length: 6 }).map((_, index) => (
+        <span key={index} className="size-[2px] bg-current" />
+      ))}
+    </div>
+  );
+}
+
+type SortableSubtaskItemProps = {
+  subtask: Subtask;
+  pending: boolean;
+  editing: boolean;
+  onStartEdit: (event: MouseEvent<HTMLSpanElement>) => void;
+  onCommit: (value: string) => void;
+  onCancel: () => void;
+  onToggle: () => void;
+};
+
+function SortableSubtaskItem({
+  subtask,
+  pending,
+  editing,
+  onStartEdit,
+  onCommit,
+  onCancel,
+  onToggle,
+}: SortableSubtaskItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: subtask.id, disabled: pending });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "group/subtask relative flex items-center gap-[11px] py-[4px]",
+        isDragging && "z-10 bg-foreground/[0.04] [&>*]:invisible",
+      )}
+    >
+      {!pending ? (
+        <SubtaskDragHandle listeners={listeners} attributes={attributes} />
+      ) : null}
+      <SubtaskCheckbox checked={subtask.done} onToggle={onToggle} />
+      <span className="min-w-0 flex-1">
+        <span className="relative inline-block max-w-full">
+          <EditableText
+            text={subtask.title}
+            editing={editing}
+            className={cn(
+              "text-[13.5px] leading-[1.4] transition-colors duration-[220ms] ease-out motion-reduce:transition-none",
+              subtask.done && "text-faint",
+            )}
+            ariaLabel="Rename subtask"
+            onStartEdit={onStartEdit}
+            onCommit={onCommit}
+            onCancel={onCancel}
+          />
+          <span
+            aria-hidden
+            className={cn(
+              strikeClass,
+              subtask.done && !editing ? "scale-x-100" : "scale-x-0",
+            )}
+          />
+        </span>
+      </span>
+    </li>
+  );
+}
+
+type SubtaskListProps = {
+  subtasks: Subtask[];
+  pendingIds: Set<string>;
+  editingSubtaskId: string | null;
+  setEditingSubtaskId: (id: string | null) => void;
+  onToggleSubtask: (subtaskId: string, done: boolean) => void;
+  onRenameSubtask: (subtaskId: string, title: string) => void;
+  onReorderSubtasks: (subtaskIds: string[]) => void;
+};
+
+function SubtaskDragPreview({ subtask }: { subtask: Subtask }) {
+  return (
+    <div className="flex items-center gap-[11px] bg-card py-[4px] pl-[20px] shadow-[0_4px_12px_rgba(0,0,0,0.1)]">
+      <SubtaskCheckbox checked={subtask.done} onToggle={() => {}} />
+      <span
+        className={cn(
+          "text-[13.5px] leading-[1.4]",
+          subtask.done && "text-faint",
+        )}
+      >
+        {subtask.title}
+      </span>
+    </div>
+  );
+}
+
+function SubtaskList({
+  subtasks,
+  pendingIds,
+  editingSubtaskId,
+  setEditingSubtaskId,
+  onToggleSubtask,
+  onRenameSubtask,
+  onReorderSubtasks,
+}: SubtaskListProps) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+  );
+
+  const persisted = useMemo(
+    () => subtasks.filter((subtask) => !pendingIds.has(subtask.id)),
+    [pendingIds, subtasks],
+  );
+  const pending = useMemo(
+    () => subtasks.filter((subtask) => pendingIds.has(subtask.id)),
+    [pendingIds, subtasks],
+  );
+
+  const [orderedPersisted, setOrderedPersisted] = useState(persisted);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const orderedRef = useRef(orderedPersisted);
+  orderedRef.current = orderedPersisted;
+
+  useEffect(() => {
+    if (!activeId) {
+      setOrderedPersisted(persisted);
+    }
+  }, [activeId, persisted]);
+
+  const displaySubtasks = useMemo(
+    () => [...orderedPersisted, ...pending],
+    [orderedPersisted, pending],
+  );
+
+  const sortableIds = useMemo(
+    () => orderedPersisted.map((subtask) => subtask.id),
+    [orderedPersisted],
+  );
+
+  const activeSubtask = activeId
+    ? orderedPersisted.find((subtask) => subtask.id === activeId) ?? null
+    : null;
+
+  function handleDragStart(event: DragStartEvent) {
+    setActiveId(String(event.active.id));
+  }
+
+  function handleDragOver(event: DragOverEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    setOrderedPersisted((items) => {
+      const oldIndex = items.findIndex((item) => item.id === active.id);
+      const newIndex = items.findIndex((item) => item.id === over.id);
+      if (oldIndex < 0 || newIndex < 0) {
+        return items;
+      }
+      return arrayMove(items, oldIndex, newIndex);
+    });
+  }
+
+  function handleDragEnd(_event: DragEndEvent) {
+    setActiveId(null);
+    const finalIds = orderedRef.current.map((subtask) => subtask.id);
+    const originalIds = persisted.map((subtask) => subtask.id);
+    if (finalIds.join(",") !== originalIds.join(",")) {
+      onReorderSubtasks(finalIds);
+    }
+  }
+
+  function handleDragCancel(_event: DragCancelEvent) {
+    setActiveId(null);
+    setOrderedPersisted(persisted);
+  }
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      modifiers={[restrictToVerticalAxis]}
+      measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+        <ul className="flex flex-col gap-[4px]">
+          {displaySubtasks.map((subtask) => (
+            <SortableSubtaskItem
+              key={subtask.id}
+              subtask={subtask}
+              pending={pendingIds.has(subtask.id)}
+              editing={editingSubtaskId === subtask.id}
+              onStartEdit={(event) => {
+                event.stopPropagation();
+                setEditingSubtaskId(subtask.id);
+              }}
+              onCommit={(value) => {
+                onRenameSubtask(subtask.id, value);
+                setEditingSubtaskId(null);
+              }}
+              onCancel={() => setEditingSubtaskId(null)}
+              onToggle={() => onToggleSubtask(subtask.id, !subtask.done)}
+            />
+          ))}
+        </ul>
+      </SortableContext>
+      <DragOverlay dropAnimation={null}>
+        {activeSubtask ? <SubtaskDragPreview subtask={activeSubtask} /> : null}
+      </DragOverlay>
+    </DndContext>
+  );
+}
+
+function titleClass(bucket: Bucket, isCompleted: boolean) {
+  const base =
+    bucket === "now"
       ? "text-[15.5px] font-semibold leading-[1.42] tracking-[-0.005em]"
-      : "text-[15.5px] font-semibold leading-[1.42] tracking-[-0.005em]";
+      : bucket === "later"
+        ? "text-[14.5px] text-muted-foreground"
+        : "text-[15px] leading-[1.42]";
+
+  return cn(
+    base,
+    "transition-colors duration-[220ms] ease-out motion-reduce:transition-none",
+    isCompleted && "text-faint",
+  );
+}
+
+const strikeClass =
+  "pointer-events-none absolute left-0 top-[52%] h-[1.5px] w-full origin-left bg-current transition-transform duration-[220ms] ease-out motion-reduce:transition-none";
+
+type EditableTextProps = {
+  text: string;
+  editing: boolean;
+  className?: string;
+  ariaLabel: string;
+  onStartEdit: (event: MouseEvent<HTMLSpanElement>) => void;
+  onCommit: (value: string) => void;
+  onCancel: () => void;
+};
+
+function EditableText({
+  text,
+  editing,
+  className,
+  ariaLabel,
+  onStartEdit,
+  onCommit,
+  onCancel,
+}: EditableTextProps) {
+  const nodeRef = useRef<HTMLSpanElement | null>(null);
+  const snapshot = useRef(text);
+  const wasEditing = useRef(false);
+
+  if (editing && !wasEditing.current) {
+    snapshot.current = text;
   }
-  if (bucket === "later") {
-    return "text-[14.5px] text-muted-foreground";
+  wasEditing.current = editing;
+
+  useLayoutEffect(() => {
+    if (!editing) {
+      return;
+    }
+
+    const node = nodeRef.current;
+    if (!node) {
+      return;
+    }
+
+    node.focus();
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    range.collapse(false);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  }, [editing]);
+
+  function commit() {
+    const node = nodeRef.current;
+    if (!node) {
+      return;
+    }
+
+    const next = (node.textContent ?? "").trim();
+    if (!next) {
+      node.textContent = snapshot.current;
+      onCancel();
+      return;
+    }
+
+    if (next !== text) {
+      onCommit(next);
+      return;
+    }
+
+    onCancel();
   }
-  return "text-[15px] leading-[1.42]";
+
+  function cancelEdit() {
+    const node = nodeRef.current;
+    if (node) {
+      node.textContent = snapshot.current;
+    }
+    onCancel();
+  }
+
+  return (
+    <span
+      ref={nodeRef}
+      className={cn(
+        "cursor-text outline-none whitespace-pre-wrap break-words empty:min-w-[1ch]",
+        className,
+      )}
+      contentEditable={editing}
+      suppressContentEditableWarning
+      role={editing ? "textbox" : undefined}
+      aria-label={editing ? ariaLabel : undefined}
+      onClick={(event) => {
+        if (editing) {
+          event.stopPropagation();
+          return;
+        }
+        onStartEdit(event);
+      }}
+      onBlur={() => {
+        if (editing) {
+          commit();
+        }
+      }}
+      onKeyDown={(event) => {
+        if (!editing) {
+          return;
+        }
+        event.stopPropagation();
+        if (event.key === "Enter") {
+          event.preventDefault();
+          commit();
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          cancelEdit();
+        }
+      }}
+      onPaste={(event) => {
+        if (!editing) {
+          return;
+        }
+        event.preventDefault();
+        const plain = event.clipboardData.getData("text/plain").replace(/\n/g, " ");
+        if (document.queryCommandSupported?.("insertText")) {
+          document.execCommand("insertText", false, plain);
+          return;
+        }
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) {
+          return;
+        }
+        selection.deleteFromDocument();
+        selection.getRangeAt(0).insertNode(document.createTextNode(plain));
+        selection.collapseToEnd();
+      }}
+    >
+      {editing ? snapshot.current : text}
+    </span>
+  );
 }
 
 export function TaskRow({
@@ -74,34 +554,112 @@ export function TaskRow({
   selected,
   selectedDate,
   onSelect,
+  menuVariant,
+  orderKey = "",
+  actions,
 }: TaskRowProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [addingSubtask, setAddingSubtask] = useState(false);
+  const [subtaskTitle, setSubtaskTitle] = useState("");
+  const [pendingSubtasks, setPendingSubtasks] = useState<
+    { id: string; title: string }[]
+  >([]);
+  const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    isDragging,
+  } = useSortable({ id: task.id });
+
+  const rowNodeRef = useRef<HTMLDivElement | null>(null);
+  const setRowRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      rowNodeRef.current = node;
+      setNodeRef(node);
+    },
+    [setNodeRef],
+  );
+  useSlideOnReorder(rowNodeRef, !isDragging, orderKey);
+
   const segments = selectedDate
     ? taskMetaSegments(task, selectedDate)
     : taskMetaSegments(task, task.scheduledDate ?? "");
   const isLater = bucket === "later";
   const isCompleted = task.completedAt !== null;
+  const visibleSubtasks = useMemo(() => {
+    const knownTitles = new Set(task.subtasks.map((subtask) => subtask.title));
+    const extras = pendingSubtasks.filter(
+      (pending) => !knownTitles.has(pending.title),
+    );
+    return [
+      ...task.subtasks,
+      ...extras.map((pending) => ({
+        id: pending.id,
+        taskId: task.id,
+        title: pending.title,
+        done: false,
+        position: task.subtasks.length,
+        createdAt: "",
+        updatedAt: "",
+      })),
+    ];
+  }, [pendingSubtasks, task.id, task.subtasks]);
 
-  return (
+  const expanded = selected && !isDragging;
+  const pendingIds = useMemo(
+    () => new Set(pendingSubtasks.map((pending) => pending.id)),
+    [pendingSubtasks],
+  );
+
+  const row = (
     <div
+      ref={setRowRef}
       role="button"
       tabIndex={0}
       onClick={onSelect}
       onKeyDown={(event) => {
+        const target = event.target;
+        if (
+          target instanceof HTMLElement &&
+          target.closest("[data-subtask-drag-handle]")
+        ) {
+          return;
+        }
+        if (
+          target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          (target instanceof HTMLElement && target.isContentEditable)
+        ) {
+          return;
+        }
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           onSelect();
         }
       }}
       className={cn(
-        "grid cursor-default border-b border-hair outline-none",
-        selected
-          ? "grid-cols-[13px_19px_minmax(0,1fr)] gap-x-[12px] bg-foreground/[0.03] py-[14px] pl-[13px] pr-[28px] shadow-[inset_2px_0_0_var(--foreground)]"
-          : "grid-cols-[19px_minmax(0,1fr)] gap-x-[15px] px-[28px] hover:bg-foreground/[0.02]",
-        isLater && !selected ? "items-center py-[12px]" : !selected && "py-[15px]",
+        "relative grid cursor-default border-b border-hair outline-none",
+        "grid-cols-[13px_19px_minmax(0,1fr)] gap-x-[12px] px-[28px]",
+        "transition-[padding-top,padding-bottom,opacity] duration-200 ease-out motion-reduce:transition-none",
+        isDragging && "bg-foreground/[0.04] [&>*]:invisible",
+        expanded
+          ? "bg-foreground/[0.03] py-[14px] before:absolute before:inset-y-0 before:left-0 before:w-[2px] before:bg-foreground"
+          : cn(
+              isLater && "items-center py-[12px]",
+              !isLater && "py-[15px]",
+              !isDragging && "hover:bg-foreground/[0.02]",
+            ),
+        isCompleted && !isDragging && "opacity-70",
       )}
     >
-      {selected ? <DragHandleDots /> : null}
-      <TaskCheckbox checked={isCompleted} />
+      <DragHandleDots listeners={listeners} attributes={attributes} />
+      <TaskCheckbox
+        checked={isCompleted}
+        onToggle={() => actions?.onComplete(!isCompleted)}
+      />
       <div className="min-w-0">
         <div
           className={cn(
@@ -110,7 +668,33 @@ export function TaskRow({
               : undefined,
           )}
         >
-          <span className={titleClass(bucket, selected)}>{task.title}</span>
+          <span className="relative inline-block max-w-full">
+            <EditableText
+              text={task.title}
+              editing={isEditing}
+              className={titleClass(bucket, isCompleted)}
+              ariaLabel="Rename task"
+              onStartEdit={(event) => {
+                if (!selected) {
+                  return;
+                }
+                event.stopPropagation();
+                setIsEditing(true);
+              }}
+              onCommit={(value) => {
+                actions?.onRename(value);
+                setIsEditing(false);
+              }}
+              onCancel={() => setIsEditing(false)}
+            />
+            <span
+              aria-hidden
+              className={cn(
+                strikeClass,
+                isCompleted && !isEditing ? "scale-x-100" : "scale-x-0",
+              )}
+            />
+          </span>
           {isLater && task.startDate ? (
             <span className="text-[12px] tabular-nums text-faint">
               starts{" "}
@@ -139,27 +723,182 @@ export function TaskRow({
             )}
           </div>
         ) : null}
-        {selected && task.subtasks.length > 0 ? (
-          <ul className="mt-[10px] space-y-[4px]">
-            {task.subtasks.map((subtask) => (
-              <li
-                key={subtask.id}
-                className="flex items-start gap-[11px] py-[4px]"
-              >
-                <SubtaskCheckbox checked={subtask.done} />
-                <span
-                  className={cn(
-                    "text-[13.5px] leading-[1.4]",
-                    subtask.done && "text-faint line-through",
-                  )}
+        <div
+          className={cn(
+            "grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none",
+            expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+          )}
+        >
+          <div className="-ml-[20px] overflow-hidden pl-[20px]">
+            <div className="mt-[10px]">
+              {visibleSubtasks.length > 0 && expanded && actions ? (
+                <SubtaskList
+                  subtasks={visibleSubtasks}
+                  pendingIds={pendingIds}
+                  editingSubtaskId={editingSubtaskId}
+                  setEditingSubtaskId={setEditingSubtaskId}
+                  onToggleSubtask={actions.onToggleSubtask}
+                  onRenameSubtask={actions.onRenameSubtask}
+                  onReorderSubtasks={actions.onReorderSubtasks}
+                />
+              ) : visibleSubtasks.length > 0 ? (
+                <ul className="flex flex-col gap-[4px]">
+                  {visibleSubtasks.map((subtask) => (
+                    <li
+                      key={subtask.id}
+                      className="flex items-center gap-[11px] py-[4px]"
+                    >
+                      <SubtaskCheckbox
+                        checked={subtask.done}
+                        onToggle={() =>
+                          actions?.onToggleSubtask(subtask.id, !subtask.done)
+                        }
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="relative inline-block max-w-full">
+                          <EditableText
+                            text={subtask.title}
+                            editing={editingSubtaskId === subtask.id}
+                            className={cn(
+                              "text-[13.5px] leading-[1.4] transition-colors duration-[220ms] ease-out motion-reduce:transition-none",
+                              subtask.done && "text-faint",
+                            )}
+                            ariaLabel="Rename subtask"
+                            onStartEdit={(event) => {
+                              event.stopPropagation();
+                              setEditingSubtaskId(subtask.id);
+                            }}
+                            onCommit={(value) => {
+                              actions?.onRenameSubtask(subtask.id, value);
+                              setEditingSubtaskId(null);
+                            }}
+                            onCancel={() => setEditingSubtaskId(null)}
+                          />
+                          <span
+                            aria-hidden
+                            className={cn(
+                              strikeClass,
+                              subtask.done && editingSubtaskId !== subtask.id
+                                ? "scale-x-100"
+                                : "scale-x-0",
+                            )}
+                          />
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {addingSubtask ? (
+                <input
+                  autoFocus
+                  value={subtaskTitle}
+                  placeholder="Subtask title"
+                  className="mt-[6px] w-full bg-transparent text-[13px] outline-none placeholder:text-faint"
+                  onClick={(event) => event.stopPropagation()}
+                  onChange={(event) => setSubtaskTitle(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      const title = subtaskTitle.trim();
+                      if (title) {
+                        setPendingSubtasks((current) => [
+                          ...current,
+                          { id: crypto.randomUUID(), title },
+                        ]);
+                        actions?.onAddSubtask(title);
+                        setSubtaskTitle("");
+                      }
+                      setAddingSubtask(false);
+                    }
+                    if (event.key === "Escape") {
+                      setSubtaskTitle("");
+                      setAddingSubtask(false);
+                    }
+                  }}
+                  onBlur={() => {
+                    setSubtaskTitle("");
+                    setAddingSubtask(false);
+                  }}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="mt-[6px] text-[13px] text-faint hover:text-muted-foreground"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setAddingSubtask(true);
+                  }}
                 >
-                  {subtask.title}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+                  Add a subtask
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
+  );
+
+  if (!actions) {
+    return row;
+  }
+
+  return (
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onSelect={() => setIsEditing(true)}>
+            Rename
+          </ContextMenuItem>
+          {menuVariant === "day" ? (
+            <>
+              <ContextMenuSeparator />
+              {(["now", "next", "later"] as const).map((targetBucket) => (
+                <ContextMenuItem
+                  key={targetBucket}
+                  disabled={targetBucket === bucket}
+                  onSelect={() => actions.onMoveToBucket?.(targetBucket)}
+                >
+                  Move to{" "}
+                  {targetBucket === "now"
+                    ? "Now"
+                    : targetBucket === "next"
+                      ? "Next"
+                      : "Later"}
+                </ContextMenuItem>
+              ))}
+              <ContextMenuItem onSelect={() => actions.onUnschedule?.()}>
+                Unschedule
+              </ContextMenuItem>
+            </>
+          ) : (
+            <>
+              <ContextMenuSeparator />
+              <ContextMenuItem onSelect={() => actions.onScheduleToToday?.()}>
+                Schedule to today
+              </ContextMenuItem>
+            </>
+          )}
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            variant="destructive"
+            onSelect={() => setDeleteOpen(true)}
+          >
+            Delete
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+      <TaskDeleteDialog
+        open={deleteOpen}
+        title={task.title}
+        onOpenChange={setDeleteOpen}
+        onConfirm={() => {
+          actions.onDelete();
+          setDeleteOpen(false);
+        }}
+      />
+    </>
   );
 }

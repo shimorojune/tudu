@@ -53,7 +53,7 @@ export function taskMetaSegments(
     }
     segments.push({
       kind: "text",
-      text: `${doneCount} of ${task.subtasks.length}`,
+      text: `${doneCount} of ${task.subtasks.length} completed`,
     });
   }
 

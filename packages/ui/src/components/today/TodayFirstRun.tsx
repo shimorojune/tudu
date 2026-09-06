@@ -1,8 +1,10 @@
-import { toast } from "sonner";
+export type TodayFirstRunProps = {
+  onAddFirst: () => void;
+};
 
 const points = [
   <>
-    Type a task and it lands in <span className="font-semibold">Next</span>.
+    Type a task and it lands in <span className="font-semibold">Later</span>.
     Drag it up into <span className="font-semibold">Now</span> when it is what
     you are actually doing. Order is the only priority there is.
   </>,
@@ -16,7 +18,7 @@ const points = [
   </>,
 ];
 
-export function TodayFirstRun() {
+export function TodayFirstRun({ onAddFirst }: TodayFirstRunProps) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-[26px] bg-card px-[60px]">
       <div className="max-w-[460px] space-y-[16px]">
@@ -41,9 +43,7 @@ export function TodayFirstRun() {
         <button
           type="button"
           className="border border-foreground px-[14px] py-[9px] text-[13px] font-semibold"
-          onClick={() => {
-            toast("Add task lands in step 4");
-          }}
+          onClick={onAddFirst}
         >
           Add my first task
         </button>

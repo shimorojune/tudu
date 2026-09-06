@@ -1,5 +1,11 @@
-import type { Bucket, Task } from "@tudu/shared";
-import { TaskRow } from "@/components/tasks/TaskRow";
+import { useDroppable } from "@dnd-kit/core";
+import {
+  SortableContext,
+} from "@dnd-kit/sortable";
+import { DEFAULT_NOW_SOFT_CAP, type Bucket, type Task } from "@tudu/shared";
+import { noSortingStrategy } from "@/lib/dragSort";
+import { cn } from "@/lib/utils";
+import { TaskRow, type TaskRowActions } from "@/components/tasks/TaskRow";
 
 export type BucketSectionProps = {
   bucket: Bucket;
@@ -11,6 +17,10 @@ export type BucketSectionProps = {
   showNowHelper?: boolean;
   showNowClearPrompt?: boolean;
   onNowClearPrompt?: () => void;
+  nowCount?: number;
+  nowSoftCap?: number;
+  dropTarget?: boolean;
+  rowActionsForTask?: (taskId: string) => TaskRowActions;
 };
 
 export function BucketSection({
@@ -23,25 +33,58 @@ export function BucketSection({
   showNowHelper = false,
   showNowClearPrompt = false,
   onNowClearPrompt,
+  nowCount,
+  nowSoftCap = DEFAULT_NOW_SOFT_CAP,
+  dropTarget = false,
+  rowActionsForTask,
 }: BucketSectionProps) {
   const isNow = bucket === "now";
+  const overCap = (nowCount ?? 0) > nowSoftCap;
+  const { setNodeRef } = useDroppable({ id: `bucket-${bucket}` });
 
   return (
-    <section>
+    // The whole section is the drop zone, header included, so there is no dead
+    // band between buckets. Rows still win: see taskCollisionDetection.
+    <section
+      ref={setNodeRef}
+      className={cn(
+        "transition-colors duration-150",
+        dropTarget && "bg-foreground/[0.03]",
+      )}
+    >
       <header
-        className={
+        className={cn(
+          "transition-colors duration-150",
           isNow
             ? "flex items-baseline gap-[12px] px-[28px] pb-[8px] pt-[24px]"
-            : "px-[28px] pb-[8px] pt-[28px]"
-        }
+            : "px-[28px] pb-[8px] pt-[28px]",
+          dropTarget && "bg-foreground/[0.06]",
+        )}
       >
-        <span className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
+        <span
+          className={cn(
+            "text-[10.5px] font-extrabold uppercase tracking-[0.16em] transition-colors duration-150",
+            dropTarget ? "text-foreground" : "text-faint",
+          )}
+        >
           {label}
         </span>
-        {showNowHelper ? (
-          <span className="ml-auto text-[11.5px] text-ghost">
-            drag a row to reorder, or into another bucket
-          </span>
+        {isNow && showNowHelper ? (
+          <>
+            <span
+              className={cn(
+                "text-[11px] font-bold tabular-nums leading-none whitespace-nowrap px-[6px] py-[2px]",
+                overCap
+                  ? "bg-primary font-extrabold text-primary-foreground"
+                  : "border border-hair text-faint",
+              )}
+            >
+              {nowCount} / {nowSoftCap}
+            </span>
+            <span className="ml-auto text-[11.5px] text-ghost">
+              drag a row to reorder, or into another bucket
+            </span>
+          </>
         ) : null}
       </header>
 
@@ -58,22 +101,32 @@ export function BucketSection({
         </p>
       ) : null}
 
-      {tasks.length === 0 && !showNowClearPrompt ? (
-        <p className="px-[28px] py-[8px] text-[13px] text-faint">
-          Nothing here yet.
-        </p>
-      ) : null}
+      <div className={cn(tasks.length === 0 && "min-h-[48px]")}>
+        {tasks.length === 0 && !showNowClearPrompt ? (
+          <p className="px-[28px] py-[8px] text-[13px] text-faint">
+            Nothing here yet.
+          </p>
+        ) : null}
 
-      {tasks.map((task) => (
-        <TaskRow
-          key={task.id}
-          task={task}
-          bucket={bucket}
-          selected={task.id === selectedTaskId}
-          selectedDate={selectedDate}
-          onSelect={() => onSelectTask(task.id)}
-        />
-      ))}
+        <SortableContext
+          items={tasks.map((task) => task.id)}
+          strategy={noSortingStrategy}
+        >
+          {tasks.map((task, index) => (
+            <TaskRow
+              key={task.id}
+              task={task}
+              bucket={bucket}
+              selected={task.id === selectedTaskId}
+              selectedDate={selectedDate}
+              onSelect={() => onSelectTask(task.id)}
+              menuVariant="day"
+              orderKey={`${bucket}:${index}`}
+              actions={rowActionsForTask?.(task.id)}
+            />
+          ))}
+        </SortableContext>
+      </div>
     </section>
   );
 }

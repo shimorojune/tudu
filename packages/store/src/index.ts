@@ -11,6 +11,7 @@ export {
   useCreateSubtaskMutation,
   useUpdateSubtaskMutation,
   useDeleteSubtaskMutation,
+  useReorderSubtasksMutation,
 } from "./api/tasksApi.js";
 export {
   daySlice,

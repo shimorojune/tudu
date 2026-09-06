@@ -10,7 +10,7 @@ export type Bucket = z.infer<typeof bucketSchema>;
 
 /** Soft cap on Now. Nudged in the UI, never enforced by the API. Step 11 turns this
     into a preference in the 3 to 5 range. */
-export const DEFAULT_NOW_SOFT_CAP = 3;
+export const DEFAULT_NOW_SOFT_CAP = 5;
 
 const isoDateSchema = z
   .string()
@@ -143,6 +143,12 @@ export const updateSubtaskRequestSchema = z
   });
 
 export type UpdateSubtaskRequest = z.infer<typeof updateSubtaskRequestSchema>;
+
+export const reorderSubtasksRequestSchema = z.object({
+  subtaskIds: z.array(z.uuid()).min(1, "Send at least one subtask"),
+});
+
+export type ReorderSubtasksRequest = z.infer<typeof reorderSubtasksRequestSchema>;
 
 export type TasksResponse = { tasks: Task[] };
 export type TaskResponse = { task: Task };

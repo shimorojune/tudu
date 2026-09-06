@@ -1,11 +1,12 @@
 # Tudu implementation roadmap
 
 Source of truth for the design:
-[Claude artifact](https://claude.ai/code/artifact/26712a88-3eed-429a-b4ed-6bc11c15b3fa)
-(Canva design `DAHUWPSU1Vk`, title "Tudu"). Open the artifact in a browser to read
-every screen. `/Users/rraj/Documents/work/tudu_designs/Tudu.dc.html` is superseded and
-must not be used as reference. The six `Tudu Day *.dc.html` files are rejected
-alternates. The design system lives in
+`/Users/rraj/Documents/work/tudu_designs/Tudu.artifact.html` (27 screens, decoded from the
+[Claude artifact](https://claude.ai/code/artifact/26712a88-3eed-429a-b4ed-6bc11c15b3fa)).
+Open the HTML file in a browser to read every screen. Canva design `DAHUWPSU1Vk` (title
+"Tudu") is the upstream source. `/Users/rraj/Documents/work/tudu_designs/Tudu.dc.html` is
+superseded and must not be used as reference. The six `Tudu Day *.dc.html` files are
+rejected alternates. The design system lives in
 `/Users/rraj/Documents/work/tudu_designs/_ds/modernist-a66f2ef5-bc24-49ae-997b-e721e12e0c64/`.
 
 ## How these plans work
@@ -65,9 +66,9 @@ layout. The nav tab sits between Inbox and Team and shows a plain faint count of
 backlog items (not Inbox's red badge). Step 7 drags from this route onto a day column.
 Step 4 makes the list editable.
 
-### Now has a soft cap
+### Now has a soft cap of five
 
-Three to five, nudged and never blocked. This is the whole ballgame. Without a cap,
+Five tasks, nudged and never blocked. This is the whole ballgame. Without a cap,
 everything lands in Now and the buckets become decoration. With one, moving something in
 forces something out, which is the actual thinking the app exists to provoke.
 
@@ -77,7 +78,9 @@ meaningful request rather than a shrug, because the manager is implicitly asking
 comes out.
 
 The API never enforces it. Rollover has to be able to carry five unfinished Now tasks
-into tomorrow, so an over-cap day must stay storable.
+into tomorrow, so an over-cap day must stay storable. Step 4 adds the cap badge to the
+Now header (`3 / 5` at cap, `6 / 5` when over). `DEFAULT_NOW_SOFT_CAP` in
+`@tudu/shared` is `5`. Step 11 turns this into a user preference in the 3 to 5 range.
 
 ### The rest
 
@@ -100,7 +103,7 @@ JIRA knows when something is due, only you know whether you are touching it toda
 | 1 | Foundations: deps, router, theme, app shell chrome | [01-foundations.md](./01-foundations.md) | Done |
 | 2 | Task data model and API | [02-task-data-model.md](./02-task-data-model.md) | Done |
 | 3 | Today screen, read only | [03-today-screen.md](./03-today-screen.md) | Done |
-| 4 | Task CRUD and drag to reorder | not written | Pending |
+| 4 | Task CRUD and drag to reorder | [04-task-crud-and-drag.md](./04-task-crud-and-drag.md) | Done |
 | 5 | Detail pane: Details, Comments, Timeline | not written | Pending |
 | 6 | Rollover, carry dots, slipping | not written | Pending |
 | 7 | Week view and drag to reschedule | not written | Pending |
@@ -160,11 +163,38 @@ in?" Step 4 wires the button to the reorder endpoint. No schema change.
 
 ### Step 4: Task CRUD and drag to reorder
 
-Create, rename, complete, delete. Subtask list. The add row at the bottom of the list.
-Drag to reorder within a bucket and drag across buckets, using `@dnd-kit`. Optimistic
-updates through RTK Query. This is the first step where the app is genuinely usable.
+Create, rename, complete, delete. Subtask list with add and toggle. The add row at the
+bottom of the list. Drag to reorder within a bucket and drag across buckets, using
+`@dnd-kit`. Optimistic updates through RTK Query. This is the first step where the app
+is genuinely usable.
 
-Design screens covered: A1 interactions, the add row, subtask rows.
+Design screens covered: A1 interactions, the add row, subtask rows, A2b Now cap badge.
+
+#### Step 4 decisions (settled)
+
+**1. Rename and delete live in a right-click menu** on the row. Double-click the title
+renames in place. The menu also carries Move to Now / Next / Later and Unschedule (or
+Schedule to today on the Unscheduled route).
+
+**2. Completing a task leaves it in place**, struck through and faded. It does not sink
+to the bottom of its bucket.
+
+**3. New tasks from the add row land at the bottom of Later** on whichever date is
+selected (or undated on the Unscheduled route).
+
+**4. Add a subtask** is a faint line at the bottom of the expanded subtask list on the
+selected row only.
+
+**5. Subtasks stay folded** behind the `2 of 3` count on unselected rows. No expand
+chevron.
+
+**6. Delete asks first** via the existing `alert-dialog` component. The database
+soft-deletes; there is no restore endpoint, so no Undo toast.
+
+**7. The drag handle is always visible** on every row, not only the selected row.
+
+**8. The Now soft cap is five**, matching the mockup badge (`3 / 5`, over-cap `6 / 5`).
+`DEFAULT_NOW_SOFT_CAP` changes from `3` to `5`.
 
 ### Step 5: Detail pane: Details, Comments, Timeline
 
@@ -262,6 +292,55 @@ code back to the mockup on any of these points.
    The tab width animates when the label changes so the tabs after it slide instead
    of snapping. The Unscheduled count carries `min-w-[15px]` so Team does not nudge
    when the count crosses two digits.
+9. **The drag handle is always visible.** The mockup draws it only on the grabbed row,
+   but the row grid silently changes width on select, which is bad UX. Step 4 uses one
+   grid (`13px 19px minmax(0,1fr)`) for every row. The handle is a fixed 18×9px box
+   centred on the checkbox so it does not stretch when the row expands. Horizontal
+   padding stays `px-[28px]` on select; the 2px selection bar is an overlay-only
+   pseudo-element, not inset shadow that steals layout space. Vertical padding still
+   shifts slightly on select (`15px` to `14px`, or `12px` on Later rows), but it
+   transitions over the same 200ms ease-out as the subtask panel so selecting a row
+   does not snap its height.
+10. **Drop feedback is invented.** The mockup footer lists drag states as future work.
+    Step 4 reorders the real list under the cursor so the row you drag is already
+    sitting where it will land, tints the target bucket at 3% ink, and uses
+    translate-only motion so rows slide instead of scaling. The pending order lives
+    in one ids-per-bucket map, so the preview and the saved order cannot disagree.
+    Three dnd-kit settings are load-bearing and easy to lose: `onDragMove` (not just
+    `onDragOver`, which only fires when the hovered row changes, so crossing a row
+    midpoint never re-targeted), `MeasuringStrategy.Always` (the preview reflows the
+    list, so rects measured once at drag start go stale), and re-targeting only when
+    the pointer itself moved (a reflow re-fires targeting under a still cursor and
+    the row flip-flops between buckets). Each bucket droppable covers its whole
+    section including the header, otherwise the header is a dead band where
+    targeting falls back to guesswork. Drops on bucket chrome (header, gaps above
+    the first row or below the last) resolve to the nearest row slot from pointer Y,
+    not always the bottom. Collision never returns the dragged row: when only its
+    invisible slot is under the pointer, the bucket droppable wins and placement
+    resolves from pointer Y. Sortable strategy transforms are off because the DOM
+    reorder is the preview; sibling rows slide into place via a 180ms FLIP hook that
+    fires only when a row's position in the bucket order changes, so expand and
+    collapse is left entirely to the CSS height transition. The dragged row stays in
+    the list as a collapsed-height faint slot (`bg-foreground/[0.04]`), not an
+    invisible full-height hole; the `DragOverlay` carries the title.
+    `DragOverlay` uses `dropAnimation={null}`: the default 250ms fly-back animates
+    the ghost to the row's start position while the live preview already shows it at
+    the drop spot, so the ghost looks like a duplicate bouncing home.
+11. **Completed parent tasks get strikethrough and fade.** The mockup only draws
+    completed subtasks this way. Parent tasks stay in place when ticked; they do not
+    sink to the bucket bottom. Step 4 uses a 220ms strike sweep across the title
+    (not a static `line-through`) plus a checkbox fill fade. Subtasks use the same
+    sweep and fade.
+12. **Rename and delete live in a right-click menu.** The mockup draws neither. Click
+    the title on a selected row to rename in place on the same contentEditable node,
+    so the row does not reflow; Delete opens a confirm dialog.
+13. **"Add a subtask" line on the selected row.** The mockup draws subtasks but no way
+    to add one. Step 4 adds a faint affordance at the bottom of the expanded list.
+    The panel expands with a 200ms height transition; subtask create is optimistic so
+    the new row appears as soon as Enter is pressed. Click a subtask title to rename
+    it in place on the same contentEditable node, same as the parent task.
+14. **C6 first-run tip copy says Later, not Next.** The mockup's numbered tip originally
+    said Next; product decision is Later for the add row default.
 
 ## Screens deliberately left out of the roadmap
 

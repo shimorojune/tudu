@@ -339,6 +339,72 @@ export async function softDeleteSubtask(
   return true;
 }
 
+/** Maps subtask ids to contiguous positions from zero. Pure, so it is unit tested
+    directly. Returns null when ids do not match the live set exactly. */
+export function planSubtaskReorder(
+  subtaskIds: string[],
+  liveIds: readonly string[],
+): Map<string, number> | null {
+  if (subtaskIds.length !== liveIds.length) {
+    return null;
+  }
+
+  const live = new Set(liveIds);
+
+  for (const id of subtaskIds) {
+    if (!live.has(id)) {
+      return null;
+    }
+  }
+
+  const placements = new Map<string, number>();
+  subtaskIds.forEach((id, index) => {
+    placements.set(id, index);
+  });
+
+  return placements;
+}
+
+/** Rewrites position for every subtask in the given order.
+    Returns false if the parent task is not owned, or any id is missing or
+    belongs to a different task, in which case nothing is written. */
+export async function reorderSubtasks(
+  db: Db,
+  userId: string,
+  taskId: string,
+  subtaskIds: string[],
+): Promise<boolean> {
+  const parent = await findTaskById(db, userId, taskId);
+
+  if (!parent) {
+    return false;
+  }
+
+  const placements = planSubtaskReorder(
+    subtaskIds,
+    parent.subtasks.map((subtask) => subtask.id),
+  );
+
+  if (!placements) {
+    return false;
+  }
+
+  const writes = [...placements.entries()].map(([subtaskId, position]) =>
+    db
+      .update(subtasks)
+      .set({ position })
+      .where(and(eq(subtasks.id, subtaskId), eq(subtasks.taskId, taskId))),
+  );
+
+  const [first, ...rest] = writes;
+
+  if (first) {
+    await db.batch([first, ...rest]);
+  }
+
+  return true;
+}
+
 async function ownedSubtask(db: Db, userId: string, subtaskId: string) {
   const rows = await db
     .select({ id: subtasks.id })

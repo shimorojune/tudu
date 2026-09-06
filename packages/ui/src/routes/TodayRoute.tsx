@@ -2,11 +2,14 @@ import { useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   setSelectedTaskId,
+  todayIso,
+  useCreateTaskMutation,
   useGetTasksForDayQuery,
   useGetUnscheduledTasksQuery,
   type RootState,
 } from "@tudu/store";
 import { DayTaskList } from "@/components/tasks/DayTaskList";
+import { createTaskBody } from "@/lib/createTask";
 import { DetailInspector } from "@/components/inspector/DetailInspector";
 import { JiraColumnEmpty } from "@/components/jira/JiraColumnEmpty";
 import { TodayFirstRun } from "@/components/today/TodayFirstRun";
@@ -14,19 +17,18 @@ import { TodayPanelLayout } from "@/components/today/TodayPanelLayout";
 
 export function TodayRoute() {
   const dispatch = useDispatch();
-  const selectedDate = useSelector((state: RootState) => state.day.selectedDate);
-  const selectedTaskId = useSelector(
-    (state: RootState) => state.day.selectedTaskId,
-  );
+  const selectedDate = useSelector((s: RootState) => s.day.selectedDate);
+  const selectedTaskId = useSelector((s: RootState) => s.day.selectedTaskId);
 
   const dayQuery = useGetTasksForDayQuery(selectedDate);
   const unscheduledQuery = useGetUnscheduledTasksQuery();
+  const [createTask] = useCreateTaskMutation();
 
   const tasks = dayQuery.data?.tasks ?? [];
   const unscheduledCount = unscheduledQuery.data?.tasks.length ?? 0;
 
   const selectedTask = useMemo(
-    () => tasks.find((task) => task.id === selectedTaskId) ?? null,
+    () => tasks.find((t) => t.id === selectedTaskId) ?? null,
     [tasks, selectedTaskId],
   );
 
@@ -36,7 +38,7 @@ export function TodayRoute() {
     tasks.length === 0 &&
     unscheduledCount === 0;
 
-  if (dayQuery.isLoading || unscheduledQuery.isLoading) {
+  if (dayQuery.isLoading) {
     return (
       <p className="px-[28px] py-[24px] text-[14px] text-muted-foreground">
         Loading…
@@ -53,7 +55,19 @@ export function TodayRoute() {
   }
 
   if (isFirstRun) {
-    return <TodayFirstRun />;
+    return (
+      <TodayFirstRun
+        onAddFirst={() => {
+          createTask(
+            createTaskBody({
+              title: "My first task",
+              scheduledDate: todayIso(),
+              bucket: "later",
+            }),
+          );
+        }}
+      />
+    );
   }
 
   return (
@@ -65,13 +79,16 @@ export function TodayRoute() {
             selectedDate={selectedDate}
             selectedTaskId={selectedTaskId}
             onSelectTask={(id) => dispatch(setSelectedTaskId(id))}
+            onTaskDeleted={(id) => {
+              if (selectedTaskId === id) {
+                dispatch(setSelectedTaskId(null));
+              }
+            }}
           />
         </div>
       }
       jiraColumn={<JiraColumnEmpty />}
-      inspector={
-        <DetailInspector task={selectedTask} selectedDate={selectedDate} />
-      }
+      inspector={<DetailInspector task={selectedTask} selectedDate={selectedDate} />}
     />
   );
 }
