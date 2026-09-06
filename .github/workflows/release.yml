@@ -149,10 +149,14 @@ jobs:
     if: needs.release.outputs.new_release_published == 'true'
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Publish release
         run: gh release edit "v${{ needs.release.outputs.new_release_version }}" --draft=false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
 
   rollback-release:
     name: Rollback Release
@@ -184,6 +188,8 @@ jobs:
       - name: Revert release commit on master
         run: |
           VERSION="${{ needs.release.outputs.new_release_version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin master
           git checkout master
           git pull origin master
