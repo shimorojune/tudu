@@ -18,6 +18,18 @@ inputs:
     description: Deployment description
     required: false
     default: ""
+  wait_for_completion:
+    description: Poll deployment status until done or error
+    required: false
+    default: "true"
+  poll_interval_seconds:
+    description: Seconds between deployment status polls
+    required: false
+    default: "20"
+  poll_timeout_minutes:
+    description: Maximum minutes to wait for deployment completion
+    required: false
+    default: "45"
 
 runs:
   using: composite
@@ -30,6 +42,9 @@ runs:
         DOKPLOY_COMPOSE_ID: ${{ inputs.compose_id }}
         DEPLOY_TITLE: ${{ inputs.title }}
         DEPLOY_DESCRIPTION: ${{ inputs.description }}
+        WAIT_FOR_COMPLETION: ${{ inputs.wait_for_completion }}
+        POLL_INTERVAL_SECONDS: ${{ inputs.poll_interval_seconds }}
+        POLL_TIMEOUT_MINUTES: ${{ inputs.poll_timeout_minutes }}
       run: |
         set -euo pipefail
         api_url="${DOKPLOY_API_URL%/}"
@@ -39,27 +54,146 @@ runs:
           --arg description "$DEPLOY_DESCRIPTION" \
           '{composeId: $composeId, title: $title, description: $description}')
 
-        max_attempts=5
-        attempt=1
-        while [ "$attempt" -le "$max_attempts" ]; do
-          echo "Triggering Dokploy deployment (attempt ${attempt}/${max_attempts})..."
-          if curl -fsS --retry 0 --connect-timeout 30 --max-time 120 \
-            -X POST "${api_url}/api/compose.deploy" \
-            -H "Content-Type: application/json" \
-            -H "x-api-key: ${DOKPLOY_API_KEY}" \
-            -d "$payload"; then
-            echo "Deployment triggered successfully."
-            exit 0
+        trigger_deployment() {
+          local attempt=1
+          local max_attempts=5
+          while [ "$attempt" -le "$max_attempts" ]; do
+            echo "Triggering Dokploy deployment (attempt ${attempt}/${max_attempts})..."
+            if curl -fsS --retry 0 --connect-timeout 30 --max-time 120 \
+              -X POST "${api_url}/api/compose.deploy" \
+              -H "Content-Type: application/json" \
+              -H "x-api-key: ${DOKPLOY_API_KEY}" \
+              -d "$payload"; then
+              echo "Deployment triggered successfully."
+              return 0
+            fi
+
+            local exit_code=$?
+            if [ "$attempt" -eq "$max_attempts" ]; then
+              echo "Dokploy deploy trigger failed after ${max_attempts} attempts (exit ${exit_code})."
+              return "$exit_code"
+            fi
+
+            local sleep_seconds=$((attempt * 15))
+            echo "Dokploy API unavailable (exit ${exit_code}). Retrying in ${sleep_seconds}s..."
+            sleep "$sleep_seconds"
+            attempt=$((attempt + 1))
+          done
+        }
+
+        fetch_deployments() {
+          curl -fsS --retry 0 --connect-timeout 30 --max-time 120 \
+            -G "${api_url}/api/deployment.allByCompose" \
+            --data-urlencode "composeId=${DOKPLOY_COMPOSE_ID}" \
+            -H "x-api-key: ${DOKPLOY_API_KEY}"
+        }
+
+        find_deployment() {
+          local response="$1"
+          local since="$2"
+          local title="$3"
+          local allow_fallback="$4"
+          local strict_match
+          local fallback_match
+
+          strict_match=$(echo "$response" | jq -c --arg title "$title" --argjson since "$since" '
+            [.[] | select(.title == $title) |
+              (.createdAt | if type == "number" then
+                (if . > 9999999999 then (. / 1000 | floor) else . end)
+              elif type == "string" then
+                (fromdateiso8601? // empty)
+              else empty end) as $epoch |
+              select($epoch != null and $epoch >= $since)
+            ] | sort_by(.createdAt) | last // empty
+          ')
+
+          if [ -n "$strict_match" ] && [ "$strict_match" != "null" ]; then
+            echo "$strict_match"
+            return 0
           fi
 
-          exit_code=$?
-          if [ "$attempt" -eq "$max_attempts" ]; then
-            echo "Dokploy deploy trigger failed after ${max_attempts} attempts (exit ${exit_code})."
-            exit "$exit_code"
+          if [ "$allow_fallback" != true ]; then
+            return 1
           fi
 
-          sleep_seconds=$((attempt * 15))
-          echo "Dokploy API unavailable (exit ${exit_code}). Retrying in ${sleep_seconds}s..."
-          sleep "$sleep_seconds"
-          attempt=$((attempt + 1))
-        done
+          fallback_match=$(echo "$response" | jq -c --arg title "$title" '
+            [.[] | select(.title == $title)] | sort_by(.createdAt) | last // empty
+          ')
+
+          if [ -n "$fallback_match" ] && [ "$fallback_match" != "null" ]; then
+            echo "$fallback_match"
+            return 0
+          fi
+
+          return 1
+        }
+
+        wait_for_deployment() {
+          local trigger_epoch="$1"
+          local deadline=$((trigger_epoch + POLL_TIMEOUT_MINUTES * 60))
+          local fallback_after=$((trigger_epoch + 120))
+
+          while true; do
+            local now allow_fallback=false
+            now=$(date +%s)
+            if [ "$now" -ge "$deadline" ]; then
+              echo "Dokploy deployment timed out after ${POLL_TIMEOUT_MINUTES} minutes."
+              exit 1
+            fi
+
+            if [ "$now" -ge "$fallback_after" ]; then
+              allow_fallback=true
+            fi
+
+            local response
+            if ! response=$(fetch_deployments); then
+              echo "Failed to fetch Dokploy deployment status. Retrying in ${POLL_INTERVAL_SECONDS}s..."
+              sleep "$POLL_INTERVAL_SECONDS"
+              continue
+            fi
+
+            local deployment=""
+            if deployment=$(find_deployment "$response" "$trigger_epoch" "$DEPLOY_TITLE" "$allow_fallback"); then
+              :
+            else
+              deployment=""
+            fi
+
+            if [ -z "$deployment" ] || [ "$deployment" = "null" ]; then
+              echo "Waiting for Dokploy deployment record (title: ${DEPLOY_TITLE})..."
+              sleep "$POLL_INTERVAL_SECONDS"
+              continue
+            fi
+
+            local status deployment_id
+            status=$(echo "$deployment" | jq -r '.status // empty')
+            deployment_id=$(echo "$deployment" | jq -r '.deploymentId // .id // empty')
+
+            echo "Deployment ${deployment_id:-unknown} status: ${status:-unknown}"
+
+            case "$status" in
+              done)
+                echo "Dokploy deployment completed successfully."
+                return 0
+                ;;
+              error)
+                echo "Dokploy deployment failed (deploymentId: ${deployment_id:-unknown})."
+                exit 1
+                ;;
+              pending|running|"")
+                sleep "$POLL_INTERVAL_SECONDS"
+                ;;
+              *)
+                echo "Unknown Dokploy deployment status: ${status}"
+                sleep "$POLL_INTERVAL_SECONDS"
+                ;;
+            esac
+          done
+        }
+
+        trigger_epoch=$(date +%s)
+        trigger_deployment
+
+        if [ "$WAIT_FOR_COMPLETION" = "true" ]; then
+          wait_for_deployment "$trigger_epoch"
+        fi

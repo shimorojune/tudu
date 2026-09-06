@@ -95,11 +95,6 @@ jobs:
             apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
             dist/${{ env.ZIP_NAME }}
 
-      - name: Publish release
-        run: gh release edit "v${{ needs.release.outputs.new_release_version }}" --draft=false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   deploy-prod:
     name: Deploy Web + Server
     needs: release
@@ -147,3 +142,57 @@ jobs:
           compose_id: ${{ secrets.DOKPLOY_COMPOSE_ID }}
           title: Release v${{ needs.release.outputs.new_release_version }}
           description: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  publish-release:
+    name: Publish Release
+    needs: [release, build-macos, deploy-prod]
+    if: needs.release.outputs.new_release_published == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release
+        run: gh release edit "v${{ needs.release.outputs.new_release_version }}" --draft=false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  rollback-release:
+    name: Rollback Release
+    needs: [release, build-macos, deploy-prod, publish-release]
+    if: >-
+      always() &&
+      needs.release.outputs.new_release_published == 'true' &&
+      (needs.build-macos.result == 'failure' ||
+       needs.deploy-prod.result == 'failure' ||
+       needs.publish-release.result == 'failure')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete draft GitHub release
+        run: gh release delete "v${{ needs.release.outputs.new_release_version }}" --yes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Delete remote tag
+        run: git push origin ":refs/tags/v${{ needs.release.outputs.new_release_version }}"
+        continue-on-error: true
+
+      - name: Revert release commit on master
+        run: |
+          VERSION="${{ needs.release.outputs.new_release_version }}"
+          git fetch origin master
+          git checkout master
+          git pull origin master
+          COMMIT=$(git log origin/master --grep="^chore(release): ${VERSION}$" -1 --format=%H)
+          if [ -z "$COMMIT" ]; then
+            echo "No release commit found for ${VERSION}, skipping revert."
+            exit 1
+          fi
+          git revert "$COMMIT" --no-edit
+          git push origin master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
