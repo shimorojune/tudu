@@ -1,3 +1,15 @@
+# [0.6.0](https://github.com/eGainDev/tudu/compare/v0.5.2...v0.6.0) (2026-09-06)
+
+
+### Bug Fixes
+
+* improve deployment logic in Dokploy action ([ca7faa8](https://github.com/eGainDev/tudu/commit/ca7faa8194fd087fbd97e339cbb9bb6252279623))
+
+
+### Features
+
+* add drag-drop reordering, subtask reorder, and task row UX ([9fe1093](https://github.com/eGainDev/tudu/commit/9fe109349843e9c1c8306678d26cc4e08c432076))
+
 ## [0.5.2](https://github.com/eGainDev/tudu/compare/v0.5.1...v0.5.2) (2026-09-06)
 
 
