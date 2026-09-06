@@ -40,7 +40,9 @@ export function useSlideOnReorder(
 
     clearMotion(node);
 
-    const top = node.offsetTop;
+    const element = node;
+
+    const top = element.offsetTop;
     const previous = previousTop.current;
     const orderChanged = previousOrderKey.current !== orderKey;
     previousTop.current = top;
@@ -57,30 +59,30 @@ export function useSlideOnReorder(
       return;
     }
 
-    node.style.transition = "none";
-    node.style.transform = `translate3d(0, ${shift}px, 0)`;
+    element.style.transition = "none";
+    element.style.transform = `translate3d(0, ${shift}px, 0)`;
 
     let secondFrame = 0;
     const firstFrame = requestAnimationFrame(() => {
       secondFrame = requestAnimationFrame(() => {
-        node.style.transition = `transform ${SLIDE_MS}ms ${SLIDE_EASING}`;
-        node.style.transform = "translate3d(0, 0, 0)";
+        element.style.transition = `transform ${SLIDE_MS}ms ${SLIDE_EASING}`;
+        element.style.transform = "translate3d(0, 0, 0)";
       });
     });
 
     function onEnd(event: TransitionEvent) {
-      if (event.target !== node || event.propertyName !== "transform") {
+      if (event.target !== element || event.propertyName !== "transform") {
         return;
       }
-      clearMotion(node);
+      clearMotion(element);
     }
 
-    node.addEventListener("transitionend", onEnd);
+    element.addEventListener("transitionend", onEnd);
 
     return () => {
       cancelAnimationFrame(firstFrame);
       cancelAnimationFrame(secondFrame);
-      node.removeEventListener("transitionend", onEnd);
+      element.removeEventListener("transitionend", onEnd);
     };
   });
 }
