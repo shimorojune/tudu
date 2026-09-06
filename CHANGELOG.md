@@ -1,3 +1,10 @@
+## [0.5.2](https://github.com/eGainDev/tudu/compare/v0.5.1...v0.5.2) (2026-09-06)
+
+
+### Bug Fixes
+
+* enhance dokploy deployment action with polling options ([f55c693](https://github.com/eGainDev/tudu/commit/f55c69399cbe6142db7368906306de535807030e))
+
 ## [0.5.1](https://github.com/eGainDev/tudu/compare/v0.5.0...v0.5.1) (2026-09-05)
 
 
