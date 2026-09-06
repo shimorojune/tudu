@@ -1,3 +1,15 @@
+# [0.7.0](https://github.com/eGainDev/tudu/compare/v0.6.1...v0.7.0) (2026-09-06)
+
+
+### Bug Fixes
+
+* harden release workflow for blocked tags and CI-only publish ([8c79b10](https://github.com/eGainDev/tudu/commit/8c79b10e18775e7154c4f2c041734e5d9a59d674))
+
+
+### Features
+
+* add detail pane with comments and timeline ([be6766b](https://github.com/eGainDev/tudu/commit/be6766bc45a3e5edfe10719253598a1e3cc7788e))
+
 # [0.6.0](https://github.com/eGainDev/tudu/compare/v0.5.2...v0.6.0) (2026-09-06)
 
 
