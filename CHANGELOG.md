@@ -5,6 +5,20 @@
 
 * improve deployment logic in Dokploy action ([ca7faa8](https://github.com/eGainDev/tudu/commit/ca7faa8194fd087fbd97e339cbb9bb6252279623))
 * narrow element type in useSlideOnReorder for tsc build ([cc4f527](https://github.com/eGainDev/tudu/commit/cc4f527ebdd6c053a9a0897249a0e481786be5e8))
+* repair release publish and rollback in CI workflow ([e6c386e](https://github.com/eGainDev/tudu/commit/e6c386e3c5dc9cf91fe1363e06f6d5b454c0e6ef))
+
+
+### Features
+
+* add drag-drop reordering, subtask reorder, and task row UX ([9fe1093](https://github.com/eGainDev/tudu/commit/9fe109349843e9c1c8306678d26cc4e08c432076))
+
+# [0.6.0](https://github.com/eGainDev/tudu/compare/v0.5.2...v0.6.0) (2026-09-06)
+
+
+### Bug Fixes
+
+* improve deployment logic in Dokploy action ([ca7faa8](https://github.com/eGainDev/tudu/commit/ca7faa8194fd087fbd97e339cbb9bb6252279623))
+* narrow element type in useSlideOnReorder for tsc build ([cc4f527](https://github.com/eGainDev/tudu/commit/cc4f527ebdd6c053a9a0897249a0e481786be5e8))
 
 
 ### Features
