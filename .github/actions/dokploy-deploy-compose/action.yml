@@ -88,61 +88,78 @@ runs:
             -H "x-api-key: ${DOKPLOY_API_KEY}"
         }
 
+        normalize_deployments() {
+          jq -c '
+            if type == "array" then .
+            elif (.data | type) == "array" then .data
+            elif (.result | type) == "array" then .result
+            elif (.data.data | type) == "array" then .data.data
+            else [] end
+          '
+        }
+
         find_deployment() {
           local response="$1"
-          local since="$2"
+          local before_ids="$2"
           local title="$3"
-          local allow_fallback="$4"
-          local strict_match
-          local fallback_match
+          local description="$4"
+          local since="$5"
+          local version run_id
 
-          strict_match=$(echo "$response" | jq -c --arg title "$title" --argjson since "$since" '
-            [.[] | select(.title == $title) |
+          version=$(echo "$title" | sed -n 's/^Release v//p')
+          run_id=$(echo "$description" | sed -n 's|.*/actions/runs/||p')
+
+          echo "$response" | normalize_deployments | jq -c \
+            --arg before_ids "$before_ids" \
+            --arg title "$title" \
+            --arg description "$description" \
+            --arg version "$version" \
+            --arg run_id "$run_id" \
+            --argjson since "$since" '
+            ($before_ids | split("\n") | map(select(length > 0))) as $known |
+            [.[] |
+              (.deploymentId // .id // empty) as $id |
+              select($id != "") |
+              ([$known[] | select(. == $id)] | length == 0) as $is_new |
               (.createdAt | if type == "number" then
                 (if . > 9999999999 then (. / 1000 | floor) else . end)
               elif type == "string" then
-                (fromdateiso8601? // empty)
-              else empty end) as $epoch |
-              select($epoch != null and $epoch >= $since)
-            ] | sort_by(.createdAt) | last // empty
-          ')
-
-          if [ -n "$strict_match" ] && [ "$strict_match" != "null" ]; then
-            echo "$strict_match"
-            return 0
-          fi
-
-          if [ "$allow_fallback" != true ]; then
-            return 1
-          fi
-
-          fallback_match=$(echo "$response" | jq -c --arg title "$title" '
-            [.[] | select(.title == $title)] | sort_by(.createdAt) | last // empty
-          ')
-
-          if [ -n "$fallback_match" ] && [ "$fallback_match" != "null" ]; then
-            echo "$fallback_match"
-            return 0
-          fi
-
-          return 1
+                ((. | sub("\\.[0-9]+Z$"; "Z")) | fromdateiso8601? // null)
+              else null end) as $epoch |
+              {
+                deployment: .,
+                id: $id,
+                is_new: $is_new,
+                epoch: $epoch,
+                score: (
+                  (if $is_new then 100 else 0 end) +
+                  (if (.description // "" | contains($description)) and ($description | length > 0) then 80 else 0 end) +
+                  (if ($run_id | length > 0) and ((.description // "") | contains($run_id)) then 80 else 0 end) +
+                  (if (.title // "") == $title then 70 else 0 end) +
+                  (if ($version | length > 0) and ((.title // "") | startswith("chore(release): " + $version)) then 60 else 0 end) +
+                  (if ($version | length > 0) and ((.title // "") | contains($version)) then 40 else 0 end) +
+                  (if ($epoch != null and $epoch >= $since) then 20 else 0 end)
+                )
+              }
+            ] |
+            map(select(.score > 0)) |
+            sort_by(.score, .epoch) |
+            last // empty |
+            .deployment // empty
+          '
         }
 
         wait_for_deployment() {
-          local trigger_epoch="$1"
-          local deadline=$((trigger_epoch + POLL_TIMEOUT_MINUTES * 60))
-          local fallback_after=$((trigger_epoch + 120))
+          local before_ids="$1"
+          local since="$2"
+          local deadline=$((since + POLL_TIMEOUT_MINUTES * 60))
 
           while true; do
-            local now allow_fallback=false
+            local now
             now=$(date +%s)
             if [ "$now" -ge "$deadline" ]; then
               echo "Dokploy deployment timed out after ${POLL_TIMEOUT_MINUTES} minutes."
               exit 1
-            fi
-
-            if [ "$now" -ge "$fallback_after" ]; then
-              allow_fallback=true
             fi
 
             local response
@@ -152,15 +169,13 @@ runs:
               continue
             fi
 
-            local deployment=""
-            if deployment=$(find_deployment "$response" "$trigger_epoch" "$DEPLOY_TITLE" "$allow_fallback"); then
-              :
-            else
-              deployment=""
-            fi
+            local deployment
+            deployment=$(find_deployment "$response" "$before_ids" "$DEPLOY_TITLE" "$DEPLOY_DESCRIPTION" "$since" || true)
 
             if [ -z "$deployment" ] || [ "$deployment" = "null" ]; then
-              echo "Waiting for Dokploy deployment record (title: ${DEPLOY_TITLE})..."
+              echo "Waiting for Dokploy deployment (title: ${DEPLOY_TITLE})..."
+              echo "Known deployments:"
+              echo "$response" | normalize_deployments | jq -r '.[] | "- \(.deploymentId // .id // "unknown"): \(.status // "unknown") | \(.title // "" | split("\n")[0])"' | head -5
               sleep "$POLL_INTERVAL_SECONDS"
               continue
             fi
@@ -191,9 +206,12 @@ runs:
           done
         }
 
-        trigger_epoch=$(date +%s)
+        since_epoch=$(( $(date +%s) - 300 ))
+        before_response=$(fetch_deployments)
+        before_ids=$(echo "$before_response" | normalize_deployments | jq -r '(.[] | .deploymentId // .id // empty)' | sort -u)
+
         trigger_deployment
 
         if [ "$WAIT_FOR_COMPLETION" = "true" ]; then
-          wait_for_deployment "$trigger_epoch"
+          wait_for_deployment "$before_ids" "$since_epoch"
         fi
