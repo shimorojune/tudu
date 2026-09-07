@@ -440,7 +440,7 @@ function SubtaskList({
 function titleClass(bucket: Bucket, isCompleted: boolean) {
   const base =
     bucket === "now"
-      ? "text-[15.5px] font-semibold leading-[1.42] tracking-[-0.005em]"
+      ? "text-[15.5px] font-semibold leading-[1.42]"
       : bucket === "later"
         ? "text-[14.5px] text-muted-foreground"
         : "text-[15px] leading-[1.42]";
