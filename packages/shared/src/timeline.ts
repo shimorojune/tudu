@@ -3,6 +3,7 @@ import type { Bucket } from "./tasks.js";
 export const TIMELINE_EVENT_TYPES = [
   "created",
   "renamed",
+  "description_changed",
   "completed",
   "reopened",
   "moved",
@@ -25,6 +26,7 @@ export type TimelineEventDraft = {
 
 export type TaskSnapshot = {
   title: string;
+  description: string | null;
   scheduledDate: string | null;
   bucket: Bucket | null;
   startDate: string | null;
@@ -47,6 +49,10 @@ export function planTaskTimelineEvents(args: {
       type: "renamed",
       data: { from: before.title, to: after.title },
     });
+  }
+
+  if (before.description !== after.description) {
+    events.push({ type: "description_changed", data: {} });
   }
 
   if (!before.completedAt && after.completedAt) {

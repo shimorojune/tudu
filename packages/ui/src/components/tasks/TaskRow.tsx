@@ -32,6 +32,7 @@ import { taskMetaSegments } from "@/lib/taskMeta";
 import { CarryDots } from "@/components/tasks/CarryDots";
 import { SubtaskComposer } from "@/components/tasks/SubtaskComposer";
 import { TaskDeleteDialog } from "@/components/tasks/TaskDeleteDialog";
+import { LinkifiedText } from "@/components/text/LinkifiedText";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -263,19 +264,13 @@ function SortableSubtaskItem({
             className={cn(
               "text-[13.5px] leading-[1.4] transition-colors duration-[220ms] ease-out motion-reduce:transition-none",
               subtask.done && "text-faint",
+              subtask.done && !editing && "line-through decoration-[1.5px]",
             )}
             ariaLabel="Rename subtask"
             onStartEdit={onStartEdit}
             onCommit={onCommit}
             onAutoSave={onAutoSave}
             onCancel={onCancel}
-          />
-          <span
-            aria-hidden
-            className={cn(
-              strikeClass,
-              subtask.done && !editing ? "scale-x-100" : "scale-x-0",
-            )}
           />
         </span>
       </span>
@@ -437,7 +432,7 @@ function SubtaskList({
   );
 }
 
-function titleClass(bucket: Bucket, isCompleted: boolean) {
+function titleClass(bucket: Bucket, isCompleted: boolean, editing: boolean) {
   const base =
     bucket === "now"
       ? "text-[15.5px] font-semibold leading-[1.42]"
@@ -449,11 +444,9 @@ function titleClass(bucket: Bucket, isCompleted: boolean) {
     base,
     "transition-colors duration-[220ms] ease-out motion-reduce:transition-none",
     isCompleted && "text-faint",
+    isCompleted && !editing && "line-through decoration-[1.5px]",
   );
 }
-
-const strikeClass =
-  "pointer-events-none absolute left-0 top-[52%] h-[1.5px] w-full origin-left bg-current transition-transform duration-[220ms] ease-out motion-reduce:transition-none";
 
 type EditableTextProps = {
   text: string;
@@ -478,7 +471,6 @@ function EditableText({
 }: EditableTextProps) {
   const nodeRef = useRef<HTMLSpanElement | null>(null);
   const snapshot = useRef(text);
-  const wasEditing = useRef(false);
   const lastSaved = useRef(text);
 
   const debouncedSave = useDebouncedCallback((value: string) => {
@@ -491,12 +483,6 @@ function EditableText({
     onAutoSave?.(trimmed);
   }, 600);
 
-  if (editing && !wasEditing.current) {
-    snapshot.current = text;
-    lastSaved.current = text;
-  }
-  wasEditing.current = editing;
-
   useLayoutEffect(() => {
     if (!editing) {
       debouncedSave.cancel();
@@ -508,6 +494,9 @@ function EditableText({
       return;
     }
 
+    snapshot.current = text;
+    lastSaved.current = text;
+    node.textContent = text;
     node.focus();
     const selection = window.getSelection();
     const range = document.createRange();
@@ -515,7 +504,9 @@ function EditableText({
     range.collapse(false);
     selection?.removeAllRanges();
     selection?.addRange(range);
-  }, [debouncedSave, editing]);
+    // Only when entering edit. Autosave updates `text` and must not reset the caret.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
+  }, [editing]);
 
   function commit() {
     debouncedSave.cancel();
@@ -548,39 +539,26 @@ function EditableText({
     onCancel();
   }
 
-  return (
+  return editing ? (
     <span
+      key="edit"
       ref={nodeRef}
       className={cn(
         "cursor-text outline-none whitespace-pre-wrap break-words empty:min-w-[1ch]",
         className,
       )}
-      contentEditable={editing}
+      contentEditable
       suppressContentEditableWarning
-      role={editing ? "textbox" : undefined}
-      aria-label={editing ? ariaLabel : undefined}
-      onClick={(event) => {
-        if (editing) {
-          event.stopPropagation();
-          return;
-        }
-        onStartEdit(event);
-      }}
+      role="textbox"
+      aria-label={ariaLabel}
+      onClick={(event) => event.stopPropagation()}
       onInput={() => {
-        if (!editing) {
-          return;
-        }
         debouncedSave(nodeRef.current?.textContent ?? "");
       }}
       onBlur={() => {
-        if (editing) {
-          commit();
-        }
+        commit();
       }}
       onKeyDown={(event) => {
-        if (!editing) {
-          return;
-        }
         event.stopPropagation();
         if (event.key === "Enter") {
           event.preventDefault();
@@ -592,9 +570,6 @@ function EditableText({
         }
       }}
       onPaste={(event) => {
-        if (!editing) {
-          return;
-        }
         event.preventDefault();
         const plain = event.clipboardData.getData("text/plain").replace(/\n/g, " ");
         if (document.queryCommandSupported?.("insertText")) {
@@ -609,8 +584,17 @@ function EditableText({
         selection.getRangeAt(0).insertNode(document.createTextNode(plain));
         selection.collapseToEnd();
       }}
+    />
+  ) : (
+    <span
+      key="view"
+      className={cn(
+        "cursor-text outline-none whitespace-pre-wrap break-words empty:min-w-[1ch]",
+        className,
+      )}
+      onClick={onStartEdit}
     >
-      {editing ? snapshot.current : text}
+      <LinkifiedText text={text} />
     </span>
   );
 }
@@ -657,6 +641,15 @@ export function TaskRow({
       setIsEditing(false);
     }
   }, [isDragging, isEditing]);
+
+  useEffect(() => {
+    setPendingSubtasks((current) =>
+      current.filter(
+        (pending) =>
+          !task.subtasks.some((subtask) => subtask.title === pending.title),
+      ),
+    );
+  }, [task.subtasks]);
 
   useLayoutEffect(() => {
     if (!flash) {
@@ -764,13 +757,11 @@ export function TaskRow({
             <EditableText
               text={task.title}
               editing={isEditing}
-              className={titleClass(bucket, isCompleted)}
+              className={titleClass(bucket, isCompleted, isEditing)}
               ariaLabel="Rename task"
               onStartEdit={(event) => {
-                if (!selected) {
-                  return;
-                }
                 event.stopPropagation();
+                onSelect();
                 setIsEditing(true);
               }}
               onCommit={(value) => {
@@ -781,13 +772,6 @@ export function TaskRow({
                 actions?.onRename(value);
               }}
               onCancel={() => setIsEditing(false)}
-            />
-            <span
-              aria-hidden
-              className={cn(
-                strikeClass,
-                isCompleted && !isEditing ? "scale-x-100" : "scale-x-0",
-              )}
             />
           </span>
           {isLater && task.startDate ? (
@@ -800,6 +784,11 @@ export function TaskRow({
             </span>
           ) : null}
         </div>
+        {task.description && !isEditing ? (
+          <p className="mt-[4px] line-clamp-1 text-[12.5px] text-faint">
+            <LinkifiedText text={task.description} />
+          </p>
+        ) : null}
         {segments.length > 0 ? (
           <div className="mt-[4px] flex flex-wrap items-center gap-[9px] text-[12.5px] tabular-nums text-muted-foreground">
             {segments.map((segment, index) =>
@@ -827,7 +816,7 @@ export function TaskRow({
             expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
           )}
         >
-          <div className="-ml-[20px] overflow-hidden pl-[20px]">
+          <div className={cn("-ml-[20px] pl-[20px]", expanded ? "overflow-visible" : "overflow-hidden")}>
             <div className="mt-[10px]">
               {visibleSubtasks.length > 0 && expanded && actions ? (
                 <SubtaskList
@@ -861,6 +850,9 @@ export function TaskRow({
                             className={cn(
                               "text-[13.5px] leading-[1.4] transition-colors duration-[220ms] ease-out motion-reduce:transition-none",
                               subtask.done && "text-faint",
+                              subtask.done &&
+                                editingSubtaskId !== subtask.id &&
+                                "line-through decoration-[1.5px]",
                             )}
                             ariaLabel="Rename subtask"
                             onStartEdit={(event) => {
@@ -875,15 +867,6 @@ export function TaskRow({
                               actions?.onRenameSubtask(subtask.id, value);
                             }}
                             onCancel={() => setEditingSubtaskId(null)}
-                          />
-                          <span
-                            aria-hidden
-                            className={cn(
-                              strikeClass,
-                              subtask.done && editingSubtaskId !== subtask.id
-                                ? "scale-x-100"
-                                : "scale-x-0",
-                            )}
                           />
                         </span>
                       </span>

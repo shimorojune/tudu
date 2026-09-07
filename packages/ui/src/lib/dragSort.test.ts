@@ -23,6 +23,7 @@ function makeTask(id: string, bucket: Bucket, position: number): Task {
   return {
     id,
     title: `Task ${id}`,
+    description: null,
     scheduledDate: DATE,
     bucket,
     position,

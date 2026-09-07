@@ -25,6 +25,7 @@ export const tasks = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
+    description: text("description"),
     /** Null means unscheduled: the task lives in the backlog, not in any day. */
     scheduledDate: date("scheduled_date", { mode: "string" }),
     /** Null only when scheduledDate is null. No default on purpose: a default would

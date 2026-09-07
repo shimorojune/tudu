@@ -3,6 +3,7 @@ import { planTaskTimelineEvents, type TaskSnapshot } from "./timeline.js";
 
 const base: TaskSnapshot = {
   title: "Ship feature",
+  description: null,
   scheduledDate: "2026-09-06",
   bucket: "next",
   startDate: null,
@@ -24,6 +25,14 @@ describe("planTaskTimelineEvents", () => {
     expect(events).toEqual([
       { type: "renamed", data: { from: "Ship feature", to: "Ship fix" } },
     ]);
+  });
+
+  it("records a description change", () => {
+    const events = planTaskTimelineEvents({
+      before: base,
+      after: { ...base, description: "More detail" },
+    });
+    expect(events).toEqual([{ type: "description_changed", data: {} }]);
   });
 
   it("records completion", () => {

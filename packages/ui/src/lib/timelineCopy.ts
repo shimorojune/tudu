@@ -77,6 +77,15 @@ export function formatTimelineEvent(
           { kind: "text", text: " renamed this" },
         ],
       };
+    case "description_changed":
+      return {
+        timeLabel,
+        isSystem: false,
+        parts: [
+          actorPart(ctx),
+          { kind: "text", text: " updated the description" },
+        ],
+      };
     case "completed":
       return {
         timeLabel,

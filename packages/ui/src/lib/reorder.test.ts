@@ -17,6 +17,7 @@ function makeTask(
   return {
     id,
     title: `Task ${id}`,
+    description: null,
     scheduledDate,
     bucket,
     position,

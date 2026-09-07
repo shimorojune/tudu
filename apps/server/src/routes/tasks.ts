@@ -79,6 +79,7 @@ function toTask(row: TaskRowWithSubtasks): Task {
   return {
     id: row.id,
     title: row.title,
+    description: row.description,
     scheduledDate: row.scheduledDate,
     bucket: row.bucket,
     position: row.position,
@@ -101,6 +102,7 @@ function toUpdateFields(patch: UpdateTaskRequest): UpdateTaskFields {
   const fields: UpdateTaskFields = {};
 
   if ("title" in patch) fields.title = patch.title;
+  if ("description" in patch) fields.description = patch.description ?? null;
   if ("scheduledDate" in patch) fields.scheduledDate = patch.scheduledDate;
   if ("bucket" in patch) fields.bucket = patch.bucket;
   if ("startDate" in patch) fields.startDate = patch.startDate;

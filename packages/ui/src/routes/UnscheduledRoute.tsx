@@ -50,6 +50,7 @@ import {
   taskCollisionDetection,
 } from "@/lib/dragCollision";
 import { createTaskBody } from "@/lib/createTask";
+import { openNowCount } from "@/lib/nowCount";
 import { cn } from "@/lib/utils";
 import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
 import { TaskRow, type TaskRowActions } from "@/components/tasks/TaskRow";
@@ -367,7 +368,7 @@ export function UnscheduledRoute() {
         initialBucket="later"
         initialDate={todayIso()}
         defaultDayChoice="unscheduled"
-        nowCount={todayTasks.filter((task) => task.bucket === "now").length}
+        nowCount={openNowCount(todayTasks)}
         onOpenChange={setDialogOpen}
         onSubmit={async (args) => {
           const result = await createTask(

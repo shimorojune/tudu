@@ -37,6 +37,7 @@ vi.mock("@dnd-kit/sortable", () => ({
 const task: Task = {
   id: "11111111-1111-4111-8111-111111111111",
   title: "Thursday task",
+  description: null,
   scheduledDate: "2026-09-10",
   bucket: "later",
   position: 0,

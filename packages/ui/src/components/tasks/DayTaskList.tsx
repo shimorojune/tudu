@@ -28,6 +28,7 @@ import {
   todayIso,
 } from "@tudu/store";
 import { bucketLabel } from "@/lib/buckets";
+import { openNowCount } from "@/lib/nowCount";
 import {
   buildPullIntoNowLanes,
   moveTaskToBucketLanes,
@@ -268,7 +269,7 @@ function DayTaskListDnd({
           showNowHelper={bucket === "now" && isToday}
           showNowClearPrompt={bucket === "now" && showNowClearPrompt}
           onNowClearPrompt={onNowClearPrompt}
-          nowCount={grouped.now.length}
+          nowCount={openNowCount(grouped.now)}
           dropTarget={dropTargetBucket === bucket}
           dragActive={drag !== null}
           rowActionsForTask={rowActionsForTask}
@@ -306,7 +307,9 @@ export function DayTaskList({
 
   const groupedForPrompt = useMemo(() => tasksByBucket(tasks), [tasks]);
   const showNowClearPrompt =
-    isToday && groupedForPrompt.now.length === 0 && groupedForPrompt.next.length > 0;
+    isToday &&
+    openNowCount(tasks) === 0 &&
+    groupedForPrompt.next.length > 0;
 
   const [createTask] = useCreateTaskMutation();
   const [updateTask] = useUpdateTaskMutation();
@@ -445,7 +448,7 @@ export function DayTaskList({
         open={dialogOpen}
         initialBucket={dialogBucket}
         initialDate={selectedDate}
-        nowCount={groupedForPrompt.now.length}
+        nowCount={openNowCount(tasks)}
         onOpenChange={setDialogOpen}
         onSubmit={handleCreateTask}
       />

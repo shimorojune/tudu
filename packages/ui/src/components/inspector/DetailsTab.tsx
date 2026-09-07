@@ -8,6 +8,7 @@ import {
   withSyntheticCreated,
 } from "@/lib/timelineCopy";
 import { TimelineEventRow } from "@/components/inspector/TimelineEventRow";
+import { TaskDescriptionField } from "@/components/inspector/TaskDescriptionField";
 import { cn } from "@/lib/utils";
 
 export type DetailsTabProps = {
@@ -105,6 +106,8 @@ export function DetailsTab({
       <h2 className="text-[19px] font-extrabold leading-[1.3] tracking-[-0.018em]">
         {task.title}
       </h2>
+
+      <TaskDescriptionField taskId={task.id} description={task.description} />
 
       <dl className="mt-[22px] grid grid-cols-[78px_minmax(0,1fr)] items-center gap-x-[16px] gap-y-[13px] text-[13px]">
         <dt className="text-muted-foreground">Bucket</dt>

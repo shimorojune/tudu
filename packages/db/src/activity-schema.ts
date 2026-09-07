@@ -14,6 +14,7 @@ import { tasks } from "./tasks-schema.js";
 export const timelineEventType = pgEnum("timeline_event_type", [
   "created",
   "renamed",
+  "description_changed",
   "completed",
   "reopened",
   "moved",

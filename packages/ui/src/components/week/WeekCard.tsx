@@ -1,6 +1,7 @@
 import { forwardRef, type ComponentPropsWithoutRef } from "react";
 import type { Task } from "@tudu/shared";
 import { taskMetaSegments } from "@/lib/taskMeta";
+import { LinkifiedText } from "@/components/text/LinkifiedText";
 import { cn } from "@/lib/utils";
 
 export type WeekCardProps = Omit<ComponentPropsWithoutRef<"button">, "type"> & {
@@ -43,11 +44,11 @@ export const WeekCard = forwardRef<HTMLButtonElement, WeekCardProps>(
         <div
           className={cn(
             "text-[12.5px] leading-[1.4]",
-            completed && "line-through",
+            completed && "line-through decoration-[1.5px]",
             isNow && !completed && "font-semibold",
           )}
         >
-          {task.title}
+          <LinkifiedText text={task.title} />
         </div>
         {segments.length > 0 ? (
           <div className="mt-[3px] flex flex-wrap items-center gap-x-[6px] gap-y-[2px] text-[11px] text-muted-foreground">

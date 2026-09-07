@@ -195,6 +195,7 @@ export async function createTask(
 
 type NewTaskFields = {
   title: string;
+  description: string | null;
   scheduledDate: string | null;
   bucket: Bucket | null;
   startDate: string | null;
@@ -207,6 +208,7 @@ export type UpdateTaskFields = Partial<
   Pick<
     NewTaskFields,
     | "title"
+    | "description"
     | "scheduledDate"
     | "bucket"
     | "startDate"

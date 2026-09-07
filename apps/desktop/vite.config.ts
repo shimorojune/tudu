@@ -26,6 +26,7 @@ export default defineConfig({
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
   },
   optimizeDeps: {
-    include: ["@tudu/shared", "@tudu/store", "@tudu/ui"],
+    include: ["@tudu/shared", "@tudu/ui"],
+    exclude: ["@tudu/store"],
   },
 });

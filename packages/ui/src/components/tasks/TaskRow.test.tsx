@@ -45,6 +45,7 @@ function defaultActions(overrides: Partial<TaskRowActions> = {}): TaskRowActions
 const fixtureTask: Task = {
   id: "11111111-1111-4111-8111-111111111111",
   title: "Improve error message",
+  description: null,
   scheduledDate: "2026-09-05",
   bucket: "now",
   position: 0,
@@ -219,7 +220,7 @@ describe("TaskRow", () => {
     );
   });
 
-  it("shows a strike bar on completed tasks", () => {
+  it("shows a strike on each line of completed tasks", () => {
     const { container } = render(
       <TaskRow
         task={{ ...fixtureTask, completedAt: "2026-09-05T12:00:00.000Z" }}
@@ -231,14 +232,13 @@ describe("TaskRow", () => {
       />,
     );
 
-    const strike = container.querySelector('[aria-hidden="true"].scale-x-100');
-    expect(strike).toBeInTheDocument();
-    expect(screen.getByText("Improve error message")).toHaveClass("text-faint");
-    expect(screen.getByText("Improve error message")).not.toHaveClass("line-through");
+    const title = container.querySelector(".cursor-text");
+    expect(title).toHaveClass("text-faint");
+    expect(title).toHaveClass("line-through");
   });
 
-  it("uses the same strike bar on completed subtasks", () => {
-    const { container } = render(
+  it("uses the same strike on completed subtasks", () => {
+    render(
       <TaskRow
         task={fixtureTask}
         bucket="now"
@@ -246,16 +246,45 @@ describe("TaskRow", () => {
         selectedDate="2026-09-05"
         onSelect={vi.fn()}
         menuVariant="day"
+        actions={defaultActions()}
       />,
     );
 
-    const title = screen.getByText("One");
-    expect(title).toHaveClass("text-faint");
-    expect(title).not.toHaveClass("line-through");
-    expect(title.parentElement?.querySelector(".scale-x-100")).toBeInTheDocument();
+    expect(screen.getByText("One").closest(".cursor-text")).toHaveClass(
+      "line-through",
+    );
   });
 
-  it("hides the strike bar on incomplete tasks", () => {
+  it("strikes through links in a completed wrapping subtask", () => {
+    const task = {
+      ...fixtureTask,
+      subtasks: [
+        {
+          ...fixtureTask.subtasks[0]!,
+          title: "See https://example.com later",
+          done: true,
+        },
+      ],
+    };
+
+    render(
+      <TaskRow
+        task={task}
+        bucket="now"
+        selected
+        selectedDate="2026-09-05"
+        onSelect={vi.fn()}
+        menuVariant="day"
+        actions={defaultActions()}
+      />,
+    );
+
+    const link = screen.getByRole("link", { name: "https://example.com" });
+    expect(link.closest(".line-through")).toBeTruthy();
+    expect(link.className).toContain("underline_line-through");
+  });
+
+  it("hides the strike on incomplete tasks", () => {
     const { container } = render(
       <TaskRow
         task={fixtureTask}
@@ -267,8 +296,8 @@ describe("TaskRow", () => {
       />,
     );
 
-    const strike = container.querySelector('[aria-hidden="true"].scale-x-0');
-    expect(strike).toBeInTheDocument();
+    const title = container.querySelector(".cursor-text");
+    expect(title).not.toHaveClass("line-through");
   });
 
   it("calls onComplete when the checkbox is clicked", async () => {
@@ -317,6 +346,88 @@ describe("TaskRow", () => {
     );
   });
 
+  it("does not put links inside the subtask editor", async () => {
+    const user = userEvent.setup();
+    const task = {
+      ...fixtureTask,
+      subtasks: [
+        {
+          ...fixtureTask.subtasks[0]!,
+          title: "See https://example.com later",
+        },
+      ],
+    };
+
+    render(
+      <TaskRow
+        task={task}
+        bucket="now"
+        selected
+        selectedDate="2026-09-05"
+        onSelect={vi.fn()}
+        menuVariant="day"
+        actions={defaultActions()}
+      />,
+    );
+
+    expect(
+      screen.getByRole("link", { name: "https://example.com" }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByText("See"));
+    const editor = screen.getByRole("textbox", { name: "Rename subtask" });
+    expect(editor).toHaveTextContent("See https://example.com later");
+    expect(editor.querySelector("a")).toBeNull();
+
+    await user.keyboard("{Enter}");
+    const link = screen.getByRole("link", { name: "https://example.com" });
+    expect(link.parentElement?.parentElement?.textContent).toBe(
+      "See https://example.com later",
+    );
+  });
+
+  it("does not rewrite the subtask editor when a url autosaves", async () => {
+    const user = userEvent.setup();
+    const actions = defaultActions();
+    const baseSubtask = {
+      ...fixtureTask.subtasks[0]!,
+      title: "Notes",
+    };
+    const rowProps = {
+      bucket: "now" as const,
+      selected: true,
+      selectedDate: "2026-09-05",
+      onSelect: vi.fn(),
+      menuVariant: "day" as const,
+      actions,
+    };
+
+    const { rerender } = render(
+      <TaskRow task={{ ...fixtureTask, subtasks: [baseSubtask] }} {...rowProps} />,
+    );
+
+    await user.click(screen.getByText("Notes"));
+    const editor = screen.getByRole("textbox", { name: "Rename subtask" });
+    await user.type(editor, " https://example.com/x");
+
+    rerender(
+      <TaskRow
+        task={{
+          ...fixtureTask,
+          subtasks: [{ ...baseSubtask, title: "Notes https://example.com/x" }],
+        }}
+        {...rowProps}
+      />,
+    );
+
+    expect(editor).toHaveTextContent("Notes https://example.com/x");
+    expect(editor.querySelector("a")).toBeNull();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+
+    await user.type(editor, " more");
+    expect(editor).toHaveTextContent("Notes https://example.com/x more");
+  });
+
   it("renames the main task title on click when selected", async () => {
     const onRename = vi.fn();
     const user = userEvent.setup();
@@ -333,7 +444,7 @@ describe("TaskRow", () => {
       />,
     );
 
-    await user.click(screen.getByText("Improve error message"));
+    await user.click(screen.getAllByText("Improve error message")[0]!);
     const editor = screen.getByRole("textbox", { name: "Rename task" });
     await user.tripleClick(editor);
     await user.keyboard("Updated title{Enter}");
@@ -356,15 +467,15 @@ describe("TaskRow", () => {
       />,
     );
 
-    await user.click(screen.getByText("Improve error message"));
+    await user.click(screen.getAllByText("Improve error message")[0]!);
     const editor = screen.getByRole("textbox", { name: "Rename task" });
     await user.tripleClick(editor);
     await user.keyboard("Changed mind{Escape}");
     expect(onRename).not.toHaveBeenCalled();
-    expect(screen.getByText("Improve error message")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Rename task" })).not.toBeInTheDocument();
   });
 
-  it("does not edit the main task title when the row is not selected", async () => {
+  it("selects and starts editing on title click when the row is not selected", async () => {
     const onSelect = vi.fn();
     const user = userEvent.setup();
 
@@ -380,8 +491,8 @@ describe("TaskRow", () => {
       />,
     );
 
-    await user.click(screen.getByText("Improve error message"));
-    expect(screen.queryByRole("textbox", { name: "Rename task" })).not.toBeInTheDocument();
+    await user.click(screen.getAllByText("Improve error message")[0]!);
+    expect(screen.getByRole("textbox", { name: "Rename task" })).toBeInTheDocument();
     expect(onSelect).toHaveBeenCalled();
   });
 

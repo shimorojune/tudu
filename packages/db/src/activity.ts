@@ -33,6 +33,7 @@ async function ownedTaskId(
 export function taskRowToSnapshot(row: TaskRow): import("@tudu/shared").TaskSnapshot {
   return {
     title: row.title,
+    description: row.description,
     scheduledDate: row.scheduledDate,
     bucket: row.bucket,
     startDate: row.startDate,
@@ -46,6 +47,7 @@ export function applyTaskPatch(
   before: TaskRow,
   fields: Partial<{
     title: string;
+    description: string | null;
     scheduledDate: string | null;
     bucket: import("@tudu/shared").Bucket | null;
     startDate: string | null;

@@ -11,6 +11,7 @@ const friday = "2026-09-11";
 
 function makeTask(overrides: Partial<Task> & Pick<Task, "id" | "title" | "scheduledDate">): Task {
   return {
+    description: null,
     bucket: "later",
     position: 0,
     startDate: null,
@@ -30,6 +31,7 @@ function makeTask(overrides: Partial<Task> & Pick<Task, "id" | "title" | "schedu
 const task: Task = {
   id: "11111111-1111-4111-8111-111111111111",
   title: "Parent",
+  description: null,
   scheduledDate: "2026-09-06",
   bucket: "now",
   position: 0,

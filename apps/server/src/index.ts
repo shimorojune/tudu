@@ -12,6 +12,7 @@ import { cors } from "hono/cors";
 import { Hono } from "hono";
 import { createAuth } from "./auth.js";
 import { createActivityRoute } from "./routes/activity.js";
+import { createLinkPreviewRoute } from "./routes/linkPreview.js";
 import { createTasksRoute } from "./routes/tasks.js";
 import { createUpdatesRoute } from "./routes/updates.js";
 import { createSessionMiddleware, type SessionEnv } from "./session-middleware.js";
@@ -92,6 +93,7 @@ app.get("/me", async (c) => {
 if (db) {
   app.route("/", createTasksRoute(db));
   app.route("/", createActivityRoute(db));
+  app.route("/", createLinkPreviewRoute());
 }
 
 const port = Number(process.env.PORT) || DEFAULT_SERVER_PORT;

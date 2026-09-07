@@ -6,6 +6,7 @@ function baseTask(overrides: Partial<Task> = {}): Task {
   return {
     id: "11111111-1111-4111-8111-111111111111",
     title: "Task",
+    description: null,
     scheduledDate: "2026-09-06",
     bucket: "now",
     position: 0,

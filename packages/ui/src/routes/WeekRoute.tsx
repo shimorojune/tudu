@@ -10,6 +10,7 @@ import {
 import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
 import { WeekGrid } from "@/components/week/WeekGrid";
 import { createTaskBody } from "@/lib/createTask";
+import { openNowCount } from "@/lib/nowCount";
 import {
   defaultHighlightDay,
   defaultWeekId,
@@ -34,10 +35,7 @@ export function WeekRoute() {
   const [dialogBucket, setDialogBucket] = useState<Bucket>("later");
 
   const highlightedDayQuery = useGetTasksForDayQuery(highlightedDay);
-  const nowCount =
-    highlightedDayQuery.data?.tasks.filter(
-      (task) => task.bucket === "now" && task.completedAt === null,
-    ).length ?? 0;
+  const nowCount = openNowCount(highlightedDayQuery.data?.tasks ?? []);
 
   const [createTask] = useCreateTaskMutation();
   const [createSubtask] = useCreateSubtaskMutation();

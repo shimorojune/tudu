@@ -44,6 +44,7 @@ export const taskSchema = z
   .object({
     id: z.uuid(),
     title: z.string(),
+    description: z.string().nullable(),
     scheduledDate: isoDateSchema.nullable(),
     bucket: bucketSchema.nullable(),
     position: z.number().int(),
@@ -78,6 +79,13 @@ export type CreateTaskRequest = z.infer<typeof createTaskRequestSchema>;
 export const updateTaskRequestSchema = z
   .object({
     title: z.string().trim().min(1).max(500),
+    description: z
+      .string()
+      .trim()
+      .max(5000)
+      .nullable()
+      .optional()
+      .transform((value) => (value === "" || value === undefined ? null : value)),
     scheduledDate: isoDateSchema.nullable(),
     bucket: bucketSchema.nullable(),
     startDate: isoDateSchema.nullable(),

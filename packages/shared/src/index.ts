@@ -2,6 +2,7 @@ export * from "./tasks.js";
 export * from "./activity.js";
 export * from "./timeline.js";
 export * from "./day.js";
+export * from "./linkPreview.js";
 
 export type HealthResponse = { status: "ok"; version: string };
 

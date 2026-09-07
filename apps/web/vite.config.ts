@@ -24,6 +24,7 @@ export default defineConfig({
     minify: "esbuild",
   },
   optimizeDeps: {
-    include: ["@tudu/shared", "@tudu/store", "@tudu/ui"],
+    include: ["@tudu/shared", "@tudu/ui"],
+    exclude: ["@tudu/store"],
   },
 });

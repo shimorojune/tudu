@@ -189,6 +189,7 @@ export function createOptimisticTask(body: CreateTaskRequest, tempId: string): T
   return {
     id: tempId,
     title: body.title,
+    description: null,
     scheduledDate: body.scheduledDate ?? null,
     bucket: body.bucket ?? null,
     position: 9999,

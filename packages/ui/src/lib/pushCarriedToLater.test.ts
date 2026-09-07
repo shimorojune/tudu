@@ -6,6 +6,7 @@ function task(overrides: Partial<Task> & Pick<Task, "id" | "bucket">): Task {
   return {
     id: overrides.id,
     title: overrides.title ?? "Task",
+    description: null,
     scheduledDate: overrides.scheduledDate ?? "2026-09-06",
     bucket: overrides.bucket,
     position: overrides.position ?? 0,

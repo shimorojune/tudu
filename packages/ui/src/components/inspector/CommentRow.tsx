@@ -20,6 +20,7 @@ import {
   Avatar,
   AvatarFallback,
 } from "@/components/ui/avatar";
+import { LinkifiedText } from "@/components/text/LinkifiedText";
 import { cn } from "@/lib/utils";
 
 export type CommentRowProps = {
@@ -47,12 +48,6 @@ function CommentEditableBody({
 }) {
   const nodeRef = useRef<HTMLDivElement | null>(null);
   const snapshot = useRef(text);
-  const wasEditing = useRef(false);
-
-  if (editing && !wasEditing.current) {
-    snapshot.current = text;
-  }
-  wasEditing.current = editing;
 
   useLayoutEffect(() => {
     if (!editing) {
@@ -64,6 +59,8 @@ function CommentEditableBody({
       return;
     }
 
+    snapshot.current = text;
+    node.textContent = text;
     node.focus();
     const selection = window.getSelection();
     const range = document.createRange();
@@ -102,32 +99,19 @@ function CommentEditableBody({
     onCancel();
   }
 
-  return (
+  return editing ? (
     <div
+      key="edit"
       ref={nodeRef}
-      className={cn(
-        "mt-[6px] cursor-text whitespace-pre-wrap break-words text-[13px] leading-[1.5] outline-none",
-        editing ? "min-h-[1.5em]" : "",
-      )}
-      contentEditable={editing}
+      className="mt-[6px] min-h-[1.5em] cursor-text whitespace-pre-wrap break-words text-[13px] leading-[1.5] outline-none"
+      contentEditable
       suppressContentEditableWarning
-      role={editing ? "textbox" : undefined}
-      onClick={(event) => {
-        if (editing) {
-          event.stopPropagation();
-          return;
-        }
-        onStartEdit(event);
-      }}
+      role="textbox"
+      onClick={(event) => event.stopPropagation()}
       onBlur={() => {
-        if (editing) {
-          commit();
-        }
+        commit();
       }}
       onKeyDown={(event) => {
-        if (!editing) {
-          return;
-        }
         event.stopPropagation();
         if (event.key === "Enter" && !event.shiftKey) {
           event.preventDefault();
@@ -138,8 +122,14 @@ function CommentEditableBody({
           cancelEdit();
         }
       }}
+    />
+  ) : (
+    <div
+      key="view"
+      className="mt-[6px] cursor-text whitespace-pre-wrap break-words text-[13px] leading-[1.5] outline-none"
+      onClick={onStartEdit}
     >
-      {editing ? snapshot.current : text}
+      <LinkifiedText text={text} />
     </div>
   );
 }
