@@ -1,3 +1,15 @@
+# [0.12.0](https://github.com/eGainDev/tudu/compare/v0.11.0...v0.12.0) (2026-09-07)
+
+
+### Bug Fixes
+
+* simplify window management in Tauri app ([99aa765](https://github.com/eGainDev/tudu/commit/99aa765a3d33b9be595b1c54966902f87def08ac))
+
+
+### Features
+
+* add week view with drag reschedule and unscheduled rail ([89eac24](https://github.com/eGainDev/tudu/commit/89eac243b80155e8535d665ce52c1e62a914b7dc))
+
 # [0.11.0](https://github.com/eGainDev/tudu/compare/v0.10.1...v0.11.0) (2026-09-07)
 
 
