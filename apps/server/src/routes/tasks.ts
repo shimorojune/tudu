@@ -13,6 +13,7 @@ import {
   listUnscheduledTasks,
   reorderTasks,
   reorderSubtasks,
+  rollOverTasks,
   softDeleteSubtask,
   softDeleteTask,
   updateSubtask,
@@ -23,12 +24,14 @@ import {
   createTaskRequestSchema,
   reorderRequestSchema,
   reorderSubtasksRequestSchema,
+  rolloverRequestSchema,
   updateSubtaskRequestSchema,
   updateTaskRequestSchema,
   type Subtask,
   type Task,
   type TaskResponse,
   type TasksResponse,
+  type RolloverResponse,
   type UpdateTaskRequest,
 } from "@tudu/shared";
 import { Hono } from "hono";
@@ -150,6 +153,14 @@ export function createTasksRoute(db: Db) {
     }
 
     return c.body(null, 204);
+  });
+
+  app.post("/tasks/rollover", jsonBody(rolloverRequestSchema), async (c) => {
+    const { toDate } = c.req.valid("json");
+    const result = await rollOverTasks(db, userId(c), toDate);
+    const response: RolloverResponse = result;
+
+    return c.json(response);
   });
 
   app.get("/tasks", queryParams(dayQuerySchema), async (c) => {

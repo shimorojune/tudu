@@ -90,6 +90,8 @@ type DayTaskListDndProps = {
   rowActionsForTask: (taskId: string) => TaskRowActions;
   onNowClearPrompt: () => void;
   onReorder: (items: ContainerItems) => void;
+  flashTaskId: string | null;
+  onFlashComplete: () => void;
 };
 
 function DayTaskListDnd({
@@ -103,6 +105,8 @@ function DayTaskListDnd({
   rowActionsForTask,
   onNowClearPrompt,
   onReorder,
+  flashTaskId,
+  onFlashComplete,
 }: DayTaskListDndProps) {
   const { droppableRects } = useDndContext();
   const pointerYRef = usePointerY();
@@ -244,6 +248,8 @@ function DayTaskListDnd({
           nowCount={grouped.now.length}
           dropTarget={dropTargetBucket === bucket}
           rowActionsForTask={rowActionsForTask}
+          flashTaskId={flashTaskId}
+          onFlashComplete={onFlashComplete}
         />
       ))}
       <DragOverlay dropAnimation={null}>
@@ -266,6 +272,7 @@ export function DayTaskList({
 }: DayTaskListProps) {
   const isToday = selectedDate === todayIso();
   const addInputRef = useRef<HTMLInputElement>(null);
+  const [flashTaskId, setFlashTaskId] = useState<string | null>(null);
 
   const baseItems = useMemo(
     () => itemsFromTasks(tasks, BUCKETS, (task) => task.bucket),
@@ -367,19 +374,27 @@ export function DayTaskList({
               }
             }}
             onReorder={handleReorder}
+            flashTaskId={flashTaskId}
+            onFlashComplete={() => setFlashTaskId(null)}
           />
         </DndContext>
       </ScrollArea>
       <AddTaskRow
         inputRef={addInputRef}
-        onSubmit={(title) => {
-          createTask(
-            createTaskBody({
-              title,
-              scheduledDate: selectedDate,
-              bucket: "later",
-            }),
-          );
+        onSubmit={async (title) => {
+          try {
+            const result = await createTask(
+              createTaskBody({
+                title,
+                scheduledDate: selectedDate,
+                bucket: "later",
+              }),
+            ).unwrap();
+            onSelectTask(result.task.id);
+            setFlashTaskId(result.task.id);
+          } catch {
+            // create failed; leave selection unchanged
+          }
         }}
       />
     </div>

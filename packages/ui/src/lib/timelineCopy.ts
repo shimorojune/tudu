@@ -184,6 +184,27 @@ export function formatTimelineEvent(
           { kind: "text", text: " deleted a comment" },
         ],
       };
+    case "rolled_over": {
+      const from = formatIsoDate((data.from as string | null) ?? null);
+      const days = data.carriedDays as number | undefined;
+      const suffix =
+        days && days > 1
+          ? `, ${days} days carried`
+          : days === 1
+            ? ", first day carried"
+            : "";
+      return {
+        timeLabel,
+        isSystem: true,
+        parts: [
+          {
+            kind: "text",
+            text: `Rolled over from ${from}${suffix}`,
+            muted: true,
+          },
+        ],
+      };
+    }
     default:
       return {
         timeLabel,

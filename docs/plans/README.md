@@ -105,7 +105,7 @@ JIRA knows when something is due, only you know whether you are touching it toda
 | 3 | Today screen, read only | [03-today-screen.md](./03-today-screen.md) | Done |
 | 4 | Task CRUD and drag to reorder | [04-task-crud-and-drag.md](./04-task-crud-and-drag.md) | Done |
 | 5 | Detail pane: Details, Comments, Timeline | [05-detail-pane.md](./05-detail-pane.md) | Done |
-| 6 | Rollover, carry dots, slipping | not written | Pending |
+| 6 | Rollover, carry dots, slipping | [06-rollover.md](./06-rollover.md) | Planned |
 | 7 | Week view and drag to reschedule | not written | Pending |
 | 8 | Command palette and keyboard shortcuts | not written | Pending |
 | 9 | Manager: Inbox, roster, report's day | not written | Pending |
@@ -247,12 +247,50 @@ sentence).
 
 ### Step 6: Rollover, carry dots, slipping
 
-A server side job at the configured day start time that moves unfinished tasks forward
-and increments `carried_days`. The dismissible rollover banner, the carry dots, the
-"Push all to Later" bulk action, and the slipping rule (carried two days or more, or
-past deadline).
+On-focus rollover: when the app gains focus after the day-start hour, unfinished tasks
+from every past date roll forward to the effective today with their bucket preserved,
+`carried_days` recomputed, and a system `rolled_over` timeline row per task. The A2
+recap banner inside the left pane, the A2b midnight banner full width above the three
+panes, carry dots on task rows, overdue meta styling, and a one-click "Push all to
+Later" bulk action. No cron, no new tables.
 
-Design screens covered: A2 Rollover.
+Design screens covered: A2 Rollover, A2b Past midnight.
+
+#### Step 6 decisions (settled)
+
+**1. Trigger is client, on focus.** `visibilitychange` and `window` focus call
+`POST /tasks/rollover` once per effective day. No server scheduler.
+
+**2. Day start is a constant.** `DAY_START_HOUR = 4` in `@tudu/shared`, next to
+`DEFAULT_NOW_SOFT_CAP`. Step 11 turns it into a preference without logic changes.
+
+**3. Both banners ship.** A2 recap inside the left pane; A2b full width above the
+three-pane layout between midnight and the day-start hour.
+
+**4. Primary action is "Push all to Later".** One click moves every carried task
+currently in Now to the bottom of Later, order preserved, via the existing reorder
+endpoint. The design's "Trim Now…" dialog is not built.
+
+**5. Carry dots replace the meta-line carried text.** Right-hand column, 5px circles,
+up to three, `title="carried N days"`. Details tab still shows the numeric Carried field.
+
+**6. All past unfinished days roll forward,** not just yesterday. Nothing gets stranded
+on old dates.
+
+**7. Dots turn accent red when slipping.** `SLIPPING_CARRY_DAYS = 2`, or past deadline.
+Personal view only in this step; step 9 adds the manager "slipping" label.
+
+**8. Undo defers to step 8.** Rollover is not destructive; manual drag still works.
+
+**9. Bucket is preserved on rollover.** Unfinished Now returns as Now at the top of the
+lane. C3's "Carry to top of Now" setting is not built.
+
+**10. Manual reschedule clears carry.** A user-initiated `scheduledDate` change resets
+`carriedDays` to 0 and `carriedSince` to null.
+
+**11. Completed tasks never roll.** They stay on the day they were finished.
+
+**12. Banner dismissal is localStorage, keyed by date.** Survives reload, resets next day.
 
 ### Step 7: Week view and drag to reschedule
 
@@ -406,6 +444,23 @@ code back to the mockup on any of these points.
     `created` row for that task.
 24. **The inspector close X is wired.** A1 draws an X on the tab strip. Step 3 left it
     out. Step 5 clears `selectedTaskId` on click.
+25. **Rollover runs on first focus, not as a server cron.** A2b's footer copy says
+    "Rollover runs on first focus after your day-start hour". The original roadmap
+    promised a server-side job; step 6 uses a client-triggered `POST /tasks/rollover`
+    instead. No scheduler, no per-user timezone column, no preferences table yet.
+26. **"Push all to Later" replaces "Trim Now…".** A2 draws a primary button labelled
+    "Trim Now…" with no dialog spec. Step 6 uses a one-click bulk demote of carried
+    Now tasks to Later via the existing reorder endpoint.
+27. **Carry dots replace the meta-line "carried N days" text.** A1 used inline text;
+    A2 uses right-column dots. Step 6 follows A2 on the Today list.
+28. **Personal carry dots turn accent red when slipping.** The mockup only reddens dots
+    in the manager view (B3). Step 6 applies red dots on the personal Today list when
+    `carriedDays >= 2` or the deadline is past, so the rule is visible where you work.
+29. **A2 banner copy drops the em dash.** The mockup reads "Something here will slip,
+    decide which now" with an em dash between. Step 6 uses a period: "Something here
+    will slip. Decide which now, not at 17:00." (`pnpm lint:copy` rejects U+2014.)
+30. **Rollover undo defers to step 8.** A2b's footer mentions Cmd+Z. Step 6 does not
+    wire undo; you can still drag or right-click to fix a rollover manually.
 
 ## Screens deliberately left out of the roadmap
 

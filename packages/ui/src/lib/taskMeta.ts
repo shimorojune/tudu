@@ -5,13 +5,23 @@ function parseNoon(isoDate: string) {
   return new Date(`${isoDate}T12:00:00`);
 }
 
-function formatDeadline(deadline: string, selectedDate: string): string {
+function formatDeadline(
+  deadline: string,
+  selectedDate: string,
+  now: Date,
+): { text: string; emphasis?: boolean; accent?: boolean } {
   const date = parseISO(deadline);
   const time = format(date, "HH:mm");
-  if (isSameDay(date, parseNoon(selectedDate))) {
-    return `due today ${time}`;
+
+  if (date.getTime() < now.getTime()) {
+    return { text: `overdue, was due ${time}`, emphasis: true, accent: true };
   }
-  return `due ${format(date, "EEE d MMM")}`;
+
+  if (isSameDay(date, parseNoon(selectedDate))) {
+    return { text: `due today ${time}`, emphasis: true };
+  }
+
+  return { text: `due ${format(date, "EEE d MMM")}` };
 }
 
 function formatStart(startDate: string, selectedDate: string): string | null {
@@ -22,13 +32,14 @@ function formatStart(startDate: string, selectedDate: string): string | null {
 }
 
 export type MetaSegment =
-  | { kind: "text"; text: string; emphasis?: boolean }
+  | { kind: "text"; text: string; emphasis?: boolean; accent?: boolean }
   | { kind: "dot" };
 
 /** Ordered meta segments for the task row meta line. JIRA key is step 10. */
 export function taskMetaSegments(
   task: Task,
   selectedDate: string,
+  now: Date = new Date(),
 ): MetaSegment[] {
   const segments: MetaSegment[] = [];
 
@@ -41,9 +52,8 @@ export function taskMetaSegments(
     if (segments.length > 0) {
       segments.push({ kind: "dot" });
     }
-    const text = formatDeadline(task.deadline, selectedDate);
-    const emphasis = text.startsWith("due today");
-    segments.push({ kind: "text", text, emphasis });
+    const deadline = formatDeadline(task.deadline, selectedDate, now);
+    segments.push({ kind: "text", ...deadline });
   }
 
   const doneCount = task.subtasks.filter((s) => s.done).length;
@@ -54,17 +64,6 @@ export function taskMetaSegments(
     segments.push({
       kind: "text",
       text: `${doneCount} of ${task.subtasks.length} completed`,
-    });
-  }
-
-  if (task.carriedDays > 0) {
-    if (segments.length > 0) {
-      segments.push({ kind: "dot" });
-    }
-    const dayWord = task.carriedDays === 1 ? "day" : "days";
-    segments.push({
-      kind: "text",
-      text: `carried ${task.carriedDays} ${dayWord}`,
     });
   }
 

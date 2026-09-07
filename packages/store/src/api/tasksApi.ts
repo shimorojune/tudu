@@ -3,6 +3,8 @@ import type {
   CreateTaskRequest,
   ReorderRequest,
   ReorderSubtasksRequest,
+  RolloverRequest,
+  RolloverResponse,
   TaskResponse,
   TasksResponse,
   UpdateSubtaskRequest,
@@ -123,6 +125,29 @@ export const tasksApi = baseApi.injectEndpoints({
           type: "Timeline" as const,
           id,
         })),
+    }),
+    rollover: builder.mutation<RolloverResponse, RolloverRequest>({
+      query: (body) => ({ url: "/tasks/rollover", method: "POST", body }),
+      async onQueryStarted(body, { dispatch, queryFulfilled, getState }) {
+        try {
+          const { data } = await queryFulfilled;
+          const { setSelectedDate } = await import("../slices/daySlice.js");
+          const state = readState(getState);
+          if (state.day.selectedDate < body.toDate) {
+            dispatch(setSelectedDate(body.toDate));
+          }
+          if (data.taskIds.length > 0) {
+            const { refetchTimelineFirstPages } = await import("./invalidateTimeline.js");
+            await refetchTimelineFirstPages(dispatch, data.taskIds);
+          }
+        } catch {
+          // Tag invalidation still runs on success only.
+        }
+      },
+      invalidatesTags: (result) => [
+        "Task",
+        ...(result?.taskIds.map((id) => ({ type: "Timeline" as const, id })) ?? []),
+      ],
     }),
     createSubtask: builder.mutation<
       TaskResponse,
@@ -246,6 +271,7 @@ export const {
   useUpdateTaskMutation,
   useDeleteTaskMutation,
   useReorderTasksMutation,
+  useRolloverMutation,
   useCreateSubtaskMutation,
   useUpdateSubtaskMutation,
   useDeleteSubtaskMutation,

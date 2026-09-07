@@ -1,20 +1,31 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Plus, SlidersHorizontal } from "lucide-react";
-import { toast } from "sonner";
+import { requestAddTask } from "@tudu/store";
+import { useDispatch } from "react-redux";
 import { BrandMark } from "@/components/chrome/BrandMark";
 import { DateNav } from "@/components/chrome/DateNav";
 import { DayJump } from "@/components/chrome/DayJump";
 import { NavTabs } from "@/components/chrome/NavTabs";
 
 function NewTaskButton() {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  async function handleClick() {
+    if (pathname !== "/" && pathname !== "/unscheduled") {
+      await navigate({ to: "/" });
+    }
+    dispatch(requestAddTask());
+  }
+
   return (
     <button
       type="button"
       aria-label="New task"
       className="flex items-center gap-[7px] bg-primary px-[13px] py-[7px] text-[12.5px] font-bold text-primary-foreground"
       onClick={() => {
-        // TODO(step 4): open the new task flow.
-        toast("New task lands in step 4");
+        void handleClick();
       }}
     >
       <Plus size={13} strokeWidth={2.4} />

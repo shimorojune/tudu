@@ -27,3 +27,17 @@
 html, body, #root {
   min-height: 100%;
 }
+
+@keyframes add-task-flash {
+  0%,
+  20% {
+    background-color: color-mix(in srgb, var(--primary) 28%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.add-task-flash {
+  animation: add-task-flash 900ms ease-out;
+}

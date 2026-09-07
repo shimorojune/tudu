@@ -234,7 +234,11 @@ export async function updateTask(
     return undefined;
   }
 
-  const patch: UpdateTaskFields & { position?: number } = { ...fields };
+  const patch: UpdateTaskFields & {
+    position?: number;
+    carriedDays?: number;
+    carriedSince?: string | null;
+  } = { ...fields };
 
   // Moving a task into a different lane sends it to the bottom of that lane.
   if ("scheduledDate" in fields || "bucket" in fields) {
@@ -248,6 +252,14 @@ export async function updateTask(
       patch.scheduledDate ?? null,
       patch.bucket ?? null,
     );
+  }
+
+  if (
+    "scheduledDate" in fields &&
+    fields.scheduledDate !== existing.scheduledDate
+  ) {
+    patch.carriedDays = 0;
+    patch.carriedSince = null;
   }
 
   const afterRow = applyTaskPatch(existing, patch);
@@ -352,6 +364,8 @@ export async function reorderTasks(
       bucket: placement.bucket,
     });
 
+    const dateChanged = placement.scheduledDate !== before.scheduledDate;
+
     writes.push(
       db
         .update(tasks)
@@ -359,6 +373,9 @@ export async function reorderTasks(
           scheduledDate: placement.scheduledDate,
           bucket: placement.bucket,
           position: placement.position,
+          ...(dateChanged
+            ? { carriedDays: 0, carriedSince: null }
+            : {}),
         })
         .where(and(eq(tasks.id, placement.taskId), eq(tasks.userId, userId))),
     );

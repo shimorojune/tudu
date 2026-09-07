@@ -23,10 +23,12 @@ import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { CSS } from "@dnd-kit/utilities";
 import type { Bucket, Subtask, Task } from "@tudu/shared";
+import { isSlipping } from "@tudu/shared";
 import { Check } from "lucide-react";
 import { useSlideOnReorder } from "@/hooks/useSlideOnReorder";
 import { cn } from "@/lib/utils";
 import { taskMetaSegments } from "@/lib/taskMeta";
+import { CarryDots } from "@/components/tasks/CarryDots";
 import { TaskDeleteDialog } from "@/components/tasks/TaskDeleteDialog";
 import {
   ContextMenu,
@@ -58,7 +60,18 @@ export type TaskRowProps = {
   menuVariant: "day" | "unscheduled";
   orderKey?: string;
   actions?: TaskRowActions;
+  flash?: boolean;
+  onFlashComplete?: () => void;
 };
+
+function flashElement(element: HTMLElement | null) {
+  if (!element) {
+    return;
+  }
+  element.classList.remove("add-task-flash");
+  void element.offsetWidth;
+  element.classList.add("add-task-flash");
+}
 
 function TaskCheckbox({
   checked,
@@ -557,6 +570,8 @@ export function TaskRow({
   menuVariant,
   orderKey = "",
   actions,
+  flash = false,
+  onFlashComplete,
 }: TaskRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [addingSubtask, setAddingSubtask] = useState(false);
@@ -583,6 +598,18 @@ export function TaskRow({
     [setNodeRef],
   );
   useSlideOnReorder(rowNodeRef, !isDragging, orderKey);
+
+  useLayoutEffect(() => {
+    if (!flash) {
+      return;
+    }
+    const node = rowNodeRef.current;
+    if (!node) {
+      return;
+    }
+    node.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    flashElement(node);
+  }, [flash]);
 
   const segments = selectedDate
     ? taskMetaSegments(task, selectedDate)
@@ -640,9 +667,15 @@ export function TaskRow({
           onSelect();
         }
       }}
+      onAnimationEnd={(event) => {
+        if (event.animationName === "add-task-flash") {
+          event.currentTarget.classList.remove("add-task-flash");
+          onFlashComplete?.();
+        }
+      }}
       className={cn(
         "relative grid cursor-default border-b border-hair outline-none",
-        "grid-cols-[13px_19px_minmax(0,1fr)] gap-x-[12px] px-[28px]",
+        "grid-cols-[13px_19px_minmax(0,1fr)_auto] gap-x-[12px] px-[28px]",
         "transition-[padding-top,padding-bottom,opacity] duration-200 ease-out motion-reduce:transition-none",
         isDragging && "bg-foreground/[0.04] [&>*]:invisible",
         expanded
@@ -715,7 +748,10 @@ export function TaskRow({
               ) : (
                 <span
                   key={`text-${index}`}
-                  className={cn(segment.emphasis && "font-bold text-foreground")}
+                  className={cn(
+                    segment.emphasis && "font-bold text-foreground",
+                    segment.accent && "font-bold text-primary",
+                  )}
                 >
                   {segment.text}
                 </span>
@@ -837,6 +873,13 @@ export function TaskRow({
           </div>
         </div>
       </div>
+      <CarryDots
+        carriedDays={task.carriedDays}
+        slipping={isSlipping({
+          carriedDays: task.carriedDays,
+          deadline: task.deadline,
+        })}
+      />
     </div>
   );
 

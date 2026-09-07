@@ -65,4 +65,25 @@ describe("formatTimelineEvent", () => {
     );
     expect(copy.parts.some((part) => part.kind === "mono")).toBe(true);
   });
+
+  it("formats rolled_over as system line", () => {
+    const copy = formatTimelineEvent(
+      {
+        ...base,
+        actorId: null,
+        type: "rolled_over",
+        data: { from: "2026-09-05", to: "2026-09-06", carriedDays: 1 },
+      },
+      ctx,
+    );
+    expect(copy.isSystem).toBe(true);
+    expect(copy.parts[0]).toMatchObject({
+      kind: "text",
+      text: expect.stringContaining("Rolled over from"),
+      muted: true,
+    });
+    if (copy.parts[0]?.kind === "text") {
+      expect(copy.parts[0].text).toContain("first day carried");
+    }
+  });
 });

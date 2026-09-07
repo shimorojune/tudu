@@ -64,6 +64,8 @@ type UnscheduledDndProps = {
   setSelectedTaskId: (id: string | null) => void;
   makeRowActions: (taskId: string) => TaskRowActions;
   onReorder: (items: ContainerItems) => void;
+  flashTaskId: string | null;
+  onFlashComplete: () => void;
 };
 
 function UnscheduledDnd({
@@ -73,6 +75,8 @@ function UnscheduledDnd({
   setSelectedTaskId,
   makeRowActions,
   onReorder,
+  flashTaskId,
+  onFlashComplete,
 }: UnscheduledDndProps) {
   const { droppableRects } = useDndContext();
   const pointerYRef = usePointerY();
@@ -213,6 +217,8 @@ function UnscheduledDnd({
                 menuVariant="unscheduled"
                 orderKey={`unscheduled:${index}`}
                 actions={makeRowActions(task.id)}
+                flash={task.id === flashTaskId}
+                onFlashComplete={onFlashComplete}
               />
             ))}
           </SortableContext>
@@ -233,6 +239,7 @@ export function UnscheduledRoute() {
   const { data, isLoading, isError } = useGetUnscheduledTasksQuery();
   const { data: todayData } = useGetTasksForDayQuery(todayIso());
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [flashTaskId, setFlashTaskId] = useState<string | null>(null);
   const addInputRef = useRef<HTMLInputElement>(null);
 
   const [createTask] = useCreateTaskMutation();
@@ -331,13 +338,23 @@ export function UnscheduledRoute() {
             setSelectedTaskId={setSelectedTaskId}
             makeRowActions={makeRowActions}
             onReorder={handleReorder}
+            flashTaskId={flashTaskId}
+            onFlashComplete={() => setFlashTaskId(null)}
           />
         </DndContext>
       </ScrollArea>
       <AddTaskRow
         inputRef={addInputRef}
-        onSubmit={(title) => {
-          createTask(createTaskBody({ title, scheduledDate: null, bucket: null }));
+        onSubmit={async (title) => {
+          try {
+            const result = await createTask(
+              createTaskBody({ title, scheduledDate: null, bucket: null }),
+            ).unwrap();
+            setSelectedTaskId(result.task.id);
+            setFlashTaskId(result.task.id);
+          } catch {
+            // create failed; leave selection unchanged
+          }
         }}
       />
     </div>

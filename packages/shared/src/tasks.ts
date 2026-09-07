@@ -151,5 +151,16 @@ export const reorderSubtasksRequestSchema = z.object({
 
 export type ReorderSubtasksRequest = z.infer<typeof reorderSubtasksRequestSchema>;
 
+export const rolloverRequestSchema = z.object({
+  toDate: isoDateSchema,
+});
+
+export type RolloverRequest = z.infer<typeof rolloverRequestSchema>;
+
+export type RolloverResponse = {
+  movedCount: number;
+  taskIds: string[];
+};
+
 export type TasksResponse = { tasks: Task[] };
 export type TaskResponse = { task: Task };

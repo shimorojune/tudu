@@ -18,12 +18,14 @@ type DayState = {
   selectedDate: string;
   selectedTaskId: string | null;
   inspectorTab: InspectorTab;
+  addTaskRequest: number;
 };
 
 const initialState: DayState = {
   selectedDate: todayIso(),
   selectedTaskId: null,
   inspectorTab: "details",
+  addTaskRequest: 0,
 };
 
 export const daySlice = createSlice({
@@ -50,6 +52,9 @@ export const daySlice = createSlice({
     setInspectorTab(state, action: PayloadAction<InspectorTab>) {
       state.inspectorTab = action.payload;
     },
+    requestAddTask(state) {
+      state.addTaskRequest += 1;
+    },
   },
 });
 
@@ -59,4 +64,5 @@ export const {
   goToToday,
   setSelectedTaskId,
   setInspectorTab,
+  requestAddTask,
 } = daySlice.actions;

@@ -15,6 +15,13 @@
       "when": 1788707099222,
       "tag": "0001_flaky_captain_stacy",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788713782351,
+      "tag": "0002_giant_texas_twister",
+      "breakpoints": true
     }
   ]
 }

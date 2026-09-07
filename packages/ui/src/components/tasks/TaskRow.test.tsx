@@ -213,7 +213,9 @@ describe("TaskRow", () => {
       />,
     );
 
-    expect(container.firstChild).toHaveClass("grid-cols-[13px_19px_minmax(0,1fr)]");
+    expect(container.firstChild).toHaveClass(
+      "grid-cols-[13px_19px_minmax(0,1fr)_auto]",
+    );
   });
 
   it("shows a strike bar on completed tasks", () => {
@@ -430,6 +432,41 @@ describe("TaskRow", () => {
     );
 
     expect(screen.getByText("fix the bug")).toBeInTheDocument();
+  });
+
+  it("scrolls into view and flashes when flash is true", () => {
+    const scrollIntoView = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+
+    const { container, rerender } = render(
+      <TaskRow
+        task={fixtureTask}
+        bucket="later"
+        selected
+        selectedDate="2026-09-05"
+        onSelect={vi.fn()}
+        menuVariant="day"
+        flash={false}
+      />,
+    );
+
+    rerender(
+      <TaskRow
+        task={fixtureTask}
+        bucket="later"
+        selected
+        selectedDate="2026-09-05"
+        onSelect={vi.fn()}
+        menuVariant="day"
+        flash
+      />,
+    );
+
+    expect(scrollIntoView).toHaveBeenCalledWith({
+      block: "nearest",
+      behavior: "smooth",
+    });
+    expect(container.querySelector('[role="button"]')).toHaveClass("add-task-flash");
   });
 
   it("reserves subtask drag handle space without shifting checkbox layout", () => {

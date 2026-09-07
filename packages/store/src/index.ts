@@ -8,6 +8,7 @@ export {
   useUpdateTaskMutation,
   useDeleteTaskMutation,
   useReorderTasksMutation,
+  useRolloverMutation,
   useCreateSubtaskMutation,
   useUpdateSubtaskMutation,
   useDeleteSubtaskMutation,
@@ -29,6 +30,7 @@ export {
   shiftSelectedDate,
   goToToday,
   setInspectorTab,
+  requestAddTask,
   todayIso,
   type InspectorTab,
 } from "./slices/daySlice.js";

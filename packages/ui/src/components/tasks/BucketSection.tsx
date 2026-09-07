@@ -21,6 +21,8 @@ export type BucketSectionProps = {
   nowSoftCap?: number;
   dropTarget?: boolean;
   rowActionsForTask?: (taskId: string) => TaskRowActions;
+  flashTaskId?: string | null;
+  onFlashComplete?: () => void;
 };
 
 export function BucketSection({
@@ -37,6 +39,8 @@ export function BucketSection({
   nowSoftCap = DEFAULT_NOW_SOFT_CAP,
   dropTarget = false,
   rowActionsForTask,
+  flashTaskId = null,
+  onFlashComplete,
 }: BucketSectionProps) {
   const isNow = bucket === "now";
   const overCap = (nowCount ?? 0) > nowSoftCap;
@@ -123,6 +127,8 @@ export function BucketSection({
               menuVariant="day"
               orderKey={`${bucket}:${index}`}
               actions={rowActionsForTask?.(task.id)}
+              flash={task.id === flashTaskId}
+              onFlashComplete={onFlashComplete}
             />
           ))}
         </SortableContext>

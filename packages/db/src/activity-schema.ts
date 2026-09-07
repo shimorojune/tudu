@@ -24,6 +24,7 @@ export const timelineEventType = pgEnum("timeline_event_type", [
   "commented",
   "comment_edited",
   "comment_deleted",
+  "rolled_over",
 ]);
 
 export const comments = pgTable(
