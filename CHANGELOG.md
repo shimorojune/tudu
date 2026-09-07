@@ -1,3 +1,15 @@
+# [0.11.0](https://github.com/eGainDev/tudu/compare/v0.10.1...v0.11.0) (2026-09-07)
+
+
+### Bug Fixes
+
+* update font weights for Archivo in HTML files and adjust TaskRow component styling ([ddc988c](https://github.com/eGainDev/tudu/commit/ddc988cd8f016b4af276214b860d28689cdb9604))
+
+
+### Features
+
+* add in-app OTA update banner with GitHub release link ([6dff7c6](https://github.com/eGainDev/tudu/commit/6dff7c6600662c0f9152b78b1db31e0078846e8b))
+
 ## [0.10.1](https://github.com/eGainDev/tudu/compare/v0.10.0...v0.10.1) (2026-09-07)
 
 
