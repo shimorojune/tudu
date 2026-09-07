@@ -10,7 +10,7 @@
   ],
   "permissions": [
     "updater:default",
-    "dialog:default",
-    "process:default"
+    "process:default",
+    "opener:default"
   ]
 }

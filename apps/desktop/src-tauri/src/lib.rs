@@ -7,110 +7,15 @@ use tauri::{
     Manager, WindowEvent,
 };
 
-#[cfg(all(not(debug_assertions), target_os = "macos"))]
-use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
-#[cfg(all(not(debug_assertions), target_os = "macos"))]
-use tauri_plugin_updater::UpdaterExt;
-
-#[cfg(all(not(debug_assertions), target_os = "macos"))]
-const MAX_RELEASE_NOTES_LEN: usize = 240;
-
-#[cfg(all(not(debug_assertions), target_os = "macos"))]
-fn build_update_message(version: &str, body: &Option<String>) -> String {
-    let mut message = format!("Version {version} is ready. Install it now?");
-    if let Some(notes) = body {
-        let trimmed = notes.trim();
-        if !trimmed.is_empty() && trimmed.len() <= MAX_RELEASE_NOTES_LEN {
-            message.push_str("\n\n");
-            message.push_str(trimmed);
-        }
-    }
-    message
-}
-
-#[cfg(all(not(debug_assertions), target_os = "macos"))]
-fn ask_yes_no(
-    app: &tauri::AppHandle,
-    title: &str,
-    message: &str,
-    yes_label: &str,
-    no_label: &str,
-) -> bool {
-    app.dialog()
-        .message(message)
-        .title(title)
-        .buttons(MessageDialogButtons::OkCancelCustom(
-            yes_label.to_string(),
-            no_label.to_string(),
-        ))
-        .blocking_show()
-}
-
-#[cfg(all(not(debug_assertions), target_os = "macos"))]
-async fn check_for_updates(app: tauri::AppHandle) {
-    let updater = match app.updater() {
-        Ok(updater) => updater,
-        Err(error) => {
-            eprintln!("Updater unavailable: {error}");
-            return;
-        }
-    };
-
-    let update = match updater.check().await {
-        Ok(Some(update)) => update,
-        Ok(None) => return,
-        Err(error) => {
-            eprintln!("Failed to check for updates: {error}");
-            return;
-        }
-    };
-
-    let version = update.version.clone();
-    let message = build_update_message(&version, &update.body);
-    let should_update = ask_yes_no(&app, "Update available", &message, "Update", "Later");
-
-    if !should_update {
-        return;
-    }
-
-    if let Err(error) = update
-        .download_and_install(|_chunk, _total| {}, || {})
-        .await
-    {
-        eprintln!("Failed to install update: {error}");
-        return;
-    }
-
-    let should_restart = ask_yes_no(
-        &app,
-        "Restart Tudu",
-        "The update is installed. Restart now to use it.",
-        "Restart",
-        "Later",
-    );
-
-    if should_restart {
-        app.restart();
-    }
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_positioner::init())
         .setup(|app| {
             cleanup::cleanup_legacy_data(&app.handle());
-
-            #[cfg(all(not(debug_assertions), target_os = "macos"))]
-            {
-                let handle = app.handle().clone();
-                std::thread::spawn(move || {
-                    tauri::async_runtime::block_on(check_for_updates(handle));
-                });
-            }
 
             #[cfg(target_os = "macos")]
             {

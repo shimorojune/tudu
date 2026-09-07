@@ -13,6 +13,7 @@ const sampleRelease: GitHubRelease = {
   tag_name: "v0.9.1",
   published_at: "2026-09-07T10:00:00.000Z",
   body: "Bug fixes",
+  html_url: "https://github.com/eGainDev/tudu/releases/tag/v0.9.1",
   assets: [
     {
       name: UPDATES_SIG_NAME,
@@ -61,6 +62,7 @@ describe("mapReleaseToManifest", () => {
       version: "0.9.1",
       notes: "Bug fixes",
       pub_date: "2026-09-07T10:00:00.000Z",
+      release_url: "https://github.com/eGainDev/tudu/releases/tag/v0.9.1",
       platforms: {
         [UPDATES_PLATFORM]: {
           signature: "signed-payload",

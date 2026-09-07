@@ -11,6 +11,7 @@ export type GitHubRelease = {
   tag_name: string;
   published_at: string;
   body: string | null;
+  html_url: string;
   assets: GitHubReleaseAsset[];
 };
 
@@ -18,6 +19,7 @@ export type TauriUpdateManifest = {
   version: string;
   notes: string;
   pub_date: string;
+  release_url: string;
   platforms: Record<
     string,
     {
@@ -50,6 +52,7 @@ export function mapReleaseToManifest(
     version: stripReleaseTag(release.tag_name),
     notes: release.body?.trim() || `Tudu ${stripReleaseTag(release.tag_name)}`,
     pub_date: release.published_at,
+    release_url: release.html_url,
     platforms: {
       [UPDATES_PLATFORM]: {
         signature,

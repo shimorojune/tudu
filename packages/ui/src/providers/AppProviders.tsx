@@ -3,6 +3,10 @@ import { useEffect, type ReactNode } from "react";
 import { Provider } from "react-redux";
 import { getStoredAuthToken } from "@/lib/authClient";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import {
+  UpdateContext,
+  defaultUpdateContextValue,
+} from "@/providers/UpdateContext";
 import { ThemeProvider } from "./ThemeProvider";
 
 function AuthTokenBridge({ children }: { children: ReactNode }) {
@@ -20,11 +24,13 @@ type AppProvidersProps = {
 export function AppProviders({ children }: AppProvidersProps) {
   return (
     <Provider store={store}>
-      <ThemeProvider>
-        <TooltipProvider delayDuration={150}>
-          <AuthTokenBridge>{children}</AuthTokenBridge>
-        </TooltipProvider>
-      </ThemeProvider>
+      <UpdateContext.Provider value={defaultUpdateContextValue}>
+        <ThemeProvider>
+          <TooltipProvider delayDuration={150}>
+            <AuthTokenBridge>{children}</AuthTokenBridge>
+          </TooltipProvider>
+        </ThemeProvider>
+      </UpdateContext.Provider>
     </Provider>
   );
 }
