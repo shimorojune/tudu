@@ -1,3 +1,10 @@
+# [0.9.0](https://github.com/eGainDev/tudu/compare/v0.8.0...v0.9.0) (2026-09-07)
+
+
+### Features
+
+* add per-bucket task modal and subtask edit/delete ([3c75d10](https://github.com/eGainDev/tudu/commit/3c75d1098a429d5a78d3757636f1d892f92f670a))
+
 # [0.8.0](https://github.com/eGainDev/tudu/compare/v0.7.0...v0.8.0) (2026-09-07)
 
 
