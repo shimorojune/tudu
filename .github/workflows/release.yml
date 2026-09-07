@@ -162,6 +162,7 @@ jobs:
     runs-on: macos-latest
     env:
       ZIP_NAME: Tudu-macOS-v${{ needs.release.outputs.new_release_version }}.zip
+      VITE_API_URL: https://api.tudu.ezdev.net
     steps:
       - name: Checkout
         uses: actions/checkout@v4
