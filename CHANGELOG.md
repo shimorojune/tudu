@@ -1,3 +1,10 @@
+## [0.12.1](https://github.com/eGainDev/tudu/compare/v0.12.0...v0.12.1) (2026-09-07)
+
+
+### Bug Fixes
+
+* expose TAURI env vars so desktop update check runs ([12cc98b](https://github.com/eGainDev/tudu/commit/12cc98b6fa9a23bdf991a9869fd32997efadf287))
+
 # [0.12.0](https://github.com/eGainDev/tudu/compare/v0.11.0...v0.12.0) (2026-09-07)
 
 
