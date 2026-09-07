@@ -49,6 +49,40 @@ function applyLanesToTasks(tasks: Task[], lanes: Lane[]): Task[] {
 
 type CachePatch = { undo: () => void };
 
+export function syncTaskToDayCache(
+  tasks: Task[],
+  task: Task,
+  date: string,
+): Task[] {
+  const index = tasks.findIndex((entry) => entry.id === task.id);
+  if (task.scheduledDate === date) {
+    const next =
+      index === -1
+        ? [...tasks, task]
+        : tasks.map((entry) => (entry.id === task.id ? task : entry));
+    return [...next].sort((a, b) => a.position - b.position);
+  }
+  if (index === -1) {
+    return tasks;
+  }
+  return tasks.filter((entry) => entry.id !== task.id);
+}
+
+export function syncTaskToUnscheduledCache(tasks: Task[], task: Task): Task[] {
+  const index = tasks.findIndex((entry) => entry.id === task.id);
+  if (task.scheduledDate === null) {
+    const next =
+      index === -1
+        ? [...tasks, task]
+        : tasks.map((entry) => (entry.id === task.id ? task : entry));
+    return [...next].sort((a, b) => a.position - b.position);
+  }
+  if (index === -1) {
+    return tasks;
+  }
+  return tasks.filter((entry) => entry.id !== task.id);
+}
+
 export function patchAllTaskCaches(
   dispatch: AppDispatch,
   getState: () => RootState,
@@ -266,21 +300,43 @@ export function replaceTaskInCaches(
   getState: () => RootState,
   task: Task,
 ): CachePatch[] {
-  return patchAllTaskCaches(dispatch, getState, (tasks) => {
-    const index = tasks.findIndex((entry) => entry.id === task.id);
-    if (index === -1) {
-      if (task.scheduledDate === null && tasks.every((t) => t.scheduledDate === null)) {
-        return [...tasks, task];
-      }
-      if (task.scheduledDate !== null && tasks.some((t) => t.scheduledDate !== null)) {
-        return [...tasks, task];
-      }
-      return tasks;
+  const patches: CachePatch[] = [];
+  const apiState = getState()[baseApi.reducerPath] as {
+    queries: Record<string, TaskQueryEntry | undefined>;
+  };
+
+  for (const entry of Object.values(apiState.queries)) {
+    if (!entry?.endpointName || entry.status !== "fulfilled") {
+      continue;
     }
-    const next = [...tasks];
-    next[index] = task;
-    return next;
-  });
+
+    if (entry.endpointName === "getTasksForDay") {
+      const date = entry.originalArgs as string;
+      patches.push(
+        dispatch(
+          tasksApi.util.updateQueryData("getTasksForDay", date, (draft) => {
+            draft.tasks = syncTaskToDayCache(draft.tasks, task, date);
+          }),
+        ),
+      );
+    }
+
+    if (entry.endpointName === "getUnscheduledTasks") {
+      patches.push(
+        dispatch(
+          tasksApi.util.updateQueryData(
+            "getUnscheduledTasks",
+            undefined,
+            (draft) => {
+              draft.tasks = syncTaskToUnscheduledCache(draft.tasks, task);
+            },
+          ),
+        ),
+      );
+    }
+  }
+
+  return patches;
 }
 
 export function removeTaskFromCaches(

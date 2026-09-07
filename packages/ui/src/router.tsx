@@ -53,6 +53,9 @@ const todayRoute = createRoute({
 const weekRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/week",
+  validateSearch: (search: Record<string, unknown>) => ({
+    week: typeof search.week === "string" ? search.week : undefined,
+  }),
   component: WeekRoute,
 });
 

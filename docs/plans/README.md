@@ -106,7 +106,7 @@ JIRA knows when something is due, only you know whether you are touching it toda
 | 4 | Task CRUD and drag to reorder | [04-task-crud-and-drag.md](./04-task-crud-and-drag.md) | Done |
 | 5 | Detail pane: Details, Comments, Timeline | [05-detail-pane.md](./05-detail-pane.md) | Done |
 | 6 | Rollover, carry dots, slipping | [06-rollover.md](./06-rollover.md) | Done |
-| 7 | Week view and drag to reschedule | not written | Pending |
+| 7 | Week view and drag to reschedule | [07-week-view.md](./07-week-view.md) | Done |
 | 8 | Command palette and keyboard shortcuts | not written | Pending |
 | 9 | Manager: Inbox, roster, report's day | not written | Pending |
 | 10 | JIRA integration | not written | Pending |
@@ -295,12 +295,34 @@ lane. C3's "Carry to top of Now" setting is not built.
 
 ### Step 7: Week view and drag to reschedule
 
-Seven column grid, Monday to Sunday. Today column highlight. Task cards placed by
-scheduled day. Drag a card to another day to reschedule, option drag to copy. Drag from
-the Unscheduled route onto a day column to schedule. Week picker popover and jump to
-this week.
+Seven column grid, Monday to Sunday, with a left Unscheduled rail on `/week`. Compact
+cards on `scheduledDate`. Cross-day drag always lands in Later. In-column drag changes
+bucket and order. Card popover for bucket, complete, delete, and Open day. Week picker
+in the top bar. No duplicate API yet (Option-drag copy deferred).
 
 Design screens covered: A5 Week.
+
+#### Step 7 decisions (settled)
+
+**1. Columns show scheduled tasks only.** Start and deadline are card meta, not extra
+cards on other days.
+
+**2. Unscheduled rail on Week.** `/unscheduled` tab stays. Drag from the rail schedules
+into Later on the target day.
+
+**3. Cross-day drag always Later.** Preserves the product rule that a new day needs a
+fresh bucket pick.
+
+**4. In-column drag respects buckets.** Faint Now / Next / Later (or Priority 1 / 2 /
+3) labels on every day column.
+
+**5. Card popover, not inspector.** Open day jumps to Today with the task selected.
+
+**6. Header click highlights only.** New task and N use the highlighted day.
+
+**7. Completed tasks stay visible** on the week grid, struck through.
+
+**8. No new API.** Seven `getTasksForDay` queries plus existing reorder.
 
 ### Step 8: Command palette and keyboard shortcuts
 
@@ -462,6 +484,14 @@ code back to the mockup on any of these points.
     will slip. Decide which now, not at 17:00." (`pnpm lint:copy` rejects U+2014.)
 30. **Rollover undo defers to step 8.** A2b's footer mentions Cmd+Z. Step 6 does not
     wire undo; you can still drag or right-click to fix a rollover manually.
+31. **A5 Unscheduled lives in a left rail on Week, not only the nav tab.** The mockup
+    footer copy about Later is superseded (see deviation 1). Step 7 adds a 220px rail on
+    `/week` so drag-to-schedule does not require a route change.
+32. **A5 shows a flat card pile.** Step 7 draws faint Now / Next / Later zones inside
+    each day so in-column bucket drag has real targets.
+33. **Cross-day week drag always lands in Later.** The mockup does not state a bucket;
+    step 7 always uses Later so a moved task does not inherit Now on a new day.
+34. **Option-drag copy deferred.** A5 footer mentions copy; no duplicate API exists yet.
 
 ## Screens deliberately left out of the roadmap
 
