@@ -1,3 +1,10 @@
+# [0.13.0](https://github.com/eGainDev/tudu/compare/v0.12.1...v0.13.0) (2026-09-07)
+
+
+### Features
+
+* implement command palette with keyboard shortcuts ([bac70bc](https://github.com/eGainDev/tudu/commit/bac70bc3d0aed2c12e6085add3601e44910383b9))
+
 ## [0.12.1](https://github.com/eGainDev/tudu/compare/v0.12.0...v0.12.1) (2026-09-07)
 
 
