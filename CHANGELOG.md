@@ -1,3 +1,10 @@
+# [0.8.0](https://github.com/eGainDev/tudu/compare/v0.7.0...v0.8.0) (2026-09-07)
+
+
+### Features
+
+* rollover, carry dots, and task creation UX ([de596b9](https://github.com/eGainDev/tudu/commit/de596b9cf0639fc18304d5ddaf44423ced80cb6d))
+
 # [0.7.0](https://github.com/eGainDev/tudu/compare/v0.6.1...v0.7.0) (2026-09-06)
 
 
