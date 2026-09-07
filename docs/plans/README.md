@@ -107,7 +107,7 @@ JIRA knows when something is due, only you know whether you are touching it toda
 | 5 | Detail pane: Details, Comments, Timeline | [05-detail-pane.md](./05-detail-pane.md) | Done |
 | 6 | Rollover, carry dots, slipping | [06-rollover.md](./06-rollover.md) | Done |
 | 7 | Week view and drag to reschedule | [07-week-view.md](./07-week-view.md) | Done |
-| 8 | Command palette and keyboard shortcuts | not written | Pending |
+| 8 | Command palette and keyboard shortcuts | [08-command-palette.md](./08-command-palette.md) | Done |
 | 9 | Manager: Inbox, roster, report's day | not written | Pending |
 | 10 | JIRA integration | not written | Pending |
 | 11 | Settings screens | not written | Pending |
@@ -326,10 +326,25 @@ fresh bucket pick.
 
 ### Step 8: Command palette and keyboard shortcuts
 
-`cmdk` command palette on Cmd K. Quick add on Cmd N. The full in app shortcut map. This
-comes after the actions exist so the palette has something to call.
+`cmdk` command palette on Cmd+K. Commands only: navigate every main tab, New task,
+Jump to this week. N still opens the existing NewTaskDialog. Cmd+Shift+W jumps to this
+week on desktop only. Rollover undo stays deferred.
 
-Design screens covered: A4 palette shell, C8 Quick add (in app portion only).
+Design reference: A4 overlay shell (content is commands, not JIRA).
+
+#### Step 8 decisions (settled)
+
+**1. Reuse shadcn CommandDialog.** No extra palette library.
+
+**2. Commands only.** No task search, no new API.
+
+**3. Include placeholder routes.** Inbox, Team, Settings appear before those steps ship.
+
+**4. New task reuses `requestAddTask()`.** Same modal as N and the top bar button.
+
+**5. Cmd+Shift+W is desktop only.** Web uses palette or week picker instead.
+
+**6. Rollover undo deferred** again.
 
 ### Step 9: Manager: Inbox, roster, report's day
 

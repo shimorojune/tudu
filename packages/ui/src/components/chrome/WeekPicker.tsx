@@ -109,7 +109,10 @@ export function WeekPicker({ weekId, weekDays }: WeekPickerProps) {
             className="flex w-full items-center gap-[8px] border-t border-hair px-[12px] py-[9px] text-left text-[11px] text-faint"
             onClick={() => goToWeek(defaultWeekId())}
           >
-            Jump to this week
+            <span>Jump to this week</span>
+            <span className="ml-auto font-mono text-[10px] text-faint">
+              Cmd+Shift+W
+            </span>
           </button>
         </PopoverContent>
       </Popover>
