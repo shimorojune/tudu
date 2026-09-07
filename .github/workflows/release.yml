@@ -186,6 +186,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build Tauri app
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm tauri:build
 
       - name: Package app zip
@@ -200,6 +203,8 @@ jobs:
           tag_name: v${{ needs.release.outputs.new_release_version }}
           files: |
             apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
+            apps/desktop/src-tauri/target/release/bundle/macos/Tudu.app.tar.gz
+            apps/desktop/src-tauri/target/release/bundle/macos/Tudu.app.tar.gz.sig
             dist/${{ env.ZIP_NAME }}
 
   deploy-prod:

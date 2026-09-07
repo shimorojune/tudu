@@ -13,6 +13,7 @@ import { Hono } from "hono";
 import { createAuth } from "./auth.js";
 import { createActivityRoute } from "./routes/activity.js";
 import { createTasksRoute } from "./routes/tasks.js";
+import { createUpdatesRoute } from "./routes/updates.js";
 import { createSessionMiddleware, type SessionEnv } from "./session-middleware.js";
 
 const serverDir = dirname(fileURLToPath(import.meta.url));
@@ -56,6 +57,8 @@ app.get("/health", (c) => {
   };
   return c.json(response);
 });
+
+app.route("/", createUpdatesRoute());
 
 app.all("/api/auth/*", (c) => {
   if (!auth) {
