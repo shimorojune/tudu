@@ -37,9 +37,12 @@ fn ask_yes_no(
     no_label: &str,
 ) -> bool {
     app.dialog()
-        .title(title)
         .message(message)
-        .buttons(MessageDialogButtons::OkCancelCustom(yes_label, no_label))
+        .title(title)
+        .buttons(MessageDialogButtons::OkCancelCustom(
+            yes_label.to_string(),
+            no_label.to_string(),
+        ))
         .blocking_show()
 }
 
