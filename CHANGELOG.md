@@ -1,3 +1,10 @@
+## [0.10.1](https://github.com/eGainDev/tudu/compare/v0.10.0...v0.10.1) (2026-09-07)
+
+
+### Bug Fixes
+
+* bake prod API URL into macOS release builds ([c6af65c](https://github.com/eGainDev/tudu/commit/c6af65c0ec4976f3480627fd709b0c959f261965))
+
 # [0.10.0](https://github.com/eGainDev/tudu/compare/v0.9.0...v0.10.0) (2026-09-07)
 
 
