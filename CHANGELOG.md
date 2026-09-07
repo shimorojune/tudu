@@ -1,3 +1,16 @@
+# [0.10.0](https://github.com/eGainDev/tudu/compare/v0.9.0...v0.10.0) (2026-09-07)
+
+
+### Bug Fixes
+
+* correct tauri dialog API for macOS updater prompts ([577002a](https://github.com/eGainDev/tudu/commit/577002abaad3ba21a23faf9d790d0196e7866e50))
+* pass UPDATES env vars through docker-compose ([29cd441](https://github.com/eGainDev/tudu/commit/29cd441df43e49b4e3b20d860aca1e8a27cb8bcb))
+
+
+### Features
+
+* add Mac OTA updates via API proxy and update prompts ([db8170e](https://github.com/eGainDev/tudu/commit/db8170e8487085e8dc0cb58494532f68cdf31671))
+
 # [0.9.0](https://github.com/eGainDev/tudu/compare/v0.8.0...v0.9.0) (2026-09-07)
 
 
