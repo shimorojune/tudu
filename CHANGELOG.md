@@ -1,3 +1,10 @@
+# [0.14.0](https://github.com/eGainDev/tudu/compare/v0.13.0...v0.14.0) (2026-09-07)
+
+
+### Features
+
+* add link preview functionality and task description support ([891894a](https://github.com/eGainDev/tudu/commit/891894a46d1edb4abceb3b7dd40d89c77cae34c6))
+
 # [0.13.0](https://github.com/eGainDev/tudu/compare/v0.12.1...v0.13.0) (2026-09-07)
 
 
