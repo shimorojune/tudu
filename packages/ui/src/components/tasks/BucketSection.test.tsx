@@ -17,6 +17,7 @@ describe("BucketSection", () => {
         selectedTaskId={null}
         selectedDate="2026-09-05"
         onSelectTask={vi.fn()}
+        onAddTask={vi.fn()}
         showNowClearPrompt
         onNowClearPrompt={onNowClearPrompt}
       />,
@@ -40,6 +41,7 @@ describe("BucketSection", () => {
         selectedTaskId={null}
         selectedDate="2026-09-05"
         onSelectTask={vi.fn()}
+        onAddTask={vi.fn()}
         showNowHelper
         nowCount={3}
         nowSoftCap={DEFAULT_NOW_SOFT_CAP}
@@ -58,6 +60,7 @@ describe("BucketSection", () => {
         selectedTaskId={null}
         selectedDate="2026-09-05"
         onSelectTask={vi.fn()}
+        onAddTask={vi.fn()}
         showNowHelper
         nowCount={6}
         nowSoftCap={5}
@@ -76,6 +79,7 @@ describe("BucketSection", () => {
         selectedTaskId={null}
         selectedDate="2026-09-05"
         onSelectTask={vi.fn()}
+        onAddTask={vi.fn()}
         dropTarget
       />,
     );

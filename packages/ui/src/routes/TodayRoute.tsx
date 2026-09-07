@@ -1,25 +1,24 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { effectiveDayIso } from "@tudu/shared";
+import { effectiveDayIso, type Bucket } from "@tudu/shared";
 import {
   setSelectedTaskId,
+  useCreateSubtaskMutation,
   useCreateTaskMutation,
   useGetTasksForDayQuery,
   useGetUnscheduledTasksQuery,
-  useReorderTasksMutation,
   type RootState,
 } from "@tudu/store";
 import { DayTaskList } from "@/components/tasks/DayTaskList";
+import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
 import { createTaskBody } from "@/lib/createTask";
 import { DetailInspector } from "@/components/inspector/DetailInspector";
 import { JiraColumnEmpty } from "@/components/jira/JiraColumnEmpty";
 import { MidnightBanner } from "@/components/today/MidnightBanner";
-import { RolloverBanner } from "@/components/today/RolloverBanner";
 import { TodayFirstRun } from "@/components/today/TodayFirstRun";
 import { TodayPanelLayout } from "@/components/today/TodayPanelLayout";
+import { useNewTaskShortcut } from "@/hooks/useNewTaskShortcut";
 import { useRolloverOnFocus } from "@/hooks/useRolloverOnFocus";
-import { buildPushCarriedToLaterLanes } from "@/lib/pushCarriedToLater";
-import { dismissRecap } from "@/lib/rolloverState";
 
 export function TodayRoute() {
   const dispatch = useDispatch();
@@ -29,7 +28,10 @@ export function TodayRoute() {
   const dayQuery = useGetTasksForDayQuery(selectedDate);
   const unscheduledQuery = useGetUnscheduledTasksQuery();
   const [createTask] = useCreateTaskMutation();
-  const [reorderTasks] = useReorderTasksMutation();
+  const [createSubtask] = useCreateSubtaskMutation();
+
+  const [firstRunDialogOpen, setFirstRunDialogOpen] = useState(false);
+  const [firstRunBucket, setFirstRunBucket] = useState<Bucket>("later");
 
   const tasks = dayQuery.data?.tasks ?? [];
   const unscheduledCount = unscheduledQuery.data?.tasks.length ?? 0;
@@ -44,28 +46,15 @@ export function TodayRoute() {
 
   const { maybeRollover } = useRolloverOnFocus(!isFirstRun);
 
-  const [recapDismissed, setRecapDismissed] = useState(false);
-
   const selectedTask =
     tasks.find((t) => t.id === selectedTaskId) ?? null;
 
-  const handlePushAllToLater = useCallback(async () => {
-    const lanes = buildPushCarriedToLaterLanes({
-      tasks,
-      scheduledDate: effectiveDay,
-    });
-    if (lanes.length === 0) {
-      return;
-    }
-    await reorderTasks({ lanes }).unwrap();
-    dismissRecap(effectiveDay);
-    setRecapDismissed(true);
-  }, [effectiveDay, reorderTasks, tasks]);
+  function openFirstRunDialog(bucket: Bucket = "later") {
+    setFirstRunBucket(bucket);
+    setFirstRunDialogOpen(true);
+  }
 
-  const handleDismissRecap = useCallback(() => {
-    dismissRecap(effectiveDay);
-    setRecapDismissed(true);
-  }, [effectiveDay]);
+  useNewTaskShortcut(() => openFirstRunDialog("later"), { enabled: isFirstRun });
 
   if (dayQuery.isLoading) {
     return (
@@ -85,22 +74,38 @@ export function TodayRoute() {
 
   if (isFirstRun) {
     return (
-      <TodayFirstRun
-        onAddFirst={() => {
-          createTask(
-            createTaskBody({
-              title: "My first task",
-              scheduledDate: selectedDate,
-              bucket: "later",
-            }),
-          );
-        }}
-      />
+      <>
+        <TodayFirstRun
+          onAddFirst={() => openFirstRunDialog("later")}
+        />
+        <NewTaskDialog
+          open={firstRunDialogOpen}
+          initialBucket={firstRunBucket}
+          initialDate={selectedDate}
+          nowCount={0}
+          onOpenChange={setFirstRunDialogOpen}
+          onSubmit={async (args) => {
+            const result = await createTask(
+              createTaskBody({
+                title: args.title,
+                scheduledDate: args.scheduledDate,
+                bucket: args.scheduledDate === null ? null : args.bucket,
+              }),
+            ).unwrap();
+
+            for (const subtaskTitle of args.subtaskTitles) {
+              await createSubtask({
+                taskId: result.task.id,
+                body: { title: subtaskTitle },
+              }).unwrap();
+            }
+
+            dispatch(setSelectedTaskId(result.task.id));
+          }}
+        />
+      </>
     );
   }
-
-  const showRecap =
-    selectedDate === effectiveDay && !recapDismissed;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -113,16 +118,6 @@ export function TodayRoute() {
       <TodayPanelLayout
         taskList={
           <div className="flex h-full min-h-0 flex-col bg-card">
-            {showRecap ? (
-              <RolloverBanner
-                tasks={tasks}
-                effectiveDay={effectiveDay}
-                onPushAllToLater={() => {
-                  void handlePushAllToLater();
-                }}
-                onDismiss={handleDismissRecap}
-              />
-            ) : null}
             <DayTaskList
               tasks={tasks}
               selectedDate={selectedDate}

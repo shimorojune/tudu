@@ -35,6 +35,7 @@ function defaultActions(overrides: Partial<TaskRowActions> = {}): TaskRowActions
     onDelete: vi.fn(),
     onToggleSubtask: vi.fn(),
     onRenameSubtask: vi.fn(),
+    onDeleteSubtask: vi.fn(),
     onAddSubtask: vi.fn(),
     onReorderSubtasks: vi.fn(),
     ...overrides,
@@ -196,7 +197,7 @@ describe("TaskRow", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Add a subtask" }));
-    const input = screen.getByPlaceholderText("Subtask title");
+    const input = screen.getByPlaceholderText("Subtask");
     await user.type(input, "fix the bug");
     expect(input).toHaveValue("fix the bug");
   });
@@ -401,7 +402,7 @@ describe("TaskRow", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Add a subtask" }));
-    await user.type(screen.getByPlaceholderText("Subtask title"), "fix the bug{Enter}");
+    await user.type(screen.getByPlaceholderText("Subtask"), "fix the bug{Enter}");
     expect(onAddSubtask).toHaveBeenCalledWith("fix the bug");
     expect(screen.getByText("fix the bug")).toBeInTheDocument();
 

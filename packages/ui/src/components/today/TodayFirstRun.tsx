@@ -4,13 +4,12 @@ export type TodayFirstRunProps = {
 
 const points = [
   <>
-    Type a task and it lands in <span className="font-semibold">Later</span>.
-    Drag it up into <span className="font-semibold">Now</span> when it is what
-    you are actually doing. Order is the only priority there is.
+    Use <span className="font-semibold">Add task</span> on a bucket to choose
+    where it lands before you type. Order is the only priority there is.
   </>,
   <>
-    Paste a JIRA key into the add field, or press ⌘L on a task, to tether it to
-    an issue. Your assigned issues are already in the middle pane.
+    Paste a JIRA key into a task, or press L on a task, to tether it to an
+    issue. Your assigned issues are already in the middle pane.
   </>,
   <>
     Anything unfinished comes with you tomorrow, with a dot for each day it has
@@ -47,7 +46,7 @@ export function TodayFirstRun({ onAddFirst }: TodayFirstRunProps) {
         >
           Add my first task
         </button>
-        <span className="font-mono text-[12.5px] text-faint">⌘N</span>
+        <span className="text-[12.5px] text-faint">Press N</span>
       </div>
     </div>
   );

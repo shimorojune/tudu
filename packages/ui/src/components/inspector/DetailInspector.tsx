@@ -70,7 +70,7 @@ function DetailInspectorBody({
 
       <footer className="mt-auto flex h-[30px] shrink-0 items-center justify-between border-t border-hair px-[24px] text-[11px] text-faint">
         <span>Panes drag to resize · rows drag to reorder</span>
-        <span className="font-mono">⌘K commands</span>
+        <span>Cmd+K for commands</span>
       </footer>
     </div>
   );

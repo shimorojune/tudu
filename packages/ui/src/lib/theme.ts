@@ -27,8 +27,9 @@ export function systemTheme(): ResolvedTheme {
     : "light";
 }
 
-export function resolveTheme(preference: ThemePreference): ResolvedTheme {
-  return preference === "system" ? systemTheme() : preference;
+export function resolveTheme(_preference: ThemePreference): ResolvedTheme {
+  // Step 13 restores dark theme. Force light until then.
+  return "light";
 }
 
 export function applyTheme(resolved: ResolvedTheme) {

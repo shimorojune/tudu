@@ -57,3 +57,8 @@ import { Button } from "../../components/ui/button"; // BAD
 
 Every icon-only control needs an `aria-label`. Always set `type="button"` on
 non-submitting buttons.
+
+## Shortcut labels
+
+Write shortcuts in plain words: `Press N`, `Cmd+K`, `Enter`, `Esc`, `Shift+N`.
+Never use Mac glyph chips like `⌘N` or `↩`.

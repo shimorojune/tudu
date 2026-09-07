@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useDebouncedCallback } from "use-debounce";
 import {
   DndContext,
   DragOverlay,
@@ -24,11 +25,12 @@ import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { CSS } from "@dnd-kit/utilities";
 import type { Bucket, Subtask, Task } from "@tudu/shared";
 import { isSlipping } from "@tudu/shared";
-import { Check } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { useSlideOnReorder } from "@/hooks/useSlideOnReorder";
 import { cn } from "@/lib/utils";
 import { taskMetaSegments } from "@/lib/taskMeta";
 import { CarryDots } from "@/components/tasks/CarryDots";
+import { SubtaskComposer } from "@/components/tasks/SubtaskComposer";
 import { TaskDeleteDialog } from "@/components/tasks/TaskDeleteDialog";
 import {
   ContextMenu,
@@ -47,6 +49,7 @@ export type TaskRowActions = {
   onScheduleToToday?: () => void;
   onToggleSubtask: (subtaskId: string, done: boolean) => void;
   onRenameSubtask: (subtaskId: string, title: string) => void;
+  onDeleteSubtask: (subtaskId: string) => void;
   onAddSubtask: (title: string) => void;
   onReorderSubtasks: (subtaskIds: string[]) => void;
 };
@@ -186,14 +189,32 @@ function SubtaskDragHandle({
   );
 }
 
+function SubtaskRemoveButton({ onRemove }: { onRemove: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label="Remove subtask"
+      className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/subtask:opacity-100 focus-visible:opacity-100 motion-reduce:transition-none hover:text-foreground"
+      onClick={(event) => {
+        event.stopPropagation();
+        onRemove();
+      }}
+    >
+      <X size={12} strokeWidth={2} aria-hidden />
+    </button>
+  );
+}
+
 type SortableSubtaskItemProps = {
   subtask: Subtask;
   pending: boolean;
   editing: boolean;
   onStartEdit: (event: MouseEvent<HTMLSpanElement>) => void;
   onCommit: (value: string) => void;
+  onAutoSave: (value: string) => void;
   onCancel: () => void;
   onToggle: () => void;
+  onDelete: () => void;
 };
 
 function SortableSubtaskItem({
@@ -202,8 +223,10 @@ function SortableSubtaskItem({
   editing,
   onStartEdit,
   onCommit,
+  onAutoSave,
   onCancel,
   onToggle,
+  onDelete,
 }: SortableSubtaskItemProps) {
   const {
     attributes,
@@ -244,6 +267,7 @@ function SortableSubtaskItem({
             ariaLabel="Rename subtask"
             onStartEdit={onStartEdit}
             onCommit={onCommit}
+            onAutoSave={onAutoSave}
             onCancel={onCancel}
           />
           <span
@@ -255,6 +279,7 @@ function SortableSubtaskItem({
           />
         </span>
       </span>
+      {!pending ? <SubtaskRemoveButton onRemove={onDelete} /> : null}
     </li>
   );
 }
@@ -266,6 +291,7 @@ type SubtaskListProps = {
   setEditingSubtaskId: (id: string | null) => void;
   onToggleSubtask: (subtaskId: string, done: boolean) => void;
   onRenameSubtask: (subtaskId: string, title: string) => void;
+  onDeleteSubtask: (subtaskId: string) => void;
   onReorderSubtasks: (subtaskIds: string[]) => void;
 };
 
@@ -292,6 +318,7 @@ function SubtaskList({
   setEditingSubtaskId,
   onToggleSubtask,
   onRenameSubtask,
+  onDeleteSubtask,
   onReorderSubtasks,
 }: SubtaskListProps) {
   const sensors = useSensors(
@@ -393,8 +420,12 @@ function SubtaskList({
                 onRenameSubtask(subtask.id, value);
                 setEditingSubtaskId(null);
               }}
+              onAutoSave={(value) => {
+                onRenameSubtask(subtask.id, value);
+              }}
               onCancel={() => setEditingSubtaskId(null)}
               onToggle={() => onToggleSubtask(subtask.id, !subtask.done)}
+              onDelete={() => onDeleteSubtask(subtask.id)}
             />
           ))}
         </ul>
@@ -431,6 +462,7 @@ type EditableTextProps = {
   ariaLabel: string;
   onStartEdit: (event: MouseEvent<HTMLSpanElement>) => void;
   onCommit: (value: string) => void;
+  onAutoSave?: (value: string) => void;
   onCancel: () => void;
 };
 
@@ -441,19 +473,33 @@ function EditableText({
   ariaLabel,
   onStartEdit,
   onCommit,
+  onAutoSave,
   onCancel,
 }: EditableTextProps) {
   const nodeRef = useRef<HTMLSpanElement | null>(null);
   const snapshot = useRef(text);
   const wasEditing = useRef(false);
+  const lastSaved = useRef(text);
+
+  const debouncedSave = useDebouncedCallback((value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === lastSaved.current) {
+      return;
+    }
+    lastSaved.current = trimmed;
+    snapshot.current = trimmed;
+    onAutoSave?.(trimmed);
+  }, 600);
 
   if (editing && !wasEditing.current) {
     snapshot.current = text;
+    lastSaved.current = text;
   }
   wasEditing.current = editing;
 
   useLayoutEffect(() => {
     if (!editing) {
+      debouncedSave.cancel();
       return;
     }
 
@@ -469,9 +515,10 @@ function EditableText({
     range.collapse(false);
     selection?.removeAllRanges();
     selection?.addRange(range);
-  }, [editing]);
+  }, [debouncedSave, editing]);
 
   function commit() {
+    debouncedSave.cancel();
     const node = nodeRef.current;
     if (!node) {
       return;
@@ -493,6 +540,7 @@ function EditableText({
   }
 
   function cancelEdit() {
+    debouncedSave.cancel();
     const node = nodeRef.current;
     if (node) {
       node.textContent = snapshot.current;
@@ -517,6 +565,12 @@ function EditableText({
           return;
         }
         onStartEdit(event);
+      }}
+      onInput={() => {
+        if (!editing) {
+          return;
+        }
+        debouncedSave(nodeRef.current?.textContent ?? "");
       }}
       onBlur={() => {
         if (editing) {
@@ -575,7 +629,6 @@ export function TaskRow({
 }: TaskRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [addingSubtask, setAddingSubtask] = useState(false);
-  const [subtaskTitle, setSubtaskTitle] = useState("");
   const [pendingSubtasks, setPendingSubtasks] = useState<
     { id: string; title: string }[]
   >([]);
@@ -598,6 +651,12 @@ export function TaskRow({
     [setNodeRef],
   );
   useSlideOnReorder(rowNodeRef, !isDragging, orderKey);
+
+  useEffect(() => {
+    if (isDragging && isEditing) {
+      setIsEditing(false);
+    }
+  }, [isDragging, isEditing]);
 
   useLayoutEffect(() => {
     if (!flash) {
@@ -718,6 +777,9 @@ export function TaskRow({
                 actions?.onRename(value);
                 setIsEditing(false);
               }}
+              onAutoSave={(value) => {
+                actions?.onRename(value);
+              }}
               onCancel={() => setIsEditing(false)}
             />
             <span
@@ -775,6 +837,7 @@ export function TaskRow({
                   setEditingSubtaskId={setEditingSubtaskId}
                   onToggleSubtask={actions.onToggleSubtask}
                   onRenameSubtask={actions.onRenameSubtask}
+                  onDeleteSubtask={actions.onDeleteSubtask}
                   onReorderSubtasks={actions.onReorderSubtasks}
                 />
               ) : visibleSubtasks.length > 0 ? (
@@ -782,7 +845,7 @@ export function TaskRow({
                   {visibleSubtasks.map((subtask) => (
                     <li
                       key={subtask.id}
-                      className="flex items-center gap-[11px] py-[4px]"
+                      className="group/subtask flex items-center gap-[11px] py-[4px]"
                     >
                       <SubtaskCheckbox
                         checked={subtask.done}
@@ -808,6 +871,9 @@ export function TaskRow({
                               actions?.onRenameSubtask(subtask.id, value);
                               setEditingSubtaskId(null);
                             }}
+                            onAutoSave={(value) => {
+                              actions?.onRenameSubtask(subtask.id, value);
+                            }}
                             onCancel={() => setEditingSubtaskId(null)}
                           />
                           <span
@@ -821,41 +887,27 @@ export function TaskRow({
                           />
                         </span>
                       </span>
+                      {!pendingIds.has(subtask.id) ? (
+                        <SubtaskRemoveButton
+                          onRemove={() => actions?.onDeleteSubtask(subtask.id)}
+                        />
+                      ) : null}
                     </li>
                   ))}
                 </ul>
               ) : null}
               {addingSubtask ? (
-                <input
+                <SubtaskComposer
                   autoFocus
-                  value={subtaskTitle}
-                  placeholder="Subtask title"
-                  className="mt-[6px] w-full bg-transparent text-[13px] outline-none placeholder:text-faint"
-                  onClick={(event) => event.stopPropagation()}
-                  onChange={(event) => setSubtaskTitle(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      const title = subtaskTitle.trim();
-                      if (title) {
-                        setPendingSubtasks((current) => [
-                          ...current,
-                          { id: crypto.randomUUID(), title },
-                        ]);
-                        actions?.onAddSubtask(title);
-                        setSubtaskTitle("");
-                      }
-                      setAddingSubtask(false);
-                    }
-                    if (event.key === "Escape") {
-                      setSubtaskTitle("");
-                      setAddingSubtask(false);
-                    }
+                  className="mt-[6px]"
+                  onAdd={(title) => {
+                    setPendingSubtasks((current) => [
+                      ...current,
+                      { id: crypto.randomUUID(), title },
+                    ]);
+                    actions?.onAddSubtask(title);
                   }}
-                  onBlur={() => {
-                    setSubtaskTitle("");
-                    setAddingSubtask(false);
-                  }}
+                  onEnd={() => setAddingSubtask(false)}
                 />
               ) : (
                 <button

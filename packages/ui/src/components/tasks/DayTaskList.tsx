@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -19,6 +19,7 @@ import { BUCKETS, type Bucket, type Task } from "@tudu/shared";
 import {
   useCreateSubtaskMutation,
   useCreateTaskMutation,
+  useDeleteSubtaskMutation,
   useDeleteTaskMutation,
   useReorderTasksMutation,
   useReorderSubtasksMutation,
@@ -46,12 +47,15 @@ import {
   pointerYFromEvent,
   taskCollisionDetection,
 } from "@/lib/dragCollision";
-import { AddTaskRow } from "@/components/tasks/AddTaskRow";
 import { BucketSection } from "@/components/tasks/BucketSection";
+import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
 import { createTaskBody } from "@/lib/createTask";
 import type { TaskRowActions } from "@/components/tasks/TaskRow";
+import { useNewTaskShortcut } from "@/hooks/useNewTaskShortcut";
 import { usePointerY } from "@/hooks/usePointerY";
 import { ScrollArea } from "@/components/ui/scroll-area";
+
+const CONTAINER_SWITCH_HYSTERESIS_PX = 12;
 
 export type DayTaskListProps = {
   tasks: Task[];
@@ -90,6 +94,7 @@ type DayTaskListDndProps = {
   rowActionsForTask: (taskId: string) => TaskRowActions;
   onNowClearPrompt: () => void;
   onReorder: (items: ContainerItems) => void;
+  onAddTask: (bucket: Bucket) => void;
   flashTaskId: string | null;
   onFlashComplete: () => void;
 };
@@ -105,6 +110,7 @@ function DayTaskListDnd({
   rowActionsForTask,
   onNowClearPrompt,
   onReorder,
+  onAddTask,
   flashTaskId,
   onFlashComplete,
 }: DayTaskListDndProps) {
@@ -168,11 +174,17 @@ function DayTaskListDnd({
     return rect ? { top: rect.top, height: rect.height } : null;
   }
 
-  function pointerMovedSinceLastPlacement(delta: number): boolean {
-    return (
-      appliedDeltaRef.current === null ||
-      Math.abs(delta - (appliedDeltaRef.current ?? 0)) >= 1
-    );
+  function pointerMovedSinceLastPlacement(
+    delta: number,
+    changesContainer: boolean,
+  ): boolean {
+    if (appliedDeltaRef.current === null) {
+      return true;
+    }
+    const moved = Math.abs(delta - appliedDeltaRef.current);
+    return changesContainer
+      ? moved >= CONTAINER_SWITCH_HYSTERESIS_PX
+      : moved >= 1;
   }
 
   function placeFromEvent(
@@ -181,9 +193,6 @@ function DayTaskListDnd({
     commit = false,
   ): ContainerItems {
     if (!event.over) {
-      return current.items;
-    }
-    if (!commit && !pointerMovedSinceLastPlacement(event.delta.y)) {
       return current.items;
     }
 
@@ -197,12 +206,25 @@ function DayTaskListDnd({
       rowRectFor,
     });
 
-    return placeItem({
+    const nextItems = placeItem({
       items: current.items,
       activeId: current.activeId,
       overId: target.overId,
       insertAfter: target.insertAfter,
     });
+
+    const beforeContainer = findContainer(current.items, current.activeId);
+    const afterContainer = findContainer(nextItems, current.activeId);
+    const changesContainer = beforeContainer !== afterContainer;
+
+    if (
+      !commit &&
+      !pointerMovedSinceLastPlacement(event.delta.y, changesContainer)
+    ) {
+      return current.items;
+    }
+
+    return nextItems;
   }
 
   function handleDragUpdate(event: DragMoveEvent | DragOverEvent) {
@@ -242,11 +264,13 @@ function DayTaskListDnd({
           selectedTaskId={selectedTaskId}
           selectedDate={selectedDate}
           onSelectTask={onSelectTask}
+          onAddTask={onAddTask}
           showNowHelper={bucket === "now" && isToday}
           showNowClearPrompt={bucket === "now" && showNowClearPrompt}
           onNowClearPrompt={onNowClearPrompt}
           nowCount={grouped.now.length}
           dropTarget={dropTargetBucket === bucket}
+          dragActive={drag !== null}
           rowActionsForTask={rowActionsForTask}
           flashTaskId={flashTaskId}
           onFlashComplete={onFlashComplete}
@@ -271,8 +295,9 @@ export function DayTaskList({
   onTaskDeleted,
 }: DayTaskListProps) {
   const isToday = selectedDate === todayIso();
-  const addInputRef = useRef<HTMLInputElement>(null);
   const [flashTaskId, setFlashTaskId] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogBucket, setDialogBucket] = useState<Bucket>("later");
 
   const baseItems = useMemo(
     () => itemsFromTasks(tasks, BUCKETS, (task) => task.bucket),
@@ -289,7 +314,15 @@ export function DayTaskList({
   const [reorderTasks] = useReorderTasksMutation();
   const [reorderSubtasks] = useReorderSubtasksMutation();
   const [createSubtask] = useCreateSubtaskMutation();
+  const [deleteSubtask] = useDeleteSubtaskMutation();
   const [updateSubtask] = useUpdateSubtaskMutation();
+
+  const openDialog = useCallback((bucket: Bucket = "later") => {
+    setDialogBucket(bucket);
+    setDialogOpen(true);
+  }, []);
+
+  useNewTaskShortcut(() => openDialog("later"));
 
   const laneFor = (bucket: string) => ({
     scheduledDate: selectedDate,
@@ -333,6 +366,9 @@ export function DayTaskList({
       onRenameSubtask: (subtaskId, title) => {
         updateSubtask({ id: subtaskId, patch: { title } });
       },
+      onDeleteSubtask: (subtaskId) => {
+        deleteSubtask(subtaskId);
+      },
       onAddSubtask: (title) => {
         createSubtask({ taskId, body: { title } });
       },
@@ -347,6 +383,31 @@ export function DayTaskList({
     if (lanes.length > 0) {
       reorderTasks({ lanes });
     }
+  }
+
+  async function handleCreateTask(args: {
+    title: string;
+    bucket: Bucket;
+    scheduledDate: string | null;
+    subtaskTitles: string[];
+  }) {
+    const result = await createTask(
+      createTaskBody({
+        title: args.title,
+        scheduledDate: args.scheduledDate,
+        bucket: args.scheduledDate === null ? null : args.bucket,
+      }),
+    ).unwrap();
+
+    for (const subtaskTitle of args.subtaskTitles) {
+      await createSubtask({
+        taskId: result.task.id,
+        body: { title: subtaskTitle },
+      }).unwrap();
+    }
+
+    onSelectTask(result.task.id);
+    setFlashTaskId(result.task.id);
   }
 
   return (
@@ -374,28 +435,19 @@ export function DayTaskList({
               }
             }}
             onReorder={handleReorder}
+            onAddTask={openDialog}
             flashTaskId={flashTaskId}
             onFlashComplete={() => setFlashTaskId(null)}
           />
         </DndContext>
       </ScrollArea>
-      <AddTaskRow
-        inputRef={addInputRef}
-        onSubmit={async (title) => {
-          try {
-            const result = await createTask(
-              createTaskBody({
-                title,
-                scheduledDate: selectedDate,
-                bucket: "later",
-              }),
-            ).unwrap();
-            onSelectTask(result.task.id);
-            setFlashTaskId(result.task.id);
-          } catch {
-            // create failed; leave selection unchanged
-          }
-        }}
+      <NewTaskDialog
+        open={dialogOpen}
+        initialBucket={dialogBucket}
+        initialDate={selectedDate}
+        nowCount={groupedForPrompt.now.length}
+        onOpenChange={setDialogOpen}
+        onSubmit={handleCreateTask}
       />
     </div>
   );

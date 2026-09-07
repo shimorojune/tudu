@@ -1,56 +1,146 @@
 ---
-description: Mandatory browser review after any user-visible or behavioral change
+description: Hard-gated browser review after any user-visible or behavioral change
 globs: packages/ui/**/*.tsx,packages/ui/**/*.css,packages/store/**/*.ts,apps/server/src/routes/**/*.ts
 alwaysApply: false
 ---
 
-# Review is mandatory
+# Review is a hard gate
 
 Any change that affects what the user sees or how the app behaves is not done
-when the code compiles and tests pass. It is done after you verify it yourself
-in a real browser with the `chrome-devtools` MCP. Never ask the user to be
-your first reviewer.
+when the code compiles and tests pass. It is done only after a full browser
+review against the test matrix below. Never ask the user to be your first
+reviewer.
 
-This applies to UI, UX, store/cache logic, API wiring, and any other change
-where the user would notice stale data, wrong state, or a crash. Unit tests
-alone are not enough.
+This applies to UI, UX, store/cache logic, API wiring, shortcuts, modals, and
+any other change where the user would notice stale data, wrong state, or a
+crash. Unit tests alone are not enough.
 
-## Steps
+## Step zero: sign in
 
-1. Make sure the dev server is up: `pnpm dev:all`, app at `http://localhost:5173`.
-2. Navigate to the screen that owns the changed behavior, then reach the exact
-   state you changed. Select the task, switch tabs, drag a row, submit a form.
-3. `take_snapshot` for structure and `take_screenshot` for pixels when UI changed.
+1. Run `pnpm db:seed` to ensure the standing test user exists.
+2. Start the app: `pnpm dev:all`, web at `http://localhost:5173`.
+3. Navigate to `/sign-in` and sign in as `testuser@egain.com` / `egain@123`.
+4. Confirm real data is on screen (task list, buckets, or first-run state).
+5. `list_console_messages` must be clean. A 401 or error state means you are
+   not signed in yet. Nothing observed past that point counts as reviewed.
+
+If any flow in the matrix cannot be exercised, the work is not done. Fix access
+or stop and say so. An auth wall is never an excuse.
+
+## Build the test matrix first
+
+Before touching the browser, enumerate every entry point, every control, and
+every value of every control affected by the change. Write it down, then test
+each row.
+
+Rules:
+
+- Every segment of a segmented control gets tested, not just the default.
+- Every toggle gets tested on both sides.
+- Every list gets tested empty and overflowing.
+- Every keyboard shortcut gets tested from every screen state where it applies.
+- Every modal gets tested with enough content to overflow the viewport.
+- Every global handler (`window` listeners, shortcuts, portals) gets a
+  single-owner audit: grep for other registrations of the same key or event,
+  and confirm only one is live per screen state.
+
+## Parallel agents
+
+Dispatch one browser subagent per flow when the matrix has more than three
+rows. Each agent:
+
+1. Creates its own tab with `new_page`.
+2. Passes its own `pageId` on every browser call.
+3. Signs in independently if needed.
+4. Reports its own pass/fail rows.
+
+Agents must not share a tab. Thoroughness beats speed.
+
+## Per-flow steps
+
+1. Navigate to the screen that owns the changed behavior.
+2. Reach the exact state you changed. Select the task, switch tabs, drag a
+   row, submit a form, open the modal from every entry point.
+3. `take_snapshot` for structure. `take_screenshot` for pixels when UI changed.
    Read the screenshot. Do not assume it looks right.
 4. Exercise the interaction end to end with `click`, `fill`, `press_key`,
    `hover`, drag. Confirm the observable result, not just that nothing threw.
 5. `list_console_messages` must be clean. Any new warning or error is a defect
    of this change until proven otherwise.
 
-## Functional changes to check every time
+## Functional checks every time
 
 - Cache and refetch: after a mutation, does the UI update without a full page
-  reload? Open the inspector, perform the action, confirm the new data appears.
-- React hooks: no hooks after early returns or inside conditionals. If a query
-  needs to be conditional, use `skip`, not an `if` guard around the hook call.
+  reload?
+- React hooks: no hooks after early returns or inside conditionals.
 - Cross-tab state: switching tabs or selecting another task must not crash or
   leave stale panels visible.
 - Optimistic updates: on failure, does the UI roll back cleanly?
+- Shortcuts: test with focus in an input, with a dialog open, and with focus
+  on the page body.
 
-## UI side effects to check every time
+## UI checks every time
 
-- Neighboring states of the same component: selected and unselected, empty and
-  populated, completed and active, dragging and idle.
+- Neighboring states: selected and unselected, empty and populated, completed
+  and active, dragging and idle.
 - Every bucket and route that renders the component, not only the one you were
-  looking at.
-- Alignment and baseline of siblings. A wrapper added for one element commonly
-  shifts the row it lives in.
+  looking at. If the change touches a shared component, the matrix must name
+  every route that imports it. Today and Unscheduled both render TaskRow and
+  NewTaskDialog. Inbox, Week, and first-run count if they share the same
+  component.
+- A named route is Pass only if you navigated to that exact URL and the
+  snapshot URL matches. No snapshot of `/unscheduled` means Unscheduled was
+  not reviewed. Claiming it was is a failed review.
+- A crash overlay is an automatic fail: "Something went wrong",
+  "is not defined", a React error boundary, or a blank main with a console
+  exception. Open every named route before declaring the work done.
+- Alignment and baseline of siblings.
 - Keyboard path and focus order, plus `aria-label` on any icon-only control.
 - Motion: run the transition, then confirm no leftover inline `transform` or
   `transition` sticks to the node afterwards.
 
-## Reporting
+## Own the feature, not the diff
 
-State what you opened, what you clicked, what you saw, and what you ruled out.
+The matrix above tests what changed. This section tests what the feature
+promises. A thorough diff review that misses an obvious gap in the same feature
+is still a failed review.
+
+- **Full verb sweep.** For every list of things the UI renders, check create,
+  read, update, delete, reorder, and toggle. Name any verb the user cannot
+  perform. A missing verb is a defect of the feature even when it predates
+  your change.
+- **Dead plumbing check.** Grep for exported mutations and API routes touching
+  the feature. Anything with no caller is a gap: report it, and wire it if it
+  is small.
+- **Dead controls.** Every button, checkbox, and input in the changed area must
+  do something when clicked. A control with no handler, or a handler that
+  receives `undefined`, is a defect.
+- **Both branches.** When a component renders one of two versions of a list,
+  test both. Confirm the one users actually hit is the one that got the fix.
+- **Fix or log.** Small adjacent defects get fixed in the same change. Larger
+  ones get named explicitly in the report. Silence is not an option.
+
+Add "out of scope" to the banned-phrase list when it is used to skip a defect
+found inside the feature under review.
+
+## Report format
+
+State results as a table:
+
+| Flow | Steps taken | Observed | Pass/Fail |
+
+Banned phrases without a screenshot that was actually read:
+
+- "should work"
+- "verified by tests"
+- "looks correct"
+- "both routes" / "Today and Unscheduled" unless each URL has its own snapshot
+
 If devtools cannot reach a state, say so plainly and name the untested state.
 Never claim a change is verified from unit tests alone.
+
+## Platforms
+
+Run the matrix on web (`http://localhost:5173`). When the change touches
+desktop-specific behavior (Tauri shell, native shortcuts), also run on desktop
+(`pnpm dev:desktop`).

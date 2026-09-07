@@ -105,13 +105,14 @@ JIRA knows when something is due, only you know whether you are touching it toda
 | 3 | Today screen, read only | [03-today-screen.md](./03-today-screen.md) | Done |
 | 4 | Task CRUD and drag to reorder | [04-task-crud-and-drag.md](./04-task-crud-and-drag.md) | Done |
 | 5 | Detail pane: Details, Comments, Timeline | [05-detail-pane.md](./05-detail-pane.md) | Done |
-| 6 | Rollover, carry dots, slipping | [06-rollover.md](./06-rollover.md) | Planned |
+| 6 | Rollover, carry dots, slipping | [06-rollover.md](./06-rollover.md) | Done |
 | 7 | Week view and drag to reschedule | not written | Pending |
 | 8 | Command palette and keyboard shortcuts | not written | Pending |
 | 9 | Manager: Inbox, roster, report's day | not written | Pending |
 | 10 | JIRA integration | not written | Pending |
 | 11 | Settings screens | not written | Pending |
 | 12 | macOS shell: menu bar, global hotkeys, Dock badge | not written | Pending |
+| 13 | Dark theme rework | not written | Pending |
 
 ### Step 1: Foundations
 

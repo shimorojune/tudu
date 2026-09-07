@@ -1,9 +1,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import {
   dismissMidnight,
-  dismissRecap,
   isMidnightDismissed,
-  isRecapDismissed,
   readDayOverride,
   readLastRun,
   writeDayOverride,
@@ -19,13 +17,6 @@ describe("rolloverState", () => {
     expect(readLastRun()).toBeNull();
     writeLastRun("2026-09-06");
     expect(readLastRun()).toBe("2026-09-06");
-  });
-
-  it("dismisses recap per effective day", () => {
-    expect(isRecapDismissed("2026-09-06")).toBe(false);
-    dismissRecap("2026-09-06");
-    expect(isRecapDismissed("2026-09-06")).toBe(true);
-    expect(isRecapDismissed("2026-09-07")).toBe(false);
   });
 
   it("dismisses midnight per calendar day", () => {

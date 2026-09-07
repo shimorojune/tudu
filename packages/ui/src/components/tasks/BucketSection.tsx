@@ -2,6 +2,7 @@ import { useDroppable } from "@dnd-kit/core";
 import {
   SortableContext,
 } from "@dnd-kit/sortable";
+import { Plus } from "lucide-react";
 import { DEFAULT_NOW_SOFT_CAP, type Bucket, type Task } from "@tudu/shared";
 import { noSortingStrategy } from "@/lib/dragSort";
 import { cn } from "@/lib/utils";
@@ -14,12 +15,14 @@ export type BucketSectionProps = {
   selectedTaskId: string | null;
   selectedDate: string;
   onSelectTask: (id: string) => void;
+  onAddTask: (bucket: Bucket) => void;
   showNowHelper?: boolean;
   showNowClearPrompt?: boolean;
   onNowClearPrompt?: () => void;
   nowCount?: number;
   nowSoftCap?: number;
   dropTarget?: boolean;
+  dragActive?: boolean;
   rowActionsForTask?: (taskId: string) => TaskRowActions;
   flashTaskId?: string | null;
   onFlashComplete?: () => void;
@@ -32,12 +35,14 @@ export function BucketSection({
   selectedTaskId,
   selectedDate,
   onSelectTask,
+  onAddTask,
   showNowHelper = false,
   showNowClearPrompt = false,
   onNowClearPrompt,
   nowCount,
   nowSoftCap = DEFAULT_NOW_SOFT_CAP,
   dropTarget = false,
+  dragActive = false,
   rowActionsForTask,
   flashTaskId = null,
   onFlashComplete,
@@ -60,8 +65,8 @@ export function BucketSection({
         className={cn(
           "transition-colors duration-150",
           isNow
-            ? "flex items-baseline gap-[12px] px-[28px] pb-[8px] pt-[24px]"
-            : "px-[28px] pb-[8px] pt-[28px]",
+            ? "flex items-center gap-[11px] px-[28px] pb-[8px] pt-[24px]"
+            : "flex items-center gap-[11px] px-[28px] pb-[8px] pt-[28px]",
           dropTarget && "bg-foreground/[0.06]",
         )}
       >
@@ -74,21 +79,29 @@ export function BucketSection({
           {label}
         </span>
         {isNow && showNowHelper ? (
-          <>
-            <span
-              className={cn(
-                "text-[11px] font-bold tabular-nums leading-none whitespace-nowrap px-[6px] py-[2px]",
-                overCap
-                  ? "bg-primary font-extrabold text-primary-foreground"
-                  : "border border-hair text-faint",
-              )}
-            >
-              {nowCount} / {nowSoftCap}
-            </span>
-            <span className="ml-auto text-[11.5px] text-ghost">
-              drag a row to reorder, or into another bucket
-            </span>
-          </>
+          <span
+            className={cn(
+              "text-[11px] font-bold tabular-nums leading-none whitespace-nowrap px-[6px] py-[2px]",
+              overCap
+                ? "bg-primary font-extrabold text-primary-foreground"
+                : "border border-hair text-faint",
+            )}
+          >
+            {nowCount} / {nowSoftCap}
+          </span>
+        ) : null}
+        <button
+          type="button"
+          className="inline-flex flex-none items-center gap-[5px] whitespace-nowrap border border-hair px-[8px] py-[4px] text-[11.5px] font-bold leading-none text-foreground hover:border-foreground hover:bg-foreground/[0.04]"
+          onClick={() => onAddTask(bucket)}
+        >
+          <Plus size={11} strokeWidth={2.6} aria-hidden />
+          Add task
+        </button>
+        {isNow && showNowHelper ? (
+          <span className="ml-auto text-[11.5px] text-ghost">
+            drag a row to reorder, or into another bucket
+          </span>
         ) : null}
       </header>
 
@@ -105,7 +118,12 @@ export function BucketSection({
         </p>
       ) : null}
 
-      <div className={cn(tasks.length === 0 && "min-h-[48px]")}>
+      <div
+        className={cn(
+          tasks.length === 0 && "min-h-[48px]",
+          dragActive && tasks.length === 0 && "min-h-[52px]",
+        )}
+      >
         {tasks.length === 0 && !showNowClearPrompt ? (
           <p className="px-[28px] py-[8px] text-[13px] text-faint">
             Nothing here yet.

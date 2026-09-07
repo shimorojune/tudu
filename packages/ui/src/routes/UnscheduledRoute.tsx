@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { Plus } from "lucide-react";
 import type { Task } from "@tudu/shared";
 import {
   DndContext,
@@ -22,6 +23,7 @@ import {
 import {
   useCreateSubtaskMutation,
   useCreateTaskMutation,
+  useDeleteSubtaskMutation,
   useDeleteTaskMutation,
   useGetTasksForDayQuery,
   useGetUnscheduledTasksQuery,
@@ -49,8 +51,9 @@ import {
 } from "@/lib/dragCollision";
 import { createTaskBody } from "@/lib/createTask";
 import { cn } from "@/lib/utils";
-import { AddTaskRow } from "@/components/tasks/AddTaskRow";
+import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
 import { TaskRow, type TaskRowActions } from "@/components/tasks/TaskRow";
+import { useNewTaskShortcut } from "@/hooks/useNewTaskShortcut";
 import { usePointerY } from "@/hooks/usePointerY";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -240,7 +243,7 @@ export function UnscheduledRoute() {
   const { data: todayData } = useGetTasksForDayQuery(todayIso());
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [flashTaskId, setFlashTaskId] = useState<string | null>(null);
-  const addInputRef = useRef<HTMLInputElement>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const [createTask] = useCreateTaskMutation();
   const [updateTask] = useUpdateTaskMutation();
@@ -248,7 +251,10 @@ export function UnscheduledRoute() {
   const [reorderTasks] = useReorderTasksMutation();
   const [reorderSubtasks] = useReorderSubtasksMutation();
   const [createSubtask] = useCreateSubtaskMutation();
+  const [deleteSubtask] = useDeleteSubtaskMutation();
   const [updateSubtask] = useUpdateSubtaskMutation();
+
+  useNewTaskShortcut(() => setDialogOpen(true));
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -303,6 +309,9 @@ export function UnscheduledRoute() {
       onRenameSubtask: (subtaskId, title) => {
         updateSubtask({ id: subtaskId, patch: { title } });
       },
+      onDeleteSubtask: (subtaskId) => {
+        deleteSubtask(subtaskId);
+      },
       onAddSubtask: (title) => {
         createSubtask({ taskId, body: { title } });
       },
@@ -321,8 +330,18 @@ export function UnscheduledRoute() {
 
   return (
     <div className="flex h-full flex-col bg-card">
-      <header className="px-[28px] pb-[8px] pt-[24px] text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
-        Unscheduled
+      <header className="flex items-center gap-[11px] px-[28px] pb-[8px] pt-[24px]">
+        <span className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
+          Unscheduled
+        </span>
+        <button
+          type="button"
+          className="inline-flex flex-none items-center gap-[5px] whitespace-nowrap border border-hair px-[8px] py-[4px] text-[11.5px] font-bold leading-none text-foreground hover:border-foreground hover:bg-foreground/[0.04]"
+          onClick={() => setDialogOpen(true)}
+        >
+          <Plus size={11} strokeWidth={2.6} aria-hidden />
+          Add task
+        </button>
       </header>
       <ScrollArea className="min-h-0 flex-1">
         <DndContext
@@ -343,18 +362,31 @@ export function UnscheduledRoute() {
           />
         </DndContext>
       </ScrollArea>
-      <AddTaskRow
-        inputRef={addInputRef}
-        onSubmit={async (title) => {
-          try {
-            const result = await createTask(
-              createTaskBody({ title, scheduledDate: null, bucket: null }),
-            ).unwrap();
-            setSelectedTaskId(result.task.id);
-            setFlashTaskId(result.task.id);
-          } catch {
-            // create failed; leave selection unchanged
+      <NewTaskDialog
+        open={dialogOpen}
+        initialBucket="later"
+        initialDate={todayIso()}
+        defaultDayChoice="unscheduled"
+        nowCount={todayTasks.filter((task) => task.bucket === "now").length}
+        onOpenChange={setDialogOpen}
+        onSubmit={async (args) => {
+          const result = await createTask(
+            createTaskBody({
+              title: args.title,
+              scheduledDate: args.scheduledDate,
+              bucket: args.scheduledDate === null ? null : args.bucket,
+            }),
+          ).unwrap();
+
+          for (const subtaskTitle of args.subtaskTitles) {
+            await createSubtask({
+              taskId: result.task.id,
+              body: { title: subtaskTitle },
+            }).unwrap();
           }
+
+          setSelectedTaskId(result.task.id);
+          setFlashTaskId(result.task.id);
         }}
       />
     </div>

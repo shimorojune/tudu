@@ -12,14 +12,6 @@ export function writeLastRun(iso: string) {
   localStorage.setItem(key("lastRunEffectiveDay"), iso);
 }
 
-export function isRecapDismissed(iso: string): boolean {
-  return localStorage.getItem(key(`dismissRecap:${iso}`)) === "1";
-}
-
-export function dismissRecap(iso: string) {
-  localStorage.setItem(key(`dismissRecap:${iso}`), "1");
-}
-
 export function isMidnightDismissed(iso: string): boolean {
   return localStorage.getItem(key(`dismissMidnight:${iso}`)) === "1";
 }

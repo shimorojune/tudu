@@ -5,7 +5,7 @@
   "description": "Tudu monorepo: desktop app, web app, and server",
   "license": "MIT",
   "scripts": {
-    "dev": "pnpm --parallel --filter @tudu/server --filter @tudu/desktop run dev",
+    "dev": "pnpm --parallel --filter @tudu/server --filter @tudu/web run dev",
     "dev:all": "pnpm --parallel --filter @tudu/server --filter @tudu/desktop --filter @tudu/web run dev",
     "dev:desktop": "pnpm --filter @tudu/desktop dev",
     "dev:web": "pnpm --filter @tudu/web dev",
@@ -20,6 +20,7 @@
     "db:generate": "pnpm --filter @tudu/db db:generate",
     "db:migrate": "pnpm --filter @tudu/db db:migrate",
     "db:push": "pnpm --filter @tudu/db db:push",
+    "db:seed": "pnpm --filter @tudu/server db:seed",
     "prepare": "husky"
   },
   "engines": {
