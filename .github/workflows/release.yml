@@ -114,7 +114,20 @@ jobs:
               EC=$?
             fi
             if [ "$EC" -ne 0 ] && grep -qE 'refs/tags/v0\.14\.0|tag v0\.14\.0|tag_name was used by an immutable release' "$LOG"; then
-              echo "v0.14.0 is immutable. Retrying as 0.15.0."
+              echo "v0.14.0 is immutable. Cleaning up and retrying as 0.15.0."
+              git tag -d v0.14.0 2>/dev/null || true
+              git fetch origin master
+              if git log origin/master -1 --format=%s | grep -q '^chore(release): 0.14.0$'; then
+                git checkout master
+                git reset --hard origin/master
+                git revert HEAD --no-edit
+                git push origin master
+                git fetch origin master
+                git reset --hard origin/master
+              else
+                git reset --hard origin/master
+              fi
+              : > "$LOG"
               run_release --release-as 0.15.0
               EC=$?
               RELEASE_AS=0.15.0
