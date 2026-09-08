@@ -1,3 +1,10 @@
+## [0.15.1](https://github.com/eGainDev/tudu/compare/tudu-0.15.0...tudu-0.15.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* prefix git tags with tudu- to dodge org tag rules ([35db685](https://github.com/eGainDev/tudu/commit/35db68585626db766b89d9b22cf28e4ac48d0844))
+
 # [0.14.0](https://github.com/eGainDev/tudu/compare/v0.13.0...v0.14.0) (2026-09-08)
 
 
