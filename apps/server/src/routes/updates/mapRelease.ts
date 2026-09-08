@@ -30,6 +30,9 @@ export type TauriUpdateManifest = {
 };
 
 export function stripReleaseTag(tagName: string): string {
+  if (tagName.startsWith("tudu-")) {
+    return tagName.slice("tudu-".length);
+  }
   return tagName.startsWith("v") ? tagName.slice(1) : tagName;
 }
 

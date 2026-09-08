@@ -34,6 +34,10 @@ describe("stripReleaseTag", () => {
   it("leaves tags without v unchanged", () => {
     expect(stripReleaseTag("0.9.1")).toBe("0.9.1");
   });
+
+  it("removes a leading tudu- prefix", () => {
+    expect(stripReleaseTag("tudu-0.15.1")).toBe("0.15.1");
+  });
 });
 
 describe("buildDownloadUrl", () => {

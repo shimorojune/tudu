@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       release_as:
-        description: "Force semver when auto version is blocked (e.g. 0.6.1)"
+        description: "Reserved for manual force version (not wired yet)"
         required: false
         type: string
       finish_version:
-        description: "Skip semantic-release; build and publish an existing draft tag (e.g. 0.6.1)"
+        description: "Skip semantic-release; build and publish an existing draft tag (e.g. 0.15.1)"
         required: false
         type: string
 
@@ -38,7 +38,7 @@ jobs:
         if: inputs.finish_version != ''
         id: finish
         run: |
-          TAG="v${{ inputs.finish_version }}"
+          TAG="tudu-${{ inputs.finish_version }}"
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release ${TAG} not found. Create a draft release first."
             exit 1
@@ -89,50 +89,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
-          set +e
+          set -o pipefail
           LOG=semantic-release.log
           : > "$LOG"
 
-          run_release() {
-            local args=("$@")
-            pnpm exec semantic-release "${args[@]}" 2>&1 | tee "$LOG"
-            return ${PIPESTATUS[0]}
-          }
-
-          RELEASE_AS="${{ inputs.release_as }}"
-          EC=0
-
-          if [ -n "$RELEASE_AS" ]; then
-            run_release --release-as "$RELEASE_AS"
-            EC=$?
-          else
-            run_release
-            EC=$?
-            if [ "$EC" -ne 0 ] && grep -qE 'refs/tags/v0\.6\.0|tag v0\.6\.0' "$LOG"; then
-              echo "v0.6.0 tag is blocked by repository rules. Retrying as 0.6.1."
-              run_release --release-as 0.6.1
-              EC=$?
-            fi
-            if [ "$EC" -ne 0 ] && grep -qE 'refs/tags/v0\.14\.0|tag v0\.14\.0|tag_name was used by an immutable release' "$LOG"; then
-              echo "v0.14.0 is immutable. Cleaning up and retrying as 0.15.0."
-              git tag -d v0.14.0 2>/dev/null || true
-              git fetch origin master
-              if git log origin/master -1 --format=%s | grep -q '^chore(release): 0.14.0$'; then
-                git checkout master
-                git reset --hard origin/master
-                git revert HEAD --no-edit
-                git push origin master
-                git fetch origin master
-                git reset --hard origin/master
-              else
-                git reset --hard origin/master
-              fi
-              : > "$LOG"
-              run_release --release-as 0.15.0
-              EC=$?
-              RELEASE_AS=0.15.0
-            fi
-          fi
+          pnpm exec semantic-release 2>&1 | tee "$LOG"
+          EC=${PIPESTATUS[0]}
 
           PUBLISHED=false
           VERSION=""
@@ -140,47 +102,13 @@ jobs:
           if grep -q "Published release" "$LOG"; then
             PUBLISHED=true
             VERSION=$(grep -oE 'Published release [0-9]+\.[0-9]+\.[0-9]+' "$LOG" | tail -1 | awk '{print $3}')
-          elif [ "$EC" -ne 0 ] && grep -q "The next release version is" "$LOG"; then
-            if [ -n "$RELEASE_AS" ]; then
-              VERSION="$RELEASE_AS"
-            else
-              VERSION=$(grep "The next release version is" "$LOG" | tail -1 | awk '{print $NF}')
-            fi
-            if grep -qE 'creations being restricted|push declined due to repository rule|immutable release' "$LOG"; then
-              if [ "$VERSION" = "0.14.0" ]; then
-                echo "v0.14.0 is immutable. Retrying semantic-release as 0.15.0."
-                run_release --release-as 0.15.0
-                EC=$?
-                VERSION=0.15.0
-                RELEASE_AS=0.15.0
-                if grep -q "Published release" "$LOG"; then
-                  PUBLISHED=true
-                fi
-              fi
-              if [ "$PUBLISHED" != "true" ]; then
-                echo "Tag push blocked for v${VERSION}. Creating tag via GitHub API."
-                git fetch origin master
-                RELEASE_SHA=$(git rev-parse origin/master)
-                gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
-                  -f ref="refs/tags/v${VERSION}" \
-                  -f sha="$RELEASE_SHA" 2>/dev/null || true
-                if ! gh release view "v${VERSION}" >/dev/null 2>&1; then
-                  gh release create "v${VERSION}" --target "$RELEASE_SHA" --draft --title "v${VERSION}" \
-                    --notes "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/v0.13.0...v${VERSION}"
-                fi
-                PUBLISHED=true
-                EC=0
-              fi
-            fi
           fi
 
           if [ "$PUBLISHED" = "true" ] && [ -n "$VERSION" ]; then
             git fetch origin master
-            if [ -z "$RELEASE_SHA" ]; then
-              RELEASE_SHA=$(git rev-parse origin/master)
-            fi
-            if ! git ls-remote --exit-code origin "refs/tags/v${VERSION}" >/dev/null 2>&1; then
-              echo "Tag v${VERSION} is not on origin. Downstream jobs will checkout ${RELEASE_SHA}."
+            RELEASE_SHA=$(git rev-parse origin/master)
+            if ! git ls-remote --exit-code origin "refs/tags/tudu-${VERSION}" >/dev/null 2>&1; then
+              echo "Tag tudu-${VERSION} is not on origin. Downstream jobs will checkout ${RELEASE_SHA}."
             fi
           fi
 
@@ -200,9 +128,9 @@ jobs:
             echo "published=${{ steps.finish.outputs.published }}" >> "$GITHUB_OUTPUT"
             echo "version=${{ steps.finish.outputs.version }}" >> "$GITHUB_OUTPUT"
             echo "finish_only=${{ steps.finish.outputs.finish_only }}" >> "$GITHUB_OUTPUT"
-            RELEASE_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v${{ inputs.finish_version }}" --jq '.object.sha' 2>/dev/null || true)
+            RELEASE_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/tudu-${{ inputs.finish_version }}" --jq '.object.sha' 2>/dev/null || true)
             if [ -z "$RELEASE_SHA" ]; then
-              RELEASE_SHA=$(gh release view "v${{ inputs.finish_version }}" --json targetCommitish --jq '.targetCommitish' 2>/dev/null || true)
+              RELEASE_SHA=$(gh release view "tudu-${{ inputs.finish_version }}" --json targetCommitish --jq '.targetCommitish' 2>/dev/null || true)
             fi
             echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
           else
@@ -224,7 +152,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.release.outputs.release_sha || format('v{0}', needs.release.outputs.new_release_version) }}
+          ref: ${{ needs.release.outputs.release_sha || format('tudu-{0}', needs.release.outputs.new_release_version) }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -260,7 +188,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
-          TAG="v${{ needs.release.outputs.new_release_version }}"
+          TAG="tudu-${{ needs.release.outputs.new_release_version }}"
           gh release upload "$TAG" \
             apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg \
             apps/desktop/src-tauri/target/release/bundle/macos/Tudu.app.tar.gz \
@@ -277,7 +205,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.release.outputs.release_sha || format('v{0}', needs.release.outputs.new_release_version) }}
+          ref: ${{ needs.release.outputs.release_sha || format('tudu-{0}', needs.release.outputs.new_release_version) }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -323,7 +251,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Publish release
-        run: gh release edit "v${{ needs.release.outputs.new_release_version }}" --draft=false
+        run: gh release edit "tudu-${{ needs.release.outputs.new_release_version }}" --draft=false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
@@ -347,14 +275,14 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Delete draft GitHub release
-        run: gh release delete "v${{ needs.release.outputs.new_release_version }}" --yes
+        run: gh release delete "tudu-${{ needs.release.outputs.new_release_version }}" --yes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         continue-on-error: true
 
       - name: Delete remote tag
-        run: git push origin ":refs/tags/v${{ needs.release.outputs.new_release_version }}"
+        run: git push origin ":refs/tags/tudu-${{ needs.release.outputs.new_release_version }}"
         continue-on-error: true
 
       - name: Revert release commit on master
