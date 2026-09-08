@@ -1,3 +1,16 @@
+# [0.14.0](https://github.com/eGainDev/tudu/compare/v0.13.0...v0.14.0) (2026-09-08)
+
+
+### Bug Fixes
+
+* add DOM lib so shared linkPreview builds in CI ([22df317](https://github.com/eGainDev/tudu/commit/22df31712b27f72b2007918bddf9a095460e028b))
+* checkout release commit SHA when tag push is blocked ([d8306b1](https://github.com/eGainDev/tudu/commit/d8306b10233c7c400bec6357c5a25fe45cd9ef85))
+
+
+### Features
+
+* add link preview functionality and task description support ([891894a](https://github.com/eGainDev/tudu/commit/891894a46d1edb4abceb3b7dd40d89c77cae34c6))
+
 # [0.13.0](https://github.com/eGainDev/tudu/compare/v0.12.1...v0.13.0) (2026-09-07)
 
 
