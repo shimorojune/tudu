@@ -113,6 +113,12 @@ jobs:
               run_release --release-as 0.6.1
               EC=$?
             fi
+            if [ "$EC" -ne 0 ] && grep -qE 'refs/tags/v0\.14\.0|tag v0\.14\.0|tag_name was used by an immutable release' "$LOG"; then
+              echo "v0.14.0 is immutable. Retrying as 0.15.0."
+              run_release --release-as 0.15.0
+              EC=$?
+              RELEASE_AS=0.15.0
+            fi
           fi
 
           PUBLISHED=false
@@ -122,20 +128,36 @@ jobs:
             PUBLISHED=true
             VERSION=$(grep -oE 'Published release [0-9]+\.[0-9]+\.[0-9]+' "$LOG" | tail -1 | awk '{print $3}')
           elif [ "$EC" -ne 0 ] && grep -q "The next release version is" "$LOG"; then
-            VERSION=$(grep "The next release version is" "$LOG" | tail -1 | awk '{print $NF}')
-            if grep -qE 'creations being restricted|push declined due to repository rule' "$LOG"; then
-              echo "Tag push blocked for v${VERSION}. Creating tag via GitHub API."
-              git fetch origin master
-              RELEASE_SHA=$(git rev-parse origin/master)
-              gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
-                -f ref="refs/tags/v${VERSION}" \
-                -f sha="$RELEASE_SHA" 2>/dev/null || true
-              if ! gh release view "v${VERSION}" >/dev/null 2>&1; then
-                gh release create "v${VERSION}" --target "$RELEASE_SHA" --draft --title "v${VERSION}" \
-                  --notes "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/v0.5.2...v${VERSION}"
+            if [ -n "$RELEASE_AS" ]; then
+              VERSION="$RELEASE_AS"
+            else
+              VERSION=$(grep "The next release version is" "$LOG" | tail -1 | awk '{print $NF}')
+            fi
+            if grep -qE 'creations being restricted|push declined due to repository rule|immutable release' "$LOG"; then
+              if [ "$VERSION" = "0.14.0" ]; then
+                echo "v0.14.0 is immutable. Retrying semantic-release as 0.15.0."
+                run_release --release-as 0.15.0
+                EC=$?
+                VERSION=0.15.0
+                RELEASE_AS=0.15.0
+                if grep -q "Published release" "$LOG"; then
+                  PUBLISHED=true
+                fi
               fi
-              PUBLISHED=true
-              EC=0
+              if [ "$PUBLISHED" != "true" ]; then
+                echo "Tag push blocked for v${VERSION}. Creating tag via GitHub API."
+                git fetch origin master
+                RELEASE_SHA=$(git rev-parse origin/master)
+                gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
+                  -f ref="refs/tags/v${VERSION}" \
+                  -f sha="$RELEASE_SHA" 2>/dev/null || true
+                if ! gh release view "v${VERSION}" >/dev/null 2>&1; then
+                  gh release create "v${VERSION}" --target "$RELEASE_SHA" --draft --title "v${VERSION}" \
+                    --notes "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/v0.13.0...v${VERSION}"
+                fi
+                PUBLISHED=true
+                EC=0
+              fi
             fi
           fi
 
@@ -221,14 +243,17 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "dist/$ZIP_NAME"
 
       - name: Upload release assets
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ needs.release.outputs.new_release_version }}
-          files: |
-            apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
-            apps/desktop/src-tauri/target/release/bundle/macos/Tudu.app.tar.gz
-            apps/desktop/src-tauri/target/release/bundle/macos/Tudu.app.tar.gz.sig
-            dist/${{ env.ZIP_NAME }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          TAG="v${{ needs.release.outputs.new_release_version }}"
+          gh release upload "$TAG" \
+            apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg \
+            apps/desktop/src-tauri/target/release/bundle/macos/Tudu.app.tar.gz \
+            apps/desktop/src-tauri/target/release/bundle/macos/Tudu.app.tar.gz.sig \
+            "dist/${ZIP_NAME}" \
+            --clobber
 
   deploy-prod:
     name: Deploy Web + Server
