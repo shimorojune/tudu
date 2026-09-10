@@ -38,6 +38,8 @@ export const tasks = pgTable(
     /** A timestamp rather than a boolean, because step 5's timeline needs to know
         when the task was finished. */
     completedAt: timestamp("completed_at", { withTimezone: true }),
+    /** Open-task working state. Cleared when the task is completed. */
+    inProgress: boolean("in_progress").notNull().default(false),
     carriedDays: integer("carried_days").notNull().default(0),
     carriedSince: date("carried_since", { mode: "string" }),
     isPrivate: boolean("is_private").notNull().default(false),

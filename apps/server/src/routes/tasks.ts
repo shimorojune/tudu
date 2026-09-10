@@ -86,6 +86,7 @@ function toTask(row: TaskRowWithSubtasks): Task {
     startDate: row.startDate,
     deadline: row.deadline?.toISOString() ?? null,
     completedAt: row.completedAt?.toISOString() ?? null,
+    inProgress: row.inProgress,
     carriedDays: row.carriedDays,
     carriedSince: row.carriedSince,
     isPrivate: row.isPrivate,
@@ -114,6 +115,10 @@ function toUpdateFields(patch: UpdateTaskRequest): UpdateTaskFields {
 
   if ("completed" in patch) {
     fields.completedAt = patch.completed ? new Date() : null;
+  }
+
+  if ("inProgress" in patch) {
+    fields.inProgress = patch.inProgress;
   }
 
   return fields;

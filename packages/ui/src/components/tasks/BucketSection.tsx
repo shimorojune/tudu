@@ -15,6 +15,7 @@ export type BucketSectionProps = {
   selectedTaskId: string | null;
   selectedDate: string;
   onSelectTask: (id: string) => void;
+  onDeselectTask?: () => void;
   onAddTask: (bucket: Bucket) => void;
   showNowHelper?: boolean;
   showNowClearPrompt?: boolean;
@@ -26,6 +27,7 @@ export type BucketSectionProps = {
   rowActionsForTask?: (taskId: string) => TaskRowActions;
   flashTaskId?: string | null;
   onFlashComplete?: () => void;
+  skipSlideForTaskId?: string | null;
 };
 
 export function BucketSection({
@@ -35,6 +37,7 @@ export function BucketSection({
   selectedTaskId,
   selectedDate,
   onSelectTask,
+  onDeselectTask,
   onAddTask,
   showNowHelper = false,
   showNowClearPrompt = false,
@@ -46,6 +49,7 @@ export function BucketSection({
   rowActionsForTask,
   flashTaskId = null,
   onFlashComplete,
+  skipSlideForTaskId = null,
 }: BucketSectionProps) {
   const isNow = bucket === "now";
   const overCap = (nowCount ?? 0) > nowSoftCap;
@@ -142,11 +146,13 @@ export function BucketSection({
               selected={task.id === selectedTaskId}
               selectedDate={selectedDate}
               onSelect={() => onSelectTask(task.id)}
+              onCollapse={onDeselectTask}
               menuVariant="day"
               orderKey={`${bucket}:${index}`}
               actions={rowActionsForTask?.(task.id)}
               flash={task.id === flashTaskId}
               onFlashComplete={onFlashComplete}
+              skipSlide={task.id === skipSlideForTaskId}
             />
           ))}
         </SortableContext>

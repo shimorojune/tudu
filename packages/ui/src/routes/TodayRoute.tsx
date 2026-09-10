@@ -123,6 +123,7 @@ export function TodayRoute() {
               selectedDate={selectedDate}
               selectedTaskId={selectedTaskId}
               onSelectTask={(id) => dispatch(setSelectedTaskId(id))}
+              onDeselectTask={() => dispatch(setSelectedTaskId(null))}
               onTaskDeleted={(id) => {
                 if (selectedTaskId === id) {
                   dispatch(setSelectedTaskId(null));

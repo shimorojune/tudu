@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useDispatch } from "react-redux";
 import { goToToday, requestAddTask } from "@tudu/store";
+import { useCommandPalette } from "@/components/chrome/CommandPaletteContext";
 import {
   commandsByGroup,
   isDesktopApp,
@@ -21,14 +22,14 @@ import {
 
 const GROUP_ORDER: CommandGroupName[] = ["Go", "Actions"];
 
-function isDialogOpen(): boolean {
+export function isCommandPaletteBlocked(): boolean {
   return (
     document.querySelector("[role='dialog'],[role='alertdialog']") !== null
   );
 }
 
 export function CommandPalette() {
-  const [open, setOpen] = useState(false);
+  const { open, setOpen } = useCommandPalette();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const grouped = commandsByGroup();
@@ -71,15 +72,11 @@ export function CommandPalette() {
 
       if (mod && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        setOpen((current) => {
-          if (current) {
-            return false;
-          }
-          if (isDialogOpen()) {
-            return false;
-          }
-          return true;
-        });
+        if (open) {
+          setOpen(false);
+        } else if (!isCommandPaletteBlocked()) {
+          setOpen(true);
+        }
         return;
       }
 
@@ -96,7 +93,7 @@ export function CommandPalette() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [jumpToThisWeek]);
+  }, [jumpToThisWeek, open, setOpen]);
 
   return (
     <CommandDialog

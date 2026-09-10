@@ -52,6 +52,7 @@ const fixtureTask: Task = {
   startDate: null,
   deadline: "2026-09-05T18:00:00.000Z",
   completedAt: null,
+    inProgress: false,
   carriedDays: 0,
   carriedSince: null,
   isPrivate: false,
@@ -126,6 +127,95 @@ describe("TaskRow", () => {
     expect(row).not.toHaveClass("pl-[13px]");
     expect(row).toHaveClass("before:bg-foreground");
     expect(screen.getByText("One")).toBeInTheDocument();
+  });
+
+  it("keeps an empty selected task collapsed", () => {
+    const emptyTask: Task = {
+      ...fixtureTask,
+      id: "99999999-9999-4999-8999-999999999999",
+      subtasks: [],
+    };
+    const { container } = render(
+      <TaskRow
+        task={emptyTask}
+        bucket="now"
+        selected
+        selectedDate="2026-09-05"
+        onSelect={vi.fn()}
+        menuVariant="day"
+      />,
+    );
+
+    const panel = container.querySelector(".grid.transition-\\[grid-template-rows\\]");
+    expect(panel).toHaveClass("grid-rows-[0fr]");
+    expect(panel).not.toHaveClass("grid-rows-[1fr]");
+  });
+
+  it("calls onCollapse when the expanded row body is clicked", async () => {
+    const onCollapse = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <TaskRow
+        task={fixtureTask}
+        bucket="now"
+        selected
+        selectedDate="2026-09-05"
+        onSelect={vi.fn()}
+        onCollapse={onCollapse}
+        menuVariant="day"
+        actions={defaultActions()}
+      />,
+    );
+
+    await user.click(screen.getByText("2 of 3 completed"));
+    expect(onCollapse).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call onCollapse when the title is clicked to edit", async () => {
+    const onCollapse = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <TaskRow
+        task={fixtureTask}
+        bucket="now"
+        selected
+        selectedDate="2026-09-05"
+        onSelect={vi.fn()}
+        onCollapse={onCollapse}
+        menuVariant="day"
+        actions={defaultActions()}
+      />,
+    );
+
+    await user.click(screen.getAllByText("Improve error message")[0]!);
+    expect(onCollapse).not.toHaveBeenCalled();
+  });
+
+  it("shows Mark in progress in the context menu", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TaskRow
+        task={fixtureTask}
+        bucket="now"
+        selected={false}
+        selectedDate="2026-09-05"
+        onSelect={vi.fn()}
+        menuVariant="day"
+        actions={defaultActions({
+          onToggleInProgress: vi.fn(),
+        })}
+      />,
+    );
+
+    await user.pointer({
+      keys: "[MouseRight>]",
+      target: screen.getByRole("button", { name: /Improve error message/i }),
+    });
+
+    expect(screen.getByRole("menuitem", { name: "Mark in progress" })).toBeInTheDocument();
   });
 
   it("animates the subtask panel open and closed", () => {

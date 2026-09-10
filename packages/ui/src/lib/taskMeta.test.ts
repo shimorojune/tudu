@@ -13,6 +13,7 @@ function baseTask(overrides: Partial<Task> = {}): Task {
     startDate: null,
     deadline: null,
     completedAt: null,
+    inProgress: false,
     carriedDays: 0,
     carriedSince: null,
     isPrivate: false,
@@ -33,6 +34,18 @@ describe("taskMetaSegments", () => {
     expect(segments.some((segment) => segment.kind === "text" && segment.text.includes("carried"))).toBe(
       false,
     );
+  });
+
+  it("shows in progress label for open in-progress tasks", () => {
+    const segments = taskMetaSegments(
+      baseTask({ inProgress: true }),
+      "2026-09-06",
+    );
+    expect(
+      segments.some(
+        (segment) => segment.kind === "text" && segment.text === "In progress",
+      ),
+    ).toBe(true);
   });
 
   it("shows overdue deadline with accent", () => {

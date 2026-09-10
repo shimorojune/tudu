@@ -58,7 +58,7 @@ function BucketZone({
       </div>
       <SortableContext items={tasks.map((task) => task.id)} strategy={noSortingStrategy}>
         <div className="flex flex-col gap-[8px]">
-          {tasks.map((task) => {
+          {tasks.map((task, index) => {
             const open = popoverTaskId === task.id;
             return (
               <WeekCardPopover
@@ -74,6 +74,7 @@ function BucketZone({
                   task={task}
                   scheduledDate={date}
                   isToday={isToday}
+                  orderKey={`${date}:${index}`}
                 />
               </WeekCardPopover>
             );

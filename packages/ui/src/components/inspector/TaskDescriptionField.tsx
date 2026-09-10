@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
 import { useUpdateTaskMutation } from "@tudu/store";
+import { AUTOSAVE_MS } from "@/lib/autosave";
 import { cn } from "@/lib/utils";
 
 export type TaskDescriptionFieldProps = {
@@ -14,9 +15,13 @@ export function TaskDescriptionField({
 }: TaskDescriptionFieldProps) {
   const [value, setValue] = useState(description ?? "");
   const lastSaved = useRef(description ?? "");
+  const focusedRef = useRef(false);
   const [updateTask] = useUpdateTaskMutation();
 
   useEffect(() => {
+    if (focusedRef.current) {
+      return;
+    }
     const next = description ?? "";
     setValue(next);
     lastSaved.current = next;
@@ -30,7 +35,7 @@ export function TaskDescriptionField({
     }
     lastSaved.current = normalized ?? "";
     void updateTask({ id: taskId, patch: { description: normalized } });
-  }, 600);
+  }, AUTOSAVE_MS);
 
   return (
     <textarea
@@ -43,13 +48,21 @@ export function TaskDescriptionField({
         "text-[13.5px] leading-[1.55] text-muted-foreground outline-none",
         "placeholder:text-faint focus:border-foreground focus:text-foreground",
       )}
+      onFocus={() => {
+        focusedRef.current = true;
+      }}
       onChange={(event) => {
         const next = event.target.value;
         setValue(next);
         debouncedSave(next);
       }}
-      onBlur={() => {
+      onBlur={(event) => {
+        focusedRef.current = false;
         debouncedSave.flush();
+        const next = event.target.value.trim();
+        const normalized = next.length > 0 ? next : null;
+        lastSaved.current = normalized ?? "";
+        setValue(event.target.value);
       }}
     />
   );

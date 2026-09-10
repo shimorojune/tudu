@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Task } from "@tudu/shared";
 import {
   appendOptimisticSubtask,
+  mergeTaskPatch,
   reorderSubtasksInTask,
   syncTaskToDayCache,
 } from "./taskCache.js";
@@ -17,6 +18,7 @@ function makeTask(overrides: Partial<Task> & Pick<Task, "id" | "title" | "schedu
     startDate: null,
     deadline: null,
     completedAt: null,
+    inProgress: false,
     carriedDays: 0,
     carriedSince: null,
     isPrivate: false,
@@ -38,6 +40,7 @@ const task: Task = {
   startDate: null,
   deadline: null,
   completedAt: null,
+  inProgress: false,
   carriedDays: 0,
   carriedSince: null,
   isPrivate: false,
@@ -80,6 +83,41 @@ describe("reorderSubtasksInTask", () => {
       "22222222-2222-4222-8222-222222222222",
     ]);
     expect(next.subtasks[0]?.position).toBe(0);
+  });
+});
+
+describe("mergeTaskPatch", () => {
+  it("moves a completed task to the lane end and clears in progress", () => {
+    const lane = [
+      task,
+      makeTask({
+        id: "33333333-3333-4333-8333-333333333333",
+        title: "Second",
+        scheduledDate: "2026-09-06",
+        bucket: "now",
+        position: 1,
+      }),
+    ];
+    const completing = { ...task, inProgress: true, position: 0 };
+
+    const next = mergeTaskPatch(completing, { completed: true }, lane);
+
+    expect(next.completedAt).not.toBeNull();
+    expect(next.inProgress).toBe(false);
+    expect(next.position).toBe(2);
+  });
+
+  it("keeps position when uncompleting", () => {
+    const completed = {
+      ...task,
+      completedAt: "2026-09-06T10:00:00.000Z",
+      position: 4,
+    };
+
+    const next = mergeTaskPatch(completed, { completed: false }, [task]);
+
+    expect(next.completedAt).toBeNull();
+    expect(next.position).toBe(4);
   });
 });
 

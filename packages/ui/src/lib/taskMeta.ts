@@ -56,6 +56,13 @@ export function taskMetaSegments(
     segments.push({ kind: "text", ...deadline });
   }
 
+  if (task.inProgress && task.completedAt === null) {
+    if (segments.length > 0) {
+      segments.push({ kind: "dot" });
+    }
+    segments.push({ kind: "text", text: "In progress", accent: true });
+  }
+
   const doneCount = task.subtasks.filter((s) => s.done).length;
   if (task.subtasks.length > 0) {
     if (segments.length > 0) {

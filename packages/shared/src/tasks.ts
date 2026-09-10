@@ -51,6 +51,7 @@ export const taskSchema = z
     startDate: isoDateSchema.nullable(),
     deadline: z.iso.datetime({ offset: true }).nullable(),
     completedAt: z.iso.datetime({ offset: true }).nullable(),
+    inProgress: z.boolean(),
     carriedDays: z.number().int(),
     carriedSince: isoDateSchema.nullable(),
     isPrivate: z.boolean(),
@@ -92,6 +93,7 @@ export const updateTaskRequestSchema = z
     deadline: z.iso.datetime({ offset: true }).nullable(),
     /** true stamps completedAt with now, false clears it. */
     completed: z.boolean(),
+    inProgress: z.boolean(),
     isPrivate: z.boolean(),
   })
   .partial()

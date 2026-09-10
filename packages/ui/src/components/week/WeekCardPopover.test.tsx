@@ -44,6 +44,7 @@ const task: Task = {
   startDate: null,
   deadline: null,
   completedAt: null,
+    inProgress: false,
   carriedDays: 0,
   carriedSince: null,
   isPrivate: false,

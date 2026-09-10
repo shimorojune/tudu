@@ -22,7 +22,7 @@ export function useSlideOnReorder(
   orderKey: string,
 ) {
   const previousTop = useRef<number | null>(null);
-  const previousOrderKey = useRef(orderKey);
+  const previousOrderKey = useRef<string | null>(null);
 
   useLayoutEffect(() => {
     const node = nodeRef.current;
@@ -34,23 +34,26 @@ export function useSlideOnReorder(
     if (!enabled || prefersReducedMotion()) {
       clearMotion(node);
       previousTop.current = node.offsetTop;
-      previousOrderKey.current = orderKey;
+      previousOrderKey.current = null;
       return;
     }
 
-    clearMotion(node);
-
     const element = node;
-
     const top = element.offsetTop;
     const previous = previousTop.current;
     const orderChanged = previousOrderKey.current !== orderKey;
+
+    // Parent re-renders (inspector, timeline) must not cancel an in-flight FLIP.
+    if (!orderChanged) {
+      return;
+    }
+
     previousTop.current = top;
     previousOrderKey.current = orderKey;
 
     // Expand and collapse moves rows too, but the panel's height transition
     // already animates that. A FLIP on top of it fights and then snaps.
-    if (previous === null || !orderChanged) {
+    if (previous === null) {
       return;
     }
 
@@ -84,5 +87,5 @@ export function useSlideOnReorder(
       cancelAnimationFrame(secondFrame);
       element.removeEventListener("transitionend", onEnd);
     };
-  });
+  }, [enabled, orderKey, nodeRef]);
 }

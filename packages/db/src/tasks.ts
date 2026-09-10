@@ -201,6 +201,7 @@ type NewTaskFields = {
   startDate: string | null;
   deadline: Date | null;
   completedAt: Date | null;
+  inProgress: boolean;
   isPrivate: boolean;
 };
 
@@ -214,6 +215,7 @@ export type UpdateTaskFields = Partial<
     | "startDate"
     | "deadline"
     | "completedAt"
+    | "inProgress"
     | "isPrivate"
   >
 >;
@@ -262,6 +264,24 @@ export async function updateTask(
   ) {
     patch.carriedDays = 0;
     patch.carriedSince = null;
+  }
+
+  if ("completedAt" in fields) {
+    const completing = fields.completedAt !== null;
+    const wasCompleted = existing.completedAt !== null;
+    if (completing && !wasCompleted) {
+      patch.inProgress = false;
+      patch.position = await nextPosition(
+        db,
+        userId,
+        existing.scheduledDate,
+        existing.bucket,
+      );
+    }
+  }
+
+  if ("inProgress" in fields && fields.inProgress === true && existing.completedAt) {
+    delete patch.inProgress;
   }
 
   const afterRow = applyTaskPatch(existing, patch);

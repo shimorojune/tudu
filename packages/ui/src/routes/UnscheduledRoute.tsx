@@ -96,6 +96,7 @@ function UnscheduledDnd({
     activeId: string;
     items: ContainerItems;
   } | null>(null);
+  const [suppressSlideId, setSuppressSlideId] = useState<string | null>(null);
   dragRef.current = drag;
 
   const tasks = drag
@@ -191,8 +192,10 @@ function UnscheduledDnd({
     }
 
     const items = placeFromEvent(current, event, true);
-    setDrag(null);
     onReorderRef.current(items);
+    setSuppressSlideId(current.activeId);
+    setDrag(null);
+    requestAnimationFrame(() => setSuppressSlideId(null));
   }
 
   return (
@@ -218,11 +221,13 @@ function UnscheduledDnd({
                 selected={task.id === selectedTaskId}
                 selectedDate=""
                 onSelect={() => setSelectedTaskId(task.id)}
+                onCollapse={() => setSelectedTaskId(null)}
                 menuVariant="unscheduled"
                 orderKey={`unscheduled:${index}`}
                 actions={makeRowActions(task.id)}
                 flash={task.id === flashTaskId}
                 onFlashComplete={onFlashComplete}
+                skipSlide={task.id === suppressSlideId}
               />
             ))}
           </SortableContext>
@@ -297,6 +302,16 @@ export function UnscheduledRoute() {
         if (selectedTaskId === taskId) {
           setSelectedTaskId(null);
         }
+      },
+      onToggleInProgress: () => {
+        const task = sourceTasks.find((entry) => entry.id === taskId);
+        if (!task || task.completedAt !== null) {
+          return;
+        }
+        updateTask({
+          id: taskId,
+          patch: { inProgress: !task.inProgress },
+        });
       },
       onScheduleToToday: () => {
         const lanes = scheduleToTodayLanes(todayTasks, sourceTasks, taskId, todayIso());

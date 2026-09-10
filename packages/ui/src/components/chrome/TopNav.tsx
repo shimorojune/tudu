@@ -1,5 +1,9 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Plus, SlidersHorizontal } from "lucide-react";
+import { Plus, Search, SlidersHorizontal } from "lucide-react";
+import {
+  isCommandPaletteBlocked,
+} from "@/components/chrome/CommandPalette";
+import { useCommandPalette } from "@/components/chrome/CommandPaletteContext";
 import { requestAddTask } from "@tudu/store";
 import { useDispatch } from "react-redux";
 import { BrandMark } from "@/components/chrome/BrandMark";
@@ -25,6 +29,26 @@ function NewTaskButton() {
     >
       <Plus size={13} strokeWidth={2.4} />
       New task
+    </button>
+  );
+}
+
+function CommandsButton() {
+  const { openPalette } = useCommandPalette();
+
+  return (
+    <button
+      type="button"
+      aria-label="Commands"
+      title="Cmd+K"
+      className="text-muted-foreground hover:text-foreground"
+      onClick={() => {
+        if (!isCommandPaletteBlocked()) {
+          openPalette();
+        }
+      }}
+    >
+      <Search size={17} strokeWidth={1.6} />
     </button>
   );
 }
@@ -64,6 +88,7 @@ export function TopNav() {
           </>
         )}
         <div className="h-[20px] w-px bg-hair" />
+        <CommandsButton />
         <NewTaskButton />
         <SettingsLink />
       </div>

@@ -27,6 +27,7 @@ import type { Bucket, Subtask, Task } from "@tudu/shared";
 import { isSlipping } from "@tudu/shared";
 import { Check, X } from "lucide-react";
 import { useSlideOnReorder } from "@/hooks/useSlideOnReorder";
+import { AUTOSAVE_MS } from "@/lib/autosave";
 import { cn } from "@/lib/utils";
 import { taskMetaSegments } from "@/lib/taskMeta";
 import { CarryDots } from "@/components/tasks/CarryDots";
@@ -45,6 +46,7 @@ export type TaskRowActions = {
   onComplete: (completed: boolean) => void;
   onRename: (title: string) => void;
   onDelete: () => void;
+  onToggleInProgress?: () => void;
   onMoveToBucket?: (bucket: Bucket) => void;
   onUnschedule?: () => void;
   onScheduleToToday?: () => void;
@@ -61,11 +63,13 @@ export type TaskRowProps = {
   selected: boolean;
   selectedDate: string;
   onSelect: () => void;
+  onCollapse?: () => void;
   menuVariant: "day" | "unscheduled";
   orderKey?: string;
   actions?: TaskRowActions;
   flash?: boolean;
   onFlashComplete?: () => void;
+  skipSlide?: boolean;
 };
 
 function flashElement(element: HTMLElement | null) {
@@ -481,7 +485,7 @@ function EditableText({
     lastSaved.current = trimmed;
     snapshot.current = trimmed;
     onAutoSave?.(trimmed);
-  }, 600);
+  }, AUTOSAVE_MS);
 
   useLayoutEffect(() => {
     if (!editing) {
@@ -605,11 +609,13 @@ export function TaskRow({
   selected,
   selectedDate,
   onSelect,
+  onCollapse,
   menuVariant,
   orderKey = "",
   actions,
   flash = false,
   onFlashComplete,
+  skipSlide = false,
 }: TaskRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [addingSubtask, setAddingSubtask] = useState(false);
@@ -618,6 +624,7 @@ export function TaskRow({
   >([]);
   const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [panelClipOpen, setPanelClipOpen] = useState(false);
 
   const {
     attributes,
@@ -634,7 +641,7 @@ export function TaskRow({
     },
     [setNodeRef],
   );
-  useSlideOnReorder(rowNodeRef, !isDragging, orderKey);
+  useSlideOnReorder(rowNodeRef, !isDragging && !skipSlide, orderKey);
 
   useEffect(() => {
     if (isDragging && isEditing) {
@@ -646,10 +653,11 @@ export function TaskRow({
     setPendingSubtasks((current) =>
       current.filter(
         (pending) =>
+          editingSubtaskId === pending.id ||
           !task.subtasks.some((subtask) => subtask.title === pending.title),
       ),
     );
-  }, [task.subtasks]);
+  }, [editingSubtaskId, task.subtasks]);
 
   useLayoutEffect(() => {
     if (!flash) {
@@ -663,11 +671,11 @@ export function TaskRow({
     flashElement(node);
   }, [flash]);
 
+  const isCompleted = task.completedAt !== null;
   const segments = selectedDate
     ? taskMetaSegments(task, selectedDate)
     : taskMetaSegments(task, task.scheduledDate ?? "");
   const isLater = bucket === "later";
-  const isCompleted = task.completedAt !== null;
   const visibleSubtasks = useMemo(() => {
     const knownTitles = new Set(task.subtasks.map((subtask) => subtask.title));
     const extras = pendingSubtasks.filter(
@@ -687,7 +695,25 @@ export function TaskRow({
     ];
   }, [pendingSubtasks, task.id, task.subtasks]);
 
-  const expanded = selected && !isDragging;
+  const expanded =
+    selected &&
+    !isDragging &&
+    (task.subtasks.length > 0 || pendingSubtasks.length > 0 || addingSubtask);
+  const inProgress = task.inProgress && !isCompleted;
+
+  useEffect(() => {
+    if (!expanded) {
+      setPanelClipOpen(false);
+    }
+  }, [expanded]);
+
+  function handleRowClick() {
+    if (selected && expanded) {
+      onCollapse?.();
+      return;
+    }
+    onSelect();
+  }
   const pendingIds = useMemo(
     () => new Set(pendingSubtasks.map((pending) => pending.id)),
     [pendingSubtasks],
@@ -698,7 +724,7 @@ export function TaskRow({
       ref={setRowRef}
       role="button"
       tabIndex={0}
-      onClick={onSelect}
+      onClick={handleRowClick}
       onKeyDown={(event) => {
         const target = event.target;
         if (
@@ -716,7 +742,7 @@ export function TaskRow({
         }
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          onSelect();
+          handleRowClick();
         }
       }}
       onAnimationEnd={(event) => {
@@ -736,6 +762,8 @@ export function TaskRow({
               isLater && "items-center py-[12px]",
               !isLater && "py-[15px]",
               !isDragging && "hover:bg-foreground/[0.02]",
+              inProgress &&
+                "before:absolute before:inset-y-0 before:left-0 before:w-[2px] before:bg-primary",
             ),
         isCompleted && !isDragging && "opacity-70",
       )}
@@ -815,10 +843,25 @@ export function TaskRow({
             "grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none",
             expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
           )}
+          onTransitionEnd={(event) => {
+            if (
+              event.propertyName === "grid-template-rows" &&
+              expanded &&
+              event.currentTarget === event.target
+            ) {
+              setPanelClipOpen(true);
+            }
+          }}
+          onClick={(event) => event.stopPropagation()}
         >
-          <div className={cn("-ml-[20px] pl-[20px]", expanded ? "overflow-visible" : "overflow-hidden")}>
+          <div
+            className={cn(
+              "min-h-0 -ml-[20px] pl-[20px]",
+              panelClipOpen && expanded ? "overflow-visible" : "overflow-hidden",
+            )}
+          >
             <div className="mt-[10px]">
-              {visibleSubtasks.length > 0 && expanded && actions ? (
+              {visibleSubtasks.length > 0 && actions ? (
                 <SubtaskList
                   subtasks={visibleSubtasks}
                   pendingIds={pendingIds}
@@ -930,6 +973,19 @@ export function TaskRow({
           <ContextMenuItem onSelect={() => setIsEditing(true)}>
             Rename
           </ContextMenuItem>
+          <ContextMenuItem
+            onSelect={() => {
+              onSelect();
+              setAddingSubtask(true);
+            }}
+          >
+            Add a subtask
+          </ContextMenuItem>
+          {!isCompleted && actions.onToggleInProgress ? (
+            <ContextMenuItem onSelect={() => actions.onToggleInProgress?.()}>
+              {task.inProgress ? "Clear in progress" : "Mark in progress"}
+            </ContextMenuItem>
+          ) : null}
           {menuVariant === "day" ? (
             <>
               <ContextMenuSeparator />

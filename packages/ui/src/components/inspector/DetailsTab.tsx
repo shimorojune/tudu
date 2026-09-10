@@ -1,7 +1,7 @@
 import { format, parseISO } from "date-fns";
 import type { Task, TimelineEvent } from "@tudu/shared";
 import { BUCKETS, type Bucket } from "@tudu/shared";
-import { useGetMeQuery } from "@tudu/store";
+import { useGetMeQuery, useUpdateTaskMutation } from "@tudu/store";
 import { bucketLabel } from "@/lib/buckets";
 import {
   formatTimelineEvent,
@@ -96,8 +96,10 @@ export function DetailsTab({
   onJumpToTimeline,
 }: DetailsTabProps) {
   const { data: me } = useGetMeQuery();
+  const [updateTask] = useUpdateTaskMutation();
 
   const viewerName = me?.name?.trim() || "You";
+  const isOpen = task.completedAt === null;
   const events = withSyntheticCreated(task.id, task.createdAt, timelineEvents);
   const latest = events.slice(0, 2);
 
@@ -125,6 +127,31 @@ export function DetailsTab({
 
         <dt className="text-muted-foreground">Carried</dt>
         <dd className="tabular-nums">{formatCarried(task)}</dd>
+
+        {isOpen ? (
+          <>
+            <dt className="text-muted-foreground">Status</dt>
+            <dd>
+              <button
+                type="button"
+                className={cn(
+                  "border px-[10px] py-[4px] text-[12px] font-semibold",
+                  task.inProgress
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-hair text-muted-foreground hover:border-foreground",
+                )}
+                onClick={() => {
+                  updateTask({
+                    id: task.id,
+                    patch: { inProgress: !task.inProgress },
+                  });
+                }}
+              >
+                {task.inProgress ? "In progress" : "Not in progress"}
+              </button>
+            </dd>
+          </>
+        ) : null}
 
         {task.isPrivate ? (
           <>

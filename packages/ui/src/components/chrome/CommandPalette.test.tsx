@@ -4,6 +4,19 @@ import { makeStore } from "@tudu/store";
 import { Provider } from "react-redux";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { CommandPalette } from "./CommandPalette";
+import {
+  CommandPaletteProvider,
+  useCommandPalette,
+} from "./CommandPaletteContext";
+
+function OpenCommandsButton() {
+  const { openPalette } = useCommandPalette();
+  return (
+    <button type="button" aria-label="Commands" onClick={openPalette}>
+      Open
+    </button>
+  );
+}
 
 const navigate = vi.fn();
 
@@ -15,7 +28,10 @@ function renderPalette() {
   const store = makeStore();
   render(
     <Provider store={store}>
-      <CommandPalette />
+      <CommandPaletteProvider>
+        <OpenCommandsButton />
+        <CommandPalette />
+      </CommandPaletteProvider>
     </Provider>,
   );
   return store;
@@ -123,6 +139,15 @@ describe("CommandPalette", () => {
     await pressCmdShiftW();
 
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("opens from the commands button", async () => {
+    const user = userEvent.setup();
+    renderPalette();
+
+    await user.click(screen.getByRole("button", { name: "Commands" }));
+
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
   it("jumps to this week on desktop with Cmd+Shift+W", async () => {

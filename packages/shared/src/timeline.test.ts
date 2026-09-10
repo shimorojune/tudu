@@ -9,6 +9,7 @@ const base: TaskSnapshot = {
   startDate: null,
   deadline: null,
   completedAt: null,
+    inProgress: false,
   isPrivate: false,
 };
 

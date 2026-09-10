@@ -47,12 +47,13 @@ export function UnscheduledRail({
             strategy={noSortingStrategy}
           >
             <div className="flex flex-col gap-[8px]">
-              {tasks.map((task) => (
+              {tasks.map((task, index) => (
                 <SortableWeekCard
                   key={task.id}
                   task={task}
                   scheduledDate=""
                   isToday={false}
+                  orderKey={`unscheduled:${index}`}
                 />
               ))}
             </div>

@@ -13,6 +13,7 @@ function task(overrides: Partial<Task> & Pick<Task, "id" | "bucket">): Task {
     startDate: null,
     deadline: null,
     completedAt: null,
+    inProgress: false,
     carriedDays: overrides.carriedDays ?? 0,
     carriedSince: overrides.carriedSince ?? null,
     isPrivate: false,

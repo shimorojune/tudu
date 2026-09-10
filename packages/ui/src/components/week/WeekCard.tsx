@@ -24,6 +24,7 @@ export const WeekCard = forwardRef<HTMLButtonElement, WeekCardProps>(
     ref,
   ) {
     const completed = task.completedAt !== null;
+    const inProgress = task.inProgress && !completed;
     const segments = taskMetaSegments(task, scheduledDate);
     const isNow = task.bucket === "now";
 
@@ -34,7 +35,11 @@ export const WeekCard = forwardRef<HTMLButtonElement, WeekCardProps>(
         data-week-card={task.id}
         className={cn(
           "w-full border-l-2 px-[9px] py-[3px] text-left",
-          isNow ? "border-foreground" : "border-hair",
+          inProgress
+            ? "border-primary"
+            : isNow
+              ? "border-foreground"
+              : "border-hair",
           completed && "opacity-55",
           dragging && "opacity-40",
           className,

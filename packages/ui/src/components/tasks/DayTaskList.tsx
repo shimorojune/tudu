@@ -63,6 +63,7 @@ export type DayTaskListProps = {
   selectedDate: string;
   selectedTaskId: string | null;
   onSelectTask: (id: string) => void;
+  onDeselectTask?: () => void;
   onTaskDeleted?: (id: string) => void;
 };
 
@@ -89,6 +90,7 @@ type DayTaskListDndProps = {
   selectedDate: string;
   selectedTaskId: string | null;
   onSelectTask: (id: string) => void;
+  onDeselectTask?: () => void;
   isToday: boolean;
   baseItems: ContainerItems;
   showNowClearPrompt: boolean;
@@ -105,6 +107,7 @@ function DayTaskListDnd({
   selectedDate,
   selectedTaskId,
   onSelectTask,
+  onDeselectTask,
   isToday,
   baseItems,
   showNowClearPrompt,
@@ -128,6 +131,7 @@ function DayTaskListDnd({
     activeId: string;
     items: ContainerItems;
   } | null>(null);
+  const [suppressSlideId, setSuppressSlideId] = useState<string | null>(null);
   dragRef.current = drag;
 
   const laneFor = (bucket: string) => ({
@@ -250,8 +254,10 @@ function DayTaskListDnd({
     }
 
     const items = placeFromEvent(current, event, true);
-    setDrag(null);
     onReorderRef.current(items);
+    setSuppressSlideId(current.activeId);
+    setDrag(null);
+    requestAnimationFrame(() => setSuppressSlideId(null));
   }
 
   return (
@@ -265,6 +271,7 @@ function DayTaskListDnd({
           selectedTaskId={selectedTaskId}
           selectedDate={selectedDate}
           onSelectTask={onSelectTask}
+          onDeselectTask={onDeselectTask}
           onAddTask={onAddTask}
           showNowHelper={bucket === "now" && isToday}
           showNowClearPrompt={bucket === "now" && showNowClearPrompt}
@@ -275,6 +282,7 @@ function DayTaskListDnd({
           rowActionsForTask={rowActionsForTask}
           flashTaskId={flashTaskId}
           onFlashComplete={onFlashComplete}
+          skipSlideForTaskId={suppressSlideId}
         />
       ))}
       <DragOverlay dropAnimation={null}>
@@ -293,6 +301,7 @@ export function DayTaskList({
   selectedDate,
   selectedTaskId,
   onSelectTask,
+  onDeselectTask,
   onTaskDeleted,
 }: DayTaskListProps) {
   const isToday = selectedDate === todayIso();
@@ -350,6 +359,16 @@ export function DayTaskList({
       onDelete: () => {
         deleteTask(taskId);
         onTaskDeleted?.(taskId);
+      },
+      onToggleInProgress: () => {
+        const task = tasks.find((entry) => entry.id === taskId);
+        if (!task || task.completedAt !== null) {
+          return;
+        }
+        updateTask({
+          id: taskId,
+          patch: { inProgress: !task.inProgress },
+        });
       },
       onMoveToBucket: (bucket) => {
         const lanes = moveTaskToBucketLanes(tasks, taskId, bucket, selectedDate);
@@ -427,6 +446,7 @@ export function DayTaskList({
             selectedDate={selectedDate}
             selectedTaskId={selectedTaskId}
             onSelectTask={onSelectTask}
+            onDeselectTask={onDeselectTask}
             isToday={isToday}
             baseItems={baseItems}
             showNowClearPrompt={showNowClearPrompt}
