@@ -1,3 +1,16 @@
+# [0.16.0](https://github.com/eGainDev/tudu/compare/tudu-0.15.1...tudu-0.16.0) (2026-09-10)
+
+
+### Bug Fixes
+
+* persist in-progress and stop complete overlap ([30a1b59](https://github.com/eGainDev/tudu/commit/30a1b5904741948420d74f56be8427d6f879f918))
+
+
+### Features
+
+* add in-progress flag and lighter task row UX ([d43b353](https://github.com/eGainDev/tudu/commit/d43b353aa44486474c43d05d7bed4c12a914431b))
+* add manager inbox, team roster, and report day ([20a9e68](https://github.com/eGainDev/tudu/commit/20a9e685296eb79743b5839f02f2a2dba9ba779b))
+
 ## [0.15.1](https://github.com/eGainDev/tudu/compare/tudu-0.15.0...tudu-0.15.1) (2026-09-08)
 
 
