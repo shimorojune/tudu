@@ -43,8 +43,12 @@ export function useSlideOnReorder(
     const previous = previousTop.current;
     const orderChanged = previousOrderKey.current !== orderKey;
 
-    // Parent re-renders (inspector, timeline) must not cancel an in-flight FLIP.
+    // Parent re-renders (inspector, timeline) must not restart FLIP, but an
+    // aborted animation can leave a stale translate that overlaps other rows.
     if (!orderChanged) {
+      if (element.style.transform) {
+        clearMotion(element);
+      }
       return;
     }
 
@@ -73,19 +77,29 @@ export function useSlideOnReorder(
       });
     });
 
+    function finishMotion() {
+      window.clearTimeout(fallback);
+      clearMotion(element);
+    }
+
     function onEnd(event: TransitionEvent) {
       if (event.target !== element || event.propertyName !== "transform") {
         return;
       }
-      clearMotion(element);
+      finishMotion();
     }
 
     element.addEventListener("transitionend", onEnd);
+    const fallback = window.setTimeout(finishMotion, SLIDE_MS + 32);
 
     return () => {
       cancelAnimationFrame(firstFrame);
       cancelAnimationFrame(secondFrame);
+      window.clearTimeout(fallback);
       element.removeEventListener("transitionend", onEnd);
+      // Re-renders during complete-to-bottom cancel rAF/timeout mid-FLIP. The
+      // row is already at its new layout slot; drop any leftover translate.
+      clearMotion(element);
     };
   }, [enabled, orderKey, nodeRef]);
 }

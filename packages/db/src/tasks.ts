@@ -6,6 +6,7 @@ import {
   applyTaskPatch,
   countCommentsForTasks,
   insertTimelineEvents,
+  taskRowPersistableChanged,
   taskRowToSnapshot,
 } from "./activity.js";
 import { timelineEvents } from "./activity-schema.js";
@@ -290,7 +291,7 @@ export async function updateTask(
     after: taskRowToSnapshot(afterRow),
   });
 
-  if (drafts.length === 0) {
+  if (!taskRowPersistableChanged(existing, afterRow)) {
     return existing;
   }
 
@@ -305,6 +306,11 @@ export async function updateTask(
       ),
     )
     .returning();
+
+  if (drafts.length === 0) {
+    const rows = await updateStmt;
+    return rows[0];
+  }
 
   const timelineInserts = drafts.map((draft) =>
     db.insert(timelineEvents).values({

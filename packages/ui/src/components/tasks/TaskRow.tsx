@@ -634,6 +634,7 @@ export function TaskRow({
   } = useSortable({ id: task.id });
 
   const rowNodeRef = useRef<HTMLDivElement | null>(null);
+  const isCompleted = task.completedAt !== null;
   const setRowRef = useCallback(
     (node: HTMLDivElement | null) => {
       rowNodeRef.current = node;
@@ -641,7 +642,11 @@ export function TaskRow({
     },
     [setNodeRef],
   );
-  useSlideOnReorder(rowNodeRef, !isDragging && !skipSlide, orderKey);
+  useSlideOnReorder(
+    rowNodeRef,
+    !isDragging && !skipSlide && !isCompleted,
+    orderKey,
+  );
 
   useEffect(() => {
     if (isDragging && isEditing) {
@@ -671,7 +676,6 @@ export function TaskRow({
     flashElement(node);
   }, [flash]);
 
-  const isCompleted = task.completedAt !== null;
   const segments = selectedDate
     ? taskMetaSegments(task, selectedDate)
     : taskMetaSegments(task, task.scheduledDate ?? "");

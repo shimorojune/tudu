@@ -82,31 +82,7 @@ describe("useSlideOnReorder", () => {
     expect(screen.getByTestId("row").style.transform).toBe("");
   });
 
-  it("keeps an in-flight transform when orderKey is unchanged", () => {
-    const { rerender } = render(
-      <Harness top={0} enabled orderKey="now:0">
-        first
-      </Harness>,
-    );
-
-    rerender(
-      <Harness top={40} enabled orderKey="now:1">
-        first
-      </Harness>,
-    );
-
-    expect(screen.getByTestId("row").style.transform).toContain("translate3d");
-
-    rerender(
-      <Harness top={40} enabled orderKey="now:1">
-        first
-      </Harness>,
-    );
-
-    expect(screen.getByTestId("row").style.transform).toContain("translate3d");
-  });
-
-  it("clears leftover transform when the row becomes the dragged one", async () => {
+  it("clears leftover transform when slide is disabled", async () => {
     const { rerender } = render(
       <Harness top={0} enabled orderKey="now:0">
         first

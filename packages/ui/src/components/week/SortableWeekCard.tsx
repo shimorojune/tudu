@@ -33,7 +33,11 @@ export const SortableWeekCard = forwardRef<HTMLButtonElement, SortableWeekCardPr
       [setNodeRef, ref],
     );
 
-    useSlideOnReorder(nodeRef, !isDragging && !skipSlide, orderKey);
+    useSlideOnReorder(
+      nodeRef,
+      !isDragging && !skipSlide && task.completedAt === null,
+      orderKey,
+    );
 
     return (
       <WeekCard

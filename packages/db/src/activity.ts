@@ -53,6 +53,10 @@ export function applyTaskPatch(
     startDate: string | null;
     deadline: Date | null;
     completedAt: Date | null;
+    inProgress: boolean;
+    position: number;
+    carriedDays: number;
+    carriedSince: string | null;
     isPrivate: boolean;
   }>,
 ): TaskRow {
@@ -60,6 +64,24 @@ export function applyTaskPatch(
     ...before,
     ...fields,
   };
+}
+
+/** Fields that persist even when they do not produce a timeline event. */
+export function taskRowPersistableChanged(before: TaskRow, after: TaskRow): boolean {
+  return (
+    before.title !== after.title ||
+    before.description !== after.description ||
+    before.scheduledDate !== after.scheduledDate ||
+    before.bucket !== after.bucket ||
+    before.startDate !== after.startDate ||
+    (before.deadline?.getTime() ?? null) !== (after.deadline?.getTime() ?? null) ||
+    (before.completedAt?.getTime() ?? null) !== (after.completedAt?.getTime() ?? null) ||
+    before.isPrivate !== after.isPrivate ||
+    before.inProgress !== after.inProgress ||
+    before.position !== after.position ||
+    before.carriedDays !== after.carriedDays ||
+    before.carriedSince !== after.carriedSince
+  );
 }
 
 export async function insertTimelineEvents(
