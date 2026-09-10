@@ -1,4 +1,4 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Plus, Search, SlidersHorizontal } from "lucide-react";
 import {
   isCommandPaletteBlocked,
@@ -13,10 +13,19 @@ import { NavTabs } from "@/components/chrome/NavTabs";
 import { WeekPicker } from "@/components/chrome/WeekPicker";
 import { defaultWeekId, weekDaysFromWeekId } from "@/lib/week";
 
-function NewTaskButton() {
+function NewTaskButton({ reportUserId }: { reportUserId: string | null }) {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   function handleClick() {
+    if (reportUserId) {
+      void navigate({
+        to: "/team/$userId",
+        params: { userId: reportUserId },
+        search: { send: true },
+      });
+      return;
+    }
     dispatch(requestAddTask());
   }
 
@@ -71,6 +80,8 @@ export function TopNav() {
     select: (s) => s.location.search as { week?: string },
   });
   const onWeek = pathname === "/week";
+  const reportMatch = pathname.match(/^\/team\/([^/]+)$/);
+  const reportUserId = reportMatch?.[1] ?? null;
   const weekId = search.week ?? defaultWeekId();
   const weekDays = weekDaysFromWeekId(weekId);
 
@@ -89,7 +100,7 @@ export function TopNav() {
         )}
         <div className="h-[20px] w-px bg-hair" />
         <CommandsButton />
-        <NewTaskButton />
+        <NewTaskButton reportUserId={reportUserId} />
         <SettingsLink />
       </div>
     </header>

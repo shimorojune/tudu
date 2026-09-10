@@ -5,9 +5,10 @@ import { CommentRow } from "@/components/inspector/CommentRow";
 
 export type CommentsTabProps = {
   task: Task;
+  notifiedName?: string | null;
 };
 
-export function CommentsTab({ task }: CommentsTabProps) {
+export function CommentsTab({ task, notifiedName = null }: CommentsTabProps) {
   const { data, isLoading } = useGetCommentsQuery(task.id);
   const comments = data?.comments ?? [];
 
@@ -27,6 +28,11 @@ export function CommentsTab({ task }: CommentsTabProps) {
         )}
       </div>
       <CommentComposer taskId={task.id} />
+      {notifiedName ? (
+        <p className="border-t border-hair px-[24px] py-[10px] text-[11.5px] text-faint">
+          {notifiedName} is notified in Tudu
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -15,6 +15,9 @@ export const TIMELINE_EVENT_TYPES = [
   "comment_edited",
   "comment_deleted",
   "rolled_over",
+  "inbox_sent",
+  "inbox_accepted",
+  "inbox_declined",
 ] as const;
 
 export type TimelineEventType = (typeof TIMELINE_EVENT_TYPES)[number];

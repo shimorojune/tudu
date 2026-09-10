@@ -88,4 +88,23 @@ describe("BucketSection", () => {
     expect(header).toHaveClass("bg-foreground/[0.06]");
     expect(screen.getByText("Next")).toHaveClass("text-foreground");
   });
+
+  it("hides Add task in manager view", () => {
+    render(
+      <BucketSection
+        bucket="now"
+        label="Now"
+        tasks={[]}
+        selectedTaskId={null}
+        selectedDate="2026-09-05"
+        onSelectTask={vi.fn()}
+        onAddTask={vi.fn()}
+        viewer="manager"
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Add task" }),
+    ).not.toBeInTheDocument();
+  });
 });

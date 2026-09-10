@@ -1,5 +1,7 @@
+import { QueryBuilder } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
-import { planReorder, planSubtaskReorder } from "./tasks.js";
+import { notPendingInbox, planReorder, planSubtaskReorder } from "./tasks.js";
+import { tasks } from "./tasks-schema.js";
 
 describe("planReorder", () => {
   it("numbers a lane contiguously from zero", () => {
@@ -69,5 +71,20 @@ describe("planSubtaskReorder", () => {
 
   it("returns null when the list length does not match", () => {
     expect(planSubtaskReorder(["a"], liveIds)).toBeNull();
+  });
+});
+
+describe("notPendingInbox", () => {
+  it("qualifies inbox_items.task_id, not tasks.task_id", () => {
+    const qb = new QueryBuilder();
+    const { sql } = qb
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(notPendingInbox())
+      .toSQL();
+
+    expect(sql).toContain('"inbox_items"."task_id"');
+    expect(sql).toContain('"inbox_items"."status"');
+    expect(sql).not.toContain('"tasks"."task_id"');
   });
 });

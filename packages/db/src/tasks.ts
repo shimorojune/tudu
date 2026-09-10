@@ -50,6 +50,17 @@ export function planReorder(lanes: Lane[]): TaskPlacement[] {
   return placements;
 }
 
+/** Qualify inbox_items by name. Interpolating `${inboxItems.taskId}` inside a
+    tasks query makes Drizzle rewrite it as `"tasks"."task_id"`. */
+export function notPendingInbox() {
+  return sql`not exists (
+    select 1 from "inbox_items"
+    where "inbox_items"."task_id" = ${tasks.id}
+      and "inbox_items"."status" = 'pending'
+      and "inbox_items"."deleted_at" is null
+  )`;
+}
+
 function laneFilter(
   userId: string,
   scheduledDate: string | null,
@@ -97,6 +108,7 @@ export async function listTasksForDay(
       eq(tasks.userId, userId),
       isNull(tasks.deletedAt),
       eq(tasks.scheduledDate, scheduledDate),
+      notPendingInbox(),
     ),
     with: liveSubtasks,
     // Enum sorts in declaration order, so this is Now, Next, Later.
@@ -115,6 +127,7 @@ export async function listUnscheduledTasks(
       eq(tasks.userId, userId),
       isNull(tasks.deletedAt),
       isNull(tasks.scheduledDate),
+      notPendingInbox(),
     ),
     with: liveSubtasks,
     orderBy: [asc(tasks.position)],
@@ -147,7 +160,7 @@ export async function findTaskById(
 
 /** Next free position at the bottom of a lane. The design appends: a typed task and an
     accepted task both land at the bottom of their bucket. */
-async function nextPosition(
+export async function nextPosition(
   db: Db,
   userId: string,
   scheduledDate: string | null,

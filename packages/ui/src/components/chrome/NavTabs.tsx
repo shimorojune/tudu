@@ -1,14 +1,14 @@
 import { Link } from "@tanstack/react-router";
 import { useLayoutEffect, useRef, useState } from "react";
 import { useSelector } from "react-redux";
-import { todayIso, useGetUnscheduledTasksQuery } from "@tudu/store";
+import { todayIso, useGetInboxCountQuery, useGetUnscheduledTasksQuery } from "@tudu/store";
 import type { RootState } from "@tudu/store";
 import { dayTabLabel } from "@/lib/dayLabel";
 
 const tabs = [
   { label: "Today", to: "/", exact: true as const, dynamicDay: true as const },
   { label: "Week", to: "/week", exact: false as const },
-  { label: "Inbox", to: "/inbox", exact: false as const, badge: 2 },
+  { label: "Inbox", to: "/inbox", exact: false as const, badge: true as const },
   { label: "Unscheduled", to: "/unscheduled", exact: false as const, count: true as const },
   { label: "Team", to: "/team", exact: false as const },
 ];
@@ -107,7 +107,9 @@ function DayTabSlot({ label, to, exact }: DayTabSlotProps) {
 
 export function NavTabs() {
   const { data } = useGetUnscheduledTasksQuery();
+  const inboxCountQuery = useGetInboxCountQuery();
   const unscheduledCount = data?.tasks.length ?? 0;
+  const inboxCount = inboxCountQuery.data?.count ?? 0;
   const selectedDate = useSelector((state: RootState) => state.day.selectedDate);
   const dayLabel = dayTabLabel(selectedDate, todayIso());
 
@@ -143,7 +145,7 @@ export function NavTabs() {
           >
             <TabContent
               label={tab.label}
-              badge={"badge" in tab ? tab.badge : undefined}
+              badge={"badge" in tab ? inboxCount : undefined}
               count={"count" in tab ? unscheduledCount : undefined}
             />
           </Link>

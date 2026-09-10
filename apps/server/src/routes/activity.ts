@@ -1,9 +1,11 @@
 import { zValidator } from "@hono/zod-validator";
 import type { Db } from "@tudu/db";
 import {
+  assertManagerAction,
   createComment,
   listCommentsForTask,
   listTimelineForTask,
+  resolveTaskAccess,
   softDeleteComment,
   updateComment,
   type CommentWithAuthor,
@@ -61,6 +63,7 @@ function toTimelineEvent(
     id: row.id,
     taskId: row.taskId,
     actorId: row.actorId,
+    actor: row.actor ?? null,
     type: row.type,
     data: row.data,
     createdAt: row.createdAt.toISOString(),
@@ -85,13 +88,30 @@ export function createActivityRoute(db: Db) {
   }
 
   app.get("/tasks/:id/comments", async (c) => {
-    const rows = await listCommentsForTask(db, userId(c), c.req.param("id"));
+    const access = await resolveTaskAccess(db, userId(c), c.req.param("id"));
+    if (!access) {
+      return c.json({ error: "Task not found" }, 404);
+    }
+
+    assertManagerAction(access, "see");
+    const rows = await listCommentsForTask(db, c.req.param("id"));
     const response: CommentsResponse = { comments: rows.map(toComment) };
 
     return c.json(response);
   });
 
   app.post("/tasks/:id/comments", jsonBody(createCommentRequestSchema), async (c) => {
+    const access = await resolveTaskAccess(db, userId(c), c.req.param("id"));
+    if (!access) {
+      return c.json({ error: "Task not found" }, 404);
+    }
+
+    try {
+      assertManagerAction(access, "comment");
+    } catch {
+      return c.json({ error: "Not allowed" }, 403);
+    }
+
     const created = await createComment(
       db,
       userId(c),
@@ -136,8 +156,19 @@ export function createActivityRoute(db: Db) {
   });
 
   app.get("/tasks/:id/timeline", queryParams(timelineQuerySchema), async (c) => {
+    const access = await resolveTaskAccess(db, userId(c), c.req.param("id"));
+    if (!access) {
+      return c.json({ error: "Task not found" }, 404);
+    }
+
+    try {
+      assertManagerAction(access, "see");
+    } catch {
+      return c.json({ error: "Not allowed" }, 403);
+    }
+
     const { before, limit } = c.req.valid("query");
-    const events = await listTimelineForTask(db, userId(c), c.req.param("id"), {
+    const events = await listTimelineForTask(db, c.req.param("id"), {
       before,
       limit,
     });

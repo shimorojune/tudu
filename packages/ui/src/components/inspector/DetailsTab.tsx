@@ -3,6 +3,7 @@ import type { Task, TimelineEvent } from "@tudu/shared";
 import { BUCKETS, type Bucket } from "@tudu/shared";
 import { useGetMeQuery, useUpdateTaskMutation } from "@tudu/store";
 import { bucketLabel } from "@/lib/buckets";
+import { personFirstName } from "@/lib/person";
 import {
   formatTimelineEvent,
   withSyntheticCreated,
@@ -17,6 +18,8 @@ export type DetailsTabProps = {
   isToday: boolean;
   timelineEvents: TimelineEvent[];
   onJumpToTimeline: () => void;
+  readOnly?: boolean;
+  sharedWithName?: string | null;
 };
 
 function formatFieldDate(isoDate: string | null) {
@@ -94,6 +97,8 @@ export function DetailsTab({
   isToday,
   timelineEvents,
   onJumpToTimeline,
+  readOnly = false,
+  sharedWithName = null,
 }: DetailsTabProps) {
   const { data: me } = useGetMeQuery();
   const [updateTask] = useUpdateTaskMutation();
@@ -109,7 +114,11 @@ export function DetailsTab({
         {task.title}
       </h2>
 
-      <TaskDescriptionField taskId={task.id} description={task.description} />
+      <TaskDescriptionField
+        taskId={task.id}
+        description={task.description}
+        readOnly={readOnly}
+      />
 
       <dl className="mt-[22px] grid grid-cols-[78px_minmax(0,1fr)] items-center gap-x-[16px] gap-y-[13px] text-[13px]">
         <dt className="text-muted-foreground">Bucket</dt>
@@ -128,7 +137,7 @@ export function DetailsTab({
         <dt className="text-muted-foreground">Carried</dt>
         <dd className="tabular-nums">{formatCarried(task)}</dd>
 
-        {isOpen ? (
+        {isOpen && !readOnly ? (
           <>
             <dt className="text-muted-foreground">Status</dt>
             <dd>
@@ -150,6 +159,13 @@ export function DetailsTab({
                 {task.inProgress ? "In progress" : "Not in progress"}
               </button>
             </dd>
+          </>
+        ) : null}
+
+        {sharedWithName && !task.isPrivate ? (
+          <>
+            <dt className="text-muted-foreground">Shared with</dt>
+            <dd>{personFirstName(sharedWithName)}</dd>
           </>
         ) : null}
 
@@ -182,6 +198,7 @@ export function DetailsTab({
           {latest.map((event, index) => {
             const copy = formatTimelineEvent(event, {
               viewerName,
+              viewerId: me?.id,
               isToday,
               selectedDate,
             });

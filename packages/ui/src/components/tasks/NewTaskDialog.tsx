@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Bucket } from "@tudu/shared";
 import { BUCKETS, DEFAULT_NOW_SOFT_CAP } from "@tudu/shared";
 import { todayIso } from "@tudu/store";
+import { DateField } from "@/components/ui/date-field";
 import {
   Dialog,
   DialogContent,
@@ -237,11 +238,12 @@ export function NewTaskDialog({
                 ]}
               />
               {dayChoice === "pick" ? (
-                <input
-                  type="date"
+                <DateField
                   value={pickedDate}
-                  className="border border-rule bg-transparent px-[10px] py-[7px] text-[13px] outline-none"
-                  onChange={(event) => setPickedDate(event.target.value)}
+                  allowClear={false}
+                  onChange={setPickedDate}
+                  aria-label="Task date"
+                  className="w-auto bg-transparent px-[10px] py-[7px] text-[13px]"
                 />
               ) : null}
             </div>

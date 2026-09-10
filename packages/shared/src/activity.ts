@@ -26,6 +26,7 @@ export const timelineEventSchema = z.object({
   id: z.uuid(),
   taskId: z.uuid(),
   actorId: z.string().nullable(),
+  actor: commentAuthorSchema.nullable(),
   type: timelineEventTypeSchema,
   data: z.record(z.string(), z.unknown()),
   createdAt: z.iso.datetime({ offset: true }),

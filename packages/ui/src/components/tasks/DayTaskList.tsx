@@ -25,6 +25,8 @@ import {
   useReorderSubtasksMutation,
   useUpdateSubtaskMutation,
   useUpdateTaskMutation,
+  useReorderReportTasksMutation,
+  useDeleteReportTaskMutation,
   todayIso,
 } from "@tudu/store";
 import { bucketLabel } from "@/lib/buckets";
@@ -51,7 +53,7 @@ import {
 import { BucketSection } from "@/components/tasks/BucketSection";
 import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
 import { createTaskBody } from "@/lib/createTask";
-import type { TaskRowActions } from "@/components/tasks/TaskRow";
+import type { TaskRowActions, TaskViewer } from "@/components/tasks/TaskRow";
 import { useNewTaskShortcut } from "@/hooks/useNewTaskShortcut";
 import { usePointerY } from "@/hooks/usePointerY";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -65,6 +67,8 @@ export type DayTaskListProps = {
   onSelectTask: (id: string) => void;
   onDeselectTask?: () => void;
   onTaskDeleted?: (id: string) => void;
+  viewer?: TaskViewer;
+  reportUserId?: string;
 };
 
 function tasksByBucket(tasks: Task[]): Record<Bucket, Task[]> {
@@ -100,6 +104,7 @@ type DayTaskListDndProps = {
   onAddTask: (bucket: Bucket) => void;
   flashTaskId: string | null;
   onFlashComplete: () => void;
+  viewer: TaskViewer;
 };
 
 function DayTaskListDnd({
@@ -117,6 +122,7 @@ function DayTaskListDnd({
   onAddTask,
   flashTaskId,
   onFlashComplete,
+  viewer,
 }: DayTaskListDndProps) {
   const { droppableRects } = useDndContext();
   const pointerYRef = usePointerY();
@@ -283,6 +289,7 @@ function DayTaskListDnd({
           flashTaskId={flashTaskId}
           onFlashComplete={onFlashComplete}
           skipSlideForTaskId={suppressSlideId}
+          viewer={viewer}
         />
       ))}
       <DragOverlay dropAnimation={null}>
@@ -303,11 +310,14 @@ export function DayTaskList({
   onSelectTask,
   onDeselectTask,
   onTaskDeleted,
+  viewer = "owner",
+  reportUserId,
 }: DayTaskListProps) {
   const isToday = selectedDate === todayIso();
   const [flashTaskId, setFlashTaskId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogBucket, setDialogBucket] = useState<Bucket>("later");
+  const isManager = viewer === "manager";
 
   const baseItems = useMemo(
     () => itemsFromTasks(tasks, BUCKETS, (task) => task.bucket),
@@ -316,6 +326,7 @@ export function DayTaskList({
 
   const groupedForPrompt = useMemo(() => tasksByBucket(tasks), [tasks]);
   const showNowClearPrompt =
+    !isManager &&
     isToday &&
     openNowCount(tasks) === 0 &&
     groupedForPrompt.next.length > 0;
@@ -324,6 +335,8 @@ export function DayTaskList({
   const [updateTask] = useUpdateTaskMutation();
   const [deleteTask] = useDeleteTaskMutation();
   const [reorderTasks] = useReorderTasksMutation();
+  const [reorderReportTasks] = useReorderReportTasksMutation();
+  const [deleteReportTask] = useDeleteReportTaskMutation();
   const [reorderSubtasks] = useReorderSubtasksMutation();
   const [createSubtask] = useCreateSubtaskMutation();
   const [deleteSubtask] = useDeleteSubtaskMutation();
@@ -334,12 +347,23 @@ export function DayTaskList({
     setDialogOpen(true);
   }, []);
 
-  useNewTaskShortcut(() => openDialog("later"));
+  useNewTaskShortcut(() => openDialog("later"), { enabled: !isManager });
 
   const laneFor = (bucket: string) => ({
     scheduledDate: selectedDate,
     bucket: bucket as Bucket,
   });
+
+  function applyReorder(lanes: ReturnType<typeof lanesFromItems>) {
+    if (lanes.length === 0) {
+      return;
+    }
+    if (isManager && reportUserId) {
+      reorderReportTasks({ userId: reportUserId, lanes });
+      return;
+    }
+    reorderTasks({ lanes });
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -351,16 +375,29 @@ export function DayTaskList({
   function makeRowActions(taskId: string): TaskRowActions {
     return {
       onComplete: (completed) => {
+        if (isManager) {
+          return;
+        }
         updateTask({ id: taskId, patch: { completed } });
       },
       onRename: (title) => {
+        if (isManager) {
+          return;
+        }
         updateTask({ id: taskId, patch: { title } });
       },
       onDelete: () => {
-        deleteTask(taskId);
+        if (isManager && reportUserId) {
+          deleteReportTask({ userId: reportUserId, taskId });
+        } else {
+          deleteTask(taskId);
+        }
         onTaskDeleted?.(taskId);
       },
       onToggleInProgress: () => {
+        if (isManager) {
+          return;
+        }
         const task = tasks.find((entry) => entry.id === taskId);
         if (!task || task.completedAt !== null) {
           return;
@@ -372,39 +409,47 @@ export function DayTaskList({
       },
       onMoveToBucket: (bucket) => {
         const lanes = moveTaskToBucketLanes(tasks, taskId, bucket, selectedDate);
-        if (lanes.length > 0) {
-          reorderTasks({ lanes });
-        }
+        applyReorder(lanes);
       },
       onUnschedule: () => {
         const lanes = unscheduleTaskLanes(tasks, taskId);
-        if (lanes.length > 0) {
-          reorderTasks({ lanes });
-        }
+        applyReorder(lanes);
       },
       onToggleSubtask: (subtaskId, done) => {
+        if (isManager) {
+          return;
+        }
         updateSubtask({ id: subtaskId, patch: { done } });
       },
       onRenameSubtask: (subtaskId, title) => {
+        if (isManager) {
+          return;
+        }
         updateSubtask({ id: subtaskId, patch: { title } });
       },
       onDeleteSubtask: (subtaskId) => {
+        if (isManager) {
+          return;
+        }
         deleteSubtask(subtaskId);
       },
       onAddSubtask: (title) => {
+        if (isManager) {
+          return;
+        }
         createSubtask({ taskId, body: { title } });
       },
       onReorderSubtasks: (subtaskIds) => {
+        if (isManager) {
+          return;
+        }
         reorderSubtasks({ taskId, body: { subtaskIds } });
       },
     };
   }
 
   function handleReorder(afterItems: ContainerItems) {
-    const lanes = lanesFromItems({ before: baseItems, after: afterItems, laneFor });
-    if (lanes.length > 0) {
-      reorderTasks({ lanes });
-    }
+    applyReorder(lanesFromItems({ before: baseItems, after: afterItems, laneFor }));
   }
 
   async function handleCreateTask(args: {
@@ -453,25 +498,26 @@ export function DayTaskList({
             rowActionsForTask={makeRowActions}
             onNowClearPrompt={() => {
               const lanes = buildPullIntoNowLanes(tasks, selectedDate);
-              if (lanes.length > 0) {
-                reorderTasks({ lanes });
-              }
+              applyReorder(lanes);
             }}
             onReorder={handleReorder}
             onAddTask={openDialog}
             flashTaskId={flashTaskId}
             onFlashComplete={() => setFlashTaskId(null)}
+            viewer={viewer}
           />
         </DndContext>
       </ScrollArea>
-      <NewTaskDialog
-        open={dialogOpen}
-        initialBucket={dialogBucket}
-        initialDate={selectedDate}
-        nowCount={openNowCount(tasks)}
-        onOpenChange={setDialogOpen}
-        onSubmit={handleCreateTask}
-      />
+      {isManager ? null : (
+        <NewTaskDialog
+          open={dialogOpen}
+          initialBucket={dialogBucket}
+          initialDate={selectedDate}
+          nowCount={openNowCount(tasks)}
+          onOpenChange={setDialogOpen}
+          onSubmit={handleCreateTask}
+        />
+      )}
     </div>
   );
 }

@@ -13,17 +13,16 @@ export type CommentWithAuthor = CommentRow & {
   author: { id: string; name: string; email: string };
 };
 
-async function ownedTaskId(
+export type TimelineEventWithActor = TimelineEventRow & {
+  actor: { id: string; name: string; email: string } | null;
+};
+
+async function liveTaskId(
   db: Db,
-  userId: string,
   taskId: string,
 ): Promise<string | undefined> {
   const row = await db.query.tasks.findFirst({
-    where: and(
-      eq(tasks.id, taskId),
-      eq(tasks.userId, userId),
-      isNull(tasks.deletedAt),
-    ),
+    where: and(eq(tasks.id, taskId), isNull(tasks.deletedAt)),
     columns: { id: true },
   });
 
@@ -139,11 +138,10 @@ export async function countCommentsForTasks(
 
 export async function listCommentsForTask(
   db: Db,
-  userId: string,
   taskId: string,
 ): Promise<CommentWithAuthor[]> {
-  const owned = await ownedTaskId(db, userId, taskId);
-  if (!owned) {
+  const live = await liveTaskId(db, taskId);
+  if (!live) {
     return [];
   }
 
@@ -164,8 +162,8 @@ export async function createComment(
   taskId: string,
   body: string,
 ): Promise<CommentWithAuthor | undefined> {
-  const owned = await ownedTaskId(db, userId, taskId);
-  if (!owned) {
+  const live = await liveTaskId(db, taskId);
+  if (!live) {
     return undefined;
   }
 
@@ -210,10 +208,6 @@ export async function updateComment(
   });
 
   if (!existing || existing.authorId !== userId) {
-    return undefined;
-  }
-
-  if (existing.task.userId !== userId) {
     return undefined;
   }
 
@@ -262,10 +256,6 @@ export async function softDeleteComment(
     return false;
   }
 
-  if (existing.task.userId !== userId) {
-    return false;
-  }
-
   await db.batch([
     db
       .update(comments)
@@ -284,12 +274,11 @@ export async function softDeleteComment(
 
 export async function listTimelineForTask(
   db: Db,
-  userId: string,
   taskId: string,
   args: { before?: string; limit: number },
-): Promise<TimelineEventRow[]> {
-  const owned = await ownedTaskId(db, userId, taskId);
-  if (!owned) {
+): Promise<TimelineEventWithActor[]> {
+  const live = await liveTaskId(db, taskId);
+  if (!live) {
     return [];
   }
 
@@ -303,5 +292,10 @@ export async function listTimelineForTask(
     where: and(...filters),
     orderBy: [desc(timelineEvents.createdAt)],
     limit: args.limit,
-  });
+    with: {
+      actor: {
+        columns: { id: true, name: true, email: true },
+      },
+    },
+  }) as Promise<TimelineEventWithActor[]>;
 }

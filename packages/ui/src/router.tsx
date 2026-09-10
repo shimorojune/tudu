@@ -13,6 +13,7 @@ import { TodayRoute } from "@/routes/TodayRoute";
 import { WeekRoute } from "@/routes/WeekRoute";
 import { InboxRoute } from "@/routes/InboxRoute";
 import { TeamRoute } from "@/routes/TeamRoute";
+import { ReportDayRoute } from "@/routes/ReportDayRoute";
 import { SettingsRoute } from "@/routes/SettingsRoute";
 import { UnscheduledRoute } from "@/routes/UnscheduledRoute";
 
@@ -71,6 +72,15 @@ const teamRoute = createRoute({
   component: TeamRoute,
 });
 
+const reportDayRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/team/$userId",
+  validateSearch: (search: Record<string, unknown>) => ({
+    send: search.send === true || search.send === "1" || search.send === "true",
+  }),
+  component: ReportDayRoute,
+});
+
 const unscheduledRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/unscheduled",
@@ -91,6 +101,7 @@ const routeTree = rootRoute.addChildren([
     inboxRoute,
     unscheduledRoute,
     teamRoute,
+    reportDayRoute,
     settingsRoute,
   ]),
 ]);

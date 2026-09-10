@@ -6,6 +6,7 @@ export * from "./schema.js";
 export * from "./tasks.js";
 export * from "./activity.js";
 export * from "./rollover.js";
+export * from "./manager.js";
 
 export function createDb(databaseUrl: string) {
   const sql = neon(databaseUrl);

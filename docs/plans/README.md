@@ -108,7 +108,7 @@ JIRA knows when something is due, only you know whether you are touching it toda
 | 6 | Rollover, carry dots, slipping | [06-rollover.md](./06-rollover.md) | Done |
 | 7 | Week view and drag to reschedule | [07-week-view.md](./07-week-view.md) | Done |
 | 8 | Command palette and keyboard shortcuts | [08-command-palette.md](./08-command-palette.md) | Done |
-| 9 | Manager: Inbox, roster, report's day | not written | Pending |
+| 9 | Manager: Inbox, roster, report's day | [09-manager-inbox.md](./09-manager-inbox.md) | Done |
 | 10 | JIRA integration | not written | Pending |
 | 11 | Settings screens | not written | Pending |
 | 12 | macOS shell: menu bar, global hotkeys, Dock badge | not written | Pending |
@@ -349,11 +349,26 @@ Design reference: A4 overlay shell (content is commands, not JIRA).
 ### Step 9: Manager: Inbox, roster, report's day
 
 Tables for `manager_links`, `manager_permissions`, `inbox_items`, `manager_invites`.
-Accept into a bucket or decline with a reason. Team roster with per report counts.
-Read only view of a report's day plus the send a task form. Permission checks on every
-query. Private tasks are never visible to a manager.
+Accept into a bucket or decline with a reason. Decline bounces to the sender. Team roster
+with per-report counts and email invites. Read-only-looking view of a report's day plus
+the send-a-task form. Permission checks on every query. Private tasks are never visible
+to a manager.
 
-Design screens covered: B1 Inbox, B2 Team roster, B3 Report's day, C5 Manager invite.
+Design screens covered: B1 Inbox, B2 Team roster, B3 Report's day.
+
+#### Step 9 decisions (settled)
+
+**1. Screens are Inbox, Team, and a report's day.** No C5 wizard. No Settings toggles.
+
+**2. One manager per person.** Confirm before anything is shared. Add someone by email.
+
+**3. Accept day is startDate, else today.** Deadline stays. Over-cap Now is allowed.
+
+**4. Decline bounces to the sender.** Reason required. Returned cards have no Decline.
+
+**5. Manager can read, comment, reorder, delete, and send.** Cannot edit, complete, or see private.
+
+**6. Seed Marcus and Priya around testuser.** Password `egain@123`. Seed never runs in production.
 
 ### Step 10: JIRA integration
 

@@ -57,6 +57,8 @@ export type TaskRowActions = {
   onReorderSubtasks: (subtaskIds: string[]) => void;
 };
 
+export type TaskViewer = "owner" | "manager";
+
 export type TaskRowProps = {
   task: Task;
   bucket: Bucket;
@@ -70,6 +72,7 @@ export type TaskRowProps = {
   flash?: boolean;
   onFlashComplete?: () => void;
   skipSlide?: boolean;
+  viewer?: TaskViewer;
 };
 
 function flashElement(element: HTMLElement | null) {
@@ -88,16 +91,16 @@ function TaskCheckbox({
   checked: boolean;
   onToggle: () => void;
 }) {
+  const className = cn(
+    "mt-px flex size-[18px] shrink-0 items-center justify-center border-[1.5px] bg-card",
+    checked ? "border-foreground bg-foreground text-card" : "border-ghost",
+  );
+
   return (
     <button
       type="button"
       aria-label={checked ? "Mark incomplete" : "Mark complete"}
-      className={cn(
-        "mt-px flex size-[18px] shrink-0 items-center justify-center border-[1.5px] bg-card transition-colors duration-150 ease-out",
-        checked
-          ? "border-foreground bg-foreground text-card"
-          : "border-ghost",
-      )}
+      className={cn(className, "transition-colors duration-150 ease-out")}
       onClick={(event) => {
         event.stopPropagation();
         onToggle();
@@ -118,20 +121,36 @@ function TaskCheckbox({
 function SubtaskCheckbox({
   checked,
   onToggle,
+  readOnly = false,
 }: {
   checked: boolean;
   onToggle: () => void;
+  readOnly?: boolean;
 }) {
+  const className = cn(
+    "flex size-[14px] shrink-0 items-center justify-center border-[1.5px]",
+    checked
+      ? "border-foreground bg-foreground text-card"
+      : "border-ghost bg-card",
+  );
+
+  if (readOnly) {
+    return (
+      <span className={className} aria-hidden>
+        <Check
+          size={10}
+          strokeWidth={3}
+          className={cn(checked ? "opacity-100" : "opacity-0")}
+        />
+      </span>
+    );
+  }
+
   return (
     <button
       type="button"
       aria-label={checked ? "Mark subtask incomplete" : "Mark subtask complete"}
-      className={cn(
-        "flex size-[14px] shrink-0 items-center justify-center border-[1.5px] transition-colors duration-150 ease-out",
-        checked
-          ? "border-foreground bg-foreground text-card"
-          : "border-ghost bg-card",
-      )}
+      className={cn(className, "transition-colors duration-150 ease-out")}
       onClick={(event) => {
         event.stopPropagation();
         onToggle();
@@ -214,6 +233,7 @@ type SortableSubtaskItemProps = {
   subtask: Subtask;
   pending: boolean;
   editing: boolean;
+  readOnly: boolean;
   onStartEdit: (event: MouseEvent<HTMLSpanElement>) => void;
   onCommit: (value: string) => void;
   onAutoSave: (value: string) => void;
@@ -226,6 +246,7 @@ function SortableSubtaskItem({
   subtask,
   pending,
   editing,
+  readOnly,
   onStartEdit,
   onCommit,
   onAutoSave,
@@ -240,7 +261,7 @@ function SortableSubtaskItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: subtask.id, disabled: pending });
+  } = useSortable({ id: subtask.id, disabled: pending || readOnly });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -256,29 +277,44 @@ function SortableSubtaskItem({
         isDragging && "z-10 bg-foreground/[0.04] [&>*]:invisible",
       )}
     >
-      {!pending ? (
+      {!pending && !readOnly ? (
         <SubtaskDragHandle listeners={listeners} attributes={attributes} />
       ) : null}
-      <SubtaskCheckbox checked={subtask.done} onToggle={onToggle} />
+      <SubtaskCheckbox
+        checked={subtask.done}
+        onToggle={onToggle}
+        readOnly={readOnly}
+      />
       <span className="min-w-0 flex-1">
         <span className="relative inline-block max-w-full">
-          <EditableText
-            text={subtask.title}
-            editing={editing}
-            className={cn(
-              "text-[13.5px] leading-[1.4] transition-colors duration-[220ms] ease-out motion-reduce:transition-none",
-              subtask.done && "text-faint",
-              subtask.done && !editing && "line-through decoration-[1.5px]",
-            )}
-            ariaLabel="Rename subtask"
-            onStartEdit={onStartEdit}
-            onCommit={onCommit}
-            onAutoSave={onAutoSave}
-            onCancel={onCancel}
-          />
+          {readOnly ? (
+            <span
+              className={cn(
+                "text-[13.5px] leading-[1.4]",
+                subtask.done && "text-faint line-through decoration-[1.5px]",
+              )}
+            >
+              <LinkifiedText text={subtask.title} />
+            </span>
+          ) : (
+            <EditableText
+              text={subtask.title}
+              editing={editing}
+              className={cn(
+                "text-[13.5px] leading-[1.4] transition-colors duration-[220ms] ease-out motion-reduce:transition-none",
+                subtask.done && "text-faint",
+                subtask.done && !editing && "line-through decoration-[1.5px]",
+              )}
+              ariaLabel="Rename subtask"
+              onStartEdit={onStartEdit}
+              onCommit={onCommit}
+              onAutoSave={onAutoSave}
+              onCancel={onCancel}
+            />
+          )}
         </span>
       </span>
-      {!pending ? <SubtaskRemoveButton onRemove={onDelete} /> : null}
+      {!pending && !readOnly ? <SubtaskRemoveButton onRemove={onDelete} /> : null}
     </li>
   );
 }
@@ -292,6 +328,7 @@ type SubtaskListProps = {
   onRenameSubtask: (subtaskId: string, title: string) => void;
   onDeleteSubtask: (subtaskId: string) => void;
   onReorderSubtasks: (subtaskIds: string[]) => void;
+  readOnly?: boolean;
 };
 
 function SubtaskDragPreview({ subtask }: { subtask: Subtask }) {
@@ -319,6 +356,7 @@ function SubtaskList({
   onRenameSubtask,
   onDeleteSubtask,
   onReorderSubtasks,
+  readOnly = false,
 }: SubtaskListProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -411,6 +449,7 @@ function SubtaskList({
               subtask={subtask}
               pending={pendingIds.has(subtask.id)}
               editing={editingSubtaskId === subtask.id}
+              readOnly={readOnly}
               onStartEdit={(event) => {
                 event.stopPropagation();
                 setEditingSubtaskId(subtask.id);
@@ -616,6 +655,7 @@ export function TaskRow({
   flash = false,
   onFlashComplete,
   skipSlide = false,
+  viewer = "owner",
 }: TaskRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [addingSubtask, setAddingSubtask] = useState(false);
@@ -704,6 +744,7 @@ export function TaskRow({
     !isDragging &&
     (task.subtasks.length > 0 || pendingSubtasks.length > 0 || addingSubtask);
   const inProgress = task.inProgress && !isCompleted;
+  const isManager = viewer === "manager";
 
   useEffect(() => {
     if (!expanded) {
@@ -773,10 +814,14 @@ export function TaskRow({
       )}
     >
       <DragHandleDots listeners={listeners} attributes={attributes} />
-      <TaskCheckbox
-        checked={isCompleted}
-        onToggle={() => actions?.onComplete(!isCompleted)}
-      />
+      {isManager ? (
+        <span aria-hidden className="mt-px size-[18px]" />
+      ) : (
+        <TaskCheckbox
+          checked={isCompleted}
+          onToggle={() => actions?.onComplete(!isCompleted)}
+        />
+      )}
       <div className="min-w-0">
         <div
           className={cn(
@@ -786,25 +831,31 @@ export function TaskRow({
           )}
         >
           <span className="relative inline-block max-w-full">
-            <EditableText
-              text={task.title}
-              editing={isEditing}
-              className={titleClass(bucket, isCompleted, isEditing)}
-              ariaLabel="Rename task"
-              onStartEdit={(event) => {
-                event.stopPropagation();
-                onSelect();
-                setIsEditing(true);
-              }}
-              onCommit={(value) => {
-                actions?.onRename(value);
-                setIsEditing(false);
-              }}
-              onAutoSave={(value) => {
-                actions?.onRename(value);
-              }}
-              onCancel={() => setIsEditing(false)}
-            />
+            {isManager ? (
+              <span className={titleClass(bucket, isCompleted, false)}>
+                <LinkifiedText text={task.title} />
+              </span>
+            ) : (
+              <EditableText
+                text={task.title}
+                editing={isEditing}
+                className={titleClass(bucket, isCompleted, isEditing)}
+                ariaLabel="Rename task"
+                onStartEdit={(event) => {
+                  event.stopPropagation();
+                  onSelect();
+                  setIsEditing(true);
+                }}
+                onCommit={(value) => {
+                  actions?.onRename(value);
+                  setIsEditing(false);
+                }}
+                onAutoSave={(value) => {
+                  actions?.onRename(value);
+                }}
+                onCancel={() => setIsEditing(false)}
+              />
+            )}
           </span>
           {isLater && task.startDate ? (
             <span className="text-[12px] tabular-nums text-faint">
@@ -875,6 +926,7 @@ export function TaskRow({
                   onRenameSubtask={actions.onRenameSubtask}
                   onDeleteSubtask={actions.onDeleteSubtask}
                   onReorderSubtasks={actions.onReorderSubtasks}
+                  readOnly={isManager}
                 />
               ) : visibleSubtasks.length > 0 ? (
                 <ul className="flex flex-col gap-[4px]">
@@ -926,7 +978,7 @@ export function TaskRow({
                   ))}
                 </ul>
               ) : null}
-              {addingSubtask ? (
+              {isManager ? null : addingSubtask ? (
                 <SubtaskComposer
                   autoFocus
                   className="mt-[6px]"
@@ -974,25 +1026,29 @@ export function TaskRow({
       <ContextMenu>
         <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
         <ContextMenuContent>
-          <ContextMenuItem onSelect={() => setIsEditing(true)}>
-            Rename
-          </ContextMenuItem>
-          <ContextMenuItem
-            onSelect={() => {
-              onSelect();
-              setAddingSubtask(true);
-            }}
-          >
-            Add a subtask
-          </ContextMenuItem>
-          {!isCompleted && actions.onToggleInProgress ? (
-            <ContextMenuItem onSelect={() => actions.onToggleInProgress?.()}>
-              {task.inProgress ? "Clear in progress" : "Mark in progress"}
-            </ContextMenuItem>
-          ) : null}
+          {isManager ? null : (
+            <>
+              <ContextMenuItem onSelect={() => setIsEditing(true)}>
+                Rename
+              </ContextMenuItem>
+              <ContextMenuItem
+                onSelect={() => {
+                  onSelect();
+                  setAddingSubtask(true);
+                }}
+              >
+                Add a subtask
+              </ContextMenuItem>
+              {!isCompleted && actions.onToggleInProgress ? (
+                <ContextMenuItem onSelect={() => actions.onToggleInProgress?.()}>
+                  {task.inProgress ? "Clear in progress" : "Mark in progress"}
+                </ContextMenuItem>
+              ) : null}
+            </>
+          )}
           {menuVariant === "day" ? (
             <>
-              <ContextMenuSeparator />
+              {isManager ? null : <ContextMenuSeparator />}
               {(["now", "next", "later"] as const).map((targetBucket) => (
                 <ContextMenuItem
                   key={targetBucket}

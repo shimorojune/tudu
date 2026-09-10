@@ -7,11 +7,13 @@ import { cn } from "@/lib/utils";
 export type TaskDescriptionFieldProps = {
   taskId: string;
   description: string | null;
+  readOnly?: boolean;
 };
 
 export function TaskDescriptionField({
   taskId,
   description,
+  readOnly = false,
 }: TaskDescriptionFieldProps) {
   const [value, setValue] = useState(description ?? "");
   const lastSaved = useRef(description ?? "");
@@ -41,23 +43,31 @@ export function TaskDescriptionField({
     <textarea
       value={value}
       rows={3}
-      placeholder="Add a description..."
+      readOnly={readOnly}
+      placeholder={readOnly ? "" : "Add a description..."}
       aria-label="Task description"
       className={cn(
         "mt-[14px] w-full resize-y border border-hair bg-transparent px-[12px] py-[10px]",
         "text-[13.5px] leading-[1.55] text-muted-foreground outline-none",
         "placeholder:text-faint focus:border-foreground focus:text-foreground",
+        readOnly && "cursor-default focus:border-hair",
       )}
       onFocus={() => {
         focusedRef.current = true;
       }}
       onChange={(event) => {
+        if (readOnly) {
+          return;
+        }
         const next = event.target.value;
         setValue(next);
         debouncedSave(next);
       }}
       onBlur={(event) => {
         focusedRef.current = false;
+        if (readOnly) {
+          return;
+        }
         debouncedSave.flush();
         const next = event.target.value.trim();
         const normalized = next.length > 0 ? next : null;

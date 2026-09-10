@@ -8,11 +8,13 @@ import type {
 import {
   createSubtask,
   createTask,
+  deleteReportTask,
   findTaskById,
   listTasksForDay,
   listUnscheduledTasks,
   reorderTasks,
   reorderSubtasks,
+  resolveTaskAccess,
   rollOverTasks,
   softDeleteSubtask,
   softDeleteTask,
@@ -203,6 +205,15 @@ export function createTasksRoute(db: Db) {
   });
 
   app.patch("/tasks/:id", jsonBody(updateTaskRequestSchema), async (c) => {
+    const access = await resolveTaskAccess(db, userId(c), c.req.param("id"));
+    if (!access) {
+      return c.json({ error: "Task not found" }, 404);
+    }
+
+    if (access.role === "manager") {
+      return c.json({ error: "Managers cannot edit tasks" }, 403);
+    }
+
     const updated = await updateTask(
       db,
       userId(c),
@@ -226,6 +237,23 @@ export function createTasksRoute(db: Db) {
   });
 
   app.delete("/tasks/:id", async (c) => {
+    const access = await resolveTaskAccess(db, userId(c), c.req.param("id"));
+    if (!access) {
+      return c.json({ error: "Task not found" }, 404);
+    }
+
+    if (access.role === "manager") {
+      try {
+        const deleted = await deleteReportTask(db, userId(c), c.req.param("id"));
+        if (!deleted) {
+          return c.json({ error: "Task not found" }, 404);
+        }
+        return c.body(null, 204);
+      } catch {
+        return c.json({ error: "Not allowed" }, 403);
+      }
+    }
+
     const deleted = await softDeleteTask(db, userId(c), c.req.param("id"));
 
     if (!deleted) {

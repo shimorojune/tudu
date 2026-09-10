@@ -103,6 +103,7 @@ export const tasksApi = baseApi.injectEndpoints({
     }),
     deleteTask: builder.mutation<void, string>({
       query: (id) => ({ url: `/tasks/${id}`, method: "DELETE" }),
+      invalidatesTags: ["Inbox", "Team"],
       async onQueryStarted(id, { dispatch, queryFulfilled, getState }) {
         const patches = removeTaskFromCaches(dispatch, () => readState(getState), id);
 

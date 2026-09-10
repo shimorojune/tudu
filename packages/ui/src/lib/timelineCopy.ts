@@ -8,6 +8,7 @@ export type TimelinePart =
 
 export type TimelineCopyContext = {
   viewerName: string;
+  viewerId?: string;
   isToday: boolean;
   selectedDate: string;
 };
@@ -29,8 +30,9 @@ function formatEventTime(createdAt: string, referenceDate: string): string {
   return format(eventDate, "d MMM");
 }
 
-function actorPart(ctx: TimelineCopyContext): TimelinePart {
-  return { kind: "text", text: ctx.viewerName, bold: true };
+function actorPart(event: TimelineEvent, ctx: TimelineCopyContext): TimelinePart {
+  const name = event.actor?.name?.trim() || ctx.viewerName;
+  return { kind: "text", text: name, bold: true };
 }
 
 function bucketName(bucket: Bucket | null | undefined, ctx: TimelineCopyContext) {
@@ -62,18 +64,27 @@ export function formatTimelineEvent(
   const data = event.data;
 
   switch (event.type) {
-    case "created":
+    case "created": {
+      const actorName = event.actor?.name?.trim();
+      const byViewer = !event.actor || event.actor.id === ctx.viewerId;
       return {
         timeLabel,
         isSystem: true,
-        parts: [{ kind: "text", text: "Created by you", muted: true }],
+        parts: [
+          {
+            kind: "text",
+            text: actorName && !byViewer ? `Created by ${actorName}` : "Created by you",
+            muted: true,
+          },
+        ],
       };
+    }
     case "renamed":
       return {
         timeLabel,
         isSystem: false,
         parts: [
-          actorPart(ctx),
+          actorPart(event, ctx),
           { kind: "text", text: " renamed this" },
         ],
       };
@@ -82,7 +93,7 @@ export function formatTimelineEvent(
         timeLabel,
         isSystem: false,
         parts: [
-          actorPart(ctx),
+          actorPart(event, ctx),
           { kind: "text", text: " updated the description" },
         ],
       };
@@ -91,7 +102,7 @@ export function formatTimelineEvent(
         timeLabel,
         isSystem: false,
         parts: [
-          actorPart(ctx),
+          actorPart(event, ctx),
           { kind: "text", text: " completed this" },
         ],
       };
@@ -100,7 +111,7 @@ export function formatTimelineEvent(
         timeLabel,
         isSystem: false,
         parts: [
-          actorPart(ctx),
+          actorPart(event, ctx),
           { kind: "text", text: " reopened this" },
         ],
       };
@@ -111,7 +122,7 @@ export function formatTimelineEvent(
         timeLabel,
         isSystem: false,
         parts: [
-          actorPart(ctx),
+          actorPart(event, ctx),
           { kind: "text", text: " moved this from " },
           { kind: "text", text: from, bold: true },
           { kind: "text", text: " to " },
@@ -124,7 +135,7 @@ export function formatTimelineEvent(
         timeLabel,
         isSystem: false,
         parts: [
-          actorPart(ctx),
+          actorPart(event, ctx),
           { kind: "text", text: " rescheduled this" },
         ],
       };
@@ -133,7 +144,7 @@ export function formatTimelineEvent(
         timeLabel,
         isSystem: false,
         parts: [
-          actorPart(ctx),
+          actorPart(event, ctx),
           { kind: "text", text: " set the deadline to " },
           {
             kind: "mono",
@@ -146,7 +157,7 @@ export function formatTimelineEvent(
         timeLabel,
         isSystem: false,
         parts: [
-          actorPart(ctx),
+          actorPart(event, ctx),
           { kind: "text", text: " changed the start date to " },
           {
             kind: "mono",
@@ -159,7 +170,7 @@ export function formatTimelineEvent(
         timeLabel,
         isSystem: false,
         parts: [
-          actorPart(ctx),
+          actorPart(event, ctx),
           {
             kind: "text",
             text: data.toPrivate ? " made this private" : " made this visible",
@@ -171,7 +182,7 @@ export function formatTimelineEvent(
         timeLabel,
         isSystem: false,
         parts: [
-          actorPart(ctx),
+          actorPart(event, ctx),
           { kind: "text", text: " commented" },
         ],
       };
@@ -180,7 +191,7 @@ export function formatTimelineEvent(
         timeLabel,
         isSystem: false,
         parts: [
-          actorPart(ctx),
+          actorPart(event, ctx),
           { kind: "text", text: " edited a comment" },
         ],
       };
@@ -189,7 +200,7 @@ export function formatTimelineEvent(
         timeLabel,
         isSystem: false,
         parts: [
-          actorPart(ctx),
+          actorPart(event, ctx),
           { kind: "text", text: " deleted a comment" },
         ],
       };
@@ -214,6 +225,36 @@ export function formatTimelineEvent(
         ],
       };
     }
+    case "inbox_sent":
+      return {
+        timeLabel,
+        isSystem: false,
+        parts: [
+          actorPart(event, ctx),
+          { kind: "text", text: " sent this to Inbox" },
+        ],
+      };
+    case "inbox_accepted": {
+      const bucket = bucketName((data.bucket as Bucket | null) ?? null, ctx);
+      return {
+        timeLabel,
+        isSystem: false,
+        parts: [
+          actorPart(event, ctx),
+          { kind: "text", text: " accepted this into " },
+          { kind: "text", text: bucket, bold: true, accent: true },
+        ],
+      };
+    }
+    case "inbox_declined":
+      return {
+        timeLabel,
+        isSystem: false,
+        parts: [
+          actorPart(event, ctx),
+          { kind: "text", text: " declined this" },
+        ],
+      };
     default:
       return {
         timeLabel,
@@ -228,6 +269,7 @@ export function syntheticCreatedEvent(taskId: string, createdAt: string): Timeli
     id: `synthetic-created-${taskId}`,
     taskId,
     actorId: null,
+    actor: null,
     type: "created",
     data: {},
     createdAt,
@@ -235,7 +277,7 @@ export function syntheticCreatedEvent(taskId: string, createdAt: string): Timeli
 }
 
 export function withSyntheticCreated(taskId: string, createdAt: string, events: TimelineEvent[]) {
-  if (events.some((event) => event.type === "created")) {
+  if (events.some((event) => event.type === "created" || event.type === "inbox_sent")) {
     return events;
   }
   const synthetic = syntheticCreatedEvent(taskId, createdAt);

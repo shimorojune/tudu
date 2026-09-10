@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 import { DEFAULT_NOW_SOFT_CAP, type Bucket, type Task } from "@tudu/shared";
 import { noSortingStrategy } from "@/lib/dragSort";
 import { cn } from "@/lib/utils";
-import { TaskRow, type TaskRowActions } from "@/components/tasks/TaskRow";
+import { TaskRow, type TaskRowActions, type TaskViewer } from "@/components/tasks/TaskRow";
 
 export type BucketSectionProps = {
   bucket: Bucket;
@@ -28,6 +28,7 @@ export type BucketSectionProps = {
   flashTaskId?: string | null;
   onFlashComplete?: () => void;
   skipSlideForTaskId?: string | null;
+  viewer?: TaskViewer;
 };
 
 export function BucketSection({
@@ -50,6 +51,7 @@ export function BucketSection({
   flashTaskId = null,
   onFlashComplete,
   skipSlideForTaskId = null,
+  viewer = "owner",
 }: BucketSectionProps) {
   const isNow = bucket === "now";
   const overCap = (nowCount ?? 0) > nowSoftCap;
@@ -94,14 +96,16 @@ export function BucketSection({
             {nowCount} / {nowSoftCap}
           </span>
         ) : null}
-        <button
-          type="button"
-          className="inline-flex flex-none items-center gap-[5px] whitespace-nowrap border border-hair px-[8px] py-[4px] text-[11.5px] font-bold leading-none text-foreground hover:border-foreground hover:bg-foreground/[0.04]"
-          onClick={() => onAddTask(bucket)}
-        >
-          <Plus size={11} strokeWidth={2.6} aria-hidden />
-          Add task
-        </button>
+        {viewer === "owner" ? (
+          <button
+            type="button"
+            className="inline-flex flex-none items-center gap-[5px] whitespace-nowrap border border-hair px-[8px] py-[4px] text-[11.5px] font-bold leading-none text-foreground hover:border-foreground hover:bg-foreground/[0.04]"
+            onClick={() => onAddTask(bucket)}
+          >
+            <Plus size={11} strokeWidth={2.6} aria-hidden />
+            Add task
+          </button>
+        ) : null}
         {isNow && showNowHelper ? (
           <span className="ml-auto text-[11.5px] text-ghost">
             drag a row to reorder, or into another bucket
@@ -153,6 +157,7 @@ export function BucketSection({
               flash={task.id === flashTaskId}
               onFlashComplete={onFlashComplete}
               skipSlide={task.id === skipSlideForTaskId}
+              viewer={viewer}
             />
           ))}
         </SortableContext>

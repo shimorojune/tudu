@@ -9,6 +9,7 @@ import {
   formatTimelineEvent,
   withSyntheticCreated,
 } from "@/lib/timelineCopy";
+import { personFirstName } from "@/lib/person";
 import { TimelineEventRow } from "@/components/inspector/TimelineEventRow";
 
 export type TimelineTabProps = {
@@ -17,6 +18,8 @@ export type TimelineTabProps = {
   isToday: boolean;
   timelineEvents: TimelineEvent[];
   hasMore: boolean;
+  canEditPrivacy?: boolean;
+  sharedWithName?: string | null;
 };
 
 export function TimelineTab({
@@ -25,6 +28,8 @@ export function TimelineTab({
   isToday,
   timelineEvents,
   hasMore,
+  canEditPrivacy = true,
+  sharedWithName = null,
 }: TimelineTabProps) {
   const { data: me } = useGetMeQuery();
   const [updateTask] = useUpdateTaskMutation();
@@ -68,6 +73,7 @@ export function TimelineTab({
           {events.map((event, index) => {
             const copy = formatTimelineEvent(event, {
               viewerName,
+              viewerId: me?.id,
               isToday,
               selectedDate,
             });
@@ -95,22 +101,26 @@ export function TimelineTab({
         ) : null}
       </div>
 
-      <div className="mt-auto flex items-center gap-[10px] border-t border-hair px-[24px] py-[14px] text-[12px] text-muted-foreground">
-        <span className="size-[5px] bg-primary" aria-hidden />
-        Only you can see this task
-        <button
-          type="button"
-          className="ml-auto border border-rule px-[10px] py-[4px] text-[11.5px]"
-          onClick={() => {
-            void updateTask({
-              id: task.id,
-              patch: { isPrivate: !task.isPrivate },
-            });
-          }}
-        >
-          {task.isPrivate ? "Make visible" : "Make private"}
-        </button>
-      </div>
+      {canEditPrivacy ? (
+        <div className="mt-auto flex items-center gap-[10px] border-t border-hair px-[24px] py-[14px] text-[12px] text-muted-foreground">
+          <span className="size-[5px] bg-primary" aria-hidden />
+          {task.isPrivate || !sharedWithName
+            ? "Only you can see this task"
+            : `${personFirstName(sharedWithName)} can see this task`}
+          <button
+            type="button"
+            className="ml-auto border border-rule px-[10px] py-[4px] text-[11.5px]"
+            onClick={() => {
+              void updateTask({
+                id: task.id,
+                patch: { isPrivate: !task.isPrivate },
+              });
+            }}
+          >
+            {task.isPrivate ? "Make visible" : "Make private"}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

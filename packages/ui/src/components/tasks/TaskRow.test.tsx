@@ -695,4 +695,30 @@ describe("TaskRow", () => {
       expect(handle).toHaveClass("left-[-20px]");
     }
   });
+
+  it("hides complete, rename, and add subtask in manager view", () => {
+    render(
+      <TaskRow
+        task={fixtureTask}
+        bucket="now"
+        selected
+        selectedDate="2026-09-05"
+        onSelect={vi.fn()}
+        menuVariant="day"
+        actions={defaultActions()}
+        viewer="manager"
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Mark complete" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Rename task" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Add a subtask" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Improve error message")).toBeInTheDocument();
+  });
 });

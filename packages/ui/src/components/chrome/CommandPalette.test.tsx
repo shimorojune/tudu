@@ -22,6 +22,12 @@ const navigate = vi.fn();
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
+  useRouterState: (opts?: {
+    select?: (state: { location: { pathname: string } }) => unknown;
+  }) => {
+    const snapshot = { location: { pathname: "/" } };
+    return opts?.select ? opts.select(snapshot) : snapshot;
+  },
 }));
 
 function renderPalette() {

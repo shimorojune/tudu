@@ -40,3 +40,18 @@ export {
 } from "./slices/daySlice.js";
 export { makeStore, store } from "./store.js";
 export type { RootState, AppDispatch } from "./store.js";
+export {
+  managerApi,
+  useGetInboxQuery,
+  useGetInboxCountQuery,
+  useAcceptInboxItemMutation,
+  useDeclineInboxItemMutation,
+  useGetTeamQuery,
+  useCreateTeamInviteMutation,
+  useAcceptTeamInviteMutation,
+  useDeclineTeamInviteMutation,
+  useGetReportDayQuery,
+  useSendInboxTaskMutation,
+  useReorderReportTasksMutation,
+  useDeleteReportTaskMutation,
+} from "./api/managerApi.js";
