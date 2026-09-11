@@ -32,6 +32,7 @@ const task: Task = {
     name: "EGS",
     color: "ember",
     archivedAt: null,
+    isPrivate: false,
   },
   subtasks: [],
 };

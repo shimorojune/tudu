@@ -45,6 +45,12 @@ describe("updateProjectRequestSchema", () => {
       archived: true,
     });
   });
+
+  it("accepts a privacy flip", () => {
+    expect(updateProjectRequestSchema.parse({ isPrivate: true })).toEqual({
+      isPrivate: true,
+    });
+  });
 });
 
 describe("pickProjectToEnsure", () => {

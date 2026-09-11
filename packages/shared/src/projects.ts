@@ -23,6 +23,7 @@ export const projectRefSchema = z.object({
   name: z.string(),
   color: projectColorSchema,
   archivedAt: z.iso.datetime({ offset: true }).nullable(),
+  isPrivate: z.boolean().default(false),
 });
 
 export type ProjectRef = z.infer<typeof projectRefSchema>;
@@ -38,6 +39,7 @@ export type Project = z.infer<typeof projectSchema>;
 export const createProjectRequestSchema = z.object({
   name: projectNameSchema,
   color: projectColorSchema,
+  isPrivate: z.boolean().optional(),
 });
 
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
@@ -47,6 +49,7 @@ export const updateProjectRequestSchema = z
     name: projectNameSchema,
     color: projectColorSchema,
     archived: z.boolean(),
+    isPrivate: z.boolean(),
   })
   .partial()
   .refine((value) => Object.keys(value).length > 0, {

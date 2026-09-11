@@ -1,5 +1,11 @@
 import { useMemo, useState } from "react";
-import { PROJECT_COLORS, type ProjectColor } from "@tudu/shared";
+import {
+  PROJECT_COLORS,
+  type CreateProjectRequest,
+  type Project,
+  type ProjectColor,
+  type ProjectRef,
+} from "@tudu/shared";
 import {
   useCreateProjectMutation,
   useGetProjectsQuery,
@@ -18,6 +24,11 @@ export type ProjectPickerProps = {
   onChange: (projectId: string | null) => void;
   readOnly?: boolean;
   id?: string;
+  projects?: Project[];
+  onCreate?: (
+    body: CreateProjectRequest,
+  ) => Promise<{ project: { id: string } }>;
+  fallback?: ProjectRef | null;
 };
 
 export function ProjectPicker({
@@ -25,8 +36,14 @@ export function ProjectPicker({
   onChange,
   readOnly = false,
   id,
+  projects: projectsProp,
+  onCreate,
+  fallback = null,
 }: ProjectPickerProps) {
-  const { data: projects = [] } = useGetProjectsQuery();
+  const { data: ownProjects = [] } = useGetProjectsQuery({
+    skip: projectsProp !== undefined,
+  });
+  const projects = projectsProp ?? ownProjects;
   const [createProject, { isLoading }] = useCreateProjectMutation();
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -40,7 +57,7 @@ export function ProjectPicker({
   const selected =
     live.find((project) => project.id === value) ??
     projects.find((project) => project.id === value) ??
-    null;
+    (fallback && fallback.id === value ? fallback : null);
 
   if (readOnly) {
     return selected ? <ProjectChip project={selected} /> : <span>None</span>;
@@ -51,7 +68,9 @@ export function ProjectPicker({
     if (!trimmed || isLoading) {
       return;
     }
-    const result = await createProject({ name: trimmed, color }).unwrap();
+    const result = onCreate
+      ? await onCreate({ name: trimmed, color })
+      : await createProject({ name: trimmed, color }).unwrap();
     onChange(result.project.id);
     setCreating(false);
     setName("");

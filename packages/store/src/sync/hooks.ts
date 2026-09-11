@@ -466,3 +466,50 @@ export function useUpdateProjectMutation() {
     patch: arg.patch,
   }));
 }
+
+export function useDeleteProjectMutation() {
+  return useOp((id: string) => ({ type: "project.delete" as const, id }));
+}
+
+export function useGetReportProjectsQuery(
+  userId: string,
+  options?: QueryOptions,
+) {
+  const key = options?.skip || !userId ? null : viewKey.reportProjects(userId);
+  const query = useView(key);
+  const replica = useSelector(selectVisible);
+  const data = useMemo(() => {
+    const bucket = replica.reportProjects[userId] ?? {};
+    return Object.values(bucket).sort((a, b) => {
+      if (Boolean(a.archivedAt) !== Boolean(b.archivedAt)) {
+        return a.archivedAt ? 1 : -1;
+      }
+      return a.name.localeCompare(b.name);
+    });
+  }, [replica.reportProjects, userId]);
+  return { ...query, data };
+}
+
+export function useCreateReportProjectMutation() {
+  const dispatch = useDispatch<AppDispatch>();
+  const [isLoading, setLoading] = useState(false);
+  const trigger = useCallback(
+    (arg: { userId: string; body: CreateProjectRequest }) => {
+      const id = crypto.randomUUID();
+      setLoading(true);
+      const promise = dispatch(
+        enqueue({
+          type: "team.project.create",
+          id,
+          userId: arg.userId,
+          body: arg.body,
+        }),
+      )
+        .then(() => ({ project: { id } }))
+        .finally(() => setLoading(false));
+      return withUnwrap(promise);
+    },
+    [dispatch],
+  );
+  return [trigger, { isLoading }] as const;
+}

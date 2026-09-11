@@ -8,19 +8,25 @@ import {
   claimMutation,
   createComment,
   createManagerInvite,
+  assertPublicAssignableProject,
   createProject,
+  createProjectForReport,
   createSubtask,
   createTask,
   currentSyncSeq,
   declineInboxItem,
   declineManagerInvite,
+  deleteProject,
   deleteReportTask,
   emitSync,
   eventsForMutation,
+  findLiveLink,
   findTaskById,
   listCommentsForTask,
   listInbox,
+  listLiveTaskIdsForProject,
   listProjectsForUser,
+  listPublicProjectsForUser,
   listReportDayTasks,
   listTasksForDay,
   listTasksForProject,
@@ -190,12 +196,34 @@ async function emitTaskSnapshot(
   }
 
   const recipients = await recipientsForTaskId(db, taskId);
-  const events = await emitSync(db, {
-    recipientUserIds: recipients,
-    clientMutationId,
-    type: "task.upsert",
-    payload: { task: mapTask(task), ownerId: task.userId },
-  });
+  const ownerIds = recipients.filter((id) => id === task.userId);
+  const otherIds = recipients.filter((id) => id !== task.userId);
+  const events: SyncEvent[] = [];
+
+  if (ownerIds.length > 0) {
+    events.push(
+      ...(await emitSync(db, {
+        recipientUserIds: ownerIds,
+        clientMutationId,
+        type: "task.upsert",
+        payload: { task: mapTask(task), ownerId: task.userId },
+      })),
+    );
+  }
+
+  if (otherIds.length > 0) {
+    events.push(
+      ...(await emitSync(db, {
+        recipientUserIds: otherIds,
+        clientMutationId,
+        type: "task.upsert",
+        payload: {
+          task: mapTask(task, { hidePrivateProjects: true }),
+          ownerId: task.userId,
+        },
+      })),
+    );
+  }
 
   if (task.isPrivate) {
     const manager = await managerIdForOwner(db, task.userId);
@@ -214,7 +242,7 @@ async function emitTaskSnapshot(
   return events;
 }
 
-async function emitProjectSnapshot(
+async function emitProjectFanout(
   db: Db,
   projectId: string,
   clientMutationId: string | null,
@@ -224,12 +252,39 @@ async function emitProjectSnapshot(
     return [];
   }
 
-  return emitSync(db, {
+  const events = await emitSync(db, {
     recipientUserIds: [row.userId],
     clientMutationId,
     type: "project.upsert",
     payload: mapProject(row),
   });
+
+  const manager = await managerIdForOwner(db, row.userId);
+  if (!manager || manager === row.userId) {
+    return events;
+  }
+
+  if (row.isPrivate) {
+    events.push(
+      ...(await emitSync(db, {
+        recipientUserIds: [manager],
+        clientMutationId,
+        type: "project.delete",
+        payload: { id: row.id },
+      })),
+    );
+    return events;
+  }
+
+  events.push(
+    ...(await emitSync(db, {
+      recipientUserIds: [manager],
+      clientMutationId,
+      type: "project.upsert",
+      payload: mapProject(row),
+    })),
+  );
+  return events;
 }
 
 async function emitLatestTimeline(
@@ -336,10 +391,25 @@ export async function applySyncOp(
         if (!access) {
           throw new SyncOpError("Task not found", 404);
         }
-        if (access.role !== "owner") {
-          throw new SyncOpError("Not allowed", 403);
+        let updated;
+        if (access.role === "owner") {
+          updated = await updateTask(db, actorId, op.id, toUpdateFields(op.patch));
+        } else {
+          const keys = Object.keys(op.patch);
+          if (keys.length !== 1 || !("projectId" in op.patch)) {
+            throw new SyncOpError("Not allowed", 403);
+          }
+          if (op.patch.projectId) {
+            await assertPublicAssignableProject(
+              db,
+              access.task.userId,
+              op.patch.projectId,
+            );
+          }
+          updated = await updateTask(db, access.task.userId, op.id, {
+            projectId: op.patch.projectId ?? null,
+          });
         }
-        const updated = await updateTask(db, actorId, op.id, toUpdateFields(op.patch));
         if (!updated) {
           throw new SyncOpError("Task not found", 404);
         }
@@ -703,7 +773,7 @@ export async function applySyncOp(
             projectId: op.body.projectId,
           });
           if (sent.task.projectId) {
-            await push(await emitProjectSnapshot(db, sent.task.projectId, clientMutationId));
+            await push(await emitProjectFanout(db, sent.task.projectId, clientMutationId));
           }
           await push(await emitInboxForUser(db, op.userId, clientMutationId));
           await push(await emitLatestTimeline(db, sent.task.id, clientMutationId));
@@ -804,16 +874,61 @@ export async function applySyncOp(
           userId: actorId,
           name: op.body.name,
           color: op.body.color,
+          isPrivate: op.body.isPrivate,
         });
-        await push(await emitProjectSnapshot(db, created.id, clientMutationId));
+        await push(await emitProjectFanout(db, created.id, clientMutationId));
         break;
       }
       case "project.update": {
+        const before = await findProjectById(db, op.id);
         const updated = await updateProject(db, actorId, op.id, op.patch);
         if (!updated) {
           throw new SyncOpError("Project not found", 404);
         }
-        await push(await emitProjectSnapshot(db, updated.id, clientMutationId));
+        await push(await emitProjectFanout(db, updated.id, clientMutationId));
+        if (before && before.isPrivate !== updated.isPrivate) {
+          const taskIds = await listLiveTaskIdsForProject(db, updated.id);
+          for (const taskId of taskIds) {
+            await push(await emitTaskSnapshot(db, taskId, clientMutationId));
+          }
+        }
+        break;
+      }
+      case "project.delete": {
+        const taskIds = await listLiveTaskIdsForProject(db, op.id);
+        const deleted = await deleteProject(db, actorId, op.id);
+        if (!deleted) {
+          throw new SyncOpError("Project not found", 404);
+        }
+        const recipients = [deleted.userId];
+        const manager = await managerIdForOwner(db, deleted.userId);
+        if (manager && manager !== deleted.userId) {
+          recipients.push(manager);
+        }
+        await push(
+          await emitSync(db, {
+            recipientUserIds: recipients,
+            clientMutationId,
+            type: "project.delete",
+            payload: { id: deleted.id },
+          }),
+        );
+        for (const taskId of taskIds) {
+          await push(await emitTaskSnapshot(db, taskId, clientMutationId));
+        }
+        break;
+      }
+      case "team.project.create": {
+        try {
+          const created = await createProjectForReport(db, actorId, op.userId, {
+            id: op.id,
+            name: op.body.name,
+            color: op.body.color,
+          });
+          await push(await emitProjectFanout(db, created.id, clientMutationId));
+        } catch (error) {
+          wrapManager(error);
+        }
         break;
       }
       case "notification.readAll": {
@@ -933,7 +1048,9 @@ export async function bootstrapViews(
       case "reportDay": {
         try {
           const result = await listReportDayTasks(db, userId, view.userId, view.date);
-          const tasks = result.tasks.map(mapTask);
+          const tasks = result.tasks.map((row) =>
+            mapTask(row, { hidePrivateProjects: true }),
+          );
           events.push(
             synthetic("reportDay.upsert", {
               report: result.report,
@@ -954,6 +1071,17 @@ export async function bootstrapViews(
       }
       case "projects": {
         const rows = await listProjectsForUser(db, userId);
+        for (const row of rows) {
+          events.push(synthetic("project.upsert", mapProject(row)));
+        }
+        break;
+      }
+      case "reportProjects": {
+        const link = await findLiveLink(db, userId, view.userId);
+        if (!link?.permissions) {
+          break;
+        }
+        const rows = await listPublicProjectsForUser(db, view.userId);
         for (const row of rows) {
           events.push(synthetic("project.upsert", mapProject(row)));
         }
@@ -986,7 +1114,12 @@ export async function bootstrapViews(
         const task = await loadTaskWithSubtasks(db, view.taskId);
         if (task) {
           events.push(
-            synthetic("task.upsert", { task: mapTask(task), ownerId: task.userId }),
+            synthetic("task.upsert", {
+              task: mapTask(task, {
+                hidePrivateProjects: access.role === "manager",
+              }),
+              ownerId: task.userId,
+            }),
           );
         }
         const comments = await listCommentsForTask(db, view.taskId);

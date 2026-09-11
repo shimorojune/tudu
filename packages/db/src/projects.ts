@@ -9,6 +9,7 @@ import {
 } from "@tudu/shared";
 import type { Db } from "./index.js";
 import { projects, type ProjectRow } from "./projects-schema.js";
+import { tasks } from "./tasks-schema.js";
 
 export class ProjectError extends Error {
   constructor(
@@ -27,13 +28,25 @@ export function mapProject(row: ProjectRow): Project {
     name: row.name,
     color: row.color,
     archivedAt: row.archivedAt?.toISOString() ?? null,
+    isPrivate: row.isPrivate,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
 
-export function mapProjectRef(row: ProjectRow | null | undefined): ProjectRef | null {
+export type MapProjectRefOptions = {
+  hidePrivate?: boolean;
+};
+
+export function mapProjectRef(
+  row: ProjectRow | null | undefined,
+  options?: MapProjectRefOptions,
+): ProjectRef | null {
   if (!row) {
+    return null;
+  }
+
+  if (options?.hidePrivate && row.isPrivate) {
     return null;
   }
 
@@ -42,7 +55,29 @@ export function mapProjectRef(row: ProjectRow | null | undefined): ProjectRef | 
     name: row.name,
     color: row.color,
     archivedAt: row.archivedAt?.toISOString() ?? null,
+    isPrivate: row.isPrivate,
   };
+}
+
+export function isPublicAssignableProject(
+  row:
+    | {
+        userId: string;
+        archivedAt: unknown;
+        deletedAt: unknown;
+        isPrivate: boolean;
+      }
+    | null
+    | undefined,
+  ownerId: string,
+): boolean {
+  return Boolean(
+    row &&
+      row.userId === ownerId &&
+      row.archivedAt == null &&
+      row.deletedAt == null &&
+      !row.isPrivate,
+  );
 }
 
 export async function listProjectsForUser(
@@ -68,6 +103,7 @@ export async function findAssignableProject(
   db: Db,
   userId: string,
   projectId: string,
+  options?: { publicOnly?: boolean },
 ): Promise<ProjectRow | undefined> {
   return db.query.projects.findFirst({
     where: and(
@@ -75,6 +111,7 @@ export async function findAssignableProject(
       eq(projects.userId, userId),
       isNull(projects.deletedAt),
       isNull(projects.archivedAt),
+      ...(options?.publicOnly ? [eq(projects.isPrivate, false)] : []),
     ),
   });
 }
@@ -89,6 +126,34 @@ export async function assertAssignableProject(
     throw new ProjectError("Project not found", 400);
   }
   return row;
+}
+
+export async function assertPublicAssignableProject(
+  db: Db,
+  userId: string,
+  projectId: string,
+): Promise<ProjectRow> {
+  const row = await findAssignableProject(db, userId, projectId, {
+    publicOnly: true,
+  });
+  if (!row || !isPublicAssignableProject(row, userId)) {
+    throw new ProjectError("Project not found", 400);
+  }
+  return row;
+}
+
+export async function listPublicProjectsForUser(
+  db: Db,
+  userId: string,
+): Promise<ProjectRow[]> {
+  return db.query.projects.findMany({
+    where: and(
+      eq(projects.userId, userId),
+      isNull(projects.deletedAt),
+      eq(projects.isPrivate, false),
+    ),
+    orderBy: [sql`(${projects.archivedAt} is null) desc`, asc(projects.name)],
+  });
 }
 
 export async function projectNameById(
@@ -112,6 +177,7 @@ export type CreateProjectInput = {
   userId: string;
   name: string;
   color: ProjectColor;
+  isPrivate?: boolean;
 };
 
 export async function createProject(
@@ -138,6 +204,7 @@ export async function createProject(
       userId: input.userId,
       name,
       color: input.color,
+      isPrivate: input.isPrivate ?? false,
     })
     .returning();
 
@@ -148,6 +215,7 @@ export type UpdateProjectFields = Partial<{
   name: string;
   color: ProjectColor;
   archived: boolean;
+  isPrivate: boolean;
 }>;
 
 export async function updateProject(
@@ -195,6 +263,9 @@ export async function updateProject(
   }
   if (fields.archived === false) {
     patch.archivedAt = null;
+  }
+  if (fields.isPrivate !== undefined) {
+    patch.isPrivate = fields.isPrivate;
   }
 
   if (Object.keys(patch).length === 0) {
@@ -244,4 +315,46 @@ export async function ensureProjectForUser(
     .returning();
 
   return created[0]!;
+}
+
+export async function listLiveTaskIdsForProject(
+  db: Db,
+  projectId: string,
+): Promise<string[]> {
+  const rows = await db
+    .select({ id: tasks.id })
+    .from(tasks)
+    .where(and(eq(tasks.projectId, projectId), isNull(tasks.deletedAt)));
+  return rows.map((row) => row.id);
+}
+
+export async function deleteProject(
+  db: Db,
+  userId: string,
+  projectId: string,
+): Promise<ProjectRow | undefined> {
+  const existing = await db.query.projects.findFirst({
+    where: and(
+      eq(projects.id, projectId),
+      eq(projects.userId, userId),
+      isNull(projects.deletedAt),
+    ),
+  });
+
+  if (!existing) {
+    return undefined;
+  }
+
+  await db
+    .update(tasks)
+    .set({ projectId: null })
+    .where(and(eq(tasks.projectId, projectId), isNull(tasks.deletedAt)));
+
+  const rows = await db
+    .update(projects)
+    .set({ deletedAt: new Date() })
+    .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
+    .returning();
+
+  return rows[0];
 }

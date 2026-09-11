@@ -1,5 +1,10 @@
 import { format, parseISO } from "date-fns";
-import type { Task, TimelineEvent } from "@tudu/shared";
+import type {
+  CreateProjectRequest,
+  Project,
+  Task,
+  TimelineEvent,
+} from "@tudu/shared";
 import { BUCKETS, type Bucket } from "@tudu/shared";
 import { useGetMeQuery, useUpdateTaskMutation } from "@tudu/store";
 import { bucketLabel } from "@/lib/buckets";
@@ -20,6 +25,11 @@ export type DetailsTabProps = {
   timelineEvents: TimelineEvent[];
   onJumpToTimeline: () => void;
   readOnly?: boolean;
+  canAssignProject?: boolean;
+  projects?: Project[];
+  onCreateProject?: (
+    body: CreateProjectRequest,
+  ) => Promise<{ project: { id: string } }>;
   sharedWithName?: string | null;
 };
 
@@ -99,6 +109,9 @@ export function DetailsTab({
   timelineEvents,
   onJumpToTimeline,
   readOnly = false,
+  canAssignProject = false,
+  projects,
+  onCreateProject,
   sharedWithName = null,
 }: DetailsTabProps) {
   const { data: me } = useGetMeQuery();
@@ -126,7 +139,10 @@ export function DetailsTab({
         <dd>
           <ProjectPicker
             value={task.project?.id ?? null}
-            readOnly={readOnly}
+            readOnly={readOnly && !canAssignProject}
+            projects={projects}
+            onCreate={onCreateProject}
+            fallback={task.project}
             onChange={(projectId) => {
               updateTask({ id: task.id, patch: { projectId } });
             }}

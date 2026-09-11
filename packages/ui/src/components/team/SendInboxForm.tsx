@@ -2,9 +2,12 @@ import { useState, type FormEvent } from "react";
 import { ProjectChip } from "@/components/projects/ProjectChip";
 import { ProjectPicker } from "@/components/projects/ProjectPicker";
 import { DateField } from "@/components/ui/date-field";
-import { useGetProjectsQuery } from "@tudu/store";
+import {
+  useCreateReportProjectMutation,
+  useGetReportProjectsQuery,
+  useSendInboxTaskMutation,
+} from "@tudu/store";
 import { personFirstName } from "@/lib/person";
-import { useSendInboxTaskMutation } from "@tudu/store";
 
 export type SendInboxFormProps = {
   userId: string;
@@ -23,7 +26,8 @@ export function SendInboxForm({
 }: SendInboxFormProps) {
   const first = personFirstName(reportName);
   const [sendTask, { isLoading }] = useSendInboxTaskMutation();
-  const { data: projects = [] } = useGetProjectsQuery();
+  const { data: projects = [] } = useGetReportProjectsQuery(userId);
+  const [createReportProject] = useCreateReportProjectMutation();
   const [title, setTitle] = useState("");
   const [note, setNote] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -105,10 +109,17 @@ export function SendInboxForm({
         </div>
         <label className="flex flex-col gap-[7px]">
           <span className="text-[12px] text-muted-foreground">Project</span>
-          <ProjectPicker value={projectId} onChange={setProjectId} />
+          <ProjectPicker
+            value={projectId}
+            onChange={setProjectId}
+            projects={projects}
+            onCreate={(body) =>
+              createReportProject({ userId, body }).unwrap()
+            }
+          />
           {selectedProject ? (
             <span className="text-[12px] text-muted-foreground">
-              They get their own <ProjectChip project={selectedProject} />
+              Lands on <ProjectChip project={selectedProject} />
             </span>
           ) : null}
         </label>

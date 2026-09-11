@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { pickProjectToEnsure } from "@tudu/shared";
-import { mapProject, mapProjectRef } from "./projects.js";
+import { isPublicAssignableProject, mapProject, mapProjectRef } from "./projects.js";
 import type { ProjectRow } from "./projects-schema.js";
 
 const now = new Date("2026-09-11T08:00:00.000Z");
@@ -12,6 +12,7 @@ function row(overrides: Partial<ProjectRow> = {}): ProjectRow {
     name: "EGS",
     color: "ember",
     archivedAt: null,
+    isPrivate: false,
     createdAt: now,
     updatedAt: now,
     deletedAt: null,
@@ -27,6 +28,7 @@ describe("mapProject", () => {
       name: "EGS",
       color: "ember",
       archivedAt: null,
+      isPrivate: false,
       createdAt: "2026-09-11T08:00:00.000Z",
       updatedAt: "2026-09-11T08:00:00.000Z",
     });
@@ -38,7 +40,30 @@ describe("mapProject", () => {
       name: "EGS",
       color: "ember",
       archivedAt: "2026-09-11T08:00:00.000Z",
+      isPrivate: false,
     });
+  });
+
+  it("drops a private chip when the viewer is the manager", () => {
+    expect(
+      mapProjectRef(row({ isPrivate: true }), { hidePrivate: true }),
+    ).toBeNull();
+  });
+});
+
+describe("isPublicAssignableProject", () => {
+  it("accepts the report's public live project", () => {
+    expect(isPublicAssignableProject(row(), "user-1")).toBe(true);
+  });
+
+  it("rejects the manager's id, a private project, and an archived one", () => {
+    expect(isPublicAssignableProject(row(), "manager-1")).toBe(false);
+    expect(isPublicAssignableProject(row({ isPrivate: true }), "user-1")).toBe(
+      false,
+    );
+    expect(isPublicAssignableProject(row({ archivedAt: now }), "user-1")).toBe(
+      false,
+    );
   });
 });
 

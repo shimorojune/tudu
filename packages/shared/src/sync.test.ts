@@ -53,5 +53,9 @@ describe("viewKey", () => {
       type: "project",
       projectId: "11111111-1111-4111-8111-111111111111",
     });
+    expect(parseViewKey(viewKey.reportProjects("u1"))).toEqual({
+      type: "reportProjects",
+      userId: "u1",
+    });
   });
 });

@@ -12,10 +12,15 @@ import {
   type ManagerAction,
   type ManagerPermissions,
   type Person,
+  type ProjectColor,
 } from "@tudu/shared";
 import type { Db } from "./index.js";
 import { user } from "./auth-schema.js";
-import { ensureProjectForUser, findAssignableProject } from "./projects.js";
+import {
+  createProject,
+  findProjectById,
+  isPublicAssignableProject,
+} from "./projects.js";
 import type { ProjectRow } from "./projects-schema.js";
 import { countCommentsForTasks, insertTimelineEvents } from "./activity.js";
 import {
@@ -342,15 +347,11 @@ export async function sendInboxTask(
 
   let projectId: string | null = null;
   if (input.projectId) {
-    const senderProject = await findAssignableProject(db, actorId, input.projectId);
-    if (!senderProject) {
+    const reportProject = await findProjectById(db, input.projectId);
+    if (!isPublicAssignableProject(reportProject, reportUserId)) {
       throw new ManagerActionError("Project not found", 400);
     }
-    const reportProject = await ensureProjectForUser(db, reportUserId, {
-      name: senderProject.name,
-      color: senderProject.color,
-    });
-    projectId = reportProject.id;
+    projectId = reportProject!.id;
   }
 
   const position = await nextPosition(db, reportUserId, null, null);
@@ -387,6 +388,26 @@ export async function sendInboxTask(
   ]);
 
   return { item: item!, task };
+}
+
+export async function createProjectForReport(
+  db: Db,
+  managerUserId: string,
+  reportUserId: string,
+  input: { id?: string; name: string; color: ProjectColor },
+): Promise<ProjectRow> {
+  const link = await findLiveLink(db, managerUserId, reportUserId);
+  if (!link?.permissions) {
+    throw new ManagerActionError("Not a report of yours", 403);
+  }
+
+  return createProject(db, {
+    id: input.id,
+    userId: reportUserId,
+    name: input.name,
+    color: input.color,
+    isPrivate: false,
+  });
 }
 
 export async function acceptInboxItem(

@@ -1,7 +1,15 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { useGetProjectsQuery } from "@tudu/store";
+import { useSelector } from "react-redux";
+import {
+  todayIso,
+  useGetProjectsQuery,
+  useGetReportDayQuery,
+  useGetReportProjectsQuery,
+  type RootState,
+} from "@tudu/store";
 import { ProjectChip } from "@/components/projects/ProjectChip";
 import { useProjectFilterId } from "@/hooks/useProjectFilterId";
+import { mergeReportFilterProjects } from "@/lib/projectFilter";
 import { cn } from "@/lib/utils";
 import {
   Popover,
@@ -16,14 +24,33 @@ export function ProjectFilter() {
     select: (state) => state.location.search as Record<string, unknown>,
   });
   const selectedId = useProjectFilterId();
-  const { data: projects = [] } = useGetProjectsQuery();
-  const selected = projects.find((project) => project.id === selectedId) ?? null;
-  const options = projects.filter((project) => {
-    if (project.archivedAt === null) {
-      return true;
-    }
-    return project.id === selectedId;
+  const reportMatch = pathname.match(/^\/team\/([^/]+)$/);
+  const reportUserId = reportMatch?.[1] ?? null;
+  const selectedDate =
+    useSelector((state: RootState) => state.day.selectedDate) || todayIso();
+  const { data: ownProjects = [] } = useGetProjectsQuery({
+    skip: Boolean(reportUserId),
   });
+  const { data: reportProjects = [] } = useGetReportProjectsQuery(
+    reportUserId ?? "",
+    { skip: !reportUserId },
+  );
+  const { data: reportDay } = useGetReportDayQuery(
+    { userId: reportUserId ?? "", date: selectedDate },
+    { skip: !reportUserId },
+  );
+  const projects = reportUserId
+    ? mergeReportFilterProjects(reportProjects, reportDay?.tasks ?? [])
+    : ownProjects;
+  const selected = projects.find((project) => project.id === selectedId) ?? null;
+  const options = reportUserId
+    ? projects
+    : projects.filter((project) => {
+        if (project.archivedAt === null) {
+          return true;
+        }
+        return project.id === selectedId;
+      });
 
   function setProject(projectId: string | undefined) {
     const next = { ...search, project: projectId };

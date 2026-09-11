@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { PROJECT_COLORS, type ProjectColor } from "@tudu/shared";
 import {
   useCreateProjectMutation,
+  useDeleteProjectMutation,
   useGetProjectsQuery,
   useUpdateProjectMutation,
 } from "@tudu/store";
@@ -14,11 +15,15 @@ export function ProjectsSettingsPanel() {
   const { data: projects = [], isLoading } = useGetProjectsQuery();
   const [createProject] = useCreateProjectMutation();
   const [updateProject] = useUpdateProjectMutation();
+  const [deleteProject] = useDeleteProjectMutation();
   const [name, setName] = useState("");
   const [color, setColor] = useState<ProjectColor>("ember");
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(
+    null,
+  );
 
   async function handleCreate() {
     const trimmed = name.trim();
@@ -51,7 +56,7 @@ export function ProjectsSettingsPanel() {
       </div>
       <p className="mt-[10px] max-w-[420px] text-[13px] text-muted-foreground">
         A project is a sticker on a task. One or none. Archive hides it from
-        pickers. Old chips stay.
+        pickers. Old chips stay. Private hides the chip from your manager.
       </p>
 
       <form
@@ -103,6 +108,11 @@ export function ProjectsSettingsPanel() {
             {project.archivedAt ? (
               <span className="text-[11px] text-faint">Archived</span>
             ) : null}
+            {project.isPrivate ? (
+              <span className="text-[11px] text-faint">Private</span>
+            ) : (
+              <span className="text-[11px] text-faint">Public</span>
+            )}
             {editingId === project.id ? (
               <input
                 value={editName}
@@ -181,6 +191,50 @@ export function ProjectsSettingsPanel() {
             >
               {project.archivedAt ? "Unarchive" : "Archive"}
             </button>
+            <button
+              type="button"
+              className="text-[12px] text-muted-foreground"
+              onClick={() => {
+                void updateProject({
+                  id: project.id,
+                  patch: { isPrivate: !project.isPrivate },
+                });
+              }}
+            >
+              {project.isPrivate ? "Make public" : "Make private"}
+            </button>
+            {confirmingDeleteId === project.id ? (
+              <div className="flex items-center gap-[8px]">
+                <span className="text-[12px] text-muted-foreground">
+                  Tasks stay. The chip comes off.
+                </span>
+                <button
+                  type="button"
+                  className="text-[12px] font-semibold text-destructive"
+                  onClick={() => {
+                    void deleteProject(project.id);
+                    setConfirmingDeleteId(null);
+                  }}
+                >
+                  Delete project
+                </button>
+                <button
+                  type="button"
+                  className="text-[12px] text-muted-foreground"
+                  onClick={() => setConfirmingDeleteId(null)}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="text-[12px] text-muted-foreground"
+                onClick={() => setConfirmingDeleteId(project.id)}
+              >
+                Delete
+              </button>
+            )}
           </li>
         ))}
       </ul>

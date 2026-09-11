@@ -42,6 +42,7 @@ vi.mock("@tudu/store", async (importOriginal) => {
     useGetProjectsQuery: () => ({ data: [], isLoading: false }),
     useCreateProjectMutation: () => [vi.fn(), { isLoading: false }],
     useUpdateProjectMutation: () => [vi.fn(), { isLoading: false }],
+    useDeleteProjectMutation: () => [vi.fn(), { isLoading: false }],
   };
 });
 

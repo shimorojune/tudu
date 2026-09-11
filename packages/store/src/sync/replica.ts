@@ -21,6 +21,7 @@ export type Replica = {
   owners: Record<string, string>;
   tasks: Record<string, Task>;
   projects: Record<string, Project>;
+  reportProjects: Record<string, Record<string, Project>>;
   commentsByTask: Record<string, Comment[]>;
   timelineByTask: Record<string, TimelineEvent[]>;
   timelineHasMore: Record<string, boolean>;
@@ -43,6 +44,7 @@ export function emptyReplica(): Replica {
     owners: {},
     tasks: {},
     projects: {},
+    reportProjects: {},
     commentsByTask: {},
     timelineByTask: {},
     timelineHasMore: {},
@@ -61,6 +63,12 @@ function cloneReplica(replica: Replica): Replica {
     owners: { ...replica.owners },
     tasks: { ...replica.tasks },
     projects: { ...replica.projects },
+    reportProjects: Object.fromEntries(
+      Object.entries(replica.reportProjects).map(([userId, bucket]) => [
+        userId,
+        { ...bucket },
+      ]),
+    ),
     commentsByTask: { ...replica.commentsByTask },
     timelineByTask: { ...replica.timelineByTask },
     timelineHasMore: { ...replica.timelineHasMore },
@@ -285,14 +293,12 @@ export function applyEvent(replica: Replica, event: SyncEvent): Replica {
     }
     case "project.upsert": {
       const project = event.payload as Project;
-      next.projects[project.id] = project;
-      refreshProjectRefs(next, toProjectRef(project));
+      storeProject(next, project);
       return next;
     }
     case "project.delete": {
       const id = (event.payload as { id: string }).id;
-      delete next.projects[id];
-      clearProjectRefs(next, id);
+      removeProject(next, id);
       return next;
     }
     default:
@@ -306,17 +312,70 @@ function toProjectRef(project: Project): ProjectRef {
     name: project.name,
     color: project.color,
     archivedAt: project.archivedAt,
+    isPrivate: project.isPrivate,
   };
 }
 
-function projectRefFromMap(
-  projects: Record<string, Project>,
+function findProject(
+  replica: Replica,
+  projectId: string,
+): Project | undefined {
+  const own = replica.projects[projectId];
+  if (own) {
+    return own;
+  }
+  for (const bucket of Object.values(replica.reportProjects)) {
+    if (bucket[projectId]) {
+      return bucket[projectId];
+    }
+  }
+  return undefined;
+}
+
+function storeProject(replica: Replica, project: Project): void {
+  const own =
+    !replica.viewerId || project.userId === replica.viewerId;
+  if (own) {
+    replica.projects[project.id] = project;
+    refreshProjectRefs(replica, toProjectRef(project));
+    return;
+  }
+
+  if (project.isPrivate) {
+    const bucket = { ...(replica.reportProjects[project.userId] ?? {}) };
+    delete bucket[project.id];
+    replica.reportProjects[project.userId] = bucket;
+    clearProjectRefs(replica, project.id);
+    return;
+  }
+
+  replica.reportProjects[project.userId] = {
+    ...(replica.reportProjects[project.userId] ?? {}),
+    [project.id]: project,
+  };
+  refreshProjectRefs(replica, toProjectRef(project));
+}
+
+function removeProject(replica: Replica, projectId: string): void {
+  delete replica.projects[projectId];
+  for (const [userId, bucket] of Object.entries(replica.reportProjects)) {
+    if (bucket[projectId]) {
+      const nextBucket = { ...bucket };
+      delete nextBucket[projectId];
+      replica.reportProjects[userId] = nextBucket;
+    }
+  }
+  clearProjectRefs(replica, projectId);
+}
+
+function projectRefFromReplica(
+  replica: Replica,
   projectId: string | null | undefined,
 ): ProjectRef | null {
   if (!projectId) {
     return null;
   }
-  const project = projects[projectId];
+  const project = findProject(replica, projectId);
   return project ? toProjectRef(project) : null;
 }
 
@@ -347,19 +406,32 @@ function clearProjectRefs(replica: Replica, projectId: string): void {
       replica.tasks[taskId] = { ...task, project: null };
     }
   }
+  replica.inboxPending = replica.inboxPending.map((item) =>
+    item.task.project?.id === projectId
+      ? { ...item, task: { ...item.task, project: null } }
+      : item,
+  );
+  for (const [key, day] of Object.entries(replica.reportDays)) {
+    replica.reportDays[key] = {
+      ...day,
+      tasks: day.tasks.map((task) =>
+        task.project?.id === projectId ? { ...task, project: null } : task,
+      ),
+    };
+  }
 }
 
 function mergePatch(
   task: Task,
   patch: UpdateTaskRequest,
   siblings: Task[],
-  projects: Record<string, Project>,
+  replica: Replica,
 ): Task {
   const { completed, inProgress: patchInProgress, projectId, ...rest } = patch;
   const next = { ...task, ...rest, updatedAt: new Date().toISOString() };
 
   if ("projectId" in patch) {
-    next.project = projectRefFromMap(projects, projectId);
+    next.project = projectRefFromReplica(replica, projectId);
   }
 
   if ("completed" in patch) {
@@ -411,7 +483,7 @@ function applyReorderToTasks(
 function optimisticTask(
   id: string,
   body: CreateTaskRequest,
-  projects: Record<string, Project>,
+  replica: Replica,
 ): Task {
   const now = new Date().toISOString();
   return {
@@ -432,7 +504,7 @@ function optimisticTask(
     updatedAt: now,
     subtasks: [],
     commentCount: 0,
-    project: projectRefFromMap(projects, body.projectId),
+    project: projectRefFromReplica(replica, body.projectId),
   };
 }
 
@@ -442,7 +514,7 @@ export function applyOp(replica: Replica, op: SyncOp): Replica {
 
   switch (op.type) {
     case "task.create": {
-      next.tasks[op.id] = optimisticTask(op.id, op.body, next.projects);
+      next.tasks[op.id] = optimisticTask(op.id, op.body, next);
       if (next.viewerId) {
         next.owners[op.id] = next.viewerId;
       }
@@ -457,7 +529,7 @@ export function applyOp(replica: Replica, op: SyncOp): Replica {
         task,
         op.patch,
         Object.values(next.tasks),
-        next.projects,
+        next,
       );
       return next;
     }
@@ -653,19 +725,20 @@ export function applyOp(replica: Replica, op: SyncOp): Replica {
     }
     case "project.create": {
       const now = new Date().toISOString();
-      next.projects[op.id] = {
+      storeProject(next, {
         id: op.id,
         userId: next.viewerId ?? "",
         name: op.body.name,
         color: op.body.color,
         archivedAt: null,
+        isPrivate: op.body.isPrivate ?? false,
         createdAt: now,
         updatedAt: now,
-      };
+      });
       return next;
     }
     case "project.update": {
-      const existing = next.projects[op.id];
+      const existing = findProject(next, op.id);
       if (!existing) {
         return next;
       }
@@ -676,15 +749,32 @@ export function applyOp(replica: Replica, op: SyncOp): Replica {
           : op.patch.archived === false
             ? null
             : existing.archivedAt;
-      const updated: Project = {
+      storeProject(next, {
         ...existing,
         name: op.patch.name ?? existing.name,
         color: op.patch.color ?? existing.color,
         archivedAt,
+        isPrivate: op.patch.isPrivate ?? existing.isPrivate,
         updatedAt: now,
-      };
-      next.projects[op.id] = updated;
-      refreshProjectRefs(next, toProjectRef(updated));
+      });
+      return next;
+    }
+    case "project.delete": {
+      removeProject(next, op.id);
+      return next;
+    }
+    case "team.project.create": {
+      const now = new Date().toISOString();
+      storeProject(next, {
+        id: op.id,
+        userId: op.userId,
+        name: op.body.name,
+        color: op.body.color,
+        archivedAt: null,
+        isPrivate: false,
+        createdAt: now,
+        updatedAt: now,
+      });
       return next;
     }
     default: {

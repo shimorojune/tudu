@@ -40,7 +40,8 @@ export type SyncView =
   | { type: "taskDetail"; taskId: string }
   | { type: "notifications" }
   | { type: "projects" }
-  | { type: "project"; projectId: string };
+  | { type: "project"; projectId: string }
+  | { type: "reportProjects"; userId: string };
 
 export const viewKey = {
   day: (date: string) => `day:${date}`,
@@ -52,6 +53,7 @@ export const viewKey = {
   notifications: () => "notifications",
   projects: () => "projects",
   project: (projectId: string) => `project:${projectId}`,
+  reportProjects: (userId: string) => `reportProjects:${userId}`,
 };
 
 export function parseViewKey(key: string): SyncView | null {
@@ -78,6 +80,13 @@ export function parseViewKey(key: string): SyncView | null {
   }
   if (key.startsWith("taskDetail:")) {
     return { type: "taskDetail", taskId: key.slice(11) };
+  }
+  if (key.startsWith("reportProjects:")) {
+    const userId = key.slice("reportProjects:".length);
+    if (!userId) {
+      return null;
+    }
+    return { type: "reportProjects", userId };
   }
   if (key.startsWith("reportDay:")) {
     const rest = key.slice(10);
@@ -228,6 +237,16 @@ export const syncOpSchema = z.discriminatedUnion("type", [
     type: z.literal("project.update"),
     id: z.uuid(),
     patch: updateProjectRequestSchema,
+  }),
+  z.object({
+    type: z.literal("project.delete"),
+    id: z.uuid(),
+  }),
+  z.object({
+    type: z.literal("team.project.create"),
+    id: z.uuid(),
+    userId: z.string(),
+    body: createProjectRequestSchema,
   }),
 ]);
 

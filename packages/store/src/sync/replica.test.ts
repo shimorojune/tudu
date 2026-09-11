@@ -383,6 +383,7 @@ describe("project replica", () => {
     name: "EGS",
     color: "ember" as const,
     archivedAt: null,
+    isPrivate: false,
     createdAt: now,
     updatedAt: now,
   };
@@ -418,6 +419,7 @@ describe("project replica", () => {
         name: "EGS",
         color: "ember",
         archivedAt: null,
+        isPrivate: false,
       },
     });
     let replica = applyEvent(
@@ -432,5 +434,112 @@ describe("project replica", () => {
       }),
     );
     expect(replica.tasks[task.id]?.project?.name).toBe("EGS Core");
+  });
+
+  it("keeps chips when a project is archived", () => {
+    const task = makeTask({
+      project: {
+        id: project.id,
+        name: "EGS",
+        color: "ember",
+        archivedAt: null,
+        isPrivate: false,
+      },
+    });
+    let replica = applyEvent(
+      emptyReplica(),
+      event({ type: "task.upsert", payload: { task, ownerId: "priya" } }),
+    );
+    replica = applyOp(replica, {
+      type: "project.update",
+      id: project.id,
+      patch: { archived: true },
+    });
+    replica = applyEvent(
+      replica,
+      event({
+        type: "project.upsert",
+        payload: { ...project, archivedAt: now },
+      }),
+    );
+    expect(replica.tasks[task.id]?.project?.id).toBe(project.id);
+  });
+
+  it("drops chips when a project is deleted", () => {
+    const task = makeTask({
+      project: {
+        id: project.id,
+        name: "EGS",
+        color: "ember",
+        archivedAt: null,
+        isPrivate: false,
+      },
+    });
+    let replica = applyEvent(
+      emptyReplica(),
+      event({ type: "task.upsert", payload: { task, ownerId: "priya" } }),
+    );
+    replica = applyEvent(
+      replica,
+      event({ type: "project.upsert", payload: project }),
+    );
+    replica = applyEvent(
+      replica,
+      event({ type: "project.delete", payload: { id: project.id } }),
+    );
+    expect(replica.tasks[task.id]?.project).toBeNull();
+    expect(replica.projects[project.id]).toBeUndefined();
+  });
+
+  it("stores a report's public project for the manager", () => {
+    const replica = applyEvent(
+      { ...emptyReplica(), viewerId: "marcus" },
+      event({ type: "project.upsert", payload: project }),
+    );
+    expect(replica.projects[project.id]).toBeUndefined();
+    expect(replica.reportProjects.priya?.[project.id]?.name).toBe("EGS");
+  });
+
+  it("creates a report project from a manager op", () => {
+    const next = applyOp(
+      { ...emptyReplica(), viewerId: "marcus" },
+      {
+        type: "team.project.create",
+        id: project.id,
+        userId: "priya",
+        body: { name: "EGS", color: "ember" },
+      },
+    );
+    expect(next.reportProjects.priya?.[project.id]?.name).toBe("EGS");
+    expect(next.reportProjects.priya?.[project.id]?.isPrivate).toBe(false);
+  });
+
+  it("removes a report project when it becomes private", () => {
+    const task = makeTask({
+      project: {
+        id: project.id,
+        name: "EGS",
+        color: "ember",
+        archivedAt: null,
+        isPrivate: false,
+      },
+    });
+    let replica = applyEvent(
+      { ...emptyReplica(), viewerId: "marcus" },
+      event({ type: "project.upsert", payload: project }),
+    );
+    replica = applyEvent(
+      replica,
+      event({ type: "task.upsert", payload: { task, ownerId: "priya" } }),
+    );
+    replica = applyEvent(
+      replica,
+      event({
+        type: "project.upsert",
+        payload: { ...project, isPrivate: true },
+      }),
+    );
+    expect(replica.reportProjects.priya?.[project.id]).toBeUndefined();
+    expect(replica.tasks[task.id]?.project).toBeNull();
   });
 });

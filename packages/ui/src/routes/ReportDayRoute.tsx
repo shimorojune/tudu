@@ -89,6 +89,7 @@ export function ReportDayRoute() {
         selectedDate={date}
         viewer="manager"
         notifiedName={first}
+        reportUserId={userId}
       />
     );
 

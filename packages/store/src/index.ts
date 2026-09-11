@@ -38,6 +38,9 @@ export {
   useGetProjectQuery,
   useCreateProjectMutation,
   useUpdateProjectMutation,
+  useDeleteProjectMutation,
+  useGetReportProjectsQuery,
+  useCreateReportProjectMutation,
 } from "./sync/hooks.js";
 export { startSync, stopSync } from "./sync/client.js";
 export { resetSync, selectVisible } from "./sync/slice.js";

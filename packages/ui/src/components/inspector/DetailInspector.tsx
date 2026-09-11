@@ -4,6 +4,8 @@ import {
   setInspectorTab,
   setSelectedTaskId,
   todayIso,
+  useCreateReportProjectMutation,
+  useGetReportProjectsQuery,
   useGetTeamQuery,
   useGetTimelineQuery,
   type RootState,
@@ -21,6 +23,7 @@ export type DetailInspectorProps = {
   selectedDate: string;
   viewer?: TaskViewer;
   notifiedName?: string | null;
+  reportUserId?: string;
 };
 
 export function DetailInspector({
@@ -28,6 +31,7 @@ export function DetailInspector({
   selectedDate,
   viewer = "owner",
   notifiedName = null,
+  reportUserId,
 }: DetailInspectorProps) {
   if (!task) {
     return <DetailInspectorEmpty />;
@@ -39,6 +43,7 @@ export function DetailInspector({
       selectedDate={selectedDate}
       viewer={viewer}
       notifiedName={notifiedName}
+      reportUserId={reportUserId}
     />
   );
 }
@@ -48,11 +53,13 @@ function DetailInspectorBody({
   selectedDate,
   viewer,
   notifiedName,
+  reportUserId,
 }: {
   task: Task;
   selectedDate: string;
   viewer: TaskViewer;
   notifiedName: string | null;
+  reportUserId?: string;
 }) {
   const dispatch = useDispatch();
   const tab = useSelector((state: RootState) => state.day.inspectorTab);
@@ -60,6 +67,11 @@ function DetailInspectorBody({
   const isManager = viewer === "manager";
   const { data: team } = useGetTeamQuery(undefined, { skip: isManager });
   const { data: timelineData } = useGetTimelineQuery(task.id);
+  const { data: reportProjects = [] } = useGetReportProjectsQuery(
+    reportUserId ?? "",
+    { skip: !isManager || !reportUserId },
+  );
+  const [createReportProject] = useCreateReportProjectMutation();
 
   const sharedWithName = isManager ? null : (team?.manager?.name ?? null);
   const commentNotifyName = isManager
@@ -85,6 +97,14 @@ function DetailInspectorBody({
           timelineEvents={timelineData?.events ?? []}
           onJumpToTimeline={() => dispatch(setInspectorTab("timeline"))}
           readOnly={isManager}
+          canAssignProject={isManager}
+          projects={isManager ? reportProjects : undefined}
+          onCreateProject={
+            isManager && reportUserId
+              ? (body) =>
+                  createReportProject({ userId: reportUserId, body }).unwrap()
+              : undefined
+          }
           sharedWithName={sharedWithName}
         />
       ) : null}

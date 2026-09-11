@@ -16,7 +16,11 @@ export function mapSubtask(row: SubtaskRow): Subtask {
   };
 }
 
-export function mapTask(row: TaskRowWithSubtasks): Task {
+export type MapTaskOptions = {
+  hidePrivateProjects?: boolean;
+};
+
+export function mapTask(row: TaskRowWithSubtasks, options?: MapTaskOptions): Task {
   return {
     id: row.id,
     title: row.title,
@@ -35,7 +39,9 @@ export function mapTask(row: TaskRowWithSubtasks): Task {
     updatedAt: row.updatedAt.toISOString(),
     subtasks: row.subtasks.map(mapSubtask),
     commentCount: row.commentCount,
-    project: mapProjectRef(row.project),
+    project: mapProjectRef(row.project, {
+      hidePrivate: options?.hidePrivateProjects,
+    }),
   };
 }
 

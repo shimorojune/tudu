@@ -25,6 +25,7 @@ function task(overrides: Partial<Task>): Task {
       name: "EGS",
       color: "ember",
       archivedAt: null,
+      isPrivate: false,
     },
     subtasks: [],
     ...overrides,

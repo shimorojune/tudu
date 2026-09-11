@@ -71,6 +71,13 @@
       "when": 1789142047782,
       "tag": "0009_clammy_redwing",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789149438592,
+      "tag": "0010_blushing_scalphunter",
+      "breakpoints": true
     }
   ]
 }

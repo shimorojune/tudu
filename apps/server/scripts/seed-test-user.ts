@@ -3,12 +3,15 @@ import { fileURLToPath } from "node:url";
 import { config } from "dotenv";
 import {
   createDb,
+  createProject,
   createTask,
   ensureProjectForUser,
   inboxItems,
   managerLinks,
   managerPermissions,
+  projects,
   tasks,
+  updateProject,
   user,
 } from "@tudu/db";
 import { DEFAULT_MANAGER_PERMISSIONS, effectiveDayIso } from "@tudu/shared";
@@ -156,6 +159,24 @@ async function main() {
     color: "moss",
   });
   await ensureProjectForUser(db, marcusId, { name: "EGS", color: "ember" });
+
+  let side = await db.query.projects.findFirst({
+    where: and(
+      eq(projects.userId, testuserId),
+      eq(projects.name, "Side"),
+      isNull(projects.deletedAt),
+    ),
+  });
+  if (!side) {
+    side = await createProject(db, {
+      userId: testuserId,
+      name: "Side",
+      color: "ink",
+      isPrivate: true,
+    });
+  } else if (!side.isPrivate) {
+    side = (await updateProject(db, testuserId, side.id, { isPrivate: true })) ?? side;
+  }
 
   const today = effectiveDayIso();
   const tomorrow = offsetIso(today, 1);
@@ -305,6 +326,28 @@ async function main() {
       deadline: null,
       isPrivate: false,
       projectId: home.id,
+    });
+  }
+
+  const seededPrivateProjectTask = await db.query.tasks.findFirst({
+    where: and(
+      eq(tasks.userId, testuserId),
+      eq(tasks.projectId, side.id),
+      eq(tasks.isPrivate, false),
+      isNull(tasks.deletedAt),
+    ),
+  });
+
+  if (!seededPrivateProjectTask) {
+    await createTask(db, {
+      userId: testuserId,
+      title: "Renew passport",
+      scheduledDate: today,
+      bucket: "next",
+      startDate: null,
+      deadline: null,
+      isPrivate: false,
+      projectId: side.id,
     });
   }
 
