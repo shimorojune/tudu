@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useDispatch } from "react-redux";
 import { useGetMeQuery, type AppDispatch } from "@tudu/store";
+import { AccountSkeleton } from "@/components/loading/AccountSkeleton";
 import { personInitials } from "@/lib/person";
 import { signOut } from "@/lib/signOut";
 
@@ -21,11 +22,7 @@ export function AccountSettingsPanel() {
   const [submitting, setSubmitting] = useState(false);
 
   if (isLoading || !me) {
-    return (
-      <div className="px-[30px] py-[26px] text-[14px] text-muted-foreground">
-        Loading…
-      </div>
-    );
+    return <AccountSkeleton />;
   }
 
   const name = displayName(me.name, me.email);

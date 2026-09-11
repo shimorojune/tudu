@@ -17,6 +17,9 @@ import { InspectorSheet } from "@/components/inspector/InspectorSheet";
 import { JiraColumnEmpty } from "@/components/jira/JiraColumnEmpty";
 import { MidnightBanner } from "@/components/today/MidnightBanner";
 import { TodayFirstRun } from "@/components/today/TodayFirstRun";
+import { DayListSkeleton } from "@/components/loading/DayListSkeleton";
+import { LoadingStatus } from "@/components/loading/LoadingStatus";
+import { PaneSkeleton } from "@/components/loading/PaneSkeleton";
 import { TodayPanelLayout } from "@/components/today/TodayPanelLayout";
 import { useNewTaskShortcut } from "@/hooks/useNewTaskShortcut";
 import { useRolloverOnFocus } from "@/hooks/useRolloverOnFocus";
@@ -61,9 +64,18 @@ export function TodayRoute() {
 
   if (dayQuery.isLoading) {
     return (
-      <p className="px-[28px] py-[24px] text-[14px] text-muted-foreground">
-        Loading…
-      </p>
+      <LoadingStatus>
+        <TodayPanelLayout
+          taskList={
+            <DayListSkeleton
+              announce={false}
+              isToday={selectedDate === effectiveDay}
+            />
+          }
+          jiraColumn={<PaneSkeleton announce={false} />}
+          inspector={<PaneSkeleton announce={false} />}
+        />
+      </LoadingStatus>
     );
   }
 

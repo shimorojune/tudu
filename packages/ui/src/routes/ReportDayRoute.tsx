@@ -10,6 +10,7 @@ import {
 } from "@tudu/store";
 import { DetailInspector } from "@/components/inspector/DetailInspector";
 import { InspectorSheet } from "@/components/inspector/InspectorSheet";
+import { ReportDaySkeleton } from "@/components/loading/ReportDaySkeleton";
 import { DayTaskList } from "@/components/tasks/DayTaskList";
 import { SendInboxForm } from "@/components/team/SendInboxForm";
 import { useViewportBand } from "@/hooks/useViewportBand";
@@ -40,11 +41,7 @@ export function ReportDayRoute() {
   }, [dispatch]);
 
   if (isLoading) {
-    return (
-      <p className="px-[32px] py-[24px] text-[14px] text-muted-foreground">
-        Loading…
-      </p>
-    );
+    return <ReportDaySkeleton isToday={date === todayIso()} />;
   }
 
   if (isError || !data) {

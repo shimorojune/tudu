@@ -1,8 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { makeStore } from "@tudu/store";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WeekRoute } from "./WeekRoute";
+
+const weekQuery = vi.hoisted(() => ({ isLoading: false }));
 
 vi.mock("@tanstack/react-router", () => ({
   useSearch: () => ({}),
@@ -32,12 +34,16 @@ vi.mock("@/hooks/useWeekTaskQueries", () => ({
   useWeekTaskQueries: () => ({
     unscheduledQuery: { data: { tasks: [] } },
     tasksByDay: new Map(),
-    isLoading: false,
+    isLoading: weekQuery.isLoading,
     isError: false,
   }),
 }));
 
 describe("WeekRoute", () => {
+  beforeEach(() => {
+    weekQuery.isLoading = false;
+  });
+
   it("renders the week grid shell", () => {
     render(
       <Provider store={makeStore()}>
@@ -52,5 +58,21 @@ describe("WeekRoute", () => {
     expect(
       screen.getByRole("button", { name: "Jump to Unscheduled" }),
     ).toBeInTheDocument();
+  });
+
+  it("shows a skeleton while week tasks load", () => {
+    weekQuery.isLoading = true;
+
+    render(
+      <Provider store={makeStore()}>
+        <WeekRoute />
+      </Provider>,
+    );
+
+    expect(screen.getByRole("status", { name: "Loading" })).toBeInTheDocument();
+    expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Undated tasks live in the left rail. Drag one onto a day."),
+    ).not.toBeInTheDocument();
   });
 });

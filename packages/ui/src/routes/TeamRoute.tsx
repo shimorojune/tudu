@@ -9,6 +9,7 @@ import {
   todayIso,
   type RootState,
 } from "@tudu/store";
+import { TeamSkeleton } from "@/components/loading/TeamSkeleton";
 import { personFirstName, personInitials } from "@/lib/person";
 import { cn } from "@/lib/utils";
 
@@ -56,11 +57,7 @@ export function TeamRoute() {
   }
 
   if (isLoading) {
-    return (
-      <p className="px-[32px] py-[24px] text-[14px] text-muted-foreground">
-        Loading…
-      </p>
-    );
+    return <TeamSkeleton />;
   }
 
   if (isError || !data) {

@@ -7,6 +7,7 @@ import {
   useCreateTaskMutation,
   useGetTasksForDayQuery,
 } from "@tudu/store";
+import { WeekGridSkeleton } from "@/components/loading/WeekGridSkeleton";
 import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
 import { WeekGrid } from "@/components/week/WeekGrid";
 import { createTaskBody } from "@/lib/createTask";
@@ -51,9 +52,10 @@ export function WeekRoute() {
 
   if (isLoading) {
     return (
-      <p className="px-[22px] py-[24px] text-[14px] text-muted-foreground">
-        Loading…
-      </p>
+      <WeekGridSkeleton
+        weekDays={weekDays}
+        highlightedDay={highlightedDay}
+      />
     );
   }
 

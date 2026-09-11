@@ -55,6 +55,7 @@ import { createTaskBody } from "@/lib/createTask";
 import { openNowCount } from "@/lib/nowCount";
 import { cn } from "@/lib/utils";
 import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
+import { UnscheduledListSkeleton } from "@/components/loading/UnscheduledListSkeleton";
 import { TaskRow, type TaskRowActions } from "@/components/tasks/TaskRow";
 import { useNewTaskShortcut } from "@/hooks/useNewTaskShortcut";
 import { usePointerY } from "@/hooks/usePointerY";
@@ -274,11 +275,7 @@ export function UnscheduledRoute() {
   );
 
   if (isLoading) {
-    return (
-      <p className="px-[28px] py-[24px] text-[14px] text-muted-foreground">
-        Loading…
-      </p>
-    );
+    return <UnscheduledListSkeleton />;
   }
 
   if (isError) {

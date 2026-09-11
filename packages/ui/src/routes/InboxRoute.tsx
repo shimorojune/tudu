@@ -15,6 +15,7 @@ import {
 import { isCommandPaletteBlocked } from "@/components/chrome/CommandPalette";
 import { useCommandPalette } from "@/components/chrome/CommandPaletteContext";
 import { InspectorSheet } from "@/components/inspector/InspectorSheet";
+import { InboxSkeleton } from "@/components/loading/InboxSkeleton";
 import { TaskDeleteDialog } from "@/components/tasks/TaskDeleteDialog";
 import { useViewportBand } from "@/hooks/useViewportBand";
 import { inboxShortcutAction } from "@/lib/inboxShortcuts";
@@ -340,11 +341,7 @@ export function InboxRoute() {
   }, [acceptInbox, active, paletteOpen]);
 
   if (isLoading) {
-    return (
-      <p className="px-[32px] py-[24px] text-[14px] text-muted-foreground">
-        Loading…
-      </p>
-    );
+    return <InboxSkeleton />;
   }
 
   if (isError) {
