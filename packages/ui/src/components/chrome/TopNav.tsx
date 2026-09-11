@@ -93,7 +93,7 @@ export function TopNav() {
   const weekDays = weekDaysFromWeekId(weekId);
 
   return (
-    <header className="flex h-[56px] shrink-0 items-center gap-[10px] overflow-hidden border-b border-rule bg-card px-[12px] xl:gap-[28px] xl:px-[22px]">
+    <header className="flex h-[calc(56px+env(safe-area-inset-top))] shrink-0 items-center gap-[10px] overflow-hidden border-b border-rule bg-card px-[12px] pt-[env(safe-area-inset-top)] xl:gap-[28px] xl:px-[22px]">
       <BrandMark />
       <NavTabs />
       <div className="ml-auto flex min-w-0 shrink-0 items-center gap-[8px] xl:gap-[18px]">

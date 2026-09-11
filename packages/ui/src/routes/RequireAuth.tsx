@@ -12,7 +12,7 @@ export function RequireAuth({ children }: RequireAuthProps) {
 
   if (isPending) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background pt-[env(safe-area-inset-top)]">
         <BrandMark />
         <p className="text-sm text-muted-foreground">Loading...</p>
       </div>
