@@ -10,6 +10,7 @@ import { BrandMark } from "@/components/chrome/BrandMark";
 import { DateNav } from "@/components/chrome/DateNav";
 import { DayJump } from "@/components/chrome/DayJump";
 import { NavTabs } from "@/components/chrome/NavTabs";
+import { NotificationBell } from "@/components/chrome/NotificationBell";
 import { WeekPicker } from "@/components/chrome/WeekPicker";
 import { defaultWeekId, weekDaysFromWeekId } from "@/lib/week";
 
@@ -102,6 +103,7 @@ export function TopNav() {
         )}
         <div className="h-[20px] w-px bg-hair" />
         <CommandsButton />
+        <NotificationBell />
         <NewTaskButton reportUserId={reportUserId} />
         <SettingsLink />
       </div>

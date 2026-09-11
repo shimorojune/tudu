@@ -5,6 +5,7 @@ export * from "./day.js";
 export * from "./linkPreview.js";
 export * from "./manager.js";
 export * from "./sync.js";
+export * from "./notifications.js";
 
 export type HealthResponse = { status: "ok"; version: string };
 

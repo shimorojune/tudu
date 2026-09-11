@@ -50,6 +50,20 @@
       "when": 1789060360800,
       "tag": "0006_empty_umar",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789127775311,
+      "tag": "0007_real_young_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789131878550,
+      "tag": "0008_kind_meteorite",
+      "breakpoints": true
     }
   ]
 }

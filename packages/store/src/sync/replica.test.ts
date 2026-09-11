@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type {
+  AppNotification,
   Comment,
   InboxPendingItem,
   SyncEvent,
@@ -95,6 +96,30 @@ describe("applyEvent", () => {
     );
     expect(next.commentsByTask[row.taskId]?.map((item) => item.body)).toEqual([
       "Looks good",
+    ]);
+  });
+
+  it("keeps comments oldest-first when a live row arrives before bootstrap", () => {
+    const newer = comment({
+      id: "55555555-5555-4555-8555-555555555555",
+      body: "hello",
+      createdAt: "2026-09-11T12:37:00.000Z",
+    });
+    const older = comment({
+      body: "hi",
+      createdAt: "2026-09-10T17:48:00.000Z",
+    });
+    let replica = applyEvent(
+      emptyReplica(),
+      event({ type: "comment.upsert", payload: newer }),
+    );
+    replica = applyEvent(
+      replica,
+      event({ type: "comment.upsert", payload: older, seq: 0 }),
+    );
+    expect(replica.commentsByTask[older.taskId]?.map((item) => item.body)).toEqual([
+      "hi",
+      "hello",
     ]);
   });
 
@@ -281,5 +306,71 @@ describe("tasksForDay", () => {
     expect(tasksForDay(replica, "2026-09-10").map((task) => task.id)).toEqual([
       own.id,
     ]);
+  });
+});
+
+function notice(overrides: Partial<AppNotification> = {}): AppNotification {
+  return {
+    id: "88888888-8888-4888-8888-888888888888",
+    userId: "priya",
+    actorId: "marcus",
+    kind: "comment",
+    taskId: "11111111-1111-4111-8111-111111111111",
+    ownerId: "priya",
+    commentId: "22222222-2222-4222-8222-222222222222",
+    inboxItemId: null,
+    scheduledDate: "2026-09-10",
+    taskTitle: "Ship it",
+    body: "Marcus commented on Ship it: Looks good",
+    readAt: null,
+    createdAt: now,
+    ...overrides,
+  };
+}
+
+describe("notification replica", () => {
+  it("prepends a notification and counts unread", () => {
+    const row = notice();
+    const next = applyEvent(
+      emptyReplica(),
+      event({ type: "notification.upsert", payload: row }),
+    );
+    expect(next.notifications[0]?.body).toContain("Ship it");
+    expect(next.notifications.filter((item) => item.readAt === null)).toHaveLength(1);
+  });
+
+  it("marks one notification read from an op", () => {
+    const row = notice();
+    let replica = applyEvent(
+      emptyReplica(),
+      event({ type: "notification.upsert", payload: row }),
+    );
+    replica = applyOp(replica, { type: "notification.read", id: row.id });
+    expect(replica.notifications[0]?.readAt).toBeTruthy();
+  });
+
+  it("marks every notification read", () => {
+    const first = notice();
+    const second = notice({
+      id: "99999999-9999-4999-8999-999999999999",
+      createdAt: "2026-09-10T08:01:00.000Z",
+    });
+    let replica = applyEvent(
+      emptyReplica(),
+      event({ type: "notification.upsert", payload: first }),
+    );
+    replica = applyEvent(
+      replica,
+      event({ type: "notification.upsert", payload: second, seq: 2 }),
+    );
+    replica = applyEvent(
+      replica,
+      event({
+        type: "notification.readAll",
+        seq: 3,
+        payload: { readAt: "2026-09-10T09:00:00.000Z" },
+      }),
+    );
+    expect(replica.notifications.every((item) => item.readAt)).toBe(true);
   });
 });

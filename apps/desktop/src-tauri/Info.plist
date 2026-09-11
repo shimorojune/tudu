@@ -6,5 +6,7 @@
   <string>Tudu</string>
   <key>CFBundleName</key>
   <string>Tudu</string>
+  <key>NSUserNotificationsUsageDescription</key>
+  <string>Tudu shows banners for inbox, comments, and task changes while the app is open.</string>
 </dict>
 </plist>

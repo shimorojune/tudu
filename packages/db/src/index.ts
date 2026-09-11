@@ -8,6 +8,7 @@ export * from "./activity.js";
 export * from "./rollover.js";
 export * from "./manager.js";
 export * from "./sync.js";
+export * from "./notifications.js";
 export * from "./mapTask.js";
 
 export function createDb(databaseUrl: string) {

@@ -42,3 +42,17 @@ html, body, #root {
 .add-task-flash {
   animation: add-task-flash 900ms ease-out;
 }
+
+@keyframes comment-focus-tint {
+  0%,
+  35% {
+    background-color: color-mix(in srgb, var(--foreground) 8%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.comment-focus-tint {
+  animation: comment-focus-tint 1600ms ease-out;
+}

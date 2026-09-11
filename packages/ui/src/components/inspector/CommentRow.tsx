@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 export type CommentRowProps = {
   comment: Comment;
   taskId: string;
+  focused?: boolean;
 };
 
 function authorInitial(name: string) {
@@ -134,17 +135,25 @@ function CommentEditableBody({
   );
 }
 
-export function CommentRow({ comment, taskId }: CommentRowProps) {
+export function CommentRow({ comment, taskId, focused = false }: CommentRowProps) {
   const { data: me } = useGetMeQuery();
   const [updateComment] = useUpdateCommentMutation();
   const [deleteComment] = useDeleteCommentMutation();
   const [editing, setEditing] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   const isSelf = me?.id === comment.authorId;
   const canEdit = isSelf;
 
   const timestamp = format(parseISO(comment.createdAt), "EEE d MMM, HH:mm");
+
+  useLayoutEffect(() => {
+    if (!focused) {
+      return;
+    }
+    rootRef.current?.scrollIntoView({ block: "nearest" });
+  }, [focused]);
 
   const handleCommit = useCallback(
     (body: string) => {
@@ -163,7 +172,11 @@ export function CommentRow({ comment, taskId }: CommentRowProps) {
 
   return (
     <>
-      <div className="flex gap-[12px] py-[14px]">
+      <div
+        ref={rootRef}
+        data-comment-id={comment.id}
+        className={cn("flex gap-[12px] py-[14px]", focused && "comment-focus-tint")}
+      >
         <Avatar
           size="sm"
           className={cn(

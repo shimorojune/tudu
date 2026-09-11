@@ -40,6 +40,9 @@ describe("viewKey", () => {
       date: "2026-09-10",
     });
     expect(parseViewKey(viewKey.inbox())).toEqual({ type: "inbox" });
+    expect(parseViewKey(viewKey.notifications())).toEqual({
+      type: "notifications",
+    });
     expect(parseViewKey(viewKey.reportDay("u1", "2026-09-10"))).toEqual({
       type: "reportDay",
       userId: "u1",

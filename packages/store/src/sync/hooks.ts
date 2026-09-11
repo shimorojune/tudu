@@ -92,6 +92,20 @@ export function useGetInboxCountQuery(_arg?: void, options?: QueryOptions) {
   };
 }
 
+export function useGetNotificationsQuery(_arg?: void, options?: QueryOptions) {
+  const key = options?.skip ? null : viewKey.notifications();
+  const query = useView(key);
+  const replica = useSelector(selectVisible);
+  const data = useMemo(
+    () => ({
+      notifications: replica.notifications,
+      unreadCount: replica.notifications.filter((item) => item.readAt === null).length,
+    }),
+    [replica],
+  );
+  return { ...query, data };
+}
+
 export function useGetTeamQuery(date?: string | void, options?: QueryOptions) {
   const resolved = date || effectiveDayIso();
   const key = options?.skip ? null : viewKey.team(resolved);
@@ -139,9 +153,20 @@ export function useGetCommentsQuery(taskId: string, options?: QueryOptions) {
   const key = options?.skip ? null : viewKey.taskDetail(taskId);
   const query = useView(key);
   const replica = useSelector(selectVisible);
+  const comments = replica.commentsByTask[taskId] ?? [];
   const data = useMemo(
-    () => ({ comments: replica.commentsByTask[taskId] ?? [] }),
-    [replica, taskId],
+    () => ({
+      comments: comments.slice().sort((a, b) => {
+        if (a.createdAt < b.createdAt) {
+          return -1;
+        }
+        if (a.createdAt > b.createdAt) {
+          return 1;
+        }
+        return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+      }),
+    }),
+    [comments],
   );
   return { ...query, data };
 }
@@ -374,4 +399,12 @@ export function useDeleteReportTaskMutation() {
     userId: arg.userId,
     taskId: arg.taskId,
   }));
+}
+
+export function useReadNotificationMutation() {
+  return useOp((id: string) => ({ type: "notification.read" as const, id }));
+}
+
+export function useReadAllNotificationsMutation() {
+  return useOp((_arg?: void) => ({ type: "notification.readAll" as const }));
 }

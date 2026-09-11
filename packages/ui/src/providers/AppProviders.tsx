@@ -11,6 +11,10 @@ import { Provider, useDispatch } from "react-redux";
 import { getStoredAuthToken } from "@/lib/authClient";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
+  NotificationOsProvider,
+  defaultNotificationOsValue,
+} from "@/providers/NotificationOsContext";
+import {
   UpdateContext,
   defaultUpdateContextValue,
 } from "@/providers/UpdateContext";
@@ -47,11 +51,13 @@ export function AppProviders({ children }: AppProvidersProps) {
   return (
     <Provider store={store}>
       <UpdateContext.Provider value={defaultUpdateContextValue}>
-        <ThemeProvider>
-          <TooltipProvider delayDuration={150}>
-            <AuthTokenBridge>{children}</AuthTokenBridge>
-          </TooltipProvider>
-        </ThemeProvider>
+        <NotificationOsProvider value={defaultNotificationOsValue}>
+          <ThemeProvider>
+            <TooltipProvider delayDuration={150}>
+              <AuthTokenBridge>{children}</AuthTokenBridge>
+            </TooltipProvider>
+          </ThemeProvider>
+        </NotificationOsProvider>
       </UpdateContext.Provider>
     </Provider>
   );

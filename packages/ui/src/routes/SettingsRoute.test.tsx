@@ -78,4 +78,20 @@ describe("SettingsRoute", () => {
       screen.getByText("This page is not in this version yet."),
     ).toBeInTheDocument();
   });
+
+  it("shows banner toggles on the notifications page", async () => {
+    localStorage.clear();
+    const user = userEvent.setup();
+
+    render(
+      <Provider store={makeStore()}>
+        <SettingsRoute />
+      </Provider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Notifications and sync" }));
+
+    expect(screen.getByRole("button", { name: "Enable notifications" })).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Inbox notifications" })).toBeInTheDocument();
+  });
 });

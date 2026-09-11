@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { Plus } from "lucide-react";
 import type { Task } from "@tudu/shared";
 import {
@@ -34,6 +34,10 @@ import {
   useUpdateTaskMutation,
   todayIso,
   selectVisible,
+  setSelectedTaskId,
+  setInspectorTab,
+  clearFocusCommentId,
+  type RootState,
 } from "@tudu/store";
 import { scheduleToTodayLanes } from "@/lib/reorder";
 import {
@@ -57,6 +61,8 @@ import { cn } from "@/lib/utils";
 import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
 import { UnscheduledListSkeleton } from "@/components/loading/UnscheduledListSkeleton";
 import { TaskRow, type TaskRowActions } from "@/components/tasks/TaskRow";
+import { DetailInspector } from "@/components/inspector/DetailInspector";
+import { InspectorSheet } from "@/components/inspector/InspectorSheet";
 import { useNewTaskShortcut } from "@/hooks/useNewTaskShortcut";
 import { usePointerY } from "@/hooks/usePointerY";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -252,9 +258,12 @@ function UnscheduledDnd({
 }
 
 export function UnscheduledRoute() {
+  const dispatch = useDispatch();
+  const selectedTaskId = useSelector((state: RootState) => state.day.selectedTaskId);
+  const inspectorTab = useSelector((state: RootState) => state.day.inspectorTab);
+  const focusCommentId = useSelector((state: RootState) => state.day.focusCommentId);
   const { data, isLoading, isError } = useGetUnscheduledTasksQuery();
   const { data: todayData } = useGetTasksForDayQuery(todayIso());
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [flashTaskId, setFlashTaskId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -289,6 +298,10 @@ export function UnscheduledRoute() {
   const sourceTasks = [...(data?.tasks ?? [])].sort(
     (a, b) => a.position - b.position,
   );
+  const selectedTask = sourceTasks.find((task) => task.id === selectedTaskId) ?? null;
+  const showInspector =
+    selectedTask !== null &&
+    (inspectorTab === "comments" || Boolean(focusCommentId));
   const baseItems = itemsFromTasks(sourceTasks, [CONTAINER], () => CONTAINER);
   const todayTasks = todayData?.tasks ?? [];
 
@@ -303,7 +316,7 @@ export function UnscheduledRoute() {
       onDelete: () => {
         deleteTask(taskId);
         if (selectedTaskId === taskId) {
-          setSelectedTaskId(null);
+          dispatch(setSelectedTaskId(null));
         }
       },
       onToggleInProgress: () => {
@@ -373,7 +386,7 @@ export function UnscheduledRoute() {
             sourceTasks={sourceTasks}
             baseItems={baseItems}
             selectedTaskId={selectedTaskId}
-            setSelectedTaskId={setSelectedTaskId}
+            setSelectedTaskId={(id) => dispatch(setSelectedTaskId(id))}
             makeRowActions={makeRowActions}
             onReorder={handleReorder}
             flashTaskId={flashTaskId}
@@ -381,6 +394,17 @@ export function UnscheduledRoute() {
           />
         </DndContext>
       </ScrollArea>
+      <InspectorSheet
+        open={showInspector}
+        title="Task details"
+        onClose={() => {
+          dispatch(setSelectedTaskId(null));
+          dispatch(setInspectorTab("details"));
+          dispatch(clearFocusCommentId());
+        }}
+      >
+        <DetailInspector task={selectedTask} selectedDate="" />
+      </InspectorSheet>
       <NewTaskDialog
         open={dialogOpen}
         initialBucket="later"
@@ -405,7 +429,7 @@ export function UnscheduledRoute() {
             }).unwrap();
           }
 
-          setSelectedTaskId(result.task.id);
+          dispatch(setSelectedTaskId(result.task.id));
           setFlashTaskId(result.task.id);
         }}
       />

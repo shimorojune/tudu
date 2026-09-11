@@ -1,4 +1,5 @@
 import type {
+  AppNotification,
   Comment,
   CreateTaskRequest,
   InboxHistoryItem,
@@ -24,6 +25,7 @@ export type Replica = {
   inboxHistory: InboxHistoryItem[];
   teamByDate: Record<string, TeamResponse>;
   reportDays: Record<string, ReportDayResponse>;
+  notifications: AppNotification[];
   remoteMovedTaskIds: string[];
 };
 
@@ -44,6 +46,7 @@ export function emptyReplica(): Replica {
     inboxHistory: [],
     teamByDate: {},
     reportDays: {},
+    notifications: [],
     remoteMovedTaskIds: [],
   };
 }
@@ -60,12 +63,25 @@ function cloneReplica(replica: Replica): Replica {
     inboxHistory: [...replica.inboxHistory],
     teamByDate: { ...replica.teamByDate },
     reportDays: { ...replica.reportDays },
+    notifications: [...replica.notifications],
     remoteMovedTaskIds: [...replica.remoteMovedTaskIds],
   };
 }
 
 function reportDayKey(userId: string, date: string): string {
   return `${userId}:${date}`;
+}
+
+function sortComments(rows: Comment[]): Comment[] {
+  return rows.slice().sort((a, b) => {
+    if (a.createdAt < b.createdAt) {
+      return -1;
+    }
+    if (a.createdAt > b.createdAt) {
+      return 1;
+    }
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
 }
 
 function upsertTask(
@@ -155,7 +171,7 @@ export function applyEvent(replica: Replica, event: SyncEvent): Replica {
         index === -1
           ? [...existing, comment]
           : existing.map((row) => (row.id === comment.id ? comment : row));
-      next.commentsByTask[comment.taskId] = comments;
+      next.commentsByTask[comment.taskId] = sortComments(comments);
       const task = next.tasks[comment.taskId];
       if (task) {
         next.tasks[comment.taskId] = { ...task, commentCount: comments.length };
@@ -240,6 +256,26 @@ export function applyEvent(replica: Replica, event: SyncEvent): Replica {
       for (const task of payload.tasks) {
         upsertTask(next, task, payload.report.id, false);
       }
+      return next;
+    }
+    case "notification.upsert": {
+      const row = event.payload as AppNotification;
+      const existing = next.notifications.findIndex((item) => item.id === row.id);
+      const list =
+        existing === -1
+          ? [row, ...next.notifications]
+          : next.notifications.map((item) => (item.id === row.id ? row : item));
+      next.notifications = list
+        .slice()
+        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
+        .slice(0, 50);
+      return next;
+    }
+    case "notification.readAll": {
+      const readAt = (event.payload as { readAt: string }).readAt;
+      next.notifications = next.notifications.map((item) =>
+        item.readAt ? item : { ...item, readAt },
+      );
       return next;
     }
     default:
@@ -430,7 +466,7 @@ export function applyOp(replica: Replica, op: SyncOp): Replica {
         updatedAt: now,
         author: { id: "", name: "You", email: "" },
       };
-      next.commentsByTask[op.taskId] = [...existing, row];
+      next.commentsByTask[op.taskId] = sortComments([...existing, row]);
       const task = next.tasks[op.taskId];
       if (task) {
         next.tasks[op.taskId] = { ...task, commentCount: task.commentCount + 1 };
@@ -514,6 +550,20 @@ export function applyOp(replica: Replica, op: SyncOp): Replica {
     }
     case "team.task.delete": {
       removeTask(next, op.taskId);
+      return next;
+    }
+    case "notification.read": {
+      const readAt = new Date().toISOString();
+      next.notifications = next.notifications.map((item) =>
+        item.id === op.id ? { ...item, readAt: item.readAt ?? readAt } : item,
+      );
+      return next;
+    }
+    case "notification.readAll": {
+      const readAt = new Date().toISOString();
+      next.notifications = next.notifications.map((item) =>
+        item.readAt ? item : { ...item, readAt },
+      );
       return next;
     }
     default: {

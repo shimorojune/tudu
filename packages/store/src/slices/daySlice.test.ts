@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   daySlice,
   goToToday,
+  openTask,
   setInspectorTab,
   setSelectedDate,
   setSelectedTaskId,
@@ -32,5 +33,21 @@ describe("daySlice selection", () => {
 
     state = daySlice.reducer(state, setSelectedTaskId("def"));
     expect(state.inspectorTab).toBe("timeline");
+  });
+
+  it("opens a task without clearing the selection", () => {
+    const state = daySlice.reducer(
+      undefined,
+      openTask({
+        date: "2026-09-10",
+        taskId: "abc",
+        inspectorTab: "comments",
+        focusCommentId: "c1",
+      }),
+    );
+    expect(state.selectedDate).toBe("2026-09-10");
+    expect(state.selectedTaskId).toBe("abc");
+    expect(state.inspectorTab).toBe("comments");
+    expect(state.focusCommentId).toBe("c1");
   });
 });

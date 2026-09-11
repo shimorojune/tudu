@@ -34,12 +34,6 @@ export function ReportDayRoute() {
     }
   }, [dispatch, search.send]);
 
-  useEffect(() => {
-    return () => {
-      dispatch(setSelectedTaskId(null));
-    };
-  }, [dispatch]);
-
   if (isLoading) {
     return <ReportDaySkeleton isToday={date === todayIso()} />;
   }

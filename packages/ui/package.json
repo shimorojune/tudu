@@ -19,6 +19,11 @@
       "import": "./src/providers/UpdateContext.tsx",
       "default": "./src/providers/UpdateContext.tsx"
     },
+    "./notifications": {
+      "types": "./src/providers/NotificationOsContext.tsx",
+      "import": "./src/providers/NotificationOsContext.tsx",
+      "default": "./src/providers/NotificationOsContext.tsx"
+    },
     "./styles.css": "./src/index.css"
   },
   "peerDependencies": {

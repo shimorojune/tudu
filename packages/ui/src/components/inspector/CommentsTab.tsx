@@ -1,5 +1,11 @@
+import { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import type { Task } from "@tudu/shared";
-import { useGetCommentsQuery } from "@tudu/store";
+import {
+  clearFocusCommentId,
+  useGetCommentsQuery,
+  type RootState,
+} from "@tudu/store";
 import { CommentComposer } from "@/components/inspector/CommentComposer";
 import { CommentRow } from "@/components/inspector/CommentRow";
 
@@ -9,8 +15,23 @@ export type CommentsTabProps = {
 };
 
 export function CommentsTab({ task, notifiedName = null }: CommentsTabProps) {
+  const dispatch = useDispatch();
   const { data, isLoading } = useGetCommentsQuery(task.id);
   const comments = data?.comments ?? [];
+  const focusCommentId = useSelector((state: RootState) => state.day.focusCommentId);
+
+  useEffect(() => {
+    if (!focusCommentId) {
+      return;
+    }
+    if (!comments.some((comment) => comment.id === focusCommentId)) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      dispatch(clearFocusCommentId());
+    }, 1600);
+    return () => window.clearTimeout(timer);
+  }, [comments, dispatch, focusCommentId]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -22,7 +43,12 @@ export function CommentsTab({ task, notifiedName = null }: CommentsTabProps) {
         ) : (
           <div className="divide-y divide-hair">
             {comments.map((comment) => (
-              <CommentRow key={comment.id} comment={comment} taskId={task.id} />
+              <CommentRow
+                key={comment.id}
+                comment={comment}
+                taskId={task.id}
+                focused={comment.id === focusCommentId}
+              />
             ))}
           </div>
         )}

@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   AccountSettingsPanel,
 } from "@/components/settings/AccountSettingsPanel";
+import { NotificationsSettingsPanel } from "@/components/settings/NotificationsSettingsPanel";
 import {
   SettingsSidebar,
   type SettingsSection,
@@ -9,11 +10,13 @@ import {
 import { SettingsStubPanel } from "@/components/settings/SettingsStubPanel";
 import { APP_VERSION } from "@/lib/appVersion";
 
-const stubTitles: Record<Exclude<SettingsSection, "account">, string> = {
+const stubTitles: Record<
+  Exclude<SettingsSection, "account" | "notifications">,
+  string
+> = {
   general: "General",
   jira: "JIRA connection",
   manager: "Manager, privacy and rollover",
-  notifications: "Notifications and sync",
 };
 
 export function SettingsRoute() {
@@ -31,6 +34,8 @@ export function SettingsRoute() {
       <div className="min-h-0 bg-card">
         {section === "account" ? (
           <AccountSettingsPanel />
+        ) : section === "notifications" ? (
+          <NotificationsSettingsPanel />
         ) : (
           <SettingsStubPanel title={stubTitles[section]} />
         )}

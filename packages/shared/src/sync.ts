@@ -33,7 +33,8 @@ export type SyncView =
   | { type: "inbox" }
   | { type: "team"; date: string }
   | { type: "reportDay"; userId: string; date: string }
-  | { type: "taskDetail"; taskId: string };
+  | { type: "taskDetail"; taskId: string }
+  | { type: "notifications" };
 
 export const viewKey = {
   day: (date: string) => `day:${date}`,
@@ -42,6 +43,7 @@ export const viewKey = {
   team: (date: string) => `team:${date}`,
   reportDay: (userId: string, date: string) => `reportDay:${userId}:${date}`,
   taskDetail: (taskId: string) => `taskDetail:${taskId}`,
+  notifications: () => "notifications",
 };
 
 export function parseViewKey(key: string): SyncView | null {
@@ -50,6 +52,9 @@ export function parseViewKey(key: string): SyncView | null {
   }
   if (key === "inbox") {
     return { type: "inbox" };
+  }
+  if (key === "notifications") {
+    return { type: "notifications" };
   }
   if (key.startsWith("day:")) {
     return { type: "day", date: key.slice(4) };
@@ -87,6 +92,8 @@ export const SYNC_EVENT_TYPES = [
   "invite.upsert",
   "roster.upsert",
   "reportDay.upsert",
+  "notification.upsert",
+  "notification.readAll",
 ] as const;
 
 export type SyncEventType = (typeof SYNC_EVENT_TYPES)[number];
@@ -188,6 +195,13 @@ export const syncOpSchema = z.discriminatedUnion("type", [
     type: z.literal("team.task.delete"),
     userId: z.string(),
     taskId: z.uuid(),
+  }),
+  z.object({
+    type: z.literal("notification.read"),
+    id: z.uuid(),
+  }),
+  z.object({
+    type: z.literal("notification.readAll"),
   }),
 ]);
 

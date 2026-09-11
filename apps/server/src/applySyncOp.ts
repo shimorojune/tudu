@@ -47,11 +47,16 @@ import {
   updateSubtask,
   updateTask,
   user,
+  insertAndEmitNotifications,
+  listNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
   type UpdateTaskFields,
 } from "@tudu/db";
 import {
   effectiveDayIso,
   isSlipping,
+  isTaskChangeTimelineType,
   parseViewKey,
   type InboxHistoryItem,
   type InboxPendingItem,
@@ -308,6 +313,25 @@ export async function applySyncOp(
         await push(await emitTaskSnapshot(db, op.id, clientMutationId));
         await push(await emitLatestTimeline(db, op.id, clientMutationId));
         await push(await emitRosterForOwner(db, actorId, clientMutationId));
+        if (actorId !== access.task.userId) {
+          const latest = await listTimelineForTask(db, op.id, { limit: 1 });
+          const row = latest[0];
+          if (row && isTaskChangeTimelineType(row.type)) {
+            await push(
+              await insertAndEmitNotifications(db, {
+                recipientUserIds: [access.task.userId],
+                actorId,
+                clientMutationId,
+                kind: "task_changed",
+                taskTitle: updated.title,
+                changeType: row.type,
+                taskId: op.id,
+                ownerId: access.task.userId,
+                scheduledDate: updated.scheduledDate,
+              }),
+            );
+          }
+        }
         break;
       }
       case "task.delete": {
@@ -317,6 +341,8 @@ export async function applySyncOp(
         }
         const recipients = await recipientsForTaskId(db, op.id);
         const ownerId = access.task.userId;
+        const deletedTitle = access.task.title;
+        const deletedDate = access.task.scheduledDate;
         if (access.role === "manager") {
           const deleted = await deleteReportTask(db, actorId, op.id);
           if (!deleted) {
@@ -336,6 +362,20 @@ export async function applySyncOp(
             payload: { id: op.id },
           }),
         );
+        if (actorId !== ownerId) {
+          await push(
+            await insertAndEmitNotifications(db, {
+              recipientUserIds: [ownerId],
+              actorId,
+              clientMutationId,
+              kind: "task_deleted",
+              taskTitle: deletedTitle,
+              taskId: op.id,
+              ownerId,
+              scheduledDate: deletedDate,
+            }),
+          );
+        }
         await push(await emitRosterForOwner(db, ownerId, clientMutationId));
         break;
       }
@@ -420,6 +460,20 @@ export async function applySyncOp(
         );
         await push(await emitTaskSnapshot(db, op.taskId, clientMutationId));
         await push(await emitLatestTimeline(db, op.taskId, clientMutationId));
+        await push(
+          await insertAndEmitNotifications(db, {
+            recipientUserIds: recipients,
+            actorId,
+            clientMutationId,
+            kind: "comment",
+            taskTitle: access.task.title,
+            commentQuote: created.body,
+            taskId: op.taskId,
+            ownerId: access.task.userId,
+            commentId: created.id,
+            scheduledDate: access.task.scheduledDate,
+          }),
+        );
         break;
       }
       case "comment.update": {
@@ -504,6 +558,23 @@ export async function applySyncOp(
             }),
           );
           await push(await emitInboxForUser(db, bounced.toUserId, clientMutationId));
+          const bouncedTask = await loadTaskWithSubtasks(db, bounced.taskId);
+          if (bouncedTask) {
+            await push(
+              await insertAndEmitNotifications(db, {
+                recipientUserIds: [bounced.toUserId],
+                actorId,
+                clientMutationId,
+                kind: "inbox_declined",
+                taskTitle: bouncedTask.title,
+                commentQuote: op.body.reason,
+                taskId: bounced.taskId,
+                ownerId: bounced.toUserId,
+                inboxItemId: bounced.id,
+                scheduledDate: bouncedTask.scheduledDate,
+              }),
+            );
+          }
         } catch (error) {
           wrapManager(error);
         }
@@ -599,6 +670,19 @@ export async function applySyncOp(
           });
           await push(await emitInboxForUser(db, op.userId, clientMutationId));
           await push(await emitLatestTimeline(db, sent.task.id, clientMutationId));
+          await push(
+            await insertAndEmitNotifications(db, {
+              recipientUserIds: [op.userId],
+              actorId,
+              clientMutationId,
+              kind: "inbox",
+              taskTitle: sent.task.title,
+              taskId: sent.task.id,
+              ownerId: op.userId,
+              inboxItemId: sent.item.id,
+              scheduledDate: sent.task.scheduledDate,
+            }),
+          );
         } catch (error) {
           wrapManager(error);
         }
@@ -626,6 +710,9 @@ export async function applySyncOp(
           throw new SyncOpError("Task not found", 404);
         }
         const recipients = await recipientsForTaskId(db, op.taskId);
+        const deletedTitle = access.task.title;
+        const deletedDate = access.task.scheduledDate;
+        const ownerId = access.task.userId;
         try {
           const deleted = await deleteReportTask(db, actorId, op.taskId);
           if (!deleted) {
@@ -642,7 +729,48 @@ export async function applySyncOp(
             payload: { id: op.taskId },
           }),
         );
+        if (actorId !== ownerId) {
+          await push(
+            await insertAndEmitNotifications(db, {
+              recipientUserIds: [ownerId],
+              actorId,
+              clientMutationId,
+              kind: "task_deleted",
+              taskTitle: deletedTitle,
+              taskId: op.taskId,
+              ownerId,
+              scheduledDate: deletedDate,
+            }),
+          );
+        }
         await push(await emitRosterForOwner(db, op.userId, clientMutationId));
+        break;
+      }
+      case "notification.read": {
+        const row = await markNotificationRead(db, actorId, op.id);
+        if (!row) {
+          throw new SyncOpError("Notification not found", 404);
+        }
+        await push(
+          await emitSync(db, {
+            recipientUserIds: [actorId],
+            clientMutationId,
+            type: "notification.upsert",
+            payload: row,
+          }),
+        );
+        break;
+      }
+      case "notification.readAll": {
+        const readAt = await markAllNotificationsRead(db, actorId);
+        await push(
+          await emitSync(db, {
+            recipientUserIds: [actorId],
+            clientMutationId,
+            type: "notification.readAll",
+            payload: { readAt: readAt.toISOString() },
+          }),
+        );
         break;
       }
       default:
@@ -729,6 +857,13 @@ export async function bootstrapViews(
           events.push(synthetic("inbox.upsert", toPending(row)));
         }
         events.push(synthetic("inbox.upsert", { history: history.map(toHistory) }));
+        break;
+      }
+      case "notifications": {
+        const rows = await listNotifications(db, userId, 50);
+        for (const row of rows) {
+          events.push(synthetic("notification.upsert", row));
+        }
         break;
       }
       case "team": {
