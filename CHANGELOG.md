@@ -1,3 +1,13 @@
+# [0.20.0](https://github.com/eGainDev/tudu/compare/tudu-0.19.0...tudu-0.20.0) (2026-09-11)
+
+
+### Features
+
+* enhance task schemas and UI with new updateTaskRequestSchema and improved TaskRow behavior ([61a3b1c](https://github.com/eGainDev/tudu/commit/61a3b1c1275ec7ef8c12413177c090ae9987034f))
+* enhance team management UI with new components and responsive design ([0d03017](https://github.com/eGainDev/tudu/commit/0d03017da0e42c41aaf45f2e7fd61a567f844db6))
+* implement project management features in task system ([22f7a99](https://github.com/eGainDev/tudu/commit/22f7a99ef4109e3a1b9560af59a929139439529c))
+* integrate notification system into desktop app ([954d0f4](https://github.com/eGainDev/tudu/commit/954d0f4f5c6435104945ea27f6269dc6f52f1971))
+
 # [0.19.0](https://github.com/eGainDev/tudu/compare/tudu-0.18.0...tudu-0.19.0) (2026-09-11)
 
 
