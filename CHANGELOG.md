@@ -1,3 +1,11 @@
+# [0.19.0](https://github.com/eGainDev/tudu/compare/tudu-0.18.0...tudu-0.19.0) (2026-09-11)
+
+
+### Features
+
+* introduce loading skeleton components for improved UI experience ([08ca510](https://github.com/eGainDev/tudu/commit/08ca510ed9c5ad5b8cf6e1ff18117b8b82aaa04c))
+* update viewport handling and enhance UI components ([4bbef54](https://github.com/eGainDev/tudu/commit/4bbef542abe7ebc8fbb3df5ec6cdac2e6ec52525))
+
 # [0.18.0](https://github.com/eGainDev/tudu/compare/tudu-0.17.0...tudu-0.18.0) (2026-09-11)
 
 
