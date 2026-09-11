@@ -61,6 +61,8 @@ import { cn } from "@/lib/utils";
 import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
 import { UnscheduledListSkeleton } from "@/components/loading/UnscheduledListSkeleton";
 import { TaskRow, type TaskRowActions } from "@/components/tasks/TaskRow";
+import { useProjectFilterId } from "@/hooks/useProjectFilterId";
+import { isTaskDimmed } from "@/lib/projectFilter";
 import { DetailInspector } from "@/components/inspector/DetailInspector";
 import { InspectorSheet } from "@/components/inspector/InspectorSheet";
 import { useNewTaskShortcut } from "@/hooks/useNewTaskShortcut";
@@ -92,6 +94,7 @@ function UnscheduledDnd({
   onFlashComplete,
 }: UnscheduledDndProps) {
   const remoteMovedTaskIds = useSelector(selectVisible).remoteMovedTaskIds;
+  const filterProjectId = useProjectFilterId();
   const { droppableRects } = useDndContext();
   const pointerYRef = usePointerY();
   const { setNodeRef } = useDroppable({ id: containerDroppableId(CONTAINER) });
@@ -241,6 +244,7 @@ function UnscheduledDnd({
                   task.id === suppressSlideId ||
                   remoteMovedTaskIds.includes(task.id)
                 }
+                dimmed={isTaskDimmed(task, filterProjectId)}
               />
             ))}
           </SortableContext>
@@ -419,6 +423,7 @@ export function UnscheduledRoute() {
               description: args.description,
               scheduledDate: args.scheduledDate,
               bucket: args.scheduledDate === null ? null : args.bucket,
+              projectId: args.projectId,
             }),
           ).unwrap();
 

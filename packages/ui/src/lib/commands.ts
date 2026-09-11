@@ -3,8 +3,17 @@ export type CommandGroup = "Go" | "Actions";
 export type CommandAction =
   | {
       kind: "navigate";
-      to: "/" | "/week" | "/inbox" | "/unscheduled" | "/team" | "/settings";
+      to:
+        | "/"
+        | "/week"
+        | "/inbox"
+        | "/unscheduled"
+        | "/team"
+        | "/settings"
+        | "/projects/$projectId";
       goToToday?: boolean;
+      search?: Record<string, unknown>;
+      params?: { projectId: string };
     }
   | { kind: "requestAddTask" }
   | { kind: "jumpToThisWeek" };
@@ -77,11 +86,57 @@ export const APP_COMMANDS: readonly AppCommand[] = [
     shortcut: "Cmd+Shift+W",
     action: { kind: "jumpToThisWeek" },
   },
+  {
+    id: "go-settings-projects",
+    group: "Go",
+    label: "Go to Settings Projects",
+    keywords: ["projects", "settings", "group"],
+    action: { kind: "navigate", to: "/settings", search: { section: "projects" } },
+  },
 ] as const;
 
-export function commandsByGroup(): Map<CommandGroup, AppCommand[]> {
+export function projectCommands(
+  projects: { id: string; name: string; archivedAt: string | null }[],
+): AppCommand[] {
+  return projects
+    .filter((project) => project.archivedAt === null)
+    .flatMap((project) => [
+      {
+        id: `filter-today-${project.id}`,
+        group: "Go" as const,
+        label: `Filter Today to ${project.name}`,
+        keywords: ["filter", "project", project.name],
+        action: {
+          kind: "navigate" as const,
+          to: "/" as const,
+          search: { project: project.id },
+        },
+      },
+      {
+        id: `open-project-${project.id}`,
+        group: "Go" as const,
+        label: `Open project ${project.name}`,
+        keywords: ["project", "open", project.name],
+        action: {
+          kind: "navigate" as const,
+          to: "/projects/$projectId" as const,
+          params: { projectId: project.id },
+        },
+      },
+    ]);
+}
+
+export function buildAppCommands(
+  projects: { id: string; name: string; archivedAt: string | null }[],
+): AppCommand[] {
+  return [...APP_COMMANDS, ...projectCommands(projects)];
+}
+
+export function commandsByGroup(
+  commands: readonly AppCommand[] = APP_COMMANDS,
+): Map<CommandGroup, AppCommand[]> {
   const groups = new Map<CommandGroup, AppCommand[]>();
-  for (const command of APP_COMMANDS) {
+  for (const command of commands) {
     const existing = groups.get(command.group) ?? [];
     existing.push(command);
     groups.set(command.group, existing);

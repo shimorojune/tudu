@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "./schema.js";
 
 export * from "./schema.js";
+export * from "./projects.js";
 export * from "./tasks.js";
 export * from "./activity.js";
 export * from "./rollover.js";

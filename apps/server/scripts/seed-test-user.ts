@@ -4,6 +4,7 @@ import { config } from "dotenv";
 import {
   createDb,
   createTask,
+  ensureProjectForUser,
   inboxItems,
   managerLinks,
   managerPermissions,
@@ -146,6 +147,16 @@ async function main() {
   await ensureLink(db, marcusId, testuserId);
   await ensureLink(db, testuserId, priyaId);
 
+  const egs = await ensureProjectForUser(db, testuserId, {
+    name: "EGS",
+    color: "ember",
+  });
+  const home = await ensureProjectForUser(db, testuserId, {
+    name: "Home",
+    color: "moss",
+  });
+  await ensureProjectForUser(db, marcusId, { name: "EGS", color: "ember" });
+
   const today = effectiveDayIso();
   const tomorrow = offsetIso(today, 1);
 
@@ -256,6 +267,47 @@ async function main() {
     });
   }
 
+  const seededProjectTask = await db.query.tasks.findFirst({
+    where: and(
+      eq(tasks.userId, testuserId),
+      eq(tasks.projectId, egs.id),
+      isNull(tasks.deletedAt),
+    ),
+  });
+
+  if (!seededProjectTask) {
+    await createTask(db, {
+      userId: testuserId,
+      title: "Ship EGS capacity notes",
+      scheduledDate: today,
+      bucket: "now",
+      startDate: null,
+      deadline: null,
+      isPrivate: false,
+      projectId: egs.id,
+    });
+    await createTask(db, {
+      userId: testuserId,
+      title: "Book dentist",
+      scheduledDate: tomorrow,
+      bucket: "later",
+      startDate: null,
+      deadline: null,
+      isPrivate: false,
+      projectId: home.id,
+    });
+    await createTask(db, {
+      userId: testuserId,
+      title: "Sort garage bins",
+      scheduledDate: null,
+      bucket: null,
+      startDate: null,
+      deadline: null,
+      isPrivate: false,
+      projectId: home.id,
+    });
+  }
+
   const priyaExisting = await db.query.tasks.findFirst({
     where: and(eq(tasks.userId, priyaId), isNull(tasks.deletedAt)),
   });
@@ -279,6 +331,10 @@ async function main() {
       deadline: null,
       isPrivate: false,
     });
+    const priyaEgs = await ensureProjectForUser(db, priyaId, {
+      name: "EGS",
+      color: "ember",
+    });
     const slipping = await createTask(db, {
       userId: priyaId,
       title: "Triage EGS inbox",
@@ -287,6 +343,7 @@ async function main() {
       startDate: null,
       deadline: null,
       isPrivate: false,
+      projectId: priyaEgs.id,
     });
     await db
       .update(tasks)

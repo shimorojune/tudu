@@ -29,7 +29,10 @@ async function liveTaskId(
   return row?.id;
 }
 
-export function taskRowToSnapshot(row: TaskRow): import("@tudu/shared").TaskSnapshot {
+export function taskRowToSnapshot(
+  row: TaskRow,
+  projectName: string | null = null,
+): import("@tudu/shared").TaskSnapshot {
   return {
     title: row.title,
     description: row.description,
@@ -39,6 +42,7 @@ export function taskRowToSnapshot(row: TaskRow): import("@tudu/shared").TaskSnap
     deadline: row.deadline?.toISOString() ?? null,
     completedAt: row.completedAt?.toISOString() ?? null,
     isPrivate: row.isPrivate,
+    projectName,
   };
 }
 
@@ -57,6 +61,7 @@ export function applyTaskPatch(
     carriedDays: number;
     carriedSince: string | null;
     isPrivate: boolean;
+    projectId: string | null;
   }>,
 ): TaskRow {
   return {
@@ -79,7 +84,8 @@ export function taskRowPersistableChanged(before: TaskRow, after: TaskRow): bool
     before.inProgress !== after.inProgress ||
     before.position !== after.position ||
     before.carriedDays !== after.carriedDays ||
-    before.carriedSince !== after.carriedSince
+    before.carriedSince !== after.carriedSince ||
+    before.projectId !== after.projectId
   );
 }
 

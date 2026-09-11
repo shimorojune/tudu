@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearch } from "@tanstack/react-router";
 import {
   AccountSettingsPanel,
 } from "@/components/settings/AccountSettingsPanel";
 import { NotificationsSettingsPanel } from "@/components/settings/NotificationsSettingsPanel";
+import { ProjectsSettingsPanel } from "@/components/settings/ProjectsSettingsPanel";
 import {
   SettingsSidebar,
   type SettingsSection,
@@ -11,7 +13,7 @@ import { SettingsStubPanel } from "@/components/settings/SettingsStubPanel";
 import { APP_VERSION } from "@/lib/appVersion";
 
 const stubTitles: Record<
-  Exclude<SettingsSection, "account" | "notifications">,
+  Exclude<SettingsSection, "account" | "notifications" | "projects">,
   string
 > = {
   general: "General",
@@ -20,7 +22,16 @@ const stubTitles: Record<
 };
 
 export function SettingsRoute() {
-  const [section, setSection] = useState<SettingsSection>("account");
+  const search = useSearch({ strict: false }) as { section?: string };
+  const [section, setSection] = useState<SettingsSection>(
+    search.section === "projects" ? "projects" : "account",
+  );
+
+  useEffect(() => {
+    if (search.section === "projects") {
+      setSection("projects");
+    }
+  }, [search.section]);
 
   return (
     <div className="grid h-full min-h-0 grid-cols-1 bg-card md:grid-cols-[214px_minmax(0,1fr)]">
@@ -36,6 +47,8 @@ export function SettingsRoute() {
           <AccountSettingsPanel />
         ) : section === "notifications" ? (
           <NotificationsSettingsPanel />
+        ) : section === "projects" ? (
+          <ProjectsSettingsPanel />
         ) : (
           <SettingsStubPanel title={stubTitles[section]} />
         )}

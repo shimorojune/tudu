@@ -10,11 +10,14 @@ import {
   taskRowToSnapshot,
 } from "./activity.js";
 import { timelineEvents } from "./activity-schema.js";
+import { assertAssignableProject, projectNameById } from "./projects.js";
+import type { ProjectRow } from "./projects-schema.js";
 import { subtasks, tasks, type SubtaskRow, type TaskRow } from "./tasks-schema.js";
 
 export type TaskRowWithSubtasks = TaskRow & {
   subtasks: SubtaskRow[];
   commentCount: number;
+  project: ProjectRow | null;
 };
 
 export type TaskPlacement = {
@@ -81,11 +84,12 @@ const liveSubtasks = {
     where: isNull(subtasks.deletedAt),
     orderBy: [asc(subtasks.position)],
   },
+  project: true as const,
 };
 
 async function attachCommentCounts(
   db: Db,
-  rows: (TaskRow & { subtasks: SubtaskRow[] })[],
+  rows: (TaskRow & { subtasks: SubtaskRow[]; project?: ProjectRow | null })[],
 ): Promise<TaskRowWithSubtasks[]> {
   const counts = await countCommentsForTasks(
     db,
@@ -94,6 +98,7 @@ async function attachCommentCounts(
 
   return rows.map((row) => ({
     ...row,
+    project: row.project ?? null,
     commentCount: counts.get(row.id) ?? 0,
   }));
 }
@@ -131,6 +136,25 @@ export async function listUnscheduledTasks(
     ),
     with: liveSubtasks,
     orderBy: [asc(tasks.position)],
+  });
+
+  return attachCommentCounts(db, rows);
+}
+
+export async function listTasksForProject(
+  db: Db,
+  userId: string,
+  projectId: string,
+): Promise<TaskRowWithSubtasks[]> {
+  const rows = await db.query.tasks.findMany({
+    where: and(
+      eq(tasks.userId, userId),
+      eq(tasks.projectId, projectId),
+      isNull(tasks.deletedAt),
+      notPendingInbox(),
+    ),
+    with: liveSubtasks,
+    orderBy: [asc(tasks.scheduledDate), asc(tasks.bucket), asc(tasks.position)],
   });
 
   return attachCommentCounts(db, rows);
@@ -201,12 +225,17 @@ export type CreateTaskInput = {
   startDate: string | null;
   deadline: Date | null;
   isPrivate: boolean;
+  projectId?: string | null;
 };
 
 export async function createTask(
   db: Db,
   input: CreateTaskInput,
 ): Promise<TaskRow> {
+  if (input.projectId) {
+    await assertAssignableProject(db, input.userId, input.projectId);
+  }
+
   const position = await nextPosition(
     db,
     input.userId,
@@ -239,6 +268,7 @@ type NewTaskFields = {
   completedAt: Date | null;
   inProgress: boolean;
   isPrivate: boolean;
+  projectId: string | null;
 };
 
 export type UpdateTaskFields = Partial<
@@ -253,6 +283,7 @@ export type UpdateTaskFields = Partial<
     | "completedAt"
     | "inProgress"
     | "isPrivate"
+    | "projectId"
   >
 >;
 
@@ -320,10 +351,18 @@ export async function updateTask(
     delete patch.inProgress;
   }
 
+  if ("projectId" in fields && fields.projectId && fields.projectId !== existing.projectId) {
+    await assertAssignableProject(db, userId, fields.projectId);
+  }
+
   const afterRow = applyTaskPatch(existing, patch);
+  const [beforeProjectName, afterProjectName] = await Promise.all([
+    projectNameById(db, existing.projectId),
+    projectNameById(db, afterRow.projectId),
+  ]);
   const drafts = planTaskTimelineEvents({
-    before: taskRowToSnapshot(existing),
-    after: taskRowToSnapshot(afterRow),
+    before: taskRowToSnapshot(existing, beforeProjectName),
+    after: taskRowToSnapshot(afterRow, afterProjectName),
   });
 
   if (!taskRowPersistableChanged(existing, afterRow)) {

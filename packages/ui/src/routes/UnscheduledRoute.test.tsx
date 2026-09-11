@@ -30,6 +30,10 @@ vi.mock("@/hooks/useNewTaskShortcut", () => ({
   useNewTaskShortcut: () => undefined,
 }));
 
+vi.mock("@/hooks/useProjectFilterId", () => ({
+  useProjectFilterId: () => undefined,
+}));
+
 describe("UnscheduledRoute", () => {
   it("renders the empty unscheduled list", () => {
     render(

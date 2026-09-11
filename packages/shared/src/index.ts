@@ -1,4 +1,5 @@
 export * from "./tasks.js";
+export * from "./projects.js";
 export * from "./activity.js";
 export * from "./timeline.js";
 export * from "./day.js";

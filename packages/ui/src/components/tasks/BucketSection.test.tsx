@@ -4,6 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_NOW_SOFT_CAP } from "@tudu/shared";
 import { BucketSection } from "./BucketSection";
 
+vi.mock("@/hooks/useProjectFilterId", () => ({
+  useProjectFilterId: () => undefined,
+}));
+
 describe("BucketSection", () => {
   it("shows the Now clear prompt when requested", async () => {
     const onNowClearPrompt = vi.fn();

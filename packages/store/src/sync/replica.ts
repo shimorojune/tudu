@@ -4,6 +4,8 @@ import type {
   CreateTaskRequest,
   InboxHistoryItem,
   InboxPendingItem,
+  Project,
+  ProjectRef,
   ReportDayResponse,
   SyncEvent,
   SyncOp,
@@ -18,6 +20,7 @@ export type Replica = {
   viewerId: string | null;
   owners: Record<string, string>;
   tasks: Record<string, Task>;
+  projects: Record<string, Project>;
   commentsByTask: Record<string, Comment[]>;
   timelineByTask: Record<string, TimelineEvent[]>;
   timelineHasMore: Record<string, boolean>;
@@ -39,6 +42,7 @@ export function emptyReplica(): Replica {
     viewerId: null,
     owners: {},
     tasks: {},
+    projects: {},
     commentsByTask: {},
     timelineByTask: {},
     timelineHasMore: {},
@@ -56,6 +60,7 @@ function cloneReplica(replica: Replica): Replica {
     viewerId: replica.viewerId,
     owners: { ...replica.owners },
     tasks: { ...replica.tasks },
+    projects: { ...replica.projects },
     commentsByTask: { ...replica.commentsByTask },
     timelineByTask: { ...replica.timelineByTask },
     timelineHasMore: { ...replica.timelineHasMore },
@@ -278,14 +283,84 @@ export function applyEvent(replica: Replica, event: SyncEvent): Replica {
       );
       return next;
     }
+    case "project.upsert": {
+      const project = event.payload as Project;
+      next.projects[project.id] = project;
+      refreshProjectRefs(next, toProjectRef(project));
+      return next;
+    }
+    case "project.delete": {
+      const id = (event.payload as { id: string }).id;
+      delete next.projects[id];
+      clearProjectRefs(next, id);
+      return next;
+    }
     default:
       return next;
   }
 }
 
-function mergePatch(task: Task, patch: UpdateTaskRequest, siblings: Task[]): Task {
-  const { completed, inProgress: patchInProgress, ...rest } = patch;
+function toProjectRef(project: Project): ProjectRef {
+  return {
+    id: project.id,
+    name: project.name,
+    color: project.color,
+    archivedAt: project.archivedAt,
+  };
+}
+
+function projectRefFromMap(
+  projects: Record<string, Project>,
+  projectId: string | null | undefined,
+): ProjectRef | null {
+  if (!projectId) {
+    return null;
+  }
+  const project = projects[projectId];
+  return project ? toProjectRef(project) : null;
+}
+
+function refreshProjectRefs(replica: Replica, ref: ProjectRef): void {
+  for (const [taskId, task] of Object.entries(replica.tasks)) {
+    if (task.project?.id === ref.id) {
+      replica.tasks[taskId] = { ...task, project: ref };
+    }
+  }
+  replica.inboxPending = replica.inboxPending.map((item) =>
+    item.task.project?.id === ref.id
+      ? { ...item, task: { ...item.task, project: ref } }
+      : item,
+  );
+  for (const [key, day] of Object.entries(replica.reportDays)) {
+    replica.reportDays[key] = {
+      ...day,
+      tasks: day.tasks.map((task) =>
+        task.project?.id === ref.id ? { ...task, project: ref } : task,
+      ),
+    };
+  }
+}
+
+function clearProjectRefs(replica: Replica, projectId: string): void {
+  for (const [taskId, task] of Object.entries(replica.tasks)) {
+    if (task.project?.id === projectId) {
+      replica.tasks[taskId] = { ...task, project: null };
+    }
+  }
+}
+
+function mergePatch(
+  task: Task,
+  patch: UpdateTaskRequest,
+  siblings: Task[],
+  projects: Record<string, Project>,
+): Task {
+  const { completed, inProgress: patchInProgress, projectId, ...rest } = patch;
   const next = { ...task, ...rest, updatedAt: new Date().toISOString() };
+
+  if ("projectId" in patch) {
+    next.project = projectRefFromMap(projects, projectId);
+  }
 
   if ("completed" in patch) {
     const completing = completed === true;
@@ -333,7 +408,11 @@ function applyReorderToTasks(
   return next;
 }
 
-function optimisticTask(id: string, body: CreateTaskRequest): Task {
+function optimisticTask(
+  id: string,
+  body: CreateTaskRequest,
+  projects: Record<string, Project>,
+): Task {
   const now = new Date().toISOString();
   return {
     id,
@@ -353,6 +432,7 @@ function optimisticTask(id: string, body: CreateTaskRequest): Task {
     updatedAt: now,
     subtasks: [],
     commentCount: 0,
+    project: projectRefFromMap(projects, body.projectId),
   };
 }
 
@@ -362,7 +442,7 @@ export function applyOp(replica: Replica, op: SyncOp): Replica {
 
   switch (op.type) {
     case "task.create": {
-      next.tasks[op.id] = optimisticTask(op.id, op.body);
+      next.tasks[op.id] = optimisticTask(op.id, op.body, next.projects);
       if (next.viewerId) {
         next.owners[op.id] = next.viewerId;
       }
@@ -373,7 +453,12 @@ export function applyOp(replica: Replica, op: SyncOp): Replica {
       if (!task) {
         return next;
       }
-      next.tasks[op.id] = mergePatch(task, op.patch, Object.values(next.tasks));
+      next.tasks[op.id] = mergePatch(
+        task,
+        op.patch,
+        Object.values(next.tasks),
+        next.projects,
+      );
       return next;
     }
     case "task.delete": {
@@ -566,6 +651,42 @@ export function applyOp(replica: Replica, op: SyncOp): Replica {
       );
       return next;
     }
+    case "project.create": {
+      const now = new Date().toISOString();
+      next.projects[op.id] = {
+        id: op.id,
+        userId: next.viewerId ?? "",
+        name: op.body.name,
+        color: op.body.color,
+        archivedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      return next;
+    }
+    case "project.update": {
+      const existing = next.projects[op.id];
+      if (!existing) {
+        return next;
+      }
+      const now = new Date().toISOString();
+      const archivedAt =
+        op.patch.archived === true
+          ? (existing.archivedAt ?? now)
+          : op.patch.archived === false
+            ? null
+            : existing.archivedAt;
+      const updated: Project = {
+        ...existing,
+        name: op.patch.name ?? existing.name,
+        color: op.patch.color ?? existing.color,
+        archivedAt,
+        updatedAt: now,
+      };
+      next.projects[op.id] = updated;
+      refreshProjectRefs(next, toProjectRef(updated));
+      return next;
+    }
     default: {
       return next;
     }
@@ -597,6 +718,41 @@ export function tasksForDay(replica: Replica, date: string): Task[] {
       return !ownerId || ownerId === replica.viewerId;
     })
     .sort((a, b) => {
+      const bucketRank = { now: 0, next: 1, later: 2 };
+      const left = a.bucket ? bucketRank[a.bucket] : 3;
+      const right = b.bucket ? bucketRank[b.bucket] : 3;
+      if (left !== right) {
+        return left - right;
+      }
+      return a.position - b.position;
+    });
+}
+
+export function tasksForProject(replica: Replica, projectId: string): Task[] {
+  return Object.values(replica.tasks)
+    .filter((task) => {
+      if (task.project?.id !== projectId) {
+        return false;
+      }
+      if (!replica.viewerId) {
+        return true;
+      }
+      const ownerId = replica.owners[task.id];
+      return !ownerId || ownerId === replica.viewerId;
+    })
+    .sort((a, b) => {
+      if (Boolean(a.completedAt) !== Boolean(b.completedAt)) {
+        return a.completedAt ? 1 : -1;
+      }
+      if (a.scheduledDate !== b.scheduledDate) {
+        if (a.scheduledDate === null) {
+          return 1;
+        }
+        if (b.scheduledDate === null) {
+          return -1;
+        }
+        return a.scheduledDate < b.scheduledDate ? -1 : 1;
+      }
       const bucketRank = { now: 0, next: 1, later: 2 };
       const left = a.bucket ? bucketRank[a.bucket] : 3;
       const right = b.bucket ? bucketRank[b.bucket] : 3;

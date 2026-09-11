@@ -136,7 +136,7 @@ describe("CommandPalette", () => {
     await pressCmdK();
     await user.click(await screen.findByText("Go to Unscheduled"));
 
-    expect(navigate).toHaveBeenCalledWith({ to: "/unscheduled" });
+    expect(navigate).toHaveBeenCalledWith({ to: "/unscheduled", search: {} });
   });
 
   it("ignores Cmd+Shift+W on web", async () => {

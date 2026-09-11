@@ -14,6 +14,16 @@ describe("createTaskRequestSchema", () => {
     expect(result.scheduledDate).toBeNull();
     expect(result.bucket).toBeNull();
     expect(result.description).toBeNull();
+    expect(result.projectId).toBeUndefined();
+  });
+
+  it("accepts a project id", () => {
+    const result = createTaskRequestSchema.parse({
+      title: "Write the runbook",
+      projectId: "11111111-1111-4111-8111-111111111111",
+    });
+
+    expect(result.projectId).toBe("11111111-1111-4111-8111-111111111111");
   });
 
   it("accepts a description and trims blank to null", () => {

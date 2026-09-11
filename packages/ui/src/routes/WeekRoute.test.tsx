@@ -8,6 +8,16 @@ const weekQuery = vi.hoisted(() => ({ isLoading: false }));
 
 vi.mock("@tanstack/react-router", () => ({
   useSearch: () => ({}),
+  useRouterState: (opts?: {
+    select?: (state: { location: { search: Record<string, unknown> } }) => unknown;
+  }) => {
+    const snapshot = { location: { search: {} } };
+    return opts?.select ? opts.select(snapshot) : snapshot;
+  },
+}));
+
+vi.mock("@/hooks/useProjectFilterId", () => ({
+  useProjectFilterId: () => undefined,
 }));
 
 vi.mock("@tudu/store", async (importOriginal) => {

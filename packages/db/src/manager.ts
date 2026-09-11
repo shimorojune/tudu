@@ -15,6 +15,8 @@ import {
 } from "@tudu/shared";
 import type { Db } from "./index.js";
 import { user } from "./auth-schema.js";
+import { ensureProjectForUser, findAssignableProject } from "./projects.js";
+import type { ProjectRow } from "./projects-schema.js";
 import { countCommentsForTasks, insertTimelineEvents } from "./activity.js";
 import {
   inboxItems,
@@ -49,6 +51,7 @@ const liveSubtasks = {
     where: isNull(subtasks.deletedAt),
     orderBy: [asc(subtasks.position)],
   },
+  project: true as const,
 };
 
 function toPerson(row: { id: string; name: string; email: string }): Person {
@@ -71,7 +74,10 @@ function permissionsFromRow(row: ManagerPermissionRow): ManagerPermissions {
 
 async function attachCommentCounts(
   db: Db,
-  rows: (TaskRow & { subtasks: TaskRowWithSubtasks["subtasks"] })[],
+  rows: (TaskRow & {
+    subtasks: TaskRowWithSubtasks["subtasks"];
+    project?: ProjectRow | null;
+  })[],
 ): Promise<TaskRowWithSubtasks[]> {
   const counts = await countCommentsForTasks(
     db,
@@ -80,6 +86,7 @@ async function attachCommentCounts(
 
   return rows.map((row) => ({
     ...row,
+    project: "project" in row ? (row.project ?? null) : null,
     commentCount: counts.get(row.id) ?? 0,
   }));
 }
@@ -321,6 +328,7 @@ export async function sendInboxTask(
     description: string | null;
     startDate: string | null;
     deadline: Date | null;
+    projectId?: string;
   },
 ): Promise<{ item: InboxItemRow; task: TaskRow }> {
   const link = await findLiveLink(db, actorId, reportUserId);
@@ -330,6 +338,19 @@ export async function sendInboxTask(
 
   if (!link.permissions.canSendInbox) {
     throw new ManagerActionError("Not allowed to send tasks", 403);
+  }
+
+  let projectId: string | null = null;
+  if (input.projectId) {
+    const senderProject = await findAssignableProject(db, actorId, input.projectId);
+    if (!senderProject) {
+      throw new ManagerActionError("Project not found", 400);
+    }
+    const reportProject = await ensureProjectForUser(db, reportUserId, {
+      name: senderProject.name,
+      color: senderProject.color,
+    });
+    projectId = reportProject.id;
   }
 
   const position = await nextPosition(db, reportUserId, null, null);
@@ -346,6 +367,7 @@ export async function sendInboxTask(
       startDate: input.startDate,
       deadline: input.deadline,
       isPrivate: false,
+      projectId,
     })
     .returning();
   const task = inserted[0]!;

@@ -25,6 +25,7 @@ function makeTask(overrides: Partial<Task> & Pick<Task, "id" | "title" | "schedu
     createdAt: "2026-09-10T08:00:00.000Z",
     updatedAt: "2026-09-10T08:00:00.000Z",
     commentCount: 0,
+    project: null,
     subtasks: [],
     ...overrides,
   };
@@ -47,6 +48,7 @@ const task: Task = {
   createdAt: "2026-09-06T08:00:00.000Z",
   updatedAt: "2026-09-06T08:00:00.000Z",
   commentCount: 0,
+  project: null,
   subtasks: [
     {
       id: "22222222-2222-4222-8222-222222222222",

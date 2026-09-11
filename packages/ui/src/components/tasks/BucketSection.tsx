@@ -7,6 +7,8 @@ import { DEFAULT_NOW_SOFT_CAP, type Bucket, type Task } from "@tudu/shared";
 import { noSortingStrategy } from "@/lib/dragSort";
 import { cn } from "@/lib/utils";
 import { TaskRow, type TaskRowActions, type TaskViewer } from "@/components/tasks/TaskRow";
+import { useProjectFilterId } from "@/hooks/useProjectFilterId";
+import { isTaskDimmed } from "@/lib/projectFilter";
 
 export type BucketSectionProps = {
   bucket: Bucket;
@@ -55,6 +57,7 @@ export function BucketSection({
   skipSlideForTaskIds,
   viewer = "owner",
 }: BucketSectionProps) {
+  const filterProjectId = useProjectFilterId();
   const isNow = bucket === "now";
   const overCap = (nowCount ?? 0) > nowSoftCap;
   const { setNodeRef } = useDroppable({ id: `bucket-${bucket}` });
@@ -163,6 +166,7 @@ export function BucketSection({
                 Boolean(skipSlideForTaskIds?.includes(task.id))
               }
               viewer={viewer}
+              dimmed={isTaskDimmed(task, filterProjectId)}
             />
           ))}
         </SortableContext>

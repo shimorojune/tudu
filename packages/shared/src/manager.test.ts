@@ -3,6 +3,7 @@ import {
   acceptScheduledDate,
   canDeclineInboxCard,
   declineInboxRequestSchema,
+  sendInboxTaskRequestSchema,
   DEFAULT_MANAGER_PERMISSIONS,
   inboxCardKind,
   normalizeInviteEmail,
@@ -85,5 +86,29 @@ describe("permitManagerAction", () => {
     expect(permitManagerAction(DEFAULT_MANAGER_PERMISSIONS, "edit")).toBe(
       false,
     );
+  });
+});
+
+describe("sendInboxTaskRequestSchema", () => {
+  it("accepts the sender project id and rejects a free-text name", () => {
+    expect(
+      sendInboxTaskRequestSchema.parse({
+        title: "Triage EGS inbox",
+        projectId: "11111111-1111-4111-8111-111111111111",
+      }).projectId,
+    ).toBe("11111111-1111-4111-8111-111111111111");
+
+    expect(
+      sendInboxTaskRequestSchema.safeParse({
+        title: "Triage EGS inbox",
+        projectName: "EGS",
+      }).success,
+    ).toBe(true);
+    expect(
+      sendInboxTaskRequestSchema.parse({
+        title: "Triage EGS inbox",
+        projectName: "EGS",
+      }).projectId,
+    ).toBeUndefined();
   });
 });

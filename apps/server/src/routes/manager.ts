@@ -1,7 +1,8 @@
 import { zValidator } from "@hono/zod-validator";
-import type { Db, SubtaskRow, TaskRowWithSubtasks } from "@tudu/db";
+import type { Db, TaskRowWithSubtasks } from "@tudu/db";
 import {
   ManagerActionError,
+  mapTask,
   acceptInboxItem,
   acceptManagerInvite,
   countPendingInbox,
@@ -28,7 +29,6 @@ import {
   type InboxPendingItem,
   type InboxResponse,
   type ReportDayResponse,
-  type Subtask,
   type Task,
   type TeamInvite,
   type TeamResponse,
@@ -56,38 +56,8 @@ function queryParams<T extends z.ZodType>(schema: T) {
   });
 }
 
-function toSubtask(row: SubtaskRow): Subtask {
-  return {
-    id: row.id,
-    taskId: row.taskId,
-    title: row.title,
-    done: row.done,
-    position: row.position,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  };
-}
-
 function toTask(row: TaskRowWithSubtasks): Task {
-  return {
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    scheduledDate: row.scheduledDate,
-    bucket: row.bucket,
-    position: row.position,
-    startDate: row.startDate,
-    deadline: row.deadline?.toISOString() ?? null,
-    completedAt: row.completedAt?.toISOString() ?? null,
-    inProgress: row.inProgress,
-    carriedDays: row.carriedDays,
-    carriedSince: row.carriedSince,
-    isPrivate: row.isPrivate,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-    subtasks: row.subtasks.map(toSubtask),
-    commentCount: row.commentCount,
-  };
+  return mapTask(row);
 }
 
 const dateQuerySchema = z.object({
@@ -285,6 +255,7 @@ export function createManagerRoute(db: Db) {
           description: body.description ?? null,
           startDate: body.startDate ?? null,
           deadline: body.deadline ? new Date(body.deadline) : null,
+          projectId: body.projectId,
         });
         return c.json({ taskId: sent.task.id, inboxItemId: sent.item.id }, 201);
       } catch (error) {

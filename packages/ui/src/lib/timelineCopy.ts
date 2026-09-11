@@ -255,6 +255,23 @@ export function formatTimelineEvent(
           { kind: "text", text: " declined this" },
         ],
       };
+    case "project_changed": {
+      const to = (data.to as string | null) ?? null;
+      const from = (data.from as string | null) ?? null;
+      const text = to
+        ? from
+          ? ` moved this from ${from} to ${to}`
+          : ` set the project to ${to}`
+        : " cleared the project";
+      return {
+        timeLabel,
+        isSystem: false,
+        parts: [
+          actorPart(event, ctx),
+          { kind: "text", text },
+        ],
+      };
+    }
     default:
       return {
         timeLabel,

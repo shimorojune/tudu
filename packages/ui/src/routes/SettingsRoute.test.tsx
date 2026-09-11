@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
@@ -11,6 +12,14 @@ const signOutMock = vi.fn();
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
+  useSearch: () => ({}),
+  Link: ({
+    children,
+    to,
+  }: {
+    children: ReactNode;
+    to: string;
+  }) => <a href={to}>{children}</a>,
 }));
 
 vi.mock("@/lib/signOut", () => ({
@@ -30,6 +39,9 @@ vi.mock("@tudu/store", async (importOriginal) => {
       },
       isLoading: false,
     }),
+    useGetProjectsQuery: () => ({ data: [], isLoading: false }),
+    useCreateProjectMutation: () => [vi.fn(), { isLoading: false }],
+    useUpdateProjectMutation: () => [vi.fn(), { isLoading: false }],
   };
 });
 
@@ -93,5 +105,19 @@ describe("SettingsRoute", () => {
 
     expect(screen.getByRole("button", { name: "Enable notifications" })).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Inbox notifications" })).toBeInTheDocument();
+  });
+
+  it("shows the projects section", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Provider store={makeStore()}>
+        <SettingsRoute />
+      </Provider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Projects" }));
+
+    expect(screen.getByLabelText("New project name")).toBeInTheDocument();
   });
 });

@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 export type SettingsSection =
   | "account"
   | "general"
+  | "projects"
   | "jira"
   | "manager"
   | "notifications";
@@ -16,6 +17,7 @@ type SettingsSidebarProps = {
 const sections: { id: SettingsSection; label: string }[] = [
   { id: "general", label: "General" },
   { id: "account", label: "Account and login" },
+  { id: "projects", label: "Projects" },
   { id: "jira", label: "JIRA connection" },
   { id: "manager", label: "Manager, privacy and rollover" },
   { id: "notifications", label: "Notifications and sync" },

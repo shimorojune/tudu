@@ -38,6 +38,7 @@ function makeTask(id: string, bucket: Bucket, position: number): Task {
     updatedAt: "2026-09-06T08:00:00.000Z",
     subtasks: [],
     commentCount: 0,
+    project: null,
   };
 }
 

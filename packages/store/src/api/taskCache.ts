@@ -251,6 +251,7 @@ export function createOptimisticTask(body: CreateTaskRequest, tempId: string): T
     updatedAt: now,
     subtasks: [],
     commentCount: 0,
+    project: null,
   };
 }
 

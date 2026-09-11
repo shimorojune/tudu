@@ -16,6 +16,8 @@ import { TeamRoute } from "@/routes/TeamRoute";
 import { ReportDayRoute } from "@/routes/ReportDayRoute";
 import { SettingsRoute } from "@/routes/SettingsRoute";
 import { UnscheduledRoute } from "@/routes/UnscheduledRoute";
+import { ProjectRoute } from "@/routes/ProjectRoute";
+import { parseProjectSearch } from "@/lib/projectFilter";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -48,6 +50,7 @@ const appLayoutRoute = createRoute({
 const todayRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/",
+  validateSearch: (search: Record<string, unknown>) => parseProjectSearch(search),
   component: TodayRoute,
 });
 
@@ -56,6 +59,7 @@ const weekRoute = createRoute({
   path: "/week",
   validateSearch: (search: Record<string, unknown>) => ({
     week: typeof search.week === "string" ? search.week : undefined,
+    ...parseProjectSearch(search),
   }),
   component: WeekRoute,
 });
@@ -77,6 +81,7 @@ const reportDayRoute = createRoute({
   path: "/team/$userId",
   validateSearch: (search: Record<string, unknown>) => ({
     send: search.send === true || search.send === "1" || search.send === "true",
+    ...parseProjectSearch(search),
   }),
   component: ReportDayRoute,
 });
@@ -84,6 +89,7 @@ const reportDayRoute = createRoute({
 const unscheduledRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/unscheduled",
+  validateSearch: (search: Record<string, unknown>) => parseProjectSearch(search),
   component: UnscheduledRoute,
 });
 
@@ -91,6 +97,12 @@ const settingsRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/settings",
   component: SettingsRoute,
+});
+
+const projectRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/projects/$projectId",
+  component: ProjectRoute,
 });
 
 const routeTree = rootRoute.addChildren([
@@ -103,6 +115,7 @@ const routeTree = rootRoute.addChildren([
     teamRoute,
     reportDayRoute,
     settingsRoute,
+    projectRoute,
   ]),
 ]);
 

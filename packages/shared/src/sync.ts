@@ -6,6 +6,10 @@ import {
   sendInboxTaskRequestSchema,
 } from "./manager.js";
 import {
+  createProjectRequestSchema,
+  updateProjectRequestSchema,
+} from "./projects.js";
+import {
   createSubtaskRequestSchema,
   createTaskRequestSchema,
   reorderRequestSchema,
@@ -34,7 +38,9 @@ export type SyncView =
   | { type: "team"; date: string }
   | { type: "reportDay"; userId: string; date: string }
   | { type: "taskDetail"; taskId: string }
-  | { type: "notifications" };
+  | { type: "notifications" }
+  | { type: "projects" }
+  | { type: "project"; projectId: string };
 
 export const viewKey = {
   day: (date: string) => `day:${date}`,
@@ -44,6 +50,8 @@ export const viewKey = {
   reportDay: (userId: string, date: string) => `reportDay:${userId}:${date}`,
   taskDetail: (taskId: string) => `taskDetail:${taskId}`,
   notifications: () => "notifications",
+  projects: () => "projects",
+  project: (projectId: string) => `project:${projectId}`,
 };
 
 export function parseViewKey(key: string): SyncView | null {
@@ -55,6 +63,12 @@ export function parseViewKey(key: string): SyncView | null {
   }
   if (key === "notifications") {
     return { type: "notifications" };
+  }
+  if (key === "projects") {
+    return { type: "projects" };
+  }
+  if (key.startsWith("project:")) {
+    return { type: "project", projectId: key.slice(8) };
   }
   if (key.startsWith("day:")) {
     return { type: "day", date: key.slice(4) };
@@ -94,6 +108,8 @@ export const SYNC_EVENT_TYPES = [
   "reportDay.upsert",
   "notification.upsert",
   "notification.readAll",
+  "project.upsert",
+  "project.delete",
 ] as const;
 
 export type SyncEventType = (typeof SYNC_EVENT_TYPES)[number];
@@ -202,6 +218,16 @@ export const syncOpSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("notification.readAll"),
+  }),
+  z.object({
+    type: z.literal("project.create"),
+    id: z.uuid(),
+    body: createProjectRequestSchema,
+  }),
+  z.object({
+    type: z.literal("project.update"),
+    id: z.uuid(),
+    patch: updateProjectRequestSchema,
   }),
 ]);
 

@@ -12,6 +12,7 @@ import { DayJump } from "@/components/chrome/DayJump";
 import { NavTabs } from "@/components/chrome/NavTabs";
 import { NotificationBell } from "@/components/chrome/NotificationBell";
 import { WeekPicker } from "@/components/chrome/WeekPicker";
+import { ProjectFilter } from "@/components/projects/ProjectFilter";
 import { defaultWeekId, weekDaysFromWeekId } from "@/lib/week";
 
 function NewTaskButton({ reportUserId }: { reportUserId: string | null }) {
@@ -83,6 +84,11 @@ export function TopNav() {
   const onWeek = pathname === "/week";
   const reportMatch = pathname.match(/^\/team\/([^/]+)$/);
   const reportUserId = reportMatch?.[1] ?? null;
+  const showProjectFilter =
+    pathname === "/" ||
+    pathname === "/week" ||
+    pathname === "/unscheduled" ||
+    reportUserId !== null;
   const weekId = search.week ?? defaultWeekId();
   const weekDays = weekDaysFromWeekId(weekId);
 
@@ -101,6 +107,7 @@ export function TopNav() {
             </div>
           </>
         )}
+        {showProjectFilter ? <ProjectFilter /> : null}
         <div className="h-[20px] w-px bg-hair" />
         <CommandsButton />
         <NotificationBell />

@@ -16,6 +16,7 @@ import { isCommandPaletteBlocked } from "@/components/chrome/CommandPalette";
 import { useCommandPalette } from "@/components/chrome/CommandPaletteContext";
 import { InspectorSheet } from "@/components/inspector/InspectorSheet";
 import { InboxSkeleton } from "@/components/loading/InboxSkeleton";
+import { ProjectChip } from "@/components/projects/ProjectChip";
 import { TaskDeleteDialog } from "@/components/tasks/TaskDeleteDialog";
 import { useViewportBand } from "@/hooks/useViewportBand";
 import { inboxShortcutAction } from "@/lib/inboxShortcuts";
@@ -118,6 +119,9 @@ function InboxCard({
         <h2 className="text-[17px] font-bold leading-[1.35] tracking-[-0.01em]">
           {item.task.title}
         </h2>
+        {item.task.project ? (
+          <ProjectChip project={item.task.project} />
+        ) : null}
         {item.task.startDate || item.task.deadline ? (
           <p className="text-[12.5px] tabular-nums text-muted-foreground">
             {item.task.startDate

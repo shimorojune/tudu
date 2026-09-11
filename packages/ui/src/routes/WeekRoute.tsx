@@ -106,6 +106,7 @@ export function WeekRoute() {
               description: args.description,
               scheduledDate: args.scheduledDate,
               bucket: args.bucket,
+              projectId: args.projectId,
             }),
           ).unwrap();
           for (const subtaskTitle of args.subtaskTitles) {

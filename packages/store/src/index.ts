@@ -34,6 +34,10 @@ export {
   useGetNotificationsQuery,
   useReadNotificationMutation,
   useReadAllNotificationsMutation,
+  useGetProjectsQuery,
+  useGetProjectQuery,
+  useCreateProjectMutation,
+  useUpdateProjectMutation,
 } from "./sync/hooks.js";
 export { startSync, stopSync } from "./sync/client.js";
 export { resetSync, selectVisible } from "./sync/slice.js";

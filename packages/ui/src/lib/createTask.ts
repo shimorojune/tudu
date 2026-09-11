@@ -5,6 +5,7 @@ export function createTaskBody(args: {
   description?: string | null;
   scheduledDate?: string | null;
   bucket?: Bucket | null;
+  projectId?: string | null;
 }): CreateTaskRequest {
   const trimmedDescription = args.description?.trim();
   return {
@@ -18,5 +19,6 @@ export function createTaskBody(args: {
     startDate: null,
     deadline: null,
     isPrivate: false,
+    projectId: args.projectId ?? null,
   };
 }

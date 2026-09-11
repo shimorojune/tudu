@@ -5,6 +5,8 @@ import type { Task } from "@tudu/shared";
 import { selectVisible } from "@tudu/store";
 import { containerDroppableId } from "@/lib/dragSort";
 import { UNSCHEDULED_CONTAINER } from "@/lib/week";
+import { useProjectFilterId } from "@/hooks/useProjectFilterId";
+import { isTaskDimmed } from "@/lib/projectFilter";
 import { SortableWeekCard } from "@/components/week/SortableWeekCard";
 import { cn } from "@/lib/utils";
 import { noSortingStrategy } from "@/lib/dragSort";
@@ -19,6 +21,7 @@ export function UnscheduledRail({
   dropActive,
 }: UnscheduledRailProps) {
   const remoteMovedTaskIds = useSelector(selectVisible).remoteMovedTaskIds;
+  const filterProjectId = useProjectFilterId();
   const { setNodeRef } = useDroppable({
     id: containerDroppableId(UNSCHEDULED_CONTAINER),
   });
@@ -58,6 +61,7 @@ export function UnscheduledRail({
                   isToday={false}
                   orderKey={`unscheduled:${index}`}
                   skipSlide={remoteMovedTaskIds.includes(task.id)}
+                  dimmed={isTaskDimmed(task, filterProjectId)}
                 />
               ))}
             </div>

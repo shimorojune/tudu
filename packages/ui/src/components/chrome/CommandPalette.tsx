@@ -6,10 +6,12 @@ import {
   requestAddTask,
   useAcceptInboxItemMutation,
   useGetInboxQuery,
+  useGetProjectsQuery,
 } from "@tudu/store";
 import { type Bucket } from "@tudu/shared";
 import { useCommandPalette } from "@/components/chrome/CommandPaletteContext";
 import {
+  buildAppCommands,
   commandsByGroup,
   isDesktopApp,
   type AppCommand,
@@ -44,7 +46,8 @@ export function CommandPalette() {
   const { open, setOpen } = useCommandPalette();
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const grouped = commandsByGroup();
+  const { data: projects = [] } = useGetProjectsQuery();
+  const grouped = commandsByGroup(buildAppCommands(projects));
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const onInbox = pathname === "/inbox";
   const { data: inbox } = useGetInboxQuery(undefined, {
@@ -67,7 +70,17 @@ export function CommandPalette() {
           if (command.action.goToToday) {
             dispatch(goToToday());
           }
-          void navigate({ to: command.action.to });
+          if (command.action.to === "/projects/$projectId" && command.action.params) {
+            void navigate({
+              to: "/projects/$projectId",
+              params: command.action.params,
+            });
+            return;
+          }
+          void navigate({
+            to: command.action.to,
+            search: command.action.search ?? {},
+          } as never);
           return;
         case "requestAddTask":
           dispatch(requestAddTask());

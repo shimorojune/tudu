@@ -8,6 +8,8 @@ vi.mock("@tudu/store", async (importOriginal) => {
   return {
     ...actual,
     todayIso: () => "2026-09-11",
+    useGetProjectsQuery: () => ({ data: [], isLoading: false }),
+    useCreateProjectMutation: () => [vi.fn(), { isLoading: false }],
   };
 });
 
@@ -37,6 +39,7 @@ describe("NewTaskDialog", () => {
       bucket: "later",
       scheduledDate: "2026-09-11",
       subtaskTitles: [],
+      projectId: null,
     });
   });
 

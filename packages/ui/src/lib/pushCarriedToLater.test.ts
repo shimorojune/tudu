@@ -20,6 +20,7 @@ function task(overrides: Partial<Task> & Pick<Task, "id" | "bucket">): Task {
     createdAt: "2026-09-06T08:00:00.000Z",
     updatedAt: "2026-09-06T08:00:00.000Z",
     commentCount: 0,
+    project: null,
     subtasks: [],
   };
 }

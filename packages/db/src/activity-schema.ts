@@ -29,6 +29,7 @@ export const timelineEventType = pgEnum("timeline_event_type", [
   "inbox_sent",
   "inbox_accepted",
   "inbox_declined",
+  "project_changed",
 ]);
 
 export const comments = pgTable(

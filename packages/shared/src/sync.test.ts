@@ -48,5 +48,10 @@ describe("viewKey", () => {
       userId: "u1",
       date: "2026-09-10",
     });
+    expect(parseViewKey(viewKey.projects())).toEqual({ type: "projects" });
+    expect(parseViewKey(viewKey.project("11111111-1111-4111-8111-111111111111"))).toEqual({
+      type: "project",
+      projectId: "11111111-1111-4111-8111-111111111111",
+    });
   });
 });

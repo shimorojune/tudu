@@ -1,5 +1,6 @@
 import type { Comment, Subtask, Task, TimelineEvent } from "@tudu/shared";
 import type { CommentWithAuthor, TimelineEventWithActor } from "./activity.js";
+import { mapProjectRef } from "./projects.js";
 import type { SubtaskRow } from "./tasks-schema.js";
 import type { TaskRowWithSubtasks } from "./tasks.js";
 
@@ -34,6 +35,7 @@ export function mapTask(row: TaskRowWithSubtasks): Task {
     updatedAt: row.updatedAt.toISOString(),
     subtasks: row.subtasks.map(mapSubtask),
     commentCount: row.commentCount,
+    project: mapProjectRef(row.project),
   };
 }
 

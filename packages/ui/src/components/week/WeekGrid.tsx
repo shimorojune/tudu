@@ -40,6 +40,8 @@ import {
 } from "@/lib/week";
 import { remapWeekDropTarget, weekLaneFor } from "@/lib/weekDrag";
 import { usePointerY } from "@/hooks/usePointerY";
+import { useProjectFilterId } from "@/hooks/useProjectFilterId";
+import { isTaskDimmed } from "@/lib/projectFilter";
 import { UnscheduledRail } from "@/components/week/UnscheduledRail";
 import { WeekColumn } from "@/components/week/WeekColumn";
 import { WeekCard } from "@/components/week/WeekCard";
@@ -77,6 +79,7 @@ function WeekGridDnd({
   onHighlightDay,
 }: WeekGridDndProps) {
   const today = effectiveDayIso();
+  const filterProjectId = useProjectFilterId();
   const { droppableRects } = useDndContext();
   const pointerYRef = usePointerY();
   const appliedDeltaRef = useRef<number | null>(null);
@@ -311,6 +314,7 @@ function WeekGridDnd({
               scheduledDate={activeTask.scheduledDate ?? ""}
               isToday={activeTask.scheduledDate === today}
               dragging={false}
+              dimmed={isTaskDimmed(activeTask, filterProjectId)}
             />
           </div>
         ) : null}

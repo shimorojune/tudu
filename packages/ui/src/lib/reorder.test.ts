@@ -32,6 +32,7 @@ function makeTask(
     updatedAt: "2026-09-06T08:00:00.000Z",
     subtasks: [],
     commentCount: 0,
+    project: null,
   };
 }
 

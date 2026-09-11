@@ -1,5 +1,8 @@
 import { useState, type FormEvent } from "react";
+import { ProjectChip } from "@/components/projects/ProjectChip";
+import { ProjectPicker } from "@/components/projects/ProjectPicker";
 import { DateField } from "@/components/ui/date-field";
+import { useGetProjectsQuery } from "@tudu/store";
 import { personFirstName } from "@/lib/person";
 import { useSendInboxTaskMutation } from "@tudu/store";
 
@@ -20,11 +23,15 @@ export function SendInboxForm({
 }: SendInboxFormProps) {
   const first = personFirstName(reportName);
   const [sendTask, { isLoading }] = useSendInboxTaskMutation();
+  const { data: projects = [] } = useGetProjectsQuery();
   const [title, setTitle] = useState("");
   const [note, setNote] = useState("");
   const [startDate, setStartDate] = useState("");
   const [deadline, setDeadline] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const selectedProject =
+    projects.find((project) => project.id === projectId) ?? null;
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -40,11 +47,13 @@ export function SendInboxForm({
         description: note.trim() ? note.trim() : null,
         startDate: startDate || null,
         deadline: deadline ? `${deadline}T18:00:00.000Z` : null,
+        projectId: projectId ?? undefined,
       }).unwrap();
       setTitle("");
       setNote("");
       setStartDate("");
       setDeadline("");
+      setProjectId(null);
       onSent?.();
     } catch (caught) {
       const message =
@@ -94,6 +103,15 @@ export function SendInboxForm({
             />
           </label>
         </div>
+        <label className="flex flex-col gap-[7px]">
+          <span className="text-[12px] text-muted-foreground">Project</span>
+          <ProjectPicker value={projectId} onChange={setProjectId} />
+          {selectedProject ? (
+            <span className="text-[12px] text-muted-foreground">
+              They get their own <ProjectChip project={selectedProject} />
+            </span>
+          ) : null}
+        </label>
         <label className="flex flex-col gap-[7px]">
           <span className="text-[12px] text-muted-foreground">Note</span>
           <textarea

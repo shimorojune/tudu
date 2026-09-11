@@ -106,6 +106,7 @@ export function TodayRoute() {
                 description: args.description,
                 scheduledDate: args.scheduledDate,
                 bucket: args.scheduledDate === null ? null : args.bucket,
+                projectId: args.projectId,
               }),
             ).unwrap();
 

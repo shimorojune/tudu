@@ -31,6 +31,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     createdAt: now,
     updatedAt: now,
     commentCount: 0,
+    project: null,
     subtasks: [],
     ...overrides,
   };

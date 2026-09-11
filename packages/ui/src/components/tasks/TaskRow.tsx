@@ -29,6 +29,7 @@ import { Check, X } from "lucide-react";
 import { useSlideOnReorder } from "@/hooks/useSlideOnReorder";
 import { AUTOSAVE_MS } from "@/lib/autosave";
 import { cn } from "@/lib/utils";
+import { ProjectChip } from "@/components/projects/ProjectChip";
 import { taskMetaSegments } from "@/lib/taskMeta";
 import { CarryDots } from "@/components/tasks/CarryDots";
 import { SubtaskComposer } from "@/components/tasks/SubtaskComposer";
@@ -73,6 +74,7 @@ export type TaskRowProps = {
   onFlashComplete?: () => void;
   skipSlide?: boolean;
   viewer?: TaskViewer;
+  dimmed?: boolean;
 };
 
 function flashElement(element: HTMLElement | null) {
@@ -656,6 +658,7 @@ export function TaskRow({
   onFlashComplete,
   skipSlide = false,
   viewer = "owner",
+  dimmed = false,
 }: TaskRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [addingSubtask, setAddingSubtask] = useState(false);
@@ -811,6 +814,7 @@ export function TaskRow({
                 "before:absolute before:inset-y-0 before:left-0 before:w-[2px] before:bg-primary",
             ),
         isCompleted && !isDragging && "opacity-70",
+        dimmed && !isDragging && "opacity-35",
       )}
     >
       <DragHandleDots listeners={listeners} attributes={attributes} />
@@ -872,8 +876,12 @@ export function TaskRow({
             <LinkifiedText text={task.description} />
           </p>
         ) : null}
-        {segments.length > 0 ? (
+        {segments.length > 0 || task.project ? (
           <div className="mt-[4px] flex flex-wrap items-center gap-[9px] text-[12.5px] tabular-nums text-muted-foreground">
+            {task.project ? <ProjectChip project={task.project} /> : null}
+            {task.project && segments.length > 0 ? (
+              <span className="text-ghost">·</span>
+            ) : null}
             {segments.map((segment, index) =>
               segment.kind === "dot" ? (
                 <span key={`dot-${index}`} className="text-ghost">

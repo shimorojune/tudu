@@ -1,3 +1,5 @@
+import type { ProjectColor } from "@tudu/shared";
+
 /** Tudu brand colors and mark geometry from assets/tokens.json */
 
 export const TUDU_ACCENT_RGB: [number, number, number] = [236, 48, 19];
@@ -22,6 +24,20 @@ export const TUDU_FULL_PALETTE: [number, number, number][] = [
   [48, 23, 14],
   [32, 29, 42],
 ];
+
+export const PROJECT_COLOR_RGB: Record<ProjectColor, [number, number, number]> = {
+  ember: [236, 48, 19],
+  rust: [174, 24, 0],
+  clay: [255, 86, 60],
+  ink: [32, 29, 42],
+  stone: [240, 237, 232],
+  moss: [48, 23, 14],
+};
+
+export function projectColorCss(color: ProjectColor): string {
+  const [red, green, blue] = PROJECT_COLOR_RGB[color];
+  return `rgb(${red} ${green} ${blue})`;
+}
 
 /** Mark T geometry scaled to a 64×64 viewBox (from assets/tudu-mark.svg). */
 export const TUDU_T_PATH = "M11.52 16.64H52.48V26.88H37.12V49.76H26.88V26.88H11.52Z";

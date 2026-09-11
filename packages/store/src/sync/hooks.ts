@@ -6,6 +6,7 @@ import {
   viewKey,
   type AcceptInboxRequest,
   type CreateInviteRequest,
+  type CreateProjectRequest,
   type CreateSubtaskRequest,
   type CreateTaskRequest,
   type DeclineInboxRequest,
@@ -15,6 +16,7 @@ import {
   type SendInboxTaskRequest,
   type TimelineResponse,
   type UpdateCommentRequest,
+  type UpdateProjectRequest,
   type UpdateSubtaskRequest,
   type UpdateTaskRequest,
 } from "@tudu/shared";
@@ -24,6 +26,7 @@ import { enqueue, subscribeView } from "./client.js";
 import {
   reportDayKey,
   tasksForDay,
+  tasksForProject,
   unscheduledTasks,
 } from "./replica.js";
 import { selectVisible } from "./slice.js";
@@ -381,6 +384,7 @@ export function useSendInboxTaskMutation() {
       description: arg.description,
       startDate: arg.startDate,
       deadline: arg.deadline,
+      projectId: arg.projectId,
     },
   }));
 }
@@ -407,4 +411,58 @@ export function useReadNotificationMutation() {
 
 export function useReadAllNotificationsMutation() {
   return useOp((_arg?: void) => ({ type: "notification.readAll" as const }));
+}
+
+export function useGetProjectsQuery(options?: QueryOptions) {
+  const key = options?.skip ? null : viewKey.projects();
+  const query = useView(key);
+  const replica = useSelector(selectVisible);
+  const data = useMemo(
+    () =>
+      Object.values(replica.projects).sort((a, b) => {
+        if (Boolean(a.archivedAt) !== Boolean(b.archivedAt)) {
+          return a.archivedAt ? 1 : -1;
+        }
+        return a.name.localeCompare(b.name);
+      }),
+    [replica.projects],
+  );
+  return { ...query, data };
+}
+
+export function useGetProjectQuery(projectId: string, options?: QueryOptions) {
+  const key = options?.skip || !projectId ? null : viewKey.project(projectId);
+  const query = useView(key);
+  const replica = useSelector(selectVisible);
+  const project = replica.projects[projectId];
+  const tasks = useMemo(
+    () => (projectId ? tasksForProject(replica, projectId) : []),
+    [replica, projectId],
+  );
+  return { ...query, data: project ? { project, tasks } : undefined };
+}
+
+export function useCreateProjectMutation() {
+  const dispatch = useDispatch<AppDispatch>();
+  const [isLoading, setLoading] = useState(false);
+  const trigger = useCallback(
+    (body: CreateProjectRequest) => {
+      const id = crypto.randomUUID();
+      setLoading(true);
+      const promise = dispatch(enqueue({ type: "project.create", id, body }))
+        .then(() => ({ project: { id } }))
+        .finally(() => setLoading(false));
+      return withUnwrap(promise);
+    },
+    [dispatch],
+  );
+  return [trigger, { isLoading }] as const;
+}
+
+export function useUpdateProjectMutation() {
+  return useOp((arg: { id: string; patch: UpdateProjectRequest }) => ({
+    type: "project.update" as const,
+    id: arg.id,
+    patch: arg.patch,
+  }));
 }

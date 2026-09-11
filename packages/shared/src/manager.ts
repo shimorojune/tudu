@@ -170,6 +170,7 @@ export const sendInboxTaskRequestSchema = z.object({
     .transform((value) => (value === "" || value === undefined ? null : value)),
   startDate: isoDateSchema.nullable().optional().default(null),
   deadline: z.iso.datetime({ offset: true }).nullable().optional().default(null),
+  projectId: z.uuid().optional(),
 });
 
 export type SendInboxTaskRequest = z.infer<typeof sendInboxTaskRequestSchema>;

@@ -1,7 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
 import type {
   Db,
-  SubtaskRow,
   TaskRowWithSubtasks,
   UpdateTaskFields,
 } from "@tudu/db";
@@ -10,6 +9,8 @@ import {
   createTask,
   deleteReportTask,
   findTaskById,
+  mapTask,
+  ProjectError,
   listTasksForDay,
   listUnscheduledTasks,
   reorderTasks,
@@ -29,7 +30,6 @@ import {
   rolloverRequestSchema,
   updateSubtaskRequestSchema,
   updateTaskRequestSchema,
-  type Subtask,
   type Task,
   type TaskResponse,
   type TasksResponse,
@@ -65,38 +65,8 @@ const dayQuerySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a YYYY-MM-DD date"),
 });
 
-function toSubtask(row: SubtaskRow): Subtask {
-  return {
-    id: row.id,
-    taskId: row.taskId,
-    title: row.title,
-    done: row.done,
-    position: row.position,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  };
-}
-
 function toTask(row: TaskRowWithSubtasks): Task {
-  return {
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    scheduledDate: row.scheduledDate,
-    bucket: row.bucket,
-    position: row.position,
-    startDate: row.startDate,
-    deadline: row.deadline?.toISOString() ?? null,
-    completedAt: row.completedAt?.toISOString() ?? null,
-    inProgress: row.inProgress,
-    carriedDays: row.carriedDays,
-    carriedSince: row.carriedSince,
-    isPrivate: row.isPrivate,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-    subtasks: row.subtasks.map(toSubtask),
-    commentCount: row.commentCount,
-  };
+  return mapTask(row);
 }
 
 /** Translates the wire patch into database fields. `completed` is a boolean on the
@@ -110,6 +80,7 @@ function toUpdateFields(patch: UpdateTaskRequest): UpdateTaskFields {
   if ("bucket" in patch) fields.bucket = patch.bucket;
   if ("startDate" in patch) fields.startDate = patch.startDate;
   if ("isPrivate" in patch) fields.isPrivate = patch.isPrivate;
+  if ("projectId" in patch) fields.projectId = patch.projectId ?? null;
 
   if ("deadline" in patch) {
     fields.deadline = patch.deadline ? new Date(patch.deadline) : null;
@@ -183,16 +154,25 @@ export function createTasksRoute(db: Db) {
   app.post("/tasks", jsonBody(createTaskRequestSchema), async (c) => {
     const body = c.req.valid("json");
 
-    const created = await createTask(db, {
-      userId: userId(c),
-      title: body.title,
-      description: body.description ?? null,
-      scheduledDate: body.scheduledDate,
-      bucket: body.bucket,
-      startDate: body.startDate,
-      deadline: body.deadline ? new Date(body.deadline) : null,
-      isPrivate: body.isPrivate,
-    });
+    let created;
+    try {
+      created = await createTask(db, {
+        userId: userId(c),
+        title: body.title,
+        description: body.description ?? null,
+        scheduledDate: body.scheduledDate,
+        bucket: body.bucket,
+        startDate: body.startDate,
+        deadline: body.deadline ? new Date(body.deadline) : null,
+        isPrivate: body.isPrivate,
+        projectId: body.projectId ?? null,
+      });
+    } catch (error) {
+      if (error instanceof ProjectError) {
+        return c.json({ error: error.message }, error.status);
+      }
+      throw error;
+    }
 
     const row = await findTaskById(db, userId(c), created.id);
 
@@ -215,12 +195,20 @@ export function createTasksRoute(db: Db) {
       return c.json({ error: "Managers cannot edit tasks" }, 403);
     }
 
-    const updated = await updateTask(
-      db,
-      userId(c),
-      c.req.param("id"),
-      toUpdateFields(c.req.valid("json")),
-    );
+    let updated;
+    try {
+      updated = await updateTask(
+        db,
+        userId(c),
+        c.req.param("id"),
+        toUpdateFields(c.req.valid("json")),
+      );
+    } catch (error) {
+      if (error instanceof ProjectError) {
+        return c.json({ error: error.message }, error.status);
+      }
+      throw error;
+    }
 
     if (!updated) {
       return c.json({ error: "Task not found" }, 404);

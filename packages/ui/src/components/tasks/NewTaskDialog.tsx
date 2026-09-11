@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { bucketLabel } from "@/lib/buckets";
+import { ProjectPicker } from "@/components/projects/ProjectPicker";
 import { SubtaskComposerList } from "@/components/tasks/SubtaskComposer";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +28,7 @@ export type NewTaskDialogProps = {
     bucket: Bucket;
     scheduledDate: string | null;
     subtaskTitles: string[];
+    projectId: string | null;
   }) => Promise<void>;
 };
 
@@ -118,6 +120,7 @@ export function NewTaskDialog({
   const [dayChoice, setDayChoice] = useState<NewTaskDayChoice>("today");
   const [pickedDate, setPickedDate] = useState(initialDate);
   const [subtasks, setSubtasks] = useState<{ id: string; title: string }[]>([]);
+  const [projectId, setProjectId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const today = todayIso();
@@ -135,6 +138,7 @@ export function NewTaskDialog({
     );
     setPickedDate(initialDate);
     setSubtasks([]);
+    setProjectId(null);
     setSubmitting(false);
     window.requestAnimationFrame(() => titleRef.current?.focus());
   }, [defaultDayChoice, initialBucket, initialDate, open, today]);
@@ -178,6 +182,7 @@ export function NewTaskDialog({
         bucket,
         scheduledDate,
         subtaskTitles: subtasks.map((subtask) => subtask.title),
+        projectId,
       });
       onOpenChange(false);
     } finally {
@@ -286,6 +291,13 @@ export function NewTaskDialog({
                 </span>
               ) : null}
             </div>
+          </div>
+
+          <div className="space-y-[8px]">
+            <div className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
+              Project
+            </div>
+            <ProjectPicker value={projectId} onChange={setProjectId} />
           </div>
 
           <div className="space-y-[8px]">

@@ -8,6 +8,8 @@ import { selectVisible } from "@tudu/store";
 import { bucketLabel } from "@/lib/buckets";
 import { containerDroppableId } from "@/lib/dragSort";
 import { containerForDayBucket, isWeekendIso, parseIsoDate } from "@/lib/week";
+import { useProjectFilterId } from "@/hooks/useProjectFilterId";
+import { isTaskDimmed } from "@/lib/projectFilter";
 import { SortableWeekCard } from "@/components/week/SortableWeekCard";
 import { WeekCardPopover } from "@/components/week/WeekCardPopover";
 import { cn } from "@/lib/utils";
@@ -44,6 +46,7 @@ function BucketZone({
   onPopoverChange: (taskId: string | null) => void;
 }) {
   const remoteMovedTaskIds = useSelector(selectVisible).remoteMovedTaskIds;
+  const filterProjectId = useProjectFilterId();
   const container = containerForDayBucket(date, bucket);
   const { setNodeRef } = useDroppable({ id: containerDroppableId(container) });
   const label = bucketLabel(bucket, isToday);
@@ -79,6 +82,7 @@ function BucketZone({
                   isToday={isToday}
                   orderKey={`${date}:${index}`}
                   skipSlide={remoteMovedTaskIds.includes(task.id)}
+                  dimmed={isTaskDimmed(task, filterProjectId)}
                 />
               </WeekCardPopover>
             );

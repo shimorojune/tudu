@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { projectRefSchema } from "./projects.js";
 
 /** Bucket slots. These are stable ids, not labels: screen C1 lets the user rename
     what gets displayed, and a day that is not today may label them differently.
@@ -59,6 +60,7 @@ export const taskSchema = z
     updatedAt: z.iso.datetime({ offset: true }),
     subtasks: z.array(subtaskSchema),
     commentCount: z.number().int(),
+    project: projectRefSchema.nullable(),
   })
   .refine(dayAndBucketPaired, { message: PAIRING_MESSAGE, path: ["bucket"] });
 
@@ -79,6 +81,7 @@ export const createTaskRequestSchema = z
     startDate: isoDateSchema.nullable().default(null),
     deadline: z.iso.datetime({ offset: true }).nullable().default(null),
     isPrivate: z.boolean().default(false),
+    projectId: z.uuid().nullable().optional(),
   })
   .refine(dayAndBucketPaired, { message: PAIRING_MESSAGE, path: ["bucket"] });
 
@@ -102,6 +105,7 @@ export const updateTaskRequestSchema = z
     completed: z.boolean(),
     inProgress: z.boolean(),
     isPrivate: z.boolean(),
+    projectId: z.uuid().nullable(),
   })
   .partial()
   .refine((value) => Object.keys(value).length > 0, {

@@ -18,6 +18,7 @@ export const TIMELINE_EVENT_TYPES = [
   "inbox_sent",
   "inbox_accepted",
   "inbox_declined",
+  "project_changed",
 ] as const;
 
 export type TimelineEventType = (typeof TIMELINE_EVENT_TYPES)[number];
@@ -36,6 +37,7 @@ export type TaskSnapshot = {
   deadline: string | null;
   completedAt: string | null;
   isPrivate: boolean;
+  projectName: string | null;
 };
 
 /** Compare before and after a task patch. Returns zero or more event drafts.
@@ -108,6 +110,13 @@ export function planTaskTimelineEvents(args: {
     events.push({
       type: "privacy_changed",
       data: { toPrivate: after.isPrivate },
+    });
+  }
+
+  if (before.projectName !== after.projectName) {
+    events.push({
+      type: "project_changed",
+      data: { from: before.projectName, to: after.projectName },
     });
   }
 

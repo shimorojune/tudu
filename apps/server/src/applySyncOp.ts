@@ -8,6 +8,7 @@ import {
   claimMutation,
   createComment,
   createManagerInvite,
+  createProject,
   createSubtask,
   createTask,
   currentSyncSeq,
@@ -19,14 +20,17 @@ import {
   findTaskById,
   listCommentsForTask,
   listInbox,
+  listProjectsForUser,
   listReportDayTasks,
   listTasksForDay,
+  listTasksForProject,
   listTeam,
   listTimelineForTask,
   listUnscheduledTasks,
   loadTaskWithSubtasks,
   managerIdForOwner,
   mapComment,
+  mapProject,
   mapTask,
   mapTimelineEvent,
   recipientsForTaskId,
@@ -44,8 +48,11 @@ import {
   tasks,
   uniqueIds,
   updateComment,
+  updateProject,
   updateSubtask,
   updateTask,
+  findProjectById,
+  ProjectError,
   user,
   insertAndEmitNotifications,
   listNotifications,
@@ -100,11 +107,18 @@ function toUpdateFields(patch: UpdateTaskRequest): UpdateTaskFields {
     fields.inProgress = patch.inProgress;
   }
 
+  if ("projectId" in patch) {
+    fields.projectId = patch.projectId ?? null;
+  }
+
   return fields;
 }
 
 function wrapManager(error: unknown): never {
   if (error instanceof ManagerActionError) {
+    throw new SyncOpError(error.message, error.status);
+  }
+  if (error instanceof ProjectError) {
     throw new SyncOpError(error.message, error.status);
   }
   throw error;
@@ -200,6 +214,24 @@ async function emitTaskSnapshot(
   return events;
 }
 
+async function emitProjectSnapshot(
+  db: Db,
+  projectId: string,
+  clientMutationId: string | null,
+): Promise<SyncEvent[]> {
+  const row = await findProjectById(db, projectId);
+  if (!row) {
+    return [];
+  }
+
+  return emitSync(db, {
+    recipientUserIds: [row.userId],
+    clientMutationId,
+    type: "project.upsert",
+    payload: mapProject(row),
+  });
+}
+
 async function emitLatestTimeline(
   db: Db,
   taskId: string,
@@ -292,6 +324,7 @@ export async function applySyncOp(
           startDate: op.body.startDate ?? null,
           deadline: op.body.deadline ? new Date(op.body.deadline) : null,
           isPrivate: op.body.isPrivate ?? false,
+          projectId: op.body.projectId ?? null,
         });
         await push(await emitTaskSnapshot(db, op.id, clientMutationId));
         await push(await emitLatestTimeline(db, op.id, clientMutationId));
@@ -667,7 +700,11 @@ export async function applySyncOp(
             description: op.body.description ?? null,
             startDate: op.body.startDate ?? null,
             deadline: op.body.deadline ? new Date(op.body.deadline) : null,
+            projectId: op.body.projectId,
           });
+          if (sent.task.projectId) {
+            await push(await emitProjectSnapshot(db, sent.task.projectId, clientMutationId));
+          }
           await push(await emitInboxForUser(db, op.userId, clientMutationId));
           await push(await emitLatestTimeline(db, sent.task.id, clientMutationId));
           await push(
@@ -759,6 +796,24 @@ export async function applySyncOp(
             payload: row,
           }),
         );
+        break;
+      }
+      case "project.create": {
+        const created = await createProject(db, {
+          id: op.id,
+          userId: actorId,
+          name: op.body.name,
+          color: op.body.color,
+        });
+        await push(await emitProjectSnapshot(db, created.id, clientMutationId));
+        break;
+      }
+      case "project.update": {
+        const updated = await updateProject(db, actorId, op.id, op.patch);
+        if (!updated) {
+          throw new SyncOpError("Project not found", 404);
+        }
+        await push(await emitProjectSnapshot(db, updated.id, clientMutationId));
         break;
       }
       case "notification.readAll": {
@@ -894,6 +949,27 @@ export async function bootstrapViews(
           );
         } catch {
           break;
+        }
+        break;
+      }
+      case "projects": {
+        const rows = await listProjectsForUser(db, userId);
+        for (const row of rows) {
+          events.push(synthetic("project.upsert", mapProject(row)));
+        }
+        break;
+      }
+      case "project": {
+        const row = await findProjectById(db, view.projectId);
+        if (!row || row.userId !== userId) {
+          break;
+        }
+        events.push(synthetic("project.upsert", mapProject(row)));
+        const projectTasks = await listTasksForProject(db, userId, view.projectId);
+        for (const task of projectTasks) {
+          events.push(
+            synthetic("task.upsert", { task: mapTask(task), ownerId: userId }),
+          );
         }
         break;
       }

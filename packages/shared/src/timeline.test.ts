@@ -11,6 +11,7 @@ const base: TaskSnapshot = {
   completedAt: null,
     inProgress: false,
   isPrivate: false,
+  projectName: null,
 };
 
 describe("planTaskTimelineEvents", () => {
@@ -88,5 +89,15 @@ describe("planTaskTimelineEvents", () => {
     expect(events).toHaveLength(2);
     expect(events[0]?.type).toBe("renamed");
     expect(events[1]?.type).toBe("completed");
+  });
+
+  it("records a project change", () => {
+    const events = planTaskTimelineEvents({
+      before: base,
+      after: { ...base, projectName: "EGS" },
+    });
+    expect(events).toEqual([
+      { type: "project_changed", data: { from: null, to: "EGS" } },
+    ]);
   });
 });

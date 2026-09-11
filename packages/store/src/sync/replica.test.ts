@@ -37,6 +37,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     createdAt: now,
     updatedAt: now,
     commentCount: 0,
+    project: null,
     subtasks: [],
     ...overrides,
   };
@@ -372,5 +373,64 @@ describe("notification replica", () => {
       }),
     );
     expect(replica.notifications.every((item) => item.readAt)).toBe(true);
+  });
+});
+
+describe("project replica", () => {
+  const project = {
+    id: "33333333-3333-4333-8333-333333333333",
+    userId: "priya",
+    name: "EGS",
+    color: "ember" as const,
+    archivedAt: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  it("creates a project from an op", () => {
+    const next = applyOp(emptyReplica(), {
+      type: "project.create",
+      id: project.id,
+      body: { name: "EGS", color: "ember" },
+    });
+    expect(next.projects[project.id]?.name).toBe("EGS");
+    expect(next.projects[project.id]?.archivedAt).toBeNull();
+  });
+
+  it("updates a project name and archives it", () => {
+    let replica = applyEvent(
+      emptyReplica(),
+      event({ type: "project.upsert", payload: project }),
+    );
+    replica = applyOp(replica, {
+      type: "project.update",
+      id: project.id,
+      patch: { name: "EGS Core", archived: true },
+    });
+    expect(replica.projects[project.id]?.name).toBe("EGS Core");
+    expect(replica.projects[project.id]?.archivedAt).toBeTruthy();
+  });
+
+  it("refreshes chips on tasks when a project is renamed", () => {
+    const task = makeTask({
+      project: {
+        id: project.id,
+        name: "EGS",
+        color: "ember",
+        archivedAt: null,
+      },
+    });
+    let replica = applyEvent(
+      emptyReplica(),
+      event({ type: "task.upsert", payload: { task, ownerId: "priya" } }),
+    );
+    replica = applyEvent(
+      replica,
+      event({
+        type: "project.upsert",
+        payload: { ...project, name: "EGS Core" },
+      }),
+    );
+    expect(replica.tasks[task.id]?.project?.name).toBe("EGS Core");
   });
 });

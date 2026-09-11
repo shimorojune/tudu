@@ -135,6 +135,18 @@ describe("formatTimelineEvent", () => {
       declined.parts.some((part) => part.kind === "text" && part.text.includes("declined")),
     ).toBe(true);
   });
+
+  it("names the project after a change", () => {
+    const copy = formatTimelineEvent(
+      { ...base, type: "project_changed", data: { from: null, to: "EGS" } },
+      ctx,
+    );
+    expect(
+      copy.parts.some(
+        (part) => part.kind === "text" && part.text.includes("set the project to EGS"),
+      ),
+    ).toBe(true);
+  });
 });
 
 describe("withSyntheticCreated", () => {

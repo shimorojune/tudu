@@ -9,6 +9,7 @@ import {
   withSyntheticCreated,
 } from "@/lib/timelineCopy";
 import { TimelineEventRow } from "@/components/inspector/TimelineEventRow";
+import { ProjectPicker } from "@/components/projects/ProjectPicker";
 import { TaskDescriptionField } from "@/components/inspector/TaskDescriptionField";
 import { cn } from "@/lib/utils";
 
@@ -121,6 +122,17 @@ export function DetailsTab({
       />
 
       <dl className="mt-[22px] grid grid-cols-[78px_minmax(0,1fr)] items-center gap-x-[16px] gap-y-[13px] text-[13px]">
+        <dt className="text-muted-foreground">Project</dt>
+        <dd>
+          <ProjectPicker
+            value={task.project?.id ?? null}
+            readOnly={readOnly}
+            onChange={(projectId) => {
+              updateTask({ id: task.id, patch: { projectId } });
+            }}
+          />
+        </dd>
+
         <dt className="text-muted-foreground">Bucket</dt>
         <dd>
           <BucketReadOnly activeBucket={task.bucket} isToday={isToday} />

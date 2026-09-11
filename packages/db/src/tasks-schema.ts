@@ -12,6 +12,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema.js";
+import { projects } from "./projects-schema.js";
 
 /** Declaration order matters: Postgres sorts an enum by the order its values were
     declared, so `order by bucket` yields Now, then Next, then Later for free. */
@@ -43,6 +44,9 @@ export const tasks = pgTable(
     carriedDays: integer("carried_days").notNull().default(0),
     carriedSince: date("carried_since", { mode: "string" }),
     isPrivate: boolean("is_private").notNull().default(false),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -96,6 +100,10 @@ export const tasksRelations = relations(tasks, ({ many, one }) => ({
   owner: one(user, {
     fields: [tasks.userId],
     references: [user.id],
+  }),
+  project: one(projects, {
+    fields: [tasks.projectId],
+    references: [projects.id],
   }),
 }));
 
