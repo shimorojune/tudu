@@ -158,6 +158,23 @@ export async function findTaskById(
   return withCount;
 }
 
+export async function loadTaskWithSubtasks(
+  db: Db,
+  taskId: string,
+): Promise<TaskRowWithSubtasks | undefined> {
+  const row = await db.query.tasks.findFirst({
+    where: and(eq(tasks.id, taskId), isNull(tasks.deletedAt)),
+    with: liveSubtasks,
+  });
+
+  if (!row) {
+    return undefined;
+  }
+
+  const [withCount] = await attachCommentCounts(db, [row]);
+  return withCount;
+}
+
 /** Next free position at the bottom of a lane. The design appends: a typed task and an
     accepted task both land at the bottom of their bucket. */
 export async function nextPosition(
@@ -175,6 +192,7 @@ export async function nextPosition(
 }
 
 export type CreateTaskInput = {
+  id?: string;
   userId: string;
   title: string;
   scheduledDate: string | null;
@@ -451,6 +469,7 @@ export async function createSubtask(
   db: Db,
   taskId: string,
   title: string,
+  id?: string,
 ): Promise<SubtaskRow> {
   const rows = await db
     .select({ highest: sql<number | null>`max(${subtasks.position})` })
@@ -461,7 +480,7 @@ export async function createSubtask(
 
   const inserted = await db
     .insert(subtasks)
-    .values({ taskId, title, position })
+    .values(id ? { id, taskId, title, position } : { taskId, title, position })
     .returning();
 
   return inserted[0]!;

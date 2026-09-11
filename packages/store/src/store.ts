@@ -1,6 +1,7 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { baseApi } from "./api/baseApi.js";
 import { daySlice } from "./slices/daySlice.js";
+import { syncSlice } from "./sync/slice.js";
 import "./api/healthApi.js";
 import "./api/tasksApi.js";
 import "./api/activityApi.js";
@@ -12,6 +13,7 @@ export function makeStore() {
     reducer: {
       [baseApi.reducerPath]: baseApi.reducer,
       day: daySlice.reducer,
+      sync: syncSlice.reducer,
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware().concat(baseApi.middleware),

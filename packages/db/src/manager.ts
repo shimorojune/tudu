@@ -316,6 +316,7 @@ export async function sendInboxTask(
   actorId: string,
   reportUserId: string,
   input: {
+    id?: string;
     title: string;
     description: string | null;
     startDate: string | null;
@@ -335,6 +336,7 @@ export async function sendInboxTask(
   const inserted = await db
     .insert(tasks)
     .values({
+      ...(input.id ? { id: input.id } : {}),
       userId: reportUserId,
       title: input.title,
       description: input.description,

@@ -161,6 +161,7 @@ export async function createComment(
   userId: string,
   taskId: string,
   body: string,
+  id?: string,
 ): Promise<CommentWithAuthor | undefined> {
   const live = await liveTaskId(db, taskId);
   if (!live) {
@@ -169,7 +170,7 @@ export async function createComment(
 
   const [inserted] = await db
     .insert(comments)
-    .values({ taskId, authorId: userId, body })
+    .values(id ? { id, taskId, authorId: userId, body } : { taskId, authorId: userId, body })
     .returning();
 
   if (!inserted) {

@@ -1,6 +1,8 @@
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext } from "@dnd-kit/sortable";
+import { useSelector } from "react-redux";
 import type { Task } from "@tudu/shared";
+import { selectVisible } from "@tudu/store";
 import { containerDroppableId } from "@/lib/dragSort";
 import { UNSCHEDULED_CONTAINER } from "@/lib/week";
 import { SortableWeekCard } from "@/components/week/SortableWeekCard";
@@ -16,6 +18,7 @@ export function UnscheduledRail({
   tasks,
   dropActive,
 }: UnscheduledRailProps) {
+  const remoteMovedTaskIds = useSelector(selectVisible).remoteMovedTaskIds;
   const { setNodeRef } = useDroppable({
     id: containerDroppableId(UNSCHEDULED_CONTAINER),
   });
@@ -54,6 +57,7 @@ export function UnscheduledRail({
                   scheduledDate=""
                   isToday={false}
                   orderKey={`unscheduled:${index}`}
+                  skipSlide={remoteMovedTaskIds.includes(task.id)}
                 />
               ))}
             </div>

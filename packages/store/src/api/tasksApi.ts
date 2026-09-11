@@ -13,10 +13,6 @@ import type {
 import type { RootState } from "../store.js";
 import { baseApi } from "./baseApi.js";
 import {
-  isLatestWriteGeneration,
-  nextWriteGeneration,
-} from "./mutationWriteGen.js";
-import {
   appendOptimisticSubtask,
   applyReorderOptimistic,
   createOptimisticTask,
@@ -72,7 +68,6 @@ export const tasksApi = baseApi.injectEndpoints({
         body: patch,
       }),
       async onQueryStarted({ id, patch }, { dispatch, queryFulfilled, getState }) {
-        const generation = nextWriteGeneration(id);
         const patches = patchAllTaskCaches(dispatch, () => readState(getState), (tasks) =>
           tasks.map((task) =>
             task.id === id ? mergeTaskPatch(task, patch, tasks) : task,
@@ -81,9 +76,6 @@ export const tasksApi = baseApi.injectEndpoints({
 
         try {
           const { data } = await queryFulfilled;
-          if (!isLatestWriteGeneration(id, generation)) {
-            return;
-          }
           for (const entry of patches) {
             entry.undo();
           }
@@ -91,9 +83,6 @@ export const tasksApi = baseApi.injectEndpoints({
           const { refetchTimelineFirstPage } = await import("./invalidateTimeline.js");
           await refetchTimelineFirstPage(dispatch, id);
         } catch {
-          if (!isLatestWriteGeneration(id, generation)) {
-            return;
-          }
           for (const entry of patches) {
             entry.undo();
           }
@@ -203,7 +192,6 @@ export const tasksApi = baseApi.injectEndpoints({
         body: patch,
       }),
       async onQueryStarted({ id, patch }, { dispatch, queryFulfilled, getState }) {
-        const generation = nextWriteGeneration(id);
         const patches = patchAllTaskCaches(dispatch, () => readState(getState), (tasks) =>
           tasks.map((task) => ({
             ...task,
@@ -215,17 +203,11 @@ export const tasksApi = baseApi.injectEndpoints({
 
         try {
           const { data } = await queryFulfilled;
-          if (!isLatestWriteGeneration(id, generation)) {
-            return;
-          }
           for (const entry of patches) {
             entry.undo();
           }
           replaceTaskInCaches(dispatch, () => readState(getState), data.task);
         } catch {
-          if (!isLatestWriteGeneration(id, generation)) {
-            return;
-          }
           for (const entry of patches) {
             entry.undo();
           }

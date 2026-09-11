@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useSelector } from "react-redux";
 import { Plus } from "lucide-react";
 import type { Task } from "@tudu/shared";
 import {
@@ -32,6 +33,7 @@ import {
   useUpdateSubtaskMutation,
   useUpdateTaskMutation,
   todayIso,
+  selectVisible,
 } from "@tudu/store";
 import { scheduleToTodayLanes } from "@/lib/reorder";
 import {
@@ -82,6 +84,7 @@ function UnscheduledDnd({
   flashTaskId,
   onFlashComplete,
 }: UnscheduledDndProps) {
+  const remoteMovedTaskIds = useSelector(selectVisible).remoteMovedTaskIds;
   const { droppableRects } = useDndContext();
   const pointerYRef = usePointerY();
   const { setNodeRef } = useDroppable({ id: containerDroppableId(CONTAINER) });
@@ -227,7 +230,10 @@ function UnscheduledDnd({
                 actions={makeRowActions(task.id)}
                 flash={task.id === flashTaskId}
                 onFlashComplete={onFlashComplete}
-                skipSlide={task.id === suppressSlideId}
+                skipSlide={
+                  task.id === suppressSlideId ||
+                  remoteMovedTaskIds.includes(task.id)
+                }
               />
             ))}
           </SortableContext>

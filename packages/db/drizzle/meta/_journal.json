@@ -43,6 +43,13 @@
       "when": 1789053503355,
       "tag": "0005_organic_absorbing_man",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789060360800,
+      "tag": "0006_empty_umar",
+      "breakpoints": true
     }
   ]
 }

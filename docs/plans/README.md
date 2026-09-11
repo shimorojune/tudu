@@ -109,6 +109,7 @@ JIRA knows when something is due, only you know whether you are touching it toda
 | 7 | Week view and drag to reschedule | [07-week-view.md](./07-week-view.md) | Done |
 | 8 | Command palette and keyboard shortcuts | [08-command-palette.md](./08-command-palette.md) | Done |
 | 9 | Manager: Inbox, roster, report's day | [09-manager-inbox.md](./09-manager-inbox.md) | Done |
+| 9a | Live sync engine (before JIRA writes) | [13-sync-engine.md](./13-sync-engine.md) | Done |
 | 10 | JIRA integration | not written | Pending |
 | 11 | Settings screens | not written | Pending |
 | 12 | macOS shell: menu bar, global hotkeys, Dock badge | not written | Pending |
@@ -370,7 +371,17 @@ Design screens covered: B1 Inbox, B2 Team roster, B3 Report's day.
 
 **6. Seed Marcus and Priya around testuser.** Password `egain@123`. Seed never runs in production.
 
+### Step 9a: Live sync engine
+
+In-memory replica, mutation queue, and a live event stream. Writes go through
+`POST /sync`. Another person's comment appears while you look. Lands before JIRA
+(step 10) so JIRA can emit the same events. Plan: [13-sync-engine.md](./13-sync-engine.md).
+
 ### Step 10: JIRA integration
+
+Depends on the live sync engine in [13-sync-engine.md](./13-sync-engine.md). JIRA writes
+should emit the same events so a linked ticket change shows up live, the same way a
+comment from Marcus does.
 
 Server side Atlassian proxy, because a browser cannot call the Atlassian API directly.
 Connection storage, a pull loop on an interval, the JIRA column populated, the link

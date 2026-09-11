@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useSelector } from "react-redux";
 import {
   DndContext,
   DragOverlay,
@@ -28,6 +29,7 @@ import {
   useReorderReportTasksMutation,
   useDeleteReportTaskMutation,
   todayIso,
+  selectVisible,
 } from "@tudu/store";
 import { bucketLabel } from "@/lib/buckets";
 import { openNowCount } from "@/lib/nowCount";
@@ -124,6 +126,7 @@ function DayTaskListDnd({
   onFlashComplete,
   viewer,
 }: DayTaskListDndProps) {
+  const remoteMovedTaskIds = useSelector(selectVisible).remoteMovedTaskIds;
   const { droppableRects } = useDndContext();
   const pointerYRef = usePointerY();
   const appliedDeltaRef = useRef<number | null>(null);
@@ -289,6 +292,7 @@ function DayTaskListDnd({
           flashTaskId={flashTaskId}
           onFlashComplete={onFlashComplete}
           skipSlideForTaskId={suppressSlideId}
+          skipSlideForTaskIds={remoteMovedTaskIds}
           viewer={viewer}
         />
       ))}

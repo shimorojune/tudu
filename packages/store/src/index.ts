@@ -1,7 +1,7 @@
 export { setAuthTokenGetter, baseApi } from "./api/baseApi.js";
 export { healthApi, useGetHealthQuery, useGetMeQuery } from "./api/healthApi.js";
+export { tasksApi } from "./api/tasksApi.js";
 export {
-  tasksApi,
   useGetTasksForDayQuery,
   useGetUnscheduledTasksQuery,
   useCreateTaskMutation,
@@ -13,20 +13,32 @@ export {
   useUpdateSubtaskMutation,
   useDeleteSubtaskMutation,
   useReorderSubtasksMutation,
-} from "./api/tasksApi.js";
-export {
-  linkPreviewApi,
-  useGetLinkPreviewQuery,
-} from "./api/linkPreviewApi.js";
-export {
-  activityApi,
   useGetCommentsQuery,
   useCreateCommentMutation,
   useUpdateCommentMutation,
   useDeleteCommentMutation,
   useGetTimelineQuery,
   useLazyGetTimelineOlderQuery,
-} from "./api/activityApi.js";
+  useGetInboxQuery,
+  useGetInboxCountQuery,
+  useAcceptInboxItemMutation,
+  useDeclineInboxItemMutation,
+  useGetTeamQuery,
+  useCreateTeamInviteMutation,
+  useAcceptTeamInviteMutation,
+  useDeclineTeamInviteMutation,
+  useGetReportDayQuery,
+  useSendInboxTaskMutation,
+  useReorderReportTasksMutation,
+  useDeleteReportTaskMutation,
+} from "./sync/hooks.js";
+export { startSync, stopSync } from "./sync/client.js";
+export { selectVisible } from "./sync/slice.js";
+export {
+  linkPreviewApi,
+  useGetLinkPreviewQuery,
+} from "./api/linkPreviewApi.js";
+export { activityApi } from "./api/activityApi.js";
 export {
   daySlice,
   setSelectedDate,
@@ -40,18 +52,4 @@ export {
 } from "./slices/daySlice.js";
 export { makeStore, store } from "./store.js";
 export type { RootState, AppDispatch } from "./store.js";
-export {
-  managerApi,
-  useGetInboxQuery,
-  useGetInboxCountQuery,
-  useAcceptInboxItemMutation,
-  useDeclineInboxItemMutation,
-  useGetTeamQuery,
-  useCreateTeamInviteMutation,
-  useAcceptTeamInviteMutation,
-  useDeclineTeamInviteMutation,
-  useGetReportDayQuery,
-  useSendInboxTaskMutation,
-  useReorderReportTasksMutation,
-  useDeleteReportTaskMutation,
-} from "./api/managerApi.js";
+export { managerApi } from "./api/managerApi.js";

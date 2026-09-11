@@ -17,6 +17,7 @@ import { createManagerRoute } from "./routes/manager.js";
 import { createTasksRoute } from "./routes/tasks.js";
 import { createUpdatesRoute } from "./routes/updates.js";
 import { createSessionMiddleware, type SessionEnv } from "./session-middleware.js";
+import { createSyncRoute } from "./routes/sync.js";
 
 const serverDir = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(serverDir, "../../../.env") });
@@ -92,6 +93,7 @@ app.get("/me", async (c) => {
 });
 
 if (db) {
+  app.route("/", createSyncRoute(db));
   app.route("/", createManagerRoute(db));
   app.route("/", createTasksRoute(db));
   app.route("/", createActivityRoute(db));

@@ -4,6 +4,7 @@ export * from "./timeline.js";
 export * from "./day.js";
 export * from "./linkPreview.js";
 export * from "./manager.js";
+export * from "./sync.js";
 
 export type HealthResponse = { status: "ok"; version: string };
 

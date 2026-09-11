@@ -1,6 +1,13 @@
-import { setAuthTokenGetter, store } from "@tudu/store";
+import {
+  setAuthTokenGetter,
+  startSync,
+  stopSync,
+  store,
+  useGetMeQuery,
+  type AppDispatch,
+} from "@tudu/store";
 import { useEffect, type ReactNode } from "react";
-import { Provider } from "react-redux";
+import { Provider, useDispatch } from "react-redux";
 import { getStoredAuthToken } from "@/lib/authClient";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
@@ -10,11 +17,26 @@ import {
 import { ThemeProvider } from "./ThemeProvider";
 
 function AuthTokenBridge({ children }: { children: ReactNode }) {
-  useEffect(() => {
-    setAuthTokenGetter(getStoredAuthToken);
-  }, []);
+  setAuthTokenGetter(getStoredAuthToken);
 
   return <>{children}</>;
+}
+
+export function SyncHost() {
+  const dispatch = useDispatch<AppDispatch>();
+  const { data: me, isSuccess } = useGetMeQuery();
+
+  useEffect(() => {
+    if (!isSuccess || !me?.id) {
+      return;
+    }
+    dispatch(startSync(me.id));
+    return () => {
+      dispatch(stopSync());
+    };
+  }, [dispatch, isSuccess, me?.id]);
+
+  return null;
 }
 
 type AppProvidersProps = {

@@ -1,8 +1,10 @@
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext } from "@dnd-kit/sortable";
+import { useSelector } from "react-redux";
 import { format } from "date-fns";
 import type { Task } from "@tudu/shared";
 import { BUCKETS, type Bucket } from "@tudu/shared";
+import { selectVisible } from "@tudu/store";
 import { bucketLabel } from "@/lib/buckets";
 import { containerDroppableId } from "@/lib/dragSort";
 import { containerForDayBucket, isWeekendIso, parseIsoDate } from "@/lib/week";
@@ -41,6 +43,7 @@ function BucketZone({
   popoverTaskId: string | null;
   onPopoverChange: (taskId: string | null) => void;
 }) {
+  const remoteMovedTaskIds = useSelector(selectVisible).remoteMovedTaskIds;
   const container = containerForDayBucket(date, bucket);
   const { setNodeRef } = useDroppable({ id: containerDroppableId(container) });
   const label = bucketLabel(bucket, isToday);
@@ -75,6 +78,7 @@ function BucketZone({
                   scheduledDate={date}
                   isToday={isToday}
                   orderKey={`${date}:${index}`}
+                  skipSlide={remoteMovedTaskIds.includes(task.id)}
                 />
               </WeekCardPopover>
             );

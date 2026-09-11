@@ -232,8 +232,8 @@ function WeekGridDnd({
     }
 
     const items = placeFromEvent(current, event, true);
-    setDrag(null);
     onReorderRef.current(items);
+    setDrag(null);
   }
 
   return (

@@ -28,6 +28,7 @@ export type BucketSectionProps = {
   flashTaskId?: string | null;
   onFlashComplete?: () => void;
   skipSlideForTaskId?: string | null;
+  skipSlideForTaskIds?: string[];
   viewer?: TaskViewer;
 };
 
@@ -51,6 +52,7 @@ export function BucketSection({
   flashTaskId = null,
   onFlashComplete,
   skipSlideForTaskId = null,
+  skipSlideForTaskIds,
   viewer = "owner",
 }: BucketSectionProps) {
   const isNow = bucket === "now";
@@ -156,7 +158,10 @@ export function BucketSection({
               actions={rowActionsForTask?.(task.id)}
               flash={task.id === flashTaskId}
               onFlashComplete={onFlashComplete}
-              skipSlide={task.id === skipSlideForTaskId}
+              skipSlide={
+                task.id === skipSlideForTaskId ||
+                Boolean(skipSlideForTaskIds?.includes(task.id))
+              }
               viewer={viewer}
             />
           ))}
