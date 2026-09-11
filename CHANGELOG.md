@@ -1,3 +1,10 @@
+# [0.17.0](https://github.com/eGainDev/tudu/compare/tudu-0.16.0...tudu-0.17.0) (2026-09-11)
+
+
+### Features
+
+* add live sync so task changes show up without a reload ([9e136e4](https://github.com/eGainDev/tudu/commit/9e136e4da9d9922ebdf3c1b17ad59eba5b74d910))
+
 # [0.16.0](https://github.com/eGainDev/tudu/compare/tudu-0.15.1...tudu-0.16.0) (2026-09-10)
 
 
