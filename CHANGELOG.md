@@ -1,3 +1,10 @@
+# [0.18.0](https://github.com/eGainDev/tudu/compare/tudu-0.17.0...tudu-0.18.0) (2026-09-11)
+
+
+### Features
+
+* add task description support across the application ([9f1f1aa](https://github.com/eGainDev/tudu/commit/9f1f1aa21ff9bf455ac67b0385a19c18513791d3))
+
 # [0.17.0](https://github.com/eGainDev/tudu/compare/tudu-0.16.0...tudu-0.17.0) (2026-09-11)
 
 
