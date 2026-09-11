@@ -871,7 +871,7 @@ export function TaskRow({
             </span>
           ) : null}
         </div>
-        {task.description && !isEditing ? (
+        {task.description ? (
           <p className="mt-[4px] line-clamp-1 text-[12.5px] text-faint">
             <LinkifiedText text={task.description} />
           </p>

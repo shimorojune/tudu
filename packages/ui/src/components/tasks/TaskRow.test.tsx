@@ -519,6 +519,27 @@ describe("TaskRow", () => {
     expect(editor).toHaveTextContent("Notes https://example.com/x more");
   });
 
+  it("keeps the description visible while renaming the title", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TaskRow
+        task={{ ...fixtureTask, description: "We need this now" }}
+        bucket="now"
+        selected
+        selectedDate="2026-09-05"
+        onSelect={vi.fn()}
+        menuVariant="day"
+        actions={defaultActions()}
+      />,
+    );
+
+    expect(screen.getByText("We need this now")).toBeInTheDocument();
+    await user.click(screen.getAllByText("Improve error message")[0]!);
+    expect(screen.getByRole("textbox", { name: "Rename task" })).toBeInTheDocument();
+    expect(screen.getByText("We need this now")).toBeInTheDocument();
+  });
+
   it("renames the main task title on click when selected", async () => {
     const onRename = vi.fn();
     const user = userEvent.setup();

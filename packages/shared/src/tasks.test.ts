@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createTaskRequestSchema, laneSchema } from "./tasks.js";
+import {
+  createTaskRequestSchema,
+  laneSchema,
+  updateTaskRequestSchema,
+} from "./tasks.js";
 
 describe("createTaskRequestSchema", () => {
   it("rejects a blank title", () => {
@@ -82,6 +86,24 @@ describe("createTaskRequestSchema", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe("updateTaskRequestSchema", () => {
+  it("does not invent a description on a title-only patch", () => {
+    const result = updateTaskRequestSchema.parse({ title: "Ship it" });
+
+    expect(result).toEqual({ title: "Ship it" });
+    expect("description" in result).toBe(false);
+  });
+
+  it("clears a blank description and keeps a trimmed one", () => {
+    expect(updateTaskRequestSchema.parse({ description: "  " })).toEqual({
+      description: null,
+    });
+    expect(updateTaskRequestSchema.parse({ description: " More " })).toEqual({
+      description: "More",
+    });
   });
 });
 
