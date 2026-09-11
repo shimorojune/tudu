@@ -186,6 +186,7 @@ export function createTasksRoute(db: Db) {
     const created = await createTask(db, {
       userId: userId(c),
       title: body.title,
+      description: body.description ?? null,
       scheduledDate: body.scheduledDate,
       bucket: body.bucket,
       startDate: body.startDate,

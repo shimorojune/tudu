@@ -302,7 +302,7 @@ function optimisticTask(id: string, body: CreateTaskRequest): Task {
   return {
     id,
     title: body.title,
-    description: null,
+    description: body.description ?? null,
     scheduledDate: body.scheduledDate ?? null,
     bucket: body.bucket ?? null,
     position: 0,

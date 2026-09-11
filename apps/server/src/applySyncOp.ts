@@ -281,6 +281,7 @@ export async function applySyncOp(
           id: op.id,
           userId: actorId,
           title: op.body.title,
+          description: op.body.description ?? null,
           scheduledDate: op.body.scheduledDate ?? null,
           bucket: op.body.bucket ?? null,
           startDate: op.body.startDate ?? null,

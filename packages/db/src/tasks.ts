@@ -195,6 +195,7 @@ export type CreateTaskInput = {
   id?: string;
   userId: string;
   title: string;
+  description?: string | null;
   scheduledDate: string | null;
   bucket: Bucket | null;
   startDate: string | null;
@@ -213,7 +214,10 @@ export async function createTask(
     input.bucket,
   );
 
-  const rows = await db.insert(tasks).values({ ...input, position }).returning();
+  const rows = await db
+    .insert(tasks)
+    .values({ ...input, description: input.description ?? null, position })
+    .returning();
   const row = rows[0]!;
 
   // Two round trips: partial failure leaves a task without a created row; the UI

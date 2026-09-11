@@ -458,6 +458,7 @@ export function DayTaskList({
 
   async function handleCreateTask(args: {
     title: string;
+    description: string | null;
     bucket: Bucket;
     scheduledDate: string | null;
     subtaskTitles: string[];
@@ -465,6 +466,7 @@ export function DayTaskList({
     const result = await createTask(
       createTaskBody({
         title: args.title,
+        description: args.description,
         scheduledDate: args.scheduledDate,
         bucket: args.scheduledDate === null ? null : args.bucket,
       }),

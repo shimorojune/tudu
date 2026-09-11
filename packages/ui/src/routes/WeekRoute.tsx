@@ -101,6 +101,7 @@ export function WeekRoute() {
           const created = await createTask(
             createTaskBody({
               title: args.title,
+              description: args.description,
               scheduledDate: args.scheduledDate,
               bucket: args.bucket,
             }),

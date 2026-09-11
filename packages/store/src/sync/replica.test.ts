@@ -222,6 +222,7 @@ describe("applyOp", () => {
       id,
       body: {
         title: "New",
+        description: "More detail",
         scheduledDate: "2026-09-10",
         bucket: "next",
         startDate: null,
@@ -230,6 +231,7 @@ describe("applyOp", () => {
       },
     });
     expect(next.tasks[id]?.title).toBe("New");
+    expect(next.tasks[id]?.description).toBe("More detail");
     expect(next.tasks[id]?.bucket).toBe("next");
   });
 

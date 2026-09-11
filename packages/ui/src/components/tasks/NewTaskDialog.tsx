@@ -23,6 +23,7 @@ export type NewTaskDialogProps = {
   onOpenChange: (open: boolean) => void;
   onSubmit: (args: {
     title: string;
+    description: string | null;
     bucket: Bucket;
     scheduledDate: string | null;
     subtaskTitles: string[];
@@ -112,6 +113,7 @@ export function NewTaskDialog({
 }: NewTaskDialogProps) {
   const titleRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [bucket, setBucket] = useState<Bucket>(initialBucket);
   const [dayChoice, setDayChoice] = useState<NewTaskDayChoice>("today");
   const [pickedDate, setPickedDate] = useState(initialDate);
@@ -125,6 +127,7 @@ export function NewTaskDialog({
       return;
     }
     setTitle("");
+    setDescription("");
     setBucket(initialBucket);
     setDayChoice(
       defaultDayChoice ??
@@ -166,10 +169,12 @@ export function NewTaskDialog({
     if (!trimmed || submitting) {
       return;
     }
+    const trimmedDescription = description.trim();
     setSubmitting(true);
     try {
       await onSubmit({
         title: trimmed,
+        description: trimmedDescription.length > 0 ? trimmedDescription : null,
         bucket,
         scheduledDate,
         subtaskTitles: subtasks.map((subtask) => subtask.title),
@@ -214,13 +219,21 @@ export function NewTaskDialog({
             placeholder="What needs doing?"
             className="w-full border-b border-rule bg-transparent pb-[10px] text-[18px] font-semibold outline-none placeholder:text-faint"
             onChange={(event) => setTitle(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                void handleSubmit();
-              }
-            }}
           />
+
+          <div className="space-y-[8px]">
+            <div className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
+              Description
+            </div>
+            <textarea
+              value={description}
+              rows={3}
+              placeholder="Add a description..."
+              aria-label="Task description"
+              className="w-full resize-y border border-hair bg-transparent px-[12px] py-[10px] text-[13.5px] leading-[1.55] text-muted-foreground outline-none placeholder:text-faint focus:border-foreground focus:text-foreground"
+              onChange={(event) => setDescription(event.target.value)}
+            />
+          </div>
 
           <div className="space-y-[8px]">
             <div className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">

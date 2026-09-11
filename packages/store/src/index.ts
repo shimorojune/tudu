@@ -33,7 +33,7 @@ export {
   useDeleteReportTaskMutation,
 } from "./sync/hooks.js";
 export { startSync, stopSync } from "./sync/client.js";
-export { selectVisible } from "./sync/slice.js";
+export { resetSync, selectVisible } from "./sync/slice.js";
 export {
   linkPreviewApi,
   useGetLinkPreviewQuery,

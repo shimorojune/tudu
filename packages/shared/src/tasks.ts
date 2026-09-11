@@ -67,6 +67,13 @@ export type Task = z.infer<typeof taskSchema>;
 export const createTaskRequestSchema = z
   .object({
     title: z.string().trim().min(1, "A task needs a title").max(500),
+    description: z
+      .string()
+      .trim()
+      .max(5000)
+      .nullable()
+      .optional()
+      .transform((value) => (value === "" || value === undefined ? null : value)),
     scheduledDate: isoDateSchema.nullable().default(null),
     bucket: bucketSchema.nullable().default(null),
     startDate: isoDateSchema.nullable().default(null),

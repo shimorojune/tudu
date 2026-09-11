@@ -13,6 +13,27 @@ describe("createTaskRequestSchema", () => {
 
     expect(result.scheduledDate).toBeNull();
     expect(result.bucket).toBeNull();
+    expect(result.description).toBeNull();
+  });
+
+  it("accepts a description and trims blank to null", () => {
+    const withDescription = createTaskRequestSchema.parse({
+      title: "Write the runbook",
+      description: "  More detail  ",
+      scheduledDate: "2026-09-05",
+      bucket: "now",
+    });
+
+    expect(withDescription.description).toBe("More detail");
+
+    const blankDescription = createTaskRequestSchema.parse({
+      title: "Write the runbook",
+      description: "   ",
+      scheduledDate: "2026-09-05",
+      bucket: "now",
+    });
+
+    expect(blankDescription.description).toBeNull();
   });
 
   it("rejects a day without a bucket", () => {

@@ -88,6 +88,7 @@ export function TodayRoute() {
             const result = await createTask(
               createTaskBody({
                 title: args.title,
+                description: args.description,
                 scheduledDate: args.scheduledDate,
                 bucket: args.scheduledDate === null ? null : args.bucket,
               }),
