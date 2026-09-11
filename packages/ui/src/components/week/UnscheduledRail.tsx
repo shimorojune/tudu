@@ -24,7 +24,7 @@ export function UnscheduledRail({
   });
 
   return (
-    <div className="flex min-h-0 flex-col border-r border-hair bg-card">
+    <div className="flex min-h-0 flex-col border-r border-hair bg-card" data-week-col="unscheduled">
       <div className="border-b border-hair px-[14px] py-[12px]">
         <div className="text-[10.5px] font-extrabold uppercase tracking-[0.14em] text-faint">
           Unscheduled

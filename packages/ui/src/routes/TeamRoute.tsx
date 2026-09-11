@@ -78,7 +78,7 @@ export function TeamRoute() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-card">
-      <div className="flex items-center justify-end gap-[12px] border-b border-rule px-[32px] py-[14px]">
+      <div className="flex items-center justify-end gap-[12px] border-b border-rule px-[16px] py-[14px] md:px-[32px]">
         {adding ? (
           <form className="flex items-center gap-[8px]" onSubmit={(event) => void submitInvite(event)}>
             <input
@@ -118,13 +118,13 @@ export function TeamRoute() {
         )}
       </div>
       {addError ? (
-        <p className="border-b border-hair px-[32px] py-[10px] text-[12.5px] text-destructive">
+        <p className="border-b border-hair px-[16px] py-[10px] text-[12.5px] text-destructive md:px-[32px]">
           {addError}
         </p>
       ) : null}
 
       {incoming.length > 0 ? (
-        <div className="border-b border-hair px-[32px] py-[16px]">
+        <div className="border-b border-hair px-[16px] py-[16px] md:px-[32px]">
           <div className="mb-[10px] text-[10.5px] font-extrabold uppercase tracking-[0.14em] text-faint">
             Incoming invites
           </div>
@@ -163,7 +163,7 @@ export function TeamRoute() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-[minmax(0,1fr)_84px_84px_112px_214px] gap-x-[16px] border-b border-rule px-[32px] py-[14px] text-[10.5px] font-extrabold uppercase tracking-[0.14em] text-faint">
+      <div className="hidden grid-cols-[minmax(0,1fr)_84px_84px_112px_214px] gap-x-[16px] border-b border-rule px-[32px] py-[14px] text-[10.5px] font-extrabold uppercase tracking-[0.14em] text-faint md:grid">
         <span>Reports to me</span>
         <span className="text-right">Now</span>
         <span className="text-right">Open</span>
@@ -171,21 +171,76 @@ export function TeamRoute() {
         <span />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         {reports.length === 0 && outgoing.length === 0 ? (
-          <p className="px-[32px] py-[28px] text-[14px] text-muted-foreground">
+          <p className="px-[16px] py-[28px] text-[14px] text-muted-foreground md:px-[32px]">
             Add someone by email. They confirm before anything is shared.
           </p>
         ) : null}
 
         {reports.map((row, index) => (
-          <div
-            key={row.user.id}
-            className={cn(
-              "grid grid-cols-[minmax(0,1fr)_84px_84px_112px_214px] items-center gap-x-[16px] border-b border-hair px-[32px] py-[18px]",
-              index === 0 && "bg-foreground/[0.03]",
-            )}
-          >
+          <div key={row.user.id}>
+            <div
+              className={cn(
+                "border-b border-hair px-[16px] py-[16px] md:hidden",
+                index === 0 && "bg-foreground/[0.03]",
+              )}
+            >
+              <div className="flex items-center gap-[14px]">
+                <Avatar name={row.user.name} filled={index === 0} />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[15px] font-semibold">{row.user.name}</div>
+                  <div className="truncate text-[12px] text-muted-foreground">
+                    {row.nowTitle ? `now: ${row.nowTitle}` : "nothing in Now"}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-[12px] flex gap-[16px] text-[12.5px] text-muted-foreground">
+                <span>
+                  Now <span className="tabular-nums text-foreground">{row.nowCount}</span>
+                </span>
+                <span>
+                  Open <span className="tabular-nums text-foreground">{row.openCount}</span>
+                </span>
+                <span className={row.slippingCount > 0 ? "font-bold text-primary" : undefined}>
+                  Slipping <span className="tabular-nums">{row.slippingCount}</span>
+                </span>
+              </div>
+              <div className="mt-[12px] flex gap-[8px]">
+                <Link
+                  to="/team/$userId"
+                  params={{ userId: row.user.id }}
+                  search={{ send: false }}
+                  className="border border-rule px-[14px] py-[7px] text-[12px]"
+                >
+                  Open day
+                </Link>
+                <button
+                  type="button"
+                  className={cn(
+                    "px-[14px] py-[7px] text-[12px] font-bold",
+                    index === 0
+                      ? "bg-foreground text-card"
+                      : "border border-rule",
+                  )}
+                  onClick={() =>
+                    void navigate({
+                      to: "/team/$userId",
+                      params: { userId: row.user.id },
+                      search: { send: true },
+                    })
+                  }
+                >
+                  Add task
+                </button>
+              </div>
+            </div>
+            <div
+              className={cn(
+                "hidden grid-cols-[minmax(0,1fr)_84px_84px_112px_214px] items-center gap-x-[16px] border-b border-hair px-[32px] py-[18px] md:grid",
+                index === 0 && "bg-foreground/[0.03]",
+              )}
+            >
             <div className="flex min-w-0 items-center gap-[14px]">
               <Avatar name={row.user.name} filled={index === 0} />
               <div className="min-w-0">
@@ -235,13 +290,14 @@ export function TeamRoute() {
                 Add task
               </button>
             </div>
+            </div>
           </div>
         ))}
 
         {outgoing.map((invite) => (
           <div
             key={invite.id}
-            className="grid grid-cols-[minmax(0,1fr)_84px_84px_112px_214px] items-center gap-x-[16px] border-b border-hair px-[32px] py-[18px]"
+            className="grid grid-cols-[minmax(0,1fr)_84px_84px_112px_214px] items-center gap-x-[16px] border-b border-hair px-[16px] py-[18px] md:px-[32px]"
           >
             <div className="flex min-w-0 items-center gap-[14px]">
               <Avatar name={invite.email} />
@@ -259,11 +315,11 @@ export function TeamRoute() {
           </div>
         ))}
 
-        <div className="border-b border-rule px-[32px] pb-[14px] pt-[34px] text-[10.5px] font-extrabold uppercase tracking-[0.14em] text-faint">
+        <div className="border-b border-rule px-[16px] pb-[14px] pt-[34px] text-[10.5px] font-extrabold uppercase tracking-[0.14em] text-faint md:px-[32px]">
           I report to
         </div>
         {manager ? (
-          <div className="grid grid-cols-[minmax(0,1fr)_310px] items-center gap-x-[16px] px-[32px] py-[18px]">
+          <div className="grid grid-cols-1 items-center gap-[12px] px-[16px] py-[18px] md:grid-cols-[minmax(0,1fr)_310px] md:gap-x-[16px] md:px-[32px]">
             <div className="flex min-w-0 items-center gap-[14px]">
               <Avatar name={manager.name} />
               <div className="min-w-0">
@@ -273,19 +329,19 @@ export function TeamRoute() {
                 </div>
               </div>
             </div>
-            <p className="text-right text-[12px] leading-[1.45] text-muted-foreground">
+            <p className="text-[12px] leading-[1.45] text-muted-foreground md:text-right">
               {personFirstName(manager.name)} can read, comment, reorder, delete, and
               send to Inbox. They cannot edit, complete, or see private tasks.
             </p>
           </div>
         ) : (
-          <p className="px-[32px] py-[18px] text-[14px] text-muted-foreground">
+          <p className="px-[16px] py-[18px] text-[14px] text-muted-foreground md:px-[32px]">
             You do not report to anyone yet.
           </p>
         )}
       </div>
 
-      <div className="mt-auto flex h-[34px] items-center border-t border-hair bg-background px-[32px] text-[11.5px] text-faint">
+      <div className="mt-auto flex h-[34px] items-center border-t border-hair bg-background px-[16px] text-[11.5px] text-faint md:px-[32px]">
         Slipping = carried two days or more, or past deadline
       </div>
     </div>

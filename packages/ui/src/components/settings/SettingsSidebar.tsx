@@ -29,7 +29,7 @@ export function SettingsSidebar({
   return (
     <nav
       aria-label="Settings"
-      className="flex h-full flex-col bg-background py-[14px] text-[13.5px]"
+      className="flex bg-background py-[10px] text-[13.5px] max-md:items-center max-md:overflow-x-auto max-md:px-[8px] md:h-full md:flex-col md:py-[14px]"
     >
       {sections.map((section) => {
         const selected = section.id === active;
@@ -38,7 +38,7 @@ export function SettingsSidebar({
             key={section.id}
             type="button"
             className={cn(
-              "px-[18px] py-[8px] text-left",
+              "px-[18px] py-[8px] text-left whitespace-nowrap",
               selected
                 ? "bg-card font-semibold shadow-[inset_2px_0_0_var(--foreground)]"
                 : "text-muted-foreground hover:text-foreground",
@@ -49,7 +49,7 @@ export function SettingsSidebar({
           </button>
         );
       })}
-      <div className="mt-auto px-[18px] py-[10px] text-[11.5px] text-faint">
+      <div className="mt-auto hidden px-[18px] py-[10px] text-[11.5px] text-faint md:block">
         Tudu {version}
       </div>
     </nav>

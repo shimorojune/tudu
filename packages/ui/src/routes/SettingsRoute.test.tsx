@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { describe, expect, it, vi } from "vitest";
 import { makeStore } from "@tudu/store";
+import { APP_VERSION } from "@/lib/appVersion";
 import { SettingsRoute } from "./SettingsRoute";
 
 const navigate = vi.fn();
@@ -43,6 +44,7 @@ describe("SettingsRoute", () => {
     expect(screen.getAllByText("Test User").length).toBeGreaterThan(0);
     expect(screen.getAllByText("testuser@egain.com").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+    expect(screen.getByText(`Tudu ${APP_VERSION}`)).toBeInTheDocument();
   });
 
   it("signs out and navigates to sign-in", async () => {

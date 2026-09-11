@@ -19,7 +19,7 @@ export function DateNav() {
   const selected = parseISO(`${selectedDate}T12:00:00`);
 
   return (
-    <div className="flex items-center gap-[10px] text-muted-foreground">
+    <div className="flex shrink-0 items-center gap-[6px] whitespace-nowrap text-muted-foreground xl:gap-[10px]">
       <button
         type="button"
         aria-label="Previous day"
@@ -32,10 +32,13 @@ export function DateNav() {
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="text-[13.5px] font-semibold tabular-nums text-foreground hover:text-primary"
+            className="whitespace-nowrap text-[13px] font-semibold tabular-nums text-foreground hover:text-primary xl:text-[13.5px]"
             aria-label="Pick a date"
           >
-            {label}
+            <span className="xl:hidden">
+              {format(new Date(`${selectedDate}T12:00:00`), "d MMM")}
+            </span>
+            <span className="hidden xl:inline">{label}</span>
           </button>
         </PopoverTrigger>
         <PopoverContent align="center" className="w-auto p-0">

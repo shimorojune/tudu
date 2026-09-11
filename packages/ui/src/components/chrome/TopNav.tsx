@@ -33,11 +33,11 @@ function NewTaskButton({ reportUserId }: { reportUserId: string | null }) {
     <button
       type="button"
       aria-label="New task"
-      className="flex items-center gap-[7px] bg-primary px-[13px] py-[7px] text-[12.5px] font-bold text-primary-foreground"
+      className="flex shrink-0 items-center gap-[7px] bg-primary px-[9px] py-[7px] text-[12.5px] font-bold text-primary-foreground xl:px-[13px]"
       onClick={handleClick}
     >
       <Plus size={13} strokeWidth={2.4} />
-      New task
+      <span className="hidden xl:inline">New task</span>
     </button>
   );
 }
@@ -50,7 +50,7 @@ function CommandsButton() {
       type="button"
       aria-label="Commands"
       title="Cmd+K"
-      className="text-muted-foreground hover:text-foreground"
+      className="shrink-0 text-muted-foreground hover:text-foreground"
       onClick={() => {
         if (!isCommandPaletteBlocked()) {
           openPalette();
@@ -67,7 +67,7 @@ function SettingsLink() {
     <Link
       to="/settings"
       aria-label="Settings"
-      className="text-muted-foreground"
+      className="shrink-0 text-muted-foreground"
     >
       <SlidersHorizontal size={17} strokeWidth={1.6} />
     </Link>
@@ -86,16 +86,18 @@ export function TopNav() {
   const weekDays = weekDaysFromWeekId(weekId);
 
   return (
-    <header className="flex h-[56px] shrink-0 items-center gap-[28px] border-b border-rule bg-card px-[22px]">
+    <header className="flex h-[56px] shrink-0 items-center gap-[10px] overflow-hidden border-b border-rule bg-card px-[12px] xl:gap-[28px] xl:px-[22px]">
       <BrandMark />
       <NavTabs />
-      <div className="ml-auto flex items-center gap-[18px]">
+      <div className="ml-auto flex min-w-0 shrink-0 items-center gap-[8px] xl:gap-[18px]">
         {onWeek ? (
           <WeekPicker weekId={weekId} weekDays={weekDays} />
         ) : (
           <>
             <DateNav />
-            <DayJump />
+            <div className="hidden xl:flex">
+              <DayJump />
+            </div>
           </>
         )}
         <div className="h-[20px] w-px bg-hair" />

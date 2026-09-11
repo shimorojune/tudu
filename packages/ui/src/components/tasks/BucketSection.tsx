@@ -73,8 +73,8 @@ export function BucketSection({
         className={cn(
           "transition-colors duration-150",
           isNow
-            ? "flex items-center gap-[11px] px-[28px] pb-[8px] pt-[24px]"
-            : "flex items-center gap-[11px] px-[28px] pb-[8px] pt-[28px]",
+            ? "flex items-center gap-[8px] px-[16px] pb-[8px] pt-[20px] xl:gap-[11px] xl:px-[28px] xl:pt-[24px]"
+            : "flex items-center gap-[8px] px-[16px] pb-[8px] pt-[22px] xl:gap-[11px] xl:px-[28px] xl:pt-[28px]",
           dropTarget && "bg-foreground/[0.06]",
         )}
       >
@@ -109,7 +109,7 @@ export function BucketSection({
           </button>
         ) : null}
         {isNow && showNowHelper ? (
-          <span className="ml-auto text-[11.5px] text-ghost">
+          <span className="ml-auto hidden text-[11.5px] text-ghost xl:inline">
             drag a row to reorder, or into another bucket
           </span>
         ) : null}

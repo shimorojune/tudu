@@ -121,6 +121,7 @@ export function WeekColumn({
 
   return (
     <div
+      data-week-col={date}
       className={cn(
         "flex min-h-0 flex-col border-r border-hair",
         isToday && "bg-[#f6f4f3]",

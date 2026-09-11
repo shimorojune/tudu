@@ -7,7 +7,7 @@ export function BrandMark() {
         </span>
         <div className="absolute -bottom-[2px] -right-[2px] size-[6px] bg-primary" />
       </div>
-      <span className="text-[16.5px] font-extrabold tracking-[-0.03em]">
+      <span className="hidden text-[16.5px] font-extrabold tracking-[-0.03em] xl:inline">
         Tudu
       </span>
     </div>

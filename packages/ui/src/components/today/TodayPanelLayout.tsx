@@ -4,6 +4,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { useViewportBand } from "@/hooks/useViewportBand";
 
 const STORAGE_KEY = "tudu.today-panel-layout";
 
@@ -50,6 +51,7 @@ export function TodayPanelLayout({
   jiraColumn,
   inspector,
 }: TodayPanelLayoutProps) {
+  const band = useViewportBand();
   const defaultLayout = useMemo(
     () => readStoredLayout() ?? DEFAULT_LAYOUT,
     [],
@@ -58,6 +60,19 @@ export function TodayPanelLayout({
   const onLayoutChanged = useCallback((layout: Record<string, number>) => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(layout));
   }, []);
+
+  if (band === "phone") {
+    return <div className="h-full min-h-0">{taskList}</div>;
+  }
+
+  if (band === "tablet") {
+    return (
+      <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_minmax(280px,396px)]">
+        <div className="min-h-0 border-r border-hair">{taskList}</div>
+        <div className="min-h-0">{inspector}</div>
+      </div>
+    );
+  }
 
   return (
     <ResizablePanelGroup

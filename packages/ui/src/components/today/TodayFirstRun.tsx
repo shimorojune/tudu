@@ -19,7 +19,7 @@ const points = [
 
 export function TodayFirstRun({ onAddFirst }: TodayFirstRunProps) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-[26px] bg-card px-[60px]">
+    <div className="flex h-full flex-col items-center justify-center gap-[26px] bg-card px-[24px] md:px-[60px]">
       <div className="max-w-[460px] space-y-[16px]">
         <h2 className="text-[23px] tracking-[-0.025em]">
           Nothing here yet. Good.

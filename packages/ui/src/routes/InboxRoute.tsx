@@ -14,7 +14,9 @@ import {
 } from "@tudu/store";
 import { isCommandPaletteBlocked } from "@/components/chrome/CommandPalette";
 import { useCommandPalette } from "@/components/chrome/CommandPaletteContext";
+import { InspectorSheet } from "@/components/inspector/InspectorSheet";
 import { TaskDeleteDialog } from "@/components/tasks/TaskDeleteDialog";
+import { useViewportBand } from "@/hooks/useViewportBand";
 import { inboxShortcutAction } from "@/lib/inboxShortcuts";
 import { personFirstName, personInitials } from "@/lib/person";
 import { cn } from "@/lib/utils";
@@ -287,6 +289,8 @@ export function InboxRoute() {
   const history = data?.history ?? [];
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [decliningId, setDecliningId] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const band = useViewportBand();
 
   useEffect(() => {
     if (pending.length === 0) {
@@ -355,11 +359,57 @@ export function InboxRoute() {
     ?? history[0]?.from.name
     ?? null;
 
+  const historyTitle = managerName
+    ? `Recent from ${personFirstName(managerName)}`
+    : "Recent from your manager";
+
+  const historyPanel = (
+    <aside className="flex min-h-0 flex-col bg-background">
+      <div className="flex items-center gap-[10px] border-b border-hair px-[24px] py-[20px]">
+        {managerName ? <Avatar name={managerName} /> : null}
+        <span className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
+          {historyTitle}
+        </span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {history.length === 0 ? (
+          <p className="px-[24px] py-[20px] text-[12.5px] leading-[1.5] text-faint">
+            Everything they send waits here until you decide. They see the outcome,
+            never the wait.
+          </p>
+        ) : (
+          history.map((item) => <HistoryRow key={item.id} item={item} />)
+        )}
+      </div>
+      <div className="mt-auto flex h-[30px] items-center border-t border-hair px-[24px] text-[11px] text-faint">
+        Tasks you mark private never appear to a manager
+      </div>
+    </aside>
+  );
+
   return (
-    <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_356px]">
+    <div
+      className={cn(
+        "grid h-full min-h-0",
+        band === "phone"
+          ? "grid-cols-1"
+          : "grid-cols-[minmax(0,1fr)_356px]",
+      )}
+    >
       <div className="min-h-0 overflow-y-auto border-r border-hair bg-card">
+        {band === "phone" ? (
+          <div className="flex justify-end border-b border-hair px-[16px] py-[10px]">
+            <button
+              type="button"
+              className="text-[12.5px] font-bold text-foreground"
+              onClick={() => setHistoryOpen(true)}
+            >
+              {historyTitle}
+            </button>
+          </div>
+        ) : null}
         {pending.length === 0 ? (
-          <p className="px-[32px] py-[48px] text-[14px] text-muted-foreground">
+          <p className="px-[16px] py-[48px] text-[14px] text-muted-foreground md:px-[32px]">
             Nothing here lands in your day until you accept it
           </p>
         ) : (
@@ -375,29 +425,17 @@ export function InboxRoute() {
           ))
         )}
       </div>
-      <aside className="flex min-h-0 flex-col bg-background">
-        <div className="flex items-center gap-[10px] border-b border-hair px-[24px] py-[20px]">
-          {managerName ? <Avatar name={managerName} /> : null}
-          <span className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
-            {managerName
-              ? `Recent from ${personFirstName(managerName)}`
-              : "Recent from your manager"}
-          </span>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {history.length === 0 ? (
-            <p className="px-[24px] py-[20px] text-[12.5px] leading-[1.5] text-faint">
-              Everything they send waits here until you decide. They see the outcome,
-              never the wait.
-            </p>
-          ) : (
-            history.map((item) => <HistoryRow key={item.id} item={item} />)
-          )}
-        </div>
-        <div className="mt-auto flex h-[30px] items-center border-t border-hair px-[24px] text-[11px] text-faint">
-          Tasks you mark private never appear to a manager
-        </div>
-      </aside>
+      {band === "phone" ? (
+        <InspectorSheet
+          open={historyOpen}
+          title={historyTitle}
+          onClose={() => setHistoryOpen(false)}
+        >
+          {historyPanel}
+        </InspectorSheet>
+      ) : (
+        historyPanel
+      )}
     </div>
   );
 }

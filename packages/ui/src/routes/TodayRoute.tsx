@@ -13,12 +13,14 @@ import { DayTaskList } from "@/components/tasks/DayTaskList";
 import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
 import { createTaskBody } from "@/lib/createTask";
 import { DetailInspector } from "@/components/inspector/DetailInspector";
+import { InspectorSheet } from "@/components/inspector/InspectorSheet";
 import { JiraColumnEmpty } from "@/components/jira/JiraColumnEmpty";
 import { MidnightBanner } from "@/components/today/MidnightBanner";
 import { TodayFirstRun } from "@/components/today/TodayFirstRun";
 import { TodayPanelLayout } from "@/components/today/TodayPanelLayout";
 import { useNewTaskShortcut } from "@/hooks/useNewTaskShortcut";
 import { useRolloverOnFocus } from "@/hooks/useRolloverOnFocus";
+import { useViewportBand } from "@/hooks/useViewportBand";
 
 export function TodayRoute() {
   const dispatch = useDispatch();
@@ -45,6 +47,7 @@ export function TodayRoute() {
     selectedDate === effectiveDay;
 
   const { maybeRollover } = useRolloverOnFocus(!isFirstRun);
+  const band = useViewportBand();
 
   const selectedTask =
     tasks.find((t) => t.id === selectedTaskId) ?? null;
@@ -138,6 +141,15 @@ export function TodayRoute() {
           <DetailInspector task={selectedTask} selectedDate={selectedDate} />
         }
       />
+      {band === "phone" ? (
+        <InspectorSheet
+          open={selectedTask !== null}
+          title="Task details"
+          onClose={() => dispatch(setSelectedTaskId(null))}
+        >
+          <DetailInspector task={selectedTask} selectedDate={selectedDate} />
+        </InspectorSheet>
+      ) : null}
     </div>
   );
 }

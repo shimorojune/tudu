@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { format } from "date-fns";
 import type { Task } from "@tudu/shared";
 import {
   DndContext,
@@ -33,6 +34,7 @@ import {
 } from "@/lib/dragCollision";
 import {
   containerForDayBucket,
+  parseIsoDate,
   UNSCHEDULED_CONTAINER,
   weekContainersForDays,
 } from "@/lib/week";
@@ -41,6 +43,7 @@ import { usePointerY } from "@/hooks/usePointerY";
 import { UnscheduledRail } from "@/components/week/UnscheduledRail";
 import { WeekColumn } from "@/components/week/WeekColumn";
 import { WeekCard } from "@/components/week/WeekCard";
+import { cn } from "@/lib/utils";
 
 const CONTAINER_SWITCH_HYSTERESIS_PX = 12;
 
@@ -78,6 +81,7 @@ function WeekGridDnd({
   const pointerYRef = usePointerY();
   const appliedDeltaRef = useRef<number | null>(null);
   const dragRef = useRef<{ activeId: string; items: ContainerItems } | null>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const baseItemsRef = useRef(baseItems);
   baseItemsRef.current = baseItems;
   const onReorderRef = useRef(onReorder);
@@ -236,26 +240,68 @@ function WeekGridDnd({
     setDrag(null);
   }
 
+  function scrollToColumn(id: string) {
+    const node = scrollerRef.current?.querySelector(`[data-week-col="${id}"]`);
+    node?.scrollIntoView({ inline: "start", block: "nearest" });
+  }
+
   return (
-    <>
-      <div className="grid min-h-0 flex-1 grid-cols-[220px_repeat(7,minmax(0,1fr))]">
-        <UnscheduledRail
-          tasks={displayUnscheduled}
-          dropActive={dropTargetContainer === UNSCHEDULED_CONTAINER}
-        />
-        {weekDays.map((day) => (
-          <WeekColumn
-            key={day}
-            date={day}
-            tasks={displayByDay.get(day) ?? []}
-            isToday={day === today}
-            highlighted={day === highlightedDay}
-            dropTargetBucket={dropTargetContainer}
-            popoverTaskId={popoverTaskId}
-            onHighlight={() => onHighlightDay(day)}
-            onPopoverChange={setPopoverTaskId}
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex shrink-0 gap-[6px] overflow-x-auto border-b border-hair bg-card px-[10px] py-[8px] xl:hidden">
+        <button
+          type="button"
+          aria-label="Jump to Unscheduled"
+          className="shrink-0 border border-rule px-[8px] py-[5px] text-[11px] font-bold text-muted-foreground"
+          onClick={() => scrollToColumn("unscheduled")}
+        >
+          Unscheduled
+        </button>
+        {weekDays.map((day) => {
+          const active = day === highlightedDay;
+          return (
+            <button
+              key={day}
+              type="button"
+              aria-label={`Jump to ${format(parseIsoDate(day), "EEEE")}`}
+              className={cn(
+                "shrink-0 border border-rule px-[8px] py-[5px] text-[11px] font-bold",
+                active
+                  ? "bg-foreground text-card"
+                  : "text-muted-foreground",
+              )}
+              onClick={() => {
+                onHighlightDay(day);
+                scrollToColumn(day);
+              }}
+            >
+              {format(parseIsoDate(day), "EEE")}
+            </button>
+          );
+        })}
+      </div>
+      <div
+        ref={scrollerRef}
+        className="min-h-0 flex-1 overflow-x-auto xl:overflow-x-hidden"
+      >
+        <div className="grid h-full min-h-0 min-w-[1160px] grid-cols-[180px_repeat(7,minmax(140px,1fr))] xl:min-w-0 xl:grid-cols-[220px_repeat(7,minmax(0,1fr))]">
+          <UnscheduledRail
+            tasks={displayUnscheduled}
+            dropActive={dropTargetContainer === UNSCHEDULED_CONTAINER}
           />
-        ))}
+          {weekDays.map((day) => (
+            <WeekColumn
+              key={day}
+              date={day}
+              tasks={displayByDay.get(day) ?? []}
+              isToday={day === today}
+              highlighted={day === highlightedDay}
+              dropTargetBucket={dropTargetContainer}
+              popoverTaskId={popoverTaskId}
+              onHighlight={() => onHighlightDay(day)}
+              onPopoverChange={setPopoverTaskId}
+            />
+          ))}
+        </div>
       </div>
       <DragOverlay dropAnimation={null}>
         {activeTask ? (
@@ -269,7 +315,7 @@ function WeekGridDnd({
           </div>
         ) : null}
       </DragOverlay>
-    </>
+    </div>
   );
 }
 
@@ -325,6 +371,7 @@ export function WeekGrid({
       sensors={sensors}
       collisionDetection={taskCollisionDetection}
       measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+      autoScroll
     >
       <WeekGridDnd
         weekDays={weekDays}

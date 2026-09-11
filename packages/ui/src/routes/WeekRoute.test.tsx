@@ -45,9 +45,12 @@ describe("WeekRoute", () => {
       </Provider>,
     );
 
-    expect(screen.getByText("Unscheduled")).toBeInTheDocument();
+    expect(screen.getAllByText("Unscheduled").length).toBeGreaterThan(0);
     expect(
       screen.getByText("Undated tasks live in the left rail. Drag one onto a day."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Jump to Unscheduled" }),
     ).toBeInTheDocument();
   });
 });

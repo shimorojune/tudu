@@ -7,6 +7,7 @@ import {
   type SettingsSection,
 } from "@/components/settings/SettingsSidebar";
 import { SettingsStubPanel } from "@/components/settings/SettingsStubPanel";
+import { APP_VERSION } from "@/lib/appVersion";
 
 const stubTitles: Record<Exclude<SettingsSection, "account">, string> = {
   general: "General",
@@ -19,12 +20,12 @@ export function SettingsRoute() {
   const [section, setSection] = useState<SettingsSection>("account");
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-[214px_minmax(0,1fr)] bg-card">
-      <div className="border-r border-hair">
+    <div className="grid h-full min-h-0 grid-cols-1 bg-card md:grid-cols-[214px_minmax(0,1fr)]">
+      <div className="border-b border-hair md:border-b-0 md:border-r">
         <SettingsSidebar
           active={section}
           onSelect={setSection}
-          version="0.17.0"
+          version={APP_VERSION}
         />
       </div>
       <div className="min-h-0 bg-card">

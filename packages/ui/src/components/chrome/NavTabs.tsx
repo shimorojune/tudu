@@ -4,14 +4,7 @@ import { useSelector } from "react-redux";
 import { todayIso, useGetInboxCountQuery, useGetUnscheduledTasksQuery } from "@tudu/store";
 import type { RootState } from "@tudu/store";
 import { dayTabLabel } from "@/lib/dayLabel";
-
-const tabs = [
-  { label: "Today", to: "/", exact: true as const, dynamicDay: true as const },
-  { label: "Week", to: "/week", exact: false as const },
-  { label: "Inbox", to: "/inbox", exact: false as const, badge: true as const },
-  { label: "Unscheduled", to: "/unscheduled", exact: false as const, count: true as const },
-  { label: "Team", to: "/team", exact: false as const },
-];
+import { MAIN_NAV_ITEMS } from "@/lib/mainNav";
 
 type TabContentProps = {
   label: string;
@@ -116,10 +109,10 @@ export function NavTabs() {
   return (
     <nav
       aria-label="Main"
-      className="flex items-center gap-[20px] self-stretch text-[13.5px]"
+      className="hidden items-center gap-[20px] self-stretch text-[13.5px] xl:flex"
     >
-      {tabs.map((tab) => {
-        const isDayTab = "dynamicDay" in tab;
+      {MAIN_NAV_ITEMS.map((tab) => {
+        const isDayTab = "dayTab" in tab && tab.dayTab;
 
         if (isDayTab) {
           return (

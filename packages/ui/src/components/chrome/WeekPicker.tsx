@@ -36,7 +36,7 @@ export function WeekPicker({ weekId, weekDays }: WeekPickerProps) {
   }
 
   return (
-    <div className="relative flex items-center gap-[9px] text-muted-foreground">
+    <div className="relative flex shrink-0 items-center gap-[6px] whitespace-nowrap text-muted-foreground xl:gap-[9px]">
       <button
         type="button"
         aria-label="Previous week"
@@ -49,7 +49,7 @@ export function WeekPicker({ weekId, weekDays }: WeekPickerProps) {
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="inline-flex items-center gap-[8px] border border-rule bg-card px-[10px] py-[5px] text-[13.5px] font-semibold tabular-nums text-foreground"
+            className="inline-flex items-center gap-[8px] border border-rule bg-card px-[8px] py-[5px] text-[12.5px] font-semibold tabular-nums whitespace-nowrap text-foreground xl:px-[10px] xl:text-[13.5px]"
           >
             {label}
             <ChevronRight size={11} strokeWidth={2.4} className="rotate-90" />

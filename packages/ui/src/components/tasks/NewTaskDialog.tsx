@@ -189,7 +189,7 @@ export function NewTaskDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="max-h-[85vh] max-w-[660px] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 border-rule bg-card p-0 sm:max-w-[660px]"
+        className="max-h-dvh max-w-full grid-rows-[auto_minmax(0,1fr)_auto] gap-0 border-rule bg-card p-0 sm:max-w-full md:max-h-[85vh] md:max-w-[660px]"
         onKeyDown={(event) => {
           if (event.key === "Escape") {
             event.preventDefault();
