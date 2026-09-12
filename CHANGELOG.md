@@ -1,3 +1,11 @@
+# [0.21.0](https://github.com/eGainDev/tudu/compare/tudu-0.20.0...tudu-0.21.0) (2026-09-11)
+
+
+### Features
+
+* enhance project management with privacy features ([f1f63d8](https://github.com/eGainDev/tudu/commit/f1f63d86b0511c3d02804038fe0c7059fd5cabcf))
+* implement PWA support and enhance web app configuration ([7eb6973](https://github.com/eGainDev/tudu/commit/7eb69736a45d75d652367aba50eec5fa4628181a))
+
 # [0.20.0](https://github.com/eGainDev/tudu/compare/tudu-0.19.0...tudu-0.20.0) (2026-09-11)
 
 
