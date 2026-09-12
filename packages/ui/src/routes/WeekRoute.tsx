@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useSearch } from "@tanstack/react-router";
+import { useDispatch, useSelector } from "react-redux";
 import type { Bucket, Task } from "@tudu/shared";
 import { effectiveDayIso } from "@tudu/shared";
 import {
+  setSelectedDate,
   useCreateSubtaskMutation,
   useCreateTaskMutation,
   useGetTasksForDayQuery,
+  type RootState,
 } from "@tudu/store";
 import { WeekGridSkeleton } from "@/components/loading/WeekGridSkeleton";
 import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
@@ -17,21 +20,26 @@ import {
   defaultWeekId,
   weekDaysFromWeekId,
 } from "@/lib/week";
+import { useDaySearchSync } from "@/hooks/useDaySearchSync";
 import { useNewTaskShortcut } from "@/hooks/useNewTaskShortcut";
 import { useWeekTaskQueries } from "@/hooks/useWeekTaskQueries";
+import { DATE_ONLY_FIELDS } from "@/lib/daySearch";
 
 export function WeekRoute() {
+  const dispatch = useDispatch();
   const search = useSearch({ strict: false }) as { week?: string };
   const weekId = search.week ?? defaultWeekId();
   const weekDays = useMemo(() => weekDaysFromWeekId(weekId), [weekId]);
   const today = effectiveDayIso();
+  const selectedDate = useSelector((state: RootState) => state.day.selectedDate);
+  useDaySearchSync(DATE_ONLY_FIELDS, { weekDays, today });
 
   const { unscheduledQuery, tasksByDay, isLoading, isError } =
     useWeekTaskQueries(weekDays);
 
-  const [highlightedDay, setHighlightedDay] = useState(() =>
-    defaultHighlightDay(weekDays, today),
-  );
+  const highlightedDay = weekDays.includes(selectedDate)
+    ? selectedDate
+    : defaultHighlightDay(weekDays, today);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogBucket, setDialogBucket] = useState<Bucket>("later");
 
@@ -45,10 +53,6 @@ export function WeekRoute() {
     setDialogBucket("later");
     setDialogOpen(true);
   });
-
-  useEffect(() => {
-    setHighlightedDay(defaultHighlightDay(weekDays, today));
-  }, [weekId, weekDays, today]);
 
   if (isLoading) {
     return (
@@ -87,7 +91,7 @@ export function WeekRoute() {
         unscheduledTasks={unscheduledTasks}
         tasksByDay={tasksByDayLists}
         highlightedDay={highlightedDay}
-        onHighlightDay={setHighlightedDay}
+        onHighlightDay={(day) => dispatch(setSelectedDate(day))}
       />
       <footer className="flex h-[34px] shrink-0 items-center gap-[18px] border-t border-hair bg-background px-[22px] text-[11.5px] text-faint">
         <span>Undated tasks live in the left rail. Drag one onto a day.</span>

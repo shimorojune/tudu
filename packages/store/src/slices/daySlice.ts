@@ -70,6 +70,24 @@ export const daySlice = createSlice({
       state.inspectorTab = action.payload.inspectorTab;
       state.focusCommentId = action.payload.focusCommentId ?? null;
     },
+    hydrateDay(
+      state,
+      action: PayloadAction<{
+        date?: string;
+        taskId?: string | null;
+        inspectorTab?: InspectorTab;
+      }>,
+    ) {
+      if (action.payload.date !== undefined) {
+        state.selectedDate = action.payload.date;
+      }
+      if (action.payload.taskId !== undefined) {
+        state.selectedTaskId = action.payload.taskId;
+      }
+      if (action.payload.inspectorTab !== undefined) {
+        state.inspectorTab = action.payload.inspectorTab;
+      }
+    },
     clearFocusCommentId(state) {
       state.focusCommentId = null;
     },
@@ -86,6 +104,7 @@ export const {
   setSelectedTaskId,
   setInspectorTab,
   openTask,
+  hydrateDay,
   clearFocusCommentId,
   requestAddTask,
 } = daySlice.actions;

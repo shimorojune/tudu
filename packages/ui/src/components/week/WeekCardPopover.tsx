@@ -12,6 +12,7 @@ import {
   setSelectedDate,
   setSelectedTaskId,
 } from "@tudu/store";
+import { taskLinkSearch } from "@/lib/daySearch";
 import type { WeekViewer } from "@/lib/week";
 import { useDispatch } from "react-redux";
 import { bucketLabel } from "@/lib/buckets";
@@ -138,11 +139,21 @@ export function WeekCardPopover({
                   void navigate({
                     to: "/team/$userId",
                     params: { userId: reportUserId },
-                    search: { send: false },
+                    search: taskLinkSearch({
+                      date: scheduledDate,
+                      taskId: task.id,
+                      extra: { send: false },
+                    }),
                   });
                   return;
                 }
-                void navigate({ to: "/" });
+                void navigate({
+                  to: "/",
+                  search: taskLinkSearch({
+                    date: scheduledDate,
+                    taskId: task.id,
+                  }),
+                });
               }}
             >
               Open day

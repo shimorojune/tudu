@@ -3,6 +3,7 @@ import { ChevronLeft } from "lucide-react";
 import { useSelector } from "react-redux";
 import { todayIso, type RootState } from "@tudu/store";
 import { personInitials } from "@/lib/person";
+import { dateLinkSearch } from "@/lib/daySearch";
 import { isoWeekId, parseIsoDate } from "@/lib/week";
 import { cn } from "@/lib/utils";
 
@@ -47,7 +48,7 @@ export function ReportPersonHeader({
         <Link
           to="/team/$userId"
           params={{ userId }}
-          search={{ send: false }}
+          search={dateLinkSearch(selectedDate, { send: false })}
           className={cn(
             "px-[10px] py-[5px] text-[12px]",
             view === "day"

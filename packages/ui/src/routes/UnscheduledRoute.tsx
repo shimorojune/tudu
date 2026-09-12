@@ -65,7 +65,9 @@ import { useProjectFilterId } from "@/hooks/useProjectFilterId";
 import { isTaskDimmed } from "@/lib/projectFilter";
 import { DetailInspector } from "@/components/inspector/DetailInspector";
 import { InspectorSheet } from "@/components/inspector/InspectorSheet";
+import { useDaySearchSync } from "@/hooks/useDaySearchSync";
 import { useNewTaskShortcut } from "@/hooks/useNewTaskShortcut";
+import { TASK_TAB_FIELDS } from "@/lib/daySearch";
 import { usePointerY } from "@/hooks/usePointerY";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -268,6 +270,12 @@ export function UnscheduledRoute() {
   const focusCommentId = useSelector((state: RootState) => state.day.focusCommentId);
   const { data, isLoading, isError } = useGetUnscheduledTasksQuery();
   const { data: todayData } = useGetTasksForDayQuery(todayIso());
+  useDaySearchSync(TASK_TAB_FIELDS, {
+    taskFound: isLoading
+      ? null
+      : !selectedTaskId ||
+        Boolean(data?.tasks.some((task) => task.id === selectedTaskId)),
+  });
   const [flashTaskId, setFlashTaskId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 

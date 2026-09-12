@@ -21,9 +21,11 @@ import { DayListSkeleton } from "@/components/loading/DayListSkeleton";
 import { LoadingStatus } from "@/components/loading/LoadingStatus";
 import { PaneSkeleton } from "@/components/loading/PaneSkeleton";
 import { TodayPanelLayout } from "@/components/today/TodayPanelLayout";
+import { useDaySearchSync } from "@/hooks/useDaySearchSync";
 import { useNewTaskShortcut } from "@/hooks/useNewTaskShortcut";
 import { useRolloverOnFocus } from "@/hooks/useRolloverOnFocus";
 import { useViewportBand } from "@/hooks/useViewportBand";
+import { DAY_TASK_TAB_FIELDS } from "@/lib/daySearch";
 
 export function TodayRoute() {
   const dispatch = useDispatch();
@@ -32,13 +34,18 @@ export function TodayRoute() {
 
   const dayQuery = useGetTasksForDayQuery(selectedDate);
   const unscheduledQuery = useGetUnscheduledTasksQuery();
+  const tasks = dayQuery.data?.tasks ?? [];
+  useDaySearchSync(DAY_TASK_TAB_FIELDS, {
+    taskFound: dayQuery.isLoading
+      ? null
+      : !selectedTaskId || tasks.some((task) => task.id === selectedTaskId),
+  });
   const [createTask] = useCreateTaskMutation();
   const [createSubtask] = useCreateSubtaskMutation();
 
   const [firstRunDialogOpen, setFirstRunDialogOpen] = useState(false);
   const [firstRunBucket, setFirstRunBucket] = useState<Bucket>("later");
 
-  const tasks = dayQuery.data?.tasks ?? [];
   const unscheduledCount = unscheduledQuery.data?.tasks.length ?? 0;
   const effectiveDay = effectiveDayIso();
 

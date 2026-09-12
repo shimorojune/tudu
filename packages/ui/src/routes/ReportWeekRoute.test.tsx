@@ -10,6 +10,14 @@ vi.mock("@tanstack/react-router", () => ({
   useParams: () => ({ userId: "priya" }),
   useSearch: () => ({}),
   useNavigate: () => vi.fn(),
+  useRouterState: (opts?: {
+    select?: (state: {
+      location: { search: Record<string, unknown>; searchStr: string };
+    }) => unknown;
+  }) => {
+    const snapshot = { location: { search: {}, searchStr: "" } };
+    return opts?.select ? opts.select(snapshot) : snapshot;
+  },
   Link: ({
     to,
     children,

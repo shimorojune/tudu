@@ -69,6 +69,17 @@ export function CommandPalette() {
         case "navigate":
           if (command.action.goToToday) {
             dispatch(goToToday());
+            void navigate({
+              to: "/",
+              search: (prev: Record<string, unknown>) => {
+                const next = { ...prev };
+                delete next.date;
+                delete next.task;
+                delete next.tab;
+                return next;
+              },
+            } as never);
+            return;
           }
           if (command.action.to === "/projects/$projectId" && command.action.params) {
             void navigate({

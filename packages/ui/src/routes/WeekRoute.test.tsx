@@ -8,10 +8,13 @@ const weekQuery = vi.hoisted(() => ({ isLoading: false }));
 
 vi.mock("@tanstack/react-router", () => ({
   useSearch: () => ({}),
+  useNavigate: () => vi.fn(),
   useRouterState: (opts?: {
-    select?: (state: { location: { search: Record<string, unknown> } }) => unknown;
+    select?: (state: {
+      location: { search: Record<string, unknown>; searchStr: string };
+    }) => unknown;
   }) => {
-    const snapshot = { location: { search: {} } };
+    const snapshot = { location: { search: {}, searchStr: "" } };
     return opts?.select ? opts.select(snapshot) : snapshot;
   },
 }));

@@ -6,7 +6,14 @@ import {
   LayoutList,
   Users,
 } from "lucide-react";
-import { useGetInboxCountQuery, useGetUnscheduledTasksQuery } from "@tudu/store";
+import { useSelector } from "react-redux";
+import {
+  todayIso,
+  useGetInboxCountQuery,
+  useGetUnscheduledTasksQuery,
+  type RootState,
+} from "@tudu/store";
+import { dateLinkSearch } from "@/lib/daySearch";
 import { MAIN_NAV_ITEMS } from "@/lib/mainNav";
 
 const icons = {
@@ -22,6 +29,7 @@ export function BottomNav() {
   const inboxCountQuery = useGetInboxCountQuery();
   const unscheduledCount = unscheduledQuery.data?.tasks.length ?? 0;
   const inboxCount = inboxCountQuery.data?.count ?? 0;
+  const selectedDate = useSelector((state: RootState) => state.day.selectedDate);
 
   return (
     <nav
@@ -38,6 +46,7 @@ export function BottomNav() {
           <Link
             key={item.to}
             to={item.to}
+            search={item.to === "/" ? dateLinkSearch(selectedDate || todayIso()) : undefined}
             activeOptions={item.exact ? { exact: true } : undefined}
             aria-label={item.label}
             className="flex min-w-0 flex-1 flex-col items-center gap-[3px] px-[2px] py-[8px] text-muted-foreground"

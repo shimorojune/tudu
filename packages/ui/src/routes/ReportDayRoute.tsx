@@ -13,7 +13,9 @@ import { ReportDaySkeleton } from "@/components/loading/ReportDaySkeleton";
 import { DayTaskList } from "@/components/tasks/DayTaskList";
 import { ReportPersonHeader } from "@/components/team/ReportPersonHeader";
 import { SendInboxForm } from "@/components/team/SendInboxForm";
+import { useDaySearchSync } from "@/hooks/useDaySearchSync";
 import { useViewportBand } from "@/hooks/useViewportBand";
+import { DAY_TASK_TAB_FIELDS } from "@/lib/daySearch";
 import { personFirstName } from "@/lib/person";
 
 export function ReportDayRoute() {
@@ -27,6 +29,13 @@ export function ReportDayRoute() {
   const { data, isLoading, isError } = useGetReportDayQuery({ userId, date });
   const showSend = search.send === true || selectedTaskId === null;
   const band = useViewportBand();
+  useDaySearchSync(DAY_TASK_TAB_FIELDS, {
+    clearTask: search.send === true,
+    taskFound: isLoading
+      ? null
+      : !selectedTaskId ||
+        Boolean(data?.tasks.some((task) => task.id === selectedTaskId)),
+  });
 
   useEffect(() => {
     if (search.send) {
@@ -59,8 +68,8 @@ export function ReportDayRoute() {
         void navigate({
           to: "/team/$userId",
           params: { userId },
-          search: { send: false },
-        });
+          search: (prev: Record<string, unknown>) => ({ ...prev, send: false }),
+        } as never);
         dispatch(setSelectedTaskId(id));
       }}
       onDeselectTask={() => dispatch(setSelectedTaskId(null))}
@@ -79,8 +88,8 @@ export function ReportDayRoute() {
           void navigate({
             to: "/team/$userId",
             params: { userId },
-            search: { send: false },
-          })
+            search: (prev: Record<string, unknown>) => ({ ...prev, send: false }),
+          } as never)
         }
       />
     ) : (
@@ -132,8 +141,11 @@ export function ReportDayRoute() {
               void navigate({
                 to: "/team/$userId",
                 params: { userId },
-                search: { send: false },
-              });
+                search: (prev: Record<string, unknown>) => ({
+                  ...prev,
+                  send: false,
+                }),
+              } as never);
             }}
           >
             {sidePanel}

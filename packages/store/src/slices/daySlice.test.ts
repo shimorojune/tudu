@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   daySlice,
   goToToday,
+  hydrateDay,
   openTask,
   setInspectorTab,
   setSelectedDate,
@@ -49,5 +50,20 @@ describe("daySlice selection", () => {
     expect(state.selectedTaskId).toBe("abc");
     expect(state.inspectorTab).toBe("comments");
     expect(state.focusCommentId).toBe("c1");
+  });
+
+  it("hydrates date and task together without clearing the task", () => {
+    const state = daySlice.reducer(
+      undefined,
+      hydrateDay({
+        date: "2026-09-10",
+        taskId: "abc",
+        inspectorTab: "comments",
+      }),
+    );
+    expect(state.selectedDate).toBe("2026-09-10");
+    expect(state.selectedTaskId).toBe("abc");
+    expect(state.inspectorTab).toBe("comments");
+    expect(state.focusCommentId).toBeNull();
   });
 });

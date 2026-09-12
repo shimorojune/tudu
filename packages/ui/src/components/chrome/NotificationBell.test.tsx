@@ -67,6 +67,13 @@ describe("NotificationBell", () => {
 
     expect(readOne).toHaveBeenCalledWith("88888888-8888-4888-8888-888888888888");
     expect(store.getState().day.inspectorTab).toBe("comments");
-    expect(navigate).toHaveBeenCalledWith({ to: "/" });
+    expect(navigate).toHaveBeenCalledWith({
+      to: "/",
+      search: {
+        date: "2026-09-10",
+        task: "11111111-1111-4111-8111-111111111111",
+        tab: "comments",
+      },
+    });
   });
 });

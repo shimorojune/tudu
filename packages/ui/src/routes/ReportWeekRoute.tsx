@@ -1,13 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import type { Task } from "@tudu/shared";
 import { effectiveDayIso } from "@tudu/shared";
-import { setSelectedTaskId, useGetTeamQuery } from "@tudu/store";
+import {
+  setSelectedDate,
+  setSelectedTaskId,
+  useGetTeamQuery,
+  type RootState,
+} from "@tudu/store";
 import { WeekGridSkeleton } from "@/components/loading/WeekGridSkeleton";
 import { ReportPersonHeader } from "@/components/team/ReportPersonHeader";
 import { WeekGrid } from "@/components/week/WeekGrid";
+import { useDaySearchSync } from "@/hooks/useDaySearchSync";
 import { useReportWeekTaskQueries } from "@/hooks/useReportWeekTaskQueries";
+import { DATE_ONLY_FIELDS } from "@/lib/daySearch";
 import {
   defaultHighlightDay,
   defaultWeekId,
@@ -22,18 +29,16 @@ export function ReportWeekRoute() {
   const weekId = search.week ?? defaultWeekId();
   const weekDays = useMemo(() => weekDaysFromWeekId(weekId), [weekId]);
   const today = effectiveDayIso();
+  const selectedDate = useSelector((state: RootState) => state.day.selectedDate);
+  useDaySearchSync(DATE_ONLY_FIELDS, { weekDays, today });
 
   const { unscheduledQuery, dayQueries, tasksByDay, isLoading, isError } =
     useReportWeekTaskQueries(userId, weekDays);
   const { data: team } = useGetTeamQuery();
 
-  const [highlightedDay, setHighlightedDay] = useState(() =>
-    defaultHighlightDay(weekDays, today),
-  );
-
-  useEffect(() => {
-    setHighlightedDay(defaultHighlightDay(weekDays, today));
-  }, [weekId, weekDays, today]);
+  const highlightedDay = weekDays.includes(selectedDate)
+    ? selectedDate
+    : defaultHighlightDay(weekDays, today);
 
   const report =
     dayQueries.find((query) => query.data?.report.name)?.data?.report ??
@@ -114,7 +119,7 @@ export function ReportWeekRoute() {
         unscheduledTasks={unscheduledTasks}
         tasksByDay={tasksByDayLists}
         highlightedDay={highlightedDay}
-        onHighlightDay={setHighlightedDay}
+        onHighlightDay={(day) => dispatch(setSelectedDate(day))}
         viewer="manager"
         reportUserId={userId}
       />

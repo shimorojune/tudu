@@ -22,6 +22,7 @@ vi.mock("@tudu/store", () => ({
   useUpdateTaskMutation: () => [vi.fn()],
   setSelectedDate: vi.fn(),
   setSelectedTaskId: vi.fn(),
+  todayIso: () => "2026-09-12",
 }));
 
 vi.mock("react-redux", () => ({
@@ -144,7 +145,11 @@ describe("WeekCardPopover", () => {
     expect(navigate).toHaveBeenCalledWith({
       to: "/team/$userId",
       params: { userId: "priya" },
-      search: { send: false },
+      search: {
+        send: false,
+        date: "2026-09-10",
+        task: task.id,
+      },
     });
   });
 });

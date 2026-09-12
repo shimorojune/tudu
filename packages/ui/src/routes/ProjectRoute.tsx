@@ -10,7 +10,9 @@ import { InspectorSheet } from "@/components/inspector/InspectorSheet";
 import { ProjectListSkeleton } from "@/components/loading/ProjectListSkeleton";
 import { ProjectChip } from "@/components/projects/ProjectChip";
 import { TaskRow } from "@/components/tasks/TaskRow";
+import { useDaySearchSync } from "@/hooks/useDaySearchSync";
 import { useViewportBand } from "@/hooks/useViewportBand";
+import { TASK_TAB_FIELDS } from "@/lib/daySearch";
 import { groupProjectTasks } from "@/lib/projectGroups";
 
 export function ProjectRoute() {
@@ -19,6 +21,12 @@ export function ProjectRoute() {
   const selectedTaskId = useSelector((state: RootState) => state.day.selectedTaskId);
   const { data, isLoading } = useGetProjectQuery(projectId);
   const band = useViewportBand();
+  useDaySearchSync(TASK_TAB_FIELDS, {
+    taskFound: isLoading
+      ? null
+      : !selectedTaskId ||
+        Boolean(data?.tasks.some((task) => task.id === selectedTaskId)),
+  });
 
   if (isLoading) {
     return <ProjectListSkeleton />;

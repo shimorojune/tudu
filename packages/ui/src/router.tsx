@@ -19,6 +19,12 @@ import { ReportInboxRoute } from "@/routes/ReportInboxRoute";
 import { SettingsRoute } from "@/routes/SettingsRoute";
 import { UnscheduledRoute } from "@/routes/UnscheduledRoute";
 import { ProjectRoute } from "@/routes/ProjectRoute";
+import {
+  DATE_ONLY_FIELDS,
+  DAY_TASK_TAB_FIELDS,
+  parseDaySearch,
+  TASK_TAB_FIELDS,
+} from "@/lib/daySearch";
 import { parseProjectSearch } from "@/lib/projectFilter";
 
 const rootRoute = createRootRoute({
@@ -52,7 +58,10 @@ const appLayoutRoute = createRoute({
 const todayRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/",
-  validateSearch: (search: Record<string, unknown>) => parseProjectSearch(search),
+  validateSearch: (search: Record<string, unknown>) => ({
+    ...parseProjectSearch(search),
+    ...parseDaySearch(search, DAY_TASK_TAB_FIELDS),
+  }),
   component: TodayRoute,
 });
 
@@ -62,6 +71,7 @@ const weekRoute = createRoute({
   validateSearch: (search: Record<string, unknown>) => ({
     week: typeof search.week === "string" ? search.week : undefined,
     ...parseProjectSearch(search),
+    ...parseDaySearch(search, DATE_ONLY_FIELDS),
   }),
   component: WeekRoute,
 });
@@ -75,6 +85,8 @@ const inboxRoute = createRoute({
 const teamRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/team",
+  validateSearch: (search: Record<string, unknown>) =>
+    parseDaySearch(search, DATE_ONLY_FIELDS),
   component: TeamRoute,
 });
 
@@ -84,6 +96,7 @@ const reportWeekRoute = createRoute({
   validateSearch: (search: Record<string, unknown>) => ({
     week: typeof search.week === "string" ? search.week : undefined,
     ...parseProjectSearch(search),
+    ...parseDaySearch(search, DATE_ONLY_FIELDS),
   }),
   component: ReportWeekRoute,
 });
@@ -103,6 +116,7 @@ const reportDayRoute = createRoute({
   validateSearch: (search: Record<string, unknown>) => ({
     send: search.send === true || search.send === "1" || search.send === "true",
     ...parseProjectSearch(search),
+    ...parseDaySearch(search, DAY_TASK_TAB_FIELDS),
   }),
   component: ReportDayRoute,
 });
@@ -110,7 +124,10 @@ const reportDayRoute = createRoute({
 const unscheduledRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/unscheduled",
-  validateSearch: (search: Record<string, unknown>) => parseProjectSearch(search),
+  validateSearch: (search: Record<string, unknown>) => ({
+    ...parseProjectSearch(search),
+    ...parseDaySearch(search, TASK_TAB_FIELDS),
+  }),
   component: UnscheduledRoute,
 });
 
@@ -123,6 +140,8 @@ const settingsRoute = createRoute({
 const projectRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/projects/$projectId",
+  validateSearch: (search: Record<string, unknown>) =>
+    parseDaySearch(search, TASK_TAB_FIELDS),
   component: ProjectRoute,
 });
 

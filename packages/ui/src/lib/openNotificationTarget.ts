@@ -1,17 +1,25 @@
 import type { AppNotification } from "@tudu/shared";
-import { openTask, type AppDispatch } from "@tudu/store";
+import { openTask, todayIso, type AppDispatch } from "@tudu/store";
+import { TASK_TAB_FIELDS, taskLinkSearch } from "@/lib/daySearch";
+
+export type NotificationSearch = {
+  send?: boolean;
+  date?: string;
+  task?: string;
+  tab?: "comments" | "timeline";
+};
 
 export type NotificationNavigate = (opts: {
   to: "/" | "/inbox" | "/unscheduled" | "/team/$userId";
   params?: { userId: string };
-  search?: { send?: boolean };
+  search?: NotificationSearch;
 }) => unknown;
 
 export function bindNotificationNavigate(
   navigate: (opts: {
     to: "/" | "/inbox" | "/unscheduled" | "/team/$userId";
     params?: { userId: string };
-    search?: { send?: boolean };
+    search?: NotificationSearch;
   }) => unknown,
 ): NotificationNavigate {
   return (opts) => {
@@ -19,11 +27,11 @@ export function bindNotificationNavigate(
       void navigate({
         to: "/team/$userId",
         params: { userId: opts.params?.userId ?? "" },
-        search: { send: opts.search?.send ?? false },
+        search: opts.search ?? { send: false },
       });
       return;
     }
-    void navigate({ to: opts.to });
+    void navigate({ to: opts.to, search: opts.search });
   };
 }
 
@@ -52,6 +60,7 @@ export function openNotificationTarget(
     notification.kind === "comment" ? notification.commentId : null;
   const isOwner =
     !notification.ownerId || notification.ownerId === args.viewerId;
+  const date = notification.scheduledDate ?? todayIso();
 
   args.dispatch(
     openTask({
@@ -66,15 +75,35 @@ export function openNotificationTarget(
     void args.navigate({
       to: "/team/$userId",
       params: { userId: notification.ownerId },
-      search: { send: false },
+      search: taskLinkSearch({
+        date,
+        taskId: notification.taskId,
+        tab: inspectorTab,
+        extra: { send: false },
+      }),
     });
     return;
   }
 
   if (!notification.scheduledDate) {
-    void args.navigate({ to: "/unscheduled" });
+    void args.navigate({
+      to: "/unscheduled",
+      search: taskLinkSearch({
+        date,
+        taskId: notification.taskId,
+        tab: inspectorTab,
+        fields: TASK_TAB_FIELDS,
+      }),
+    });
     return;
   }
 
-  void args.navigate({ to: "/" });
+  void args.navigate({
+    to: "/",
+    search: taskLinkSearch({
+      date,
+      taskId: notification.taskId,
+      tab: inspectorTab,
+    }),
+  });
 }

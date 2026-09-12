@@ -26,6 +26,19 @@ vi.mock("@tudu/store", async (importOriginal) => {
   };
 });
 
+vi.mock("@tanstack/react-router", () => ({
+  useSearch: () => ({}),
+  useNavigate: () => vi.fn(),
+  useRouterState: (opts?: {
+    select?: (state: {
+      location: { search: Record<string, unknown>; searchStr: string };
+    }) => unknown;
+  }) => {
+    const snapshot = { location: { search: {}, searchStr: "" } };
+    return opts?.select ? opts.select(snapshot) : snapshot;
+  },
+}));
+
 vi.mock("@/hooks/useNewTaskShortcut", () => ({
   useNewTaskShortcut: () => undefined,
 }));

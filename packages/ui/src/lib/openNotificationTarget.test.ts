@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AppNotification } from "@tudu/shared";
 import { makeStore } from "@tudu/store";
+import { TASK_TAB_FIELDS, taskLinkSearch } from "./daySearch";
 import { openNotificationTarget } from "./openNotificationTarget";
 
 const base: AppNotification = {
@@ -31,7 +32,14 @@ describe("openNotificationTarget", () => {
     expect(store.getState().day.selectedTaskId).toBe(base.taskId);
     expect(store.getState().day.inspectorTab).toBe("comments");
     expect(store.getState().day.focusCommentId).toBe(base.commentId);
-    expect(navigate).toHaveBeenCalledWith({ to: "/" });
+    expect(navigate).toHaveBeenCalledWith({
+      to: "/",
+      search: taskLinkSearch({
+        date: base.scheduledDate ?? "",
+        taskId: base.taskId ?? "",
+        tab: "comments",
+      }),
+    });
   });
 
   it("opens the report day for a manager", () => {
@@ -45,7 +53,12 @@ describe("openNotificationTarget", () => {
     expect(navigate).toHaveBeenCalledWith({
       to: "/team/$userId",
       params: { userId: "priya" },
-      search: { send: false },
+      search: taskLinkSearch({
+        date: base.scheduledDate ?? "",
+        taskId: base.taskId ?? "",
+        tab: "comments",
+        extra: { send: false },
+      }),
     });
     expect(store.getState().day.inspectorTab).toBe("comments");
   });
@@ -78,7 +91,15 @@ describe("openNotificationTarget", () => {
       { ...base, scheduledDate: null },
       { viewerId: "priya", dispatch: store.dispatch, navigate },
     );
-    expect(navigate).toHaveBeenCalledWith({ to: "/unscheduled" });
+    expect(navigate).toHaveBeenCalledWith({
+      to: "/unscheduled",
+      search: taskLinkSearch({
+        date: "unused",
+        taskId: base.taskId ?? "",
+        tab: "comments",
+        fields: TASK_TAB_FIELDS,
+      }),
+    });
     expect(store.getState().day.inspectorTab).toBe("comments");
   });
 

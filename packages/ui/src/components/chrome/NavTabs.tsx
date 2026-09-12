@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { todayIso, useGetInboxCountQuery, useGetUnscheduledTasksQuery } from "@tudu/store";
 import type { RootState } from "@tudu/store";
+import { dateLinkSearch } from "@/lib/daySearch";
 import { dayTabLabel } from "@/lib/dayLabel";
 import { MAIN_NAV_ITEMS } from "@/lib/mainNav";
 
@@ -52,9 +53,10 @@ type DayTabSlotProps = {
   label: string;
   to: string;
   exact: boolean;
+  date: string;
 };
 
-function DayTabSlot({ label, to, exact }: DayTabSlotProps) {
+function DayTabSlot({ label, to, exact, date }: DayTabSlotProps) {
   const linkRef = useRef<HTMLAnchorElement>(null);
   const [width, setWidth] = useState<number>();
 
@@ -83,6 +85,7 @@ function DayTabSlot({ label, to, exact }: DayTabSlotProps) {
       <Link
         ref={linkRef}
         to={to}
+        search={dateLinkSearch(date)}
         activeOptions={exact ? { exact: true } : undefined}
         // shrink-0 keeps the link at its natural width while the slot animates
         // past it, so the measurement above can never feed back on itself.
@@ -121,6 +124,7 @@ export function NavTabs() {
               label={dayLabel}
               to={tab.to}
               exact={tab.exact}
+              date={selectedDate}
             />
           );
         }

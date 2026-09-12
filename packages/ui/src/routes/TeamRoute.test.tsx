@@ -27,6 +27,15 @@ vi.mock("@/hooks/useViewportBand", () => ({
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
+  useSearch: () => ({}),
+  useRouterState: (opts?: {
+    select?: (state: {
+      location: { search: Record<string, unknown>; searchStr: string };
+    }) => unknown;
+  }) => {
+    const snapshot = { location: { search: {}, searchStr: "" } };
+    return opts?.select ? opts.select(snapshot) : snapshot;
+  },
   Link: ({
     to,
     children,

@@ -34,15 +34,20 @@ export function WeekPicker({
   const monthLabel = format(parseIsoWeekId(weekId), "MMMM yyyy");
 
   function goToWeek(nextWeekId: string) {
+    const search = (prev: Record<string, unknown>) => {
+      const next: Record<string, unknown> = { ...prev, week: nextWeekId };
+      delete next.date;
+      return next;
+    };
     if (to === "/team/$userId/week" && params) {
       void navigate({
         to,
         params,
-        search: { week: nextWeekId },
-      });
+        search,
+      } as never);
       return;
     }
-    void navigate({ to: "/week", search: { week: nextWeekId } });
+    void navigate({ to: "/week", search } as never);
   }
 
   function shiftWeek(delta: number) {

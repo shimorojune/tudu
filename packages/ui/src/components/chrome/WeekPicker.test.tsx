@@ -25,10 +25,17 @@ describe("WeekPicker", () => {
 
     await user.click(screen.getByRole("button", { name: "Next week" }));
 
-    expect(navigate).toHaveBeenCalledWith({
-      to: "/team/$userId/week",
-      params: { userId: "priya" },
-      search: { week: "2026-W38" },
+    expect(navigate).toHaveBeenCalledTimes(1);
+    const call = navigate.mock.calls[0][0] as {
+      to: string;
+      params: { userId: string };
+      search: (prev: Record<string, unknown>) => Record<string, unknown>;
+    };
+    expect(call.to).toBe("/team/$userId/week");
+    expect(call.params).toEqual({ userId: "priya" });
+    expect(call.search({ week: "2026-W37", date: "2026-09-10", project: "p" })).toEqual({
+      week: "2026-W38",
+      project: "p",
     });
   });
 });

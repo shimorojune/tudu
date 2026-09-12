@@ -60,6 +60,7 @@ export {
   setInspectorTab,
   requestAddTask,
   openTask,
+  hydrateDay,
   clearFocusCommentId,
   todayIso,
   type InspectorTab,

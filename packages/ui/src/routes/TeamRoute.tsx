@@ -16,6 +16,8 @@ import { TeamPersonRow } from "@/components/team/TeamPersonRow";
 import { TeamAvatar } from "@/components/team/TeamAvatar";
 import { TeamSkeleton } from "@/components/loading/TeamSkeleton";
 import { useViewportBand } from "@/hooks/useViewportBand";
+import { useDaySearchSync } from "@/hooks/useDaySearchSync";
+import { DATE_ONLY_FIELDS, dateLinkSearch } from "@/lib/daySearch";
 import { defaultWeekId } from "@/lib/week";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +26,7 @@ export function TeamRoute() {
   const band = useViewportBand();
   const selectedDate = useSelector((state: RootState) => state.day.selectedDate);
   const date = selectedDate || todayIso();
+  useDaySearchSync(DATE_ONLY_FIELDS);
   const { data, isLoading, isError } = useGetTeamQuery(date);
   const [createInvite, createState] = useCreateTeamInviteMutation();
   const [acceptInvite] = useAcceptTeamInviteMutation();
@@ -160,7 +163,7 @@ export function TeamRoute() {
                 <Link
                   to="/team/$userId"
                   params={{ userId: row.user.id }}
-                  search={{ send: false }}
+                  search={dateLinkSearch(date, { send: false })}
                   className="border border-rule px-[14px] py-[7px] text-[12px] whitespace-nowrap"
                 >
                   Open day
