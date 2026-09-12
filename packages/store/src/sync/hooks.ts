@@ -347,7 +347,10 @@ export function useAcceptInboxItemMutation() {
   return useOp((arg: { id: string } & AcceptInboxRequest) => ({
     type: "inbox.accept" as const,
     id: arg.id,
-    body: { bucket: arg.bucket },
+    body: {
+      bucket: arg.bucket,
+      ...(arg.scheduledDate ? { scheduledDate: arg.scheduledDate } : {}),
+    },
   }));
 }
 

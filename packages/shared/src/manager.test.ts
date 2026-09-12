@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  acceptInboxRequestSchema,
   acceptScheduledDate,
   canDeclineInboxCard,
   declineInboxRequestSchema,
+  defaultAcceptOtherDate,
   sendInboxTaskRequestSchema,
   DEFAULT_MANAGER_PERMISSIONS,
   inboxCardKind,
@@ -13,12 +15,69 @@ import {
 } from "./manager.js";
 
 describe("acceptScheduledDate", () => {
-  it("uses startDate when the manager set one", () => {
-    expect(acceptScheduledDate("2026-09-12", "2026-09-10")).toBe("2026-09-12");
+  it("uses the date the assignee picked", () => {
+    expect(acceptScheduledDate("2026-09-20", "2026-09-12", "2026-09-10")).toBe(
+      "2026-09-20",
+    );
   });
 
-  it("falls back to today when start is empty", () => {
-    expect(acceptScheduledDate(null, "2026-09-10")).toBe("2026-09-10");
+  it("uses startDate when no date was requested", () => {
+    expect(acceptScheduledDate(undefined, "2026-09-12", "2026-09-10")).toBe(
+      "2026-09-12",
+    );
+  });
+
+  it("falls back to today when start is empty and no date was requested", () => {
+    expect(acceptScheduledDate(undefined, null, "2026-09-10")).toBe(
+      "2026-09-10",
+    );
+  });
+});
+
+describe("defaultAcceptOtherDate", () => {
+  it("uses a start date that is not today", () => {
+    expect(defaultAcceptOtherDate("2026-09-20", "2026-09-10")).toBe(
+      "2026-09-20",
+    );
+  });
+
+  it("uses tomorrow when start is today", () => {
+    expect(defaultAcceptOtherDate("2026-09-10", "2026-09-10")).toBe(
+      "2026-09-11",
+    );
+  });
+
+  it("uses tomorrow when start is empty", () => {
+    expect(defaultAcceptOtherDate(null, "2026-09-10")).toBe("2026-09-11");
+  });
+});
+
+describe("acceptInboxRequestSchema", () => {
+  it("accepts a bucket without a date", () => {
+    expect(acceptInboxRequestSchema.parse({ bucket: "next" })).toEqual({
+      bucket: "next",
+    });
+  });
+
+  it("accepts an optional scheduled date", () => {
+    expect(
+      acceptInboxRequestSchema.parse({
+        bucket: "later",
+        scheduledDate: "2026-09-20",
+      }),
+    ).toEqual({
+      bucket: "later",
+      scheduledDate: "2026-09-20",
+    });
+  });
+
+  it("rejects a bad date", () => {
+    expect(
+      acceptInboxRequestSchema.safeParse({
+        bucket: "now",
+        scheduledDate: "20 Sep 2026",
+      }).success,
+    ).toBe(false);
   });
 });
 

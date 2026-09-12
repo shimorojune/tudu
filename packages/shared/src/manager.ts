@@ -63,11 +63,31 @@ export function permitManagerAction(
   }
 }
 
+function offsetIso(fromIso: string, dayOffset: number): string {
+  const date = new Date(`${fromIso}T12:00:00`);
+  date.setDate(date.getDate() + dayOffset);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function acceptScheduledDate(
+  requestedDate: string | undefined,
   startDate: string | null,
   today: string,
 ): string {
-  return startDate ?? today;
+  return requestedDate ?? startDate ?? today;
+}
+
+export function defaultAcceptOtherDate(
+  startDate: string | null,
+  today: string,
+): string {
+  if (startDate && startDate !== today) {
+    return startDate;
+  }
+  return offsetIso(today, 1);
 }
 
 export function normalizeInviteEmail(email: string): string {
@@ -143,6 +163,7 @@ export type InboxResponse = {
 
 export const acceptInboxRequestSchema = z.object({
   bucket: bucketSchema,
+  scheduledDate: isoDateSchema.optional(),
 });
 
 export type AcceptInboxRequest = z.infer<typeof acceptInboxRequestSchema>;

@@ -2,7 +2,7 @@ import { format, isSameDay, parseISO } from "date-fns";
 import { useEffect, useState } from "react";
 import {
   canDeclineInboxCard,
-  type Bucket,
+  effectiveDayIso,
   type InboxHistoryItem,
   type InboxPendingItem,
 } from "@tudu/shared";
@@ -14,6 +14,7 @@ import {
 } from "@tudu/store";
 import { isCommandPaletteBlocked } from "@/components/chrome/CommandPalette";
 import { useCommandPalette } from "@/components/chrome/CommandPaletteContext";
+import { InboxAcceptControls } from "@/components/inbox/InboxAcceptControls";
 import { InspectorSheet } from "@/components/inspector/InspectorSheet";
 import { InboxSkeleton } from "@/components/loading/InboxSkeleton";
 import { ProjectChip } from "@/components/projects/ProjectChip";
@@ -75,10 +76,6 @@ function InboxCard({
   const canDecline = canDeclineInboxCard(item.kind);
   const first = personFirstName(item.from.name);
   const isReturned = item.kind === "returned";
-
-  async function accept(bucket: Bucket) {
-    await acceptInbox({ id: item.id, bucket });
-  }
 
   async function sendDecline() {
     const trimmed = reason.trim();
@@ -186,37 +183,13 @@ function InboxCard({
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-[10px] pt-[2px]">
-          <button
-            type="button"
-            className="border border-rule px-[13px] py-[8px] text-[12.5px]"
-            onClick={(event) => {
-              event.stopPropagation();
-              void accept("now");
-            }}
-          >
-            Accept into Now
-          </button>
-          <button
-            type="button"
-            className="bg-primary px-[15px] py-[8px] text-[12.5px] font-bold text-primary-foreground"
-            onClick={(event) => {
-              event.stopPropagation();
-              void accept("next");
-            }}
-          >
-            Accept into Next
-          </button>
-          <button
-            type="button"
-            className="border border-rule px-[13px] py-[8px] text-[12.5px]"
-            onClick={(event) => {
-              event.stopPropagation();
-              void accept("later");
-            }}
-          >
-            Accept into Later
-          </button>
+        <InboxAcceptControls
+          startDate={item.task.startDate}
+          today={effectiveDayIso()}
+          onAccept={({ bucket, scheduledDate }) => {
+            void acceptInbox({ id: item.id, bucket, scheduledDate });
+          }}
+        >
           {canDecline ? (
             <button
               type="button"
@@ -243,7 +216,7 @@ function InboxCard({
           <span className="ml-auto font-mono text-[11.5px] text-faint">
             {canDecline ? "⌘1 · ⌘2 · ⌘3 · ⌘\\" : "⌘1 · ⌘2 · ⌘3"}
           </span>
-        </div>
+        </InboxAcceptControls>
       )}
 
       <TaskDeleteDialog
@@ -337,7 +310,11 @@ export function InboxRoute() {
         return;
       }
 
-      void acceptInbox({ id: active.id, bucket: action });
+      void acceptInbox({
+        id: active.id,
+        bucket: action,
+        scheduledDate: effectiveDayIso(),
+      });
     }
 
     window.addEventListener("keydown", onKeyDown);

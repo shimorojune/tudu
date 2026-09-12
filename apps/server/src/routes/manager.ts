@@ -132,12 +132,14 @@ export function createManagerRoute(db: Db) {
     jsonBody(acceptInboxRequestSchema),
     async (c) => {
       try {
+        const body = c.req.valid("json");
         await acceptInboxItem(
           db,
           userId(c),
           c.req.param("id"),
-          c.req.valid("json").bucket,
+          body.bucket,
           effectiveDayIso(),
+          body.scheduledDate,
         );
         return c.body(null, 204);
       } catch (error) {

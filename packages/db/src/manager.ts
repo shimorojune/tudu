@@ -416,6 +416,7 @@ export async function acceptInboxItem(
   inboxItemId: string,
   bucket: Bucket,
   today: string,
+  requestedDate?: string,
 ): Promise<TaskRow> {
   const item = await db.query.inboxItems.findFirst({
     where: and(
@@ -438,7 +439,7 @@ export async function acceptInboxItem(
     throw new ManagerActionError("Task not found", 404);
   }
 
-  const scheduledDate = acceptScheduledDate(task.startDate, today);
+  const scheduledDate = acceptScheduledDate(requestedDate, task.startDate, today);
   const position = await nextPosition(db, actorId, scheduledDate, bucket);
 
   await db.batch([

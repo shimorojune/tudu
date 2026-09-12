@@ -622,6 +622,7 @@ export async function applySyncOp(
             op.id,
             op.body.bucket,
             effectiveDayIso(),
+            op.body.scheduledDate,
           );
           const { history } = await listInbox(db, actorId);
           const row = history.find((item) => item.item.id === op.id);

@@ -235,15 +235,25 @@ export function formatTimelineEvent(
         ],
       };
     case "inbox_accepted": {
-      const bucket = bucketName((data.bucket as Bucket | null) ?? null, ctx);
+      const acceptDate =
+        typeof data.scheduledDate === "string" ? data.scheduledDate : null;
+      const sameDay = !acceptDate || acceptDate === ctx.selectedDate;
+      const rawBucket = (data.bucket as Bucket | null) ?? null;
+      const bucket = rawBucket
+        ? bucketLabel(rawBucket, sameDay && ctx.isToday)
+        : "Unscheduled";
+      const parts: TimelinePart[] = [
+        actorPart(event, ctx),
+        { kind: "text", text: " accepted this into " },
+        { kind: "text", text: bucket, bold: true, accent: true },
+      ];
+      if (acceptDate && !sameDay) {
+        parts.push({ kind: "text", text: ` on ${formatIsoDate(acceptDate)}` });
+      }
       return {
         timeLabel,
         isSystem: false,
-        parts: [
-          actorPart(event, ctx),
-          { kind: "text", text: " accepted this into " },
-          { kind: "text", text: bucket, bold: true, accent: true },
-        ],
+        parts,
       };
     }
     case "inbox_declined":

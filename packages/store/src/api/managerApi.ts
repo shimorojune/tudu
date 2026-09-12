@@ -61,10 +61,10 @@ export const managerApi = baseApi.injectEndpoints({
     }),
     acceptInboxItem: builder.mutation<void, { id: string } & AcceptInboxRequest>(
       {
-        query: ({ id, bucket }) => ({
+        query: ({ id, bucket, scheduledDate }) => ({
           url: `/inbox/${id}/accept`,
           method: "POST",
-          body: { bucket },
+          body: { bucket, scheduledDate },
         }),
         invalidatesTags: ["Inbox", "Task", "Team"],
       },

@@ -127,6 +127,25 @@ describe("formatTimelineEvent", () => {
       true,
     );
 
+    const acceptedOtherDay = formatTimelineEvent(
+      {
+        ...base,
+        type: "inbox_accepted",
+        data: { bucket: "next", scheduledDate: "2026-09-20" },
+      },
+      ctx,
+    );
+    expect(
+      acceptedOtherDay.parts.some(
+        (part) => part.kind === "text" && part.text === "Priority 2",
+      ),
+    ).toBe(true);
+    expect(
+      acceptedOtherDay.parts.some(
+        (part) => part.kind === "text" && part.text === " on Sun 20 Sep",
+      ),
+    ).toBe(true);
+
     const declined = formatTimelineEvent(
       { ...base, type: "inbox_declined", data: { reason: "Next week" } },
       ctx,

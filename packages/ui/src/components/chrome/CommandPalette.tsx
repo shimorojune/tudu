@@ -8,7 +8,7 @@ import {
   useGetInboxQuery,
   useGetProjectsQuery,
 } from "@tudu/store";
-import { type Bucket } from "@tudu/shared";
+import { effectiveDayIso, type Bucket } from "@tudu/shared";
 import { useCommandPalette } from "@/components/chrome/CommandPaletteContext";
 import {
   buildAppCommands,
@@ -173,7 +173,11 @@ export function CommandPalette() {
                     return;
                   }
                   setOpen(false);
-                  void acceptInbox({ id: pending.id, bucket: item.bucket });
+                  void acceptInbox({
+                    id: pending.id,
+                    bucket: item.bucket,
+                    scheduledDate: effectiveDayIso(),
+                  });
                 }}
               >
                 <span>{item.label}</span>
