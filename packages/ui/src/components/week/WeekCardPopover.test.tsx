@@ -8,13 +8,17 @@ import type { Task } from "@tudu/shared";
 import { WeekCardPopover } from "./WeekCardPopover";
 import { SortableWeekCard } from "./SortableWeekCard";
 
+const navigate = vi.hoisted(() => vi.fn());
+
 vi.mock("@tanstack/react-router", () => ({
-  useNavigate: () => vi.fn(),
+  useNavigate: () => navigate,
 }));
 
 vi.mock("@tudu/store", () => ({
   useDeleteTaskMutation: () => [vi.fn()],
+  useDeleteReportTaskMutation: () => [vi.fn()],
   useReorderTasksMutation: () => [vi.fn()],
+  useReorderReportTasksMutation: () => [vi.fn()],
   useUpdateTaskMutation: () => [vi.fn()],
   setSelectedDate: vi.fn(),
   setSelectedTaskId: vi.fn(),
@@ -94,5 +98,53 @@ describe("WeekCardPopover", () => {
     ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Move to Priority 1" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Move to Priority 2" })).toBeInTheDocument();
+  });
+
+  it("hides complete for a manager and opens the report day", async () => {
+    const user = userEvent.setup();
+
+    function Harness() {
+      const [open, setOpen] = useState(false);
+      return (
+        <DndContext>
+          <SortableContext items={[task.id]}>
+            <WeekCardPopover
+              task={task}
+              scheduledDate="2026-09-10"
+              isToday={false}
+              dayTasks={[task]}
+              open={open}
+              onOpenChange={setOpen}
+              viewer="manager"
+              reportUserId="priya"
+            >
+              <SortableWeekCard
+                task={task}
+                scheduledDate="2026-09-10"
+                isToday={false}
+              />
+            </WeekCardPopover>
+          </SortableContext>
+        </DndContext>
+      );
+    }
+
+    render(<Harness />);
+
+    await user.click(screen.getByRole("button", { name: /Thursday task/i }));
+
+    expect(await screen.findByRole("button", { name: "Open day" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Mark complete" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Mark in progress" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Open day" }));
+
+    expect(navigate).toHaveBeenCalledWith({
+      to: "/team/$userId",
+      params: { userId: "priya" },
+      search: { send: false },
+    });
   });
 });

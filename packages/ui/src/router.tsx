@@ -14,6 +14,8 @@ import { WeekRoute } from "@/routes/WeekRoute";
 import { InboxRoute } from "@/routes/InboxRoute";
 import { TeamRoute } from "@/routes/TeamRoute";
 import { ReportDayRoute } from "@/routes/ReportDayRoute";
+import { ReportWeekRoute } from "@/routes/ReportWeekRoute";
+import { ReportInboxRoute } from "@/routes/ReportInboxRoute";
 import { SettingsRoute } from "@/routes/SettingsRoute";
 import { UnscheduledRoute } from "@/routes/UnscheduledRoute";
 import { ProjectRoute } from "@/routes/ProjectRoute";
@@ -76,6 +78,25 @@ const teamRoute = createRoute({
   component: TeamRoute,
 });
 
+const reportWeekRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/team/$userId/week",
+  validateSearch: (search: Record<string, unknown>) => ({
+    week: typeof search.week === "string" ? search.week : undefined,
+    ...parseProjectSearch(search),
+  }),
+  component: ReportWeekRoute,
+});
+
+const reportInboxRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/team/$userId/inbox",
+  validateSearch: (search: Record<string, unknown>) => ({
+    send: search.send === true || search.send === "1" || search.send === "true",
+  }),
+  component: ReportInboxRoute,
+});
+
 const reportDayRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/team/$userId",
@@ -113,6 +134,8 @@ const routeTree = rootRoute.addChildren([
     inboxRoute,
     unscheduledRoute,
     teamRoute,
+    reportWeekRoute,
+    reportInboxRoute,
     reportDayRoute,
     settingsRoute,
     projectRoute,

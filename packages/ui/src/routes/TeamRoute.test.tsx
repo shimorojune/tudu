@@ -134,6 +134,8 @@ describe("TeamRoute", () => {
     expect(screen.getByText("7")).toBeInTheDocument();
     expect(screen.getByText("Slipping")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open day" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open week" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open inbox" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add task" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add someone" })).toBeInTheDocument();
     expect(screen.getByText("Marcus Bell")).toBeInTheDocument();

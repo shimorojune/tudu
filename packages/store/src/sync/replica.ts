@@ -4,6 +4,7 @@ import type {
   CreateTaskRequest,
   InboxHistoryItem,
   InboxPendingItem,
+  Person,
   Project,
   ProjectRef,
   ReportDayResponse,
@@ -27,6 +28,10 @@ export type Replica = {
   timelineHasMore: Record<string, boolean>;
   inboxPending: InboxPendingItem[];
   inboxHistory: InboxHistoryItem[];
+  reportInbox: Record<
+    string,
+    { report?: Person; pending: InboxPendingItem[]; history: InboxHistoryItem[] }
+  >;
   teamByDate: Record<string, TeamResponse>;
   reportDays: Record<string, ReportDayResponse>;
   notifications: AppNotification[];
@@ -50,6 +55,7 @@ export function emptyReplica(): Replica {
     timelineHasMore: {},
     inboxPending: [],
     inboxHistory: [],
+    reportInbox: {},
     teamByDate: {},
     reportDays: {},
     notifications: [],
@@ -74,6 +80,16 @@ function cloneReplica(replica: Replica): Replica {
     timelineHasMore: { ...replica.timelineHasMore },
     inboxPending: [...replica.inboxPending],
     inboxHistory: [...replica.inboxHistory],
+    reportInbox: Object.fromEntries(
+      Object.entries(replica.reportInbox).map(([userId, bucket]) => [
+        userId,
+        {
+          report: bucket.report,
+          pending: [...bucket.pending],
+          history: [...bucket.history],
+        },
+      ]),
+    ),
     teamByDate: { ...replica.teamByDate },
     reportDays: { ...replica.reportDays },
     notifications: [...replica.notifications],
@@ -116,6 +132,14 @@ function upsertTask(
     replica.remoteMovedTaskIds = [...replica.remoteMovedTaskIds, task.id];
   }
 
+  syncTaskIntoReportDays(replica, task, ownerId);
+}
+
+function syncTaskIntoReportDays(
+  replica: Replica,
+  task: Task,
+  ownerId: string,
+): void {
   for (const [key, day] of Object.entries(replica.reportDays)) {
     const split = key.lastIndexOf(":");
     const reportId = split === -1 ? key : key.slice(0, split);
@@ -269,6 +293,21 @@ export function applyEvent(replica: Replica, event: SyncEvent): Replica {
       for (const task of payload.tasks) {
         upsertTask(next, task, payload.report.id, false);
       }
+      return next;
+    }
+    case "reportInbox.upsert": {
+      const payload = event.payload as {
+        userId: string;
+        report?: Person;
+        pending: InboxPendingItem[];
+        history?: InboxHistoryItem[];
+      };
+      const existing = next.reportInbox[payload.userId];
+      next.reportInbox[payload.userId] = {
+        report: payload.report ?? existing?.report,
+        pending: payload.pending,
+        history: payload.history ?? existing?.history ?? [],
+      };
       return next;
     }
     case "notification.upsert": {
@@ -690,21 +729,64 @@ export function applyOp(replica: Replica, op: SyncOp): Replica {
       return next;
     }
     case "team.task.send": {
+      const existing = next.reportInbox[op.userId] ?? {
+        pending: [] as InboxPendingItem[],
+        history: [] as InboxHistoryItem[],
+      };
+      if (existing.pending.some((item) => item.task.id === op.id)) {
+        return next;
+      }
+      const now = new Date().toISOString();
+      const from =
+        Object.values(next.teamByDate)
+          .map((team) => team.manager)
+          .find((person) => person && person.id === next.viewerId) ?? {
+          id: next.viewerId ?? "",
+          name: "",
+          email: "",
+        };
+      const item: InboxPendingItem = {
+        id: op.id,
+        kind: "assigned",
+        from,
+        task: {
+          id: op.id,
+          title: op.body.title,
+          description: op.body.description ?? null,
+          scheduledDate: null,
+          bucket: null,
+          position: 0,
+          startDate: op.body.startDate ?? null,
+          deadline: op.body.deadline ?? null,
+          completedAt: null,
+          inProgress: false,
+          carriedDays: 0,
+          carriedSince: null,
+          isPrivate: false,
+          createdAt: now,
+          updatedAt: now,
+          subtasks: [],
+          commentCount: 0,
+          project: projectRefFromReplica(next, op.body.projectId),
+        },
+        declineReason: null,
+        createdAt: now,
+      };
+      next.reportInbox[op.userId] = {
+        ...existing,
+        pending: [item, ...existing.pending],
+      };
       return next;
     }
     case "team.task.reorder": {
       next.tasks = applyReorderToTasks(next.tasks, op.body.lanes);
-      for (const [key, day] of Object.entries(next.reportDays)) {
-        if (!key.startsWith(`${op.userId}:`)) {
+      const movedIds = new Set(op.body.lanes.flatMap((lane) => lane.taskIds));
+      for (const taskId of movedIds) {
+        const task = next.tasks[taskId];
+        if (!task) {
           continue;
         }
-        next.reportDays[key] = {
-          ...day,
-          tasks: day.tasks
-            .map((task) => next.tasks[task.id] ?? task)
-            .filter((task) => task.scheduledDate === day.date)
-            .sort((a, b) => a.position - b.position),
-        };
+        syncTaskIntoReportDays(next, task, op.userId);
       }
       return next;
     }
@@ -867,6 +949,17 @@ export function unscheduledTasks(replica: Replica): Task[] {
       }
       const ownerId = replica.owners[task.id];
       return !ownerId || ownerId === replica.viewerId;
+    })
+    .sort((a, b) => a.position - b.position);
+}
+
+export function unscheduledForOwner(replica: Replica, ownerId: string): Task[] {
+  return Object.values(replica.tasks)
+    .filter((task) => {
+      if (task.scheduledDate !== null || task.isPrivate) {
+        return false;
+      }
+      return replica.owners[task.id] === ownerId;
     })
     .sort((a, b) => a.position - b.position);
 }

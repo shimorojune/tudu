@@ -17,7 +17,10 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { effectiveDayIso } from "@tudu/shared";
-import { useReorderTasksMutation } from "@tudu/store";
+import {
+  useReorderReportTasksMutation,
+  useReorderTasksMutation,
+} from "@tudu/store";
 import {
   findContainer,
   itemsFromTasks,
@@ -37,6 +40,7 @@ import {
   parseIsoDate,
   UNSCHEDULED_CONTAINER,
   weekContainersForDays,
+  type WeekViewer,
 } from "@/lib/week";
 import { remapWeekDropTarget, weekLaneFor } from "@/lib/weekDrag";
 import { usePointerY } from "@/hooks/usePointerY";
@@ -55,6 +59,8 @@ export type WeekGridProps = {
   tasksByDay: Map<string, Task[]>;
   highlightedDay: string;
   onHighlightDay: (day: string) => void;
+  viewer?: WeekViewer;
+  reportUserId?: string;
 };
 
 function containerOf(task: Task): string | null {
@@ -68,6 +74,8 @@ type WeekGridDndProps = WeekGridProps & {
   allTasks: Task[];
   baseItems: ContainerItems;
   onReorder: (items: ContainerItems) => void;
+  viewer: WeekViewer;
+  reportUserId?: string;
 };
 
 function WeekGridDnd({
@@ -77,6 +85,8 @@ function WeekGridDnd({
   onReorder,
   highlightedDay,
   onHighlightDay,
+  viewer,
+  reportUserId,
 }: WeekGridDndProps) {
   const today = effectiveDayIso();
   const filterProjectId = useProjectFilterId();
@@ -302,6 +312,8 @@ function WeekGridDnd({
               popoverTaskId={popoverTaskId}
               onHighlight={() => onHighlightDay(day)}
               onPopoverChange={setPopoverTaskId}
+              viewer={viewer}
+              reportUserId={reportUserId}
             />
           ))}
         </div>
@@ -329,8 +341,11 @@ export function WeekGrid({
   tasksByDay,
   highlightedDay,
   onHighlightDay,
+  viewer = "self",
+  reportUserId,
 }: WeekGridProps) {
   const [reorderTasks] = useReorderTasksMutation();
+  const [reorderReportTasks] = useReorderReportTasksMutation();
 
   const allTasks = useMemo(() => {
     const dayTasks = weekDays.flatMap((day) => tasksByDay.get(day) ?? []);
@@ -366,7 +381,11 @@ export function WeekGrid({
       laneFor: weekLaneFor,
     });
     if (lanes.length > 0) {
-      reorderTasks({ lanes });
+      if (viewer === "manager" && reportUserId) {
+        reorderReportTasks({ userId: reportUserId, lanes });
+      } else {
+        reorderTasks({ lanes });
+      }
     }
   }
 
@@ -386,6 +405,8 @@ export function WeekGrid({
         onReorder={handleReorder}
         highlightedDay={highlightedDay}
         onHighlightDay={onHighlightDay}
+        viewer={viewer}
+        reportUserId={reportUserId}
       />
     </DndContext>
   );

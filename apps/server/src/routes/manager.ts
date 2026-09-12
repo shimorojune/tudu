@@ -12,6 +12,8 @@ import {
   deleteReportTask,
   listInbox,
   listReportDayTasks,
+  listReportInbox,
+  listReportUnscheduledTasks,
   listTeam,
   reorderReportTasks,
   sendInboxTask,
@@ -29,6 +31,8 @@ import {
   type InboxPendingItem,
   type InboxResponse,
   type ReportDayResponse,
+  type ReportInboxResponse,
+  type ReportUnscheduledResponse,
   type Task,
   type TeamInvite,
   type TeamResponse,
@@ -213,6 +217,57 @@ export function createManagerRoute(db: Db) {
     try {
       await declineManagerInvite(db, userId(c), c.req.param("id"));
       return c.body(null, 204);
+    } catch (error) {
+      const mapped = handleManagerError(error);
+      return c.json({ error: mapped.error }, mapped.status);
+    }
+  });
+
+  app.get("/team/:userId/inbox", async (c) => {
+    try {
+      const result = await listReportInbox(db, userId(c), c.req.param("userId"));
+      const pending: InboxPendingItem[] = result.pending.map((row) => ({
+        id: row.item.id,
+        kind: row.kind,
+        from: row.from,
+        task: toTask(row.task),
+        declineReason: row.item.declineReason,
+        createdAt: row.item.createdAt.toISOString(),
+      }));
+      const history: InboxHistoryItem[] = result.history.map((row) => ({
+        id: row.item.id,
+        status: row.item.status === "accepted" ? "accepted" : "declined",
+        title: row.title,
+        from: row.from,
+        bucket: row.item.status === "accepted" ? row.bucket : null,
+        declineReason: row.item.declineReason,
+        createdAt: row.item.createdAt.toISOString(),
+      }));
+      const response: ReportInboxResponse = {
+        report: result.report,
+        pending,
+        history,
+        count: pending.length,
+      };
+      return c.json(response);
+    } catch (error) {
+      const mapped = handleManagerError(error);
+      return c.json({ error: mapped.error }, mapped.status);
+    }
+  });
+
+  app.get("/team/:userId/unscheduled", async (c) => {
+    try {
+      const result = await listReportUnscheduledTasks(
+        db,
+        userId(c),
+        c.req.param("userId"),
+      );
+      const response: ReportUnscheduledResponse = {
+        report: result.report,
+        tasks: result.tasks.map((row) => mapTask(row, { hidePrivateProjects: true })),
+      };
+      return c.json(response);
     } catch (error) {
       const mapped = handleManagerError(error);
       return c.json({ error: mapped.error }, mapped.status);

@@ -27,6 +27,7 @@ import {
   reportDayKey,
   tasksForDay,
   tasksForProject,
+  unscheduledForOwner,
   unscheduledTasks,
 } from "./replica.js";
 import { selectVisible } from "./slice.js";
@@ -149,6 +150,40 @@ export function useGetReportDayQuery(
       ).length,
     };
   }, [stored, replica, arg.userId, arg.date]);
+  return { ...query, data };
+}
+
+export function useGetReportUnscheduledQuery(
+  userId: string,
+  options?: QueryOptions,
+) {
+  const key = options?.skip || !userId ? null : viewKey.reportUnscheduled(userId);
+  const query = useView(key);
+  const replica = useSelector(selectVisible);
+  const data = useMemo(
+    () => ({ tasks: userId ? unscheduledForOwner(replica, userId) : [] }),
+    [replica, userId],
+  );
+  return { ...query, data };
+}
+
+export function useGetReportInboxQuery(
+  userId: string,
+  options?: QueryOptions,
+) {
+  const key = options?.skip || !userId ? null : viewKey.reportInbox(userId);
+  const query = useView(key);
+  const replica = useSelector(selectVisible);
+  const data = useMemo(() => {
+    const bucket = userId ? replica.reportInbox[userId] : undefined;
+    const pending = bucket?.pending ?? [];
+    return {
+      report: bucket?.report,
+      pending,
+      history: bucket?.history ?? [],
+      count: pending.length,
+    };
+  }, [replica, userId]);
   return { ...query, data };
 }
 

@@ -722,6 +722,71 @@ export async function listReportDayTasks(
   };
 }
 
+export async function listReportUnscheduledTasks(
+  db: Db,
+  managerUserId: string,
+  reportUserId: string,
+): Promise<{ report: Person; tasks: TaskRowWithSubtasks[] }> {
+  const link = await findLiveLink(db, managerUserId, reportUserId);
+  if (!link?.permissions || !link.permissions.canSeeDay) {
+    throw new ManagerActionError("Not a report of yours", 403);
+  }
+
+  const report = await db.query.user.findFirst({
+    where: eq(user.id, reportUserId),
+  });
+  if (!report) {
+    throw new ManagerActionError("Report not found", 404);
+  }
+
+  const hidePrivate = !link.permissions.canSeePrivate;
+  const rows = await db.query.tasks.findMany({
+    where: and(
+      eq(tasks.userId, reportUserId),
+      isNull(tasks.deletedAt),
+      isNull(tasks.scheduledDate),
+      ...(hidePrivate ? [eq(tasks.isPrivate, false)] : []),
+      notPendingInbox(),
+    ),
+    with: liveSubtasks,
+    orderBy: [asc(tasks.position)],
+  });
+
+  return {
+    report: toPerson(report),
+    tasks: await attachCommentCounts(db, rows),
+  };
+}
+
+export async function listReportInbox(
+  db: Db,
+  managerUserId: string,
+  reportUserId: string,
+): Promise<{
+  report: Person;
+  pending: InboxPendingRow[];
+  history: InboxHistoryRow[];
+}> {
+  const link = await findLiveLink(db, managerUserId, reportUserId);
+  if (!link?.permissions || !link.permissions.canSeeDay) {
+    throw new ManagerActionError("Not a report of yours", 403);
+  }
+
+  const report = await db.query.user.findFirst({
+    where: eq(user.id, reportUserId),
+  });
+  if (!report) {
+    throw new ManagerActionError("Report not found", 404);
+  }
+
+  const inbox = await listInbox(db, reportUserId);
+  return {
+    report: toPerson(report),
+    pending: inbox.pending,
+    history: inbox.history,
+  };
+}
+
 export async function createManagerInvite(
   db: Db,
   actorId: string,

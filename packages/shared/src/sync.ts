@@ -41,7 +41,9 @@ export type SyncView =
   | { type: "notifications" }
   | { type: "projects" }
   | { type: "project"; projectId: string }
-  | { type: "reportProjects"; userId: string };
+  | { type: "reportProjects"; userId: string }
+  | { type: "reportUnscheduled"; userId: string }
+  | { type: "reportInbox"; userId: string };
 
 export const viewKey = {
   day: (date: string) => `day:${date}`,
@@ -54,6 +56,8 @@ export const viewKey = {
   projects: () => "projects",
   project: (projectId: string) => `project:${projectId}`,
   reportProjects: (userId: string) => `reportProjects:${userId}`,
+  reportUnscheduled: (userId: string) => `reportUnscheduled:${userId}`,
+  reportInbox: (userId: string) => `reportInbox:${userId}`,
 };
 
 export function parseViewKey(key: string): SyncView | null {
@@ -88,6 +92,20 @@ export function parseViewKey(key: string): SyncView | null {
     }
     return { type: "reportProjects", userId };
   }
+  if (key.startsWith("reportUnscheduled:")) {
+    const userId = key.slice("reportUnscheduled:".length);
+    if (!userId) {
+      return null;
+    }
+    return { type: "reportUnscheduled", userId };
+  }
+  if (key.startsWith("reportInbox:")) {
+    const userId = key.slice("reportInbox:".length);
+    if (!userId) {
+      return null;
+    }
+    return { type: "reportInbox", userId };
+  }
   if (key.startsWith("reportDay:")) {
     const rest = key.slice(10);
     const split = rest.lastIndexOf(":");
@@ -119,6 +137,7 @@ export const SYNC_EVENT_TYPES = [
   "notification.readAll",
   "project.upsert",
   "project.delete",
+  "reportInbox.upsert",
 ] as const;
 
 export type SyncEventType = (typeof SYNC_EVENT_TYPES)[number];

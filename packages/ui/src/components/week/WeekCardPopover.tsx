@@ -4,12 +4,15 @@ import { useState } from "react";
 import type { Bucket, Task } from "@tudu/shared";
 import { BUCKETS } from "@tudu/shared";
 import {
+  useDeleteReportTaskMutation,
   useDeleteTaskMutation,
+  useReorderReportTasksMutation,
   useReorderTasksMutation,
   useUpdateTaskMutation,
   setSelectedDate,
   setSelectedTaskId,
 } from "@tudu/store";
+import type { WeekViewer } from "@/lib/week";
 import { useDispatch } from "react-redux";
 import { bucketLabel } from "@/lib/buckets";
 import { moveTaskToBucketLanes } from "@/lib/reorder";
@@ -28,6 +31,8 @@ export type WeekCardPopoverProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: ReactNode;
+  viewer?: WeekViewer;
+  reportUserId?: string;
 };
 
 export function WeekCardPopover({
@@ -38,18 +43,27 @@ export function WeekCardPopover({
   open,
   onOpenChange,
   children,
+  viewer = "self",
+  reportUserId,
 }: WeekCardPopoverProps) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [updateTask] = useUpdateTaskMutation();
   const [deleteTask] = useDeleteTaskMutation();
+  const [deleteReportTask] = useDeleteReportTaskMutation();
   const [reorderTasks] = useReorderTasksMutation();
+  const [reorderReportTasks] = useReorderReportTasksMutation();
+  const isManager = viewer === "manager";
 
   function moveToBucket(bucket: Bucket) {
     const lanes = moveTaskToBucketLanes(dayTasks, task.id, bucket, scheduledDate);
     if (lanes.length > 0) {
-      reorderTasks({ lanes });
+      if (isManager && reportUserId) {
+        reorderReportTasks({ userId: reportUserId, lanes });
+      } else {
+        reorderTasks({ lanes });
+      }
     }
     onOpenChange(false);
   }
@@ -73,7 +87,7 @@ export function WeekCardPopover({
                 Move to {bucketLabel(bucket, isToday)}
               </button>
             ))}
-            {task.completedAt === null ? (
+            {!isManager && task.completedAt === null ? (
               <button
                 type="button"
                 className="px-[14px] py-[8px] text-left text-[13px] hover:bg-foreground/[0.03]"
@@ -88,19 +102,21 @@ export function WeekCardPopover({
                 {task.inProgress ? "Clear in progress" : "Mark in progress"}
               </button>
             ) : null}
-            <button
-              type="button"
-              className="px-[14px] py-[8px] text-left text-[13px] hover:bg-foreground/[0.03]"
-              onClick={() => {
-                updateTask({
-                  id: task.id,
-                  patch: { completed: task.completedAt === null },
-                });
-                onOpenChange(false);
-              }}
-            >
-              {task.completedAt ? "Mark incomplete" : "Mark complete"}
-            </button>
+            {!isManager ? (
+              <button
+                type="button"
+                className="px-[14px] py-[8px] text-left text-[13px] hover:bg-foreground/[0.03]"
+                onClick={() => {
+                  updateTask({
+                    id: task.id,
+                    patch: { completed: task.completedAt === null },
+                  });
+                  onOpenChange(false);
+                }}
+              >
+                {task.completedAt ? "Mark incomplete" : "Mark complete"}
+              </button>
+            ) : null}
             <button
               type="button"
               className="px-[14px] py-[8px] text-left text-[13px] text-destructive hover:bg-foreground/[0.03]"
@@ -118,6 +134,14 @@ export function WeekCardPopover({
                 dispatch(setSelectedDate(scheduledDate));
                 dispatch(setSelectedTaskId(task.id));
                 onOpenChange(false);
+                if (isManager && reportUserId) {
+                  void navigate({
+                    to: "/team/$userId",
+                    params: { userId: reportUserId },
+                    search: { send: false },
+                  });
+                  return;
+                }
                 void navigate({ to: "/" });
               }}
             >
@@ -131,7 +155,11 @@ export function WeekCardPopover({
         title={task.title}
         onOpenChange={setDeleteOpen}
         onConfirm={() => {
-          deleteTask(task.id);
+          if (isManager && reportUserId) {
+            deleteReportTask({ userId: reportUserId, taskId: task.id });
+          } else {
+            deleteTask(task.id);
+          }
           setDeleteOpen(false);
         }}
       />

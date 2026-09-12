@@ -7,7 +7,12 @@ import { BUCKETS, type Bucket } from "@tudu/shared";
 import { selectVisible } from "@tudu/store";
 import { bucketLabel } from "@/lib/buckets";
 import { containerDroppableId } from "@/lib/dragSort";
-import { containerForDayBucket, isWeekendIso, parseIsoDate } from "@/lib/week";
+import {
+  containerForDayBucket,
+  isWeekendIso,
+  parseIsoDate,
+  type WeekViewer,
+} from "@/lib/week";
 import { useProjectFilterId } from "@/hooks/useProjectFilterId";
 import { isTaskDimmed } from "@/lib/projectFilter";
 import { SortableWeekCard } from "@/components/week/SortableWeekCard";
@@ -24,6 +29,8 @@ export type WeekColumnProps = {
   popoverTaskId: string | null;
   onHighlight: () => void;
   onPopoverChange: (taskId: string | null) => void;
+  viewer?: WeekViewer;
+  reportUserId?: string;
 };
 
 function BucketZone({
@@ -35,6 +42,8 @@ function BucketZone({
   dropActive,
   popoverTaskId,
   onPopoverChange,
+  viewer,
+  reportUserId,
 }: {
   date: string;
   bucket: Bucket;
@@ -44,6 +53,8 @@ function BucketZone({
   dropActive: boolean;
   popoverTaskId: string | null;
   onPopoverChange: (taskId: string | null) => void;
+  viewer?: WeekViewer;
+  reportUserId?: string;
 }) {
   const remoteMovedTaskIds = useSelector(selectVisible).remoteMovedTaskIds;
   const filterProjectId = useProjectFilterId();
@@ -75,6 +86,8 @@ function BucketZone({
                 dayTasks={allDayTasks}
                 open={open}
                 onOpenChange={(next) => onPopoverChange(next ? task.id : null)}
+                viewer={viewer}
+                reportUserId={reportUserId}
               >
                 <SortableWeekCard
                   task={task}
@@ -102,6 +115,8 @@ export function WeekColumn({
   popoverTaskId,
   onHighlight,
   onPopoverChange,
+  viewer,
+  reportUserId,
 }: WeekColumnProps) {
   const weekend = isWeekendIso(date);
   const dayDate = parseIsoDate(date);
@@ -174,6 +189,8 @@ export function WeekColumn({
             dropActive={dropTargetBucket === containerForDayBucket(date, bucket)}
             popoverTaskId={popoverTaskId}
             onPopoverChange={onPopoverChange}
+            viewer={viewer}
+            reportUserId={reportUserId}
           />
         ))}
       </div>

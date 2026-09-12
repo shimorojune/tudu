@@ -1,6 +1,5 @@
 import { useEffect } from "react";
-import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { ChevronLeft } from "lucide-react";
+import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useDispatch, useSelector } from "react-redux";
 import {
   setSelectedTaskId,
@@ -12,9 +11,10 @@ import { DetailInspector } from "@/components/inspector/DetailInspector";
 import { InspectorSheet } from "@/components/inspector/InspectorSheet";
 import { ReportDaySkeleton } from "@/components/loading/ReportDaySkeleton";
 import { DayTaskList } from "@/components/tasks/DayTaskList";
+import { ReportPersonHeader } from "@/components/team/ReportPersonHeader";
 import { SendInboxForm } from "@/components/team/SendInboxForm";
 import { useViewportBand } from "@/hooks/useViewportBand";
-import { personFirstName, personInitials } from "@/lib/person";
+import { personFirstName } from "@/lib/person";
 
 export function ReportDayRoute() {
   const { userId } = useParams({ strict: false }) as { userId: string };
@@ -95,38 +95,19 @@ export function ReportDayRoute() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-[56px] shrink-0 items-center gap-[12px] border-b border-rule bg-card px-[12px] md:gap-[16px] md:px-[22px]">
-        <Link
-          to="/team"
-          className="flex items-center gap-[8px] text-[13px] text-muted-foreground"
-        >
-          <ChevronLeft size={15} strokeWidth={1.9} />
-          Team
-        </Link>
-        <div className="flex items-center gap-[12px]">
-          <div className="flex size-[26px] items-center justify-center bg-foreground text-[11px] font-extrabold text-card">
-            {personInitials(data.report.name)}
-          </div>
-          <span className="text-[16px] font-extrabold tracking-[-0.02em]">
-            {data.report.name}
-          </span>
-          <span className="hidden text-[12px] text-faint md:inline">reports to you</span>
-        </div>
-        <button
-          type="button"
-          className="ml-auto text-[12.5px] text-muted-foreground"
-          onClick={() => {
-            dispatch(setSelectedTaskId(null));
-            void navigate({
-              to: "/team/$userId",
-              params: { userId },
-              search: { send: true },
-            });
-          }}
-        >
-          Send a task
-        </button>
-      </div>
+      <ReportPersonHeader
+        userId={userId}
+        name={data.report.name}
+        view="day"
+        onSend={() => {
+          dispatch(setSelectedTaskId(null));
+          void navigate({
+            to: "/team/$userId/inbox",
+            params: { userId },
+            search: { send: true },
+          });
+        }}
+      />
 
       {data.slippingCount > 0 ? (
         <div className="flex items-center gap-[10px] border-b border-hair bg-foreground/[0.03] px-[16px] py-[14px] text-[12.5px] text-muted-foreground md:px-[30px]">

@@ -6,6 +6,8 @@ import type {
   InboxResponse,
   Lane,
   ReportDayResponse,
+  ReportInboxResponse,
+  ReportUnscheduledResponse,
   ReorderRequest,
   SendInboxTaskRequest,
   TeamResponse,
@@ -108,6 +110,25 @@ export const managerApi = baseApi.injectEndpoints({
         method: "POST",
       }),
       invalidatesTags: ["Team"],
+    }),
+    getReportInbox: builder.query<ReportInboxResponse, string>({
+      query: (userId) => `/team/${userId}/inbox`,
+      providesTags: (_result, _error, userId) => [
+        { type: "Team", id: `${userId}:inbox` },
+        "Team",
+        "Inbox",
+      ],
+    }),
+    getReportUnscheduled: builder.query<
+      ReportUnscheduledResponse,
+      string
+    >({
+      query: (userId) => `/team/${userId}/unscheduled`,
+      providesTags: (_result, _error, userId) => [
+        { type: "Team", id: `${userId}:unscheduled` },
+        "Team",
+        "Task",
+      ],
     }),
     getReportDay: builder.query<
       ReportDayResponse,

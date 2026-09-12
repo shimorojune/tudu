@@ -57,5 +57,13 @@ describe("viewKey", () => {
       type: "reportProjects",
       userId: "u1",
     });
+    expect(parseViewKey(viewKey.reportUnscheduled("u1"))).toEqual({
+      type: "reportUnscheduled",
+      userId: "u1",
+    });
+    expect(parseViewKey(viewKey.reportInbox("u1"))).toEqual({
+      type: "reportInbox",
+      userId: "u1",
+    });
   });
 });

@@ -28,6 +28,8 @@ export {
   useAcceptTeamInviteMutation,
   useDeclineTeamInviteMutation,
   useGetReportDayQuery,
+  useGetReportUnscheduledQuery,
+  useGetReportInboxQuery,
   useSendInboxTaskMutation,
   useReorderReportTasksMutation,
   useDeleteReportTaskMutation,

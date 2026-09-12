@@ -16,6 +16,7 @@ import { TeamPersonRow } from "@/components/team/TeamPersonRow";
 import { TeamAvatar } from "@/components/team/TeamAvatar";
 import { TeamSkeleton } from "@/components/loading/TeamSkeleton";
 import { useViewportBand } from "@/hooks/useViewportBand";
+import { defaultWeekId } from "@/lib/week";
 import { cn } from "@/lib/utils";
 
 export function TeamRoute() {
@@ -164,6 +165,22 @@ export function TeamRoute() {
                 >
                   Open day
                 </Link>
+                <Link
+                  to="/team/$userId/week"
+                  params={{ userId: row.user.id }}
+                  search={{ week: defaultWeekId() }}
+                  className="border border-rule px-[14px] py-[7px] text-[12px] whitespace-nowrap"
+                >
+                  Open week
+                </Link>
+                <Link
+                  to="/team/$userId/inbox"
+                  params={{ userId: row.user.id }}
+                  search={{ send: false }}
+                  className="border border-rule px-[14px] py-[7px] text-[12px] whitespace-nowrap"
+                >
+                  Open inbox
+                </Link>
                 <button
                   type="button"
                   className={cn(
@@ -172,7 +189,7 @@ export function TeamRoute() {
                   )}
                   onClick={() =>
                     void navigate({
-                      to: "/team/$userId",
+                      to: "/team/$userId/inbox",
                       params: { userId: row.user.id },
                       search: { send: true },
                     })

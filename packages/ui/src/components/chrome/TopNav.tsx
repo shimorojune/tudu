@@ -13,6 +13,7 @@ import { NavTabs } from "@/components/chrome/NavTabs";
 import { NotificationBell } from "@/components/chrome/NotificationBell";
 import { WeekPicker } from "@/components/chrome/WeekPicker";
 import { ProjectFilter } from "@/components/projects/ProjectFilter";
+import { isWeekPath, reportUserIdFromPath } from "@/lib/reportPath";
 import { defaultWeekId, weekDaysFromWeekId } from "@/lib/week";
 
 function NewTaskButton({ reportUserId }: { reportUserId: string | null }) {
@@ -22,7 +23,7 @@ function NewTaskButton({ reportUserId }: { reportUserId: string | null }) {
   function handleClick() {
     if (reportUserId) {
       void navigate({
-        to: "/team/$userId",
+        to: "/team/$userId/inbox",
         params: { userId: reportUserId },
         search: { send: true },
       });
@@ -81,9 +82,8 @@ export function TopNav() {
   const search = useRouterState({
     select: (s) => s.location.search as { week?: string },
   });
-  const onWeek = pathname === "/week";
-  const reportMatch = pathname.match(/^\/team\/([^/]+)$/);
-  const reportUserId = reportMatch?.[1] ?? null;
+  const onWeek = isWeekPath(pathname);
+  const reportUserId = reportUserIdFromPath(pathname);
   const showProjectFilter =
     pathname === "/" ||
     pathname === "/week" ||
@@ -98,7 +98,12 @@ export function TopNav() {
       <NavTabs />
       <div className="ml-auto flex min-w-0 shrink-0 items-center gap-[8px] xl:gap-[18px]">
         {onWeek ? (
-          <WeekPicker weekId={weekId} weekDays={weekDays} />
+          <WeekPicker
+            weekId={weekId}
+            weekDays={weekDays}
+            to={reportUserId ? "/team/$userId/week" : "/week"}
+            params={reportUserId ? { userId: reportUserId } : undefined}
+          />
         ) : (
           <>
             <DateNav />

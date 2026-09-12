@@ -18,15 +18,30 @@ import { cn } from "@/lib/utils";
 export type WeekPickerProps = {
   weekId: string;
   weekDays: string[];
+  to?: "/week" | "/team/$userId/week";
+  params?: { userId: string };
 };
 
-export function WeekPicker({ weekId, weekDays }: WeekPickerProps) {
+export function WeekPicker({
+  weekId,
+  weekDays,
+  to = "/week",
+  params,
+}: WeekPickerProps) {
   const navigate = useNavigate();
   const label = weekRangeLabel(weekDays[0], weekDays[6]);
   const pickerRows = weekPickerRows({ anchorWeekId: weekId });
   const monthLabel = format(parseIsoWeekId(weekId), "MMMM yyyy");
 
   function goToWeek(nextWeekId: string) {
+    if (to === "/team/$userId/week" && params) {
+      void navigate({
+        to,
+        params,
+        search: { week: nextWeekId },
+      });
+      return;
+    }
     void navigate({ to: "/week", search: { week: nextWeekId } });
   }
 

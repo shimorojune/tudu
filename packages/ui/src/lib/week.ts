@@ -11,6 +11,8 @@ import { BUCKETS } from "@tudu/shared";
 
 export const UNSCHEDULED_CONTAINER = "unscheduled";
 
+export type WeekViewer = "self" | "manager";
+
 const ISO_WEEK_RE = /^(\d{4})-W(\d{2})$/;
 
 export function parseIsoDate(iso: string): Date {

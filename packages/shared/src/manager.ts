@@ -226,4 +226,16 @@ export type ReportDayResponse = {
   slippingCount: number;
 };
 
+export type ReportUnscheduledResponse = {
+  report: Person;
+  tasks: Task[];
+};
+
+export type ReportInboxResponse = {
+  report: Person;
+  pending: InboxPendingItem[];
+  history: InboxHistoryItem[];
+  count: number;
+};
+
 export type InboxCountResponse = { count: number };

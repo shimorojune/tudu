@@ -28,6 +28,8 @@ import {
   listProjectsForUser,
   listPublicProjectsForUser,
   listReportDayTasks,
+  listReportInbox,
+  listReportUnscheduledTasks,
   listTasksForDay,
   listTasksForProject,
   listTeam,
@@ -349,6 +351,30 @@ async function emitInboxForUser(
   return events;
 }
 
+async function emitReportInboxForManager(
+  db: Db,
+  managerUserId: string,
+  reportUserId: string,
+  clientMutationId: string | null,
+): Promise<SyncEvent[]> {
+  try {
+    const result = await listReportInbox(db, managerUserId, reportUserId);
+    return emitSync(db, {
+      recipientUserIds: [managerUserId],
+      clientMutationId,
+      type: "reportInbox.upsert",
+      payload: {
+        userId: reportUserId,
+        report: result.report,
+        pending: result.pending.map(toPending),
+        history: result.history.map(toHistory),
+      },
+    });
+  } catch {
+    return [];
+  }
+}
+
 export async function applySyncOp(
   db: Db,
   actorId: string,
@@ -640,6 +666,12 @@ export async function applySyncOp(
           await push(await emitTaskSnapshot(db, task.id, clientMutationId));
           await push(await emitLatestTimeline(db, task.id, clientMutationId));
           await push(await emitRosterForOwner(db, actorId, clientMutationId));
+          const managerId = await managerIdForOwner(db, actorId);
+          if (managerId) {
+            await push(
+              await emitReportInboxForManager(db, managerId, actorId, clientMutationId),
+            );
+          }
         } catch (error) {
           wrapManager(error);
         }
@@ -662,6 +694,12 @@ export async function applySyncOp(
             }),
           );
           await push(await emitInboxForUser(db, bounced.toUserId, clientMutationId));
+          const managerId = await managerIdForOwner(db, actorId);
+          if (managerId) {
+            await push(
+              await emitReportInboxForManager(db, managerId, actorId, clientMutationId),
+            );
+          }
           const bouncedTask = await loadTaskWithSubtasks(db, bounced.taskId);
           if (bouncedTask) {
             await push(
@@ -777,6 +815,9 @@ export async function applySyncOp(
             await push(await emitProjectFanout(db, sent.task.projectId, clientMutationId));
           }
           await push(await emitInboxForUser(db, op.userId, clientMutationId));
+          await push(
+            await emitReportInboxForManager(db, actorId, op.userId, clientMutationId),
+          );
           await push(await emitLatestTimeline(db, sent.task.id, clientMutationId));
           await push(
             await insertAndEmitNotifications(db, {
@@ -1063,6 +1104,38 @@ export async function bootstrapViews(
                   deadline: task.deadline?.toISOString() ?? null,
                 }),
               ).length,
+            }),
+          );
+        } catch {
+          break;
+        }
+        break;
+      }
+      case "reportUnscheduled": {
+        try {
+          const result = await listReportUnscheduledTasks(db, userId, view.userId);
+          for (const row of result.tasks) {
+            events.push(
+              synthetic("task.upsert", {
+                task: mapTask(row, { hidePrivateProjects: true }),
+                ownerId: view.userId,
+              }),
+            );
+          }
+        } catch {
+          break;
+        }
+        break;
+      }
+      case "reportInbox": {
+        try {
+          const result = await listReportInbox(db, userId, view.userId);
+          events.push(
+            synthetic("reportInbox.upsert", {
+              userId: view.userId,
+              report: result.report,
+              pending: result.pending.map(toPending),
+              history: result.history.map(toHistory),
             }),
           );
         } catch {

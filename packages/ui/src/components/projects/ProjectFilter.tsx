@@ -10,6 +10,7 @@ import {
 import { ProjectChip } from "@/components/projects/ProjectChip";
 import { useProjectFilterId } from "@/hooks/useProjectFilterId";
 import { mergeReportFilterProjects } from "@/lib/projectFilter";
+import { reportUserIdFromPath } from "@/lib/reportPath";
 import { cn } from "@/lib/utils";
 import {
   Popover,
@@ -24,8 +25,7 @@ export function ProjectFilter() {
     select: (state) => state.location.search as Record<string, unknown>,
   });
   const selectedId = useProjectFilterId();
-  const reportMatch = pathname.match(/^\/team\/([^/]+)$/);
-  const reportUserId = reportMatch?.[1] ?? null;
+  const reportUserId = reportUserIdFromPath(pathname);
   const selectedDate =
     useSelector((state: RootState) => state.day.selectedDate) || todayIso();
   const { data: ownProjects = [] } = useGetProjectsQuery({
