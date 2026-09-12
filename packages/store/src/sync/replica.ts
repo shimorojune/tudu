@@ -612,6 +612,9 @@ export function applyOp(replica: Replica, op: SyncOp): Replica {
     }
     case "comment.create": {
       const existing = next.commentsByTask[op.taskId] ?? [];
+      if (existing.some((row) => row.id === op.id)) {
+        return next;
+      }
       const now = new Date().toISOString();
       const row: Comment = {
         id: op.id,

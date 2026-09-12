@@ -238,6 +238,33 @@ describe("replayPending", () => {
     expect(visible.tasks[task.id]?.title).toBe("Ship it today");
     expect(visible.tasks[task.id]?.completedAt).toBe(now);
   });
+
+  it("does not show a sent comment twice while the server echo is in flight", () => {
+    const task = makeTask({ commentCount: 1 });
+    const row = comment();
+    const confirmed = applyEvent(
+      {
+        ...emptyReplica(),
+        tasks: { [task.id]: task },
+      },
+      event({ type: "comment.upsert", payload: row }),
+    );
+    const visible = replayPending(confirmed, [
+      {
+        clientMutationId: "m1",
+        op: {
+          type: "comment.create",
+          id: row.id,
+          taskId: row.taskId,
+          body: { body: row.body },
+        },
+      },
+    ]);
+    expect(visible.commentsByTask[row.taskId]?.map((item) => item.id)).toEqual([
+      row.id,
+    ]);
+    expect(visible.tasks[task.id]?.commentCount).toBe(1);
+  });
 });
 
 describe("applyOp", () => {
