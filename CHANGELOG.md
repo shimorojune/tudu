@@ -1,3 +1,13 @@
+# [0.22.0](https://github.com/eGainDev/tudu/compare/tudu-0.21.0...tudu-0.22.0) (2026-09-12)
+
+
+### Features
+
+* add report inbox and unscheduled tasks functionality ([b1398fd](https://github.com/eGainDev/tudu/commit/b1398fd3af2086b27c4892263be6c2385518e476))
+* enhance inbox item acceptance with scheduled date support ([508cded](https://github.com/eGainDev/tudu/commit/508cded426f2ed1e2923383ea76e3f9479464dbf))
+* implement day hydration and search synchronization ([ac31047](https://github.com/eGainDev/tudu/commit/ac3104789d6aff33552b95427c944cab25199f55))
+* prevent duplicate comments during server echo ([bc505a9](https://github.com/eGainDev/tudu/commit/bc505a9caf48fa10ca60ef5595458694811f0d4d))
+
 # [0.21.0](https://github.com/eGainDev/tudu/compare/tudu-0.20.0...tudu-0.21.0) (2026-09-11)
 
 
