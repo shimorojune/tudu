@@ -47,7 +47,9 @@ export function BottomNav() {
             key={item.to}
             to={item.to}
             search={item.to === "/" ? dateLinkSearch(selectedDate || todayIso()) : undefined}
-            activeOptions={item.exact ? { exact: true } : undefined}
+            activeOptions={
+              item.exact ? { exact: true, includeSearch: false } : { includeSearch: false }
+            }
             aria-label={item.label}
             className="flex min-w-0 flex-1 flex-col items-center gap-[3px] px-[2px] py-[8px] text-muted-foreground"
             activeProps={{

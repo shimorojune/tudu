@@ -86,7 +86,7 @@ function DayTabSlot({ label, to, exact, date }: DayTabSlotProps) {
         ref={linkRef}
         to={to}
         search={dateLinkSearch(date)}
-        activeOptions={exact ? { exact: true } : undefined}
+        activeOptions={exact ? { exact: true, includeSearch: false } : { includeSearch: false }}
         // shrink-0 keeps the link at its natural width while the slot animates
         // past it, so the measurement above can never feed back on itself.
         className="group shrink-0 px-px py-[18px] text-muted-foreground"
@@ -133,7 +133,9 @@ export function NavTabs() {
           <Link
             key={tab.to}
             to={tab.to}
-            activeOptions={tab.exact ? { exact: true } : undefined}
+            activeOptions={
+              tab.exact ? { exact: true, includeSearch: false } : { includeSearch: false }
+            }
             className="group px-px py-[18px] text-muted-foreground"
             activeProps={{
               className:
