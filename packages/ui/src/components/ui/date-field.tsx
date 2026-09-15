@@ -14,6 +14,7 @@ export type DateFieldProps = {
   allowClear?: boolean;
   id?: string;
   "aria-label"?: string;
+  labelPrefix?: string;
   className?: string;
 };
 
@@ -23,6 +24,7 @@ export function DateField({
   allowClear = true,
   id,
   "aria-label": ariaLabel = "Pick a date",
+  labelPrefix,
   className,
 }: DateFieldProps) {
   const [open, setOpen] = useState(false);
@@ -44,7 +46,7 @@ export function DateField({
             className,
           )}
         >
-          {label}
+          {labelPrefix ? `${labelPrefix}${label}` : label}
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto p-0">

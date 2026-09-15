@@ -5,3 +5,4 @@ export * from "./activity-schema.js";
 export * from "./manager-schema.js";
 export * from "./sync-schema.js";
 export * from "./notifications-schema.js";
+export * from "./jira-schema.js";

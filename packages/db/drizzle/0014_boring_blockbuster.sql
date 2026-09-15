@@ -1,0 +1,1 @@
+ALTER TABLE "jira_issues" ADD COLUMN "status_color_name" text;

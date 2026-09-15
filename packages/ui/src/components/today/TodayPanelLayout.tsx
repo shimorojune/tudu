@@ -65,15 +65,6 @@ export function TodayPanelLayout({
     return <div className="h-full min-h-0">{taskList}</div>;
   }
 
-  if (band === "tablet") {
-    return (
-      <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_minmax(280px,396px)]">
-        <div className="min-h-0 border-r border-hair">{taskList}</div>
-        <div className="min-h-0">{inspector}</div>
-      </div>
-    );
-  }
-
   return (
     <ResizablePanelGroup
       id="today-panels"
@@ -82,7 +73,12 @@ export function TodayPanelLayout({
       defaultLayout={defaultLayout}
       onLayoutChanged={onLayoutChanged}
     >
-      <ResizablePanel id="task-list" minSize={32} defaultSize={49}>
+      <ResizablePanel
+        id="task-list"
+        data-panel-id="task-list"
+        minSize={32}
+        defaultSize={49}
+      >
         {taskList}
       </ResizablePanel>
       <ResizableHandle className="relative z-[3] w-[7px] bg-transparent after:w-[7px]">

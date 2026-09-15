@@ -1,9 +1,10 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { Db } from "@tudu/db";
 import {
   ManagerActionError,
   acceptInboxItem,
   acceptManagerInvite,
+  assertAssignableProject,
   assertManagerAction,
   claimMutation,
   createComment,
@@ -20,7 +21,19 @@ import {
   deleteReportTask,
   emitSync,
   eventsForMutation,
+  findCachedJiraIssue,
   findLiveLink,
+  getJiraConnection,
+  getJiraConnectionStatus,
+  insertTimelineEvents,
+  jiraTaskLinks,
+  linkTaskToJiraIssue,
+  listJiraComments,
+  listJiraComponents,
+  listJiraIssues,
+  listReportJiraIssues,
+  listJiraUsers,
+  linkedJiraIssueRefsForTask,
   findTaskById,
   listCommentsForTask,
   listInbox,
@@ -66,13 +79,22 @@ import {
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
+  managerVisibleJiraLinkedTasks,
+  type TaskAccess,
   type UpdateTaskFields,
+  unlinkTaskFromJiraIssue,
+  upsertJiraComments,
+  upsertJiraIssue,
 } from "@tudu/db";
 import {
   effectiveDayIso,
   isSlipping,
   isTaskChangeTimelineType,
+  jiraIssueToTaskLinkSummary,
   parseViewKey,
+  type JiraComment,
+  type JiraIssue,
+  type ManagerPermissions,
   type InboxHistoryItem,
   type InboxPendingItem,
   type SyncEvent,
@@ -81,6 +103,18 @@ import {
   type TeamResponse,
   type UpdateTaskRequest,
 } from "@tudu/shared";
+import {
+  createJiraDataCenterAdapter,
+  type JiraAdapter,
+  type JiraAdapterFactory,
+} from "./jira/client.js";
+import {
+  ensureAllowedJiraBaseUrl,
+  ensureConfiguredJiraProjectKey,
+  JiraAccessError,
+  requireReportVisibleJiraIssue,
+} from "./jira/access.js";
+import { decryptJiraToken } from "./jira/crypto.js";
 import { notifySync } from "./syncHub.js";
 
 export class SyncOpError extends Error {
@@ -126,10 +160,424 @@ function wrapManager(error: unknown): never {
   if (error instanceof ManagerActionError) {
     throw new SyncOpError(error.message, error.status);
   }
+  if (error instanceof JiraAccessError) {
+    throw new SyncOpError(error.message, error.status);
+  }
   if (error instanceof ProjectError) {
     throw new SyncOpError(error.message, error.status);
   }
   throw error;
+}
+
+export function jiraDueDateFromDeadline(deadline: string | null): string | null {
+  return deadline ? deadline.slice(0, 10) : null;
+}
+
+export function deadlineFromJiraDueDate(dueDate: string | null): Date | null {
+  return dueDate ? new Date(`${dueDate}T18:00:00.000Z`) : null;
+}
+
+export function taskPatchChangesDeadline(
+  patch: UpdateTaskRequest,
+  previousDeadline: Date | null,
+): boolean {
+  if (!("deadline" in patch)) {
+    return false;
+  }
+  return (
+    jiraDueDateFromDeadline(patch.deadline ?? null) !==
+    jiraDueDateFromDeadline(previousDeadline?.toISOString() ?? null)
+  );
+}
+
+type JiraFieldPatch = Partial<
+  Pick<JiraIssue, "summary" | "description" | "dueDate" | "assignee">
+>;
+
+export function canWriteReportJiraFields(
+  permissions: ManagerPermissions,
+  fields: JiraFieldPatch,
+): boolean {
+  if (!permissions.canSeeDay) {
+    return false;
+  }
+  const writesIssueFields =
+    "summary" in fields || "description" in fields || "assignee" in fields;
+  const writesDueDate = "dueDate" in fields;
+  if (writesIssueFields && !permissions.canEdit) {
+    return false;
+  }
+  if (writesDueDate && !permissions.canEditDeadlines) {
+    return false;
+  }
+  return writesIssueFields || writesDueDate;
+}
+
+export function canCreateReportJiraComment(
+  permissions: ManagerPermissions,
+): boolean {
+  return permissions.canSeeDay && permissions.canComment;
+}
+
+export type JiraSyncOptions = {
+  adapterFactory?: JiraAdapterFactory;
+};
+
+function jiraAdapterFactory(options?: JiraSyncOptions): JiraAdapterFactory {
+  return options?.adapterFactory ?? createJiraDataCenterAdapter;
+}
+
+async function requireJiraAdapter(
+  db: Db,
+  actorId: string,
+  options?: JiraSyncOptions,
+): Promise<JiraAdapter> {
+  const connection = await getJiraConnection(db, actorId);
+  if (!connection) {
+    throw new SyncOpError("Jira is not connected", 400);
+  }
+
+  ensureAllowedJiraBaseUrl(connection.baseUrl);
+  return jiraAdapterFactory(options)({
+    baseUrl: connection.baseUrl,
+    token: decryptJiraToken({
+      encryptedToken: connection.encryptedToken,
+      tokenIv: connection.tokenIv,
+      tokenAuthTag: connection.tokenAuthTag,
+    }),
+  });
+}
+
+async function assertReportAccess(
+  db: Db,
+  actorId: string,
+  reportUserId: string,
+): Promise<NonNullable<Awaited<ReturnType<typeof findLiveLink>>>> {
+  const link = await findLiveLink(db, actorId, reportUserId);
+  if (!link?.permissions?.canSeeDay) {
+    throw new SyncOpError("Not a report of yours", 403);
+  }
+  return link;
+}
+
+async function assertReportJiraFieldAccess(
+  db: Db,
+  actorId: string,
+  reportUserId: string,
+  fields: JiraFieldPatch,
+): Promise<NonNullable<Awaited<ReturnType<typeof findLiveLink>>>> {
+  const link = await assertReportAccess(db, actorId, reportUserId);
+  if (!link.permissions || !canWriteReportJiraFields(link.permissions, fields)) {
+    throw new SyncOpError("Not allowed", 403);
+  }
+  return link;
+}
+
+async function assertReportJiraCommentAccess(
+  db: Db,
+  actorId: string,
+  reportUserId: string,
+): Promise<NonNullable<Awaited<ReturnType<typeof findLiveLink>>>> {
+  const link = await assertReportAccess(db, actorId, reportUserId);
+  if (!link.permissions || !canCreateReportJiraComment(link.permissions)) {
+    throw new SyncOpError("Not allowed", 403);
+  }
+  return link;
+}
+
+function assertReportJiraTaskSpawnAccess(
+  permissions: ManagerPermissions | null | undefined,
+): void {
+  if (!permissions?.canSendInbox) {
+    throw new SyncOpError("Not allowed to send tasks", 403);
+  }
+}
+
+async function taskOwnerForJiraLink(
+  db: Db,
+  actorId: string,
+  taskId: string,
+): Promise<{ ownerUserId: string; access: TaskAccess }> {
+  const access = await resolveTaskAccess(db, actorId, taskId);
+  if (!access) {
+    throw new SyncOpError("Task not found", 404);
+  }
+  if (access.role === "manager") {
+    try {
+      assertManagerAction(access, "edit");
+    } catch {
+      throw new SyncOpError("Not allowed", 403);
+    }
+  }
+  return { ownerUserId: access.task.userId, access };
+}
+
+async function linkedTaskIdsForIssue(
+  db: Db,
+  ownerUserId: string,
+  issueId: string,
+): Promise<string[]> {
+  const rows = await db
+    .select({ taskId: jiraTaskLinks.taskId })
+    .from(jiraTaskLinks)
+    .where(
+      and(
+        eq(jiraTaskLinks.userId, ownerUserId),
+        eq(jiraTaskLinks.issueId, issueId),
+        isNull(jiraTaskLinks.deletedAt),
+      ),
+    );
+  return rows.map((row) => row.taskId);
+}
+
+async function emitJiraIssueSnapshot(
+  db: Db,
+  recipientUserId: string,
+  issue: JiraIssue,
+  clientMutationId: string | null,
+): Promise<SyncEvent[]> {
+  return emitSync(db, {
+    recipientUserIds: [recipientUserId],
+    clientMutationId,
+    type: "jira.issue.upsert",
+    payload: issue,
+  });
+}
+
+async function emitReportJiraIssueSnapshot(
+  db: Db,
+  managerUserId: string,
+  reportUserId: string,
+  issue: JiraIssue,
+  clientMutationId: string | null,
+): Promise<SyncEvent[]> {
+  return emitSync(db, {
+    recipientUserIds: [managerUserId],
+    clientMutationId,
+    type: "jira.reportIssue.upsert",
+    payload: { reportUserId, issue },
+  });
+}
+
+async function emitJiraCommentSnapshot(
+  db: Db,
+  recipientUserId: string,
+  comment: JiraComment,
+  clientMutationId: string | null,
+): Promise<SyncEvent[]> {
+  return emitSync(db, {
+    recipientUserIds: [recipientUserId],
+    clientMutationId,
+    type: "jira.comment.upsert",
+    payload: comment,
+  });
+}
+
+async function emitJiraLinkUpsert(
+  db: Db,
+  recipients: string[],
+  taskId: string,
+  issue: JiraIssue,
+  clientMutationId: string | null,
+): Promise<SyncEvent[]> {
+  return emitSync(db, {
+    recipientUserIds: recipients,
+    clientMutationId,
+    type: "jira.link.upsert",
+    payload: {
+      taskId,
+      link: jiraIssueToTaskLinkSummary(issue),
+    },
+  });
+}
+
+async function emitJiraLinkDelete(
+  db: Db,
+  recipients: string[],
+  taskId: string,
+  issueIdOrKey: string,
+  clientMutationId: string | null,
+): Promise<SyncEvent[]> {
+  return emitSync(db, {
+    recipientUserIds: recipients,
+    clientMutationId,
+    type: "jira.link.delete",
+    payload: { taskId, issueIdOrKey },
+  });
+}
+
+async function emitLinkedTaskSnapshots(
+  db: Db,
+  ownerUserId: string,
+  issueId: string,
+  clientMutationId: string | null,
+): Promise<SyncEvent[]> {
+  const events: SyncEvent[] = [];
+  const taskIds = await linkedTaskIdsForIssue(db, ownerUserId, issueId);
+  for (const taskId of taskIds) {
+    events.push(...(await emitTaskSnapshot(db, taskId, clientMutationId)));
+  }
+  return events;
+}
+
+async function syncOwnerIssue(
+  db: Db,
+  ownerUserId: string,
+  issue: JiraIssue,
+  clientMutationId: string | null,
+): Promise<SyncEvent[]> {
+  await upsertJiraIssue(db, ownerUserId, issue);
+  const cached = await findCachedJiraIssue(db, ownerUserId, issue.id);
+  const events = await emitJiraIssueSnapshot(db, ownerUserId, cached ?? issue, clientMutationId);
+  events.push(...(await emitLinkedTaskSnapshots(db, ownerUserId, issue.id, clientMutationId)));
+  return events;
+}
+
+async function emitActorIssueSnapshot(
+  db: Db,
+  actorId: string,
+  ownerUserId: string,
+  issue: JiraIssue,
+  clientMutationId: string | null,
+): Promise<SyncEvent[]> {
+  if (actorId === ownerUserId) {
+    return [];
+  }
+  await upsertJiraIssue(db, actorId, issue);
+  const cached = await findCachedJiraIssue(db, actorId, issue.id);
+  return emitJiraIssueSnapshot(db, actorId, cached ?? issue, clientMutationId);
+}
+
+async function linkedTimelineTaskIds(
+  db: Db,
+  actorId: string,
+  ownerUserId: string,
+  issueId: string,
+): Promise<string[]> {
+  if (actorId === ownerUserId) {
+    return linkedTaskIdsForIssue(db, ownerUserId, issueId);
+  }
+
+  const link = await assertReportAccess(db, actorId, ownerUserId);
+  const visible = await managerVisibleJiraLinkedTasks(
+    db,
+    ownerUserId,
+    issueId,
+    link.permissions,
+  );
+  return visible.map((task) => task.taskId);
+}
+
+async function appendJiraTimelineForIssue(
+  db: Db,
+  actorId: string,
+  ownerUserId: string,
+  issue: Pick<JiraIssue, "id" | "key">,
+  type: Parameters<typeof insertTimelineEvents>[3][number]["type"],
+  data: Record<string, unknown>,
+  clientMutationId: string | null,
+): Promise<SyncEvent[]> {
+  const events: SyncEvent[] = [];
+  const taskIds = await linkedTimelineTaskIds(db, actorId, ownerUserId, issue.id);
+  for (const taskId of taskIds) {
+    await insertTimelineEvents(db, taskId, actorId, [
+      { type, data: { issueId: issue.id, issueKey: issue.key, ...data } },
+    ]);
+    events.push(...(await emitLatestTimeline(db, taskId, clientMutationId)));
+  }
+  return events;
+}
+
+async function updateLinkedTaskDeadlines(
+  db: Db,
+  actorId: string,
+  ownerUserId: string,
+  issue: JiraIssue,
+  clientMutationId: string | null,
+  permissions?: Pick<ManagerPermissions, "canSeePrivate" | "canEditDeadlines"> | null,
+): Promise<SyncEvent[]> {
+  if (actorId !== ownerUserId && !permissions?.canEditDeadlines) {
+    return [];
+  }
+  const taskIds = await linkedTaskIdsForIssue(db, ownerUserId, issue.id);
+  if (taskIds.length === 0) {
+    return [];
+  }
+
+  const nextDeadline = deadlineFromJiraDueDate(issue.dueDate);
+  const rows = await db.query.tasks.findMany({
+    where: and(
+      eq(tasks.userId, ownerUserId),
+      inArray(tasks.id, taskIds),
+      isNull(tasks.deletedAt),
+      ...(actorId !== ownerUserId && !permissions?.canSeePrivate
+        ? [eq(tasks.isPrivate, false)]
+        : []),
+    ),
+  });
+  const events: SyncEvent[] = [];
+  const nextTime = nextDeadline?.getTime() ?? null;
+
+  for (const row of rows) {
+    const previous = row.deadline?.toISOString() ?? null;
+    const previousTime = row.deadline?.getTime() ?? null;
+    if (previousTime === nextTime) {
+      continue;
+    }
+
+    await db
+      .update(tasks)
+      .set({ deadline: nextDeadline })
+      .where(
+        and(
+          eq(tasks.id, row.id),
+          eq(tasks.userId, ownerUserId),
+          isNull(tasks.deletedAt),
+        ),
+      );
+    await insertTimelineEvents(db, row.id, actorId, [
+      {
+        type: "jira_due_date_changed",
+        data: {
+          issueId: issue.id,
+          issueKey: issue.key,
+          from: previous,
+          to: nextDeadline?.toISOString() ?? null,
+          dueDate: issue.dueDate,
+        },
+      },
+    ]);
+    events.push(...(await emitTaskSnapshot(db, row.id, clientMutationId)));
+    events.push(...(await emitLatestTimeline(db, row.id, clientMutationId)));
+  }
+
+  return events;
+}
+
+async function updateLinkedJiraDueDates(
+  db: Db,
+  actorId: string,
+  taskId: string,
+  dueDate: string | null,
+  options: JiraSyncOptions | undefined,
+): Promise<JiraIssue[]> {
+  const refs = await linkedJiraIssueRefsForTask(db, actorId, taskId);
+  if (refs.length === 0) {
+    return [];
+  }
+  const adapter = await requireJiraAdapter(db, actorId, options);
+  const issues: JiraIssue[] = [];
+  for (const ref of refs) {
+    issues.push(await adapter.updateIssue(ref.issueKey, { dueDate }));
+  }
+  return issues;
+}
+
+function opAssignee(assignee: unknown): JiraIssue["assignee"] | undefined {
+  if (assignee === undefined) {
+    return undefined;
+  }
+  return (assignee ?? null) as JiraIssue["assignee"];
 }
 
 function mapTeam(team: Awaited<ReturnType<typeof listTeam>>): TeamResponse {
@@ -366,6 +814,7 @@ async function emitReportInboxForManager(
       payload: {
         userId: reportUserId,
         report: result.report,
+        permissions: result.permissions,
         pending: result.pending.map(toPending),
         history: result.history.map(toHistory),
       },
@@ -380,6 +829,7 @@ export async function applySyncOp(
   actorId: string,
   clientMutationId: string,
   op: SyncOp,
+  options?: JiraSyncOptions,
 ): Promise<SyncEvent[]> {
   const claimed = await claimMutation(db, actorId, clientMutationId);
   if (claimed === "duplicate") {
@@ -387,6 +837,7 @@ export async function applySyncOp(
   }
 
   const collected: SyncEvent[] = [];
+  let releaseOnError = true;
 
   async function push(events: SyncEvent[]) {
     collected.push(...events);
@@ -418,7 +869,24 @@ export async function applySyncOp(
           throw new SyncOpError("Task not found", 404);
         }
         let updated;
+        let pushedJiraDueDateIssues: JiraIssue[] = [];
         if (access.role === "owner") {
+          if (
+            "projectId" in op.patch &&
+            op.patch.projectId &&
+            op.patch.projectId !== access.task.projectId
+          ) {
+            await assertAssignableProject(db, actorId, op.patch.projectId);
+          }
+          if (taskPatchChangesDeadline(op.patch, access.task.deadline)) {
+            pushedJiraDueDateIssues = await updateLinkedJiraDueDates(
+              db,
+              actorId,
+              op.id,
+              jiraDueDateFromDeadline(op.patch.deadline ?? null),
+              options,
+            );
+          }
           updated = await updateTask(db, actorId, op.id, toUpdateFields(op.patch));
         } else {
           const keys = Object.keys(op.patch);
@@ -442,6 +910,9 @@ export async function applySyncOp(
         await push(await emitTaskSnapshot(db, op.id, clientMutationId));
         await push(await emitLatestTimeline(db, op.id, clientMutationId));
         await push(await emitRosterForOwner(db, actorId, clientMutationId));
+        for (const issue of pushedJiraDueDateIssues) {
+          await push(await syncOwnerIssue(db, actorId, issue, clientMutationId));
+        }
         if (actorId !== access.task.userId) {
           const latest = await listTimelineForTask(db, op.id, { limit: 1 });
           const row = latest[0];
@@ -606,6 +1077,15 @@ export async function applySyncOp(
         break;
       }
       case "comment.update": {
+        const access = await resolveTaskAccess(db, actorId, op.taskId);
+        if (!access) {
+          throw new SyncOpError("Task not found", 404);
+        }
+        try {
+          assertManagerAction(access, "comment");
+        } catch {
+          throw new SyncOpError("Not allowed", 403);
+        }
         const updated = await updateComment(db, actorId, op.id, op.patch.body);
         if (!updated) {
           throw new SyncOpError("Comment not found", 404);
@@ -623,6 +1103,15 @@ export async function applySyncOp(
         break;
       }
       case "comment.delete": {
+        const access = await resolveTaskAccess(db, actorId, op.taskId);
+        if (!access) {
+          throw new SyncOpError("Task not found", 404);
+        }
+        try {
+          assertManagerAction(access, "comment");
+        } catch {
+          throw new SyncOpError("Not allowed", 403);
+        }
         const deleted = await softDeleteComment(db, actorId, op.id);
         if (!deleted) {
           throw new SyncOpError("Comment not found", 404);
@@ -895,6 +1384,393 @@ export async function applySyncOp(
         await push(await emitRosterForOwner(db, op.userId, clientMutationId));
         break;
       }
+      case "jira.link": {
+        const { ownerUserId, access } = await taskOwnerForJiraLink(db, actorId, op.taskId);
+        const adapter = await requireJiraAdapter(db, actorId, options);
+        const issue = await adapter.getIssue(op.issueIdOrKey);
+        await upsertJiraIssue(db, ownerUserId, issue);
+        await push(await emitActorIssueSnapshot(db, actorId, ownerUserId, issue, clientMutationId));
+        await linkTaskToJiraIssue(db, {
+          id: op.id,
+          userId: ownerUserId,
+          taskId: op.taskId,
+          issueId: issue.id,
+          issueKey: issue.key,
+        });
+        await insertTimelineEvents(db, op.taskId, actorId, [
+          {
+            type: "jira_linked",
+            data: { issueId: issue.id, issueKey: issue.key },
+          },
+        ]);
+        await push(
+          await updateLinkedTaskDeadlines(
+            db,
+            actorId,
+            ownerUserId,
+            issue,
+            clientMutationId,
+            access.permissions,
+          ),
+        );
+        await push(await emitTaskSnapshot(db, op.taskId, clientMutationId));
+        await push(await emitLatestTimeline(db, op.taskId, clientMutationId));
+        await push(await syncOwnerIssue(db, ownerUserId, issue, clientMutationId));
+        await push(
+          await emitJiraLinkUpsert(
+            db,
+            await recipientsForTaskId(db, op.taskId),
+            op.taskId,
+            issue,
+            clientMutationId,
+          ),
+        );
+        break;
+      }
+      case "jira.unlink": {
+        const { ownerUserId } = await taskOwnerForJiraLink(db, actorId, op.taskId);
+        const cached = await findCachedJiraIssue(db, ownerUserId, op.issueIdOrKey);
+        const issueRef = cached
+          ? { id: cached.id, key: cached.key }
+          : { id: op.issueIdOrKey, key: op.issueIdOrKey };
+        const ok = await unlinkTaskFromJiraIssue(
+          db,
+          ownerUserId,
+          op.taskId,
+          op.issueIdOrKey,
+        );
+        if (!ok) {
+          throw new SyncOpError("Jira link not found", 404);
+        }
+        await insertTimelineEvents(db, op.taskId, actorId, [
+          {
+            type: "jira_unlinked",
+            data: { issueId: issueRef.id, issueKey: issueRef.key },
+          },
+        ]);
+        await push(await emitTaskSnapshot(db, op.taskId, clientMutationId));
+        await push(await emitLatestTimeline(db, op.taskId, clientMutationId));
+        if (cached) {
+          await push(await syncOwnerIssue(db, ownerUserId, cached, clientMutationId));
+        }
+        await push(
+          await emitJiraLinkDelete(
+            db,
+            await recipientsForTaskId(db, op.taskId),
+            op.taskId,
+            op.issueIdOrKey,
+            clientMutationId,
+          ),
+        );
+        break;
+      }
+      case "jira.task.spawn": {
+        const adapter = await requireJiraAdapter(db, actorId, options);
+        const issue = await adapter.getIssue(op.body.issueId);
+        await upsertJiraIssue(db, actorId, issue);
+        await createTask(db, {
+          id: op.id,
+          userId: actorId,
+          title: op.body.title,
+          description: op.body.description ?? null,
+          scheduledDate: op.body.scheduledDate,
+          bucket: op.body.bucket,
+          startDate: op.body.startDate,
+          deadline: op.body.deadline
+            ? new Date(op.body.deadline)
+            : deadlineFromJiraDueDate(issue.dueDate),
+          isPrivate: false,
+          projectId: op.body.projectId ?? null,
+        });
+        await linkTaskToJiraIssue(db, {
+          userId: actorId,
+          taskId: op.id,
+          issueId: issue.id,
+          issueKey: issue.key,
+        });
+        await insertTimelineEvents(db, op.id, actorId, [
+          {
+            type: "jira_linked",
+            data: { issueId: issue.id, issueKey: issue.key },
+          },
+        ]);
+        await push(await emitTaskSnapshot(db, op.id, clientMutationId));
+        await push(await emitLatestTimeline(db, op.id, clientMutationId));
+        await push(await syncOwnerIssue(db, actorId, issue, clientMutationId));
+        break;
+      }
+      case "jira.reportTask.spawn": {
+        const link = await assertReportAccess(db, actorId, op.body.reportUserId);
+        assertReportJiraTaskSpawnAccess(link.permissions);
+        await requireReportVisibleJiraIssue(
+          db,
+          actorId,
+          op.body.reportUserId,
+          op.body.issueId,
+          link.permissions,
+        );
+        const adapter = await requireJiraAdapter(db, actorId, options);
+        const issue = await adapter.getIssue(op.body.issueId);
+        const sent = await sendInboxTask(db, actorId, op.body.reportUserId, {
+          id: op.id,
+          title: op.body.title,
+          description: op.body.description ?? null,
+          startDate: op.body.startDate,
+          deadline: op.body.deadline
+            ? new Date(op.body.deadline)
+            : deadlineFromJiraDueDate(issue.dueDate),
+          projectId: op.body.projectId ?? undefined,
+        });
+        await upsertJiraIssue(db, op.body.reportUserId, issue);
+        await upsertJiraIssue(db, actorId, issue);
+        await linkTaskToJiraIssue(db, {
+          userId: op.body.reportUserId,
+          taskId: sent.task.id,
+          issueId: issue.id,
+          issueKey: issue.key,
+        });
+        await insertTimelineEvents(db, sent.task.id, actorId, [
+          {
+            type: "jira_linked",
+            data: { issueId: issue.id, issueKey: issue.key },
+          },
+        ]);
+        await push(await emitInboxForUser(db, op.body.reportUserId, clientMutationId));
+        await push(
+          await emitReportInboxForManager(
+            db,
+            actorId,
+            op.body.reportUserId,
+            clientMutationId,
+          ),
+        );
+        await push(await emitLatestTimeline(db, sent.task.id, clientMutationId));
+        await push(await emitJiraIssueSnapshot(db, actorId, issue, clientMutationId));
+        const reportIssue = (
+          await listReportJiraIssues(db, actorId, op.body.reportUserId, link.permissions)
+        ).find((row) => row.id === issue.id || row.key === issue.key);
+        if (reportIssue) {
+          await push(
+            await emitReportJiraIssueSnapshot(
+              db,
+              actorId,
+              op.body.reportUserId,
+              reportIssue,
+              clientMutationId,
+            ),
+          );
+        }
+        await push(
+          await insertAndEmitNotifications(db, {
+            recipientUserIds: [op.body.reportUserId],
+            actorId,
+            clientMutationId,
+            kind: "inbox",
+            taskTitle: sent.task.title,
+            taskId: sent.task.id,
+            ownerId: op.body.reportUserId,
+            inboxItemId: sent.item.id,
+            scheduledDate: sent.task.scheduledDate,
+          }),
+        );
+        break;
+      }
+      case "jira.issue.create": {
+        let ownerUserId = actorId;
+        let linkAccess: Awaited<ReturnType<typeof taskOwnerForJiraLink>> | null = null;
+        if (op.body.linkTaskId) {
+          linkAccess = await taskOwnerForJiraLink(db, actorId, op.body.linkTaskId);
+          ownerUserId = linkAccess.ownerUserId;
+        }
+        await ensureConfiguredJiraProjectKey(db, actorId, op.body.projectKey);
+        const adapter = await requireJiraAdapter(db, actorId, options);
+        releaseOnError = false;
+        const issue = await adapter.createIssue(op.body);
+        await upsertJiraIssue(db, actorId, issue);
+        if (op.body.linkTaskId) {
+          await upsertJiraIssue(db, ownerUserId, issue);
+          await linkTaskToJiraIssue(db, {
+            userId: ownerUserId,
+            taskId: op.body.linkTaskId,
+            issueId: issue.id,
+            issueKey: issue.key,
+          });
+          await insertTimelineEvents(db, op.body.linkTaskId, actorId, [
+            {
+              type: "jira_linked",
+              data: { issueId: issue.id, issueKey: issue.key },
+            },
+          ]);
+          await push(
+            await updateLinkedTaskDeadlines(
+              db,
+              actorId,
+              ownerUserId,
+              issue,
+              clientMutationId,
+              linkAccess?.access.permissions,
+            ),
+          );
+          await push(await emitTaskSnapshot(db, op.body.linkTaskId, clientMutationId));
+          await push(await emitLatestTimeline(db, op.body.linkTaskId, clientMutationId));
+        }
+        await push(await syncOwnerIssue(db, ownerUserId, issue, clientMutationId));
+        await push(await emitActorIssueSnapshot(db, actorId, ownerUserId, issue, clientMutationId));
+        break;
+      }
+      case "jira.issue.updateFields": {
+        const ownerUserId = op.body.reportUserId ?? actorId;
+        const fields = {
+          ...("summary" in op.body ? { summary: op.body.summary } : {}),
+          ...("description" in op.body ? { description: op.body.description } : {}),
+          ...("dueDate" in op.body ? { dueDate: op.body.dueDate } : {}),
+          ...("assignee" in op.body ? { assignee: op.body.assignee } : {}),
+        };
+        let permissions: ManagerPermissions | null = null;
+        if (op.body.reportUserId) {
+          const link = await assertReportJiraFieldAccess(
+            db,
+            actorId,
+            op.body.reportUserId,
+            fields,
+          );
+          permissions = link.permissions;
+          await requireReportVisibleJiraIssue(
+            db,
+            actorId,
+            op.body.reportUserId,
+            op.body.issueIdOrKey,
+            link.permissions,
+          );
+        }
+        const before = await findCachedJiraIssue(db, ownerUserId, op.body.issueIdOrKey);
+        const adapter = await requireJiraAdapter(db, actorId, options);
+        const issue = await adapter.updateIssue(op.body.issueIdOrKey, fields);
+        await push(await syncOwnerIssue(db, ownerUserId, issue, clientMutationId));
+        await push(await emitActorIssueSnapshot(db, actorId, ownerUserId, issue, clientMutationId));
+        if ("summary" in op.body) {
+          await push(
+            await appendJiraTimelineForIssue(
+              db,
+              actorId,
+              ownerUserId,
+              issue,
+              "jira_summary_changed",
+              { from: before?.summary ?? null, to: issue.summary },
+              clientMutationId,
+            ),
+          );
+        }
+        if ("description" in op.body) {
+          await push(
+            await appendJiraTimelineForIssue(
+              db,
+              actorId,
+              ownerUserId,
+              issue,
+              "jira_description_changed",
+              {},
+              clientMutationId,
+            ),
+          );
+        }
+        if ("dueDate" in op.body) {
+          await push(
+            await updateLinkedTaskDeadlines(
+              db,
+              actorId,
+              ownerUserId,
+              issue,
+              clientMutationId,
+              permissions,
+            ),
+          );
+        }
+        if ("assignee" in op.body) {
+          await push(
+            await appendJiraTimelineForIssue(
+              db,
+              actorId,
+              ownerUserId,
+              issue,
+              "jira_assignee_changed",
+              {
+                from: before?.assignee?.displayName ?? null,
+                to: issue.assignee?.displayName ?? null,
+              },
+              clientMutationId,
+            ),
+          );
+        }
+        break;
+      }
+      case "jira.issue.updateDueDate": {
+        const adapter = await requireJiraAdapter(db, actorId, options);
+        const issue = await adapter.updateIssue(op.issueIdOrKey, {
+          dueDate: op.dueDate,
+        });
+        await push(await syncOwnerIssue(db, actorId, issue, clientMutationId));
+        await push(await updateLinkedTaskDeadlines(db, actorId, actorId, issue, clientMutationId));
+        break;
+      }
+      case "jira.issue.updateAssignee": {
+        const adapter = await requireJiraAdapter(db, actorId, options);
+        const before = await findCachedJiraIssue(db, actorId, op.issueIdOrKey);
+        const issue = await adapter.assignIssue(
+          op.issueIdOrKey,
+          opAssignee(op.assignee) ?? null,
+        );
+        await push(await syncOwnerIssue(db, actorId, issue, clientMutationId));
+        await push(
+          await appendJiraTimelineForIssue(
+            db,
+            actorId,
+            actorId,
+            issue,
+            "jira_assignee_changed",
+            {
+              from: before?.assignee?.displayName ?? null,
+              to: issue.assignee?.displayName ?? null,
+            },
+            clientMutationId,
+          ),
+        );
+        break;
+      }
+      case "jira.comment.create": {
+        const ownerUserId = op.reportUserId ?? actorId;
+        if (op.reportUserId) {
+          const link = await assertReportJiraCommentAccess(db, actorId, op.reportUserId);
+          await requireReportVisibleJiraIssue(
+            db,
+            actorId,
+            op.reportUserId,
+            op.issueIdOrKey,
+            link.permissions,
+          );
+        }
+        const adapter = await requireJiraAdapter(db, actorId, options);
+        releaseOnError = false;
+        const comment = await adapter.addComment(op.issueIdOrKey, op.body);
+        await upsertJiraComments(db, ownerUserId, [comment]);
+        await upsertJiraComments(db, actorId, [comment]);
+        await push(await emitJiraCommentSnapshot(db, actorId, comment, clientMutationId));
+        if (ownerUserId !== actorId) {
+          await push(await emitJiraCommentSnapshot(db, ownerUserId, comment, clientMutationId));
+        }
+        await push(
+          await appendJiraTimelineForIssue(
+            db,
+            actorId,
+            ownerUserId,
+            { id: comment.issueId, key: comment.issueKey },
+            "jira_commented",
+            { commentId: comment.id },
+            clientMutationId,
+          ),
+        );
+        break;
+      }
       case "notification.read": {
         const row = await markNotificationRead(db, actorId, op.id);
         if (!row) {
@@ -989,7 +1865,9 @@ export async function applySyncOp(
         break;
     }
   } catch (error) {
-    await releaseMutation(db, actorId, clientMutationId);
+    if (releaseOnError) {
+      await releaseMutation(db, actorId, clientMutationId);
+    }
     if (error instanceof SyncOpError) {
       throw error;
     }
@@ -1078,6 +1956,58 @@ export async function bootstrapViews(
         }
         break;
       }
+      case "jira": {
+        events.push(synthetic("jira.connection", await getJiraConnectionStatus(db, userId)));
+        for (const issue of await listJiraIssues(db, userId)) {
+          events.push(synthetic("jira.issue.upsert", issue));
+        }
+        break;
+      }
+      case "jiraIssue": {
+        const issue = await findCachedJiraIssue(db, userId, view.issueIdOrKey);
+        if (!issue) {
+          break;
+        }
+        events.push(synthetic("jira.issue.upsert", issue));
+        const comments = await listJiraComments(db, userId, issue.id);
+        for (const comment of comments) {
+          events.push(synthetic("jira.comment.upsert", comment));
+        }
+        break;
+      }
+      case "jiraComponents": {
+        for (const component of await listJiraComponents(db, userId)) {
+          events.push(synthetic("jira.component.upsert", component));
+        }
+        break;
+      }
+      case "jiraUsers": {
+        for (const jiraUser of await listJiraUsers(db, userId)) {
+          events.push(synthetic("jira.user.upsert", jiraUser));
+        }
+        break;
+      }
+      case "reportJira": {
+        const link = await findLiveLink(db, userId, view.userId);
+        if (!link?.permissions?.canSeeDay) {
+          break;
+        }
+        const issues = await listReportJiraIssues(
+          db,
+          userId,
+          view.userId,
+          link.permissions,
+        );
+        for (const issue of issues) {
+          events.push(
+            synthetic("jira.reportIssue.upsert", {
+              reportUserId: view.userId,
+              issue,
+            }),
+          );
+        }
+        break;
+      }
       case "team": {
         try {
           const team = await listTeam(db, userId, view.date);
@@ -1096,6 +2026,7 @@ export async function bootstrapViews(
           events.push(
             synthetic("reportDay.upsert", {
               report: result.report,
+              permissions: result.permissions,
               date: view.date,
               tasks,
               slippingCount: result.tasks.filter((task) =>
@@ -1134,6 +2065,7 @@ export async function bootstrapViews(
             synthetic("reportInbox.upsert", {
               userId: view.userId,
               report: result.report,
+              permissions: result.permissions,
               pending: result.pending.map(toPending),
               history: result.history.map(toHistory),
             }),

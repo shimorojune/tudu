@@ -1,3 +1,8 @@
+@import './styles/_variables.scss';
+@import './styles/_keyframe-animations.scss';
+
+@import "./components/editor/tiptapTuduShell.css";
+
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "../assets/theme.css";
@@ -55,4 +60,8 @@ html, body, #root {
 
 .comment-focus-tint {
   animation: comment-focus-tint 1600ms ease-out;
+}
+
+.rich-text-editor {
+  min-height: 160px;
 }

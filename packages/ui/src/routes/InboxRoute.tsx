@@ -12,12 +12,15 @@ import {
   useDeleteTaskMutation,
   useGetInboxQuery,
 } from "@tudu/store";
-import { isCommandPaletteBlocked } from "@/components/chrome/CommandPalette";
+import { isCommandPaletteBlocked } from "@/components/chrome/dialogBlocker";
 import { useCommandPalette } from "@/components/chrome/CommandPaletteContext";
 import { InboxAcceptControls } from "@/components/inbox/InboxAcceptControls";
 import { InspectorSheet } from "@/components/inspector/InspectorSheet";
 import { InboxSkeleton } from "@/components/loading/InboxSkeleton";
 import { ProjectChip } from "@/components/projects/ProjectChip";
+import { Button } from "@/components/ui/button";
+import { FormBusy } from "@/components/forms/FormBusy";
+import { notifyAction, mutationResult } from "@/lib/notifyAction";
 import { TaskDeleteDialog } from "@/components/tasks/TaskDeleteDialog";
 import { useViewportBand } from "@/hooks/useViewportBand";
 import { inboxShortcutAction } from "@/lib/inboxShortcuts";
@@ -69,7 +72,7 @@ function InboxCard({
   onToggleDecline: (open: boolean) => void;
 }) {
   const [acceptInbox] = useAcceptInboxItemMutation();
-  const [declineInbox] = useDeclineInboxItemMutation();
+  const [declineInbox, declineState] = useDeclineInboxItemMutation();
   const [deleteTask] = useDeleteTaskMutation();
   const [reason, setReason] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -82,7 +85,10 @@ function InboxCard({
     if (!trimmed) {
       return;
     }
-    await declineInbox({ id: item.id, reason: trimmed });
+    await notifyAction(
+      () => mutationResult(declineInbox({ id: item.id, reason: trimmed })),
+      { success: "Declined", error: "Could not decline" },
+    );
     onToggleDecline(false);
     setReason("");
   }
@@ -143,11 +149,15 @@ function InboxCard({
       </div>
 
       {declining && canDecline ? (
-        <div className="flex flex-col gap-[10px] border border-rule bg-card p-[14px]">
+        <FormBusy
+          busy={Boolean(declineState?.isLoading)}
+          className="flex flex-col gap-[10px] border border-rule bg-card p-[14px]"
+        >
           <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-faint">
             {first} will see this reason
           </span>
           <textarea
+            name="inbox-decline-reason"
             value={reason}
             rows={3}
             className="w-full resize-none bg-transparent text-[13.5px] leading-[1.55] outline-none"
@@ -156,9 +166,10 @@ function InboxCard({
             onClick={(event) => event.stopPropagation()}
           />
           <div className="flex items-center gap-[10px]">
-            <button
+            <Button
               type="button"
-              className="bg-foreground px-[14px] py-[7px] text-[12.5px] font-bold text-card disabled:opacity-40"
+              loading={Boolean(declineState?.isLoading)}
+              className="h-auto bg-foreground px-[14px] py-[7px] text-[12.5px] font-bold text-card"
               disabled={!reason.trim()}
               onClick={(event) => {
                 event.stopPropagation();
@@ -166,7 +177,7 @@ function InboxCard({
               }}
             >
               Send decline
-            </button>
+            </Button>
             <button
               type="button"
               className="text-[12.5px] text-muted-foreground"
@@ -181,13 +192,16 @@ function InboxCard({
               Goes on the task timeline too
             </span>
           </div>
-        </div>
+        </FormBusy>
       ) : (
         <InboxAcceptControls
           startDate={item.task.startDate}
           today={effectiveDayIso()}
           onAccept={({ bucket, scheduledDate }) => {
-            void acceptInbox({ id: item.id, bucket, scheduledDate });
+            void notifyAction(
+              () => mutationResult(acceptInbox({ id: item.id, bucket, scheduledDate })),
+              { success: "Accepted", error: "Could not accept" },
+            );
           }}
         >
           {canDecline ? (

@@ -30,6 +30,14 @@ export const timelineEventType = pgEnum("timeline_event_type", [
   "inbox_accepted",
   "inbox_declined",
   "project_changed",
+  "jira_linked",
+  "jira_unlinked",
+  "jira_summary_changed",
+  "jira_description_changed",
+  "jira_due_date_changed",
+  "jira_assignee_changed",
+  "jira_commented",
+  "jira_external_overwrite",
 ]);
 
 export const comments = pgTable(

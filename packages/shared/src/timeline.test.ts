@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planTaskTimelineEvents, type TaskSnapshot } from "./timeline.js";
+import { TIMELINE_EVENT_TYPES, planTaskTimelineEvents, type TaskSnapshot } from "./timeline.js";
 
 const base: TaskSnapshot = {
   title: "Ship feature",
@@ -99,5 +99,22 @@ describe("planTaskTimelineEvents", () => {
     expect(events).toEqual([
       { type: "project_changed", data: { from: null, to: "EGS" } },
     ]);
+  });
+});
+
+describe("Jira timeline event types", () => {
+  it("includes link, unlink, field, comment, and conflict events", () => {
+    expect(TIMELINE_EVENT_TYPES).toEqual(
+      expect.arrayContaining([
+        "jira_linked",
+        "jira_unlinked",
+        "jira_summary_changed",
+        "jira_description_changed",
+        "jira_due_date_changed",
+        "jira_assignee_changed",
+        "jira_commented",
+        "jira_external_overwrite",
+      ]),
+    );
   });
 });

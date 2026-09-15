@@ -1,0 +1,52 @@
+import { expect, test } from "@playwright/test";
+import { isJiraConnected } from "../../helpers/jira";
+
+test.describe("rich text editor", () => {
+  test("renders Tiptap for new task description", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForURL("/");
+
+    await page.getByRole("button", { name: "Add task" }).first().click();
+    await expect(page.getByPlaceholder("What needs doing?")).toBeVisible();
+
+    const editor = page.getByTestId("rich-text-editor");
+    await expect(editor.getByTestId("tiptap-simple-editor")).toBeVisible();
+    await expect(editor.getByTestId("tiptap-toolbar")).toBeVisible();
+    await expect(
+      editor.getByRole("textbox", { name: "Task description" }),
+    ).toBeVisible();
+  });
+
+  test("shows bullet lists as list markup in Jira comment editor @jira", async ({
+    page,
+  }) => {
+    if (!(await isJiraConnected(page))) {
+      test.skip();
+    }
+
+    await page.goto("/");
+    await page.waitForURL("/");
+
+    const firstIssue = page.locator("article button").first();
+    if ((await firstIssue.count()) === 0) {
+      test.skip();
+    }
+
+    await firstIssue.click();
+    const editor = page.getByTestId("rich-text-editor").last();
+    const commentSurface = editor.getByRole("textbox", { name: "Jira comment" });
+    await commentSurface.click();
+    await page.keyboard.type("List item");
+
+    await editor
+      .getByTestId("tiptap-toolbar")
+      .getByRole("button", { name: /list/i })
+      .first()
+      .click();
+    await page.getByRole("menuitem", { name: /bullet/i }).click();
+
+    const html = await commentSurface.innerHTML();
+    expect(html).toMatch(/<ul|<li/i);
+    expect(html).not.toMatch(/^\s*\*/);
+  });
+});

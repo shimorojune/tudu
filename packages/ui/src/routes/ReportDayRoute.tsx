@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useDispatch, useSelector } from "react-redux";
+import type { JiraIssue } from "@tudu/shared";
 import {
   setSelectedTaskId,
   useGetReportDayQuery,
@@ -9,11 +10,17 @@ import {
 } from "@tudu/store";
 import { DetailInspector } from "@/components/inspector/DetailInspector";
 import { InspectorSheet } from "@/components/inspector/InspectorSheet";
+import { JiraColumn } from "@/components/jira/JiraColumn";
+import { JiraIssueDetail } from "@/components/jira/JiraIssueDetail";
+import { SendJiraInboxDialog } from "@/components/jira/CreateJiraTaskControls";
+import { PhoneJiraButton } from "@/components/jira/PhoneJiraButton";
 import { ReportDaySkeleton } from "@/components/loading/ReportDaySkeleton";
 import { DayTaskList } from "@/components/tasks/DayTaskList";
+import { TaskListHeader } from "@/components/tasks/TaskListHeader";
 import { ReportPersonHeader } from "@/components/team/ReportPersonHeader";
 import { SendInboxForm } from "@/components/team/SendInboxForm";
 import { useDaySearchSync } from "@/hooks/useDaySearchSync";
+import { useJiraPreview } from "@/hooks/useJiraPreview";
 import { useViewportBand } from "@/hooks/useViewportBand";
 import { DAY_TASK_TAB_FIELDS } from "@/lib/daySearch";
 import { personFirstName } from "@/lib/person";
@@ -29,6 +36,8 @@ export function ReportDayRoute() {
   const { data, isLoading, isError } = useGetReportDayQuery({ userId, date });
   const showSend = search.send === true || selectedTaskId === null;
   const band = useViewportBand();
+  const jiraPreview = useJiraPreview();
+  const [sendIssue, setSendIssue] = useState<JiraIssue | null>(null);
   useDaySearchSync(DAY_TASK_TAB_FIELDS, {
     clearTask: search.send === true,
     taskFound: isLoading
@@ -40,8 +49,9 @@ export function ReportDayRoute() {
   useEffect(() => {
     if (search.send) {
       dispatch(setSelectedTaskId(null));
+      jiraPreview.clearPreview();
     }
-  }, [dispatch, search.send]);
+  }, [dispatch, jiraPreview.clearPreview, search.send]);
 
   if (isLoading) {
     return <ReportDaySkeleton isToday={date === todayIso()} />;
@@ -58,13 +68,22 @@ export function ReportDayRoute() {
   const tasks = data.tasks;
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? null;
   const first = personFirstName(data.report.name);
+  const canSendInbox = data.permissions.canSendInbox;
 
   const taskList = (
     <DayTaskList
       tasks={tasks}
       selectedDate={date}
       selectedTaskId={selectedTaskId}
+      header={
+        <TaskListHeader>
+          {band === "phone" ? (
+            <PhoneJiraButton onClick={jiraPreview.openJiraSheet} />
+          ) : null}
+        </TaskListHeader>
+      }
       onSelectTask={(id) => {
+        jiraPreview.clearPreview();
         void navigate({
           to: "/team/$userId",
           params: { userId },
@@ -75,11 +94,12 @@ export function ReportDayRoute() {
       onDeselectTask={() => dispatch(setSelectedTaskId(null))}
       viewer="manager"
       reportUserId={userId}
+      reportPermissions={data.permissions}
     />
   );
 
   const sidePanel =
-    showSend && !selectedTask ? (
+    showSend && !selectedTask && canSendInbox && !jiraPreview.previewIssueKey ? (
       <SendInboxForm
         userId={userId}
         reportName={data.report.name}
@@ -99,8 +119,38 @@ export function ReportDayRoute() {
         viewer="manager"
         notifiedName={first}
         reportUserId={userId}
+        reportPermissions={data.permissions}
       />
     );
+
+  const inspector = jiraPreview.previewIssueKey ? (
+    <JiraIssueDetail
+      issueIdOrKey={jiraPreview.previewIssueKey}
+      selectedTask={selectedTask}
+      selectedDate={date}
+      reportUserId={userId}
+      reportName={data.report.name}
+      reportPermissions={data.permissions}
+      backLabel={band === "phone" ? "Back" : "Close preview"}
+      onBack={jiraPreview.clearPreview}
+      onCreateTask={setSendIssue}
+    />
+  ) : (
+    sidePanel
+  );
+
+  const jiraColumn = (
+    <JiraColumn
+      selectedTask={selectedTask}
+      selectedDate={date}
+      selectedIssueKey={jiraPreview.previewIssueKey}
+      onPreviewIssue={jiraPreview.setPreviewIssueKey}
+      onCreateTask={setSendIssue}
+      reportUserId={userId}
+      reportName={data.report.name}
+      reportPermissions={data.permissions}
+    />
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -108,8 +158,13 @@ export function ReportDayRoute() {
         userId={userId}
         name={data.report.name}
         view="day"
+        canSend={canSendInbox}
         onSend={() => {
+          if (!canSendInbox) {
+            return;
+          }
           dispatch(setSelectedTaskId(null));
+          jiraPreview.clearPreview();
           void navigate({
             to: "/team/$userId/inbox",
             params: { userId },
@@ -133,32 +188,56 @@ export function ReportDayRoute() {
           <div className="min-h-0 flex-1 border-hair bg-card">
             {taskList}
           </div>
-          <InspectorSheet
-            open={selectedTask !== null || search.send === true}
-            title={search.send && !selectedTask ? "Send a task" : "Task details"}
-            onClose={() => {
-              dispatch(setSelectedTaskId(null));
-              void navigate({
-                to: "/team/$userId",
-                params: { userId },
-                search: (prev: Record<string, unknown>) => ({
-                  ...prev,
-                  send: false,
-                }),
-              } as never);
-            }}
-          >
-            {sidePanel}
-          </InspectorSheet>
+          {jiraPreview.jiraSheetOpen ? (
+            <InspectorSheet
+              open
+              title="Jira"
+              onClose={jiraPreview.closeJiraSheet}
+            >
+              {jiraPreview.previewIssueKey ? inspector : jiraColumn}
+            </InspectorSheet>
+          ) : (
+            <InspectorSheet
+              open={selectedTask !== null || search.send === true}
+              title={search.send && !selectedTask ? "Send a task" : "Task details"}
+              onClose={() => {
+                dispatch(setSelectedTaskId(null));
+                void navigate({
+                  to: "/team/$userId",
+                  params: { userId },
+                  search: (prev: Record<string, unknown>) => ({
+                    ...prev,
+                    send: false,
+                  }),
+                } as never);
+              }}
+            >
+              {sidePanel}
+            </InspectorSheet>
+          )}
         </>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(280px,396px)]">
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(280px,360px)_minmax(280px,396px)]">
           <div className="min-h-0 border-r border-hair bg-card">
             {taskList}
           </div>
-          <div className="min-h-0">{sidePanel}</div>
+          <div className="min-h-0 border-r border-hair">
+            {jiraColumn}
+          </div>
+          <div className="min-h-0">{inspector}</div>
         </div>
       )}
+      <SendJiraInboxDialog
+        issue={sendIssue}
+        reportUserId={userId}
+        reportName={data.report.name}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSendIssue(null);
+          }
+        }}
+        onSent={() => setSendIssue(null)}
+      />
     </div>
   );
 }

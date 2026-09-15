@@ -1,30 +1,43 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
+  DEFAULT_MANAGER_PERMISSIONS,
   effectiveDayIso,
   isSlipping,
   viewKey,
   type AcceptInboxRequest,
+  type CreateJiraIssueRequest,
   type CreateInviteRequest,
   type CreateProjectRequest,
   type CreateSubtaskRequest,
   type CreateTaskRequest,
   type DeclineInboxRequest,
+  type LinkJiraTaskRequest,
   type ReorderRequest,
   type ReorderSubtasksRequest,
   type RolloverRequest,
   type SendInboxTaskRequest,
+  type SpawnJiraTaskRequest,
+  type SpawnReportJiraTaskRequest,
   type TimelineResponse,
   type UpdateCommentRequest,
+  type UpdateJiraIssueFieldsRequest,
   type UpdateProjectRequest,
   type UpdateSubtaskRequest,
   type UpdateTaskRequest,
+  type UnlinkJiraTaskRequest,
 } from "@tudu/shared";
 import { getAuthToken, resolveApiUrl } from "../api/baseApi.js";
 import type { AppDispatch, RootState } from "../store.js";
 import { enqueue, subscribeView } from "./client.js";
 import {
   reportDayKey,
+  jiraCommentsForIssue,
+  jiraComponentsForList,
+  jiraIssueFromReplica,
+  jiraIssuesForList,
+  jiraUsersForList,
+  reportJiraIssuesForUser,
   tasksForDay,
   tasksForProject,
   unscheduledForOwner,
@@ -140,6 +153,7 @@ export function useGetReportDayQuery(
     }
     return {
       report: { id: arg.userId, name: "", email: "" },
+      permissions: DEFAULT_MANAGER_PERMISSIONS,
       date: arg.date,
       tasks,
       slippingCount: tasks.filter((task) =>
@@ -179,6 +193,7 @@ export function useGetReportInboxQuery(
     const pending = bucket?.pending ?? [];
     return {
       report: bucket?.report,
+      permissions: bucket?.permissions,
       pending,
       history: bucket?.history ?? [],
       count: pending.length,
@@ -221,6 +236,89 @@ export function useGetTimelineQuery(taskId: string, options?: QueryOptions) {
     }),
     [events, replica.timelineHasMore, taskId],
   );
+  return { ...query, data };
+}
+
+export function useGetJiraConnectionQuery(options?: QueryOptions) {
+  const key = options?.skip ? null : viewKey.jira();
+  const query = useView(key);
+  const replica = useSelector(selectVisible);
+  return { ...query, data: { connection: replica.jiraConnection } };
+}
+
+export function useGetJiraIssuesQuery(options?: QueryOptions) {
+  const key = options?.skip ? null : viewKey.jira();
+  const query = useView(key);
+  const replica = useSelector(selectVisible);
+  const data = useMemo(
+    () => ({ issues: jiraIssuesForList(replica) }),
+    [replica],
+  );
+  return { ...query, data };
+}
+
+export function useGetReportJiraIssuesQuery(
+  userId: string,
+  options?: QueryOptions,
+) {
+  const key = options?.skip || !userId ? null : viewKey.reportJira(userId);
+  const query = useView(key);
+  const replica = useSelector(selectVisible);
+  const data = useMemo(
+    () => ({ issues: userId ? reportJiraIssuesForUser(replica, userId) : [] }),
+    [replica, userId],
+  );
+  return { ...query, data };
+}
+
+export function useGetJiraIssueQuery(
+  issueIdOrKey: string,
+  options?: QueryOptions,
+) {
+  const key =
+    options?.skip || !issueIdOrKey ? null : viewKey.jiraIssue(issueIdOrKey);
+  const query = useView(key);
+  const replica = useSelector(selectVisible);
+  const data = useMemo(() => {
+    const issue = issueIdOrKey
+      ? jiraIssueFromReplica(replica, issueIdOrKey)
+      : undefined;
+    return issue ? { issue } : undefined;
+  }, [replica, issueIdOrKey]);
+  return { ...query, data };
+}
+
+export function useGetJiraCommentsQuery(
+  issueIdOrKey: string,
+  options?: QueryOptions,
+) {
+  const key =
+    options?.skip || !issueIdOrKey ? null : viewKey.jiraIssue(issueIdOrKey);
+  const query = useView(key);
+  const replica = useSelector(selectVisible);
+  const data = useMemo(
+    () => ({ comments: issueIdOrKey ? jiraCommentsForIssue(replica, issueIdOrKey) : [] }),
+    [replica, issueIdOrKey],
+  );
+  return { ...query, data };
+}
+
+export function useGetJiraComponentsQuery(options?: QueryOptions) {
+  const key = options?.skip ? null : viewKey.jiraComponents();
+  const query = useView(key);
+  const replica = useSelector(selectVisible);
+  const data = useMemo(
+    () => ({ components: jiraComponentsForList(replica) }),
+    [replica],
+  );
+  return { ...query, data };
+}
+
+export function useGetJiraUsersQuery(options?: QueryOptions) {
+  const key = options?.skip ? null : viewKey.jiraUsers();
+  const query = useView(key);
+  const replica = useSelector(selectVisible);
+  const data = useMemo(() => ({ users: jiraUsersForList(replica) }), [replica]);
   return { ...query, data };
 }
 
@@ -449,6 +547,91 @@ export function useReadNotificationMutation() {
 
 export function useReadAllNotificationsMutation() {
   return useOp((_arg?: void) => ({ type: "notification.readAll" as const }));
+}
+
+export function useLinkJiraTaskMutation() {
+  return useOp((body: LinkJiraTaskRequest) => ({
+    type: "jira.link" as const,
+    id: crypto.randomUUID(),
+    taskId: body.taskId,
+    issueIdOrKey: body.issueIdOrKey,
+  }));
+}
+
+export function useUnlinkJiraTaskMutation() {
+  return useOp((body: UnlinkJiraTaskRequest) => ({
+    type: "jira.unlink" as const,
+    taskId: body.taskId,
+    issueIdOrKey: body.issueIdOrKey,
+  }));
+}
+
+export function useSpawnJiraTaskMutation() {
+  const dispatch = useDispatch<AppDispatch>();
+  const [isLoading, setLoading] = useState(false);
+  const trigger = useCallback(
+    (body: SpawnJiraTaskRequest) => {
+      const id = crypto.randomUUID();
+      setLoading(true);
+      const promise = dispatch(
+        enqueue({ type: "jira.task.spawn" as const, id, body }),
+      )
+        .then(() => ({ task: { id } }))
+        .finally(() => setLoading(false));
+      return withUnwrap(promise);
+    },
+    [dispatch],
+  );
+  return [trigger, { isLoading }] as const;
+}
+
+export function useSpawnReportJiraTaskMutation() {
+  return useOp((body: SpawnReportJiraTaskRequest) => ({
+    type: "jira.reportTask.spawn" as const,
+    id: crypto.randomUUID(),
+    body,
+  }));
+}
+
+export function useCreateJiraIssueMutation() {
+  return useOp((body: CreateJiraIssueRequest) => ({
+    type: "jira.issue.create" as const,
+    id: crypto.randomUUID(),
+    body,
+  }));
+}
+
+export function useUpdateJiraIssueFieldsMutation() {
+  return useOp((body: UpdateJiraIssueFieldsRequest) => ({
+    type: "jira.issue.updateFields" as const,
+    body,
+  }));
+}
+
+export function useUpdateJiraIssueDueDateMutation() {
+  return useOp((arg: { issueIdOrKey: string; dueDate: string | null }) => ({
+    type: "jira.issue.updateDueDate" as const,
+    issueIdOrKey: arg.issueIdOrKey,
+    dueDate: arg.dueDate,
+  }));
+}
+
+export function useUpdateJiraIssueAssigneeMutation() {
+  return useOp((arg: { issueIdOrKey: string; assignee: unknown | null }) => ({
+    type: "jira.issue.updateAssignee" as const,
+    issueIdOrKey: arg.issueIdOrKey,
+    assignee: arg.assignee,
+  }));
+}
+
+export function useCreateJiraCommentMutation() {
+  return useOp((arg: { issueIdOrKey: string; reportUserId?: string; body: string }) => ({
+    type: "jira.comment.create" as const,
+    id: crypto.randomUUID(),
+    issueIdOrKey: arg.issueIdOrKey,
+    ...(arg.reportUserId ? { reportUserId: arg.reportUserId } : {}),
+    body: arg.body,
+  }));
 }
 
 export function useGetProjectsQuery(options?: QueryOptions) {

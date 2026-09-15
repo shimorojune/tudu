@@ -3,6 +3,12 @@ import type {
   AppNotification,
   Comment,
   InboxPendingItem,
+  JiraComment,
+  JiraComponent,
+  JiraConnectionStatus,
+  JiraIssue,
+  JiraTaskLinkSummary,
+  JiraUser,
   SyncEvent,
   Task,
   TimelineEvent,
@@ -41,6 +47,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     commentCount: 0,
     project: null,
     subtasks: [],
+    jiraLinks: [],
     ...overrides,
   };
 }
@@ -55,6 +62,99 @@ function comment(overrides: Partial<Comment> = {}): Comment {
     createdAt: now,
     updatedAt: now,
     author: { id: "marcus", name: "Marcus Bell", email: "marcus@egain.com" },
+    ...overrides,
+  };
+}
+
+function jiraUser(overrides: Partial<JiraUser> = {}): JiraUser {
+  return {
+    accountId: "acct-1",
+    key: "priya",
+    name: "priya",
+    displayName: "Priya Raman",
+    emailAddress: "priya@egain.com",
+    active: true,
+    avatarUrl: null,
+    ...overrides,
+  };
+}
+
+function jiraIssue(overrides: Partial<JiraIssue> = {}): JiraIssue {
+  return {
+    id: "100493",
+    key: "EGS-100493",
+    summary: "Investigate login failure",
+    description: "Fails on partition one",
+    renderedDescription: null,
+    status: { id: "1", name: "Open", category: "todo" },
+    issueType: "Bug",
+    priority: "High",
+    assignee: jiraUser(),
+    dueDate: "2026-09-15",
+    components: [
+      {
+        id: "component-1",
+        name: "Partition",
+        projectKey: "EGS",
+        description: null,
+        archived: false,
+      },
+    ],
+    updatedAt: "2026-09-10T08:00:00.000Z",
+    browseUrl: "https://jira.example.test/browse/EGS-100493",
+    linkedTasks: [],
+    editableFields: ["summary", "description", "duedate", "assignee"],
+    ...overrides,
+  };
+}
+
+function jiraComment(overrides: Partial<JiraComment> = {}): JiraComment {
+  return {
+    id: "comment-1",
+    issueId: "100493",
+    issueKey: "EGS-100493",
+    author: jiraUser({ displayName: "Marcus Bell", emailAddress: "marcus@egain.com" }),
+    body: "I can reproduce it.",
+    renderedBody: null,
+    createdAt: "2026-09-10T08:30:00.000Z",
+    updatedAt: "2026-09-10T08:30:00.000Z",
+    ...overrides,
+  };
+}
+
+function jiraConnection(
+  overrides: Partial<JiraConnectionStatus> = {},
+): JiraConnectionStatus {
+  return {
+    connected: true,
+    baseUrl: "https://jira.example.test",
+    displayName: "Priya Raman",
+    email: "priya@egain.com",
+    projectKeys: ["EGS"],
+    updatedAt: "2026-09-10T08:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function jiraComponent(overrides: Partial<JiraComponent> = {}): JiraComponent {
+  return {
+    id: "component-1",
+    name: "Partition",
+    projectKey: "EGS",
+    description: null,
+    archived: false,
+    ...overrides,
+  };
+}
+
+function jiraTaskLink(overrides: Partial<JiraTaskLinkSummary> = {}): JiraTaskLinkSummary {
+  return {
+    issueId: "100493",
+    key: "EGS-100493",
+    summary: "Investigate login failure",
+    statusName: "Open",
+    dueDate: "2026-09-15",
+    browseUrl: "https://jira.example.test/browse/EGS-100493",
     ...overrides,
   };
 }
@@ -264,6 +364,171 @@ describe("applyEvent", () => {
       }),
     );
     expect(replica.reportInbox.priya?.pending).toEqual([]);
+  });
+
+  it("stores Jira connection, issues, comments, users, and Components", () => {
+    const issue = jiraIssue();
+    let replica = applyEvent(
+      emptyReplica(),
+      event({ type: "jira.connection", payload: jiraConnection() }),
+    );
+    replica = applyEvent(
+      replica,
+      event({ type: "jira.issue.upsert", seq: 2, payload: issue }),
+    );
+    replica = applyEvent(
+      replica,
+      event({
+        type: "jira.comment.upsert",
+        seq: 3,
+        payload: jiraComment({ createdAt: "2026-09-10T08:31:00.000Z" }),
+      }),
+    );
+    replica = applyEvent(
+      replica,
+      event({
+        type: "jira.comment.upsert",
+        seq: 4,
+        payload: jiraComment({
+          id: "comment-0",
+          body: "Earlier note",
+          createdAt: "2026-09-10T08:29:00.000Z",
+          updatedAt: "2026-09-10T08:29:00.000Z",
+        }),
+      }),
+    );
+    replica = applyEvent(
+      replica,
+      event({ type: "jira.user.upsert", seq: 5, payload: jiraUser() }),
+    );
+    replica = applyEvent(
+      replica,
+      event({ type: "jira.component.upsert", seq: 6, payload: jiraComponent() }),
+    );
+
+    expect(replica.jiraConnection.connected).toBe(true);
+    expect(replica.jiraIssues[issue.id]?.summary).toBe("Investigate login failure");
+    expect(replica.jiraIssueIds).toEqual([issue.id]);
+    expect(replica.jiraIssueKeys[issue.key]).toBe(issue.id);
+    expect(replica.jiraCommentsByIssue[issue.id]?.map((row) => row.body)).toEqual([
+      "Earlier note",
+      "I can reproduce it.",
+    ]);
+    expect(replica.jiraUsers["acct-1"]?.displayName).toBe("Priya Raman");
+    expect(replica.jiraComponents["EGS:component-1"]?.name).toBe("Partition");
+  });
+
+  it("adds and removes task Jira links from live link events", () => {
+    const task = makeTask();
+    const issue = jiraIssue();
+    let replica = applyEvent(
+      emptyReplica(),
+      event({ type: "task.upsert", payload: { task, ownerId: "priya" } }),
+    );
+    replica = applyEvent(
+      replica,
+      event({ type: "jira.issue.upsert", seq: 2, payload: issue }),
+    );
+    replica = applyEvent(
+      replica,
+      event({
+        type: "jira.link.upsert",
+        seq: 3,
+        payload: { taskId: task.id, link: jiraTaskLink() },
+      }),
+    );
+
+    expect(replica.tasks[task.id]?.jiraLinks.map((link) => link.key)).toEqual([
+      "EGS-100493",
+    ]);
+    expect(replica.jiraIssues[issue.id]?.linkedTasks).toEqual([
+      { taskId: task.id, title: "Ship it", isPrivate: false },
+    ]);
+
+    replica = applyEvent(
+      replica,
+      event({
+        type: "jira.link.delete",
+        seq: 4,
+        payload: { taskId: task.id, issueIdOrKey: "EGS-100493" },
+      }),
+    );
+
+    expect(replica.tasks[task.id]?.jiraLinks).toEqual([]);
+    expect(replica.jiraIssues[issue.id]?.linkedTasks).toEqual([]);
+  });
+
+  it("stores report Jira issue snapshots separately from personal Jira issues", () => {
+    const issue = jiraIssue({
+      linkedTasks: [
+        {
+          taskId: "11111111-1111-4111-8111-111111111111",
+          title: "Public",
+          isPrivate: false,
+        },
+      ],
+    });
+    const next = applyEvent(
+      emptyReplica(),
+      event({
+        type: "jira.reportIssue.upsert",
+        payload: { reportUserId: "priya", issue },
+      }),
+    );
+
+    expect(next.reportJiraIssues.priya).toEqual([issue.id]);
+    expect(next.jiraIssueIds).toEqual([]);
+    expect(next.jiraIssues[issue.id]?.linkedTasks).toEqual(issue.linkedTasks);
+  });
+
+  it("clears stale Jira replica data when the connection snapshot changes", () => {
+    const issue = jiraIssue();
+    let replica = applyEvent(
+      emptyReplica(),
+      event({ type: "jira.connection", payload: jiraConnection() }),
+    );
+    replica = applyEvent(
+      replica,
+      event({ type: "jira.issue.upsert", seq: 2, payload: issue }),
+    );
+    replica = applyEvent(
+      replica,
+      event({ type: "jira.comment.upsert", seq: 3, payload: jiraComment() }),
+    );
+    replica = applyEvent(
+      replica,
+      event({ type: "jira.user.upsert", seq: 4, payload: jiraUser() }),
+    );
+    replica = applyEvent(
+      replica,
+      event({ type: "jira.component.upsert", seq: 5, payload: jiraComponent() }),
+    );
+    replica = applyEvent(
+      replica,
+      event({
+        type: "jira.reportIssue.upsert",
+        seq: 6,
+        payload: { reportUserId: "report-1", issue },
+      }),
+    );
+
+    const next = applyEvent(
+      replica,
+      event({
+        type: "jira.connection",
+        seq: 7,
+        payload: jiraConnection({ projectKeys: ["ENG"] }),
+      }),
+    );
+
+    expect(next.jiraConnection.projectKeys).toEqual(["ENG"]);
+    expect(next.jiraIssues).toEqual({});
+    expect(next.jiraIssueIds).toEqual([]);
+    expect(next.jiraIssueKeys).toEqual({});
+    expect(next.jiraCommentsByIssue).toEqual({});
+    expect(next.jiraUsers).toEqual({});
+    expect(next.jiraComponents).toEqual({});
+    expect(next.reportJiraIssues).toEqual({});
   });
 });
 

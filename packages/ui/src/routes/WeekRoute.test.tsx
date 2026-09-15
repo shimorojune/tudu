@@ -14,7 +14,9 @@ vi.mock("@tanstack/react-router", () => ({
       location: { search: Record<string, unknown>; searchStr: string };
     }) => unknown;
   }) => {
-    const snapshot = { location: { search: {}, searchStr: "" } };
+    const snapshot = {
+      location: { pathname: "/week", search: {}, searchStr: "" },
+    };
     return opts?.select ? opts.select(snapshot) : snapshot;
   },
 }));

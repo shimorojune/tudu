@@ -12,6 +12,7 @@ import { cors } from "hono/cors";
 import { Hono } from "hono";
 import { createAuth } from "./auth.js";
 import { createActivityRoute } from "./routes/activity.js";
+import { createJiraRoute } from "./routes/jira.js";
 import { createLinkPreviewRoute } from "./routes/linkPreview.js";
 import { createManagerRoute } from "./routes/manager.js";
 import { createTasksRoute } from "./routes/tasks.js";
@@ -94,6 +95,7 @@ app.get("/me", async (c) => {
 
 if (db) {
   app.route("/", createSyncRoute(db));
+  app.route("/", createJiraRoute(db));
   app.route("/", createManagerRoute(db));
   app.route("/", createTasksRoute(db));
   app.route("/", createActivityRoute(db));

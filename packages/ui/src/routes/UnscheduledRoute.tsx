@@ -70,6 +70,7 @@ import { useNewTaskShortcut } from "@/hooks/useNewTaskShortcut";
 import { TASK_TAB_FIELDS } from "@/lib/daySearch";
 import { usePointerY } from "@/hooks/usePointerY";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { TaskListHeader } from "@/components/tasks/TaskListHeader";
 
 const CONTAINER = "unscheduled";
 const laneFor = () => ({ scheduledDate: null, bucket: null });
@@ -275,6 +276,7 @@ export function UnscheduledRoute() {
       ? null
       : !selectedTaskId ||
         Boolean(data?.tasks.some((task) => task.id === selectedTaskId)),
+    silentMissingTask: true,
   });
   const [flashTaskId, setFlashTaskId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -387,6 +389,7 @@ export function UnscheduledRoute() {
           Add task
         </button>
       </header>
+      <TaskListHeader data-panel-id="task-list" className="border-t-0" />
       <ScrollArea className="min-h-0 flex-1">
         <DndContext
           sensors={sensors}

@@ -26,6 +26,7 @@ export function ProjectRoute() {
       ? null
       : !selectedTaskId ||
         Boolean(data?.tasks.some((task) => task.id === selectedTaskId)),
+    silentMissingTask: true,
   });
 
   if (isLoading) {

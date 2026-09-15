@@ -19,6 +19,7 @@ import {
   type CommentsResponse,
   type TimelineEvent,
   type TimelineResponse,
+  sanitizeRichTextHtml,
 } from "@tudu/shared";
 import { Hono } from "hono";
 import type { Context } from "hono";
@@ -116,7 +117,7 @@ export function createActivityRoute(db: Db) {
       db,
       userId(c),
       c.req.param("id"),
-      c.req.valid("json").body,
+      sanitizeRichTextHtml(c.req.valid("json").body),
     );
 
     if (!created) {
@@ -133,7 +134,7 @@ export function createActivityRoute(db: Db) {
       db,
       userId(c),
       c.req.param("id"),
-      c.req.valid("json").body,
+      sanitizeRichTextHtml(c.req.valid("json").body),
     );
 
     if (!updated) {

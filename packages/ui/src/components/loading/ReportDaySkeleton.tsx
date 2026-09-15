@@ -19,9 +19,12 @@ export function ReportDaySkeleton({ isToday = false }: { isToday?: boolean }) {
           <DayListSkeleton announce={false} isToday={isToday} />
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(280px,396px)]">
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(280px,360px)_minmax(280px,396px)]">
           <div className="min-h-0 border-r border-hair">
             <DayListSkeleton announce={false} isToday={isToday} />
+          </div>
+          <div className="min-h-0 border-r border-hair">
+            <PaneSkeleton announce={false} />
           </div>
           <PaneSkeleton announce={false} />
         </div>

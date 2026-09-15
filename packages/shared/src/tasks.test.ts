@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createTaskRequestSchema,
   laneSchema,
+  taskSchema,
   updateTaskRequestSchema,
 } from "./tasks.js";
 
@@ -126,5 +127,42 @@ describe("laneSchema", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe("taskSchema", () => {
+  it("requires Jira link summaries as task metadata", () => {
+    const task = taskSchema.parse({
+      id: "11111111-1111-4111-8111-111111111111",
+      title: "Write the regression",
+      description: null,
+      scheduledDate: null,
+      bucket: null,
+      position: 0,
+      startDate: null,
+      deadline: null,
+      completedAt: null,
+      inProgress: false,
+      carriedDays: 0,
+      carriedSince: null,
+      isPrivate: false,
+      createdAt: "2026-09-13T10:00:00.000Z",
+      updatedAt: "2026-09-13T10:00:00.000Z",
+      subtasks: [],
+      commentCount: 0,
+      project: null,
+      jiraLinks: [
+        {
+          issueId: "100493",
+          key: "EGS-100493",
+          summary: "Improve archive permission error",
+          statusName: "In Progress",
+          dueDate: "2026-09-15",
+          browseUrl: "https://beetle.egain.com/browse/EGS-100493",
+        },
+      ],
+    });
+
+    expect(task.jiraLinks[0]?.summary).toBe("Improve archive permission error");
   });
 });

@@ -30,12 +30,12 @@ describe("NewTaskDialog", () => {
     );
 
     await user.type(screen.getByPlaceholderText("What needs doing?"), "Ship fix");
-    await user.type(screen.getByLabelText("Task description"), "Details here");
+    await user.type(screen.getByRole("textbox", { name: "Task description" }), "Details here");
     await user.click(screen.getByRole("button", { name: /Add to Later/i }));
 
     expect(onSubmit).toHaveBeenCalledWith({
       title: "Ship fix",
-      description: "Details here",
+      description: "<p>Details here</p>",
       bucket: "later",
       scheduledDate: "2026-09-11",
       subtaskTitles: [],
@@ -61,5 +61,25 @@ describe("NewTaskDialog", () => {
     await user.type(screen.getByPlaceholderText("What needs doing?"), "Ship fix{Enter}");
 
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("prefills title and description when provided", () => {
+    render(
+      <NewTaskDialog
+        open
+        initialBucket="later"
+        initialDate="2026-09-11"
+        initialTitle="Remote Jira summary"
+        initialDescription="Remote description"
+        nowCount={0}
+        onOpenChange={vi.fn()}
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    expect(screen.getByPlaceholderText("What needs doing?")).toHaveValue("Remote Jira summary");
+    expect(screen.getByRole("textbox", { name: "Task description" })).toHaveValue(
+      "Remote description",
+    );
   });
 });

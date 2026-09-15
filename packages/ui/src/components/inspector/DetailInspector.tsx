@@ -1,5 +1,5 @@
 import { useDispatch, useSelector } from "react-redux";
-import type { Task } from "@tudu/shared";
+import { DEFAULT_MANAGER_PERMISSIONS, type ManagerPermissions, type Task } from "@tudu/shared";
 import {
   setInspectorTab,
   setSelectedTaskId,
@@ -24,6 +24,7 @@ export type DetailInspectorProps = {
   viewer?: TaskViewer;
   notifiedName?: string | null;
   reportUserId?: string;
+  reportPermissions?: ManagerPermissions;
 };
 
 export function DetailInspector({
@@ -32,6 +33,7 @@ export function DetailInspector({
   viewer = "owner",
   notifiedName = null,
   reportUserId,
+  reportPermissions,
 }: DetailInspectorProps) {
   if (!task) {
     return <DetailInspectorEmpty />;
@@ -44,6 +46,7 @@ export function DetailInspector({
       viewer={viewer}
       notifiedName={notifiedName}
       reportUserId={reportUserId}
+      reportPermissions={reportPermissions}
     />
   );
 }
@@ -54,17 +57,20 @@ function DetailInspectorBody({
   viewer,
   notifiedName,
   reportUserId,
+  reportPermissions,
 }: {
   task: Task;
   selectedDate: string;
   viewer: TaskViewer;
   notifiedName: string | null;
   reportUserId?: string;
+  reportPermissions?: ManagerPermissions;
 }) {
   const dispatch = useDispatch();
   const tab = useSelector((state: RootState) => state.day.inspectorTab);
   const isToday = selectedDate === todayIso();
   const isManager = viewer === "manager";
+  const permissions = reportPermissions ?? DEFAULT_MANAGER_PERMISSIONS;
   const { data: team } = useGetTeamQuery(undefined, { skip: isManager });
   const { data: timelineData } = useGetTimelineQuery(task.id);
   const { data: reportProjects = [] } = useGetReportProjectsQuery(
@@ -109,7 +115,11 @@ function DetailInspectorBody({
         />
       ) : null}
       {tab === "comments" ? (
-        <CommentsTab task={task} notifiedName={commentNotifyName} />
+        <CommentsTab
+          task={task}
+          notifiedName={commentNotifyName}
+          canComment={!isManager || permissions.canComment}
+        />
       ) : null}
       {tab === "timeline" ? (
         <TimelineTab

@@ -236,6 +236,7 @@ export function planDaySearchSync(input: {
   weekDays?: readonly string[];
   taskFound?: boolean | null;
   clearTask?: boolean;
+  silentMissingTask?: boolean;
 }): DaySearchPlan {
   const desired = dayStateFromSearch({
     fields: input.fields,
@@ -263,7 +264,7 @@ export function planDaySearchSync(input: {
       hydrate: { taskId: null, inspectorTab: "details" },
       write: serializeDaySearch(next, input.fields, input.today),
       replace: true,
-      toast: "missingTask",
+      toast: input.silentMissingTask ? undefined : "missingTask",
     };
   }
 

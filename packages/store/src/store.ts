@@ -7,6 +7,7 @@ import "./api/tasksApi.js";
 import "./api/activityApi.js";
 import "./api/linkPreviewApi.js";
 import "./api/managerApi.js";
+import "./api/jiraApi.js";
 
 export function makeStore() {
   return configureStore({

@@ -11,6 +11,7 @@ export type ReportPersonHeaderProps = {
   userId: string;
   name: string;
   view: "day" | "week" | "inbox";
+  canSend?: boolean;
   onSend: () => void;
 };
 
@@ -18,6 +19,7 @@ export function ReportPersonHeader({
   userId,
   name,
   view,
+  canSend = true,
   onSend,
 }: ReportPersonHeaderProps) {
   const selectedDate =
@@ -87,7 +89,8 @@ export function ReportPersonHeader({
       </div>
       <button
         type="button"
-        className="ml-auto text-[12.5px] text-muted-foreground"
+        disabled={!canSend}
+        className="ml-auto text-[12.5px] text-muted-foreground disabled:opacity-40"
         onClick={onSend}
       >
         Send a task

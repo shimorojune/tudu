@@ -8,13 +8,19 @@ import {
 } from "@tudu/store";
 import { CommentComposer } from "@/components/inspector/CommentComposer";
 import { CommentRow } from "@/components/inspector/CommentRow";
+import { TaskCommentsSkeleton } from "@/components/loading/JiraSkeletons";
 
 export type CommentsTabProps = {
   task: Task;
   notifiedName?: string | null;
+  canComment?: boolean;
 };
 
-export function CommentsTab({ task, notifiedName = null }: CommentsTabProps) {
+export function CommentsTab({
+  task,
+  notifiedName = null,
+  canComment = true,
+}: CommentsTabProps) {
   const dispatch = useDispatch();
   const { data, isLoading } = useGetCommentsQuery(task.id);
   const comments = data?.comments ?? [];
@@ -36,7 +42,9 @@ export function CommentsTab({ task, notifiedName = null }: CommentsTabProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto px-[24px]">
-        {isLoading ? null : comments.length === 0 ? (
+        {isLoading ? (
+          <TaskCommentsSkeleton />
+        ) : comments.length === 0 ? (
           <p className="py-[48px] text-center text-[13px] text-faint">
             No comments yet.
           </p>
@@ -48,12 +56,18 @@ export function CommentsTab({ task, notifiedName = null }: CommentsTabProps) {
                 comment={comment}
                 taskId={task.id}
                 focused={comment.id === focusCommentId}
+                canEdit={canComment}
               />
             ))}
           </div>
         )}
       </div>
-      <CommentComposer taskId={task.id} />
+      <CommentComposer taskId={task.id} disabled={!canComment} />
+      {!canComment ? (
+        <p className="border-t border-hair px-[24px] py-[10px] text-[11.5px] text-faint">
+          You cannot comment on this report's task.
+        </p>
+      ) : null}
       {notifiedName ? (
         <p className="border-t border-hair px-[24px] py-[10px] text-[11.5px] text-faint">
           {notifiedName} is notified in Tudu

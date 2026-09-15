@@ -27,6 +27,7 @@ function makeTask(overrides: Partial<Task> & Pick<Task, "id" | "title" | "schedu
     commentCount: 0,
     project: null,
     subtasks: [],
+    jiraLinks: [],
     ...overrides,
   };
 }
@@ -49,6 +50,7 @@ const task: Task = {
   updatedAt: "2026-09-06T08:00:00.000Z",
   commentCount: 0,
   project: null,
+  jiraLinks: [],
   subtasks: [
     {
       id: "22222222-2222-4222-8222-222222222222",

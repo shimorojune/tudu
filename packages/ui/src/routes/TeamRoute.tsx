@@ -15,6 +15,8 @@ import { TeamManagerPane } from "@/components/team/TeamManagerPane";
 import { TeamPersonRow } from "@/components/team/TeamPersonRow";
 import { TeamAvatar } from "@/components/team/TeamAvatar";
 import { TeamSkeleton } from "@/components/loading/TeamSkeleton";
+import { Button } from "@/components/ui/button";
+import { notifyAction, mutationResult } from "@/lib/notifyAction";
 import { useViewportBand } from "@/hooks/useViewportBand";
 import { useDaySearchSync } from "@/hooks/useDaySearchSync";
 import { DATE_ONLY_FIELDS, dateLinkSearch } from "@/lib/daySearch";
@@ -29,8 +31,8 @@ export function TeamRoute() {
   useDaySearchSync(DATE_ONLY_FIELDS);
   const { data, isLoading, isError } = useGetTeamQuery(date);
   const [createInvite, createState] = useCreateTeamInviteMutation();
-  const [acceptInvite] = useAcceptTeamInviteMutation();
-  const [declineInvite] = useDeclineTeamInviteMutation();
+  const [acceptInvite, acceptState] = useAcceptTeamInviteMutation();
+  const [declineInvite, declineState] = useDeclineTeamInviteMutation();
   const [adding, setAdding] = useState(false);
   const [email, setEmail] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
@@ -39,7 +41,10 @@ export function TeamRoute() {
     event.preventDefault();
     setAddError(null);
     try {
-      await createInvite({ email }).unwrap();
+      await notifyAction(
+        () => mutationResult(createInvite({ email })),
+        { success: "Invite sent", error: "Could not send invite" },
+      );
       setEmail("");
       setAdding(false);
     } catch (error) {
@@ -95,20 +100,33 @@ export function TeamRoute() {
                       wants to be your manager
                     </div>
                   </div>
-                  <button
+                  <Button
                     type="button"
-                    className="bg-foreground px-[14px] py-[7px] text-[12px] font-bold text-card"
-                    onClick={() => void acceptInvite(invite.id)}
+                    loading={Boolean(acceptState?.isLoading)}
+                    className="h-auto bg-foreground px-[14px] py-[7px] text-[12px] font-bold text-card"
+                    onClick={() =>
+                      void notifyAction(
+                        () => mutationResult(acceptInvite(invite.id)),
+                        { success: "Invite confirmed", error: "Could not confirm" },
+                      )
+                    }
                   >
                     Confirm
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
-                    className="border border-rule px-[14px] py-[7px] text-[12px]"
-                    onClick={() => void declineInvite(invite.id)}
+                    variant="outline"
+                    loading={Boolean(declineState?.isLoading)}
+                    className="h-auto border-rule px-[14px] py-[7px] text-[12px]"
+                    onClick={() =>
+                      void notifyAction(
+                        () => mutationResult(declineInvite(invite.id)),
+                        { success: "Invite declined", error: "Could not decline" },
+                      )
+                    }
                   >
                     Decline
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>

@@ -33,6 +33,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     commentCount: 0,
     project: null,
     subtasks: [],
+    jiraLinks: [],
     ...overrides,
   };
 }

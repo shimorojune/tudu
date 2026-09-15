@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { jiraTaskLinkSummarySchema } from "./jira.js";
 import { projectRefSchema } from "./projects.js";
 
 /** Bucket slots. These are stable ids, not labels: screen C1 lets the user rename
@@ -61,6 +62,7 @@ export const taskSchema = z
     subtasks: z.array(subtaskSchema),
     commentCount: z.number().int(),
     project: projectRefSchema.nullable(),
+    jiraLinks: z.array(jiraTaskLinkSummarySchema),
   })
   .refine(dayAndBucketPaired, { message: PAIRING_MESSAGE, path: ["bucket"] });
 

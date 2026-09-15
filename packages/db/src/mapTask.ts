@@ -42,6 +42,7 @@ export function mapTask(row: TaskRowWithSubtasks, options?: MapTaskOptions): Tas
     project: mapProjectRef(row.project, {
       hidePrivate: options?.hidePrivateProjects,
     }),
+    jiraLinks: row.jiraLinks ?? [],
   };
 }
 

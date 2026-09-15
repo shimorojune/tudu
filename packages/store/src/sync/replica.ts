@@ -4,6 +4,13 @@ import type {
   CreateTaskRequest,
   InboxHistoryItem,
   InboxPendingItem,
+  JiraComment,
+  JiraComponent,
+  JiraConnectionStatus,
+  JiraIssue,
+  JiraTaskLinkSummary,
+  JiraUser,
+  ManagerPermissions,
   Person,
   Project,
   ProjectRef,
@@ -30,11 +37,24 @@ export type Replica = {
   inboxHistory: InboxHistoryItem[];
   reportInbox: Record<
     string,
-    { report?: Person; pending: InboxPendingItem[]; history: InboxHistoryItem[] }
+    {
+      report?: Person;
+      permissions?: ManagerPermissions;
+      pending: InboxPendingItem[];
+      history: InboxHistoryItem[];
+    }
   >;
   teamByDate: Record<string, TeamResponse>;
   reportDays: Record<string, ReportDayResponse>;
   notifications: AppNotification[];
+  jiraConnection: JiraConnectionStatus;
+  jiraIssues: Record<string, JiraIssue>;
+  jiraIssueIds: string[];
+  jiraIssueKeys: Record<string, string>;
+  jiraCommentsByIssue: Record<string, JiraComment[]>;
+  jiraUsers: Record<string, JiraUser>;
+  jiraComponents: Record<string, JiraComponent>;
+  reportJiraIssues: Record<string, string[]>;
   remoteMovedTaskIds: string[];
 };
 
@@ -59,6 +79,21 @@ export function emptyReplica(): Replica {
     teamByDate: {},
     reportDays: {},
     notifications: [],
+    jiraConnection: {
+      connected: false,
+      baseUrl: null,
+      displayName: null,
+      email: null,
+      projectKeys: [],
+      updatedAt: null,
+    },
+    jiraIssues: {},
+    jiraIssueIds: [],
+    jiraIssueKeys: {},
+    jiraCommentsByIssue: {},
+    jiraUsers: {},
+    jiraComponents: {},
+    reportJiraIssues: {},
     remoteMovedTaskIds: [],
   };
 }
@@ -85,6 +120,7 @@ function cloneReplica(replica: Replica): Replica {
         userId,
         {
           report: bucket.report,
+          permissions: bucket.permissions,
           pending: [...bucket.pending],
           history: [...bucket.history],
         },
@@ -93,6 +129,24 @@ function cloneReplica(replica: Replica): Replica {
     teamByDate: { ...replica.teamByDate },
     reportDays: { ...replica.reportDays },
     notifications: [...replica.notifications],
+    jiraConnection: replica.jiraConnection,
+    jiraIssues: { ...replica.jiraIssues },
+    jiraIssueIds: [...replica.jiraIssueIds],
+    jiraIssueKeys: { ...replica.jiraIssueKeys },
+    jiraCommentsByIssue: Object.fromEntries(
+      Object.entries(replica.jiraCommentsByIssue).map(([issueId, comments]) => [
+        issueId,
+        [...comments],
+      ]),
+    ),
+    jiraUsers: { ...replica.jiraUsers },
+    jiraComponents: { ...replica.jiraComponents },
+    reportJiraIssues: Object.fromEntries(
+      Object.entries(replica.reportJiraIssues).map(([userId, issueIds]) => [
+        userId,
+        [...issueIds],
+      ]),
+    ),
     remoteMovedTaskIds: [...replica.remoteMovedTaskIds],
   };
 }
@@ -111,6 +165,178 @@ function sortComments(rows: Comment[]): Comment[] {
     }
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   });
+}
+
+function sortJiraComments(rows: JiraComment[]): JiraComment[] {
+  return rows.slice().sort((a, b) => {
+    if (a.createdAt < b.createdAt) {
+      return -1;
+    }
+    if (a.createdAt > b.createdAt) {
+      return 1;
+    }
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+}
+
+function jiraUserKey(user: JiraUser): string {
+  return (
+    user.accountId ??
+    user.key ??
+    user.name ??
+    user.emailAddress ??
+    user.displayName
+  );
+}
+
+function jiraComponentKey(component: JiraComponent): string {
+  return `${component.projectKey}:${component.id}`;
+}
+
+function upsertJiraIssue(replica: Replica, issue: JiraIssue, list: "personal" | "cache"): void {
+  replica.jiraIssues[issue.id] = issue;
+  replica.jiraIssueKeys[issue.key] = issue.id;
+  if (list === "personal" && !replica.jiraIssueIds.includes(issue.id)) {
+    replica.jiraIssueIds = [...replica.jiraIssueIds, issue.id];
+  }
+}
+
+function resolveJiraIssueId(replica: Replica, issueIdOrKey: string): string {
+  return replica.jiraIssueKeys[issueIdOrKey] ?? issueIdOrKey;
+}
+
+function clearJiraReplica(replica: Replica): void {
+  replica.jiraIssues = {};
+  replica.jiraIssueIds = [];
+  replica.jiraIssueKeys = {};
+  replica.jiraCommentsByIssue = {};
+  replica.jiraUsers = {};
+  replica.jiraComponents = {};
+  replica.reportJiraIssues = {};
+}
+
+function upsertTaskJiraLink(
+  replica: Replica,
+  taskId: string,
+  link: JiraTaskLinkSummary,
+): void {
+  updateTaskEverywhere(replica, taskId, (task) => {
+    const existing = task.jiraLinks ?? [];
+    const index = existing.findIndex((row) => row.issueId === link.issueId);
+    const jiraLinks =
+      index === -1
+        ? [...existing, link]
+        : existing.map((row) => (row.issueId === link.issueId ? link : row));
+    return { ...task, jiraLinks };
+  });
+}
+
+function upsertIssueLinkedTask(
+  replica: Replica,
+  taskId: string,
+  link: JiraTaskLinkSummary,
+): void {
+  const issueId = resolveJiraIssueId(replica, link.issueId);
+  const issue = replica.jiraIssues[issueId];
+  const task = findTaskEverywhere(replica, taskId);
+  if (!issue || !task) {
+    return;
+  }
+  const linkedTask = {
+    taskId,
+    title: task.title,
+    isPrivate: task.isPrivate,
+  };
+  const index = issue.linkedTasks.findIndex((row) => row.taskId === taskId);
+  const linkedTasks =
+    index === -1
+      ? [...issue.linkedTasks, linkedTask]
+      : issue.linkedTasks.map((row) => (row.taskId === taskId ? linkedTask : row));
+  replica.jiraIssues[issueId] = { ...issue, linkedTasks };
+}
+
+function removeTaskJiraLink(
+  replica: Replica,
+  taskId: string,
+  issueIdOrKey: string,
+): void {
+  updateTaskEverywhere(replica, taskId, (task) => ({
+    ...task,
+    jiraLinks: task.jiraLinks.filter(
+      (link) => link.issueId !== issueIdOrKey && link.key !== issueIdOrKey,
+    ),
+  }));
+}
+
+function removeIssueLinkedTask(
+  replica: Replica,
+  taskId: string,
+  issueIdOrKey: string,
+): void {
+  const issueId = resolveJiraIssueId(replica, issueIdOrKey);
+  const issue = replica.jiraIssues[issueId];
+  if (!issue) {
+    return;
+  }
+  replica.jiraIssues[issueId] = {
+    ...issue,
+    linkedTasks: issue.linkedTasks.filter((row) => row.taskId !== taskId),
+  };
+}
+
+function findTaskEverywhere(replica: Replica, taskId: string): Task | undefined {
+  const task = replica.tasks[taskId];
+  if (task) {
+    return task;
+  }
+  for (const item of replica.inboxPending) {
+    if (item.task.id === taskId) {
+      return item.task;
+    }
+  }
+  for (const bucket of Object.values(replica.reportInbox)) {
+    for (const item of bucket.pending) {
+      if (item.task.id === taskId) {
+        return item.task;
+      }
+    }
+  }
+  for (const day of Object.values(replica.reportDays)) {
+    const reportTask = day.tasks.find((entry) => entry.id === taskId);
+    if (reportTask) {
+      return reportTask;
+    }
+  }
+  return undefined;
+}
+
+function updateTaskEverywhere(
+  replica: Replica,
+  taskId: string,
+  update: (task: Task) => Task,
+): void {
+  const task = replica.tasks[taskId];
+  if (task) {
+    replica.tasks[taskId] = update(task);
+  }
+
+  replica.inboxPending = replica.inboxPending.map((item) =>
+    item.task.id === taskId ? { ...item, task: update(item.task) } : item,
+  );
+  for (const [userId, bucket] of Object.entries(replica.reportInbox)) {
+    replica.reportInbox[userId] = {
+      ...bucket,
+      pending: bucket.pending.map((item) =>
+        item.task.id === taskId ? { ...item, task: update(item.task) } : item,
+      ),
+    };
+  }
+  for (const [key, day] of Object.entries(replica.reportDays)) {
+    replica.reportDays[key] = {
+      ...day,
+      tasks: day.tasks.map((row) => (row.id === taskId ? update(row) : row)),
+    };
+  }
 }
 
 function upsertTask(
@@ -299,12 +525,14 @@ export function applyEvent(replica: Replica, event: SyncEvent): Replica {
       const payload = event.payload as {
         userId: string;
         report?: Person;
+        permissions?: ManagerPermissions;
         pending: InboxPendingItem[];
         history?: InboxHistoryItem[];
       };
       const existing = next.reportInbox[payload.userId];
       next.reportInbox[payload.userId] = {
         report: payload.report ?? existing?.report,
+        permissions: payload.permissions ?? existing?.permissions,
         pending: payload.pending,
         history: payload.history ?? existing?.history ?? [],
       };
@@ -328,6 +556,74 @@ export function applyEvent(replica: Replica, event: SyncEvent): Replica {
       next.notifications = next.notifications.map((item) =>
         item.readAt ? item : { ...item, readAt },
       );
+      return next;
+    }
+    case "jira.connection": {
+      clearJiraReplica(next);
+      next.jiraConnection = event.payload as JiraConnectionStatus;
+      return next;
+    }
+    case "jira.issue.upsert": {
+      upsertJiraIssue(next, event.payload as JiraIssue, "personal");
+      return next;
+    }
+    case "jira.reportIssue.upsert": {
+      const payload = event.payload as { reportUserId: string; issue: JiraIssue };
+      upsertJiraIssue(next, payload.issue, "cache");
+      const issueIds = next.reportJiraIssues[payload.reportUserId] ?? [];
+      next.reportJiraIssues[payload.reportUserId] = issueIds.includes(payload.issue.id)
+        ? issueIds
+        : [...issueIds, payload.issue.id];
+      return next;
+    }
+    case "jira.issue.delete": {
+      const issueIdOrKey = (event.payload as { issueIdOrKey?: string; id?: string }).issueIdOrKey ??
+        (event.payload as { id?: string }).id ??
+        "";
+      const issueId = resolveJiraIssueId(next, issueIdOrKey);
+      const issue = next.jiraIssues[issueId];
+      if (issue) {
+        delete next.jiraIssueKeys[issue.key];
+      }
+      delete next.jiraIssues[issueId];
+      next.jiraIssueIds = next.jiraIssueIds.filter((id) => id !== issueId);
+      delete next.jiraCommentsByIssue[issueId];
+      for (const [userId, issueIds] of Object.entries(next.reportJiraIssues)) {
+        next.reportJiraIssues[userId] = issueIds.filter((id) => id !== issueId);
+      }
+      return next;
+    }
+    case "jira.comment.upsert": {
+      const comment = event.payload as JiraComment;
+      const existing = next.jiraCommentsByIssue[comment.issueId] ?? [];
+      const index = existing.findIndex((row) => row.id === comment.id);
+      const comments =
+        index === -1
+          ? [...existing, comment]
+          : existing.map((row) => (row.id === comment.id ? comment : row));
+      next.jiraCommentsByIssue[comment.issueId] = sortJiraComments(comments);
+      return next;
+    }
+    case "jira.link.upsert": {
+      const payload = event.payload as { taskId: string; link: JiraTaskLinkSummary };
+      upsertTaskJiraLink(next, payload.taskId, payload.link);
+      upsertIssueLinkedTask(next, payload.taskId, payload.link);
+      return next;
+    }
+    case "jira.link.delete": {
+      const payload = event.payload as { taskId: string; issueIdOrKey: string };
+      removeTaskJiraLink(next, payload.taskId, payload.issueIdOrKey);
+      removeIssueLinkedTask(next, payload.taskId, payload.issueIdOrKey);
+      return next;
+    }
+    case "jira.user.upsert": {
+      const user = event.payload as JiraUser;
+      next.jiraUsers[jiraUserKey(user)] = user;
+      return next;
+    }
+    case "jira.component.upsert": {
+      const component = event.payload as JiraComponent;
+      next.jiraComponents[jiraComponentKey(component)] = component;
       return next;
     }
     case "project.upsert": {
@@ -544,6 +840,7 @@ function optimisticTask(
     subtasks: [],
     commentCount: 0,
     project: projectRefFromReplica(replica, body.projectId),
+    jiraLinks: [],
   };
 }
 
@@ -768,6 +1065,7 @@ export function applyOp(replica: Replica, op: SyncOp): Replica {
           subtasks: [],
           commentCount: 0,
           project: projectRefFromReplica(next, op.body.projectId),
+          jiraLinks: [],
         },
         declineReason: null,
         createdAt: now,
@@ -962,6 +1260,64 @@ export function unscheduledForOwner(replica: Replica, ownerId: string): Task[] {
       return replica.owners[task.id] === ownerId;
     })
     .sort((a, b) => a.position - b.position);
+}
+
+function sortJiraIssues(issues: JiraIssue[]): JiraIssue[] {
+  return issues.slice().sort((a, b) => {
+    if (a.updatedAt !== b.updatedAt) {
+      return a.updatedAt < b.updatedAt ? 1 : -1;
+    }
+    return a.key.localeCompare(b.key);
+  });
+}
+
+export function jiraIssueFromReplica(
+  replica: Replica,
+  issueIdOrKey: string,
+): JiraIssue | undefined {
+  return replica.jiraIssues[resolveJiraIssueId(replica, issueIdOrKey)];
+}
+
+export function jiraIssuesForList(replica: Replica): JiraIssue[] {
+  return sortJiraIssues(
+    replica.jiraIssueIds
+      .map((issueId) => replica.jiraIssues[issueId])
+      .filter((issue): issue is JiraIssue => Boolean(issue)),
+  );
+}
+
+export function reportJiraIssuesForUser(replica: Replica, userId: string): JiraIssue[] {
+  return sortJiraIssues(
+    (replica.reportJiraIssues[userId] ?? [])
+      .map((issueId) => replica.jiraIssues[issueId])
+      .filter((issue): issue is JiraIssue => Boolean(issue)),
+  );
+}
+
+export function jiraCommentsForIssue(
+  replica: Replica,
+  issueIdOrKey: string,
+): JiraComment[] {
+  const issue = jiraIssueFromReplica(replica, issueIdOrKey);
+  return issue ? (replica.jiraCommentsByIssue[issue.id] ?? []) : [];
+}
+
+export function jiraComponentsForList(replica: Replica): JiraComponent[] {
+  return Object.values(replica.jiraComponents).sort((a, b) => {
+    if (a.archived !== b.archived) {
+      return a.archived ? 1 : -1;
+    }
+    return a.name.localeCompare(b.name);
+  });
+}
+
+export function jiraUsersForList(replica: Replica): JiraUser[] {
+  return Object.values(replica.jiraUsers).sort((a, b) => {
+    if (a.active !== b.active) {
+      return a.active ? -1 : 1;
+    }
+    return a.displayName.localeCompare(b.displayName);
+  });
 }
 
 export { reportDayKey };

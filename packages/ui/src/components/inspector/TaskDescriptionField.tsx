@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
 import { useUpdateTaskMutation } from "@tudu/store";
+import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { AUTOSAVE_MS } from "@/lib/autosave";
-import { cn } from "@/lib/utils";
 
 export type TaskDescriptionFieldProps = {
   taskId: string;
@@ -40,40 +40,36 @@ export function TaskDescriptionField({
   }, AUTOSAVE_MS);
 
   return (
-    <textarea
-      value={value}
-      rows={3}
-      readOnly={readOnly}
-      placeholder={readOnly ? "" : "Add a description..."}
-      aria-label="Task description"
-      className={cn(
-        "mt-[14px] w-full resize-y border border-hair bg-transparent px-[12px] py-[10px]",
-        "text-[13.5px] leading-[1.55] text-muted-foreground outline-none",
-        "placeholder:text-faint focus:border-foreground focus:text-foreground",
-        readOnly && "cursor-default focus:border-hair",
-      )}
-      onFocus={() => {
+    <div
+      className="mt-[14px]"
+      onFocusCapture={() => {
         focusedRef.current = true;
       }}
-      onChange={(event) => {
-        if (readOnly) {
-          return;
-        }
-        const next = event.target.value;
-        setValue(next);
-        debouncedSave(next);
-      }}
-      onBlur={(event) => {
+      onBlurCapture={() => {
         focusedRef.current = false;
         if (readOnly) {
           return;
         }
         debouncedSave.flush();
-        const next = event.target.value.trim();
-        const normalized = next.length > 0 ? next : null;
+        const normalized = value.trim().length > 0 ? value.trim() : null;
         lastSaved.current = normalized ?? "";
-        setValue(event.target.value);
       }}
-    />
+    >
+      <RichTextEditor
+        mode="html"
+        value={value}
+        readOnly={readOnly}
+        placeholder={readOnly ? "" : "Add a description..."}
+        aria-label="Task description"
+        className="text-muted-foreground focus-within:text-foreground"
+        onChange={(next) => {
+          if (readOnly) {
+            return;
+          }
+          setValue(next);
+          debouncedSave(next);
+        }}
+      />
+    </div>
   );
 }

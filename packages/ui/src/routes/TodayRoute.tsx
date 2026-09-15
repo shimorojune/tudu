@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { effectiveDayIso, type Bucket } from "@tudu/shared";
+import { effectiveDayIso, type Bucket, type JiraIssue } from "@tudu/shared";
 import {
+  setSelectedDate,
   setSelectedTaskId,
   useCreateSubtaskMutation,
   useCreateTaskMutation,
@@ -10,11 +11,16 @@ import {
   type RootState,
 } from "@tudu/store";
 import { DayTaskList } from "@/components/tasks/DayTaskList";
+import { TaskListHeader } from "@/components/tasks/TaskListHeader";
 import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
 import { createTaskBody } from "@/lib/createTask";
 import { DetailInspector } from "@/components/inspector/DetailInspector";
 import { InspectorSheet } from "@/components/inspector/InspectorSheet";
-import { JiraColumnEmpty } from "@/components/jira/JiraColumnEmpty";
+import { SpawnJiraTaskDialog } from "@/components/jira/CreateJiraTaskControls";
+import { JiraColumn } from "@/components/jira/JiraColumn";
+import { JiraIssueDetail } from "@/components/jira/JiraIssueDetail";
+import { LinkJiraPalette } from "@/components/jira/LinkJiraPalette";
+import { PhoneJiraButton } from "@/components/jira/PhoneJiraButton";
 import { MidnightBanner } from "@/components/today/MidnightBanner";
 import { TodayFirstRun } from "@/components/today/TodayFirstRun";
 import { DayListSkeleton } from "@/components/loading/DayListSkeleton";
@@ -22,6 +28,7 @@ import { LoadingStatus } from "@/components/loading/LoadingStatus";
 import { PaneSkeleton } from "@/components/loading/PaneSkeleton";
 import { TodayPanelLayout } from "@/components/today/TodayPanelLayout";
 import { useDaySearchSync } from "@/hooks/useDaySearchSync";
+import { useJiraPreview } from "@/hooks/useJiraPreview";
 import { useNewTaskShortcut } from "@/hooks/useNewTaskShortcut";
 import { useRolloverOnFocus } from "@/hooks/useRolloverOnFocus";
 import { useViewportBand } from "@/hooks/useViewportBand";
@@ -31,6 +38,7 @@ export function TodayRoute() {
   const dispatch = useDispatch();
   const selectedDate = useSelector((s: RootState) => s.day.selectedDate);
   const selectedTaskId = useSelector((s: RootState) => s.day.selectedTaskId);
+  const jiraPreview = useJiraPreview();
 
   const dayQuery = useGetTasksForDayQuery(selectedDate);
   const unscheduledQuery = useGetUnscheduledTasksQuery();
@@ -45,9 +53,11 @@ export function TodayRoute() {
 
   const [firstRunDialogOpen, setFirstRunDialogOpen] = useState(false);
   const [firstRunBucket, setFirstRunBucket] = useState<Bucket>("later");
+  const [spawnIssue, setSpawnIssue] = useState<JiraIssue | null>(null);
 
   const unscheduledCount = unscheduledQuery.data?.tasks.length ?? 0;
   const effectiveDay = effectiveDayIso();
+  const nowCount = tasks.filter((task) => task.bucket === "now").length;
 
   const isFirstRun =
     !dayQuery.isLoading &&
@@ -66,6 +76,62 @@ export function TodayRoute() {
     setFirstRunBucket(bucket);
     setFirstRunDialogOpen(true);
   }
+
+  function selectTask(id: string) {
+    jiraPreview.clearPreview();
+    dispatch(setSelectedTaskId(id));
+  }
+
+  const spawnDialog = (
+    <SpawnJiraTaskDialog
+      issue={spawnIssue}
+      selectedDate={selectedDate}
+      nowCount={nowCount}
+      onOpenChange={(open) => {
+        if (!open) {
+          setSpawnIssue(null);
+        }
+      }}
+      onCreated={(task) => {
+        setSpawnIssue(null);
+        jiraPreview.handleCreatedTask(task, {
+          selectedDate,
+          onSelectDate: (date) => dispatch(setSelectedDate(date)),
+          onSelectTask: selectTask,
+        });
+      }}
+    />
+  );
+
+  const jiraColumn = (
+    <JiraColumn
+      selectedTask={selectedTask}
+      selectedDate={selectedDate}
+      selectedIssueKey={jiraPreview.previewIssueKey}
+      onPreviewIssue={jiraPreview.setPreviewIssueKey}
+      onCreateTask={setSpawnIssue}
+    />
+  );
+
+  const inspector = jiraPreview.previewIssueKey ? (
+    <JiraIssueDetail
+      issueIdOrKey={jiraPreview.previewIssueKey}
+      selectedTask={selectedTask}
+      selectedDate={selectedDate}
+      backLabel={band === "phone" ? "Back" : "Close preview"}
+      onBack={jiraPreview.clearPreview}
+      onCreateTask={setSpawnIssue}
+      onCreatedTask={(task) =>
+        jiraPreview.handleCreatedTask(task, {
+          selectedDate,
+          onSelectDate: (date) => dispatch(setSelectedDate(date)),
+          onSelectTask: selectTask,
+        })
+      }
+    />
+  ) : (
+    <DetailInspector task={selectedTask} selectedDate={selectedDate} />
+  );
 
   useNewTaskShortcut(() => openFirstRunDialog("later"), { enabled: isFirstRun });
 
@@ -96,10 +162,30 @@ export function TodayRoute() {
 
   if (isFirstRun) {
     return (
-      <>
-        <TodayFirstRun
-          onAddFirst={() => openFirstRunDialog("later")}
+      <div className="flex h-full min-h-0 flex-col">
+        <TodayPanelLayout
+          taskList={
+            <>
+              {band === "phone" ? (
+                <PhoneJiraButton onClick={jiraPreview.openJiraSheet} />
+              ) : null}
+              <TodayFirstRun
+                onAddFirst={() => openFirstRunDialog("later")}
+              />
+            </>
+          }
+          jiraColumn={jiraColumn}
+          inspector={inspector}
         />
+        {band === "phone" ? (
+          <InspectorSheet
+            open={jiraPreview.jiraSheetOpen}
+            title="Jira"
+            onClose={jiraPreview.closeJiraSheet}
+          >
+            {jiraPreview.previewIssueKey ? inspector : jiraColumn}
+          </InspectorSheet>
+        ) : null}
         <NewTaskDialog
           open={firstRunDialogOpen}
           initialBucket={firstRunBucket}
@@ -124,10 +210,11 @@ export function TodayRoute() {
               }).unwrap();
             }
 
-            dispatch(setSelectedTaskId(result.task.id));
+            selectTask(result.task.id);
           }}
         />
-      </>
+        {spawnDialog}
+      </div>
     );
   }
 
@@ -146,7 +233,15 @@ export function TodayRoute() {
               tasks={tasks}
               selectedDate={selectedDate}
               selectedTaskId={selectedTaskId}
-              onSelectTask={(id) => dispatch(setSelectedTaskId(id))}
+              highlightTaskId={jiraPreview.highlightTaskId}
+              header={
+                <TaskListHeader>
+                  {band === "phone" ? (
+                    <PhoneJiraButton onClick={jiraPreview.openJiraSheet} />
+                  ) : null}
+                </TaskListHeader>
+              }
+              onSelectTask={selectTask}
               onDeselectTask={() => dispatch(setSelectedTaskId(null))}
               onTaskDeleted={(id) => {
                 if (selectedTaskId === id) {
@@ -156,20 +251,30 @@ export function TodayRoute() {
             />
           </div>
         }
-        jiraColumn={<JiraColumnEmpty />}
-        inspector={
-          <DetailInspector task={selectedTask} selectedDate={selectedDate} />
-        }
+        jiraColumn={jiraColumn}
+        inspector={inspector}
       />
       {band === "phone" ? (
-        <InspectorSheet
-          open={selectedTask !== null}
-          title="Task details"
-          onClose={() => dispatch(setSelectedTaskId(null))}
-        >
-          <DetailInspector task={selectedTask} selectedDate={selectedDate} />
-        </InspectorSheet>
+        jiraPreview.jiraSheetOpen ? (
+          <InspectorSheet
+            open
+            title="Jira"
+            onClose={jiraPreview.closeJiraSheet}
+          >
+            {jiraPreview.previewIssueKey ? inspector : jiraColumn}
+          </InspectorSheet>
+        ) : (
+          <InspectorSheet
+            open={selectedTask !== null}
+            title="Task details"
+            onClose={() => dispatch(setSelectedTaskId(null))}
+          >
+            <DetailInspector task={selectedTask} selectedDate={selectedDate} />
+          </InspectorSheet>
+        )
       ) : null}
+      <LinkJiraPalette selectedTask={selectedTask} selectedDate={selectedDate} />
+      {spawnDialog}
     </div>
   );
 }

@@ -221,6 +221,7 @@ export type TeamResponse = {
 
 export type ReportDayResponse = {
   report: Person;
+  permissions: ManagerPermissions;
   date: string;
   tasks: Task[];
   slippingCount: number;
@@ -228,11 +229,13 @@ export type ReportDayResponse = {
 
 export type ReportUnscheduledResponse = {
   report: Person;
+  permissions: ManagerPermissions;
   tasks: Task[];
 };
 
 export type ReportInboxResponse = {
   report: Person;
+  permissions: ManagerPermissions;
   pending: InboxPendingItem[];
   history: InboxHistoryItem[];
   count: number;

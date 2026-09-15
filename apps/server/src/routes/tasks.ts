@@ -35,6 +35,7 @@ import {
   type TasksResponse,
   type RolloverResponse,
   type UpdateTaskRequest,
+  sanitizeRichTextHtml,
 } from "@tudu/shared";
 import { Hono } from "hono";
 import type { Context } from "hono";
@@ -75,7 +76,10 @@ function toUpdateFields(patch: UpdateTaskRequest): UpdateTaskFields {
   const fields: UpdateTaskFields = {};
 
   if ("title" in patch) fields.title = patch.title;
-  if ("description" in patch) fields.description = patch.description ?? null;
+  if ("description" in patch) {
+    fields.description =
+      patch.description == null ? null : sanitizeRichTextHtml(patch.description);
+  }
   if ("scheduledDate" in patch) fields.scheduledDate = patch.scheduledDate;
   if ("bucket" in patch) fields.bucket = patch.bucket;
   if ("startDate" in patch) fields.startDate = patch.startDate;
@@ -159,7 +163,8 @@ export function createTasksRoute(db: Db) {
       created = await createTask(db, {
         userId: userId(c),
         title: body.title,
-        description: body.description ?? null,
+        description:
+          body.description == null ? null : sanitizeRichTextHtml(body.description),
         scheduledDate: body.scheduledDate,
         bucket: body.bucket,
         startDate: body.startDate,

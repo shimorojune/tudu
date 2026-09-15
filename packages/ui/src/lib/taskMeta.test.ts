@@ -21,6 +21,7 @@ function baseTask(overrides: Partial<Task> = {}): Task {
     updatedAt: "2026-09-06T08:00:00.000Z",
     commentCount: 0,
     project: null,
+    jiraLinks: [],
     subtasks: [],
     ...overrides,
   };
@@ -62,5 +63,37 @@ describe("taskMetaSegments", () => {
       expect(deadline.text).toMatch(/^overdue, was due \d{2}:\d{2}$/);
       expect(deadline.accent).toBe(true);
     }
+  });
+
+  it("shows linked Jira keys after local task metadata", () => {
+    const segments = taskMetaSegments(
+      baseTask({
+        inProgress: true,
+        jiraLinks: [
+          {
+            issueId: "10001",
+            key: "EGS-123",
+            summary: "Investigate sync failure",
+            statusName: "In Progress",
+            dueDate: "2026-09-08",
+            browseUrl: "https://jira.example.test/browse/EGS-123",
+          },
+          {
+            issueId: "10002",
+            key: "ENG-9",
+            summary: "Follow up",
+            statusName: "To Do",
+            dueDate: null,
+            browseUrl: "https://jira.example.test/browse/ENG-9",
+          },
+        ],
+      }),
+      "2026-09-06",
+    );
+
+    expect(segments.at(-1)).toEqual({
+      kind: "text",
+      text: "JIRA EGS-123, ENG-9",
+    });
   });
 });

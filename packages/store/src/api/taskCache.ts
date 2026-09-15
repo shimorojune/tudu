@@ -252,6 +252,7 @@ export function createOptimisticTask(body: CreateTaskRequest, tempId: string): T
     subtasks: [],
     commentCount: 0,
     project: null,
+    jiraLinks: [],
   };
 }
 

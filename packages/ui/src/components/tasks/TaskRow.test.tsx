@@ -60,6 +60,7 @@ const fixtureTask: Task = {
   updatedAt: "2026-09-05T08:00:00.000Z",
   commentCount: 0,
   project: null,
+  jiraLinks: [],
   subtasks: [
     {
       id: "22222222-2222-4222-8222-222222222222",
@@ -109,6 +110,33 @@ describe("TaskRow", () => {
     );
 
     expect(screen.getByText("2 of 3 completed")).toBeInTheDocument();
+  });
+
+  it("shows linked Jira keys in the meta line", () => {
+    render(
+      <TaskRow
+        task={{
+          ...fixtureTask,
+          jiraLinks: [
+            {
+              issueId: "10001",
+              key: "EGS-123",
+              summary: "Investigate sync failure",
+              statusName: "In Progress",
+              dueDate: "2026-09-08",
+              browseUrl: "https://jira.example.test/browse/EGS-123",
+            },
+          ],
+        }}
+        bucket="now"
+        selected={false}
+        selectedDate="2026-09-05"
+        onSelect={vi.fn()}
+        menuVariant="day"
+      />,
+    );
+
+    expect(screen.getByText("JIRA EGS-123")).toBeInTheDocument();
   });
 
   it("applies selected row treatment without shifting horizontal padding", () => {
@@ -742,5 +770,36 @@ describe("TaskRow", () => {
       screen.queryByRole("button", { name: "Add a subtask" }),
     ).not.toBeInTheDocument();
     expect(screen.getByText("Improve error message")).toBeInTheDocument();
+  });
+
+  it("hides manager move and delete menu items when row actions omit them", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TaskRow
+        task={fixtureTask}
+        bucket="now"
+        selected={false}
+        selectedDate="2026-09-05"
+        onSelect={vi.fn()}
+        menuVariant="day"
+        actions={{
+          ...defaultActions(),
+          onMoveToBucket: undefined,
+          onUnschedule: undefined,
+          onDelete: undefined,
+        }}
+        viewer="manager"
+      />,
+    );
+
+    await user.pointer({
+      keys: "[MouseRight>]",
+      target: screen.getByRole("button", { name: /Improve error message/i }),
+    });
+
+    expect(screen.queryByRole("menuitem", { name: "Move to Next" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Unschedule" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Delete" })).not.toBeInTheDocument();
   });
 });

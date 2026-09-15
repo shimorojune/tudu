@@ -17,6 +17,7 @@ export type DaySearchSyncOptions = {
   weekDays?: readonly string[];
   taskFound?: boolean | null;
   clearTask?: boolean;
+  silentMissingTask?: boolean;
   today?: string;
 };
 
@@ -40,6 +41,7 @@ export function useDaySearchSync(
   const weekDays = options.weekDays;
   const taskFound = options.taskFound ?? null;
   const clearTask = options.clearTask === true;
+  const silentMissingTask = options.silentMissingTask === true;
   const toastedKey = useRef<string | null>(null);
   const lastUrlKey = useRef<string | null>(null);
   const lastReduxKey = useRef<string | null>(null);
@@ -78,6 +80,7 @@ export function useDaySearchSync(
       weekDays,
       taskFound,
       clearTask,
+      silentMissingTask,
     });
 
     if (plan.action === "none") {
@@ -117,6 +120,7 @@ export function useDaySearchSync(
     today,
     taskFound,
     clearTask,
+    silentMissingTask,
     rawKey,
     weekKey,
     dispatch,

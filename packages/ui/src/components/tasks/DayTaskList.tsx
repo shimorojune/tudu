@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSelector } from "react-redux";
 import {
   DndContext,
@@ -16,7 +16,13 @@ import {
 } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { BUCKETS, type Bucket, type Task } from "@tudu/shared";
+import {
+  BUCKETS,
+  DEFAULT_MANAGER_PERMISSIONS,
+  type Bucket,
+  type ManagerPermissions,
+  type Task,
+} from "@tudu/shared";
 import {
   useCreateSubtaskMutation,
   useCreateTaskMutation,
@@ -59,6 +65,7 @@ import type { TaskRowActions, TaskViewer } from "@/components/tasks/TaskRow";
 import { useNewTaskShortcut } from "@/hooks/useNewTaskShortcut";
 import { usePointerY } from "@/hooks/usePointerY";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { notifyAction, mutationResult } from "@/lib/notifyAction";
 
 const CONTAINER_SWITCH_HYSTERESIS_PX = 12;
 
@@ -71,6 +78,9 @@ export type DayTaskListProps = {
   onTaskDeleted?: (id: string) => void;
   viewer?: TaskViewer;
   reportUserId?: string;
+  reportPermissions?: ManagerPermissions;
+  header?: ReactNode;
+  highlightTaskId?: string | null;
 };
 
 function tasksByBucket(tasks: Task[]): Record<Bucket, Task[]> {
@@ -107,6 +117,7 @@ type DayTaskListDndProps = {
   flashTaskId: string | null;
   onFlashComplete: () => void;
   viewer: TaskViewer;
+  canDragRows: boolean;
 };
 
 function DayTaskListDnd({
@@ -125,6 +136,7 @@ function DayTaskListDnd({
   flashTaskId,
   onFlashComplete,
   viewer,
+  canDragRows,
 }: DayTaskListDndProps) {
   const remoteMovedTaskIds = useSelector(selectVisible).remoteMovedTaskIds;
   const { droppableRects } = useDndContext();
@@ -294,6 +306,7 @@ function DayTaskListDnd({
           skipSlideForTaskId={suppressSlideId}
           skipSlideForTaskIds={remoteMovedTaskIds}
           viewer={viewer}
+          canDragRows={canDragRows}
         />
       ))}
       <DragOverlay dropAnimation={null}>
@@ -316,12 +329,18 @@ export function DayTaskList({
   onTaskDeleted,
   viewer = "owner",
   reportUserId,
+  reportPermissions,
+  header,
+  highlightTaskId = null,
 }: DayTaskListProps) {
   const isToday = selectedDate === todayIso();
   const [flashTaskId, setFlashTaskId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogBucket, setDialogBucket] = useState<Bucket>("later");
   const isManager = viewer === "manager";
+  const permissions = reportPermissions ?? DEFAULT_MANAGER_PERMISSIONS;
+  const canReorder = !isManager || permissions.canReorder;
+  const canDelete = !isManager || permissions.canDelete;
 
   const baseItems = useMemo(
     () => itemsFromTasks(tasks, BUCKETS, (task) => task.bucket),
@@ -353,6 +372,12 @@ export function DayTaskList({
 
   useNewTaskShortcut(() => openDialog("later"), { enabled: !isManager });
 
+  useEffect(() => {
+    if (highlightTaskId) {
+      setFlashTaskId(highlightTaskId);
+    }
+  }, [highlightTaskId]);
+
   const laneFor = (bucket: string) => ({
     scheduledDate: selectedDate,
     bucket: bucket as Bucket,
@@ -360,6 +385,9 @@ export function DayTaskList({
 
   function applyReorder(lanes: ReturnType<typeof lanesFromItems>) {
     if (lanes.length === 0) {
+      return;
+    }
+    if (isManager && !canReorder) {
       return;
     }
     if (isManager && reportUserId) {
@@ -390,14 +418,22 @@ export function DayTaskList({
         }
         updateTask({ id: taskId, patch: { title } });
       },
-      onDelete: () => {
-        if (isManager && reportUserId) {
-          deleteReportTask({ userId: reportUserId, taskId });
-        } else {
-          deleteTask(taskId);
-        }
-        onTaskDeleted?.(taskId);
-      },
+      onDelete: canDelete
+        ? () => {
+            if (isManager && reportUserId) {
+              void notifyAction(
+                () => mutationResult(deleteReportTask({ userId: reportUserId, taskId })),
+                { success: "Task deleted", error: "Could not delete the task" },
+              );
+            } else {
+              void notifyAction(
+                () => mutationResult(deleteTask(taskId)),
+                { success: "Task deleted", error: "Could not delete the task" },
+              );
+            }
+            onTaskDeleted?.(taskId);
+          }
+        : undefined,
       onToggleInProgress: () => {
         if (isManager) {
           return;
@@ -411,14 +447,18 @@ export function DayTaskList({
           patch: { inProgress: !task.inProgress },
         });
       },
-      onMoveToBucket: (bucket) => {
-        const lanes = moveTaskToBucketLanes(tasks, taskId, bucket, selectedDate);
-        applyReorder(lanes);
-      },
-      onUnschedule: () => {
-        const lanes = unscheduleTaskLanes(tasks, taskId);
-        applyReorder(lanes);
-      },
+      onMoveToBucket: canReorder
+        ? (bucket) => {
+            const lanes = moveTaskToBucketLanes(tasks, taskId, bucket, selectedDate);
+            applyReorder(lanes);
+          }
+        : undefined,
+      onUnschedule: canReorder
+        ? () => {
+            const lanes = unscheduleTaskLanes(tasks, taskId);
+            applyReorder(lanes);
+          }
+        : undefined,
       onToggleSubtask: (subtaskId, done) => {
         if (isManager) {
           return;
@@ -464,21 +504,29 @@ export function DayTaskList({
     subtaskTitles: string[];
     projectId: string | null;
   }) {
-    const result = await createTask(
-      createTaskBody({
-        title: args.title,
-        description: args.description,
-        scheduledDate: args.scheduledDate,
-        bucket: args.scheduledDate === null ? null : args.bucket,
-        projectId: args.projectId,
-      }),
-    ).unwrap();
+    const result = (await notifyAction(
+      () =>
+        mutationResult(
+          createTask(
+            createTaskBody({
+              title: args.title,
+              description: args.description,
+              scheduledDate: args.scheduledDate,
+              bucket: args.scheduledDate === null ? null : args.bucket,
+              projectId: args.projectId,
+            }),
+          ),
+        ),
+      { success: "Task created", error: "Could not create the task" },
+    )) as { task: { id: string } };
 
     for (const subtaskTitle of args.subtaskTitles) {
-      await createSubtask({
-        taskId: result.task.id,
-        body: { title: subtaskTitle },
-      }).unwrap();
+      await mutationResult(
+        createSubtask({
+          taskId: result.task.id,
+          body: { title: subtaskTitle },
+        }),
+      );
     }
 
     onSelectTask(result.task.id);
@@ -487,6 +535,7 @@ export function DayTaskList({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {header}
       <ScrollArea className="min-h-0 flex-1">
         <DndContext
           sensors={sensors}
@@ -505,14 +554,17 @@ export function DayTaskList({
             showNowClearPrompt={showNowClearPrompt}
             rowActionsForTask={makeRowActions}
             onNowClearPrompt={() => {
-              const lanes = buildPullIntoNowLanes(tasks, selectedDate);
-              applyReorder(lanes);
+              if (canReorder) {
+                const lanes = buildPullIntoNowLanes(tasks, selectedDate);
+                applyReorder(lanes);
+              }
             }}
             onReorder={handleReorder}
             onAddTask={openDialog}
             flashTaskId={flashTaskId}
             onFlashComplete={() => setFlashTaskId(null)}
             viewer={viewer}
+            canDragRows={canReorder}
           />
         </DndContext>
       </ScrollArea>

@@ -29,13 +29,13 @@ describe("TodayPanelLayout", () => {
     expect(screen.queryByText("Inspector pane")).not.toBeInTheDocument();
   });
 
-  it("shows list and inspector without JIRA on tablet", () => {
+  it("shows all three panes on tablet", () => {
     band.current = "tablet";
     renderLayout();
 
     expect(screen.getByText("Task list")).toBeInTheDocument();
+    expect(screen.getByText("JIRA pane")).toBeInTheDocument();
     expect(screen.getByText("Inspector pane")).toBeInTheDocument();
-    expect(screen.queryByText("JIRA pane")).not.toBeInTheDocument();
   });
 
   it("shows all three panes on desktop", () => {

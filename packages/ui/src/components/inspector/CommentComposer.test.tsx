@@ -10,23 +10,35 @@ vi.mock("@tudu/store", () => ({
 }));
 
 describe("CommentComposer", () => {
-  it("sends on Enter and keeps Shift+Enter as a newline", async () => {
-    const user = userEvent.setup();
+  it("sends rich text comments from the editor", async () => {
     createComment.mockClear();
+    const user = userEvent.setup();
 
     render(<CommentComposer taskId="11111111-1111-4111-8111-111111111111" />);
 
-    const textarea = screen.getByPlaceholderText("Add a comment…");
-    await user.type(textarea, "Hello{enter}");
+    await user.click(screen.getByRole("textbox", { name: "Task comment" }));
+    await user.keyboard("Hello");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
     expect(createComment).toHaveBeenCalledWith({
       taskId: "11111111-1111-4111-8111-111111111111",
-      body: "Hello",
+      body: expect.stringMatching(/^<p>.*<\/p>$/),
     });
+  });
 
-    createComment.mockClear();
-    await user.clear(textarea);
-    await user.type(textarea, "Line one{shift>}{enter}Line two");
+  it("renders a named read-only state when commenting is not allowed", () => {
+    render(
+      <CommentComposer
+        taskId="11111111-1111-4111-8111-111111111111"
+        disabled
+      />,
+    );
+
+    expect(screen.getByRole("textbox", { name: "Task comment" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
     expect(createComment).not.toHaveBeenCalled();
-    expect(textarea).toHaveValue("Line one\nLine two");
   });
 });
