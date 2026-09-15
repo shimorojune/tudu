@@ -57,6 +57,7 @@ const task: Task = {
   updatedAt: "2026-09-10T08:00:00.000Z",
   commentCount: 0,
   project: null,
+  jiraLinks: [],
   subtasks: [],
 };
 

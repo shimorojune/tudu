@@ -11,9 +11,16 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { Context } from "hono";
 import { z } from "zod";
-import { applySyncOp, bootstrapViews, SyncOpError } from "../applySyncOp.js";
+import {
+  applySyncOp,
+  bootstrapViews,
+  SyncOpError,
+  type JiraSyncOptions,
+} from "../applySyncOp.js";
+import { JiraHttpError } from "../jira/client.js";
 import type { SessionEnv } from "../session-middleware.js";
 import { waitForSync } from "../syncHub.js";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 function jsonBody<T extends z.ZodType>(schema: T) {
   return zValidator("json", schema, (result, c) => {
@@ -28,7 +35,22 @@ const streamQuerySchema = z.object({
   after: z.coerce.number().int().min(0).default(0),
 });
 
-export function createSyncRoute(db: Db) {
+export function syncRouteError(error: unknown): { status: ContentfulStatusCode; message: string } | null {
+  if (error instanceof JiraHttpError) {
+    return {
+      status: error.status >= 400 && error.status < 500
+        ? (error.status as ContentfulStatusCode)
+        : 502,
+      message: error.message,
+    };
+  }
+  if (error instanceof Error && error.message.startsWith("JIRA_TOKEN_ENCRYPTION_KEY")) {
+    return { status: 400, message: error.message };
+  }
+  return null;
+}
+
+export function createSyncRoute(db: Db, options?: JiraSyncOptions) {
   const app = new Hono<SessionEnv>();
 
   app.use("*", async (c, next) => {
@@ -46,7 +68,13 @@ export function createSyncRoute(db: Db) {
   app.post("/sync", jsonBody(syncPushRequestSchema), async (c) => {
     const body = c.req.valid("json");
     try {
-      const events = await applySyncOp(db, userId(c), body.clientMutationId, body.op);
+      const events = await applySyncOp(
+        db,
+        userId(c),
+        body.clientMutationId,
+        body.op,
+        options,
+      );
       const seq = events.reduce((max, event) => Math.max(max, event.seq), 0);
       const response: SyncPushResponse = {
         clientMutationId: body.clientMutationId,
@@ -57,6 +85,10 @@ export function createSyncRoute(db: Db) {
     } catch (error) {
       if (error instanceof SyncOpError) {
         return c.json({ error: error.message }, error.status);
+      }
+      const mapped = syncRouteError(error);
+      if (mapped) {
+        return c.json({ error: mapped.message }, mapped.status);
       }
       throw error;
     }

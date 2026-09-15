@@ -35,6 +35,23 @@ function apiUrl(path: string): string {
   return `${resolveApiUrl()}${path}`;
 }
 
+async function syncError(response: Response): Promise<Error> {
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    data = { error: "Sync push failed" };
+  }
+  const message =
+    data && typeof data === "object" && "error" in data
+      ? String((data as { error?: unknown }).error ?? "Sync push failed")
+      : "Sync push failed";
+  return Object.assign(new Error(message), {
+    status: response.status,
+    data,
+  });
+}
+
 export function subscribeView(key: string) {
   return (dispatch: AppDispatch, getState: () => RootState) => {
     dispatch(addView(key));
@@ -83,7 +100,7 @@ export function enqueue(op: SyncOp) {
       });
       if (!response.ok) {
         dispatch(failPending(clientMutationId));
-        throw new Error("Sync push failed");
+        throw await syncError(response);
       }
       const body = (await response.json()) as SyncPushResponse;
       dispatch(ackPending({ clientMutationId, events: body.events }));

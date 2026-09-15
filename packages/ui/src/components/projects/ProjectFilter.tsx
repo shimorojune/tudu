@@ -68,7 +68,7 @@ export function ProjectFilter() {
       <PopoverTrigger
         type="button"
         aria-label={selected ? `Filter: ${selected.name}` : "All projects"}
-        className="inline-flex max-w-[140px] shrink-0 items-center gap-[6px] border border-hair px-[8px] py-[5px] text-[12px] text-muted-foreground hover:border-foreground hover:text-foreground xl:max-w-[180px]"
+        className="inline-flex max-w-[140px] shrink-0 items-center gap-[6px] border border-rule px-[8px] py-[5px] text-[12px] text-muted-foreground hover:border-foreground hover:text-foreground xl:max-w-[180px]"
       >
         {selected ? (
           <>
@@ -87,7 +87,8 @@ export function ProjectFilter() {
         )}
       </PopoverTrigger>
       <PopoverContent
-        align="end"
+        align="start"
+        sideOffset={4}
         className="w-[200px] border-rule bg-card p-0 shadow-none"
       >
         <div className="flex flex-col py-[4px]">

@@ -1,4 +1,6 @@
 import { personFirstName } from "@/lib/person";
+import { Button } from "@/components/ui/button";
+import { notifyAction, mutationResult } from "@/lib/notifyAction";
 import {
   useAcceptTeamInviteMutation,
   useDeclineTeamInviteMutation,
@@ -7,8 +9,8 @@ import {
 
 export function InviteBanner() {
   const { data } = useGetTeamQuery();
-  const [acceptInvite] = useAcceptTeamInviteMutation();
-  const [declineInvite] = useDeclineTeamInviteMutation();
+  const [acceptInvite, acceptState] = useAcceptTeamInviteMutation();
+  const [declineInvite, declineState] = useDeclineTeamInviteMutation();
   const incoming = data?.incomingInvites ?? [];
   const invite = incoming[0];
 
@@ -28,20 +30,33 @@ export function InviteBanner() {
         manager. Confirm before they can see your day.
       </p>
       <div className="flex shrink-0 items-center gap-[8px]">
-        <button
+        <Button
           type="button"
-          className="bg-foreground px-[12px] py-[6px] text-[12.5px] font-bold text-card"
-          onClick={() => void acceptInvite(invite.id)}
+          loading={Boolean(acceptState?.isLoading)}
+          className="h-auto bg-foreground px-[12px] py-[6px] text-[12.5px] font-bold text-card"
+          onClick={() =>
+            void notifyAction(
+              () => mutationResult(acceptInvite(invite.id)),
+              { success: "Invite confirmed", error: "Could not confirm" },
+            )
+          }
         >
           Confirm
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className="border border-rule px-[12px] py-[5px] text-[12.5px] text-muted-foreground"
-          onClick={() => void declineInvite(invite.id)}
+          variant="outline"
+          loading={Boolean(declineState?.isLoading)}
+          className="h-auto border-rule px-[12px] py-[5px] text-[12.5px] text-muted-foreground"
+          onClick={() =>
+            void notifyAction(
+              () => mutationResult(declineInvite(invite.id)),
+              { success: "Invite declined", error: "Could not decline" },
+            )
+          }
         >
           Decline
-        </button>
+        </Button>
       </div>
     </div>
   );

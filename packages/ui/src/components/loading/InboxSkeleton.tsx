@@ -2,7 +2,11 @@ import { LoadingStatus } from "@/components/loading/LoadingStatus";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useViewportBand } from "@/hooks/useViewportBand";
 
-export function InboxSkeleton() {
+export function InboxSkeleton({
+  withJiraPane = false,
+}: {
+  withJiraPane?: boolean;
+}) {
   const band = useViewportBand();
 
   return (
@@ -10,6 +14,8 @@ export function InboxSkeleton() {
       className={
         band === "phone"
           ? "grid grid-cols-1"
+          : withJiraPane
+            ? "grid grid-cols-[minmax(0,1fr)_minmax(280px,360px)_minmax(280px,396px)]"
           : "grid grid-cols-[minmax(0,1fr)_356px]"
       }
     >
@@ -31,17 +37,33 @@ export function InboxSkeleton() {
         </article>
       </div>
       {band === "phone" ? null : (
-        <aside className="flex min-h-0 flex-col bg-background">
-          <div className="flex items-center gap-[10px] border-b border-hair px-[24px] py-[20px]">
-            <Skeleton className="size-[24px]" />
-            <Skeleton className="h-[10px] w-[140px]" />
-          </div>
-          <div className="flex flex-col gap-[16px] px-[24px] py-[20px]">
-            <Skeleton className="h-[12px] w-full" />
-            <Skeleton className="h-[12px] w-[84%]" />
-            <Skeleton className="h-[12px] w-[70%]" />
-          </div>
-        </aside>
+        <>
+          {withJiraPane ? (
+            <aside className="flex min-h-0 flex-col border-r border-hair bg-background">
+              <div className="flex items-center gap-[10px] border-b border-hair px-[18px] py-[20px]">
+                <Skeleton className="h-[10px] w-[42px]" />
+                <Skeleton className="h-[10px] w-[96px]" />
+              </div>
+              <div className="flex flex-col gap-[12px] px-[18px] py-[20px]">
+                <Skeleton className="h-[14px] w-full" />
+                <Skeleton className="h-[12px] w-[72%]" />
+                <Skeleton className="h-[54px] w-full" />
+                <Skeleton className="h-[54px] w-full" />
+              </div>
+            </aside>
+          ) : null}
+          <aside className="flex min-h-0 flex-col bg-background">
+            <div className="flex items-center gap-[10px] border-b border-hair px-[24px] py-[20px]">
+              <Skeleton className="size-[24px]" />
+              <Skeleton className="h-[10px] w-[140px]" />
+            </div>
+            <div className="flex flex-col gap-[16px] px-[24px] py-[20px]">
+              <Skeleton className="h-[12px] w-full" />
+              <Skeleton className="h-[12px] w-[84%]" />
+              <Skeleton className="h-[12px] w-[70%]" />
+            </div>
+          </aside>
+        </>
       )}
     </LoadingStatus>
   );

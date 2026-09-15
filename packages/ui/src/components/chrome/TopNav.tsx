@@ -1,8 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Plus, Search, SlidersHorizontal } from "lucide-react";
-import {
-  isCommandPaletteBlocked,
-} from "@/components/chrome/CommandPalette";
+import { isCommandPaletteBlocked } from "@/components/chrome/dialogBlocker";
 import { useCommandPalette } from "@/components/chrome/CommandPaletteContext";
 import { requestAddTask } from "@tudu/store";
 import { useDispatch } from "react-redux";
@@ -12,7 +10,6 @@ import { DayJump } from "@/components/chrome/DayJump";
 import { NavTabs } from "@/components/chrome/NavTabs";
 import { NotificationBell } from "@/components/chrome/NotificationBell";
 import { WeekPicker } from "@/components/chrome/WeekPicker";
-import { ProjectFilter } from "@/components/projects/ProjectFilter";
 import { isWeekPath, reportUserIdFromPath } from "@/lib/reportPath";
 import { defaultWeekId, weekDaysFromWeekId } from "@/lib/week";
 
@@ -36,7 +33,7 @@ function NewTaskButton({ reportUserId }: { reportUserId: string | null }) {
     <button
       type="button"
       aria-label="New task"
-      className="flex shrink-0 items-center gap-[7px] bg-primary px-[9px] py-[7px] text-[12.5px] font-bold text-primary-foreground xl:px-[13px]"
+      className="flex size-[36px] shrink-0 items-center justify-center bg-primary text-[12.5px] font-bold text-primary-foreground xl:h-auto xl:w-auto xl:gap-[7px] xl:px-[13px] xl:py-[7px]"
       onClick={handleClick}
     >
       <Plus size={13} strokeWidth={2.4} />
@@ -53,7 +50,7 @@ function CommandsButton() {
       type="button"
       aria-label="Commands"
       title="Cmd+K"
-      className="shrink-0 text-muted-foreground hover:text-foreground"
+      className="flex size-[36px] shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
       onClick={() => {
         if (!isCommandPaletteBlocked()) {
           openPalette();
@@ -70,7 +67,7 @@ function SettingsLink() {
     <Link
       to="/settings"
       aria-label="Settings"
-      className="shrink-0 text-muted-foreground"
+      className="flex size-[36px] shrink-0 items-center justify-center text-muted-foreground"
     >
       <SlidersHorizontal size={17} strokeWidth={1.6} />
     </Link>
@@ -84,19 +81,17 @@ export function TopNav() {
   });
   const onWeek = isWeekPath(pathname);
   const reportUserId = reportUserIdFromPath(pathname);
-  const showProjectFilter =
-    pathname === "/" ||
-    pathname === "/week" ||
-    pathname === "/unscheduled" ||
-    reportUserId !== null;
   const weekId = search.week ?? defaultWeekId();
   const weekDays = weekDaysFromWeekId(weekId);
 
   return (
-    <header className="flex h-[calc(56px+env(safe-area-inset-top))] shrink-0 items-center gap-[10px] overflow-hidden border-b border-rule bg-card px-[12px] pt-[env(safe-area-inset-top)] xl:gap-[28px] xl:px-[22px]">
+    <header
+      data-testid="top-nav"
+      className="flex h-[calc(56px+env(safe-area-inset-top))] shrink-0 items-center gap-[10px] overflow-hidden border-b border-rule bg-card px-[12px] pt-[env(safe-area-inset-top)] xl:gap-[28px] xl:px-[22px]"
+    >
       <BrandMark />
       <NavTabs />
-      <div className="ml-auto flex min-w-0 shrink-0 items-center gap-[8px] xl:gap-[18px]">
+      <div className="ml-auto flex min-w-0 shrink-0 items-center gap-[12px] xl:gap-[18px]">
         {onWeek ? (
           <WeekPicker
             weekId={weekId}
@@ -112,7 +107,6 @@ export function TopNav() {
             </div>
           </>
         )}
-        {showProjectFilter ? <ProjectFilter /> : null}
         <div className="h-[20px] w-px bg-hair" />
         <CommandsButton />
         <NotificationBell />

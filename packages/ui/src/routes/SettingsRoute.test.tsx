@@ -9,10 +9,20 @@ import { SettingsRoute } from "./SettingsRoute";
 
 const navigate = vi.fn();
 const signOutMock = vi.fn();
+const searchState = vi.hoisted(() => ({
+  section: undefined as string | undefined,
+}));
+const connectJira = vi.hoisted(() => vi.fn());
+const disconnectJira = vi.hoisted(() => vi.fn());
+const updateJiraProjectKeys = vi.hoisted(() => vi.fn());
+const refreshJiraComponents = vi.hoisted(() => vi.fn());
+const mutationResult = vi.hoisted(() => ({
+  unwrap: () => Promise.resolve({}),
+}));
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
-  useSearch: () => ({}),
+  useSearch: () => searchState,
   Link: ({
     children,
     to,
@@ -43,10 +53,50 @@ vi.mock("@tudu/store", async (importOriginal) => {
     useCreateProjectMutation: () => [vi.fn(), { isLoading: false }],
     useUpdateProjectMutation: () => [vi.fn(), { isLoading: false }],
     useDeleteProjectMutation: () => [vi.fn(), { isLoading: false }],
+    useGetJiraStatusRestQuery: () => ({
+      data: {
+        connection: {
+          connected: false,
+          baseUrl: null,
+          displayName: null,
+          email: null,
+          projectKeys: [],
+          updatedAt: null,
+        },
+      },
+      isLoading: false,
+      isError: false,
+    }),
+    useConnectJiraMutation: () => [connectJira, { isLoading: false }],
+    useDisconnectJiraMutation: () => [disconnectJira, { isLoading: false }],
+    useUpdateJiraProjectKeysMutation: () => [
+      updateJiraProjectKeys,
+      { isLoading: false },
+    ],
+    useRefreshJiraComponentsMutation: () => [
+      refreshJiraComponents,
+      { isLoading: false },
+    ],
+    useGetJiraComponentsRestQuery: () => ({
+      data: { components: [] },
+      isLoading: false,
+    }),
   };
 });
 
 describe("SettingsRoute", () => {
+  beforeEach(() => {
+    searchState.section = undefined;
+    connectJira.mockReset();
+    disconnectJira.mockReset();
+    updateJiraProjectKeys.mockReset();
+    refreshJiraComponents.mockReset();
+    connectJira.mockReturnValue(mutationResult);
+    disconnectJira.mockReturnValue(mutationResult);
+    updateJiraProjectKeys.mockReturnValue(mutationResult);
+    refreshJiraComponents.mockReturnValue(mutationResult);
+  });
+
   it("shows the signed-in profile and sign out control", () => {
     render(
       <Provider store={makeStore()}>
@@ -120,5 +170,37 @@ describe("SettingsRoute", () => {
     await user.click(screen.getByRole("button", { name: "Projects" }));
 
     expect(screen.getByLabelText("New project name")).toBeInTheDocument();
+  });
+
+  it("writes the selected settings section to the URL", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Provider store={makeStore()}>
+        <SettingsRoute />
+      </Provider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "JIRA connection" }));
+
+    expect(screen.getByRole("heading", { name: "JIRA connection" })).toBeInTheDocument();
+    expect(navigate).toHaveBeenCalledWith({
+      to: "/settings",
+      search: { section: "jira" },
+    });
+  });
+
+  it("hydrates the Jira settings section from the URL search", () => {
+    searchState.section = "jira";
+
+    render(
+      <Provider store={makeStore()}>
+        <SettingsRoute />
+      </Provider>,
+    );
+
+    expect(screen.getByRole("heading", { name: "JIRA connection" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Jira Data Center URL")).toBeInTheDocument();
+    expect(screen.getByLabelText("Personal access token")).toBeInTheDocument();
   });
 });

@@ -1,6 +1,7 @@
-import { useCallback, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
 import { format, parseISO } from "date-fns";
 import type { Comment } from "@tudu/shared";
+import { sanitizeRichTextHtml, richTextToPlainPreview } from "@tudu/shared";
 import {
   useDeleteCommentMutation,
   useGetMeQuery,
@@ -20,13 +21,15 @@ import {
   Avatar,
   AvatarFallback,
 } from "@/components/ui/avatar";
-import { LinkifiedText } from "@/components/text/LinkifiedText";
+import { RichTextContent } from "@/components/editor/RichTextContent";
+import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { cn } from "@/lib/utils";
 
 export type CommentRowProps = {
   comment: Comment;
   taskId: string;
   focused?: boolean;
+  canEdit?: boolean;
 };
 
 function authorInitial(name: string) {
@@ -37,105 +40,73 @@ function authorInitial(name: string) {
 function CommentEditableBody({
   text,
   editing,
+  readOnly,
   onStartEdit,
   onCommit,
   onCancel,
 }: {
   text: string;
   editing: boolean;
+  readOnly?: boolean;
   onStartEdit: (event: MouseEvent) => void;
   onCommit: (next: string) => void;
   onCancel: () => void;
 }) {
-  const nodeRef = useRef<HTMLDivElement | null>(null);
-  const snapshot = useRef(text);
+  const [draft, setDraft] = useState(text);
 
-  useLayoutEffect(() => {
-    if (!editing) {
-      return;
+  useEffect(() => {
+    if (editing) {
+      setDraft(text);
     }
-
-    const node = nodeRef.current;
-    if (!node) {
-      return;
-    }
-
-    snapshot.current = text;
-    node.textContent = text;
-    node.focus();
-    const selection = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(node);
-    range.collapse(false);
-    selection?.removeAllRanges();
-    selection?.addRange(range);
-  }, [editing]);
+  }, [editing, text]);
 
   function commit() {
-    const node = nodeRef.current;
-    if (!node) {
-      return;
-    }
-
-    const next = (node.textContent ?? "").trim();
-    if (!next) {
-      node.textContent = snapshot.current;
+    const next = sanitizeRichTextHtml(draft);
+    if (!richTextToPlainPreview(next)) {
       onCancel();
       return;
     }
-
     if (next !== text) {
       onCommit(next);
       return;
-    }
-
-    onCancel();
-  }
-
-  function cancelEdit() {
-    const node = nodeRef.current;
-    if (node) {
-      node.textContent = snapshot.current;
     }
     onCancel();
   }
 
   return editing ? (
     <div
-      key="edit"
-      ref={nodeRef}
-      className="mt-[6px] min-h-[1.5em] cursor-text whitespace-pre-wrap break-words text-[13px] leading-[1.5] outline-none"
-      contentEditable
-      suppressContentEditableWarning
-      role="textbox"
-      onClick={(event) => event.stopPropagation()}
-      onBlur={() => {
+      className="mt-[6px]"
+      onBlur={(event) => {
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          return;
+        }
         commit();
       }}
-      onKeyDown={(event) => {
-        event.stopPropagation();
-        if (event.key === "Enter" && !event.shiftKey) {
-          event.preventDefault();
-          commit();
-        }
-        if (event.key === "Escape") {
-          event.preventDefault();
-          cancelEdit();
-        }
-      }}
-    />
+    >
+      <RichTextEditor
+        mode="html"
+        value={draft}
+        readOnly={readOnly}
+        aria-label="Edit comment"
+        onChange={setDraft}
+      />
+    </div>
   ) : (
     <div
-      key="view"
-      className="mt-[6px] cursor-text whitespace-pre-wrap break-words text-[13px] leading-[1.5] outline-none"
+      className="mt-[6px] cursor-text outline-none"
       onClick={onStartEdit}
     >
-      <LinkifiedText text={text} />
+      <RichTextContent value={text} />
     </div>
   );
 }
 
-export function CommentRow({ comment, taskId, focused = false }: CommentRowProps) {
+export function CommentRow({
+  comment,
+  taskId,
+  focused = false,
+  canEdit = true,
+}: CommentRowProps) {
   const { data: me } = useGetMeQuery();
   const [updateComment] = useUpdateCommentMutation();
   const [deleteComment] = useDeleteCommentMutation();
@@ -144,7 +115,7 @@ export function CommentRow({ comment, taskId, focused = false }: CommentRowProps
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const isSelf = me?.id === comment.authorId;
-  const canEdit = isSelf;
+  const canEditComment = canEdit && isSelf;
 
   const timestamp = format(parseISO(comment.createdAt), "EEE d MMM, HH:mm");
 
@@ -193,7 +164,7 @@ export function CommentRow({ comment, taskId, focused = false }: CommentRowProps
               {timestamp}
               {comment.editedAt ? " edited" : ""}
             </span>
-            {canEdit ? (
+            {canEditComment ? (
               <button
                 type="button"
                 className="ml-auto text-[11px] text-muted-foreground"
@@ -203,7 +174,7 @@ export function CommentRow({ comment, taskId, focused = false }: CommentRowProps
               </button>
             ) : null}
           </div>
-          {canEdit ? (
+          {canEditComment ? (
             <CommentEditableBody
               text={comment.body}
               editing={editing}

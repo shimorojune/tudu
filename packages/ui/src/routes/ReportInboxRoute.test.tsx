@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { makeStore } from "@tudu/store";
-import type { InboxPendingItem } from "@tudu/shared";
+import { DEFAULT_MANAGER_PERMISSIONS, type InboxPendingItem, type Task } from "@tudu/shared";
 import { ReportInboxRoute } from "./ReportInboxRoute";
 
 const inboxState = vi.hoisted(() => ({
@@ -40,12 +40,15 @@ vi.mock("@tudu/store", async (importOriginal) => {
   return {
     ...actual,
     useGetReportInboxQuery: () => ({
-      data: {
-        report: inboxState.report,
-        pending: inboxState.pending,
-        history: [],
-        count: inboxState.pending.length,
-      },
+      data: inboxState.isLoading
+        ? undefined
+        : {
+            report: inboxState.report,
+            permissions: DEFAULT_MANAGER_PERMISSIONS,
+            pending: inboxState.pending,
+            history: [],
+            count: inboxState.pending.length,
+          },
       isLoading: inboxState.isLoading,
       isError: inboxState.isError,
     }),
@@ -58,6 +61,30 @@ vi.mock("@tudu/store", async (importOriginal) => {
 vi.mock("@/components/team/SendInboxForm", () => ({
   SendInboxForm: ({ reportName }: { reportName: string }) => (
     <div>Send a task to {reportName.split(" ")[0]}</div>
+  ),
+}));
+
+vi.mock("@/components/jira/JiraColumn", () => ({
+  JiraColumn: ({
+    selectedTask,
+    reportUserId,
+    reportName,
+  }: {
+    selectedTask: Task | null;
+    selectedDate: string;
+    reportUserId?: string;
+    reportName?: string;
+  }) => (
+    <div>
+      Jira inbox for {reportName} / {reportUserId} /{" "}
+      {selectedTask?.title ?? "none"}
+    </div>
+  ),
+}));
+
+vi.mock("@/components/loading/InboxSkeleton", () => ({
+  InboxSkeleton: ({ withJiraPane }: { withJiraPane?: boolean }) => (
+    <div>Inbox skeleton with Jira pane {withJiraPane ? "yes" : "no"}</div>
   ),
 }));
 
@@ -92,6 +119,7 @@ describe("ReportInboxRoute", () => {
           updatedAt: "2026-09-10T08:00:00.000Z",
           commentCount: 0,
           project: null,
+          jiraLinks: [],
           subtasks: [],
         },
         declineReason: null,
@@ -115,6 +143,19 @@ describe("ReportInboxRoute", () => {
     expect(screen.queryByRole("button", { name: /Decline/ })).not.toBeInTheDocument();
   });
 
+  it("renders the manager Jira column for the report inbox", () => {
+    render(
+      <Provider store={makeStore()}>
+        <ReportInboxRoute />
+      </Provider>,
+    );
+
+    expect(screen.getByText("Priya Raman")).toBeInTheDocument();
+    expect(
+      screen.getByText("Jira inbox for Priya Raman / priya / none"),
+    ).toBeInTheDocument();
+  });
+
   it("shows an empty waiting list while the send form stays", () => {
     render(
       <Provider store={makeStore()}>
@@ -124,5 +165,17 @@ describe("ReportInboxRoute", () => {
 
     expect(screen.getByText("Nothing waiting")).toBeInTheDocument();
     expect(screen.getByText("Send a task to Priya")).toBeInTheDocument();
+  });
+
+  it("keeps the Jira pane reserved while loading the report inbox", () => {
+    inboxState.isLoading = true;
+
+    render(
+      <Provider store={makeStore()}>
+        <ReportInboxRoute />
+      </Provider>,
+    );
+
+    expect(screen.getByText("Inbox skeleton with Jira pane yes")).toBeInTheDocument();
   });
 });

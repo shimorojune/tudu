@@ -8,8 +8,8 @@ const points = [
     where it lands before you type. Order is the only priority there is.
   </>,
   <>
-    Paste a JIRA key into a task, or press L on a task, to tether it to an
-    issue. Your assigned issues are already in the middle pane.
+    Select a task, then press Cmd+L to tether it to a JIRA issue. Your assigned
+    issues are already in the middle pane.
   </>,
   <>
     Anything unfinished comes with you tomorrow, with a dot for each day it has

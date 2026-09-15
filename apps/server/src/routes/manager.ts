@@ -245,6 +245,7 @@ export function createManagerRoute(db: Db) {
       }));
       const response: ReportInboxResponse = {
         report: result.report,
+        permissions: result.permissions,
         pending,
         history,
         count: pending.length,
@@ -265,6 +266,7 @@ export function createManagerRoute(db: Db) {
       );
       const response: ReportUnscheduledResponse = {
         report: result.report,
+        permissions: result.permissions,
         tasks: result.tasks.map((row) => mapTask(row, { hidePrivateProjects: true })),
       };
       return c.json(response);
@@ -285,6 +287,7 @@ export function createManagerRoute(db: Db) {
       );
       const response: ReportDayResponse = {
         report: result.report,
+        permissions: result.permissions,
         date,
         tasks: result.tasks.map(toTask),
         slippingCount: result.tasks.filter((task) =>

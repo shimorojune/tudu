@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { planTaskTimelineEvents } from "@tudu/shared";
-import type { Bucket, Lane } from "@tudu/shared";
+import type { Bucket, JiraTaskLinkSummary, Lane } from "@tudu/shared";
 import type { Db } from "./index.js";
 import {
   applyTaskPatch,
@@ -12,12 +12,14 @@ import {
 import { timelineEvents } from "./activity-schema.js";
 import { assertAssignableProject, projectNameById } from "./projects.js";
 import type { ProjectRow } from "./projects-schema.js";
+import { linkSummariesForTasks } from "./jira.js";
 import { subtasks, tasks, type SubtaskRow, type TaskRow } from "./tasks-schema.js";
 
 export type TaskRowWithSubtasks = TaskRow & {
   subtasks: SubtaskRow[];
   commentCount: number;
   project: ProjectRow | null;
+  jiraLinks: JiraTaskLinkSummary[];
 };
 
 export type TaskPlacement = {
@@ -95,11 +97,16 @@ async function attachCommentCounts(
     db,
     rows.map((row) => row.id),
   );
+  const links = await linkSummariesForTasks(
+    db,
+    rows.map((row) => row.id),
+  );
 
   return rows.map((row) => ({
     ...row,
     project: row.project ?? null,
     commentCount: counts.get(row.id) ?? 0,
+    jiraLinks: links.get(row.id) ?? [],
   }));
 }
 

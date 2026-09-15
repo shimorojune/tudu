@@ -32,6 +32,7 @@ export type BucketSectionProps = {
   skipSlideForTaskId?: string | null;
   skipSlideForTaskIds?: string[];
   viewer?: TaskViewer;
+  canDragRows?: boolean;
 };
 
 export function BucketSection({
@@ -56,6 +57,7 @@ export function BucketSection({
   skipSlideForTaskId = null,
   skipSlideForTaskIds,
   viewer = "owner",
+  canDragRows = true,
 }: BucketSectionProps) {
   const filterProjectId = useProjectFilterId();
   const isNow = bucket === "now";
@@ -167,6 +169,7 @@ export function BucketSection({
               }
               viewer={viewer}
               dimmed={isTaskDimmed(task, filterProjectId)}
+              draggable={canDragRows}
             />
           ))}
         </SortableContext>

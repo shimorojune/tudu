@@ -8,14 +8,17 @@ import {
   useUpdateProjectMutation,
 } from "@tudu/store";
 import { ProjectChip } from "@/components/projects/ProjectChip";
+import { Button } from "@/components/ui/button";
+import { FormBusy } from "@/components/forms/FormBusy";
 import { projectColorCss } from "@/lib/brand";
+import { notifyAction, mutationResult } from "@/lib/notifyAction";
 import { cn } from "@/lib/utils";
 
 export function ProjectsSettingsPanel() {
   const { data: projects = [], isLoading } = useGetProjectsQuery();
-  const [createProject] = useCreateProjectMutation();
+  const [createProject, createState] = useCreateProjectMutation();
   const [updateProject] = useUpdateProjectMutation();
-  const [deleteProject] = useDeleteProjectMutation();
+  const [deleteProject, deleteState] = useDeleteProjectMutation();
   const [name, setName] = useState("");
   const [color, setColor] = useState<ProjectColor>("ember");
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +35,10 @@ export function ProjectsSettingsPanel() {
     }
     setError(null);
     try {
-      await createProject({ name: trimmed, color }).unwrap();
+      await notifyAction(
+        () => mutationResult(createProject({ name: trimmed, color })),
+        { success: "Project created", error: "Could not create that project" },
+      );
       setName("");
     } catch {
       setError("Could not create that project");
@@ -66,6 +72,7 @@ export function ProjectsSettingsPanel() {
           void handleCreate();
         }}
       >
+        <FormBusy busy={Boolean(createState?.isLoading)} className="flex flex-col gap-[10px]">
         <input
           value={name}
           placeholder="New project"
@@ -88,14 +95,16 @@ export function ProjectsSettingsPanel() {
             />
           ))}
         </div>
-        <button
+        <Button
           type="submit"
+          loading={Boolean(createState?.isLoading)}
           disabled={!name.trim()}
-          className="self-start bg-foreground px-[12px] py-[6px] text-[12.5px] font-bold text-card disabled:opacity-50"
+          className="h-auto self-start bg-foreground px-[12px] py-[6px] text-[12.5px] font-bold text-card"
         >
           Create
-        </button>
+        </Button>
         {error ? <p className="text-[12px] text-destructive">{error}</p> : null}
+        </FormBusy>
       </form>
 
       <ul className="mt-[22px] flex flex-col">
@@ -136,10 +145,16 @@ export function ProjectsSettingsPanel() {
                 onClick={() => {
                   const trimmed = editName.trim();
                   if (trimmed && trimmed !== project.name) {
-                    void updateProject({
-                      id: project.id,
-                      patch: { name: trimmed },
-                    });
+                    void notifyAction(
+                      () =>
+                        mutationResult(
+                          updateProject({
+                            id: project.id,
+                            patch: { name: trimmed },
+                          }),
+                        ),
+                      { success: "Project updated", error: "Could not update the project" },
+                    );
                   }
                   setEditingId(null);
                 }}
@@ -208,16 +223,21 @@ export function ProjectsSettingsPanel() {
                 <span className="text-[12px] text-muted-foreground">
                   Tasks stay. The chip comes off.
                 </span>
-                <button
+                <Button
                   type="button"
-                  className="text-[12px] font-semibold text-destructive"
+                  variant="ghost"
+                  loading={Boolean(deleteState?.isLoading)}
+                  className="h-auto px-0 text-[12px] font-semibold text-destructive"
                   onClick={() => {
-                    void deleteProject(project.id);
+                    void notifyAction(
+                      () => mutationResult(deleteProject(project.id)),
+                      { success: "Project deleted", error: "Could not delete the project" },
+                    );
                     setConfirmingDeleteId(null);
                   }}
                 >
                   Delete project
-                </button>
+                </Button>
                 <button
                   type="button"
                   className="text-[12px] text-muted-foreground"

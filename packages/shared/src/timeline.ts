@@ -19,6 +19,14 @@ export const TIMELINE_EVENT_TYPES = [
   "inbox_accepted",
   "inbox_declined",
   "project_changed",
+  "jira_linked",
+  "jira_unlinked",
+  "jira_summary_changed",
+  "jira_description_changed",
+  "jira_due_date_changed",
+  "jira_assignee_changed",
+  "jira_commented",
+  "jira_external_overwrite",
 ] as const;
 
 export type TimelineEventType = (typeof TIMELINE_EVENT_TYPES)[number];

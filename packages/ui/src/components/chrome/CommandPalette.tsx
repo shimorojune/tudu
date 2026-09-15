@@ -27,6 +27,7 @@ import {
   CommandList,
   CommandShortcut,
 } from "@/components/ui/command";
+import { isCommandPaletteBlocked } from "@/components/chrome/dialogBlocker";
 
 const GROUP_ORDER: CommandGroupName[] = ["Go", "Actions"];
 
@@ -35,12 +36,6 @@ const INBOX_ACCEPT: { id: string; label: string; bucket: Bucket; shortcut: strin
   { id: "inbox-next", label: "Accept into Next", bucket: "next", shortcut: "Cmd+2" },
   { id: "inbox-later", label: "Accept into Later", bucket: "later", shortcut: "Cmd+3" },
 ];
-
-export function isCommandPaletteBlocked(): boolean {
-  return (
-    document.querySelector("[role='dialog'],[role='alertdialog']") !== null
-  );
-}
 
 export function CommandPalette() {
   const { open, setOpen } = useCommandPalette();

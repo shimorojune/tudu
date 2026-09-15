@@ -24,7 +24,7 @@ import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { CSS } from "@dnd-kit/utilities";
 import type { Bucket, Subtask, Task } from "@tudu/shared";
-import { isSlipping } from "@tudu/shared";
+import { isSlipping, richTextToPlainPreview } from "@tudu/shared";
 import { Check, X } from "lucide-react";
 import { useSlideOnReorder } from "@/hooks/useSlideOnReorder";
 import { AUTOSAVE_MS } from "@/lib/autosave";
@@ -46,7 +46,7 @@ import {
 export type TaskRowActions = {
   onComplete: (completed: boolean) => void;
   onRename: (title: string) => void;
-  onDelete: () => void;
+  onDelete?: () => void;
   onToggleInProgress?: () => void;
   onMoveToBucket?: (bucket: Bucket) => void;
   onUnschedule?: () => void;
@@ -75,6 +75,7 @@ export type TaskRowProps = {
   skipSlide?: boolean;
   viewer?: TaskViewer;
   dimmed?: boolean;
+  draggable?: boolean;
 };
 
 function flashElement(element: HTMLElement | null) {
@@ -659,6 +660,7 @@ export function TaskRow({
   skipSlide = false,
   viewer = "owner",
   dimmed = false,
+  draggable = true,
 }: TaskRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [addingSubtask, setAddingSubtask] = useState(false);
@@ -674,7 +676,7 @@ export function TaskRow({
     listeners,
     setNodeRef,
     isDragging,
-  } = useSortable({ id: task.id });
+  } = useSortable({ id: task.id, disabled: !draggable });
 
   const rowNodeRef = useRef<HTMLDivElement | null>(null);
   const isCompleted = task.completedAt !== null;
@@ -770,6 +772,7 @@ export function TaskRow({
   const row = (
     <div
       ref={setRowRef}
+      data-task-row="true"
       role="button"
       tabIndex={0}
       onClick={handleRowClick}
@@ -817,7 +820,11 @@ export function TaskRow({
         dimmed && !isDragging && "opacity-35",
       )}
     >
-      <DragHandleDots listeners={listeners} attributes={attributes} />
+      {draggable ? (
+        <DragHandleDots listeners={listeners} attributes={attributes} />
+      ) : (
+        <span aria-hidden className="mt-px h-[18px] w-[9px] shrink-0" />
+      )}
       {isManager ? (
         <span aria-hidden className="mt-px size-[18px]" />
       ) : (
@@ -873,7 +880,7 @@ export function TaskRow({
         </div>
         {task.description ? (
           <p className="mt-[4px] line-clamp-1 text-[12.5px] text-faint">
-            <LinkifiedText text={task.description} />
+            {richTextToPlainPreview(task.description)}
           </p>
         ) : null}
         {segments.length > 0 || task.project ? (
@@ -1029,6 +1036,16 @@ export function TaskRow({
     return row;
   }
 
+  const hasContextActions =
+    !isManager ||
+    (menuVariant === "day" && Boolean(actions.onMoveToBucket)) ||
+    (menuVariant !== "day" && Boolean(actions.onScheduleToToday)) ||
+    Boolean(actions.onDelete);
+
+  if (!hasContextActions) {
+    return row;
+  }
+
   return (
     <>
       <ContextMenu>
@@ -1054,7 +1071,7 @@ export function TaskRow({
               ) : null}
             </>
           )}
-          {menuVariant === "day" ? (
+          {menuVariant === "day" && actions.onMoveToBucket ? (
             <>
               {isManager ? null : <ContextMenuSeparator />}
               {(["now", "next", "later"] as const).map((targetBucket) => (
@@ -1075,21 +1092,25 @@ export function TaskRow({
                 Unschedule
               </ContextMenuItem>
             </>
-          ) : (
+          ) : menuVariant !== "day" && actions.onScheduleToToday ? (
             <>
               <ContextMenuSeparator />
               <ContextMenuItem onSelect={() => actions.onScheduleToToday?.()}>
                 Schedule to today
               </ContextMenuItem>
             </>
-          )}
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            variant="destructive"
-            onSelect={() => setDeleteOpen(true)}
-          >
-            Delete
-          </ContextMenuItem>
+          ) : null}
+          {actions.onDelete ? (
+            <>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                variant="destructive"
+                onSelect={() => setDeleteOpen(true)}
+              >
+                Delete
+              </ContextMenuItem>
+            </>
+          ) : null}
         </ContextMenuContent>
       </ContextMenu>
       <TaskDeleteDialog
@@ -1097,7 +1118,7 @@ export function TaskRow({
         title={task.title}
         onOpenChange={setDeleteOpen}
         onConfirm={() => {
-          actions.onDelete();
+          actions.onDelete?.();
           setDeleteOpen(false);
         }}
       />

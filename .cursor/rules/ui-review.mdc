@@ -1,31 +1,48 @@
 ---
-description: Hard-gated browser review after any user-visible or behavioral change
-globs: packages/ui/**/*.tsx,packages/ui/**/*.css,packages/store/**/*.ts,apps/server/src/routes/**/*.ts
+description: Hard-gated two-pass review after any user-visible or behavioral change
+globs: packages/ui/**/*.tsx,packages/ui/**/*.css,packages/store/**/*.ts,packages/shared/**/*.ts,packages/db/**/*.ts,apps/server/src/**/*.ts
 alwaysApply: false
 ---
 
 # Review is a hard gate
 
 Any change that affects what the user sees or how the app behaves is not done
-when the code compiles and tests pass. It is done only after a full browser
+when the code compiles and tests pass. It is done only after a full two-pass
 review against the test matrix below. Never ask the user to be your first
 reviewer.
 
-This applies to UI, UX, store/cache logic, API wiring, shortcuts, modals, and
-any other change where the user would notice stale data, wrong state, or a
-crash. Unit tests alone are not enough.
+This applies to UI, UX, store/cache logic, shared contracts, database mappings,
+server/API wiring, shortcuts, modals, and any other change where the user would
+notice stale data, wrong state, leaked data, or a crash. Unit tests alone are
+not enough.
 
-## Step zero: sign in
+## Two-pass gate
 
-1. Run `pnpm db:seed` to ensure the standing test user exists.
-2. Start the app: `pnpm dev:all`, web at `http://localhost:5173`.
-3. Navigate to `/sign-in` and sign in as `testuser@egain.com` / `egain@123`.
-4. Confirm real data is on screen (task list, buckets, or first-run state).
-5. `list_console_messages` must be clean. A 401 or error state means you are
-   not signed in yet. Nothing observed past that point counts as reviewed.
+For large features, integrations, and anything touching Team or manager flows:
+
+1. Build the complete matrix before opening the browser.
+2. Run every row in the matrix once.
+3. Fix every product, UI, functional, permission, and data-leak bug found.
+4. Run every failed row again.
+5. Run neighboring flows touched by the fixes again.
+6. Run a second pass over the affected matrix before calling the work done.
+
+The report must name what was tested, what failed, what was fixed, what was
+retested, and any state that could not be reached.
+
+## Step zero: Playwright auth
+
+1. Every user-visible change ships with Playwright specs in `apps/e2e/tests/`.
+2. `apps/e2e/global-setup.ts` runs `pnpm db:seed` and signs in as
+   `testuser@egain.com` / `egain@123`, saving storage state for specs.
+3. Run `pnpm test:e2e` before calling work done. Attach pass output to the
+   review report.
+4. Add or extend a spec for every matrix row. No row without a spec.
 
 If any flow in the matrix cannot be exercised, the work is not done. Fix access
 or stop and say so. An auth wall is never an excuse.
+
+Devtools MCP (`chrome-devtools`) is optional debug-only, not a ship gate.
 
 ## Build the test matrix first
 
@@ -44,34 +61,34 @@ Rules:
   single-owner audit: grep for other registrations of the same key or event,
   and confirm only one is live per screen state.
 
-## Parallel agents
+## Playwright spec rules
 
-Dispatch one browser subagent per flow when the matrix has more than three
-rows. Each agent:
+1. One spec file per feature area (`apps/e2e/jira/`, `apps/e2e/projects/`, etc.).
+2. Tag Jira-connected flows with `@jira` and skip in CI when no Jira token is
+   configured.
+3. Use desktop, tablet, and phone projects from `playwright.config.ts` when the
+   change touches pane layout.
+4. Assert observable DOM state, not implementation details.
+5. Capture `screenshot` on failure for visual regressions.
 
-1. Creates its own tab with `new_page`.
-2. Passes its own `pageId` on every browser call.
-3. Signs in independently if needed.
-4. Reports its own pass/fail rows.
-
-Agents must not share a tab. Thoroughness beats speed.
-
-## Per-flow steps
+## Per-flow steps (encode in Playwright)
 
 1. Navigate to the screen that owns the changed behavior.
 2. Reach the exact state you changed. Select the task, switch tabs, drag a
    row, submit a form, open the modal from every entry point.
-3. `take_snapshot` for structure. `take_screenshot` for pixels when UI changed.
-   Read the screenshot. Do not assume it looks right.
-4. Exercise the interaction end to end with `click`, `fill`, `press_key`,
-   `hover`, drag. Confirm the observable result, not just that nothing threw.
-5. `list_console_messages` must be clean. Any new warning or error is a defect
-   of this change until proven otherwise.
+3. Assert structure and pixels where UI changed.
+4. Exercise the interaction end to end. Confirm the observable result, not just
+   that nothing threw.
+5. Console errors during the spec are a defect of this change until proven
+   otherwise. Listen with `page.on("console")` when debugging.
 
 ## Functional checks every time
 
 - Cache and refetch: after a mutation, does the UI update without a full page
   reload?
+- Integration edges: success, auth failure, unavailable dependency, malformed
+  remote data, empty remote data, stale cached data, retry, and remote updates
+  arriving while the UI is open.
 - React hooks: no hooks after early returns or inside conditionals.
 - Cross-tab state: switching tabs or selecting another task must not crash or
   leave stale panels visible.
@@ -81,6 +98,12 @@ Agents must not share a tab. Thoroughness beats speed.
 
 ## UI checks every time
 
+- shadcn-first: do not hand-roll controls when a shadcn or Radix equivalent
+  exists (Select, Dialog, Toggle, fieldset). Custom composition only for
+  domain-specific UI.
+- Visual fidelity: for polish work, read before/after screenshots. Fail on
+  blocky toolbars, misaligned chevrons, and controls that look like inputs but
+  behave like buttons.
 - Neighboring states: selected and unselected, empty and populated, completed
   and active, dragging and idle.
 - Every bucket and route that renders the component, not only the one you were
@@ -98,6 +121,71 @@ Agents must not share a tab. Thoroughness beats speed.
 - Keyboard path and focus order, plus `aria-label` on any icon-only control.
 - Motion: run the transition, then confirm no leftover inline `transform` or
   `transition` sticks to the node afterwards.
+
+## Viewport matrix for pane features
+
+Any change to Today, report day, report inbox, Jira, or inspector panes must
+be reviewed at three widths:
+
+- Phone: below 768px
+- Tablet: 768px to 1279px
+- Desktop: 1280px and up
+
+A desktop-only screenshot does not cover tablet. Tablet uses the same three
+panes as desktop (tasks, Jira, inspector). Phone keeps the task list and opens
+Jira in a sheet from a task-list header control, not a sixth bottom-nav item.
+
+## Jira list versus preview
+
+Clicking a Jira issue must keep the Jira list mounted and open preview in the
+inspector (or the phone Jira sheet). Replacing the middle pane with issue
+detail is a fail.
+
+## Manager report Jira
+
+Sign in as a manager, open `/team/$userId`, and confirm assigned issues **or**
+a specific empty reason such as "this report has no matching Jira user". A
+generic "Could not load Jira issues" error is a fail unless the request itself
+failed and Retry is offered.
+
+## Mutation buttons
+
+Explicit mutation buttons (connect, save, delete, send, invite, create, link,
+comment) must show in-flight loading, refuse a second submit, and toast
+success. Autosave, drag reorder, and notification mark-read stay quiet.
+
+Mutation forms must disable their inputs and editors while busy. A screenshot
+mid-submit that shows editable fields is an automatic fail.
+
+In-flight is a required screenshot, not a unit-test proxy. Capture the frame
+after click, before the toast. Fail if the label doubles, stays fully visible
+beside the spinner, the control grows or shrinks, or the spinner walks off
+center. Claiming loaders work from `aria-busy` alone is a fail.
+
+Primary titles must wrap. A single-line input that clips a heading is a fail.
+Truncate only meta. Title weight in a side list must not exceed the neighboring
+task list.
+
+Jira row Create task must open the create dialog with the issue title filled.
+Opening preview instead is a fail.
+
+A refetch must not cover, dim, or block the list or inspector. The existing
+refresh icon spinning is enough. A frost overlay on an already-visible list is
+a fail.
+
+Rich text verification: toolbar actions must survive save and re-open (bold,
+list, link, table with chosen size). Jira column matrix must cover pagination
+load-more, preset select, custom JQL dialog, compact components trigger, and
+status color checks for Resolved, Fix Verified, and Closed on the same list.
+
+## Team and manager flows
+
+When Team, manager, report, Inbox, or Jira behavior changes, the matrix must
+cover personal view, manager roster, report day, report week, report inbox,
+send-to-inbox, accept, decline, reorder, delete where allowed, comments where
+allowed, private task hiding, public project assignment, Jira issue visibility,
+Jira task linking, timeline side effects, notification side effects, and no
+leak to uninvolved users.
 
 ## Own the feature, not the diff
 
@@ -127,16 +215,16 @@ found inside the feature under review.
 
 State results as a table:
 
-| Flow | Steps taken | Observed | Pass/Fail |
+| Matrix row | Playwright spec | Result |
 
-Banned phrases without a screenshot that was actually read:
+Banned phrases without a passing `pnpm test:e2e` run:
 
 - "should work"
 - "verified by tests"
 - "looks correct"
-- "both routes" / "Today and Unscheduled" unless each URL has its own snapshot
+- "both routes" / "Today and Unscheduled" unless each URL has its own spec
 
-If devtools cannot reach a state, say so plainly and name the untested state.
+If Playwright cannot reach a state, say so plainly and name the untested state.
 Never claim a change is verified from unit tests alone.
 
 ## Platforms

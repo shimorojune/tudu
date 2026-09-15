@@ -1,0 +1,4 @@
+ALTER TABLE "jira_issues" ADD COLUMN "assigned_list_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "jira_issues_user_assigned_list_idx" ON "jira_issues" USING btree ("user_id","assigned_list_at") WHERE "jira_issues"."assigned_list_at" is not null and "jira_issues"."deleted_at" is null;--> statement-breakpoint
+CREATE UNIQUE INDEX "jira_users_user_key_uidx" ON "jira_users" USING btree ("user_id","user_key") WHERE "jira_users"."account_id" is null and "jira_users"."user_key" is not null and "jira_users"."deleted_at" is null;--> statement-breakpoint
+CREATE UNIQUE INDEX "jira_users_user_name_uidx" ON "jira_users" USING btree ("user_id","name") WHERE "jira_users"."account_id" is null and "jira_users"."user_key" is null and "jira_users"."name" is not null and "jira_users"."deleted_at" is null;

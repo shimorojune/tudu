@@ -1,4 +1,5 @@
 export * from "./tasks.js";
+export * from "./jira.js";
 export * from "./projects.js";
 export * from "./activity.js";
 export * from "./timeline.js";
@@ -7,6 +8,7 @@ export * from "./linkPreview.js";
 export * from "./manager.js";
 export * from "./sync.js";
 export * from "./notifications.js";
+export * from "./richTextHtml.js";
 
 export type HealthResponse = { status: "ok"; version: string };
 

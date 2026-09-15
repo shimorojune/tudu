@@ -1,5 +1,14 @@
 import { z } from "zod";
 import {
+  createJiraCommentRequestSchema,
+  createJiraIssueRequestSchema,
+  linkJiraTaskRequestSchema,
+  spawnJiraTaskRequestSchema,
+  spawnReportJiraTaskRequestSchema,
+  unlinkJiraTaskRequestSchema,
+  updateJiraIssueFieldsRequestSchema,
+} from "./jira.js";
+import {
   acceptInboxRequestSchema,
   createInviteRequestSchema,
   declineInboxRequestSchema,
@@ -43,7 +52,12 @@ export type SyncView =
   | { type: "project"; projectId: string }
   | { type: "reportProjects"; userId: string }
   | { type: "reportUnscheduled"; userId: string }
-  | { type: "reportInbox"; userId: string };
+  | { type: "reportInbox"; userId: string }
+  | { type: "jira" }
+  | { type: "jiraIssue"; issueIdOrKey: string }
+  | { type: "jiraComponents" }
+  | { type: "jiraUsers" }
+  | { type: "reportJira"; userId: string };
 
 export const viewKey = {
   day: (date: string) => `day:${date}`,
@@ -58,6 +72,11 @@ export const viewKey = {
   reportProjects: (userId: string) => `reportProjects:${userId}`,
   reportUnscheduled: (userId: string) => `reportUnscheduled:${userId}`,
   reportInbox: (userId: string) => `reportInbox:${userId}`,
+  jira: () => "jira",
+  jiraIssue: (issueIdOrKey: string) => `jiraIssue:${issueIdOrKey}`,
+  jiraComponents: () => "jiraComponents",
+  jiraUsers: () => "jiraUsers",
+  reportJira: (userId: string) => `reportJira:${userId}`,
 };
 
 export function parseViewKey(key: string): SyncView | null {
@@ -72,6 +91,29 @@ export function parseViewKey(key: string): SyncView | null {
   }
   if (key === "projects") {
     return { type: "projects" };
+  }
+  if (key === "jira") {
+    return { type: "jira" };
+  }
+  if (key === "jiraComponents") {
+    return { type: "jiraComponents" };
+  }
+  if (key === "jiraUsers") {
+    return { type: "jiraUsers" };
+  }
+  if (key.startsWith("jiraIssue:")) {
+    const issueIdOrKey = key.slice("jiraIssue:".length);
+    if (!issueIdOrKey) {
+      return null;
+    }
+    return { type: "jiraIssue", issueIdOrKey };
+  }
+  if (key.startsWith("reportJira:")) {
+    const userId = key.slice("reportJira:".length);
+    if (!userId) {
+      return null;
+    }
+    return { type: "reportJira", userId };
   }
   if (key.startsWith("project:")) {
     return { type: "project", projectId: key.slice(8) };
@@ -138,6 +180,15 @@ export const SYNC_EVENT_TYPES = [
   "project.upsert",
   "project.delete",
   "reportInbox.upsert",
+  "jira.connection",
+  "jira.issue.upsert",
+  "jira.issue.delete",
+  "jira.comment.upsert",
+  "jira.link.upsert",
+  "jira.link.delete",
+  "jira.user.upsert",
+  "jira.component.upsert",
+  "jira.reportIssue.upsert",
 ] as const;
 
 export type SyncEventType = (typeof SYNC_EVENT_TYPES)[number];
@@ -267,6 +318,49 @@ export const syncOpSchema = z.discriminatedUnion("type", [
     userId: z.string(),
     body: createProjectRequestSchema,
   }),
+  z.object({
+    type: z.literal("jira.link"),
+    id: z.uuid(),
+  }).extend(linkJiraTaskRequestSchema.shape),
+  z.object({ type: z.literal("jira.unlink") }).extend(
+    unlinkJiraTaskRequestSchema.shape,
+  ),
+  z.object({
+    type: z.literal("jira.task.spawn"),
+    id: z.uuid(),
+    body: spawnJiraTaskRequestSchema,
+  }),
+  z.object({
+    type: z.literal("jira.reportTask.spawn"),
+    id: z.uuid(),
+    body: spawnReportJiraTaskRequestSchema,
+  }),
+  z.object({
+    type: z.literal("jira.issue.create"),
+    id: z.uuid(),
+    body: createJiraIssueRequestSchema,
+  }),
+  z.object({
+    type: z.literal("jira.issue.updateFields"),
+    body: updateJiraIssueFieldsRequestSchema,
+  }),
+  z.object({
+    type: z.literal("jira.issue.updateDueDate"),
+    issueIdOrKey: z.string().trim().min(1),
+    dueDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a YYYY-MM-DD date")
+      .nullable(),
+  }),
+  z.object({
+    type: z.literal("jira.issue.updateAssignee"),
+    issueIdOrKey: z.string().trim().min(1),
+    assignee: z.unknown().nullable(),
+  }),
+  z.object({
+    type: z.literal("jira.comment.create"),
+    id: z.uuid(),
+  }).extend(createJiraCommentRequestSchema.shape),
 ]);
 
 export type SyncOp = z.infer<typeof syncOpSchema>;

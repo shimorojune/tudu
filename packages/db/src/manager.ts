@@ -23,6 +23,7 @@ import {
 } from "./projects.js";
 import type { ProjectRow } from "./projects-schema.js";
 import { countCommentsForTasks, insertTimelineEvents } from "./activity.js";
+import { linkSummariesForTasks } from "./jira.js";
 import {
   inboxItems,
   managerInvites,
@@ -88,11 +89,16 @@ async function attachCommentCounts(
     db,
     rows.map((row) => row.id),
   );
+  const jiraLinks = await linkSummariesForTasks(
+    db,
+    rows.map((row) => row.id),
+  );
 
   return rows.map((row) => ({
     ...row,
     project: "project" in row ? (row.project ?? null) : null,
     commentCount: counts.get(row.id) ?? 0,
+    jiraLinks: jiraLinks.get(row.id) ?? [],
   }));
 }
 
@@ -690,7 +696,7 @@ export async function listReportDayTasks(
   managerUserId: string,
   reportUserId: string,
   date: string,
-): Promise<{ report: Person; tasks: TaskRowWithSubtasks[] }> {
+): Promise<{ report: Person; permissions: ManagerPermissions; tasks: TaskRowWithSubtasks[] }> {
   const link = await findLiveLink(db, managerUserId, reportUserId);
   if (!link?.permissions || !link.permissions.canSeeDay) {
     throw new ManagerActionError("Not a report of yours", 403);
@@ -718,6 +724,7 @@ export async function listReportDayTasks(
 
   return {
     report: toPerson(report),
+    permissions: permissionsFromRow(link.permissions),
     tasks: await attachCommentCounts(db, rows),
   };
 }
@@ -726,7 +733,7 @@ export async function listReportUnscheduledTasks(
   db: Db,
   managerUserId: string,
   reportUserId: string,
-): Promise<{ report: Person; tasks: TaskRowWithSubtasks[] }> {
+): Promise<{ report: Person; permissions: ManagerPermissions; tasks: TaskRowWithSubtasks[] }> {
   const link = await findLiveLink(db, managerUserId, reportUserId);
   if (!link?.permissions || !link.permissions.canSeeDay) {
     throw new ManagerActionError("Not a report of yours", 403);
@@ -754,6 +761,7 @@ export async function listReportUnscheduledTasks(
 
   return {
     report: toPerson(report),
+    permissions: permissionsFromRow(link.permissions),
     tasks: await attachCommentCounts(db, rows),
   };
 }
@@ -764,6 +772,7 @@ export async function listReportInbox(
   reportUserId: string,
 ): Promise<{
   report: Person;
+  permissions: ManagerPermissions;
   pending: InboxPendingRow[];
   history: InboxHistoryRow[];
 }> {
@@ -782,6 +791,7 @@ export async function listReportInbox(
   const inbox = await listInbox(db, reportUserId);
   return {
     report: toPerson(report),
+    permissions: permissionsFromRow(link.permissions),
     pending: inbox.pending,
     history: inbox.history,
   };

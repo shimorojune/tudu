@@ -11,6 +11,9 @@ import {
 import { bucketLabel } from "@/lib/buckets";
 import { ProjectPicker } from "@/components/projects/ProjectPicker";
 import { SubtaskComposerList } from "@/components/tasks/SubtaskComposer";
+import { RichTextEditor } from "@/components/editor/RichTextEditor";
+import { FormBusy } from "@/components/forms/FormBusy";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export type NewTaskDayChoice = "today" | "tomorrow" | "pick" | "unscheduled";
@@ -19,6 +22,8 @@ export type NewTaskDialogProps = {
   open: boolean;
   initialBucket: Bucket;
   initialDate: string;
+  initialTitle?: string;
+  initialDescription?: string;
   defaultDayChoice?: NewTaskDayChoice;
   nowCount: number;
   onOpenChange: (open: boolean) => void;
@@ -108,6 +113,8 @@ export function NewTaskDialog({
   open,
   initialBucket,
   initialDate,
+  initialTitle = "",
+  initialDescription = "",
   defaultDayChoice,
   nowCount,
   onOpenChange,
@@ -129,8 +136,8 @@ export function NewTaskDialog({
     if (!open) {
       return;
     }
-    setTitle("");
-    setDescription("");
+    setTitle(initialTitle);
+    setDescription(initialDescription);
     setBucket(initialBucket);
     setDayChoice(
       defaultDayChoice ??
@@ -141,7 +148,7 @@ export function NewTaskDialog({
     setProjectId(null);
     setSubmitting(false);
     window.requestAnimationFrame(() => titleRef.current?.focus());
-  }, [defaultDayChoice, initialBucket, initialDate, open, today]);
+  }, [defaultDayChoice, initialBucket, initialDate, initialDescription, initialTitle, open, today]);
 
   const scheduledDate = useMemo(() => {
     if (dayChoice === "unscheduled") {
@@ -216,7 +223,7 @@ export function NewTaskDialog({
           <span className="text-[12px] text-muted-foreground">Esc</span>
         </div>
 
-        <div className="min-h-0 space-y-[20px] overflow-y-auto px-[24px] py-[20px]">
+        <FormBusy busy={submitting} className="min-h-0 space-y-[20px] overflow-y-auto px-[24px] py-[20px]">
           <input
             ref={titleRef}
             type="text"
@@ -230,13 +237,13 @@ export function NewTaskDialog({
             <div className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
               Description
             </div>
-            <textarea
+            <RichTextEditor
+              mode="html"
               value={description}
-              rows={3}
               placeholder="Add a description..."
               aria-label="Task description"
-              className="w-full resize-y border border-hair bg-transparent px-[12px] py-[10px] text-[13.5px] leading-[1.55] text-muted-foreground outline-none placeholder:text-faint focus:border-foreground focus:text-foreground"
-              onChange={(event) => setDescription(event.target.value)}
+              className="text-muted-foreground focus-within:text-foreground"
+              onChange={setDescription}
             />
           </div>
 
@@ -334,7 +341,7 @@ export function NewTaskDialog({
               }}
             />
           </div>
-        </div>
+        </FormBusy>
 
         <div className="flex items-center gap-[16px] border-t border-rule bg-background px-[24px] py-[15px]">
           {showNowCap ? (
@@ -354,10 +361,11 @@ export function NewTaskDialog({
           >
             Cancel
           </button>
-          <button
+          <Button
             type="button"
-            disabled={!title.trim() || submitting}
-            className="inline-flex items-center gap-[8px] bg-primary px-[15px] py-[8px] text-[13px] font-bold text-primary-foreground disabled:opacity-50"
+            loading={submitting}
+            disabled={!title.trim()}
+            className="inline-flex h-auto items-center gap-[8px] bg-primary px-[15px] py-[8px] text-[13px] font-bold"
             onClick={() => {
               void handleSubmit();
             }}
@@ -366,7 +374,7 @@ export function NewTaskDialog({
             <span className="text-[11px] font-normal text-primary-foreground/70">
               Cmd+Enter
             </span>
-          </button>
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

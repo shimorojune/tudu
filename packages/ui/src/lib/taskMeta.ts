@@ -74,5 +74,15 @@ export function taskMetaSegments(
     });
   }
 
+  if (task.jiraLinks.length > 0) {
+    if (segments.length > 0) {
+      segments.push({ kind: "dot" });
+    }
+    segments.push({
+      kind: "text",
+      text: `JIRA ${task.jiraLinks.map((link) => link.key).join(", ")}`,
+    });
+  }
+
   return segments;
 }

@@ -33,6 +33,7 @@ function makeTask(
     subtasks: [],
     commentCount: 0,
     project: null,
+    jiraLinks: [],
   };
 }
 

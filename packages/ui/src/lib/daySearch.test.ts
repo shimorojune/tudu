@@ -234,4 +234,21 @@ describe("planDaySearchSync", () => {
     });
     expect(plan).toEqual({ action: "none" });
   });
+
+  it("clears a missing task without a toast when silentMissingTask is set", () => {
+    const today = todayIso();
+    const plan = planDaySearchSync({
+      fields: { task: true, tab: true },
+      parsed: { task: taskId },
+      redux: { date: today, taskId, tab: "details" },
+      today,
+      urlChanged: true,
+      reduxChanged: false,
+      issues: [],
+      taskFound: false,
+      silentMissingTask: true,
+    });
+    expect(plan.toast).toBeUndefined();
+    expect(plan.hydrate).toEqual({ taskId: null, inspectorTab: "details" });
+  });
 });

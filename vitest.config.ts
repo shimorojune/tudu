@@ -7,18 +7,34 @@ const uiRoot = path.resolve(__dirname, "packages/ui");
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    alias: {
-      "@": path.resolve(uiRoot, "./src"),
-      "@assets": path.resolve(uiRoot, "./assets"),
-      react: path.resolve(__dirname, "node_modules/react"),
-      "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
-    },
+    alias: [
+      {
+        find: "@/components/tiptap-templates/simple/simple-editor",
+        replacement: path.resolve(uiRoot, "./src/test/mocks/simple-editor.tsx"),
+      },
+      { find: "@assets", replacement: path.resolve(uiRoot, "./assets") },
+      { find: "@", replacement: path.resolve(uiRoot, "./src") },
+      {
+        find: "react",
+        replacement: path.resolve(__dirname, "node_modules/react"),
+      },
+      {
+        find: "react-dom",
+        replacement: path.resolve(__dirname, "node_modules/react-dom"),
+      },
+    ],
     dedupe: ["react", "react-dom"],
   },
   test: {
     environment: "jsdom",
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
+    alias: {
+      "@/components/tiptap-templates/simple/simple-editor": path.resolve(
+        uiRoot,
+        "./src/test/mocks/simple-editor.tsx",
+      ),
+    },
     include: [
       "packages/**/*.test.{ts,tsx}",
       "apps/server/**/*.test.ts",

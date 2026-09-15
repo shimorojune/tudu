@@ -1,4 +1,6 @@
 import { format, parseISO } from "date-fns";
+import { useState } from "react";
+import { useDispatch } from "react-redux";
 import type {
   CreateProjectRequest,
   Project,
@@ -6,8 +8,19 @@ import type {
   TimelineEvent,
 } from "@tudu/shared";
 import { BUCKETS, type Bucket } from "@tudu/shared";
-import { useGetMeQuery, useUpdateTaskMutation } from "@tudu/store";
+import {
+  jiraApi,
+  type AppDispatch,
+  useGetMeQuery,
+  useUnlinkJiraTaskMutation,
+  useUpdateTaskMutation,
+} from "@tudu/store";
 import { bucketLabel } from "@/lib/buckets";
+import {
+  formatJiraDueDate,
+  jiraStatusClass,
+  jiraStatusStyle,
+} from "@/components/jira/jiraFormat";
 import { personFirstName } from "@/lib/person";
 import {
   formatTimelineEvent,
@@ -68,6 +81,14 @@ function formatCarried(task: Task) {
   return `${task.carriedDays} ${dayWord}${since}`;
 }
 
+function errorMessage(caught: unknown, fallback: string): string {
+  if (caught && typeof caught === "object" && "data" in caught) {
+    const data = (caught as { data?: { error?: string } }).data;
+    return data?.error ?? fallback;
+  }
+  return fallback;
+}
+
 function BucketReadOnly({
   activeBucket,
   isToday,
@@ -114,13 +135,29 @@ export function DetailsTab({
   onCreateProject,
   sharedWithName = null,
 }: DetailsTabProps) {
+  const dispatch = useDispatch<AppDispatch>();
   const { data: me } = useGetMeQuery();
   const [updateTask] = useUpdateTaskMutation();
+  const [unlinkJiraTask] = useUnlinkJiraTaskMutation();
+  const [jiraError, setJiraError] = useState<string | null>(null);
 
   const viewerName = me?.name?.trim() || "You";
   const isOpen = task.completedAt === null;
   const events = withSyntheticCreated(task.id, task.createdAt, timelineEvents);
   const latest = events.slice(0, 2);
+
+  async function unlinkJira(issueKey: string) {
+    setJiraError(null);
+    try {
+      await unlinkJiraTask({
+        taskId: task.id,
+        issueIdOrKey: issueKey,
+      }).unwrap();
+      dispatch(jiraApi.util.invalidateTags(["JiraIssue"]));
+    } catch (caught) {
+      setJiraError(errorMessage(caught, "Could not unlink that Jira issue"));
+    }
+  }
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-[24px] py-[22px]">
@@ -207,7 +244,57 @@ export function DetailsTab({
             </dd>
           </>
         ) : null}
+
+        {task.jiraLinks.length > 0 ? (
+          <>
+            <dt className="self-start pt-[4px] text-muted-foreground">Jira</dt>
+            <dd className="flex flex-col gap-[8px]">
+              {task.jiraLinks.map((link) => (
+                <div
+                  key={link.issueId}
+                  className="flex min-w-0 flex-col gap-[6px] border border-hair px-[10px] py-[8px]"
+                >
+                  <div className="flex items-center gap-[8px]">
+                    <a
+                      href={link.browseUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`Open ${link.key} in Jira`}
+                      className="text-[12px] font-extrabold uppercase tracking-[0.12em] text-foreground hover:underline"
+                    >
+                      {link.key}
+                    </a>
+                    <span
+                      className={jiraStatusClass(link)}
+                      style={jiraStatusStyle(link)}
+                    >
+                      {link.statusName}
+                    </span>
+                    {!readOnly ? (
+                      <button
+                        type="button"
+                        className="ml-auto text-[11.5px] text-muted-foreground hover:text-foreground"
+                        onClick={() => void unlinkJira(link.key)}
+                      >
+                        Unlink
+                      </button>
+                    ) : null}
+                  </div>
+                  <p className="text-[12.5px] leading-[1.45] text-muted-foreground">
+                    {link.summary}
+                  </p>
+                  <span className="text-[11.5px] tabular-nums text-faint">
+                    Due {formatJiraDueDate(link.dueDate)}
+                  </span>
+                </div>
+              ))}
+            </dd>
+          </>
+        ) : null}
       </dl>
+      {jiraError ? (
+        <p className="mt-[10px] text-[12px] text-destructive">{jiraError}</p>
+      ) : null}
 
       <div className="mt-[22px] border-t border-hair pt-[18px]">
         <div className="flex items-center">

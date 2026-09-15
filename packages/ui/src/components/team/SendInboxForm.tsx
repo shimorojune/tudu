@@ -7,6 +7,9 @@ import {
   useGetReportProjectsQuery,
   useSendInboxTaskMutation,
 } from "@tudu/store";
+import { Button } from "@/components/ui/button";
+import { FormBusy } from "@/components/forms/FormBusy";
+import { notifyAction, mutationResult } from "@/lib/notifyAction";
 import { personFirstName } from "@/lib/person";
 
 export type SendInboxFormProps = {
@@ -25,7 +28,7 @@ export function SendInboxForm({
   onCancel,
 }: SendInboxFormProps) {
   const first = personFirstName(reportName);
-  const [sendTask, { isLoading }] = useSendInboxTaskMutation();
+  const [sendTask, sendState] = useSendInboxTaskMutation();
   const { data: projects = [] } = useGetReportProjectsQuery(userId);
   const [createReportProject] = useCreateReportProjectMutation();
   const [title, setTitle] = useState("");
@@ -45,14 +48,20 @@ export function SendInboxForm({
     }
     setError(null);
     try {
-      await sendTask({
-        userId,
-        title: trimmed,
-        description: note.trim() ? note.trim() : null,
-        startDate: startDate || null,
-        deadline: deadline ? `${deadline}T18:00:00.000Z` : null,
-        projectId: projectId ?? undefined,
-      }).unwrap();
+      await notifyAction(
+        () =>
+          mutationResult(
+            sendTask({
+              userId,
+              title: trimmed,
+              description: note.trim() ? note.trim() : null,
+              startDate: startDate || null,
+              deadline: deadline ? `${deadline}T18:00:00.000Z` : null,
+              projectId: projectId ?? undefined,
+            }),
+          ),
+        { success: "Sent to inbox", error: "Could not send" },
+      );
       setTitle("");
       setNote("");
       setStartDate("");
@@ -78,10 +87,14 @@ export function SendInboxForm({
           Lands in their Inbox. They accept or decline.
         </span>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-[16px] overflow-y-auto px-[24px] py-[18px]">
+      <FormBusy
+        busy={Boolean(sendState?.isLoading)}
+        className="flex min-h-0 flex-1 flex-col gap-[16px] overflow-y-auto px-[24px] py-[18px]"
+      >
         <label className="flex flex-col gap-[7px]">
           <span className="text-[12px] text-muted-foreground">Task</span>
           <input
+            name="inbox-task-title"
             required
             autoFocus={autoFocus}
             value={title}
@@ -126,9 +139,10 @@ export function SendInboxForm({
         <label className="flex flex-col gap-[7px]">
           <span className="text-[12px] text-muted-foreground">Note</span>
           <textarea
+            name="inbox-task-note"
             value={note}
             rows={3}
-            placeholder={'Why this matters, or what "done" looks like…'}
+            placeholder={'Why this matters, or what "done" looks like...'}
             onChange={(event) => setNote(event.target.value)}
             className="min-h-[56px] resize-none border border-rule bg-card px-[11px] py-[9px] text-[13.5px] outline-none placeholder:text-faint"
           />
@@ -136,14 +150,16 @@ export function SendInboxForm({
         {error ? (
           <p className="text-[12.5px] text-destructive">{error}</p>
         ) : null}
-        <div className="flex items-center gap-[12px]">
-          <button
+      </FormBusy>
+      <div className="flex items-center gap-[12px] px-[24px] pb-[18px]">
+          <Button
             type="submit"
-            disabled={!title.trim() || isLoading}
-            className="bg-primary px-[15px] py-[8px] text-[12.5px] font-bold text-primary-foreground disabled:opacity-40"
+            loading={Boolean(sendState?.isLoading)}
+            disabled={!title.trim()}
+            className="h-auto bg-primary px-[15px] py-[8px] text-[12.5px] font-bold"
           >
             Send to Inbox
-          </button>
+          </Button>
           {onCancel ? (
             <button
               type="button"
@@ -153,7 +169,6 @@ export function SendInboxForm({
               Cancel
             </button>
           ) : null}
-        </div>
       </div>
     </form>
   );

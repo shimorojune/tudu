@@ -78,6 +78,23 @@ describe("CommandPalette", () => {
     delete window.__TAURI_INTERNALS__;
   });
 
+  it("opens with Cmd+K when a closed TipTap search panel is in the document", async () => {
+    const panel = document.createElement("div");
+    panel.setAttribute("role", "dialog");
+    panel.className = "tiptap-search-replace";
+    panel.setAttribute("data-open", "false");
+    document.body.append(panel);
+
+    renderPalette();
+
+    await pressCmdK();
+    expect(
+      await screen.findByPlaceholderText("Search commands..."),
+    ).toBeInTheDocument();
+
+    document.body.removeChild(panel);
+  });
+
   it("opens and closes with Cmd+K", async () => {
     renderPalette();
 

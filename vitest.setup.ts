@@ -1,4 +1,21 @@
 import "@testing-library/jest-dom/vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach, vi } from "vitest";
+
+vi.mock("sonner", () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+    message: vi.fn(),
+  },
+  Toaster: () => null,
+}));
+
+afterEach(() => {
+  cleanup();
+});
 
 class ResizeObserverMock {
   observe() {}
@@ -8,4 +25,43 @@ class ResizeObserverMock {
 
 globalThis.ResizeObserver = ResizeObserverMock;
 
+Object.defineProperty(window, "matchMedia", {
+  writable: true,
+  value: vi.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
+});
+
 Element.prototype.scrollIntoView = () => {};
+Element.prototype.getClientRects = () =>
+  ({
+    length: 1,
+    item: () => new DOMRect(0, 0, 1, 20),
+    0: new DOMRect(0, 0, 1, 20),
+    [Symbol.iterator]: function* () {
+      yield new DOMRect(0, 0, 1, 20);
+    },
+  }) as DOMRectList;
+Element.prototype.getBoundingClientRect = () => new DOMRect(0, 0, 1, 20);
+Element.prototype.hasPointerCapture = () => false;
+Element.prototype.setPointerCapture = () => {};
+Element.prototype.releasePointerCapture = () => {};
+Range.prototype.getClientRects = () =>
+  ({
+    length: 1,
+    item: () => new DOMRect(0, 0, 1, 20),
+    0: new DOMRect(0, 0, 1, 20),
+    [Symbol.iterator]: function* () {
+      yield new DOMRect(0, 0, 1, 20);
+    },
+  }) as DOMRectList;
+Range.prototype.getBoundingClientRect = () => new DOMRect(0, 0, 1, 20);
+document.elementFromPoint = () => document.body;
+window.scrollBy = () => {};

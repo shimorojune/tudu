@@ -1,0 +1,127 @@
+const ALLOWED_TAGS = new Set([
+  "p",
+  "br",
+  "strong",
+  "b",
+  "em",
+  "i",
+  "s",
+  "del",
+  "u",
+  "mark",
+  "sub",
+  "sup",
+  "ul",
+  "ol",
+  "li",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "blockquote",
+  "pre",
+  "code",
+  "a",
+  "table",
+  "thead",
+  "tbody",
+  "tr",
+  "th",
+  "td",
+  "hr",
+]);
+
+const BLOCK_TAGS_WITH_ALIGN = new Set(["p", "h1", "h2", "h3", "h4", "h5", "h6"]);
+
+const ALLOWED_TEXT_ALIGN = new Set(["left", "center", "right", "justify"]);
+
+const BLOCKED_TAG_PATTERN =
+  /<\/?(?:script|style|iframe|object|embed|form|input|button|textarea|select|meta|link)\b[^>]*>/gi;
+
+export function looksLikeRichHtml(value: string): boolean {
+  return /<\/?[a-z][\s\S]*>/i.test(value.trim());
+}
+
+export function plainTextToRichHtml(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "<p></p>";
+  }
+  if (looksLikeRichHtml(trimmed)) {
+    return trimmed;
+  }
+  const escaped = trimmed
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  return `<p>${escaped.replace(/\n/g, "<br>")}</p>`;
+}
+
+export function richTextToPlainPreview(value: string): string {
+  const html = looksLikeRichHtml(value) ? value : plainTextToRichHtml(value);
+  return html
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<\/(p|li|h1|h2|h3|h4|h5|h6|blockquote|tr)>/gi, " ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sanitizeTextAlignStyle(attrs: string): string {
+  const styleMatch = attrs.match(/\bstyle\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
+  const styleValue = (styleMatch?.[2] ?? styleMatch?.[3] ?? styleMatch?.[4] ?? "").trim();
+  const alignMatch = styleValue.match(/text-align\s*:\s*([a-z]+)/i);
+  const align = alignMatch?.[1]?.toLowerCase() ?? "";
+  if (!ALLOWED_TEXT_ALIGN.has(align)) {
+    return "";
+  }
+  return ` style="text-align: ${align}"`;
+}
+
+function sanitizeAttributes(tagName: string, attrs: string): string {
+  if (tagName === "a") {
+    const hrefMatch = attrs.match(/\bhref\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
+    const href = (hrefMatch?.[2] ?? hrefMatch?.[3] ?? hrefMatch?.[4] ?? "").trim();
+    if (!href || /^javascript:/i.test(href)) {
+      return "";
+    }
+    const escapedHref = href.replace(/"/g, "&quot;");
+    return ` href="${escapedHref}" rel="noreferrer noopener"`;
+  }
+  if (BLOCK_TAGS_WITH_ALIGN.has(tagName)) {
+    return sanitizeTextAlignStyle(attrs);
+  }
+  return "";
+}
+
+export function sanitizeRichTextHtml(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  let html = trimmed.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
+  html = html.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "");
+  html = html.replace(BLOCKED_TAG_PATTERN, "");
+  html = html.replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+
+  return html.replace(/<\/?([a-z0-9]+)\b([^>]*)>/gi, (match, rawTag, rawAttrs) => {
+    const tag = String(rawTag).toLowerCase();
+    if (!ALLOWED_TAGS.has(tag)) {
+      return "";
+    }
+    if (match.startsWith("</")) {
+      return `</${tag}>`;
+    }
+    if (tag === "br" || tag === "hr") {
+      return `<${tag}>`;
+    }
+    return `<${tag}${sanitizeAttributes(tag, String(rawAttrs ?? ""))}>`;
+  });
+}

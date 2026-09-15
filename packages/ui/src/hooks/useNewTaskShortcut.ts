@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "@tudu/store";
+import { isCommandPaletteBlocked } from "@/components/chrome/dialogBlocker";
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
@@ -11,12 +12,6 @@ function isTypingTarget(target: EventTarget | null): boolean {
     return true;
   }
   return target.isContentEditable;
-}
-
-function isDialogOpen(): boolean {
-  return (
-    document.querySelector("[role='dialog'],[role='alertdialog']") !== null
-  );
 }
 
 type UseNewTaskShortcutOptions = {
@@ -56,7 +51,7 @@ export function useNewTaskShortcut(
       if (event.key !== "n" && event.key !== "N") {
         return;
       }
-      if (isTypingTarget(event.target) || isDialogOpen()) {
+      if (isTypingTarget(event.target) || isCommandPaletteBlocked()) {
         return;
       }
       event.preventDefault();

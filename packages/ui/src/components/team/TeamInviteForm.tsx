@@ -1,4 +1,5 @@
 import type { FormEvent } from "react";
+import { Button } from "@/components/ui/button";
 
 export type TeamInviteFormProps = {
   email: string;
@@ -29,13 +30,13 @@ export function TeamInviteForm({
           className="w-[240px] border border-rule bg-card px-[11px] py-[7px] text-[13px] outline-none"
           onChange={(event) => onEmailChange(event.target.value)}
         />
-        <button
+        <Button
           type="submit"
-          disabled={sending}
-          className="bg-foreground px-[14px] py-[7px] text-[12px] font-bold text-card disabled:opacity-40"
+          loading={sending}
+          className="h-auto bg-foreground px-[14px] py-[7px] text-[12px] font-bold text-card"
         >
           Send invite
-        </button>
+        </Button>
         {onCancel ? (
           <button
             type="button"
