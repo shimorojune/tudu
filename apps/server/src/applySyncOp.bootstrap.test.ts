@@ -24,7 +24,7 @@ function issue(): JiraIssue {
     summary: "Investigate login failure",
     description: "Fails on partition one",
     renderedDescription: null,
-    status: { id: "1", name: "Open", category: "todo" },
+    status: { id: "1", name: "Open", category: "todo", colorName: null },
     issueType: "Bug",
     priority: "High",
     assignee: {

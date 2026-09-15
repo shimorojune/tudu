@@ -9,7 +9,7 @@ function sampleIssue(id: string, key: string): JiraIssue {
     summary: "Summary",
     description: null,
     renderedDescription: null,
-    status: { id: "1", name: "Open", category: "todo" },
+    status: { id: "1", name: "Open", category: "todo", colorName: null },
     issueType: "Bug",
     priority: "High",
     assignee: null,

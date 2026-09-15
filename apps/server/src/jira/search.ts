@@ -8,7 +8,7 @@ export function prependKeyIssueToSearchResults(
   const added = withoutDuplicate.length < response.issues.length ? 0 : 1;
   return {
     issues: [keyIssue, ...withoutDuplicate],
-    total: response.total + added,
+    total: (response.total ?? 0) + added,
     startAt: response.startAt,
     hasMore: response.hasMore || added > 0,
   };

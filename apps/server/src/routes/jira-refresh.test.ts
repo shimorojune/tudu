@@ -31,7 +31,7 @@ function issue(overrides: Partial<JiraIssue> = {}): JiraIssue {
     summary: "Investigate login failure",
     description: "Fails on partition one",
     renderedDescription: null,
-    status: { id: "1", name: "Open", category: "todo" },
+    status: { id: "1", name: "Open", category: "todo", colorName: null },
     issueType: "Bug",
     priority: "High",
     assignee: null,
@@ -58,7 +58,7 @@ describe("refreshAssignedJiraIssues", () => {
   it("removes changed cached issues that no longer match the assigned list", async () => {
     const cursor = new Date("2026-09-13T10:00:00.000Z");
     const changed = issue({
-      status: { id: "6", name: "Done", category: "done" },
+      status: { id: "6", name: "Done", category: "done", colorName: null },
       assignee: null,
     });
     const searchIssues = vi
