@@ -408,6 +408,9 @@ export async function softDeleteTask(
   userId: string,
   taskId: string,
 ): Promise<boolean> {
+  const { softDeleteAttachmentsForTask } = await import("./task-attachments.js");
+  await softDeleteAttachmentsForTask(db, taskId);
+
   // No timeline row: the task and its history cascade away on soft delete.
   const rows = await db
     .update(tasks)

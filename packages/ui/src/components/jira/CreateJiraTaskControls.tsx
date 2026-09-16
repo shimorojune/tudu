@@ -5,6 +5,8 @@ import {
   jiraApi,
   type AppDispatch,
   useCreateSubtaskMutation,
+  useUpdateTaskMutation,
+  useUploadTaskAttachmentMutation,
   useSpawnJiraTaskMutation,
   useSpawnReportJiraTaskMutation,
 } from "@tudu/store";
@@ -18,6 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { jiraWikiToDisplayHtml } from "@/components/editor/wikiMarkup";
+import { patchTaskDescriptionIfAttachmentsChanged } from "@/lib/afterCreateTaskDescription";
 import { notifyAction } from "@/lib/notifyAction";
 
 function jiraIssueDescriptionForTask(issue: JiraIssue): string {
@@ -56,6 +59,8 @@ export function SpawnJiraTaskDialog({
 }) {
   const [spawnTask] = useSpawnJiraTaskMutation();
   const [createSubtask] = useCreateSubtaskMutation();
+  const [updateTask] = useUpdateTaskMutation();
+  const [uploadTaskAttachment] = useUploadTaskAttachmentMutation();
 
   return (
     <NewTaskDialog
@@ -86,6 +91,14 @@ export function SpawnJiraTaskDialog({
             success: "Task created",
             error: "Could not create the linked task",
           },
+        );
+        await patchTaskDescriptionIfAttachmentsChanged(
+          result.task.id,
+          args.description,
+          args.pendingAttachments,
+          (input) => uploadTaskAttachment(input).unwrap(),
+          (description) =>
+            updateTask({ id: result.task.id, patch: { description } }).unwrap(),
         );
         for (const subtaskTitle of args.subtaskTitles) {
           await createSubtask({

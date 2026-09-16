@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Bucket } from "@tudu/shared";
 import { BUCKETS, DEFAULT_NOW_SOFT_CAP } from "@tudu/shared";
 import { todayIso } from "@tudu/store";
+import type { TaskDescriptionUploadFn } from "@/components/editor/taskDescriptionAttachments";
+import { rejectOversizeFile } from "@/components/editor/taskDescriptionAttachments";
 import { DateField } from "@/components/ui/date-field";
 import {
   Dialog,
@@ -14,9 +16,20 @@ import { SubtaskComposerList } from "@/components/tasks/SubtaskComposer";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { FormBusy } from "@/components/forms/FormBusy";
 import { Button } from "@/components/ui/button";
+import { clearPendingAttachmentBlobUrls } from "@/lib/finalizeNewTaskDescriptionAttachments";
 import { cn } from "@/lib/utils";
 
 export type NewTaskDayChoice = "today" | "tomorrow" | "pick" | "unscheduled";
+
+export type NewTaskSubmitArgs = {
+  title: string;
+  description: string | null;
+  bucket: Bucket;
+  scheduledDate: string | null;
+  subtaskTitles: string[];
+  projectId: string | null;
+  pendingAttachments: Map<string, File>;
+};
 
 export type NewTaskDialogProps = {
   open: boolean;
@@ -27,14 +40,7 @@ export type NewTaskDialogProps = {
   defaultDayChoice?: NewTaskDayChoice;
   nowCount: number;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (args: {
-    title: string;
-    description: string | null;
-    bucket: Bucket;
-    scheduledDate: string | null;
-    subtaskTitles: string[];
-    projectId: string | null;
-  }) => Promise<void>;
+  onSubmit: (args: NewTaskSubmitArgs) => Promise<void>;
 };
 
 function offsetIso(fromIso: string, dayOffset: number) {
@@ -121,6 +127,7 @@ export function NewTaskDialog({
   onSubmit,
 }: NewTaskDialogProps) {
   const titleRef = useRef<HTMLInputElement>(null);
+  const pendingAttachmentsRef = useRef<Map<string, File>>(new Map());
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [bucket, setBucket] = useState<Bucket>(initialBucket);
@@ -132,10 +139,24 @@ export function NewTaskDialog({
 
   const today = todayIso();
 
+  const stagingUpload = useCallback<TaskDescriptionUploadFn>(async (file) => {
+    if (rejectOversizeFile(file)) {
+      throw new Error("File too large");
+    }
+    const blobUrl = URL.createObjectURL(file);
+    pendingAttachmentsRef.current.set(blobUrl, file);
+    return {
+      contentUrl: blobUrl,
+      mimeType: file.type,
+      fileName: file.name,
+    };
+  }, []);
+
   useEffect(() => {
     if (!open) {
       return;
     }
+    clearPendingAttachmentBlobUrls(pendingAttachmentsRef.current);
     setTitle(initialTitle);
     setDescription(initialDescription);
     setBucket(initialBucket);
@@ -181,6 +202,7 @@ export function NewTaskDialog({
       return;
     }
     const trimmedDescription = description.trim();
+    const pendingAttachments = new Map(pendingAttachmentsRef.current);
     setSubmitting(true);
     try {
       await onSubmit({
@@ -190,7 +212,9 @@ export function NewTaskDialog({
         scheduledDate,
         subtaskTitles: subtasks.map((subtask) => subtask.title),
         projectId,
+        pendingAttachments,
       });
+      clearPendingAttachmentBlobUrls(pendingAttachmentsRef.current);
       onOpenChange(false);
     } finally {
       setSubmitting(false);
@@ -243,6 +267,7 @@ export function NewTaskDialog({
               placeholder="Add a description..."
               aria-label="Task description"
               className="text-muted-foreground focus-within:text-foreground"
+              taskAttachments={{ upload: stagingUpload }}
               onChange={setDescription}
             />
           </div>

@@ -4,6 +4,7 @@ import { TaskDescriptionField } from "./TaskDescriptionField";
 
 vi.mock("@tudu/store", () => ({
   useUpdateTaskMutation: () => [vi.fn()],
+  useUploadTaskAttachmentMutation: () => [vi.fn()],
 }));
 
 describe("TaskDescriptionField", () => {

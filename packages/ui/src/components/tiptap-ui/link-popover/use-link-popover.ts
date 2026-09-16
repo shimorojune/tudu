@@ -13,6 +13,7 @@ import {
   isNodeTypeSelected,
   sanitizeUrl,
 } from "@/lib/tiptap-utils"
+import { downloadAttachment, isTaskAttachmentSrc } from "@/lib/attachmentUrl"
 
 /**
  * Configuration for the link popover functionality
@@ -167,17 +168,21 @@ export function useLinkHandler(props: LinkHandlerProps) {
     setUrl("")
   }, [editor])
 
-  const openLink = useCallback(
-    (target: string = "_blank", features: string = "noopener,noreferrer") => {
-      if (!url) return
+  const openLink = useCallback(() => {
+    if (!url) {
+      return
+    }
 
-      const safeUrl = sanitizeUrl(url, window.location.href)
-      if (safeUrl !== "#") {
-        window.open(safeUrl, target, features)
-      }
-    },
-    [url]
-  )
+    if (isTaskAttachmentSrc(url)) {
+      void downloadAttachment(url, "download")
+      return
+    }
+
+    const safeUrl = sanitizeUrl(url, window.location.href)
+    if (safeUrl !== "#") {
+      window.open(safeUrl, "_blank", "noopener,noreferrer")
+    }
+  }, [url])
 
   return {
     url: url || "",

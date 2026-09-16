@@ -23,8 +23,6 @@ import { useDaySearchSync } from "@/hooks/useDaySearchSync";
 import { useJiraPreview } from "@/hooks/useJiraPreview";
 import { useViewportBand } from "@/hooks/useViewportBand";
 import { DAY_TASK_TAB_FIELDS } from "@/lib/daySearch";
-import { personFirstName } from "@/lib/person";
-
 export function ReportDayRoute() {
   const { userId } = useParams({ strict: false }) as { userId: string };
   const search = useSearch({ strict: false }) as { send?: boolean };
@@ -67,7 +65,6 @@ export function ReportDayRoute() {
 
   const tasks = data.tasks;
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? null;
-  const first = personFirstName(data.report.name);
   const canSendInbox = data.permissions.canSendInbox;
 
   const taskList = (
@@ -117,7 +114,6 @@ export function ReportDayRoute() {
         task={selectedTask}
         selectedDate={date}
         viewer="manager"
-        notifiedName={first}
         reportUserId={userId}
         reportPermissions={data.permissions}
       />

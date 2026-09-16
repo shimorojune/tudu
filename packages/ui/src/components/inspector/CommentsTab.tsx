@@ -12,13 +12,11 @@ import { TaskCommentsSkeleton } from "@/components/loading/JiraSkeletons";
 
 export type CommentsTabProps = {
   task: Task;
-  notifiedName?: string | null;
   canComment?: boolean;
 };
 
 export function CommentsTab({
   task,
-  notifiedName = null,
   canComment = true,
 }: CommentsTabProps) {
   const dispatch = useDispatch();
@@ -66,11 +64,6 @@ export function CommentsTab({
       {!canComment ? (
         <p className="border-t border-hair px-[24px] py-[10px] text-[11.5px] text-faint">
           You cannot comment on this report's task.
-        </p>
-      ) : null}
-      {notifiedName ? (
-        <p className="border-t border-hair px-[24px] py-[10px] text-[11.5px] text-faint">
-          {notifiedName} is notified in Tudu
         </p>
       ) : null}
     </div>

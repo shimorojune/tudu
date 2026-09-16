@@ -6,6 +6,8 @@ import {
   setSelectedTaskId,
   useCreateSubtaskMutation,
   useCreateTaskMutation,
+  useUpdateTaskMutation,
+  useUploadTaskAttachmentMutation,
   useGetTasksForDayQuery,
   useGetUnscheduledTasksQuery,
   type RootState,
@@ -13,6 +15,7 @@ import {
 import { DayTaskList } from "@/components/tasks/DayTaskList";
 import { TaskListHeader } from "@/components/tasks/TaskListHeader";
 import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
+import { patchTaskDescriptionIfAttachmentsChanged } from "@/lib/afterCreateTaskDescription";
 import { createTaskBody } from "@/lib/createTask";
 import { DetailInspector } from "@/components/inspector/DetailInspector";
 import { InspectorSheet } from "@/components/inspector/InspectorSheet";
@@ -50,6 +53,8 @@ export function TodayRoute() {
   });
   const [createTask] = useCreateTaskMutation();
   const [createSubtask] = useCreateSubtaskMutation();
+  const [updateTask] = useUpdateTaskMutation();
+  const [uploadTaskAttachment] = useUploadTaskAttachmentMutation();
 
   const [firstRunDialogOpen, setFirstRunDialogOpen] = useState(false);
   const [firstRunBucket, setFirstRunBucket] = useState<Bucket>("later");
@@ -202,6 +207,15 @@ export function TodayRoute() {
                 projectId: args.projectId,
               }),
             ).unwrap();
+
+            await patchTaskDescriptionIfAttachmentsChanged(
+              result.task.id,
+              args.description,
+              args.pendingAttachments,
+              (input) => uploadTaskAttachment(input).unwrap(),
+              (description) =>
+                updateTask({ id: result.task.id, patch: { description } }).unwrap(),
+            );
 
             for (const subtaskTitle of args.subtaskTitles) {
               await createSubtask({

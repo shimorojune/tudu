@@ -1,6 +1,14 @@
-export { setAuthTokenGetter, baseApi } from "./api/baseApi.js";
+export {
+  setAuthTokenGetter,
+  baseApi,
+  getAuthToken,
+  resolveApiUrl,
+} from "./api/baseApi.js";
 export { healthApi, useGetHealthQuery, useGetMeQuery } from "./api/healthApi.js";
-export { tasksApi } from "./api/tasksApi.js";
+export {
+  tasksApi,
+  useUploadTaskAttachmentMutation,
+} from "./api/tasksApi.js";
 export {
   jiraApi,
   useGetJiraStatusRestQuery,

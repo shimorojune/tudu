@@ -12,6 +12,7 @@ export * from "./sync.js";
 export * from "./notifications.js";
 export * from "./jira.js";
 export * from "./mapTask.js";
+export * from "./task-attachments.js";
 
 export function createDb(databaseUrl: string) {
   const sql = neon(databaseUrl);

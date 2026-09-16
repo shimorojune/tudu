@@ -16,6 +16,7 @@ vi.mock("@tudu/store", () => ({
   },
   useGetMeQuery: () => ({ data: { id: "user-1", name: "You" } }),
   useUpdateTaskMutation: () => [vi.fn()],
+  useUploadTaskAttachmentMutation: () => [vi.fn()],
   useUnlinkJiraTaskMutation: () => [unlinkJiraTask],
   useGetProjectsQuery: () => ({ data: [], isLoading: false }),
   useCreateProjectMutation: () => [vi.fn(), { isLoading: false }],

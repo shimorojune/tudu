@@ -1,5 +1,6 @@
 import { useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
+import type { TaskDescriptionUploadFn } from "@/components/editor/taskDescriptionAttachments";
 import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
 import {
   plainTextToRichHtml,
@@ -20,6 +21,9 @@ export type RichTextEditorProps = {
   readOnly?: boolean;
   placeholder?: string;
   className?: string;
+  taskAttachments?: {
+    upload?: TaskDescriptionUploadFn;
+  };
 };
 
 function normalizeMode(mode: RichTextEditorMode | "task"): RichTextEditorMode {
@@ -49,6 +53,7 @@ export function RichTextEditor({
   readOnly = false,
   placeholder,
   className,
+  taskAttachments,
 }: RichTextEditorProps) {
   const normalizedMode = normalizeMode(mode);
   const lastEmittedRef = useRef(value);
@@ -99,6 +104,7 @@ export function RichTextEditor({
         placeholder={placeholder ?? "Start typing..."}
         ariaLabel={ariaLabel}
         className="rich-text-editor-tiptap"
+        taskAttachments={taskAttachments}
         onChange={(html) => {
           if (readOnly) {
             return;

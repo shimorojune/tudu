@@ -6,6 +6,10 @@ dist/
 apps/*/dist/
 apps/desktop/src-tauri/target/
 
+# Local attachment blobs (filesystem driver)
+.data/
+apps/server/.data/
+
 # Environment / secrets
 .env
 .env.local

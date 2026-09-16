@@ -164,7 +164,7 @@ const LinkMain: React.FC<LinkMainProps> = ({
             <ButtonGroup>
               <Button
                 type="button"
-                onClick={openLink}
+                onClick={() => openLink()}
                 title="Open in new window"
                 disabled={!url && !isActive}
                 variant="ghost"

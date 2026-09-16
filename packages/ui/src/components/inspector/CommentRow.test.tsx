@@ -27,6 +27,24 @@ const comment: Comment = {
 };
 
 describe("CommentRow", () => {
+  it("renders HTML bodies for other authors without showing raw tags", () => {
+    const htmlComment: Comment = {
+      ...comment,
+      authorId: "other-user",
+      body: "<p><strong>Ship it</strong></p>",
+      author: { id: "other-user", name: "Other User", email: "other@egain.com" },
+    };
+
+    render(
+      <Provider store={makeStore()}>
+        <CommentRow comment={htmlComment} taskId={htmlComment.taskId} />
+      </Provider>,
+    );
+
+    expect(screen.getByText("Ship it").tagName).toBe("STRONG");
+    expect(screen.queryByText("<p><strong>Ship it</strong></p>")).toBeNull();
+  });
+
   it("marks a focused comment for deep links", () => {
     render(
       <Provider store={makeStore()}>

@@ -183,9 +183,9 @@ export function CommentRow({
               onCancel={() => setEditing(false)}
             />
           ) : (
-            <p className="mt-[6px] whitespace-pre-wrap break-words text-[13px] leading-[1.5]">
-              {comment.body}
-            </p>
+            <div className="mt-[6px]">
+              <RichTextContent value={comment.body} />
+            </div>
           )}
         </div>
       </div>

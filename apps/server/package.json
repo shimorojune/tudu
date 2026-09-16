@@ -10,6 +10,7 @@
     "db:seed": "NODE_OPTIONS='--conditions=development' tsx scripts/seed-test-user.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1133.0",
     "@hono/node-server": "^1.14.4",
     "@hono/zod-validator": "^0.7.6",
     "@tudu/db": "workspace:*",

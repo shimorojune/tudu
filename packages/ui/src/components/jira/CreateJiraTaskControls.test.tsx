@@ -10,6 +10,8 @@ import {
 const spawnJiraTask = vi.hoisted(() => vi.fn());
 const spawnReportJiraTask = vi.hoisted(() => vi.fn());
 const createSubtask = vi.hoisted(() => vi.fn());
+const updateTask = vi.hoisted(() => vi.fn());
+const uploadTaskAttachment = vi.hoisted(() => vi.fn());
 const invalidateTags = vi.hoisted(() => vi.fn());
 const dispatch = vi.hoisted(() => vi.fn());
 const mutationResult = vi.hoisted(() => ({
@@ -40,6 +42,8 @@ vi.mock("@tudu/store", async (importOriginal) => {
     useSpawnJiraTaskMutation: () => [spawnJiraTask, { isLoading: false }],
     useSpawnReportJiraTaskMutation: () => [spawnReportJiraTask, { isLoading: false }],
     useCreateSubtaskMutation: () => [createSubtask, { isLoading: false }],
+    useUpdateTaskMutation: () => [updateTask, { isLoading: false }],
+    useUploadTaskAttachmentMutation: () => [uploadTaskAttachment, { isLoading: false }],
   };
 });
 
@@ -67,8 +71,12 @@ describe("SpawnJiraTaskDialog", () => {
   beforeEach(() => {
     spawnJiraTask.mockReset();
     createSubtask.mockReset();
+    updateTask.mockReset();
+    uploadTaskAttachment.mockReset();
     spawnJiraTask.mockReturnValue(mutationResult);
     createSubtask.mockReturnValue(mutationResult);
+    updateTask.mockReturnValue(mutationResult);
+    uploadTaskAttachment.mockReturnValue(mutationResult);
   });
 
   it("opens the new task dialog prefilled and spawns a linked task", async () => {
@@ -96,7 +104,7 @@ describe("SpawnJiraTaskDialog", () => {
     expect(spawnJiraTask).toHaveBeenCalledWith({
       issueId: "10001",
       title: "Remote Jira summary",
-      description: "Remote description",
+      description: "<p>Remote description</p>",
       scheduledDate: "2026-09-11",
       bucket: "later",
       startDate: null,

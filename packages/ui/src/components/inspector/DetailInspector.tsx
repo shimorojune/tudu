@@ -16,13 +16,11 @@ import { DetailInspectorEmpty } from "@/components/inspector/DetailInspectorEmpt
 import { InspectorTabs } from "@/components/inspector/InspectorTabs";
 import { TimelineTab } from "@/components/inspector/TimelineTab";
 import type { TaskViewer } from "@/components/tasks/TaskRow";
-import { personFirstName } from "@/lib/person";
 
 export type DetailInspectorProps = {
   task: Task | null;
   selectedDate: string;
   viewer?: TaskViewer;
-  notifiedName?: string | null;
   reportUserId?: string;
   reportPermissions?: ManagerPermissions;
 };
@@ -31,7 +29,6 @@ export function DetailInspector({
   task,
   selectedDate,
   viewer = "owner",
-  notifiedName = null,
   reportUserId,
   reportPermissions,
 }: DetailInspectorProps) {
@@ -44,7 +41,6 @@ export function DetailInspector({
       task={task}
       selectedDate={selectedDate}
       viewer={viewer}
-      notifiedName={notifiedName}
       reportUserId={reportUserId}
       reportPermissions={reportPermissions}
     />
@@ -55,14 +51,12 @@ function DetailInspectorBody({
   task,
   selectedDate,
   viewer,
-  notifiedName,
   reportUserId,
   reportPermissions,
 }: {
   task: Task;
   selectedDate: string;
   viewer: TaskViewer;
-  notifiedName: string | null;
   reportUserId?: string;
   reportPermissions?: ManagerPermissions;
 }) {
@@ -80,11 +74,6 @@ function DetailInspectorBody({
   const [createReportProject] = useCreateReportProjectMutation();
 
   const sharedWithName = isManager ? null : (team?.manager?.name ?? null);
-  const commentNotifyName = isManager
-    ? notifiedName
-    : sharedWithName
-      ? personFirstName(sharedWithName)
-      : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
@@ -117,7 +106,6 @@ function DetailInspectorBody({
       {tab === "comments" ? (
         <CommentsTab
           task={task}
-          notifiedName={commentNotifyName}
           canComment={!isManager || permissions.canComment}
         />
       ) : null}
@@ -132,11 +120,6 @@ function DetailInspectorBody({
           sharedWithName={sharedWithName}
         />
       ) : null}
-
-      <footer className="mt-auto flex h-[30px] shrink-0 items-center justify-between border-t border-hair px-[24px] text-[11px] text-faint">
-        <span>Panes drag to resize · rows drag to reorder</span>
-        <span>Cmd+K for commands</span>
-      </footer>
     </div>
   );
 }

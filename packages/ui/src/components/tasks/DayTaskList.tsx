@@ -32,6 +32,7 @@ import {
   useReorderSubtasksMutation,
   useUpdateSubtaskMutation,
   useUpdateTaskMutation,
+  useUploadTaskAttachmentMutation,
   useReorderReportTasksMutation,
   useDeleteReportTaskMutation,
   todayIso,
@@ -65,7 +66,11 @@ import {
 } from "@/lib/dragCollision";
 import { BucketSection } from "@/components/tasks/BucketSection";
 import { CompletedSection } from "@/components/tasks/CompletedSection";
-import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
+import {
+  NewTaskDialog,
+  type NewTaskSubmitArgs,
+} from "@/components/tasks/NewTaskDialog";
+import { patchTaskDescriptionIfAttachmentsChanged } from "@/lib/afterCreateTaskDescription";
 import { createTaskBody } from "@/lib/createTask";
 import type { TaskRowActions, TaskViewer } from "@/components/tasks/TaskRow";
 import { useNewTaskShortcut } from "@/hooks/useNewTaskShortcut";
@@ -364,6 +369,7 @@ export function DayTaskList({
 
   const [createTask] = useCreateTaskMutation();
   const [updateTask] = useUpdateTaskMutation();
+  const [uploadTaskAttachment] = useUploadTaskAttachmentMutation();
   const [deleteTask] = useDeleteTaskMutation();
   const [reorderTasks] = useReorderTasksMutation();
   const [reorderReportTasks] = useReorderReportTasksMutation();
@@ -504,14 +510,7 @@ export function DayTaskList({
     applyReorder(lanesFromItems({ before: baseItems, after: afterItems, laneFor }));
   }
 
-  async function handleCreateTask(args: {
-    title: string;
-    description: string | null;
-    bucket: Bucket;
-    scheduledDate: string | null;
-    subtaskTitles: string[];
-    projectId: string | null;
-  }) {
+  async function handleCreateTask(args: NewTaskSubmitArgs) {
     const result = (await notifyAction(
       () =>
         mutationResult(
@@ -527,6 +526,15 @@ export function DayTaskList({
         ),
       { success: "Task created", error: "Could not create the task" },
     )) as { task: { id: string } };
+
+    await patchTaskDescriptionIfAttachmentsChanged(
+      result.task.id,
+      args.description,
+      args.pendingAttachments,
+      (input) => uploadTaskAttachment(input).unwrap(),
+      (description) =>
+        updateTask({ id: result.task.id, patch: { description } }).unwrap(),
+    );
 
     for (const subtaskTitle of args.subtaskTitles) {
       await mutationResult(

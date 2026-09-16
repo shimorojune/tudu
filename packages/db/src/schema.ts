@@ -6,3 +6,4 @@ export * from "./manager-schema.js";
 export * from "./sync-schema.js";
 export * from "./notifications-schema.js";
 export * from "./jira-schema.js";
+export * from "./task-attachments-schema.js";

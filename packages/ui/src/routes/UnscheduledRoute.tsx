@@ -32,6 +32,7 @@ import {
   useReorderSubtasksMutation,
   useUpdateSubtaskMutation,
   useUpdateTaskMutation,
+  useUploadTaskAttachmentMutation,
   todayIso,
   selectVisible,
   setSelectedTaskId,
@@ -55,6 +56,7 @@ import {
   pointerYFromEvent,
   taskCollisionDetection,
 } from "@/lib/dragCollision";
+import { patchTaskDescriptionIfAttachmentsChanged } from "@/lib/afterCreateTaskDescription";
 import { createTaskBody } from "@/lib/createTask";
 import { openNowCount } from "@/lib/nowCount";
 import { splitOpenAndCompleted } from "@/lib/completedTasks";
@@ -269,8 +271,6 @@ function UnscheduledDnd({
 export function UnscheduledRoute() {
   const dispatch = useDispatch();
   const selectedTaskId = useSelector((state: RootState) => state.day.selectedTaskId);
-  const inspectorTab = useSelector((state: RootState) => state.day.inspectorTab);
-  const focusCommentId = useSelector((state: RootState) => state.day.focusCommentId);
   const { data, isLoading, isError } = useGetUnscheduledTasksQuery();
   const { data: todayData } = useGetTasksForDayQuery(todayIso());
   useDaySearchSync(TASK_TAB_FIELDS, {
@@ -285,6 +285,7 @@ export function UnscheduledRoute() {
 
   const [createTask] = useCreateTaskMutation();
   const [updateTask] = useUpdateTaskMutation();
+  const [uploadTaskAttachment] = useUploadTaskAttachmentMutation();
   const [deleteTask] = useDeleteTaskMutation();
   const [reorderTasks] = useReorderTasksMutation();
   const [reorderSubtasks] = useReorderSubtasksMutation();
@@ -317,9 +318,7 @@ export function UnscheduledRoute() {
   const { open: openTasks, completed: completedTasks } =
     splitOpenAndCompleted(sourceTasks);
   const selectedTask = sourceTasks.find((task) => task.id === selectedTaskId) ?? null;
-  const showInspector =
-    selectedTask !== null &&
-    (inspectorTab === "comments" || Boolean(focusCommentId));
+  const showInspector = selectedTask !== null;
   const baseItems = itemsFromTasks(openTasks, [CONTAINER], () => CONTAINER);
   const todayTasks = todayData?.tasks ?? [];
 
@@ -453,6 +452,15 @@ export function UnscheduledRoute() {
               projectId: args.projectId,
             }),
           ).unwrap();
+
+          await patchTaskDescriptionIfAttachmentsChanged(
+            result.task.id,
+            args.description,
+            args.pendingAttachments,
+            (input) => uploadTaskAttachment(input).unwrap(),
+            (description) =>
+              updateTask({ id: result.task.id, patch: { description } }).unwrap(),
+          );
 
           for (const subtaskTitle of args.subtaskTitles) {
             await createSubtask({

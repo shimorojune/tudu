@@ -168,7 +168,7 @@ export function DetailsTab({
       <TaskDescriptionField
         taskId={task.id}
         description={task.description}
-        readOnly={readOnly}
+        readOnly={readOnly || !isOpen}
       />
 
       <dl className="mt-[22px] grid grid-cols-[78px_minmax(0,1fr)] items-center gap-x-[16px] gap-y-[13px] text-[13px]">

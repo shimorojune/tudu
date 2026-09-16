@@ -30,17 +30,23 @@ describe("NewTaskDialog", () => {
     );
 
     await user.type(screen.getByPlaceholderText("What needs doing?"), "Ship fix");
-    await user.type(screen.getByRole("textbox", { name: "Task description" }), "Details here");
+    const descriptionField = screen.getByRole("textbox", { name: "Task description" });
+    await user.click(descriptionField);
+    await user.clear(descriptionField);
+    await user.paste("Details here");
     await user.click(screen.getByRole("button", { name: /Add to Later/i }));
 
-    expect(onSubmit).toHaveBeenCalledWith({
-      title: "Ship fix",
-      description: "<p>Details here</p>",
-      bucket: "later",
-      scheduledDate: "2026-09-11",
-      subtaskTitles: [],
-      projectId: null,
-    });
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Ship fix",
+        bucket: "later",
+        scheduledDate: "2026-09-11",
+        subtaskTitles: [],
+        projectId: null,
+        pendingAttachments: expect.any(Map),
+      }),
+    );
+    expect(onSubmit.mock.calls[0]?.[0].description).toBe("<p>Details here</p>");
   });
 
   it("does not submit when Enter is pressed in the title field", async () => {

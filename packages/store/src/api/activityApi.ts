@@ -33,26 +33,30 @@ export const activityApi = baseApi.injectEndpoints({
         const tempId = crypto.randomUUID();
         const now = new Date().toISOString();
         const me = healthApi.endpoints.getMe.select()(readState(getState)).data;
-        const optimistic: Comment = {
-          id: tempId,
-          taskId,
-          authorId: me?.id ?? "",
-          body,
-          editedAt: null,
-          createdAt: now,
-          updatedAt: now,
-          author: {
-            id: me?.id ?? "",
-            name: me?.name ?? "You",
-            email: me?.email ?? "",
-          },
-        };
+        let commentPatch: { undo: () => void } | null = null;
 
-        const commentPatch = dispatch(
-          activityApi.util.updateQueryData("getComments", taskId, (draft) => {
-            draft.comments.push(optimistic);
-          }),
-        );
+        if (me?.id) {
+          const optimistic: Comment = {
+            id: tempId,
+            taskId,
+            authorId: me.id,
+            body,
+            editedAt: null,
+            createdAt: now,
+            updatedAt: now,
+            author: {
+              id: me.id,
+              name: me.name,
+              email: me.email,
+            },
+          };
+
+          commentPatch = dispatch(
+            activityApi.util.updateQueryData("getComments", taskId, (draft) => {
+              draft.comments.push(optimistic);
+            }),
+          );
+        }
 
         const taskPatches = patchAllTaskCaches(
           dispatch,
@@ -70,7 +74,7 @@ export const activityApi = baseApi.injectEndpoints({
           const { refetchTimelineFirstPage } = await import("./invalidateTimeline.js");
           await refetchTimelineFirstPage(dispatch, taskId);
         } catch {
-          commentPatch.undo();
+          commentPatch?.undo();
           for (const patch of taskPatches) {
             patch.undo();
           }

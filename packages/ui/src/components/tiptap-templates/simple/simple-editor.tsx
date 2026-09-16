@@ -1,7 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { EditorContent, EditorContext, useEditor } from "@tiptap/react"
+import { FileHandler } from "@tiptap/extension-file-handler"
 
 // --- Tiptap Core Extensions ---
 import { StarterKit } from "@tiptap/starter-kit"
@@ -69,6 +70,21 @@ import { useCursorVisibility } from "@/hooks/use-cursor-visibility"
 // --- Styles ---
 import "@/components/tiptap-templates/simple/simple-editor.scss"
 import { cn } from "@/lib/utils"
+import { AttachFileToolbarButton } from "@/components/editor/AttachFileToolbarButton"
+import {
+  AuthenticatedImage,
+  AuthenticatedVideo,
+} from "@/components/editor/editorAttachmentExtensions"
+import {
+  handleDescriptionFiles,
+  type TaskDescriptionUploadFn,
+} from "@/components/editor/taskDescriptionAttachments"
+import { downloadAttachment, isTaskAttachmentSrc } from "@/lib/attachmentUrl"
+import { useTiptapEditor } from "@/hooks/use-tiptap-editor"
+
+export type SimpleEditorTaskAttachments = {
+  upload?: TaskDescriptionUploadFn;
+};
 
 export type SimpleEditorProps = {
   contentHtml?: string;
@@ -77,10 +93,20 @@ export type SimpleEditorProps = {
   placeholder?: string;
   ariaLabel?: string;
   className?: string;
+  taskAttachments?: SimpleEditorTaskAttachments;
 };
 
 const SEARCH_AND_REPLACE_SCROLL_OPTIONS: ScrollIntoViewOptions = {
   block: "center",
+}
+
+function AttachmentToolbarControls({
+  upload,
+}: {
+  upload: TaskDescriptionUploadFn
+}) {
+  const { editor } = useTiptapEditor()
+  return <AttachFileToolbarButton editor={editor} upload={upload} />
 }
 
 const MainToolbarContent = ({
@@ -90,6 +116,7 @@ const MainToolbarContent = ({
   isSearchAndReplaceOpen,
   searchAndReplaceButtonRef,
   isMobile,
+  attachmentUpload,
 }: {
   onHighlighterClick: () => void
   onLinkClick: () => void
@@ -97,10 +124,19 @@ const MainToolbarContent = ({
   isSearchAndReplaceOpen: boolean
   searchAndReplaceButtonRef: React.RefObject<HTMLButtonElement | null>
   isMobile: boolean
+  attachmentUpload?: TaskDescriptionUploadFn
 }) => {
   return (
     <>
       <Spacer />
+
+      {attachmentUpload ? (
+        <ToolbarGroup>
+          <AttachmentToolbarControls upload={attachmentUpload} />
+        </ToolbarGroup>
+      ) : null}
+
+      {attachmentUpload ? <ToolbarSeparator /> : null}
 
       <ToolbarGroup>
         <UndoRedoButton action="undo" />
@@ -205,6 +241,7 @@ export function SimpleEditor({
   placeholder = "Start typing...",
   ariaLabel = "Rich text editor",
   className,
+  taskAttachments,
 }: SimpleEditorProps) {
   const isMobile = useIsBreakpoint()
   const { height } = useWindowSize()
@@ -215,21 +252,10 @@ export function SimpleEditor({
   const toolbarRef = useRef<HTMLDivElement>(null)
   const searchAndReplaceButtonRef = useRef<HTMLButtonElement>(null)
   const previousContentRef = useRef<string | null>(null)
+  const attachmentUpload = taskAttachments?.upload
 
-  const editor = useEditor({
-    immediatelyRender: false,
-    editable: !readOnly,
-    editorProps: {
-      attributes: {
-        autocomplete: "off",
-        autocorrect: "off",
-        autocapitalize: "off",
-        "aria-label": ariaLabel,
-        class: "simple-editor",
-        role: "textbox",
-      },
-    },
-    extensions: [
+  const extensions = useMemo(() => {
+    const base = [
       StarterKit.configure({
         horizontalRule: false,
         link: {
@@ -255,7 +281,47 @@ export function SimpleEditor({
         searchDebounceMs: 500,
         injectCSS: false,
       }),
-    ],
+    ]
+
+    if (!taskAttachments) {
+      return base
+    }
+
+    const attachmentExtensions = [AuthenticatedImage, AuthenticatedVideo]
+
+    if (!attachmentUpload) {
+      return [...base, ...attachmentExtensions]
+    }
+
+    return [
+      ...base,
+      ...attachmentExtensions,
+      FileHandler.configure({
+        onDrop: (editor, files) => {
+          void handleDescriptionFiles(editor, files, attachmentUpload)
+        },
+        onPaste: (editor, files) => {
+          void handleDescriptionFiles(editor, files, attachmentUpload)
+        },
+        consumePasteEvent: true,
+      }),
+    ]
+  }, [attachmentUpload, placeholder, taskAttachments])
+
+  const editor = useEditor({
+    immediatelyRender: false,
+    editable: !readOnly,
+    editorProps: {
+      attributes: {
+        autocomplete: "off",
+        autocorrect: "off",
+        autocapitalize: "off",
+        "aria-label": ariaLabel,
+        class: "simple-editor",
+        role: "textbox",
+      },
+    },
+    extensions,
     content: contentHtml,
     onUpdate: ({ editor: instance }) => {
       if (readOnly) {
@@ -264,6 +330,23 @@ export function SimpleEditor({
       onChange?.(instance.getHTML())
     },
   })
+
+  const onEditorClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    const anchor = (event.target as HTMLElement).closest("a")
+    if (!anchor) {
+      return
+    }
+    const href = anchor.getAttribute("href")
+    if (!href || !isTaskAttachmentSrc(href)) {
+      return
+    }
+    event.preventDefault()
+    const fileName =
+      anchor.getAttribute("data-tudu-filename")?.trim() ||
+      anchor.textContent?.trim() ||
+      "download"
+    void downloadAttachment(href, fileName)
+  }, [])
 
   useEffect(() => {
     if (!editor) {
@@ -321,6 +404,7 @@ export function SimpleEditor({
     <div
       className={cn("simple-editor-wrapper", className)}
       data-testid="tiptap-simple-editor"
+      onClick={onEditorClick}
     >
       <EditorContext.Provider value={{ editor }}>
         {!readOnly ? (
@@ -343,6 +427,7 @@ export function SimpleEditor({
                 isSearchAndReplaceOpen={isSearchAndReplaceOpen}
                 searchAndReplaceButtonRef={searchAndReplaceButtonRef}
                 isMobile={isMobile}
+                attachmentUpload={attachmentUpload}
               />
             ) : (
               <MobileToolbarContent

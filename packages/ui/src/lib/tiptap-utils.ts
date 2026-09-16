@@ -14,7 +14,9 @@ import {
   type NodeWithPos,
 } from "@tiptap/react"
 
-export const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+import { ATTACHMENT_MAX_BYTES } from "@tudu/shared"
+
+export const MAX_FILE_SIZE = ATTACHMENT_MAX_BYTES
 
 export const MAC_SYMBOLS: Record<string, string> = {
   mod: "⌘",

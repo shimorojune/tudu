@@ -1,3 +1,5 @@
+import { isAllowedAttachmentContentUrl } from "./attachments.js";
+
 const ALLOWED_TAGS = new Set([
   "p",
   "br",
@@ -31,7 +33,12 @@ const ALLOWED_TAGS = new Set([
   "th",
   "td",
   "hr",
+  "img",
+  "video",
+  "source",
 ]);
+
+const VOID_TAGS = new Set(["br", "hr", "img", "source"]);
 
 const BLOCK_TAGS_WITH_ALIGN = new Set(["p", "h1", "h2", "h3", "h4", "h5", "h6"]);
 
@@ -62,6 +69,8 @@ export function plainTextToRichHtml(value: string): string {
 export function richTextToPlainPreview(value: string): string {
   const html = looksLikeRichHtml(value) ? value : plainTextToRichHtml(value);
   return html
+    .replace(/<img\b[^>]*>/gi, " [image] ")
+    .replace(/<video\b[^>]*>/gi, " [video] ")
     .replace(/<br\s*\/?>/gi, " ")
     .replace(/<\/(p|li|h1|h2|h3|h4|h5|h6|blockquote|tr)>/gi, " ")
     .replace(/<[^>]+>/g, "")
@@ -71,6 +80,13 @@ export function richTextToPlainPreview(value: string): string {
     .replace(/&gt;/g, ">")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function readAttr(attrs: string, name: string): string {
+  const match = attrs.match(
+    new RegExp(`\\b${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, "i"),
+  );
+  return (match?.[2] ?? match?.[3] ?? match?.[4] ?? "").trim();
 }
 
 function sanitizeTextAlignStyle(attrs: string): string {
@@ -84,12 +100,35 @@ function sanitizeTextAlignStyle(attrs: string): string {
   return ` style="text-align: ${align}"`;
 }
 
-function sanitizeAttributes(tagName: string, attrs: string): string {
+function sanitizeMediaSrc(tagName: string, attrs: string): string | null {
+  const src = readAttr(attrs, "src");
+  if (!isAllowedAttachmentContentUrl(src)) {
+    return null;
+  }
+  const escaped = src.replace(/"/g, "&quot;");
+  if (tagName === "video") {
+    const hasControls = /\bcontrols\b/i.test(attrs);
+    return hasControls
+      ? ` src="${escaped}" controls`
+      : ` src="${escaped}" controls`;
+  }
+  if (tagName === "img") {
+    const alt = readAttr(attrs, "alt");
+    const altPart =
+      alt.length > 0 ? ` alt="${alt.replace(/"/g, "&quot;")}"` : "";
+    return ` src="${escaped}"${altPart}`;
+  }
+  return ` src="${escaped}"`;
+}
+
+function sanitizeAttributes(tagName: string, attrs: string): string | null {
+  if (tagName === "img" || tagName === "video" || tagName === "source") {
+    return sanitizeMediaSrc(tagName, attrs);
+  }
   if (tagName === "a") {
-    const hrefMatch = attrs.match(/\bhref\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
-    const href = (hrefMatch?.[2] ?? hrefMatch?.[3] ?? hrefMatch?.[4] ?? "").trim();
-    if (!href || /^javascript:/i.test(href)) {
-      return "";
+    const href = readAttr(attrs, "href");
+    if (!href || /^javascript:/i.test(href) || /^data:/i.test(href)) {
+      return null;
     }
     const escapedHref = href.replace(/"/g, "&quot;");
     return ` href="${escapedHref}" rel="noreferrer noopener"`;
@@ -117,11 +156,18 @@ export function sanitizeRichTextHtml(input: string): string {
       return "";
     }
     if (match.startsWith("</")) {
+      if (VOID_TAGS.has(tag)) {
+        return "";
+      }
       return `</${tag}>`;
     }
-    if (tag === "br" || tag === "hr") {
-      return `<${tag}>`;
+    const attrs = sanitizeAttributes(tag, String(rawAttrs ?? ""));
+    if (attrs === null) {
+      return "";
     }
-    return `<${tag}${sanitizeAttributes(tag, String(rawAttrs ?? ""))}>`;
+    if (VOID_TAGS.has(tag)) {
+      return `<${tag}${attrs}>`;
+    }
+    return `<${tag}${attrs}>`;
   });
 }

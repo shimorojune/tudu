@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 
 type MockSimpleEditorProps = {
   contentHtml?: string;
@@ -9,6 +9,10 @@ type MockSimpleEditorProps = {
   className?: string;
 };
 
+function htmlToPlain(html: string): string {
+  return html.replace(/<[^>]*>/g, "").trim();
+}
+
 export function SimpleEditor({
   contentHtml = "<p></p>",
   onChange,
@@ -16,31 +20,29 @@ export function SimpleEditor({
   placeholder,
   ariaLabel = "Rich text editor",
 }: MockSimpleEditorProps) {
-  const htmlRef = useRef(contentHtml);
+  const [plain, setPlain] = useState(() => htmlToPlain(contentHtml));
 
   useEffect(() => {
-    htmlRef.current = contentHtml;
+    setPlain(htmlToPlain(contentHtml));
   }, [contentHtml]);
 
   return (
     <div data-testid="tiptap-simple-editor">
       {!readOnly ? <div data-testid="tiptap-toolbar" /> : null}
-      <div
+      <textarea
         role="textbox"
         aria-label={ariaLabel}
-        aria-disabled={readOnly ? "true" : undefined}
-        contentEditable={!readOnly}
-        suppressContentEditableWarning
-        data-placeholder={placeholder}
-        onInput={(event) => {
+        readOnly={readOnly}
+        placeholder={placeholder}
+        value={plain}
+        onChange={(event) => {
           if (readOnly) {
             return;
           }
-          const text = event.currentTarget.textContent ?? "";
-          htmlRef.current = `<p>${text}</p>`;
-          onChange?.(htmlRef.current);
+          const nextPlain = event.target.value;
+          setPlain(nextPlain);
+          onChange?.(nextPlain.length > 0 ? `<p>${nextPlain}</p>` : "<p></p>");
         }}
-        dangerouslySetInnerHTML={{ __html: contentHtml }}
       />
     </div>
   );

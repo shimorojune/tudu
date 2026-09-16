@@ -9,6 +9,7 @@ export * from "./manager.js";
 export * from "./sync.js";
 export * from "./notifications.js";
 export * from "./richTextHtml.js";
+export * from "./attachments.js";
 
 export type HealthResponse = { status: "ok"; version: string };
 

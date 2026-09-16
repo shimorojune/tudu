@@ -9,6 +9,7 @@ import type {
   TasksResponse,
   UpdateSubtaskRequest,
   UpdateTaskRequest,
+  UploadTaskAttachmentResponse,
 } from "@tudu/shared";
 import type { RootState } from "../store.js";
 import { baseApi } from "./baseApi.js";
@@ -56,6 +57,20 @@ export const tasksApi = baseApi.injectEndpoints({
             patch.undo();
           }
         }
+      },
+    }),
+    uploadTaskAttachment: builder.mutation<
+      UploadTaskAttachmentResponse,
+      { taskId: string; file: File }
+    >({
+      query: ({ taskId, file }) => {
+        const body = new FormData();
+        body.append("file", file);
+        return {
+          url: `/tasks/${taskId}/attachments`,
+          method: "POST",
+          body,
+        };
       },
     }),
     updateTask: builder.mutation<
@@ -271,6 +286,7 @@ export const {
   useGetTasksForDayQuery,
   useGetUnscheduledTasksQuery,
   useCreateTaskMutation,
+  useUploadTaskAttachmentMutation,
   useUpdateTaskMutation,
   useDeleteTaskMutation,
   useReorderTasksMutation,

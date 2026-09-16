@@ -95,3 +95,14 @@ body,
     padding: 1rem 1.5rem 30vh;
   }
 }
+
+.tudu-attachment-media {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.tudu-attachment-image,
+.tudu-attachment-video {
+  margin: 0.5rem 0;
+}

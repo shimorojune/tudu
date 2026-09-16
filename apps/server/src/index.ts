@@ -15,6 +15,7 @@ import { createActivityRoute } from "./routes/activity.js";
 import { createJiraRoute } from "./routes/jira.js";
 import { createLinkPreviewRoute } from "./routes/linkPreview.js";
 import { createManagerRoute } from "./routes/manager.js";
+import { createTaskAttachmentsRoute } from "./routes/taskAttachments.js";
 import { createTasksRoute } from "./routes/tasks.js";
 import { createUpdatesRoute } from "./routes/updates.js";
 import { createSessionMiddleware, type SessionEnv } from "./session-middleware.js";
@@ -98,6 +99,7 @@ if (db) {
   app.route("/", createJiraRoute(db));
   app.route("/", createManagerRoute(db));
   app.route("/", createTasksRoute(db));
+  app.route("/", createTaskAttachmentsRoute(db));
   app.route("/", createActivityRoute(db));
   app.route("/", createLinkPreviewRoute());
 }

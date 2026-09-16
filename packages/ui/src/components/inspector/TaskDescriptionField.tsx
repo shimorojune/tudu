@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
-import { useUpdateTaskMutation } from "@tudu/store";
+import { useUpdateTaskMutation, useUploadTaskAttachmentMutation } from "@tudu/store";
+import type { TaskDescriptionUploadFn } from "@/components/editor/taskDescriptionAttachments";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { AUTOSAVE_MS } from "@/lib/autosave";
 
@@ -19,6 +20,22 @@ export function TaskDescriptionField({
   const lastSaved = useRef(description ?? "");
   const focusedRef = useRef(false);
   const [updateTask] = useUpdateTaskMutation();
+  const [uploadTaskAttachment] = useUploadTaskAttachmentMutation();
+
+  const uploadAttachment = useCallback<TaskDescriptionUploadFn>(
+    async (file) => {
+      const { attachment } = await uploadTaskAttachment({
+        taskId,
+        file,
+      }).unwrap();
+      return {
+        contentUrl: attachment.contentUrl,
+        mimeType: attachment.mimeType,
+        fileName: attachment.fileName,
+      };
+    },
+    [taskId, uploadTaskAttachment],
+  );
 
   useEffect(() => {
     if (focusedRef.current) {
@@ -62,6 +79,9 @@ export function TaskDescriptionField({
         placeholder={readOnly ? "" : "Add a description..."}
         aria-label="Task description"
         className="text-muted-foreground focus-within:text-foreground"
+        taskAttachments={{
+          upload: readOnly ? undefined : uploadAttachment,
+        }}
         onChange={(next) => {
           if (readOnly) {
             return;

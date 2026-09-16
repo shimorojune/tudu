@@ -7,12 +7,15 @@ import {
   setSelectedDate,
   useCreateSubtaskMutation,
   useCreateTaskMutation,
+  useUpdateTaskMutation,
+  useUploadTaskAttachmentMutation,
   useGetTasksForDayQuery,
   type RootState,
 } from "@tudu/store";
 import { WeekGridSkeleton } from "@/components/loading/WeekGridSkeleton";
 import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
 import { WeekGrid } from "@/components/week/WeekGrid";
+import { patchTaskDescriptionIfAttachmentsChanged } from "@/lib/afterCreateTaskDescription";
 import { createTaskBody } from "@/lib/createTask";
 import { openNowCount } from "@/lib/nowCount";
 import {
@@ -48,6 +51,8 @@ export function WeekRoute() {
 
   const [createTask] = useCreateTaskMutation();
   const [createSubtask] = useCreateSubtaskMutation();
+  const [updateTask] = useUpdateTaskMutation();
+  const [uploadTaskAttachment] = useUploadTaskAttachmentMutation();
 
   useNewTaskShortcut(() => {
     setDialogBucket("later");
@@ -113,6 +118,16 @@ export function WeekRoute() {
               projectId: args.projectId,
             }),
           ).unwrap();
+
+          await patchTaskDescriptionIfAttachmentsChanged(
+            created.task.id,
+            args.description,
+            args.pendingAttachments,
+            (input) => uploadTaskAttachment(input).unwrap(),
+            (description) =>
+              updateTask({ id: created.task.id, patch: { description } }).unwrap(),
+          );
+
           for (const subtaskTitle of args.subtaskTitles) {
             await createSubtask({
               taskId: created.task.id,
