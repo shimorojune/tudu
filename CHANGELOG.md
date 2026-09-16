@@ -1,10 +1,3 @@
-# [0.25.0](https://github.com/eGainDev/tudu/compare/tudu-0.24.0...tudu-0.25.0) (2026-09-16)
-
-
-### Features
-
-* implement task attachment functionality ([1515759](https://github.com/eGainDev/tudu/commit/15157592f6604fe858327eb538e985686bfd0aee))
-
 # [0.24.0](https://github.com/eGainDev/tudu/compare/tudu-0.23.0...tudu-0.24.0) (2026-09-16)
 
 
