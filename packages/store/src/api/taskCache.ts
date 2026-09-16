@@ -165,31 +165,10 @@ export function appendOptimisticSubtask(
   };
 }
 
-function laneSiblings(tasks: Task[], task: Task): Task[] {
-  return tasks.filter(
-    (entry) =>
-      entry.id !== task.id &&
-      entry.scheduledDate === task.scheduledDate &&
-      entry.bucket === task.bucket,
-  );
-}
-
-function nextLanePosition(tasks: Task[], task: Task): number {
-  const siblings = laneSiblings(tasks, task);
-  if (siblings.length === 0) {
-    return task.position;
-  }
-  const maxPosition = Math.max(...siblings.map((entry) => entry.position));
-  if (task.position >= maxPosition) {
-    return task.position;
-  }
-  return maxPosition + 1;
-}
-
 export function mergeTaskPatch(
   task: Task,
   patch: UpdateTaskRequest,
-  siblingTasks?: Task[],
+  _siblingTasks?: Task[],
 ): Task {
   const { completed, inProgress: patchInProgress, ...rest } = patch;
   const next = { ...task, ...rest, updatedAt: new Date().toISOString() };
@@ -199,9 +178,6 @@ export function mergeTaskPatch(
     next.completedAt = completing ? new Date().toISOString() : null;
     if (completing) {
       next.inProgress = false;
-      if (siblingTasks) {
-        next.position = nextLanePosition(siblingTasks, task);
-      }
     }
   }
 

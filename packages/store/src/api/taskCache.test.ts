@@ -91,7 +91,7 @@ describe("reorderSubtasksInTask", () => {
 });
 
 describe("mergeTaskPatch", () => {
-  it("moves a completed task to the lane end and clears in progress", () => {
+  it("stamps completedAt, clears in progress, and keeps position", () => {
     const lane = [
       task,
       makeTask({
@@ -108,7 +108,7 @@ describe("mergeTaskPatch", () => {
 
     expect(next.completedAt).not.toBeNull();
     expect(next.inProgress).toBe(false);
-    expect(next.position).toBe(2);
+    expect(next.position).toBe(0);
   });
 
   it("keeps position when uncompleting", () => {

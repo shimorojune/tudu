@@ -57,10 +57,12 @@ import {
 } from "@/lib/dragCollision";
 import { createTaskBody } from "@/lib/createTask";
 import { openNowCount } from "@/lib/nowCount";
+import { splitOpenAndCompleted } from "@/lib/completedTasks";
 import { cn } from "@/lib/utils";
 import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
 import { UnscheduledListSkeleton } from "@/components/loading/UnscheduledListSkeleton";
 import { TaskRow, type TaskRowActions } from "@/components/tasks/TaskRow";
+import { CompletedSection } from "@/components/tasks/CompletedSection";
 import { useProjectFilterId } from "@/hooks/useProjectFilterId";
 import { isTaskDimmed } from "@/lib/projectFilter";
 import { DetailInspector } from "@/components/inspector/DetailInspector";
@@ -76,7 +78,7 @@ const CONTAINER = "unscheduled";
 const laneFor = () => ({ scheduledDate: null, bucket: null });
 
 type UnscheduledDndProps = {
-  sourceTasks: Task[];
+  openTasks: Task[];
   baseItems: ContainerItems;
   selectedTaskId: string | null;
   setSelectedTaskId: (id: string | null) => void;
@@ -87,7 +89,7 @@ type UnscheduledDndProps = {
 };
 
 function UnscheduledDnd({
-  sourceTasks,
+  openTasks,
   baseItems,
   selectedTaskId,
   setSelectedTaskId,
@@ -116,10 +118,10 @@ function UnscheduledDnd({
   dragRef.current = drag;
 
   const tasks = drag
-    ? tasksFromItems({ tasks: sourceTasks, items: drag.items, laneFor }).sort(
+    ? tasksFromItems({ tasks: openTasks, items: drag.items, laneFor }).sort(
         (a, b) => a.position - b.position,
       )
-    : sourceTasks;
+    : openTasks;
 
   const activeTask = drag
     ? tasks.find((task) => task.id === drag.activeId) ?? null
@@ -312,11 +314,13 @@ export function UnscheduledRoute() {
   const sourceTasks = [...(data?.tasks ?? [])].sort(
     (a, b) => a.position - b.position,
   );
+  const { open: openTasks, completed: completedTasks } =
+    splitOpenAndCompleted(sourceTasks);
   const selectedTask = sourceTasks.find((task) => task.id === selectedTaskId) ?? null;
   const showInspector =
     selectedTask !== null &&
     (inspectorTab === "comments" || Boolean(focusCommentId));
-  const baseItems = itemsFromTasks(sourceTasks, [CONTAINER], () => CONTAINER);
+  const baseItems = itemsFromTasks(openTasks, [CONTAINER], () => CONTAINER);
   const todayTasks = todayData?.tasks ?? [];
 
   function makeRowActions(taskId: string): TaskRowActions {
@@ -334,7 +338,7 @@ export function UnscheduledRoute() {
         }
       },
       onToggleInProgress: () => {
-        const task = sourceTasks.find((entry) => entry.id === taskId);
+        const task = openTasks.find((entry) => entry.id === taskId);
         if (!task || task.completedAt !== null) {
           return;
         }
@@ -344,7 +348,7 @@ export function UnscheduledRoute() {
         });
       },
       onScheduleToToday: () => {
-        const lanes = scheduleToTodayLanes(todayTasks, sourceTasks, taskId, todayIso());
+        const lanes = scheduleToTodayLanes(todayTasks, openTasks, taskId, todayIso());
         if (lanes.length > 0) {
           reorderTasks({ lanes });
         }
@@ -398,7 +402,7 @@ export function UnscheduledRoute() {
           measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
         >
           <UnscheduledDnd
-            sourceTasks={sourceTasks}
+            openTasks={openTasks}
             baseItems={baseItems}
             selectedTaskId={selectedTaskId}
             setSelectedTaskId={(id) => dispatch(setSelectedTaskId(id))}
@@ -406,6 +410,18 @@ export function UnscheduledRoute() {
             onReorder={handleReorder}
             flashTaskId={flashTaskId}
             onFlashComplete={() => setFlashTaskId(null)}
+          />
+          <CompletedSection
+            tasks={completedTasks}
+            selectedTaskId={selectedTaskId}
+            selectedDate=""
+            onSelectTask={(id) => dispatch(setSelectedTaskId(id))}
+            onDeselectTask={() => dispatch(setSelectedTaskId(null))}
+            rowActionsForTask={makeRowActions}
+            flashTaskId={flashTaskId}
+            onFlashComplete={() => setFlashTaskId(null)}
+            menuVariant="unscheduled"
+            bucketForRow={() => "later"}
           />
         </DndContext>
       </ScrollArea>

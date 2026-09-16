@@ -345,12 +345,6 @@ export async function updateTask(
     const wasCompleted = existing.completedAt !== null;
     if (completing && !wasCompleted) {
       patch.inProgress = false;
-      patch.position = await nextPosition(
-        db,
-        userId,
-        existing.scheduledDate,
-        existing.bucket,
-      );
     }
   }
 

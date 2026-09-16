@@ -469,11 +469,10 @@ code back to the mockup on any of these points.
     `DragOverlay` uses `dropAnimation={null}`: the default 250ms fly-back animates
     the ghost to the row's start position while the live preview already shows it at
     the drop spot, so the ghost looks like a duplicate bouncing home.
-11. **Completed parent tasks get strikethrough and fade.** The mockup only draws
-    completed subtasks this way. Parent tasks stay in place when ticked; they do not
-    sink to the bucket bottom. Step 4 uses a 220ms strike sweep across the title
-    (not a static `line-through`) plus a checkbox fill fade. Subtasks use the same
-    sweep and fade.
+11. **Completed parent tasks move to a Completed section.** Finished tasks leave
+    the Now/Next/Later lists and appear in a collapsible Completed block below Later.
+    Step 4 uses a 220ms strike sweep across the title (not a static `line-through`)
+    plus a checkbox fill fade. Subtasks use the same sweep and fade.
 12. **Rename and delete live in a right-click menu.** The mockup draws neither. Click
     the title on a selected row to rename in place on the same contentEditable node,
     so the row does not reflow; Delete opens a confirm dialog.

@@ -38,6 +38,11 @@ import {
   selectVisible,
 } from "@tudu/store";
 import { bucketLabel } from "@/lib/buckets";
+import {
+  openTaskContainer,
+  splitOpenAndCompleted,
+  tasksByBucketOpen,
+} from "@/lib/completedTasks";
 import { openNowCount } from "@/lib/nowCount";
 import {
   buildPullIntoNowLanes,
@@ -59,6 +64,7 @@ import {
   taskCollisionDetection,
 } from "@/lib/dragCollision";
 import { BucketSection } from "@/components/tasks/BucketSection";
+import { CompletedSection } from "@/components/tasks/CompletedSection";
 import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
 import { createTaskBody } from "@/lib/createTask";
 import type { TaskRowActions, TaskViewer } from "@/components/tasks/TaskRow";
@@ -83,26 +89,9 @@ export type DayTaskListProps = {
   highlightTaskId?: string | null;
 };
 
-function tasksByBucket(tasks: Task[]): Record<Bucket, Task[]> {
-  const grouped = Object.fromEntries(
-    BUCKETS.map((bucket) => [bucket, [] as Task[]]),
-  ) as Record<Bucket, Task[]>;
-
-  for (const task of tasks) {
-    if (task.bucket) {
-      grouped[task.bucket].push(task);
-    }
-  }
-
-  for (const bucket of BUCKETS) {
-    grouped[bucket].sort((a, b) => a.position - b.position);
-  }
-
-  return grouped;
-}
-
 type DayTaskListDndProps = {
-  tasks: Task[];
+  openTasks: Task[];
+  completedTasks: Task[];
   selectedDate: string;
   selectedTaskId: string | null;
   onSelectTask: (id: string) => void;
@@ -121,7 +110,8 @@ type DayTaskListDndProps = {
 };
 
 function DayTaskListDnd({
-  tasks,
+  openTasks,
+  completedTasks,
   selectedDate,
   selectedTaskId,
   onSelectTask,
@@ -162,11 +152,13 @@ function DayTaskListDnd({
 
   const displayTasks = useMemo(
     () =>
-      drag ? tasksFromItems({ tasks, items: drag.items, laneFor }) : tasks,
+      drag
+        ? tasksFromItems({ tasks: openTasks, items: drag.items, laneFor })
+        : openTasks,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tasks, drag, selectedDate],
+    [openTasks, drag, selectedDate],
   );
-  const grouped = useMemo(() => tasksByBucket(displayTasks), [displayTasks]);
+  const grouped = useMemo(() => tasksByBucketOpen(displayTasks), [displayTasks]);
 
   const activeTask = drag
     ? displayTasks.find((task) => task.id === drag.activeId) ?? null
@@ -309,6 +301,17 @@ function DayTaskListDnd({
           canDragRows={canDragRows}
         />
       ))}
+      <CompletedSection
+        tasks={completedTasks}
+        selectedTaskId={selectedTaskId}
+        selectedDate={selectedDate}
+        onSelectTask={onSelectTask}
+        onDeselectTask={onDeselectTask}
+        rowActionsForTask={rowActionsForTask}
+        flashTaskId={flashTaskId}
+        onFlashComplete={onFlashComplete}
+        viewer={viewer}
+      />
       <DragOverlay dropAnimation={null}>
         {activeTask ? (
           <div className="bg-card px-[28px] py-[14px] shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
@@ -342,16 +345,21 @@ export function DayTaskList({
   const canReorder = !isManager || permissions.canReorder;
   const canDelete = !isManager || permissions.canDelete;
 
-  const baseItems = useMemo(
-    () => itemsFromTasks(tasks, BUCKETS, (task) => task.bucket),
+  const { open: openTasks, completed: completedTasks } = useMemo(
+    () => splitOpenAndCompleted(tasks),
     [tasks],
   );
 
-  const groupedForPrompt = useMemo(() => tasksByBucket(tasks), [tasks]);
+  const baseItems = useMemo(
+    () => itemsFromTasks(openTasks, BUCKETS, openTaskContainer),
+    [openTasks],
+  );
+
+  const groupedForPrompt = useMemo(() => tasksByBucketOpen(openTasks), [openTasks]);
   const showNowClearPrompt =
     !isManager &&
     isToday &&
-    openNowCount(tasks) === 0 &&
+    openNowCount(openTasks) === 0 &&
     groupedForPrompt.next.length > 0;
 
   const [createTask] = useCreateTaskMutation();
@@ -449,13 +457,13 @@ export function DayTaskList({
       },
       onMoveToBucket: canReorder
         ? (bucket) => {
-            const lanes = moveTaskToBucketLanes(tasks, taskId, bucket, selectedDate);
+            const lanes = moveTaskToBucketLanes(openTasks, taskId, bucket, selectedDate);
             applyReorder(lanes);
           }
         : undefined,
       onUnschedule: canReorder
         ? () => {
-            const lanes = unscheduleTaskLanes(tasks, taskId);
+            const lanes = unscheduleTaskLanes(openTasks, taskId);
             applyReorder(lanes);
           }
         : undefined,
@@ -544,7 +552,8 @@ export function DayTaskList({
           measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
         >
           <DayTaskListDnd
-            tasks={tasks}
+            openTasks={openTasks}
+            completedTasks={completedTasks}
             selectedDate={selectedDate}
             selectedTaskId={selectedTaskId}
             onSelectTask={onSelectTask}
@@ -555,7 +564,7 @@ export function DayTaskList({
             rowActionsForTask={makeRowActions}
             onNowClearPrompt={() => {
               if (canReorder) {
-                const lanes = buildPullIntoNowLanes(tasks, selectedDate);
+                const lanes = buildPullIntoNowLanes(openTasks, selectedDate);
                 applyReorder(lanes);
               }
             }}
@@ -573,7 +582,7 @@ export function DayTaskList({
           open={dialogOpen}
           initialBucket={dialogBucket}
           initialDate={selectedDate}
-          nowCount={openNowCount(tasks)}
+          nowCount={openNowCount(openTasks)}
           onOpenChange={setDialogOpen}
           onSubmit={handleCreateTask}
         />

@@ -759,7 +759,7 @@ function clearProjectRefs(replica: Replica, projectId: string): void {
 function mergePatch(
   task: Task,
   patch: UpdateTaskRequest,
-  siblings: Task[],
+  _siblings: Task[],
   replica: Replica,
 ): Task {
   const { completed, inProgress: patchInProgress, projectId, ...rest } = patch;
@@ -774,15 +774,6 @@ function mergePatch(
     next.completedAt = completing ? new Date().toISOString() : null;
     if (completing) {
       next.inProgress = false;
-      const lane = siblings.filter(
-        (entry) =>
-          entry.id !== task.id &&
-          entry.scheduledDate === task.scheduledDate &&
-          entry.bucket === task.bucket,
-      );
-      if (lane.length > 0) {
-        next.position = Math.max(...lane.map((entry) => entry.position)) + 1;
-      }
     }
   }
 
