@@ -1,3 +1,17 @@
+# [0.23.0](https://github.com/eGainDev/tudu/compare/tudu-0.22.0...tudu-0.23.0) (2026-09-16)
+
+
+### Bug Fixes
+
+* enhance navigation components with improved active link handling ([f77466e](https://github.com/eGainDev/tudu/commit/f77466ee61533f9ec3ade8257353badf1c9a0823))
+* update Jira issue status structure to include colorName ([971f82f](https://github.com/eGainDev/tudu/commit/971f82fcf273fb0fd00dc17aba05a285b4c5aa93))
+
+
+### Features
+
+* configure Workbox to cache larger files ([b7c3c1f](https://github.com/eGainDev/tudu/commit/b7c3c1ff53ac58450fb837a1775c0ec3e467e3ae))
+* integrate Playwright for end-to-end testing and enhance environment configuration ([c95f74c](https://github.com/eGainDev/tudu/commit/c95f74c65587a69238e13eb679cf9c6c8d635736))
+
 # [0.22.0](https://github.com/eGainDev/tudu/compare/tudu-0.21.0...tudu-0.22.0) (2026-09-12)
 
 
