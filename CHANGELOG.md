@@ -1,3 +1,10 @@
+# [0.24.0](https://github.com/eGainDev/tudu/compare/tudu-0.23.0...tudu-0.24.0) (2026-09-16)
+
+
+### Features
+
+* add CompletedSection component and related functionality ([6067858](https://github.com/eGainDev/tudu/commit/6067858f6ea5329f7acc2d151d6e84cd70712885))
+
 # [0.23.0](https://github.com/eGainDev/tudu/compare/tudu-0.22.0...tudu-0.23.0) (2026-09-16)
 
 
