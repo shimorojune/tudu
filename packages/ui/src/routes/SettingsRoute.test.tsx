@@ -126,7 +126,7 @@ describe("SettingsRoute", () => {
     expect(navigate).toHaveBeenCalledWith({ to: "/sign-in" });
   });
 
-  it("shows a stub message for other settings sections", async () => {
+  it("shows the general settings panel", async () => {
     const user = userEvent.setup();
 
     render(
@@ -138,7 +138,7 @@ describe("SettingsRoute", () => {
     await user.click(screen.getByRole("button", { name: "General" }));
 
     expect(
-      screen.getByText("This page is not in this version yet."),
+      screen.getByRole("heading", { name: "General", level: 1 }),
     ).toBeInTheDocument();
   });
 

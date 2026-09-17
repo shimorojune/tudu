@@ -1,6 +1,15 @@
 mod app_icon;
 mod cleanup;
+mod quick_add;
 
+use std::sync::Mutex;
+
+use quick_add::{
+    hide_quick_add_window, pause_quick_add_shortcuts_command, place_quick_add_window_command,
+    present_quick_add_window, register_quick_add_shortcut, register_quick_add_shortcut_command,
+    show_main_window_command, QuickAddSession, QuickAddShortcutState, QuickAddToggleGuard,
+    DEFAULT_QUICK_ADD_ACCELERATOR,
+};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -25,6 +34,20 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_positioner::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .manage(QuickAddShortcutState(Mutex::new(
+            DEFAULT_QUICK_ADD_ACCELERATOR.to_string(),
+        )))
+        .manage(QuickAddSession(Mutex::new(None)))
+        .manage(QuickAddToggleGuard(Mutex::new(None)))
+        .invoke_handler(tauri::generate_handler![
+            register_quick_add_shortcut_command,
+            pause_quick_add_shortcuts_command,
+            hide_quick_add_window,
+            show_main_window_command,
+            place_quick_add_window_command,
+            present_quick_add_window,
+        ])
         .setup(|app| {
             cleanup::cleanup_legacy_data(&app.handle());
 
@@ -100,6 +123,26 @@ pub fn run() {
                         let _ = main_window.hide();
                     }
                 });
+            }
+
+            if let Some(window) = app.get_webview_window("quick-add") {
+                let quick_add = window.clone();
+                window.on_window_event(move |event| {
+                    if let WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = quick_add.hide();
+                    }
+                });
+            }
+
+            let handle = app.handle().clone();
+            let shortcut_state = app.state::<QuickAddShortcutState>();
+            if let Err(error) = register_quick_add_shortcut(
+                &handle,
+                shortcut_state.inner(),
+                DEFAULT_QUICK_ADD_ACCELERATOR.to_string(),
+            ) {
+                eprintln!("Failed to register Quick Add shortcut: {error}");
             }
 
             Ok(())

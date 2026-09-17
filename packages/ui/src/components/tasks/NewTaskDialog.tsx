@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Bucket } from "@tudu/shared";
-import { BUCKETS, DEFAULT_NOW_SOFT_CAP } from "@tudu/shared";
+import { DEFAULT_NOW_SOFT_CAP } from "@tudu/shared";
 import { todayIso } from "@tudu/store";
 import type { TaskDescriptionUploadFn } from "@/components/editor/taskDescriptionAttachments";
 import { rejectOversizeFile } from "@/components/editor/taskDescriptionAttachments";
-import { DateField } from "@/components/ui/date-field";
 import {
   Dialog,
   DialogContent,
@@ -17,9 +16,12 @@ import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { FormBusy } from "@/components/forms/FormBusy";
 import { Button } from "@/components/ui/button";
 import { clearPendingAttachmentBlobUrls } from "@/lib/finalizeNewTaskDescriptionAttachments";
-import { cn } from "@/lib/utils";
-
-export type NewTaskDayChoice = "today" | "tomorrow" | "pick" | "unscheduled";
+export type { NewTaskDayChoice } from "@/components/tasks/TaskScheduleFields";
+import type { NewTaskDayChoice } from "@/components/tasks/TaskScheduleFields";
+import {
+  resolveScheduledDate,
+  TaskScheduleFields,
+} from "@/components/tasks/TaskScheduleFields";
 
 export type NewTaskSubmitArgs = {
   title: string;
@@ -43,76 +45,9 @@ export type NewTaskDialogProps = {
   onSubmit: (args: NewTaskSubmitArgs) => Promise<void>;
 };
 
-function offsetIso(fromIso: string, dayOffset: number) {
-  const date = new Date(`${fromIso}T12:00:00`);
-  date.setDate(date.getDate() + dayOffset);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 function bucketSubmitLabel(bucket: Bucket, isToday: boolean): string {
   const label = bucketLabel(bucket, isToday);
   return `Add to ${label}`;
-}
-
-type SegmentedOption<T extends string> = {
-  value: T;
-  label: string;
-  hint?: string;
-};
-
-function SegmentedControl<T extends string>({
-  value,
-  options,
-  onChange,
-  disabled = false,
-}: {
-  value: T;
-  options: SegmentedOption<T>[];
-  onChange: (next: T) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "inline-flex border border-rule",
-        disabled && "cursor-not-allowed opacity-50",
-      )}
-    >
-      {options.map((option, index) => {
-        const selected = option.value === value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            disabled={disabled}
-            className={cn(
-              "flex items-center gap-[6px] px-[13px] py-[8px] text-[13px] leading-none whitespace-nowrap",
-              index < options.length - 1 && "border-r border-rule",
-              selected
-                ? "bg-foreground font-bold text-card"
-                : "bg-transparent font-normal text-muted-foreground",
-            )}
-            onClick={() => onChange(option.value)}
-          >
-            {option.label}
-            {option.hint ? (
-              <span
-                className={cn(
-                  "text-[11px] tabular-nums",
-                  selected ? "text-card/60" : "text-muted-foreground",
-                )}
-              >
-                {option.hint}
-              </span>
-            ) : null}
-          </button>
-        );
-      })}
-    </div>
-  );
 }
 
 export function NewTaskDialog({
@@ -171,18 +106,10 @@ export function NewTaskDialog({
     window.requestAnimationFrame(() => titleRef.current?.focus());
   }, [defaultDayChoice, initialBucket, initialDate, initialDescription, initialTitle, open, today]);
 
-  const scheduledDate = useMemo(() => {
-    if (dayChoice === "unscheduled") {
-      return null;
-    }
-    if (dayChoice === "today") {
-      return today;
-    }
-    if (dayChoice === "tomorrow") {
-      return offsetIso(today, 1);
-    }
-    return pickedDate;
-  }, [dayChoice, pickedDate, today]);
+  const scheduledDate = useMemo(
+    () => resolveScheduledDate(dayChoice, pickedDate, today),
+    [dayChoice, pickedDate, today],
+  );
 
   const targetIsToday = scheduledDate === today;
   const isUnscheduled = dayChoice === "unscheduled";
@@ -272,58 +199,15 @@ export function NewTaskDialog({
             />
           </div>
 
-          <div className="space-y-[8px]">
-            <div className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
-              Day
-            </div>
-            <div className="flex flex-wrap items-center gap-[12px]">
-              <SegmentedControl
-                value={dayChoice}
-                onChange={setDayChoice}
-                options={[
-                  { value: "today", label: "Today" },
-                  { value: "tomorrow", label: "Tomorrow" },
-                  { value: "pick", label: "Pick a date…" },
-                  { value: "unscheduled", label: "Unscheduled" },
-                ]}
-              />
-              {dayChoice === "pick" ? (
-                <DateField
-                  value={pickedDate}
-                  allowClear={false}
-                  onChange={setPickedDate}
-                  aria-label="Task date"
-                  className="w-auto bg-transparent px-[10px] py-[7px] text-[13px]"
-                />
-              ) : null}
-            </div>
-          </div>
-
-          <div className="space-y-[8px]">
-            <div className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
-              Bucket
-            </div>
-            <div className="flex flex-wrap items-center gap-[12px]">
-              <SegmentedControl
-                value={bucket}
-                disabled={isUnscheduled}
-                onChange={setBucket}
-                options={BUCKETS.map((value) => ({
-                  value,
-                  label: bucketLabel(value, targetIsToday),
-                  hint:
-                    value === "now" && targetIsToday
-                      ? `${nowCount} / ${DEFAULT_NOW_SOFT_CAP}`
-                      : undefined,
-                }))}
-              />
-              {isUnscheduled ? (
-                <span className="text-[12px] text-muted-foreground">
-                  An unscheduled task has no bucket
-                </span>
-              ) : null}
-            </div>
-          </div>
+          <TaskScheduleFields
+            dayChoice={dayChoice}
+            bucket={bucket}
+            pickedDate={pickedDate}
+            nowCount={nowCount}
+            onDayChoiceChange={setDayChoice}
+            onBucketChange={setBucket}
+            onPickedDateChange={setPickedDate}
+          />
 
           <div className="space-y-[8px]">
             <div className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">

@@ -24,6 +24,12 @@ export default defineConfig({
     target: "es2022",
     minify: !process.env.TAURI_ENV_DEBUG ? "esbuild" : false,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+        "quick-add": path.resolve(__dirname, "quick-add.html"),
+      },
+    },
   },
   optimizeDeps: {
     include: ["@tudu/ui"],

@@ -24,6 +24,9 @@ export type ProjectPickerProps = {
   onChange: (projectId: string | null) => void;
   readOnly?: boolean;
   id?: string;
+  triggerClassName?: string;
+  /** Tight chip trigger and in-panel menu (Quick Add window). */
+  compact?: boolean;
   projects?: Project[];
   onCreate?: (
     body: CreateProjectRequest,
@@ -36,6 +39,8 @@ export function ProjectPicker({
   onChange,
   readOnly = false,
   id,
+  triggerClassName,
+  compact = false,
   projects: projectsProp,
   onCreate,
   fallback = null,
@@ -90,14 +95,26 @@ export function ProjectPicker({
       <PopoverTrigger
         id={id}
         type="button"
-        className="inline-flex items-center gap-[8px] border border-hair px-[10px] py-[5px] text-[12.5px] hover:border-foreground"
+        className={cn(
+          "inline-flex items-center gap-[8px] border border-hair px-[10px] py-[5px] text-[12.5px] hover:border-foreground",
+          compact
+            ? "max-w-[200px] truncate"
+            : "max-w-full",
+          triggerClassName,
+        )}
         aria-label="Project"
       >
         {selected ? <ProjectChip project={selected} /> : "None"}
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="w-[240px] border-rule bg-card p-0 shadow-none"
+        side={compact ? "top" : "bottom"}
+        collisionPadding={8}
+        portalled={!compact}
+        className={cn(
+          "w-[240px] border-rule bg-card p-0 shadow-none",
+          compact && "max-h-[min(180px,40vh)] overflow-y-auto",
+        )}
       >
         {creating ? (
           <div className="flex flex-col gap-[10px] p-[12px]">

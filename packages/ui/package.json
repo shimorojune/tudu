@@ -29,7 +29,12 @@
       "import": "./src/providers/AttachmentDownloadContext.tsx",
       "default": "./src/providers/AttachmentDownloadContext.tsx"
     },
-    "./styles.css": "./src/index.css"
+    "./styles.css": "./src/index.css",
+    "./quick-add": {
+      "types": "./src/components/chrome/QuickAddTaskPane.tsx",
+      "import": "./src/components/chrome/QuickAddTaskPane.tsx",
+      "default": "./src/components/chrome/QuickAddTaskPane.tsx"
+    }
   },
   "peerDependencies": {
     "react": "^19.1.0",
@@ -52,6 +57,7 @@
     "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.3",
     "@tanstack/react-router": "^1.170.32",
+    "@tauri-apps/api": "^2.11.1",
     "@tiptap/core": "^3.31.3",
     "@tiptap/extension-file-handler": "^3.31.3",
     "@tiptap/extension-find-and-replace": "^3.31.3",

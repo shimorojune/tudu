@@ -10,14 +10,17 @@ import {
   SettingsSidebar,
   type SettingsSection,
 } from "@/components/settings/SettingsSidebar";
+import { GeneralSettingsPanel } from "@/components/settings/GeneralSettingsPanel";
 import { SettingsStubPanel } from "@/components/settings/SettingsStubPanel";
 import { APP_VERSION } from "@/lib/appVersion";
 
 const stubTitles: Record<
-  Exclude<SettingsSection, "account" | "notifications" | "projects" | "jira">,
+  Exclude<
+    SettingsSection,
+    "account" | "general" | "notifications" | "projects" | "jira"
+  >,
   string
 > = {
-  general: "General",
   manager: "Manager, privacy and rollover",
 };
 
@@ -67,6 +70,8 @@ export function SettingsRoute() {
       <div className="min-h-0 bg-card">
         {section === "account" ? (
           <AccountSettingsPanel />
+        ) : section === "general" ? (
+          <GeneralSettingsPanel />
         ) : section === "notifications" ? (
           <NotificationsSettingsPanel />
         ) : section === "projects" ? (
