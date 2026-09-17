@@ -1,3 +1,11 @@
+# [0.26.0](https://github.com/eGainDev/tudu/compare/tudu-0.25.0...tudu-0.26.0) (2026-09-17)
+
+
+### Features
+
+* document rraj.dev API requirement for desktop installs ([aa937b7](https://github.com/eGainDev/tudu/commit/aa937b70b3cb1a4baf149c96431ebaae8532b601))
+* enhance task attachment functionality with dialog and filesystem support ([11f433d](https://github.com/eGainDev/tudu/commit/11f433d7da9b0948521006a60858183535f06f06))
+
 # [0.25.0](https://github.com/eGainDev/tudu/compare/tudu-0.24.0...tudu-0.25.0) (2026-09-17)
 
 
