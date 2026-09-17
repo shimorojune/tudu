@@ -69,6 +69,60 @@ test.describe("Task description attachments", () => {
     });
   });
 
+  test("clicking a file attachment link downloads the file", async ({
+    page,
+  }) => {
+    const title = uniqueAttachmentTitle("Attach download click");
+    await createTodayTask(page, title);
+    await attachFileViaToolbar(page, notesTxtPath);
+    const editor = descriptionEditor(page);
+    const link = editor.getByRole("link", { name: "notes.txt" });
+    await expect(link).toBeVisible({ timeout: 20_000 });
+
+    const downloadPromise = page.waitForEvent("download");
+    await link.click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe("notes.txt");
+  });
+
+  test("new task: attach image before create keeps inline preview after save", async ({
+    page,
+  }) => {
+    const title = uniqueAttachmentTitle("Attach new task");
+    await page.goto("/");
+    await page.waitForURL("/");
+
+    const bucketSection = page.locator("section").filter({
+      has: page.locator("header").getByText("Later", { exact: true }),
+    });
+    await bucketSection.getByRole("button", { name: "Add task" }).click();
+
+    const dialog = page.getByRole("dialog", { name: "New task" });
+    await dialog.locator('input[placeholder="What needs doing?"]').fill(title);
+
+    const editor = dialog.getByTestId("rich-text-editor");
+    const chooserPromise = page.waitForEvent("filechooser");
+    await editor.getByRole("button", { name: "Attach file" }).click();
+    const chooser = await chooserPromise;
+    await chooser.setFiles(tinyPngPath);
+    await expect(editor.locator(".tudu-attachment-image img")).toBeVisible({
+      timeout: 20_000,
+    });
+
+    await dialog
+      .getByRole("button", { name: /Add to Later/i })
+      .click();
+    await expect(dialog).not.toBeVisible({ timeout: 60_000 });
+
+    await selectTaskByTitle(page, title);
+    await waitForDescriptionImage(page);
+    await expect(
+      descriptionEditor(page).getByRole("link", {
+        name: /\/attachments\/.+\/content/,
+      }),
+    ).toHaveCount(0);
+  });
+
   test("rejects files over 5MB", async ({ page }) => {
     const title = uniqueAttachmentTitle("Attach oversize");
     await createTodayTask(page, title);

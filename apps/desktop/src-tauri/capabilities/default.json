@@ -11,6 +11,11 @@
     "core:window:allow-is-visible",
     "positioner:default",
     "positioner:allow-move-window",
-    "notification:default"
+    "notification:default",
+    "dialog:default",
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [{ "path": "$HOME/**" }, { "path": "$DOWNLOAD/**" }]
+    }
   ]
 }

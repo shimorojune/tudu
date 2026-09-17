@@ -24,6 +24,24 @@ export function rejectOversizeFile(file: File): boolean {
   return false;
 }
 
+export function htmlFragmentForUploadedAttachment(
+  result: { contentUrl: string; mimeType: string; fileName: string },
+  file: File,
+): string {
+  const mime = result.mimeType || file.type;
+  const name = escapeHtml(result.fileName || file.name);
+
+  if (mime.startsWith("image/")) {
+    return `<p><img src="${result.contentUrl}" alt="${name}"></p>`;
+  }
+
+  if (mime.startsWith("video/")) {
+    return `<p><video src="${result.contentUrl}" controls></video></p>`;
+  }
+
+  return `<p><a href="${result.contentUrl}" data-tudu-filename="${name}">${name}</a></p>`;
+}
+
 export async function insertUploadedFileIntoEditor(
   editor: Editor,
   file: File,

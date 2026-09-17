@@ -6,6 +6,7 @@ import {
   plainTextToRichHtml,
   sanitizeRichTextHtml,
 } from "./richTextHtml";
+import { normalizeAttachmentLinksInHtml } from "@/lib/normalizeAttachmentLinksInHtml";
 import {
   editorHtmlToJiraWiki,
   safeJiraWikiToEditorHtml,
@@ -65,7 +66,11 @@ export function RichTextEditor({
     [normalizedMode, value],
   );
   const fallback = normalizedMode === "jiraWiki" && !parsed.ok;
-  const htmlValue = parsed.ok ? parsed.html : "";
+  const htmlValue = parsed.ok
+    ? normalizedMode === "jiraWiki"
+      ? parsed.html
+      : normalizeAttachmentLinksInHtml(parsed.html)
+    : "";
 
   if (fallback) {
     return (

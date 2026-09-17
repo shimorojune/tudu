@@ -1,4 +1,12 @@
-import type { TaskDescriptionUploadFn } from "@/components/editor/taskDescriptionAttachments";
+import {
+  htmlFragmentForUploadedAttachment,
+  type TaskDescriptionUploadFn,
+} from "@/components/editor/taskDescriptionAttachments";
+import {
+  descriptionHtmlReferencesBlobUrl,
+  fixAttachmentAnchorLabels,
+  replaceBlobUrlInDescriptionHtmlAttributes,
+} from "@/lib/replaceBlobUrlsInDescriptionHtml";
 
 export type UploadTaskAttachmentResult = {
   contentUrl: string;
@@ -22,11 +30,25 @@ export async function finalizeNewTaskDescriptionAttachments(
   let changed = false;
 
   for (const [blobUrl, file] of pendingAttachments) {
-    if (!next.includes(blobUrl)) {
-      continue;
-    }
     const result = await upload(file);
-    next = next.split(blobUrl).join(result.contentUrl);
+    const fileName = result.fileName || file.name || "attachment";
+
+    if (descriptionHtmlReferencesBlobUrl(next, blobUrl)) {
+      next = replaceBlobUrlInDescriptionHtmlAttributes(
+        next,
+        blobUrl,
+        result.contentUrl,
+      );
+      next = fixAttachmentAnchorLabels(next, result.contentUrl, fileName);
+    } else {
+      const fragment = htmlFragmentForUploadedAttachment(result, file);
+      const trimmed = next.trim();
+      next =
+        trimmed.length > 0 && trimmed !== "<p></p>"
+          ? `${trimmed}${fragment}`
+          : fragment;
+    }
+
     changed = true;
     URL.revokeObjectURL(blobUrl);
   }

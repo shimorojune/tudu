@@ -24,6 +24,11 @@
       "import": "./src/providers/NotificationOsContext.tsx",
       "default": "./src/providers/NotificationOsContext.tsx"
     },
+    "./attachments": {
+      "types": "./src/providers/AttachmentDownloadContext.tsx",
+      "import": "./src/providers/AttachmentDownloadContext.tsx",
+      "default": "./src/providers/AttachmentDownloadContext.tsx"
+    },
     "./styles.css": "./src/index.css"
   },
   "peerDependencies": {

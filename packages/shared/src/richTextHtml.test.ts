@@ -42,6 +42,14 @@ describe("richTextHtml", () => {
     expect(sanitizeRichTextHtml(safe)).toContain("controls");
   });
 
+  it("keeps attachment link filename metadata", () => {
+    const id = "33333333-3333-3333-3333-333333333333";
+    const safe = `<p><a href="/attachments/${id}/content" data-tudu-filename="notes.txt">notes.txt</a></p>`;
+    expect(sanitizeRichTextHtml(safe)).toBe(
+      `<p><a href="/attachments/${id}/content" rel="noreferrer noopener" data-tudu-filename="notes.txt">notes.txt</a></p>`,
+    );
+  });
+
   it("preview replaces images with a token", () => {
     const id = "11111111-1111-1111-1111-111111111111";
     expect(

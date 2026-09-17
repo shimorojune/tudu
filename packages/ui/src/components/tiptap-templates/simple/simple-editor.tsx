@@ -79,7 +79,10 @@ import {
   handleDescriptionFiles,
   type TaskDescriptionUploadFn,
 } from "@/components/editor/taskDescriptionAttachments"
-import { downloadAttachment, isTaskAttachmentSrc } from "@/lib/attachmentUrl"
+import {
+  handleAttachmentAnchorClick,
+  useDownloadAttachment,
+} from "@/providers/AttachmentDownloadContext"
 import { useTiptapEditor } from "@/hooks/use-tiptap-editor"
 
 export type SimpleEditorTaskAttachments = {
@@ -253,6 +256,7 @@ export function SimpleEditor({
   const searchAndReplaceButtonRef = useRef<HTMLButtonElement>(null)
   const previousContentRef = useRef<string | null>(null)
   const attachmentUpload = taskAttachments?.upload
+  const downloadAttachment = useDownloadAttachment()
 
   const extensions = useMemo(() => {
     const base = [
@@ -336,17 +340,8 @@ export function SimpleEditor({
     if (!anchor) {
       return
     }
-    const href = anchor.getAttribute("href")
-    if (!href || !isTaskAttachmentSrc(href)) {
-      return
-    }
-    event.preventDefault()
-    const fileName =
-      anchor.getAttribute("data-tudu-filename")?.trim() ||
-      anchor.textContent?.trim() ||
-      "download"
-    void downloadAttachment(href, fileName)
-  }, [])
+    handleAttachmentAnchorClick(event, anchor, downloadAttachment)
+  }, [downloadAttachment])
 
   useEffect(() => {
     if (!editor) {

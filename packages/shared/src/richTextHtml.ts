@@ -131,7 +131,12 @@ function sanitizeAttributes(tagName: string, attrs: string): string | null {
       return null;
     }
     const escapedHref = href.replace(/"/g, "&quot;");
-    return ` href="${escapedHref}" rel="noreferrer noopener"`;
+    const fileName = readAttr(attrs, "data-tudu-filename");
+    const fileNamePart =
+      fileName.length > 0
+        ? ` data-tudu-filename="${fileName.replace(/"/g, "&quot;")}"`
+        : "";
+    return ` href="${escapedHref}" rel="noreferrer noopener"${fileNamePart}`;
   }
   if (BLOCK_TAGS_WITH_ALIGN.has(tagName)) {
     return sanitizeTextAlignStyle(attrs);
