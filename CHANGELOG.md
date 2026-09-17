@@ -1,3 +1,10 @@
+# [0.27.0](https://github.com/eGainDev/tudu/compare/tudu-0.26.0...tudu-0.27.0) (2026-09-17)
+
+
+### Features
+
+* enhance desktop updater with update scheduling and notification features ([4854d0b](https://github.com/eGainDev/tudu/commit/4854d0bbad635962fa69083e3a53b7255bc4da41))
+
 # [0.26.0](https://github.com/eGainDev/tudu/compare/tudu-0.25.0...tudu-0.26.0) (2026-09-17)
 
 
