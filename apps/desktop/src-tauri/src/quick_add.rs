@@ -99,12 +99,6 @@ fn finish_hide_quick_add(app: &AppHandle, session: &QuickAddSession, after_save:
     }
 }
 
-fn hide_main_while_quick_add_open(app: &AppHandle) {
-    if let Some(main) = app.get_webview_window("main") {
-        let _ = main.hide();
-    }
-}
-
 pub fn toggle_quick_add(app: &AppHandle) {
     if let Some(guard) = app.try_state::<QuickAddToggleGuard>() {
         let now = Instant::now();
@@ -128,13 +122,19 @@ pub fn toggle_quick_add(app: &AppHandle) {
         return;
     }
 
+    let main_visible = main_was_visible(app);
+
     if let Some(session) = app.try_state::<QuickAddSession>() {
         if let Ok(mut guard) = session.0.lock() {
-            *guard = Some(main_was_visible(app));
+            *guard = Some(main_visible);
         }
     }
 
-    hide_main_while_quick_add_open(app);
+    if !main_visible {
+        if let Some(main) = app.get_webview_window("main") {
+            let _ = main.hide();
+        }
+    }
 
     place_quick_add_window(&window, QUICK_ADD_WINDOW_WIDTH, QUICK_ADD_WINDOW_HEIGHT);
     let _ = window.set_shadow(false);
