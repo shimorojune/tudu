@@ -1,3 +1,15 @@
+# [0.29.0](https://github.com/eGainDev/tudu/compare/tudu-0.28.0...tudu-0.29.0) (2026-09-17)
+
+
+### Bug Fixes
+
+* streamline Quick Add window visibility management ([9f2a6e8](https://github.com/eGainDev/tudu/commit/9f2a6e8940c8a1d2055ec79b057a2455ba9c47ad))
+
+
+### Features
+
+* integrate PostHog analytics for user tracking ([807cea1](https://github.com/eGainDev/tudu/commit/807cea1fdecd92fd8ba253ec361850787ff76bbe))
+
 # [0.28.0](https://github.com/eGainDev/tudu/compare/tudu-0.27.0...tudu-0.28.0) (2026-09-17)
 
 
