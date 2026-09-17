@@ -1,14 +1,5 @@
+import { resolveApiUrl } from "@tudu/store";
 import { createAuthClient } from "better-auth/react";
-
-const defaultBaseUrl = "http://localhost:3456";
-
-function resolveApiUrl() {
-  if (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-
-  return defaultBaseUrl;
-}
 
 export const AUTH_TOKEN_KEY = "tudu_bearer_token";
 

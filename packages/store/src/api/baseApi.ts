@@ -1,6 +1,5 @@
+import { resolveApiUrlFromOptions } from "@tudu/shared";
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-
-const defaultBaseUrl = "http://localhost:3456";
 
 let authTokenGetter: (() => Promise<string | null>) | null = null;
 
@@ -9,11 +8,18 @@ export function setAuthTokenGetter(getter: () => Promise<string | null>) {
 }
 
 export function resolveApiUrl() {
-  if (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
+  const viteApiUrl = import.meta.env?.VITE_API_URL;
+  const hostname =
+    typeof globalThis.location?.hostname === "string"
+      ? globalThis.location.hostname
+      : undefined;
+  const isTauri = import.meta.env?.TAURI_ENV_PLATFORM !== undefined;
 
-  return defaultBaseUrl;
+  return resolveApiUrlFromOptions({
+    viteApiUrl,
+    isTauri,
+    webHostname: hostname,
+  });
 }
 
 export function getAuthToken(): Promise<string | null> {

@@ -1,0 +1,48 @@
+{
+  "Changes": [
+    {
+      "Action": "DELETE",
+      "ResourceRecordSet": {
+        "Name": "tudu.ezdev.net",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [
+          {
+            "Value": "eternals2-alb-ext-616121446.us-west-2.elb.amazonaws.com"
+          }
+        ]
+      }
+    },
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "tudu.ezdev.net",
+        "Type": "A",
+        "TTL": 300,
+        "ResourceRecords": [{ "Value": "213.210.21.191" }]
+      }
+    },
+    {
+      "Action": "DELETE",
+      "ResourceRecordSet": {
+        "Name": "api.tudu.ezdev.net",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [
+          {
+            "Value": "eternals2-alb-ext-616121446.us-west-2.elb.amazonaws.com"
+          }
+        ]
+      }
+    },
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "api.tudu.ezdev.net",
+        "Type": "A",
+        "TTL": 300,
+        "ResourceRecords": [{ "Value": "213.210.21.191" }]
+      }
+    }
+  ]
+}

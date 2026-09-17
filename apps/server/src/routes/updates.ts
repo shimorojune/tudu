@@ -1,3 +1,4 @@
+import { resolveUpdatesPublicBaseUrl } from "@tudu/shared";
 import { Hono } from "hono";
 import {
   clearReleaseCache,
@@ -40,6 +41,11 @@ export function createUpdatesRoute() {
       return c.json({ error: "Updates not configured" }, 503);
     }
 
+    const publicBaseUrl = resolveUpdatesPublicBaseUrl(
+      c.req.header("host"),
+      config.publicBaseUrl,
+    );
+
     try {
       const release = await fetchLatestRelease(config);
       const sigAsset = findAssetByName(release, UPDATES_SIG_NAME);
@@ -48,7 +54,7 @@ export function createUpdatesRoute() {
       }
 
       const signature = await fetchReleaseAssetText(config, sigAsset.url);
-      const manifest = mapReleaseToManifest(release, signature, config.publicBaseUrl);
+      const manifest = mapReleaseToManifest(release, signature, publicBaseUrl);
       if (!manifest) {
         return c.json({ error: "Update bundle not found" }, 404);
       }
