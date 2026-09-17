@@ -46,7 +46,7 @@ export const activityApi = baseApi.injectEndpoints({
             updatedAt: now,
             author: {
               id: me.id,
-              name: me.name,
+              name: me.name ?? me.email,
               email: me.email,
             },
           };
