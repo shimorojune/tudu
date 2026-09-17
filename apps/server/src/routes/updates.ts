@@ -22,7 +22,7 @@ function resolveUpdatesConfig(): UpdatesRouteConfig | null {
   const token = process.env.UPDATES_GITHUB_TOKEN?.trim();
   const repo = process.env.UPDATES_GITHUB_REPO?.trim() || "eGainDev/tudu";
   const publicBaseUrl =
-    process.env.UPDATES_PUBLIC_BASE_URL?.trim() || "https://api.tudu.ezdev.net";
+    process.env.UPDATES_PUBLIC_BASE_URL?.trim() || "https://api.tudu.rraj.dev";
 
   if (!token) {
     return null;

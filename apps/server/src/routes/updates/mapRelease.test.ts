@@ -42,14 +42,14 @@ describe("stripReleaseTag", () => {
 
 describe("buildDownloadUrl", () => {
   it("builds a public download URL", () => {
-    expect(buildDownloadUrl("https://api.tudu.ezdev.net", UPDATES_ASSET_NAME)).toBe(
-      "https://api.tudu.ezdev.net/updates/download/Tudu.app.tar.gz",
+    expect(buildDownloadUrl("https://api.tudu.rraj.dev", UPDATES_ASSET_NAME)).toBe(
+      "https://api.tudu.rraj.dev/updates/download/Tudu.app.tar.gz",
     );
   });
 
   it("strips a trailing slash from the base URL", () => {
-    expect(buildDownloadUrl("https://api.tudu.ezdev.net/", UPDATES_ASSET_NAME)).toBe(
-      "https://api.tudu.ezdev.net/updates/download/Tudu.app.tar.gz",
+    expect(buildDownloadUrl("https://api.tudu.rraj.dev/", UPDATES_ASSET_NAME)).toBe(
+      "https://api.tudu.rraj.dev/updates/download/Tudu.app.tar.gz",
     );
   });
 });
@@ -59,7 +59,7 @@ describe("mapReleaseToManifest", () => {
     const manifest = mapReleaseToManifest(
       sampleRelease,
       "signed-payload",
-      "https://api.tudu.ezdev.net",
+      "https://api.tudu.rraj.dev",
     );
 
     expect(manifest).toEqual({
@@ -70,7 +70,7 @@ describe("mapReleaseToManifest", () => {
       platforms: {
         [UPDATES_PLATFORM]: {
           signature: "signed-payload",
-          url: "https://api.tudu.ezdev.net/updates/download/Tudu.app.tar.gz",
+          url: "https://api.tudu.rraj.dev/updates/download/Tudu.app.tar.gz",
         },
       },
     });
@@ -80,7 +80,7 @@ describe("mapReleaseToManifest", () => {
     const manifest = mapReleaseToManifest(
       { ...sampleRelease, assets: [] },
       "signed-payload",
-      "https://api.tudu.ezdev.net",
+      "https://api.tudu.rraj.dev",
     );
 
     expect(manifest).toBeNull();
