@@ -6,12 +6,27 @@ import {
   type DownloadEvent,
   type Update,
 } from "@tauri-apps/plugin-updater";
+import { useNotificationOs } from "@tudu/ui/notifications";
 import {
   UpdateProvider,
   type UpdateContextValue,
   type UpdatePhase,
 } from "@tudu/ui/update";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  UPDATE_CHECK_INTERVAL_MS,
+  shouldApplyUpdate,
+  shouldNotifyForVersion,
+  shouldRunFocusCheck,
+  shouldRunUpdateCheck,
+} from "./desktopUpdateSchedule.js";
 
 const GITHUB_RELEASES_BASE = "https://github.com/eGainDev/tudu/releases/tag";
 
@@ -42,13 +57,30 @@ async function revealMainWindow() {
 }
 
 export function DesktopUpdater({ children }: { children: ReactNode }) {
+  return <DesktopUpdaterInner>{children}</DesktopUpdaterInner>;
+}
+
+function DesktopUpdaterInner({ children }: { children: ReactNode }) {
+  const { showOsNotification } = useNotificationOs();
   const updateRef = useRef<Update | null>(null);
   const releaseUrlRef = useRef<string | undefined>(undefined);
+  const dismissedVersionRef = useRef<string | undefined>(undefined);
+  const notifiedVersionRef = useRef<string | undefined>(undefined);
+  const phaseRef = useRef<UpdatePhase>("hidden");
+  const checkInFlightRef = useRef(false);
+  const lastCheckAtRef = useRef<number | undefined>(undefined);
   const [state, setState] = useState<UpdateState>({ phase: "hidden" });
 
+  useEffect(() => {
+    phaseRef.current = state.phase;
+  }, [state.phase]);
+
   const dismiss = useCallback(() => {
+    if (state.version) {
+      dismissedVersionRef.current = state.version;
+    }
     setState({ phase: "hidden" });
-  }, []);
+  }, [state.version]);
 
   const openRelease = useCallback(() => {
     const releaseUrl = releaseUrlRef.current;
@@ -58,6 +90,65 @@ export function DesktopUpdater({ children }: { children: ReactNode }) {
 
     void openUrl(releaseUrl);
   }, []);
+
+  const applyDiscoveredUpdate = useCallback(
+    async (update: Update) => {
+      if (!shouldApplyUpdate(update.version, dismissedVersionRef.current)) {
+        return;
+      }
+
+      const releaseUrl = resolveReleaseUrl(update);
+      updateRef.current = update;
+      releaseUrlRef.current = releaseUrl;
+      setState({
+        phase: "available",
+        version: update.version,
+        releaseUrl,
+        notes: update.body,
+      });
+
+      const windowVisible = await getCurrentWindow().isVisible();
+      if (
+        !windowVisible &&
+        shouldNotifyForVersion(
+          update.version,
+          dismissedVersionRef.current,
+          notifiedVersionRef.current,
+        )
+      ) {
+        notifiedVersionRef.current = update.version;
+        void showOsNotification({
+          body: `Version ${update.version} is ready. Click to update.`,
+          onClick: () => {},
+        });
+      }
+    },
+    [showOsNotification],
+  );
+
+  const runCheck = useCallback(async () => {
+    if (!shouldCheckForUpdates) {
+      return;
+    }
+    if (!shouldRunUpdateCheck(phaseRef.current, checkInFlightRef.current)) {
+      return;
+    }
+
+    checkInFlightRef.current = true;
+    lastCheckAtRef.current = Date.now();
+
+    try {
+      const update = await check();
+      if (!update) {
+        return;
+      }
+      await applyDiscoveredUpdate(update);
+    } catch (error) {
+      console.error("Failed to check for updates:", error);
+    } finally {
+      checkInFlightRef.current = false;
+    }
+  }, [applyDiscoveredUpdate]);
 
   const install = useCallback(async () => {
     const update = updateRef.current;
@@ -136,34 +227,34 @@ export function DesktopUpdater({ children }: { children: ReactNode }) {
       return;
     }
 
-    let cancelled = false;
+    void runCheck();
 
-    void (async () => {
-      try {
-        const update = await check();
-        if (!update || cancelled) {
+    const intervalId = window.setInterval(() => {
+      void runCheck();
+    }, UPDATE_CHECK_INTERVAL_MS);
+
+    let unlistenFocus: (() => void) | undefined;
+    const appWindow = getCurrentWindow();
+    void appWindow
+      .onFocusChanged(({ payload: focused }) => {
+        if (!focused) {
           return;
         }
-
-        const releaseUrl = resolveReleaseUrl(update);
-        updateRef.current = update;
-        releaseUrlRef.current = releaseUrl;
-        setState({
-          phase: "available",
-          version: update.version,
-          releaseUrl,
-          notes: update.body,
-        });
-        await revealMainWindow();
-      } catch (error) {
-        console.error("Failed to check for updates:", error);
-      }
-    })();
+        const now = Date.now();
+        if (!shouldRunFocusCheck(lastCheckAtRef.current, now)) {
+          return;
+        }
+        void runCheck();
+      })
+      .then((unlisten) => {
+        unlistenFocus = unlisten;
+      });
 
     return () => {
-      cancelled = true;
+      clearInterval(intervalId);
+      unlistenFocus?.();
     };
-  }, []);
+  }, [runCheck]);
 
   const value = useMemo<UpdateContextValue>(
     () => ({

@@ -12,11 +12,11 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AppProviders>
       <AttachmentDownloadProvider download={desktopDownloadAttachment}>
-        <DesktopUpdater>
-          <DesktopNotifications>
+        <DesktopNotifications>
+          <DesktopUpdater>
             <App />
-          </DesktopNotifications>
-        </DesktopUpdater>
+          </DesktopUpdater>
+        </DesktopNotifications>
       </AttachmentDownloadProvider>
     </AppProviders>
   </StrictMode>,

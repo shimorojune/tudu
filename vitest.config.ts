@@ -37,6 +37,7 @@ export default defineConfig({
     },
     include: [
       "packages/**/*.test.{ts,tsx}",
+      "apps/desktop/**/*.test.ts",
       "apps/server/**/*.test.ts",
       "apps/web/**/*.test.ts",
     ],
