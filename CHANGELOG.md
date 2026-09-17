@@ -1,3 +1,15 @@
+# [0.28.0](https://github.com/eGainDev/tudu/compare/tudu-0.27.0...tudu-0.28.0) (2026-09-17)
+
+
+### Bug Fixes
+
+* update environment and API configurations ([fcff464](https://github.com/eGainDev/tudu/commit/fcff4642a7838153feb2db8bce1fda6cb1900568))
+
+
+### Features
+
+* add Quick Add feature for task management ([2098957](https://github.com/eGainDev/tudu/commit/2098957ae80bbe2f6b003be895dff8e8d22b8c6a))
+
 # [0.27.0](https://github.com/eGainDev/tudu/compare/tudu-0.26.0...tudu-0.27.0) (2026-09-17)
 
 
