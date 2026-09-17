@@ -161,7 +161,7 @@ export function dayStateFromSearch(args: {
     if (args.parsed.date && args.weekDays && !args.weekDays.includes(args.parsed.date)) {
       result.date = defaultHighlightDay(args.weekDays, args.today);
     } else if (args.weekDays && !args.parsed.date) {
-      result.date = defaultHighlightDay(args.weekDays, args.today);
+      // Week highlight comes from Redux in WeekRoute; do not reset selectedDate here.
     } else {
       result.date = args.parsed.date ?? args.today;
     }

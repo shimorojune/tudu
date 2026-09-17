@@ -5,7 +5,11 @@ RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 FROM base AS build
 ARG VITE_API_URL
+ARG VITE_POSTHOG_KEY
+ARG VITE_POSTHOG_HOST
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_POSTHOG_KEY=$VITE_POSTHOG_KEY
+ENV VITE_POSTHOG_HOST=$VITE_POSTHOG_HOST
 ENV HUSKY=0
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./

@@ -115,6 +115,14 @@ describe("dayStateFromSearch", () => {
         weekDays: [today],
       }),
     ).toEqual({ date: today });
+    expect(
+      dayStateFromSearch({
+        fields: { date: true },
+        parsed: {},
+        today,
+        weekDays: [today, tomorrow],
+      }),
+    ).toEqual({});
   });
 });
 

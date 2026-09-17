@@ -33,11 +33,16 @@
       "prosemirror-transform": "1.12.1",
       "prosemirror-model": "1.25.11",
       "prosemirror-view": "1.42.3"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "esbuild"
+    ]
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
+    "@playwright/test": "^1.55.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/commit-analyzer": "^13.0.1",
     "@semantic-release/exec": "^7.1.0",
@@ -57,7 +62,6 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "semantic-release": "^24.2.7",
-    "vitest": "^5.0.0",
-    "@playwright/test": "^1.55.0"
+    "vitest": "^5.0.0"
   }
 }

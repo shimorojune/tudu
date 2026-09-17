@@ -26,9 +26,15 @@ import {
   TASK_TAB_FIELDS,
 } from "@/lib/daySearch";
 import { parseProjectSearch } from "@/lib/projectFilter";
+import { AnalyticsPageView } from "@/providers/AnalyticsPageView";
 
 const rootRoute = createRootRoute({
-  component: () => <Outlet />,
+  component: () => (
+    <>
+      <AnalyticsPageView />
+      <Outlet />
+    </>
+  ),
 });
 
 const authLayoutRoute = createRoute({

@@ -18,6 +18,7 @@ import {
   UpdateContext,
   defaultUpdateContextValue,
 } from "@/providers/UpdateContext";
+import { AnalyticsProvider } from "@/providers/AnalyticsProvider";
 import { ThemeProvider } from "./ThemeProvider";
 
 function AuthTokenBridge({ children }: { children: ReactNode }) {
@@ -50,15 +51,17 @@ type AppProvidersProps = {
 export function AppProviders({ children }: AppProvidersProps) {
   return (
     <Provider store={store}>
-      <UpdateContext.Provider value={defaultUpdateContextValue}>
-        <NotificationOsProvider value={defaultNotificationOsValue}>
-          <ThemeProvider>
-            <TooltipProvider delayDuration={150}>
-              <AuthTokenBridge>{children}</AuthTokenBridge>
-            </TooltipProvider>
-          </ThemeProvider>
-        </NotificationOsProvider>
-      </UpdateContext.Provider>
+      <AnalyticsProvider>
+        <UpdateContext.Provider value={defaultUpdateContextValue}>
+          <NotificationOsProvider value={defaultNotificationOsValue}>
+            <ThemeProvider>
+              <TooltipProvider delayDuration={150}>
+                <AuthTokenBridge>{children}</AuthTokenBridge>
+              </TooltipProvider>
+            </ThemeProvider>
+          </NotificationOsProvider>
+        </UpdateContext.Provider>
+      </AnalyticsProvider>
     </Provider>
   );
 }
