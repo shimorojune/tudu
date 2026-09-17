@@ -1,15 +1,3 @@
-# [0.25.0](https://github.com/eGainDev/tudu/compare/tudu-0.24.0...tudu-0.25.0) (2026-09-17)
-
-
-### Bug Fixes
-
-* release build and MinIO attachment compose for prod ([1387d5b](https://github.com/eGainDev/tudu/commit/1387d5b3c267d9f9846ef47d09b2019b2f49ad1d))
-
-
-### Features
-
-* implement task attachment functionality ([1515759](https://github.com/eGainDev/tudu/commit/15157592f6604fe858327eb538e985686bfd0aee))
-
 # [0.24.0](https://github.com/eGainDev/tudu/compare/tudu-0.23.0...tudu-0.24.0) (2026-09-16)
 
 
