@@ -1,7 +1,6 @@
 import type { Db, InsertNotificationInput } from "@tudu/db";
 import { insertAndEmitNotifications } from "@tudu/db";
 import type { AppNotification, SyncEvent } from "@tudu/shared";
-import { sendWebPushForNotifications } from "./push/fcm.js";
 
 function notificationsFromEvents(events: SyncEvent[]): AppNotification[] {
   const rows: AppNotification[] = [];
@@ -19,10 +18,14 @@ export async function insertAndEmitNotificationsWithPush(
 ): Promise<SyncEvent[]> {
   const events = await insertAndEmitNotifications(db, input);
   const created = notificationsFromEvents(events);
-  if (created.length > 0) {
-    void sendWebPushForNotifications(db, created).catch((error) => {
-      console.error("[fcm] send failed", error);
-    });
+  if (created.length > 0 && process.env.FCM_SERVICE_ACCOUNT_JSON?.trim()) {
+    void import("./push/fcm.js")
+      .then(({ sendWebPushForNotifications }) =>
+        sendWebPushForNotifications(db, created),
+      )
+      .catch((error) => {
+        console.error("[fcm] send failed", error);
+      });
   }
   return events;
 }

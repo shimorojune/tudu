@@ -48,6 +48,7 @@ app.use(
     origin: resolveCorsOrigins(),
     allowHeaders: ["Content-Type", "Authorization"],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    exposeHeaders: ["set-auth-token"],
     credentials: true,
   }),
 );
