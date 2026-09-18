@@ -4,12 +4,19 @@ import {
   listPushDeviceTokensForUser,
   softDeletePushDeviceTokenByValue,
 } from "@tudu/db";
-import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
-import { getMessaging, type Messaging } from "firebase-admin/messaging";
 
-let messaging: Messaging | null | undefined;
+type MessagingClient = {
+  sendEachForMulticast: (message: {
+    tokens: string[];
+    data: Record<string, string>;
+  }) => Promise<{
+    responses: Array<{ success?: boolean; error?: { code?: string } }>;
+  }>;
+};
 
-function resolveMessaging(): Messaging | null {
+let messaging: MessagingClient | null | undefined;
+
+async function resolveMessaging(): Promise<MessagingClient | null> {
   if (messaging !== undefined) {
     return messaging;
   }
@@ -20,7 +27,9 @@ function resolveMessaging(): Messaging | null {
   }
   try {
     const credentials = JSON.parse(raw) as Record<string, unknown>;
-    let app: App;
+    const { cert, getApps, initializeApp } = await import("firebase-admin/app");
+    const { getMessaging } = await import("firebase-admin/messaging");
+    let app;
     if (getApps().length === 0) {
       app = initializeApp({ credential: cert(credentials) });
     } else {
@@ -45,7 +54,7 @@ export async function sendWebPushForNotifications(
   db: Db,
   notifications: AppNotification[],
 ): Promise<void> {
-  const client = resolveMessaging();
+  const client = await resolveMessaging();
   if (!client || notifications.length === 0) {
     return;
   }
