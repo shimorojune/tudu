@@ -1,3 +1,10 @@
+# [0.31.0](https://github.com/eGainDev/tudu/compare/tudu-0.30.0...tudu-0.31.0) (2026-09-18)
+
+
+### Features
+
+* integrate Firebase Cloud Messaging for web push notifications ([79e632c](https://github.com/eGainDev/tudu/commit/79e632c72a3c2e1a070196483b65d6ccf49d6483))
+
 # [0.30.0](https://github.com/eGainDev/tudu/compare/tudu-0.29.0...tudu-0.30.0) (2026-09-18)
 
 
