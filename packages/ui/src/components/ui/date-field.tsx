@@ -1,5 +1,5 @@
 import { format, parseISO } from "date-fns";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -16,6 +16,9 @@ export type DateFieldProps = {
   "aria-label"?: string;
   labelPrefix?: string;
   className?: string;
+  /** Prefer top in tight shells (Quick Add) so the grid is not clipped. */
+  popoverSide?: "top" | "bottom";
+  popoverAlign?: "start" | "center" | "end";
 };
 
 export function DateField({
@@ -26,9 +29,19 @@ export function DateField({
   "aria-label": ariaLabel = "Pick a date",
   labelPrefix,
   className,
+  popoverSide = "bottom",
+  popoverAlign = "start",
 }: DateFieldProps) {
   const [open, setOpen] = useState(false);
   const selected = value ? parseISO(`${value}T12:00:00`) : undefined;
+  const [month, setMonth] = useState<Date>(() => selected ?? new Date());
+
+  useEffect(() => {
+    if (selected) {
+      setMonth(selected);
+    }
+  }, [value]);
+
   const label = value
     ? format(new Date(`${value}T12:00:00`), "EEE d MMM")
     : "Pick a date";
@@ -49,9 +62,17 @@ export function DateField({
           {labelPrefix ? `${labelPrefix}${label}` : label}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-auto p-0">
+      <PopoverContent
+        align={popoverAlign}
+        side={popoverSide}
+        sideOffset={6}
+        collisionPadding={8}
+        className="z-[200] w-auto p-0 [--cell-size:2rem]"
+      >
         <Calendar
           mode="single"
+          month={month}
+          onMonthChange={setMonth}
           selected={selected}
           onSelect={(date) => {
             if (!date) {

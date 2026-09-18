@@ -8,6 +8,7 @@ import "./api/activityApi.js";
 import "./api/linkPreviewApi.js";
 import "./api/managerApi.js";
 import "./api/jiraApi.js";
+import "./api/quickAddApi.js";
 
 export function makeStore() {
   return configureStore({

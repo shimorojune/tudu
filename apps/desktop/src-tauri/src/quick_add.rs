@@ -61,41 +61,40 @@ fn main_was_visible(app: &AppHandle) -> bool {
         .unwrap_or(false)
 }
 
-fn finish_hide_quick_add(app: &AppHandle, session: &QuickAddSession, after_save: bool) {
+fn finish_hide_quick_add(app: &AppHandle, session: &QuickAddSession, _after_save: bool) {
     let main_was_visible = session.0.lock().ok().and_then(|mut guard| guard.take());
-
-    if main_was_visible == Some(false) {
-        if let Some(main) = app.get_webview_window("main") {
-            let _ = main.hide();
-        }
-    }
 
     if let Some(window) = app.get_webview_window("quick-add") {
         let _ = window.hide();
     }
 
-    if after_save {
-        if main_was_visible == Some(false) {
+    match main_was_visible {
+        Some(true) => {
+            // Main was already open: close Quick Add only. Do not hide or focus main.
+        }
+        Some(false) => {
+            if let Some(main) = app.get_webview_window("main") {
+                let _ = main.hide();
+            }
             #[cfg(target_os = "macos")]
             {
                 let _ = app.hide();
             }
         }
-        return;
-    }
-
-    if main_was_visible == Some(true) {
-        if let Some(main) = app.get_webview_window("main") {
-            let _ = main.unminimize();
-            let _ = main.show();
-            let _ = main.set_focus();
+        None => {
+            // Unknown session (edge case): hide Quick Add without changing main.
         }
+    }
+}
+
+/// Same hide path as the window close button when session state is available.
+pub fn dismiss_quick_add(app: &AppHandle) {
+    if let Some(session) = app.try_state::<QuickAddSession>() {
+        finish_hide_quick_add(app, session.inner(), false);
         return;
     }
-
-    #[cfg(target_os = "macos")]
-    {
-        let _ = app.hide();
+    if let Some(window) = app.get_webview_window("quick-add") {
+        let _ = window.hide();
     }
 }
 

@@ -80,6 +80,18 @@ export function offsetIso(fromIso: string, dayOffset: number) {
   return `${year}-${month}-${day}`;
 }
 
+function quickAddFieldLabel(
+  text: string,
+  shimmering: boolean,
+  labelClass: string,
+) {
+  return (
+    <div className={cn(labelClass, shimmering && "quick-add-jev-label-shimmer")}>
+      {text}
+    </div>
+  );
+}
+
 export type TaskScheduleFieldsProps = {
   dayChoice: NewTaskDayChoice;
   bucket: Bucket;
@@ -87,6 +99,8 @@ export type TaskScheduleFieldsProps = {
   nowCount: number;
   compact?: boolean;
   layout?: "stacked" | "quickAdd";
+  /** Quick Add: soft pulse on Bucket label while Jev suggest runs. */
+  jevSuggesting?: boolean;
   onDayChoiceChange: (choice: NewTaskDayChoice) => void;
   onBucketChange: (bucket: Bucket) => void;
   onPickedDateChange: (iso: string) => void;
@@ -99,6 +113,7 @@ export function TaskScheduleFields({
   nowCount,
   compact = false,
   layout = "stacked",
+  jevSuggesting = false,
   onDayChoiceChange,
   onBucketChange,
   onPickedDateChange,
@@ -147,7 +162,7 @@ export function TaskScheduleFields({
     return (
       <div className="space-y-[6px]">
         <div className="flex flex-nowrap items-center gap-[8px]">
-          <div className={quickAddLabelClass}>Day</div>
+          {quickAddFieldLabel("Day", false, quickAddLabelClass)}
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-[6px]">
             <SegmentedControl
               size={segmentSize}
@@ -161,6 +176,8 @@ export function TaskScheduleFields({
                 allowClear={false}
                 onChange={onPickedDateChange}
                 aria-label="Task date"
+                popoverSide="top"
+                popoverAlign="start"
                 className="w-auto bg-transparent px-[8px] py-[4px] text-[12px]"
               />
             ) : null}
@@ -168,7 +185,7 @@ export function TaskScheduleFields({
         </div>
 
         <div className="flex flex-nowrap items-center gap-[8px]">
-          <div className={quickAddLabelClass}>Bucket</div>
+          {quickAddFieldLabel("Bucket", jevSuggesting, quickAddLabelClass)}
           <div className="min-w-0 flex-1">
             <SegmentedControl
               size={segmentSize}

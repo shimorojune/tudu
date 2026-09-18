@@ -12,6 +12,9 @@ export * from "./richTextHtml.js";
 export * from "./attachments.js";
 export * from "./apiUrl.js";
 export * from "./analytics.js";
+export * from "./quickAddNaturalLanguage.js";
+export * from "./quickAddProjectTitle.js";
+export * from "./quickAddSuggest.js";
 
 export type HealthResponse = { status: "ok"; version: string };
 

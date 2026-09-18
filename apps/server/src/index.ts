@@ -14,6 +14,7 @@ import { createAuth } from "./auth.js";
 import { createActivityRoute } from "./routes/activity.js";
 import { createJiraRoute } from "./routes/jira.js";
 import { createLinkPreviewRoute } from "./routes/linkPreview.js";
+import { createQuickAddSuggestRoute } from "./routes/quickAddSuggest.js";
 import { createManagerRoute } from "./routes/manager.js";
 import { createTaskAttachmentsRoute } from "./routes/taskAttachments.js";
 import { createTasksRoute } from "./routes/tasks.js";
@@ -105,6 +106,7 @@ if (db) {
   app.route("/", createTaskAttachmentsRoute(db));
   app.route("/", createActivityRoute(db));
   app.route("/", createLinkPreviewRoute());
+  app.route("/", createQuickAddSuggestRoute(db));
   app.route("/", createPushRoute(db));
 }
 

@@ -17,6 +17,7 @@
   "main": "./dist/index.js",
   "types": "./src/index.ts",
   "dependencies": {
+    "chrono-node": "^2.10.1",
     "zod": "^4.5.4"
   }
 }

@@ -5,10 +5,10 @@ mod quick_add;
 use std::sync::Mutex;
 
 use quick_add::{
-    hide_quick_add_window, pause_quick_add_shortcuts_command, place_quick_add_window_command,
-    present_quick_add_window, register_quick_add_shortcut, register_quick_add_shortcut_command,
-    show_main_window_command, QuickAddSession, QuickAddShortcutState, QuickAddToggleGuard,
-    DEFAULT_QUICK_ADD_ACCELERATOR,
+    dismiss_quick_add, hide_quick_add_window, pause_quick_add_shortcuts_command,
+    place_quick_add_window_command, present_quick_add_window, register_quick_add_shortcut,
+    register_quick_add_shortcut_command, show_main_window_command, QuickAddSession,
+    QuickAddShortcutState, QuickAddToggleGuard, DEFAULT_QUICK_ADD_ACCELERATOR,
 };
 use tauri::{
     menu::{Menu, MenuItem},
@@ -126,11 +126,11 @@ pub fn run() {
             }
 
             if let Some(window) = app.get_webview_window("quick-add") {
-                let quick_add = window.clone();
+                let app_handle = app.handle().clone();
                 window.on_window_event(move |event| {
                     if let WindowEvent::CloseRequested { api, .. } = event {
                         api.prevent_close();
-                        let _ = quick_add.hide();
+                        dismiss_quick_add(&app_handle);
                     }
                 });
             }

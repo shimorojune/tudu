@@ -56,6 +56,7 @@ describe("initAnalytics", () => {
           maskAllInputs: true,
           maskTextSelector: "[data-ph-mask]",
         },
+        disable_surveys: false,
       }),
     );
     expect(posthogRegister).toHaveBeenCalledWith({ app_platform: "web" });

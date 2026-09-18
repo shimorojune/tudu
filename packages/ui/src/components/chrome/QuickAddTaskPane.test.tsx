@@ -11,12 +11,7 @@ vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     label: "quick-add",
     scaleFactor: () => Promise.resolve(1),
-    listen: (event: string, handler: () => void) => {
-      if (event === "quick-add:shown") {
-        handler();
-      }
-      return Promise.resolve(vi.fn());
-    },
+    listen: () => Promise.resolve(vi.fn()),
   }),
 }));
 
@@ -42,6 +37,10 @@ vi.mock("@tudu/store", async (importOriginal) => {
     todayIso: () => "2026-09-11",
     useGetTasksForDayQuery: () => ({ data: { tasks: [] } }),
     useCreateTaskMutation: () => [createTask, { isLoading: false }],
+    useQuickAddSuggestMutation: () => [
+      vi.fn().mockReturnValue({ unwrap: () => Promise.reject(new Error("skip")) }),
+      { isLoading: false },
+    ],
     useGetProjectsQuery: () => ({ data: [], isLoading: false }),
     useCreateProjectMutation: () => [vi.fn(), { isLoading: false }],
   };

@@ -19,6 +19,14 @@ function appPlatform(): "desktop" | "web" {
   return isDesktopApp() ? "desktop" : "web";
 }
 
+function isQuickAddWebview(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return /quick-add/i.test(window.location.pathname);
+}
+
 export function isAnalyticsEnabled(): boolean {
   return import.meta.env.PROD && analyticsKey() != null;
 }
@@ -39,6 +47,7 @@ export function initAnalytics(): void {
     person_profiles: "identified_only",
     autocapture: false,
     disable_session_recording: false,
+    disable_surveys: isQuickAddWebview(),
     capture_exceptions: true,
     session_recording: {
       maskAllInputs: true,

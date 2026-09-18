@@ -62,6 +62,20 @@ html, body, #root {
   animation: comment-focus-tint 1600ms ease-out;
 }
 
+@keyframes quick-add-jev-label-shimmer {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.72;
+  }
+}
+
+.quick-add-jev-label-shimmer {
+  animation: quick-add-jev-label-shimmer 1.75s ease-in-out infinite;
+}
+
 .rich-text-editor {
   min-height: 160px;
 }

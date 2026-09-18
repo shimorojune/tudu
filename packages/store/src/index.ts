@@ -103,6 +103,10 @@ export {
   linkPreviewApi,
   useGetLinkPreviewQuery,
 } from "./api/linkPreviewApi.js";
+export {
+  quickAddApi,
+  useQuickAddSuggestMutation,
+} from "./api/quickAddApi.js";
 export { activityApi } from "./api/activityApi.js";
 export {
   daySlice,
