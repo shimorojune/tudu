@@ -38,7 +38,12 @@ export function initAnalytics(): void {
     capture_pageview: false,
     person_profiles: "identified_only",
     autocapture: false,
-    disable_session_recording: true,
+    disable_session_recording: false,
+    capture_exceptions: true,
+    session_recording: {
+      maskAllInputs: true,
+      maskTextSelector: "[data-ph-mask]",
+    },
   });
 
   posthog.register({ app_platform: appPlatform() });

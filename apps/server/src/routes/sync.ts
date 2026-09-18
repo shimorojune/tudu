@@ -21,6 +21,10 @@ import { JiraHttpError } from "../jira/client.js";
 import type { SessionEnv } from "../session-middleware.js";
 import { waitForSync } from "../syncHub.js";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import {
+  captureSyncFailed,
+  captureSyncOp,
+} from "../analytics/posthog.js";
 
 function jsonBody<T extends z.ZodType>(schema: T) {
   return zValidator("json", schema, (result, c) => {
@@ -76,6 +80,10 @@ export function createSyncRoute(db: Db, options?: JiraSyncOptions) {
         options,
       );
       const seq = events.reduce((max, event) => Math.max(max, event.seq), 0);
+      captureSyncOp(userId(c), body.op, {
+        client_mutation_id: body.clientMutationId,
+      });
+
       const response: SyncPushResponse = {
         clientMutationId: body.clientMutationId,
         seq,
@@ -84,12 +92,25 @@ export function createSyncRoute(db: Db, options?: JiraSyncOptions) {
       return c.json(response);
     } catch (error) {
       if (error instanceof SyncOpError) {
+        captureSyncFailed(
+          userId(c),
+          body.op.type,
+          error.status,
+          body.clientMutationId,
+        );
         return c.json({ error: error.message }, error.status);
       }
       const mapped = syncRouteError(error);
       if (mapped) {
+        captureSyncFailed(
+          userId(c),
+          body.op.type,
+          mapped.status,
+          body.clientMutationId,
+        );
         return c.json({ error: mapped.message }, mapped.status);
       }
+      captureSyncFailed(userId(c), body.op.type, 500, body.clientMutationId);
       throw error;
     }
   });

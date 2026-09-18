@@ -5,6 +5,7 @@ import { BrandMark } from "@/components/chrome/BrandMark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { capture } from "@/lib/analytics/posthog";
 import { authClient } from "@/lib/authClient";
 
 export function SignInRoute() {
@@ -34,7 +35,10 @@ export function SignInRoute() {
 
     if (error) {
       toast.error(error.message ?? "Sign in failed");
+      return;
     }
+
+    capture("signed_in", { origin: "client" });
   }
 
   return (

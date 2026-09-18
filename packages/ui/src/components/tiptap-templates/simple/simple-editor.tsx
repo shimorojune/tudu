@@ -398,6 +398,7 @@ export function SimpleEditor({
   return (
     <div
       className={cn("simple-editor-wrapper", className)}
+      data-ph-mask="true"
       data-testid="tiptap-simple-editor"
       onClick={onEditorClick}
     >

@@ -20,6 +20,7 @@ import { createTasksRoute } from "./routes/tasks.js";
 import { createUpdatesRoute } from "./routes/updates.js";
 import { createSessionMiddleware, type SessionEnv } from "./session-middleware.js";
 import { createSyncRoute } from "./routes/sync.js";
+import { shutdownAnalytics } from "./analytics/posthog.js";
 
 const serverDir = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(serverDir, "../../../.env") });
@@ -115,3 +116,14 @@ serve(
     console.log(`Server listening on http://localhost:${info.port}`);
   },
 );
+
+function registerShutdown() {
+  const flush = () => {
+    void shutdownAnalytics();
+  };
+  process.on("SIGINT", flush);
+  process.on("SIGTERM", flush);
+  process.on("beforeExit", flush);
+}
+
+registerShutdown();

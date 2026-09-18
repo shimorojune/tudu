@@ -160,7 +160,10 @@ export function DetailsTab({
   }
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-[24px] py-[22px]">
+    <div
+      className="min-h-0 flex-1 overflow-y-auto px-[24px] py-[22px]"
+      data-ph-mask="true"
+    >
       <h2 className="text-[19px] font-extrabold leading-[1.3] tracking-[-0.018em]">
         {task.title}
       </h2>

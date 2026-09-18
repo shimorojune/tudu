@@ -50,6 +50,12 @@ describe("initAnalytics", () => {
         api_host: "https://us.i.posthog.com",
         capture_pageview: false,
         person_profiles: "identified_only",
+        disable_session_recording: false,
+        capture_exceptions: true,
+        session_recording: {
+          maskAllInputs: true,
+          maskTextSelector: "[data-ph-mask]",
+        },
       }),
     );
     expect(posthogRegister).toHaveBeenCalledWith({ app_platform: "web" });
