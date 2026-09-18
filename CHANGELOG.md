@@ -1,3 +1,10 @@
+# [0.30.0](https://github.com/eGainDev/tudu/compare/tudu-0.29.0...tudu-0.30.0) (2026-09-18)
+
+
+### Features
+
+* enhance analytics integration with PostHog ([8e3eb5a](https://github.com/eGainDev/tudu/commit/8e3eb5a0d4de98763f3902623a278047c6a86e36))
+
 # [0.29.0](https://github.com/eGainDev/tudu/compare/tudu-0.28.0...tudu-0.29.0) (2026-09-17)
 
 

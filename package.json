@@ -1,6 +1,6 @@
 {
   "name": "tudu",
-  "version": "0.29.0",
+  "version": "0.30.0",
   "private": true,
   "description": "Tudu monorepo: desktop app, web app, and server",
   "license": "MIT",
