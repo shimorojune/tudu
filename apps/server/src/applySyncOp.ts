@@ -75,7 +75,6 @@ import {
   findProjectById,
   ProjectError,
   user,
-  insertAndEmitNotifications,
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
@@ -86,6 +85,7 @@ import {
   upsertJiraComments,
   upsertJiraIssue,
 } from "@tudu/db";
+import { insertAndEmitNotificationsWithPush } from "./notificationsWithPush.js";
 import {
   effectiveDayIso,
   isSlipping,
@@ -918,7 +918,7 @@ export async function applySyncOp(
           const row = latest[0];
           if (row && isTaskChangeTimelineType(row.type)) {
             await push(
-              await insertAndEmitNotifications(db, {
+              await insertAndEmitNotificationsWithPush(db, {
                 recipientUserIds: [access.task.userId],
                 actorId,
                 clientMutationId,
@@ -964,7 +964,7 @@ export async function applySyncOp(
         );
         if (actorId !== ownerId) {
           await push(
-            await insertAndEmitNotifications(db, {
+            await insertAndEmitNotificationsWithPush(db, {
               recipientUserIds: [ownerId],
               actorId,
               clientMutationId,
@@ -1061,7 +1061,7 @@ export async function applySyncOp(
         await push(await emitTaskSnapshot(db, op.taskId, clientMutationId));
         await push(await emitLatestTimeline(db, op.taskId, clientMutationId));
         await push(
-          await insertAndEmitNotifications(db, {
+          await insertAndEmitNotificationsWithPush(db, {
             recipientUserIds: recipients,
             actorId,
             clientMutationId,
@@ -1192,7 +1192,7 @@ export async function applySyncOp(
           const bouncedTask = await loadTaskWithSubtasks(db, bounced.taskId);
           if (bouncedTask) {
             await push(
-              await insertAndEmitNotifications(db, {
+              await insertAndEmitNotificationsWithPush(db, {
                 recipientUserIds: [bounced.toUserId],
                 actorId,
                 clientMutationId,
@@ -1309,7 +1309,7 @@ export async function applySyncOp(
           );
           await push(await emitLatestTimeline(db, sent.task.id, clientMutationId));
           await push(
-            await insertAndEmitNotifications(db, {
+            await insertAndEmitNotificationsWithPush(db, {
               recipientUserIds: [op.userId],
               actorId,
               clientMutationId,
@@ -1369,7 +1369,7 @@ export async function applySyncOp(
         );
         if (actorId !== ownerId) {
           await push(
-            await insertAndEmitNotifications(db, {
+            await insertAndEmitNotificationsWithPush(db, {
               recipientUserIds: [ownerId],
               actorId,
               clientMutationId,
@@ -1561,7 +1561,7 @@ export async function applySyncOp(
           );
         }
         await push(
-          await insertAndEmitNotifications(db, {
+          await insertAndEmitNotificationsWithPush(db, {
             recipientUserIds: [op.body.reportUserId],
             actorId,
             clientMutationId,

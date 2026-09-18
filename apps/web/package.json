@@ -7,13 +7,14 @@
   "scripts": {
     "dev": "vite",
     "icons": "node scripts/generate-pwa-icons.mjs",
-    "build": "pnpm --filter @tudu/shared build && node scripts/generate-pwa-icons.mjs && tsc -b && vite build",
+    "build": "pnpm --filter @tudu/shared build && node scripts/generate-pwa-icons.mjs && node scripts/generate-firebase-messaging-sw.mjs && tsc -b && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "@tudu/shared": "workspace:*",
     "@tudu/store": "workspace:*",
     "@tudu/ui": "workspace:*",
+    "firebase": "^12.19.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

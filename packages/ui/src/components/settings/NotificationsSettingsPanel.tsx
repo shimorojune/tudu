@@ -68,7 +68,9 @@ export function NotificationsSettingsPanel() {
             {prefs.osEnabled ? "Banners on" : "Enable notifications"}
           </button>
           <p className="mt-[10px] max-w-[480px] text-[12px] text-faint">
-            Banners show while Tudu is open. The bell list always keeps a copy.
+            Banners show while Tudu is open. On the web app, enabling this also
+            registers for push when Firebase is configured. The bell list always
+            keeps a copy.
           </p>
           {hint ? (
             <p className="mt-[8px] text-[12px] text-destructive">{hint}</p>
