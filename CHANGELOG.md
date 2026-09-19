@@ -1,18 +1,3 @@
-# [0.32.0](https://github.com/eGainDev/tudu/compare/tudu-0.31.0...tudu-0.32.0) (2026-09-19)
-
-
-### Bug Fixes
-
-* defer FCM load so prod server starts in Docker ([5f6e323](https://github.com/eGainDev/tudu/commit/5f6e323d9caaf005fb09814d47f72af8de617fcd))
-* dynamic-import firebase-admin inside FCM sender ([746289c](https://github.com/eGainDev/tudu/commit/746289cb49cca6d01396db6f7089f4c0ed6ebdba))
-
-
-### Features
-
-* enhance Quick Add functionality with start and deadline management ([c56850e](https://github.com/eGainDev/tudu/commit/c56850e95af3a8bcc35b89b373078ddcf1ec50da))
-* enhance theme customization options and implement theme persistence ([22377f3](https://github.com/eGainDev/tudu/commit/22377f3a3b979fd2a4fde0d1211410e472436e89))
-* integrate TypeSafe AI suggestions for Quick Add functionality ([490e148](https://github.com/eGainDev/tudu/commit/490e148af471730e049419c51eb6b65124df9314))
-
 # [0.31.0](https://github.com/eGainDev/tudu/compare/tudu-0.30.0...tudu-0.31.0) (2026-09-18)
 
 

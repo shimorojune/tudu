@@ -1,6 +1,6 @@
 {
   "name": "@tudu/desktop",
-  "version": "0.32.0",
+  "version": "0.31.0",
   "description": "Tudu desktop app shell",
   "type": "module",
   "license": "MIT",
