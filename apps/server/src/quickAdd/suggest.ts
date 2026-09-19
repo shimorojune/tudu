@@ -77,7 +77,7 @@ function startCriteria(today: string, scheduledDate: string | null) {
   return criteria;
 }
 
-function deadlineCriteria(today: string, scheduledDate: string | null) {
+function deadlineCriteria(_today: string, scheduledDate: string | null) {
   const criteria: Record<string, string> = {
     none: "No implied deadline in the title",
     today_eod: "Due by end of today",

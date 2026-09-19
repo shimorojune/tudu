@@ -21,6 +21,9 @@ describe("runQuickAddSuggest", () => {
         today: "2026-09-18",
         nowCount: 1,
         scheduledDate: "2026-09-19",
+        parsedStartDate: null,
+        parsedDeadline: null,
+        parsedScheduledDate: null,
       },
     );
 
@@ -36,8 +39,9 @@ describe("runQuickAddSuggest", () => {
         id: projectId,
         name: "PS",
         userId,
-        color: "blue",
+        color: "ember",
         archivedAt: null,
+        deletedAt: null,
         isPrivate: false,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -67,6 +71,9 @@ describe("runQuickAddSuggest", () => {
         today: "2026-09-18",
         nowCount: 0,
         scheduledDate: "2026-09-19",
+        parsedStartDate: null,
+        parsedDeadline: null,
+        parsedScheduledDate: null,
       },
     );
 
