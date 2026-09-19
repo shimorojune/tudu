@@ -60,7 +60,7 @@ export function BottomNav() {
             <span className="relative">
               <Icon size={18} strokeWidth={1.7} aria-hidden />
               {mark ? (
-                <span className="absolute -right-[8px] -top-[5px] bg-primary px-[4px] py-px text-[9px] font-extrabold tabular-nums text-white">
+                <span className="absolute -right-[8px] -top-[5px] bg-primary px-[4px] py-px text-[9px] font-extrabold tabular-nums text-primary-foreground">
                   {mark}
                 </span>
               ) : null}

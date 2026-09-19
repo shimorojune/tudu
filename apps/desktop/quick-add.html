@@ -6,12 +6,22 @@
     <title>Tudu Quick Add</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=AR+One+Sans:ital,wght@0,400..700;1,400..700&family=Adamina&family=Fragment+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap"
+      rel="stylesheet"
+    />
     <script>
       (function () {
         try {
-          document.documentElement.classList.remove("dark");
-          document.documentElement.style.colorScheme = "light";
+          var stored = localStorage.getItem("tudu.theme") || "system";
+          var dark =
+            stored === "dark" ||
+            (stored === "system" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) {
+            document.documentElement.classList.add("dark");
+          }
+          document.documentElement.style.colorScheme = dark ? "dark" : "light";
         } catch (e) {}
       })();
     </script>

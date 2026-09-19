@@ -16,7 +16,7 @@ type TabContentProps = {
 function TabContent({ label, badge, count }: TabContentProps) {
   const badgeNode =
     badge && badge > 0 ? (
-      <span className="bg-primary px-[5px] py-px text-[11px] font-extrabold tabular-nums text-white">
+      <span className="bg-primary px-[5px] py-px text-[11px] font-extrabold tabular-nums text-primary-foreground">
         {badge}
       </span>
     ) : null;

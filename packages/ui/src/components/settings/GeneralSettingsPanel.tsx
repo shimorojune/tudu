@@ -9,6 +9,8 @@ import {
   writeQuickAddShortcut,
 } from "@/lib/quickAddPrefs";
 import { emitQuickAddShortcutChanged } from "@/lib/quickAddMainSync";
+import { ThemeModePicker } from "@/components/settings/ThemeModePicker";
+import { ThemePalettePicker } from "@/components/settings/ThemePalettePicker";
 
 async function tryRegisterShortcut(accelerator: string): Promise<boolean> {
   try {
@@ -106,6 +108,11 @@ export function GeneralSettingsPanel() {
       <p className="mt-[6px] max-w-[52ch] text-[13.5px] text-muted-foreground">
         App-wide preferences. Quick Add is available only in the desktop app.
       </p>
+
+      <div className="mt-[28px]">
+        <ThemeModePicker />
+        <ThemePalettePicker />
+      </div>
 
       {desktop ? (
         <section className="mt-[28px] max-w-[480px] space-y-[12px]">

@@ -3,111 +3,108 @@
    Radius is 0 on purpose: Modernist rounds nothing. */
 
 @layer base {
+  /* tweakcn cmm22ewu3000104l59hacdz6y (radius forced to 0 for Tudu) */
   :root {
-    --background: #f3f2f2;
-    --foreground: #201e1d;
+    --background: oklch(0.9821 0 0);
+    --foreground: oklch(0.2435 0 0);
+    --card: oklch(0.9911 0 0);
+    --card-foreground: oklch(0.2435 0 0);
+    --popover: oklch(0.9911 0 0);
+    --popover-foreground: oklch(0.2435 0 0);
+    --primary: oklch(0.4341 0.0392 41.9938);
+    --primary-foreground: oklch(1.0000 0 0);
+    --secondary: oklch(0.9200 0.0651 74.3695);
+    --secondary-foreground: oklch(0.3499 0.0685 40.8288);
+    --muted: oklch(0.9521 0 0);
+    --muted-foreground: oklch(0.5032 0 0);
+    --accent: oklch(0.9310 0 0);
+    --accent-foreground: oklch(0.2435 0 0);
+    --destructive: oklch(0.6271 0.1936 33.3390);
+    --destructive-foreground: oklch(1.0000 0 0);
+    --border: oklch(0.8822 0 0);
+    --input: oklch(0.8822 0 0);
+    --ring: oklch(0.4341 0.0392 41.9938);
 
-    --card: #fdfcfb;
-    --card-foreground: #201e1d;
-    --popover: #fdfcfb;
-    --popover-foreground: #201e1d;
-
-    --primary: #ec3013;
-    --primary-foreground: #fdfcfb;
-
-    --secondary: #eae9e9;
-    --secondary-foreground: #201e1d;
-
-    --muted: #eae9e9;
-    --muted-foreground: #7d7979;
-
-    --accent: #fff2ef;
-    --accent-foreground: #ae1800;
-
-    /* Mono palette: there is no second hue, so destructive reads as the
-       accent one step down. Pair it with an icon or label, not color alone. */
-    --destructive: #dd2b0f;
-    --destructive-foreground: #fdfcfb;
-
-    --border: #d7d3d3;
-    --input: #bab6b6;
-    --ring: #ec3013;
-
-    /* Ink tints from the design canvas. Ordered lightest to strongest.
-       hair: the quietest separator. ghost: idle grip dots and disabled marks.
-       faint: de-emphasised meta text. rule: the standard 1px divider. */
-    --hair: rgba(32, 30, 29, 0.1);
-    --ghost: rgba(32, 30, 29, 0.2);
-    --rule: rgba(32, 30, 29, 0.22);
-    --faint: rgba(32, 30, 29, 0.34);
+    --hair: oklch(0.2435 0 0 / 0.1);
+    --ghost: oklch(0.2435 0 0 / 0.2);
+    --rule: oklch(0.2435 0 0 / 0.22);
+    --faint: oklch(0.2435 0 0 / 0.34);
 
     --radius: 0rem;
 
-    --chart-1: #ec3013;
-    --chart-2: #ae1800;
-    --chart-3: #ff9783;
-    --chart-4: #605d5d;
-    --chart-5: #bab6b6;
+    --chart-1: oklch(0.4341 0.0392 41.9938);
+    --chart-2: oklch(0.9200 0.0651 74.3695);
+    --chart-3: oklch(0.9310 0 0);
+    --chart-4: oklch(0.9367 0.0523 75.5009);
+    --chart-5: oklch(0.4338 0.0437 41.6746);
 
-    --sidebar: #eceae8;
-    --sidebar-foreground: #201e1d;
-    --sidebar-primary: #ec3013;
-    --sidebar-primary-foreground: #fdfcfb;
-    --sidebar-accent: #eae9e9;
-    --sidebar-accent-foreground: #201e1d;
-    --sidebar-border: #d7d3d3;
-    --sidebar-ring: #ec3013;
+    --sidebar: oklch(0.9881 0 0);
+    --sidebar-foreground: oklch(0.2645 0 0);
+    --sidebar-primary: oklch(0.3250 0 0);
+    --sidebar-primary-foreground: oklch(0.9881 0 0);
+    --sidebar-accent: oklch(0.9761 0 0);
+    --sidebar-accent-foreground: oklch(0.3250 0 0);
+    --sidebar-border: oklch(0.9401 0 0);
+    --sidebar-ring: oklch(0.7731 0 0);
+
+    --font-sans: "AR One Sans", ui-sans-serif, sans-serif, system-ui;
+    --font-serif: Adamina, ui-serif, serif;
+    --font-mono: "Fragment Mono", ui-monospace, monospace;
+    --tracking-normal: 0em;
   }
 
-  /* Dusk: the dark variant from the design canvas */
   .dark {
-    --background: #302d2a;
-    --foreground: #f0ede8;
+    --background: oklch(0.1776 0 0);
+    --foreground: oklch(0.9491 0 0);
+    --card: oklch(0.2134 0 0);
+    --card-foreground: oklch(0.9491 0 0);
+    --popover: oklch(0.2134 0 0);
+    --popover-foreground: oklch(0.9491 0 0);
+    --primary: oklch(0.9247 0.0524 66.1732);
+    --primary-foreground: oklch(0.2029 0.0240 200.1962);
+    --secondary: oklch(0.3163 0.0190 63.6992);
+    --secondary-foreground: oklch(0.9247 0.0524 66.1732);
+    --muted: oklch(0.2520 0 0);
+    --muted-foreground: oklch(0.8200 0 0);
+    --accent: oklch(0.2850 0 0);
+    --accent-foreground: oklch(0.9491 0 0);
+    --destructive: oklch(0.6271 0.1936 33.3390);
+    --destructive-foreground: oklch(1.0000 0 0);
+    --border: oklch(0.2351 0.0115 91.7467);
+    --input: oklch(0.4017 0 0);
+    --ring: oklch(0.9247 0.0524 66.1732);
 
-    --card: #3a3733;
-    --card-foreground: #f0ede8;
-    --popover: #3a3733;
-    --popover-foreground: #f0ede8;
+    --hair: oklch(0.9491 0 0 / 0.08);
+    --ghost: oklch(0.9491 0 0 / 0.12);
+    --rule: oklch(0.9491 0 0 / 0.16);
+    --faint: oklch(0.9491 0 0 / 0.3);
 
-    --primary: #ec3013;
-    --primary-foreground: #fdfcfb;
+    --radius: 0rem;
 
-    --secondary: #44403b;
-    --secondary-foreground: #f0ede8;
+    --chart-1: oklch(0.9247 0.0524 66.1732);
+    --chart-2: oklch(0.3163 0.0190 63.6992);
+    --chart-3: oklch(0.2850 0 0);
+    --chart-4: oklch(0.3481 0.0219 67.0001);
+    --chart-5: oklch(0.9245 0.0533 67.0855);
 
-    --muted: #44403b;
-    --muted-foreground: #a8a29a;
-
-    --accent: #4d170e;
-    --accent-foreground: #ffc4b8;
-
-    --destructive: #ff563c;
-    --destructive-foreground: #201e1d;
-
-    --border: #4a4641;
-    --input: #5a554f;
-    --ring: #ff563c;
-
-    --hair: rgba(240, 237, 232, 0.1);
-    --ghost: rgba(240, 237, 232, 0.2);
-    --rule: rgba(240, 237, 232, 0.22);
-    --faint: rgba(240, 237, 232, 0.34);
-
-    --chart-1: #ff563c;
-    --chart-2: #ffc4b8;
-    --chart-3: #ec3013;
-    --chart-4: #a8a29a;
-    --chart-5: #605d5d;
-
-    --sidebar: #3d3833;
-    --sidebar-foreground: #f0ede8;
-    --sidebar-primary: #ec3013;
-    --sidebar-primary-foreground: #fdfcfb;
-    --sidebar-accent: #44403b;
-    --sidebar-accent-foreground: #f0ede8;
-    --sidebar-border: #4a4641;
-    --sidebar-ring: #ff563c;
+    --sidebar: oklch(0.2103 0.0059 285.8852);
+    --sidebar-foreground: oklch(0.9674 0.0013 286.3752);
+    --sidebar-primary: oklch(0.4882 0.2172 264.3763);
+    --sidebar-primary-foreground: oklch(1.0000 0 0);
+    --sidebar-accent: oklch(0.2739 0.0055 286.0326);
+    --sidebar-accent-foreground: oklch(0.9674 0.0013 286.3752);
+    --sidebar-border: oklch(0.2739 0.0055 286.0326);
+    --sidebar-ring: oklch(0.8711 0.0055 286.2860);
   }
+}
+
+[data-appearance-preview="light"] {
+  background: oklch(0.9821 0 0);
+  border: 1px solid oklch(0.8822 0 0);
+}
+
+[data-appearance-preview="dark"] {
+  background: oklch(0.1776 0 0);
 }
 
 @theme inline {
@@ -153,8 +150,9 @@
   --radius-lg: 0rem;
   --radius-xl: 0rem;
 
-  --font-sans: Archivo, system-ui, sans-serif;
-  --font-heading: Archivo, system-ui, sans-serif;
+  --font-sans: var(--font-sans);
+  --font-heading: var(--font-sans);
+  --font-mono: var(--font-mono);
 
   /* Full Modernist ramps, if you want steps beyond the semantic roles */
   --color-ink-100: #f8f4f4;

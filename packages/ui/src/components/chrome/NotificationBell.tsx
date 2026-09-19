@@ -43,7 +43,7 @@ export function NotificationBell() {
         >
           <Bell size={17} strokeWidth={1.6} />
           {unreadCount > 0 ? (
-            <span className="absolute -right-[7px] -top-[6px] bg-primary px-[4px] py-px text-[9px] font-extrabold tabular-nums text-white">
+            <span className="absolute -right-[7px] -top-[6px] bg-primary px-[4px] py-px text-[9px] font-extrabold tabular-nums text-primary-foreground">
               {unreadCount}
             </span>
           ) : null}

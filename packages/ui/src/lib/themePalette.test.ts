@@ -1,0 +1,77 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  applyPaletteToDocument,
+  buildThemeTokens,
+  contrastForeground,
+  deriveElevatedSurface,
+  mergeCustomColors,
+} from "@/lib/themePalette";
+import { getPresetTokens } from "@/lib/themePalettes";
+
+describe("themePalette", () => {
+  beforeEach(() => {
+    document.documentElement.classList.remove("dark");
+    document.documentElement.removeAttribute("style");
+  });
+
+  it("picks light or dark text from primary luminance", () => {
+    expect(contrastForeground("#ec3013")).toBe("#fafaf9");
+    expect(contrastForeground("#f3f2f2")).toBe("#201e1d");
+  });
+
+  it("merges custom hex colors onto preset base", () => {
+    const base = getPresetTokens("current", "light");
+    const merged = mergeCustomColors(
+      base,
+      {
+        primary: "#0000ff",
+        background: "#eeeeee",
+      },
+      "light",
+    );
+    expect(merged["--primary"]).toBe("#0000ff");
+    expect(merged["--background"]).toBe("#eeeeee");
+    expect(merged["--card"]).toBe(deriveElevatedSurface("#eeeeee"));
+    expect(merged["--popover"]).toBe(merged["--card"]);
+    expect(merged["--primary-foreground"]).toBe("#fafaf9");
+    expect(merged["--hair"]).toMatch(/rgba|oklch/);
+  });
+
+  it("elevates card surface from custom background", () => {
+    expect(deriveElevatedSurface("#302d2a")).toBe("#3a3734");
+    expect(deriveElevatedSurface("#111111")).toBe("#242424");
+  });
+
+  it("only applies stored custom colors when palette is custom", () => {
+    const withCustom = buildThemeTokens("modernist", "light", {
+      primary: "#00ff00",
+    });
+    expect(withCustom["--primary"]).not.toBe("#00ff00");
+
+    const customPalette = buildThemeTokens("custom", "light", {
+      primary: "#00ff00",
+    });
+    expect(customPalette["--primary"]).toBe("#00ff00");
+  });
+
+  it("clears inline tokens for current preset and sets font", () => {
+    document.documentElement.style.setProperty("--primary", "#ff0000");
+    applyPaletteToDocument("current", "light", {}, "system");
+    expect(document.documentElement.style.getPropertyValue("--primary")).toBe(
+      "",
+    );
+    expect(document.documentElement.style.getPropertyValue("--font-sans")).toBe(
+      "system-ui, sans-serif",
+    );
+  });
+
+  it("applies modernist tokens to the document", () => {
+    applyPaletteToDocument("modernist", "dark", {}, "ar-one-sans");
+    expect(document.documentElement.style.getPropertyValue("--primary")).toBe(
+      "#ec3013",
+    );
+    expect(document.documentElement.style.getPropertyValue("--background")).toBe(
+      "#302d2a",
+    );
+  });
+});

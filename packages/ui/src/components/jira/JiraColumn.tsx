@@ -194,7 +194,7 @@ function JiraIssueRow({
                 {jiraStatusLabel(issue)}
               </span>
             </div>
-            <h3 className="mt-[5px] text-[14px] leading-[1.35] tracking-[-0.01em]">
+            <h3 className="mt-[5px] text-[14px] font-semibold leading-[1.35] tracking-[-0.01em]">
               {issue.summary}
             </h3>
             <p className="mt-[5px] text-[11.5px] leading-[1.45] text-muted-foreground">
