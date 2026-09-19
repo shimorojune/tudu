@@ -7,8 +7,10 @@ use std::sync::Mutex;
 use quick_add::{
     dismiss_quick_add, hide_quick_add_window, pause_quick_add_shortcuts_command,
     place_quick_add_window_command, present_quick_add_window, register_quick_add_shortcut,
-    register_quick_add_shortcut_command, show_main_window_command, QuickAddSession,
-    QuickAddShortcutState, QuickAddToggleGuard, DEFAULT_QUICK_ADD_ACCELERATOR,
+    register_quick_add_shortcut_command, resize_quick_add_window,
+    save_quick_add_window_position, show_main_window_command, QuickAddSession,
+    QuickAddShortcutState, QuickAddToggleGuard, QuickAddWindowState,
+    DEFAULT_QUICK_ADD_ACCELERATOR,
 };
 use tauri::{
     menu::{Menu, MenuItem},
@@ -39,6 +41,7 @@ pub fn run() {
             DEFAULT_QUICK_ADD_ACCELERATOR.to_string(),
         )))
         .manage(QuickAddSession(Mutex::new(None)))
+        .manage(QuickAddWindowState(Mutex::new(None)))
         .manage(QuickAddToggleGuard(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             register_quick_add_shortcut_command,
@@ -47,6 +50,8 @@ pub fn run() {
             show_main_window_command,
             place_quick_add_window_command,
             present_quick_add_window,
+            resize_quick_add_window,
+            save_quick_add_window_position,
         ])
         .setup(|app| {
             cleanup::cleanup_legacy_data(&app.handle());

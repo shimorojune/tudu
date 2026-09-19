@@ -26,6 +26,8 @@ describe("runQuickAddSuggest", () => {
 
     expect(result.projectId).toBeNull();
     expect(result.bucket).toBeNull();
+    expect(result.startDate).toBeNull();
+    expect(result.deadline).toBeNull();
   });
 
   it("maps confident project and bucket answers", async () => {
@@ -47,6 +49,12 @@ describe("runQuickAddSuggest", () => {
         answers: {
           project: { choice: projectId, confidence: 0.9, type: "choice" },
           bucket: { choice: "next", confidence: 0.8, type: "choice" },
+          start: { choice: "none", confidence: 0.2, type: "choice" },
+          deadline: {
+            choice: "end_of_week",
+            confidence: 0.85,
+            type: "choice",
+          },
         },
       }),
     } as unknown as TypeSafeClient;
@@ -65,5 +73,7 @@ describe("runQuickAddSuggest", () => {
     expect(result.projectId).toBe(projectId);
     expect(result.matchedProjectName).toBe("PS");
     expect(result.bucket).toBe("next");
+    expect(result.deadline).not.toBeNull();
+    expect(result.startDate).toBeNull();
   });
 });

@@ -136,6 +136,8 @@ async function main() {
 
   const db = createDb(databaseUrl);
   const auth = createAuth(db, resolveTrustedOrigins());
+  const { ensureSystemUser } = await import("@tudu/db");
+  await ensureSystemUser(db);
 
   const ids: Record<string, string> = {};
   for (const account of ACCOUNTS) {

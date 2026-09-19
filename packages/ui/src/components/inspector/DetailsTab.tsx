@@ -27,6 +27,8 @@ import {
   withSyntheticCreated,
 } from "@/lib/timelineCopy";
 import { TimelineEventRow } from "@/components/inspector/TimelineEventRow";
+import { DeadlineField } from "@/components/tasks/DeadlineField";
+import { DateField } from "@/components/ui/date-field";
 import { ProjectPicker } from "@/components/projects/ProjectPicker";
 import { TaskDescriptionField } from "@/components/inspector/TaskDescriptionField";
 import { cn } from "@/lib/utils";
@@ -195,11 +197,40 @@ export function DetailsTab({
         </dd>
 
         <dt className="text-muted-foreground">Start</dt>
-        <dd className="tabular-nums">{formatFieldDate(task.startDate)}</dd>
+        <dd className="tabular-nums">
+          {readOnly || !isOpen ? (
+            formatFieldDate(task.startDate)
+          ) : (
+            <DateField
+              value={task.startDate ?? ""}
+              onChange={(value) => {
+                updateTask({
+                  id: task.id,
+                  patch: { startDate: value || null },
+                });
+              }}
+              allowClear
+              aria-label="Start date"
+            />
+          )}
+        </dd>
 
         <dt className="text-muted-foreground">Deadline</dt>
         <dd className="tabular-nums">
-          {formatDeadline(task.deadline, selectedDate)}
+          {readOnly || !isOpen ? (
+            formatDeadline(task.deadline, selectedDate)
+          ) : (
+            <DeadlineField
+              value={task.deadline}
+              onChange={(value) => {
+                updateTask({
+                  id: task.id,
+                  patch: { deadline: value },
+                });
+              }}
+              aria-label="Deadline"
+            />
+          )}
         </dd>
 
         <dt className="text-muted-foreground">Carried</dt>

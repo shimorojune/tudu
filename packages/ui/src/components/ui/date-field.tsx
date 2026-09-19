@@ -1,11 +1,13 @@
 import { format, parseISO } from "date-fns";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { QuickAddCalendarPlacement } from "@/lib/quickAddCalendarPlacement";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { bindQuickAddPopoverOpenChange } from "@/lib/quickAddPopoverOpen";
 import { cn } from "@/lib/utils";
 
 export type DateFieldProps = {
@@ -16,9 +18,11 @@ export type DateFieldProps = {
   "aria-label"?: string;
   labelPrefix?: string;
   className?: string;
-  /** Prefer top in tight shells (Quick Add) so the grid is not clipped. */
   popoverSide?: "top" | "bottom";
   popoverAlign?: "start" | "center" | "end";
+  emptyLabel?: string;
+  /** Tauri Quick Add: grow webview before open; popover opens below trigger. */
+  quickAddShell?: boolean;
 };
 
 export function DateField({
@@ -31,8 +35,27 @@ export function DateField({
   className,
   popoverSide = "bottom",
   popoverAlign = "start",
+  emptyLabel = "Pick a date",
+  quickAddShell = false,
 }: DateFieldProps) {
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
+  const [quickAddPlacement, setQuickAddPlacement] =
+    useState<QuickAddCalendarPlacement | null>(null);
+  const handleOpenChange = bindQuickAddPopoverOpenChange(quickAddShell, setOpen, {
+    variant: "date",
+    getTrigger: () => triggerRef.current,
+    onPlacement: setQuickAddPlacement,
+  });
+  const resolvedSide = quickAddShell
+    ? (quickAddPlacement?.side ?? popoverSide)
+    : popoverSide;
+  const resolvedAlign = quickAddShell
+    ? (quickAddPlacement?.align ?? popoverAlign)
+    : popoverAlign;
+  const quickAddPopoverClass = quickAddShell
+    ? "z-[200] w-auto max-w-[calc(100vw-16px)] p-0 [--cell-size:1.75rem]"
+    : "z-[200] w-auto p-0 [--cell-size:2rem]";
   const selected = value ? parseISO(`${value}T12:00:00`) : undefined;
   const [month, setMonth] = useState<Date>(() => selected ?? new Date());
 
@@ -44,12 +67,13 @@ export function DateField({
 
   const label = value
     ? format(new Date(`${value}T12:00:00`), "EEE d MMM")
-    : "Pick a date";
+    : emptyLabel;
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <button
+          ref={triggerRef}
           type="button"
           id={id}
           aria-label={ariaLabel}
@@ -63,11 +87,11 @@ export function DateField({
         </button>
       </PopoverTrigger>
       <PopoverContent
-        align={popoverAlign}
-        side={popoverSide}
+        align={resolvedAlign}
+        side={resolvedSide}
         sideOffset={6}
-        collisionPadding={8}
-        className="z-[200] w-auto p-0 [--cell-size:2rem]"
+        collisionPadding={quickAddShell ? 12 : 8}
+        className={quickAddPopoverClass}
       >
         <Calendar
           mode="single"
@@ -82,7 +106,7 @@ export function DateField({
               return;
             }
             onChange(format(date, "yyyy-MM-dd"));
-            setOpen(false);
+            handleOpenChange(false);
           }}
           classNames={{
             day: "rounded-none",
@@ -95,7 +119,7 @@ export function DateField({
             className="w-full border-t border-hair px-[12px] py-[8px] text-left text-[12.5px] text-muted-foreground"
             onClick={() => {
               onChange("");
-              setOpen(false);
+              handleOpenChange(false);
             }}
           >
             Clear

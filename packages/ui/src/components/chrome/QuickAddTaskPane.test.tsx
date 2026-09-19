@@ -1,10 +1,26 @@
+import { invoke } from "@tauri-apps/api/core";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import {
+  QUICK_ADD_EXPANDED_HEIGHT_DATE,
+  QUICK_ADD_WINDOW_WIDTH,
+} from "@/lib/quickAddWindowResize";
 import { QuickAddTaskPane } from "./QuickAddTaskPane";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({
+    label: "quick-add",
+    scaleFactor: () => Promise.resolve(1),
+    outerPosition: () => Promise.resolve({ x: 0, y: 0 }),
+    onMoved: () => Promise.resolve(() => {}),
+    startDragging: () => Promise.resolve(),
+    listen: () => Promise.resolve(vi.fn()),
+  }),
 }));
 
 vi.mock("@tauri-apps/api/window", () => ({
@@ -48,6 +64,7 @@ vi.mock("@tudu/store", async (importOriginal) => {
 
 describe("QuickAddTaskPane", () => {
   beforeEach(() => {
+    vi.mocked(invoke).mockClear();
     createTask.mockReset();
     createTask.mockReturnValue({
       unwrap: () =>
@@ -85,4 +102,33 @@ describe("QuickAddTaskPane", () => {
 
     await waitFor(() => expect(onClose).toHaveBeenCalled(), { timeout: 2000 });
   });
+
+  it("resizes Quick Add window before the timing date popover opens", async () => {
+    let finishResize: (() => void) | undefined;
+    vi.mocked(invoke).mockImplementation((cmd) => {
+      if (cmd === "resize_quick_add_window") {
+        return new Promise<void>((resolve) => {
+          finishResize = resolve;
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+
+    const user = userEvent.setup();
+    render(<QuickAddTaskPane onClose={vi.fn()} onRequestSignIn={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "Start date" }));
+
+    expect(invoke).toHaveBeenCalledWith("resize_quick_add_window", {
+      width: QUICK_ADD_WINDOW_WIDTH,
+      height: QUICK_ADD_EXPANDED_HEIGHT_DATE,
+    });
+    expect(screen.queryByRole("grid")).toBeNull();
+
+    finishResize?.();
+    await waitFor(() => {
+      expect(screen.getByRole("grid")).toBeInTheDocument();
+    });
+  });
+
 });

@@ -548,7 +548,7 @@ export function applyEvent(replica: Replica, event: SyncEvent): Replica {
       next.notifications = list
         .slice()
         .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
-        .slice(0, 50);
+        .slice(0, 100);
       return next;
     }
     case "notification.readAll": {

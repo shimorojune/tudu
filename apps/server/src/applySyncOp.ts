@@ -1950,7 +1950,7 @@ export async function bootstrapViews(
         break;
       }
       case "notifications": {
-        const rows = await listNotifications(db, userId, 50);
+        const rows = await listNotifications(db, userId, 100);
         for (const row of rows) {
           events.push(synthetic("notification.upsert", row));
         }

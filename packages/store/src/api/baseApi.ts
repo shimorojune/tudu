@@ -54,5 +54,6 @@ export const baseApi = createApi({
     "JiraProject",
     "JiraJqlPreset",
     "JiraUser",
+    "NotificationSettings",
   ],
 });

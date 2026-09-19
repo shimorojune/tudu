@@ -1,4 +1,9 @@
 import * as chrono from "chrono-node";
+import {
+  deadlineFromChronoDate,
+  isoDateLocal,
+  startDateFromChronoDate,
+} from "./taskScheduleHelpers.js";
 
 export type QuickAddDayChoice = "today" | "tomorrow" | "pick" | "unscheduled";
 
@@ -10,18 +15,15 @@ export type QuickAddTextSpan = {
 export type QuickAddNaturalLanguageParse = {
   spans: QuickAddTextSpan[];
   scheduledDate: string | null;
+  startDate: string | null;
+  deadline: string | null;
   dayChoice: QuickAddDayChoice;
   pickedDate: string;
   chipLabel: string | null;
   titleForSave: string;
 };
 
-function isoDateLocal(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
+type ChronoRole = "schedule" | "start" | "deadline";
 
 function offsetIso(fromIso: string, dayOffset: number): string {
   const date = new Date(`${fromIso}T12:00:00`);
@@ -66,6 +68,14 @@ function stripSpans(input: string, spans: QuickAddTextSpan[]): string {
   return normalizeWhitespace(result);
 }
 
+function chronoDateHasTime(date: Date): boolean {
+  return (
+    date.getHours() !== 0 ||
+    date.getMinutes() !== 0 ||
+    date.getSeconds() !== 0
+  );
+}
+
 function formatChipLabel(start: Date, todayIso: string): string {
   const dateIso = isoDateLocal(start);
   const tomorrowIso = offsetIso(todayIso, 1);
@@ -82,12 +92,7 @@ function formatChipLabel(start: Date, todayIso: string): string {
     });
   }
 
-  const hasTime =
-    start.getHours() !== 0 ||
-    start.getMinutes() !== 0 ||
-    start.getSeconds() !== 0;
-
-  if (!hasTime) {
+  if (!chronoDateHasTime(start)) {
     return dayPart;
   }
 
@@ -97,6 +102,23 @@ function formatChipLabel(start: Date, todayIso: string): string {
   });
 
   return `${dayPart}, ${timePart}`;
+}
+
+export function inferScheduledDateFromTiming(
+  scheduledDate: string | null,
+  startDate: string | null,
+  deadline: string | null,
+): string | null {
+  if (scheduledDate !== null) {
+    return scheduledDate;
+  }
+  if (deadline) {
+    return isoDateLocal(new Date(deadline));
+  }
+  if (startDate) {
+    return startDate;
+  }
+  return null;
 }
 
 function deriveDayChoice(
@@ -118,6 +140,37 @@ function deriveDayChoice(
   return { dayChoice: "pick", pickedDate: scheduledDate };
 }
 
+function roleForChronoMatch(text: string, index: number): ChronoRole {
+  const before = text.slice(0, index).toLowerCase();
+  const tail = before.slice(Math.max(0, before.length - 56));
+  if (/\b(due|by|before)\b/.test(tail)) {
+    return "deadline";
+  }
+  if (/\b(starting|start|from)\b/.test(tail)) {
+    return "start";
+  }
+  return "schedule";
+}
+
+function spanWithRoleKeyword(
+  text: string,
+  span: QuickAddTextSpan,
+  role: ChronoRole,
+): QuickAddTextSpan {
+  if (role === "schedule") {
+    return span;
+  }
+  const before = text.slice(0, span.start);
+  const keywordMatch = before.match(/\b(due|by|before|starting|start|from)\b\s*$/i);
+  if (!keywordMatch) {
+    return span;
+  }
+  return {
+    start: span.start - keywordMatch[0].length,
+    end: span.end,
+  };
+}
+
 /** Parse natural-language dates in Quick Add input (chrono-node). */
 export function parseQuickAddNaturalLanguage(
   input: string,
@@ -128,6 +181,8 @@ export function parseQuickAddNaturalLanguage(
   const empty: QuickAddNaturalLanguageParse = {
     spans: [],
     scheduledDate: null,
+    startDate: null,
+    deadline: null,
     dayChoice: "unscheduled",
     pickedDate: todayIso,
     chipLabel: null,
@@ -148,26 +203,65 @@ export function parseQuickAddNaturalLanguage(
     };
   }
 
-  const primary = results[0];
-  const start = primary.start.date();
-  const scheduledDate = isoDateLocal(start);
+  let scheduledDate: string | null = null;
+  let startDate: string | null = null;
+  let deadline: string | null = null;
+  let chipSource: Date | null = null;
 
-  const spans = mergeSpans(
-    results.map((result) => ({
+  const spanByResult = results.map((result) => {
+    const role = roleForChronoMatch(trimmed, result.index);
+    const base = {
       start: result.index,
       end: result.index + result.text.length,
-    })),
-  );
+    };
+    return {
+      role,
+      span: spanWithRoleKeyword(trimmed, base, role),
+      when: result.start.date(),
+    };
+  });
+
+  for (const { role, when } of spanByResult) {
+
+    if (role === "deadline") {
+      deadline = deadlineFromChronoDate(when);
+      chipSource = chipSource ?? when;
+      continue;
+    }
+
+    if (role === "start") {
+      startDate = startDateFromChronoDate(when);
+      chipSource = chipSource ?? when;
+      continue;
+    }
+
+    if (scheduledDate === null) {
+      scheduledDate = isoDateLocal(when);
+      chipSource = when;
+      if (chronoDateHasTime(when) && deadline === null) {
+        deadline = deadlineFromChronoDate(when);
+      }
+    }
+  }
+
+  const spans = mergeSpans(spanByResult.map((entry) => entry.span));
 
   const titleForSave = stripSpans(trimmed, spans);
+  scheduledDate = inferScheduledDateFromTiming(
+    scheduledDate,
+    startDate,
+    deadline,
+  );
   const { dayChoice, pickedDate } = deriveDayChoice(scheduledDate, todayIso);
 
   return {
     spans,
     scheduledDate,
+    startDate,
+    deadline,
     dayChoice,
     pickedDate,
-    chipLabel: formatChipLabel(start, todayIso),
+    chipLabel: chipSource ? formatChipLabel(chipSource, todayIso) : null,
     titleForSave: titleForSave.length > 0 ? titleForSave : trimmed,
   };
 }

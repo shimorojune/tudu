@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
 import {
   index,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -18,6 +19,14 @@ export const notificationKind = pgEnum("notification_kind", [
   "task_changed",
   "task_deleted",
   "inbox_declined",
+  "jira_assigned",
+  "jira_unassigned",
+  "jira_comment",
+  "jira_updated",
+  "reminder_digest",
+  "reminder_late",
+  "reminder_deadline",
+  "app_update",
 ]);
 
 export const notifications = pgTable(
@@ -40,6 +49,10 @@ export const notifications = pgTable(
       onDelete: "set null",
     }),
     scheduledDate: text("scheduled_date"),
+    jiraIssueId: text("jira_issue_id"),
+    jiraIssueKey: text("jira_issue_key"),
+    appVersion: text("app_version"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
     taskTitle: text("task_title").notNull(),
     body: text("body").notNull(),
     readAt: timestamp("read_at", { withTimezone: true }),

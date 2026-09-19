@@ -1,6 +1,7 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import {
   formatNotificationBody,
+  TUDU_SYSTEM_USER_ID,
   type AppNotification,
   type NotificationKind,
   type TaskChangeTimelineType,
@@ -22,6 +23,10 @@ export function mapNotification(row: NotificationRow): AppNotification {
     commentId: row.commentId,
     inboxItemId: row.inboxItemId,
     scheduledDate: row.scheduledDate,
+    jiraIssueId: row.jiraIssueId ?? null,
+    jiraIssueKey: row.jiraIssueKey ?? null,
+    appVersion: row.appVersion ?? null,
+    metadata: (row.metadata as Record<string, unknown> | null) ?? null,
     taskTitle: row.taskTitle,
     body: row.body,
     readAt: row.readAt?.toISOString() ?? null,
@@ -32,7 +37,7 @@ export function mapNotification(row: NotificationRow): AppNotification {
 export async function listNotifications(
   db: Db,
   userId: string,
-  limit = 50,
+  limit = 100,
 ): Promise<AppNotification[]> {
   const rows = await db.query.notifications.findMany({
     where: and(eq(notifications.userId, userId), isNull(notifications.deletedAt)),
@@ -163,3 +168,65 @@ export async function insertAndEmitNotifications(
   }
   return events;
 }
+
+export type InsertSystemNotificationInput = {
+  recipientUserIds: string[];
+  clientMutationId: string | null;
+  kind: NotificationKind;
+  body: string;
+  taskTitle: string;
+  taskId?: string | null;
+  ownerId?: string | null;
+  scheduledDate?: string | null;
+  jiraIssueId?: string | null;
+  jiraIssueKey?: string | null;
+  appVersion?: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+export async function insertSystemNotifications(
+  db: Db,
+  input: InsertSystemNotificationInput,
+): Promise<SyncEvent[]> {
+  const recipients = uniqueIds(input.recipientUserIds);
+  const body = input.body.trim();
+  const taskTitle = input.taskTitle.trim();
+  if (!body || !taskTitle || recipients.length === 0) {
+    return [];
+  }
+
+  const rows = await db
+    .insert(notifications)
+    .values(
+      recipients.map((userId) => ({
+        userId,
+        actorId: TUDU_SYSTEM_USER_ID,
+        kind: input.kind,
+        taskId: input.taskId ?? null,
+        ownerId: input.ownerId ?? null,
+        scheduledDate: input.scheduledDate ?? null,
+        jiraIssueId: input.jiraIssueId ?? null,
+        jiraIssueKey: input.jiraIssueKey ?? null,
+        appVersion: input.appVersion ?? null,
+        metadata: input.metadata ?? null,
+        taskTitle,
+        body,
+      })),
+    )
+    .returning();
+
+  const events: SyncEvent[] = [];
+  for (const row of rows) {
+    events.push(
+      ...(await emitSync(db, {
+        recipientUserIds: [row.userId],
+        clientMutationId: input.clientMutationId,
+        type: "notification.upsert",
+        payload: mapNotification(row),
+      })),
+    );
+  }
+  return events;
+}
+
+export { TUDU_SYSTEM_USER_ID };

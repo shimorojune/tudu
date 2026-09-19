@@ -1,3 +1,4 @@
+import { compareAppVersions } from "@tudu/shared";
 import { resolveUpdatesPublicBaseUrl } from "@tudu/shared";
 import { Hono } from "hono";
 import {
@@ -11,6 +12,7 @@ import {
   mapReleaseToManifest,
   UPDATES_ASSET_NAME,
   UPDATES_SIG_NAME,
+  stripReleaseTag,
 } from "./updates/mapRelease.js";
 
 const ALLOWED_DOWNLOADS = new Set([UPDATES_ASSET_NAME]);
@@ -34,6 +36,32 @@ function resolveUpdatesConfig(): UpdatesRouteConfig | null {
 
 export function createUpdatesRoute() {
   const app = new Hono();
+
+  app.get("/updates/check", async (c) => {
+    const config = resolveUpdatesConfig();
+    if (!config) {
+      return c.json({ error: "Updates not configured" }, 503);
+    }
+    const current = c.req.query("version")?.trim() ?? "";
+    try {
+      const release = await fetchLatestRelease(config);
+      const latestVersion = stripReleaseTag(release.tag_name);
+      const updateAvailable =
+        current.length > 0
+          ? compareAppVersions(latestVersion, current) > 0
+          : true;
+      return c.json({
+        latestVersion,
+        updateAvailable,
+        releaseUrl: release.html_url,
+        notes: release.body ?? "",
+      });
+    } catch (error) {
+      clearReleaseCache();
+      console.error("Failed to check updates:", error);
+      return c.json({ error: "Failed to fetch update metadata" }, 502);
+    }
+  });
 
   app.get("/updates/latest.json", async (c) => {
     const config = resolveUpdatesConfig();

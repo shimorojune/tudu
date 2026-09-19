@@ -9,6 +9,7 @@ import "./api/linkPreviewApi.js";
 import "./api/managerApi.js";
 import "./api/jiraApi.js";
 import "./api/quickAddApi.js";
+import "./api/notificationSettingsApi.js";
 
 export function makeStore() {
   return configureStore({

@@ -176,9 +176,10 @@ export function TaskScheduleFields({
                 allowClear={false}
                 onChange={onPickedDateChange}
                 aria-label="Task date"
-                popoverSide="top"
+                popoverSide="bottom"
                 popoverAlign="start"
-                className="w-auto bg-transparent px-[8px] py-[4px] text-[12px]"
+                quickAddShell
+                className="w-auto border border-rule bg-transparent px-[8px] py-[4px] text-[12px]"
               />
             ) : null}
           </div>

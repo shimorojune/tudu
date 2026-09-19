@@ -6,22 +6,27 @@ import {
   type ReactNode,
 } from "react";
 import {
-  parseQuickAddNaturalLanguage,
   stripProjectPhraseFromTitle,
+  validateStartBeforeDeadline,
   type Bucket,
-  type QuickAddNaturalLanguageParse,
 } from "@tudu/shared";
-import { X } from "lucide-react";
+import { GripVertical, X } from "lucide-react";
 import {
   todayIso,
   useCreateTaskMutation,
   useGetTasksForDayQuery,
-  useQuickAddSuggestMutation,
 } from "@tudu/store";
 import { authClient } from "@/lib/authClient";
 import { createTaskBody } from "@/lib/createTask";
 import { renderQuickAddHighlightedTitle } from "@/lib/quickAddHighlight";
+import {
+  startQuickAddWindowDrag,
+  useQuickAddWindowDrag,
+} from "@/hooks/useQuickAddWindowDrag";
+import { useTaskFieldSuggest } from "@/hooks/useTaskFieldSuggest";
+import { useTaskTitleNaturalLanguage } from "@/hooks/useTaskTitleNaturalLanguage";
 import { ProjectPicker } from "@/components/projects/ProjectPicker";
+import { TaskStartDeadlineFields } from "@/components/tasks/TaskStartDeadlineFields";
 import {
   type NewTaskDayChoice,
   resolveScheduledDate,
@@ -29,12 +34,11 @@ import {
 } from "@/components/tasks/TaskScheduleFields";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { resetQuickAddWindowHeight } from "@/lib/quickAddWindowResize";
 import { cn } from "@/lib/utils";
 
 const EXIT_MS = 200;
 const HIDE_REQUEST_GRACE_MS = 500;
-const CHRONO_DEBOUNCE_MS = 150;
-const JEV_DEBOUNCE_MS = 400;
 
 /** Content width; Tauri window adds 8px outer padding (see quick_add.rs). */
 export const QUICK_ADD_PANEL_WIDTH_PX = 520;
@@ -60,18 +64,20 @@ export function QuickAddTaskPane({
   const openedAtRef = useRef(0);
   const exitFinishedRef = useRef(false);
   const closeAfterSaveRef = useRef(false);
-  const jevRequestIdRef = useRef(0);
   const { data: session, isPending: sessionPending } = authClient.useSession();
   const [title, setTitle] = useState("");
-  const [parse, setParse] = useState<QuickAddNaturalLanguageParse | null>(null);
   const [bucket, setBucket] = useState<Bucket>("next");
   const [dayChoice, setDayChoice] = useState<NewTaskDayChoice>("today");
   const [pickedDate, setPickedDate] = useState(() => todayIso());
+  const [startDate, setStartDate] = useState("");
+  const [deadline, setDeadline] = useState<string | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [jevProjectName, setJevProjectName] = useState<string | null>(null);
   const [scheduleSource, setScheduleSource] = useState<AutoSource>("auto");
   const [bucketSource, setBucketSource] = useState<AutoSource>("auto");
   const [projectSource, setProjectSource] = useState<AutoSource>("auto");
+  const [startSource, setStartSource] = useState<AutoSource>("auto");
+  const [deadlineSource, setDeadlineSource] = useState<AutoSource>("auto");
   const [submitting, setSubmitting] = useState(false);
   const [jevSuggesting, setJevSuggesting] = useState(false);
   const [enterGeneration, setEnterGeneration] = useState(0);
@@ -83,21 +89,50 @@ export function QuickAddTaskPane({
     todayTasks?.tasks.filter((task) => task.bucket === "now").length ?? 0;
 
   const [createTask] = useCreateTaskMutation();
-  const [quickAddSuggest] = useQuickAddSuggestMutation();
+  useQuickAddWindowDrag();
+  const parse = useTaskTitleNaturalLanguage(title, today);
+  const scheduledDate = resolveScheduledDate(dayChoice, pickedDate, today);
+
+  useTaskFieldSuggest({
+    title,
+    parse,
+    today,
+    scheduledDate,
+    nowCount,
+    scheduleSource,
+    bucketSource,
+    projectSource,
+    startSource,
+    deadlineSource,
+    onProjectId: (id, name) => {
+      setProjectId(id);
+      setJevProjectName(name);
+    },
+    onBucket: setBucket,
+    onDayChoice: setDayChoice,
+    onPickedDate: setPickedDate,
+    onStartDate: setStartDate,
+    onDeadline: setDeadline,
+    onJevSuggesting: setJevSuggesting,
+  });
 
   const resetForm = useCallback(() => {
     setTitle("");
-    setParse(null);
     setBucket("next");
     setDayChoice("today");
     setPickedDate(today);
+    setStartDate("");
+    setDeadline(null);
     setProjectId(null);
     setJevProjectName(null);
     setScheduleSource("auto");
     setBucketSource("auto");
     setProjectSource("auto");
+    setStartSource("auto");
+    setDeadlineSource("auto");
     setSubmitting(false);
     setJevSuggesting(false);
+    void resetQuickAddWindowHeight();
   }, [today]);
 
   const beginOpen = useCallback(() => {
@@ -182,82 +217,6 @@ export function QuickAddTaskPane({
     return () => window.removeEventListener("quick-add:dev-open", onDevOpen);
   }, [beginOpen]);
 
-  useEffect(() => {
-    const handle = window.setTimeout(() => {
-      const next = parseQuickAddNaturalLanguage(title, new Date(), today);
-      setParse(next);
-      if (scheduleSource === "auto") {
-        setDayChoice(next.dayChoice);
-        setPickedDate(next.pickedDate);
-      }
-    }, CHRONO_DEBOUNCE_MS);
-
-    return () => window.clearTimeout(handle);
-  }, [title, today, scheduleSource]);
-
-  const scheduledDate = resolveScheduledDate(dayChoice, pickedDate, today);
-
-  useEffect(() => {
-    const trimmed = title.trim();
-    if (trimmed.length < 3) {
-      setJevSuggesting(false);
-      return;
-    }
-
-    const titleForSave =
-      parse?.titleForSave.trim() || trimmed;
-
-    const handle = window.setTimeout(() => {
-      const requestId = jevRequestIdRef.current + 1;
-      jevRequestIdRef.current = requestId;
-      setJevSuggesting(true);
-
-      void quickAddSuggest({
-        titleForSave,
-        rawTitle: trimmed,
-        today,
-        nowCount,
-        scheduledDate,
-      })
-        .unwrap()
-        .then((response) => {
-          if (jevRequestIdRef.current !== requestId) {
-            return;
-          }
-          if (projectSource === "auto" && response.projectId) {
-            setProjectId(response.projectId);
-            setJevProjectName(response.matchedProjectName);
-          }
-          if (
-            bucketSource === "auto" &&
-            response.bucket &&
-            scheduledDate !== null
-          ) {
-            setBucket(response.bucket);
-          }
-        })
-        .catch(() => {
-          // Jev unavailable: chrono and manual controls still work.
-        })
-        .finally(() => {
-          if (jevRequestIdRef.current === requestId) {
-            setJevSuggesting(false);
-          }
-        });
-    }, JEV_DEBOUNCE_MS);
-
-    return () => window.clearTimeout(handle);
-  }, [
-    title,
-    parse,
-    today,
-    nowCount,
-    scheduledDate,
-    quickAddSuggest,
-    projectSource,
-    bucketSource,
-  ]);
-
   const syncTitleScroll = useCallback(() => {
     const input = titleRef.current;
     const mirror = titleMirrorRef.current;
@@ -286,6 +245,10 @@ export function QuickAddTaskPane({
       return;
     }
 
+    if (validateStartBeforeDeadline(startDate || null, deadline)) {
+      return;
+    }
+
     setSubmitting(true);
     try {
       const result = await createTask(
@@ -294,6 +257,8 @@ export function QuickAddTaskPane({
           description: null,
           scheduledDate,
           bucket: scheduledDate === null ? null : bucket,
+          startDate: startDate || null,
+          deadline,
           projectId,
         }),
       ).unwrap();
@@ -384,8 +349,11 @@ export function QuickAddTaskPane({
   const quickAddRowLabelClass =
     "w-[56px] shrink-0 whitespace-nowrap text-[10px] font-extrabold uppercase tracking-[0.08em] text-faint";
 
-  const quickAddTitleTypography =
-    "min-w-0 w-full max-w-full border-0 bg-transparent p-0 text-[15px] font-semibold leading-[1.25] outline-none";
+  const quickAddTitleLineClass = "h-[20px] leading-[20px]";
+  const quickAddTitleTypography = cn(
+    "min-w-0 w-full max-w-full border-0 bg-transparent p-0 text-[15px] font-semibold outline-none",
+    quickAddTitleLineClass,
+  );
 
   const hintText = submitting
     ? null
@@ -398,62 +366,80 @@ export function QuickAddTaskPane({
       className="flex w-[520px] flex-col border border-rule bg-card shadow-sm"
       aria-busy={submitting || undefined}
     >
-      <div className="flex items-start gap-[8px] px-[12px] py-[10px]">
-        <div className="min-w-0 flex-1">
-          <div className="grid min-w-0 w-full grid-cols-[minmax(0,1fr)] [&>*]:col-start-1 [&>*]:row-start-1 [&>*]:min-w-0">
-            <div
-              ref={titleMirrorRef}
-              aria-hidden
-              className={cn(
-                quickAddTitleTypography,
-                "pointer-events-none overflow-x-hidden overflow-y-hidden whitespace-pre text-foreground",
-              )}
-            >
-              {renderQuickAddHighlightedTitle(title, parse?.spans ?? [])}
-              {!title ? (
-                <span className="text-faint">What needs doing?</span>
-              ) : null}
+      <div className="px-[12px] py-[10px]">
+        <div className="flex items-center gap-[8px]">
+          <button
+            type="button"
+            aria-label="Move Quick Add"
+            disabled={submitting}
+            className="inline-flex h-[20px] w-[20px] shrink-0 cursor-grab items-center justify-center text-faint hover:text-muted-foreground active:cursor-grabbing disabled:opacity-40"
+            onMouseDown={(event) => {
+              if (event.button !== 0) {
+                return;
+              }
+              void startQuickAddWindowDrag();
+            }}
+          >
+            <GripVertical className="size-4" aria-hidden />
+          </button>
+          <div className="min-w-0 flex-1">
+            <div className="grid min-w-0 w-full grid-cols-[minmax(0,1fr)] [&>*]:col-start-1 [&>*]:row-start-1 [&>*]:min-w-0">
+              <div
+                ref={titleMirrorRef}
+                aria-hidden
+                className={cn(
+                  quickAddTitleTypography,
+                  "pointer-events-none overflow-x-hidden overflow-y-hidden whitespace-pre text-foreground",
+                )}
+              >
+                {renderQuickAddHighlightedTitle(title, parse?.spans ?? [])}
+                {!title ? (
+                  <span className="text-faint">What needs doing?</span>
+                ) : null}
+              </div>
+              <input
+                ref={titleRef}
+                type="text"
+                value={title}
+                disabled={submitting}
+                placeholder="What needs doing?"
+                className={cn(
+                  quickAddTitleTypography,
+                  "text-transparent caret-foreground placeholder:text-transparent disabled:opacity-70",
+                )}
+                onChange={(event) => {
+                  setTitle(event.target.value);
+                  window.requestAnimationFrame(syncTitleScroll);
+                }}
+                onScroll={syncTitleScroll}
+              />
             </div>
-            <input
-              ref={titleRef}
-              type="text"
-              value={title}
-              disabled={submitting}
-              placeholder="What needs doing?"
-              className={cn(
-                quickAddTitleTypography,
-                "text-transparent caret-foreground placeholder:text-transparent disabled:opacity-70",
-              )}
-              onChange={(event) => {
-                setTitle(event.target.value);
-                window.requestAnimationFrame(syncTitleScroll);
-              }}
-              onScroll={syncTitleScroll}
-            />
           </div>
-          <p className="mt-[4px] flex min-h-[16px] items-center gap-[6px] text-[11px] text-faint">
-            {submitting ? (
-              <>
-                <Spinner className="size-3 text-muted-foreground" aria-hidden />
-                <span>Saving task…</span>
-              </>
-            ) : (
-              hintText
-            )}
-          </p>
+          <button
+            type="button"
+            aria-label="Close Quick Add"
+            disabled={submitting}
+            className="inline-flex h-[20px] w-[28px] shrink-0 items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-40"
+            onClick={closeWithAnimation}
+          >
+            <X className="size-4" aria-hidden />
+          </button>
         </div>
-        <button
-          type="button"
-          aria-label="Close Quick Add"
-          disabled={submitting}
-          className="inline-flex h-[28px] w-[28px] shrink-0 items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-40"
-          onClick={closeWithAnimation}
+        <p
+          className="mt-[4px] flex min-h-[16px] items-center gap-[6px] pl-[28px] pr-[36px] text-[11px] text-faint"
         >
-          <X className="size-4" aria-hidden />
-        </button>
+          {submitting ? (
+            <>
+              <Spinner className="size-3 text-muted-foreground" aria-hidden />
+              <span>Saving task…</span>
+            </>
+          ) : (
+            hintText
+          )}
+        </p>
       </div>
 
-      <div className="space-y-[8px] overflow-x-hidden border-t border-rule px-[12px] py-[10px]">
+      <div className="space-y-[8px] overflow-x-hidden overflow-y-visible border-t border-rule px-[12px] py-[10px]">
         <TaskScheduleFields
           layout="quickAdd"
           jevSuggesting={jevSuggesting}
@@ -472,6 +458,20 @@ export function QuickAddTaskPane({
           onPickedDateChange={(value) => {
             setScheduleSource("manual");
             setPickedDate(value);
+          }}
+        />
+
+        <TaskStartDeadlineFields
+          layout="quickAdd"
+          startDate={startDate}
+          deadline={deadline}
+          onStartDateChange={(value) => {
+            setStartSource("manual");
+            setStartDate(value);
+          }}
+          onDeadlineChange={(value) => {
+            setDeadlineSource("manual");
+            setDeadline(value);
           }}
         />
 

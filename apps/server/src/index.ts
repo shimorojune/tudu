@@ -22,6 +22,9 @@ import { createUpdatesRoute } from "./routes/updates.js";
 import { createSessionMiddleware, type SessionEnv } from "./session-middleware.js";
 import { createSyncRoute } from "./routes/sync.js";
 import { createPushRoute } from "./routes/push.js";
+import { createSettingsRoute } from "./routes/settings.js";
+import { startNotificationScheduler } from "./jobs/notificationScheduler.js";
+import { ensureSystemUser } from "@tudu/db";
 import { shutdownAnalytics } from "./analytics/posthog.js";
 
 const serverDir = dirname(fileURLToPath(import.meta.url));
@@ -99,6 +102,9 @@ app.get("/me", async (c) => {
 });
 
 if (db) {
+  void ensureSystemUser(db).catch((error) => {
+    console.error("[startup] system user", error);
+  });
   app.route("/", createSyncRoute(db));
   app.route("/", createJiraRoute(db));
   app.route("/", createManagerRoute(db));
@@ -108,6 +114,8 @@ if (db) {
   app.route("/", createLinkPreviewRoute());
   app.route("/", createQuickAddSuggestRoute(db));
   app.route("/", createPushRoute(db));
+  app.route("/", createSettingsRoute(db));
+  startNotificationScheduler(db);
 }
 
 const port = Number(process.env.PORT) || DEFAULT_SERVER_PORT;

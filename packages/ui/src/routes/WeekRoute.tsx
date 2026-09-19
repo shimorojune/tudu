@@ -115,6 +115,8 @@ export function WeekRoute() {
               description: args.description,
               scheduledDate: args.scheduledDate,
               bucket: args.bucket,
+              startDate: args.startDate,
+              deadline: args.deadline,
               projectId: args.projectId,
             }),
           ).unwrap();

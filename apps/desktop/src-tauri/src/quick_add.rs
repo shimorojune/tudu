@@ -11,16 +11,23 @@ pub struct QuickAddShortcutState(pub Mutex<String>);
 /// When Quick Add is open: whether the main window was visible before it opened.
 pub struct QuickAddSession(pub Mutex<Option<bool>>);
 
+/// Last user-dragged position for the Quick Add window (current app session only).
+pub struct QuickAddWindowState(pub Mutex<Option<LogicalPosition<f64>>>);
+
 pub struct QuickAddToggleGuard(pub Mutex<Option<Instant>>);
 
 const TOGGLE_DEBOUNCE: Duration = Duration::from_millis(320);
 
 pub const QUICK_ADD_WINDOW_WIDTH: f64 = 528.0;
-pub const QUICK_ADD_WINDOW_HEIGHT: f64 = 212.0;
+pub const QUICK_ADD_WINDOW_HEIGHT: f64 = 360.0;
 
-fn place_quick_add_window(window: &WebviewWindow, width: f64, height: f64) {
+fn bottom_center_position(
+    window: &WebviewWindow,
+    width: f64,
+    height: f64,
+) -> Option<LogicalPosition<f64>> {
     let Ok(Some(monitor)) = window.current_monitor() else {
-        return;
+        return None;
     };
     let scale = monitor.scale_factor();
     let screen = monitor.size();
@@ -28,12 +35,54 @@ fn place_quick_add_window(window: &WebviewWindow, width: f64, height: f64) {
     let screen_h = screen.height as f64 / scale;
     let x = (screen_w - width) / 2.0;
     let y = screen_h - height - 72.0;
+    Some(LogicalPosition::new(x, y.max(24.0)))
+}
+
+fn apply_quick_add_size(window: &WebviewWindow, width: f64, height: f64) {
     let _ = window.set_size(LogicalSize::new(width, height));
-    let _ = window.set_position(LogicalPosition::new(x, y.max(24.0)));
+}
+
+fn show_quick_add_window(
+    window: &WebviewWindow,
+    window_state: &QuickAddWindowState,
+) {
+    let saved = window_state
+        .0
+        .lock()
+        .ok()
+        .and_then(|guard| *guard);
+
+    apply_quick_add_size(window, QUICK_ADD_WINDOW_WIDTH, QUICK_ADD_WINDOW_HEIGHT);
+
+    if let Some(position) = saved {
+        let _ = window.set_position(position);
+    } else if let Some(position) =
+        bottom_center_position(window, QUICK_ADD_WINDOW_WIDTH, QUICK_ADD_WINDOW_HEIGHT)
+    {
+        let _ = window.set_position(position);
+    }
+
+    let _ = window.set_shadow(false);
+    let _ = window.show();
+    let _ = window.set_focus();
+    let _ = window.emit("quick-add:shown", ());
 }
 
 #[tauri::command]
-pub fn place_quick_add_window_command(
+pub fn save_quick_add_window_position(
+    _app: AppHandle,
+    state: State<'_, QuickAddWindowState>,
+    x: f64,
+    y: f64,
+) -> Result<(), String> {
+    if let Ok(mut guard) = state.0.lock() {
+        *guard = Some(LogicalPosition::new(x, y));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn resize_quick_add_window(
     app: AppHandle,
     width: f64,
     height: f64,
@@ -41,7 +90,43 @@ pub fn place_quick_add_window_command(
     let window = app
         .get_webview_window("quick-add")
         .ok_or("Quick Add window is missing")?;
-    place_quick_add_window(&window, width, height);
+    apply_quick_add_size(&window, width, height);
+    Ok(())
+}
+
+/// Repositions and resizes (used when resetting to default placement).
+#[tauri::command]
+pub fn place_quick_add_window_command(
+    app: AppHandle,
+    state: State<'_, QuickAddWindowState>,
+    width: f64,
+    height: f64,
+    reset_position: Option<bool>,
+) -> Result<(), String> {
+    let window = app
+        .get_webview_window("quick-add")
+        .ok_or("Quick Add window is missing")?;
+
+    if reset_position.unwrap_or(false) {
+        if let Ok(mut guard) = state.0.lock() {
+            *guard = None;
+        }
+    }
+
+    apply_quick_add_size(&window, width, height);
+
+    let saved = state
+        .0
+        .lock()
+        .ok()
+        .and_then(|guard| *guard);
+
+    if let Some(position) = saved {
+        let _ = window.set_position(position);
+    } else if let Some(position) = bottom_center_position(&window, width, height) {
+        let _ = window.set_position(position);
+    }
+
     Ok(())
 }
 
@@ -69,9 +154,7 @@ fn finish_hide_quick_add(app: &AppHandle, session: &QuickAddSession, _after_save
     }
 
     match main_was_visible {
-        Some(true) => {
-            // Main was already open: close Quick Add only. Do not hide or focus main.
-        }
+        Some(true) => {}
         Some(false) => {
             if let Some(main) = app.get_webview_window("main") {
                 let _ = main.hide();
@@ -81,9 +164,7 @@ fn finish_hide_quick_add(app: &AppHandle, session: &QuickAddSession, _after_save
                 let _ = app.hide();
             }
         }
-        None => {
-            // Unknown session (edge case): hide Quick Add without changing main.
-        }
+        None => {}
     }
 }
 
@@ -135,11 +216,20 @@ pub fn toggle_quick_add(app: &AppHandle) {
         }
     }
 
-    place_quick_add_window(&window, QUICK_ADD_WINDOW_WIDTH, QUICK_ADD_WINDOW_HEIGHT);
-    let _ = window.set_shadow(false);
-    let _ = window.show();
-    let _ = window.set_focus();
-    let _ = window.emit("quick-add:shown", ());
+    if let Some(state) = app.try_state::<QuickAddWindowState>() {
+        show_quick_add_window(&window, state.inner());
+    } else {
+        apply_quick_add_size(&window, QUICK_ADD_WINDOW_WIDTH, QUICK_ADD_WINDOW_HEIGHT);
+        if let Some(position) =
+            bottom_center_position(&window, QUICK_ADD_WINDOW_WIDTH, QUICK_ADD_WINDOW_HEIGHT)
+        {
+            let _ = window.set_position(position);
+        }
+        let _ = window.set_shadow(false);
+        let _ = window.show();
+        let _ = window.set_focus();
+        let _ = window.emit("quick-add:shown", ());
+    }
 }
 
 pub fn register_quick_add_shortcut(

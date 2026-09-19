@@ -7,19 +7,20 @@ export type NotificationSearch = {
   date?: string;
   task?: string;
   tab?: "comments" | "timeline";
+  jira?: string;
 };
 
 export type NotificationNavigate = (opts: {
-  to: "/" | "/inbox" | "/unscheduled" | "/team/$userId";
+  to: "/" | "/inbox" | "/unscheduled" | "/team/$userId" | "/settings";
   params?: { userId: string };
-  search?: NotificationSearch;
+  search?: NotificationSearch & { section?: string };
 }) => unknown;
 
 export function bindNotificationNavigate(
   navigate: (opts: {
-    to: "/" | "/inbox" | "/unscheduled" | "/team/$userId";
+    to: "/" | "/inbox" | "/unscheduled" | "/team/$userId" | "/settings";
     params?: { userId: string };
-    search?: NotificationSearch;
+    search?: NotificationSearch & { section?: string };
   }) => unknown,
 ): NotificationNavigate {
   return (opts) => {
@@ -35,27 +36,18 @@ export function bindNotificationNavigate(
   };
 }
 
-export function openNotificationTarget(
+function openTaskNotification(
   notification: AppNotification,
   args: {
     viewerId: string;
     dispatch: AppDispatch;
     navigate: NotificationNavigate;
   },
+  inspectorTab: "details" | "comments" | "timeline",
 ): void {
-  if (notification.kind === "task_deleted" || !notification.taskId) {
-    if (notification.kind === "inbox" || notification.kind === "inbox_declined") {
-      void args.navigate({ to: "/inbox" });
-    }
+  if (!notification.taskId) {
     return;
   }
-
-  if (notification.kind === "inbox" || notification.kind === "inbox_declined") {
-    void args.navigate({ to: "/inbox" });
-    return;
-  }
-
-  const inspectorTab = notification.kind === "comment" ? "comments" : "details";
   const focusCommentId =
     notification.kind === "comment" ? notification.commentId : null;
   const isOwner =
@@ -100,10 +92,65 @@ export function openNotificationTarget(
 
   void args.navigate({
     to: "/",
-    search: taskLinkSearch({
-      date,
-      taskId: notification.taskId,
-      tab: inspectorTab,
-    }),
+    search: {
+      ...taskLinkSearch({
+        date,
+        taskId: notification.taskId,
+        tab: inspectorTab,
+      }),
+      ...(notification.jiraIssueKey ? { jira: notification.jiraIssueKey } : {}),
+    },
   });
+}
+
+export function openNotificationTarget(
+  notification: AppNotification,
+  args: {
+    viewerId: string;
+    dispatch: AppDispatch;
+    navigate: NotificationNavigate;
+  },
+): void {
+  if (notification.kind === "app_update") {
+    void args.navigate({
+      to: "/settings",
+      search: { section: "notifications" },
+    });
+    return;
+  }
+
+  if (notification.kind === "inbox" || notification.kind === "inbox_declined") {
+    void args.navigate({ to: "/inbox" });
+    return;
+  }
+
+  if (notification.kind === "task_deleted") {
+    return;
+  }
+
+  if (notification.kind.startsWith("jira_")) {
+    if (notification.taskId) {
+      openTaskNotification(notification, args, "details");
+      return;
+    }
+    if (notification.jiraIssueKey) {
+      void args.navigate({
+        to: "/",
+        search: { jira: notification.jiraIssueKey },
+      });
+    }
+    return;
+  }
+
+  if (notification.kind.startsWith("reminder_")) {
+    openTaskNotification(notification, args, "details");
+    return;
+  }
+
+  if (!notification.taskId) {
+    return;
+  }
+
+  const inspectorTab = notification.kind === "comment" ? "comments" : "details";
+  openTaskNotification(notification, args, inspectorTab);
 }

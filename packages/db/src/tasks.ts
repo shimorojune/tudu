@@ -657,3 +657,17 @@ async function ownedSubtask(db: Db, userId: string, subtaskId: string) {
 
   return rows[0];
 }
+
+export async function listIncompleteTasksForUser(
+  db: Db,
+  userId: string,
+): Promise<TaskRow[]> {
+  return db.query.tasks.findMany({
+    where: and(
+      eq(tasks.userId, userId),
+      isNull(tasks.deletedAt),
+      isNull(tasks.completedAt),
+    ),
+    orderBy: [asc(tasks.position)],
+  });
+}

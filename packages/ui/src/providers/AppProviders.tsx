@@ -65,3 +65,6 @@ export function AppProviders({ children }: AppProvidersProps) {
     </Provider>
   );
 }
+
+export { WebUpdateChecker } from "./WebUpdateChecker.js";
+export { NotificationHost } from "./NotificationHost.js";

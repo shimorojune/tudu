@@ -4,6 +4,14 @@ export const NOTIFICATION_KINDS = [
   "task_changed",
   "task_deleted",
   "inbox_declined",
+  "jira_assigned",
+  "jira_unassigned",
+  "jira_comment",
+  "jira_updated",
+  "reminder_digest",
+  "reminder_late",
+  "reminder_deadline",
+  "app_update",
 ] as const;
 
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
@@ -28,6 +36,10 @@ export type AppNotification = {
   commentId: string | null;
   inboxItemId: string | null;
   scheduledDate: string | null;
+  jiraIssueId: string | null;
+  jiraIssueKey: string | null;
+  appVersion: string | null;
+  metadata: Record<string, unknown> | null;
   taskTitle: string;
   body: string;
   readAt: string | null;
@@ -108,6 +120,22 @@ export function formatNotificationBody(args: {
           return `${name} changed ${title}`;
       }
     }
+    case "jira_assigned":
+      return `You were assigned ${title}`;
+    case "jira_unassigned":
+      return `You were unassigned from ${title}`;
+    case "jira_comment":
+      return `New comment on ${title}`;
+    case "jira_updated":
+      return `${title} was updated in JIRA`;
+    case "reminder_digest":
+      return args.taskTitle;
+    case "reminder_late":
+      return args.taskTitle;
+    case "reminder_deadline":
+      return args.taskTitle;
+    case "app_update":
+      return args.taskTitle;
     default:
       return null;
   }

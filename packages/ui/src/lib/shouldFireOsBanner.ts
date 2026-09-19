@@ -60,6 +60,15 @@ export function shouldFireOsBanner(args: {
   ) {
     return false;
   }
+  if (notification.kind.startsWith("jira_") && !prefs.jira) {
+    return false;
+  }
+  if (notification.kind.startsWith("reminder_") && !prefs.reminders) {
+    return false;
+  }
+  if (notification.kind === "app_update" && !prefs.appUpdate) {
+    return false;
+  }
   if (!args.windowFocused) {
     return true;
   }

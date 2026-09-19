@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Bucket } from "@tudu/shared";
-import { DEFAULT_NOW_SOFT_CAP } from "@tudu/shared";
+import { DEFAULT_NOW_SOFT_CAP, validateStartBeforeDeadline } from "@tudu/shared";
 import { todayIso } from "@tudu/store";
+import { useTaskFieldSuggest } from "@/hooks/useTaskFieldSuggest";
+import { useTaskTitleNaturalLanguage } from "@/hooks/useTaskTitleNaturalLanguage";
 import type { TaskDescriptionUploadFn } from "@/components/editor/taskDescriptionAttachments";
 import { rejectOversizeFile } from "@/components/editor/taskDescriptionAttachments";
 import {
@@ -18,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { clearPendingAttachmentBlobUrls } from "@/lib/finalizeNewTaskDescriptionAttachments";
 export type { NewTaskDayChoice } from "@/components/tasks/TaskScheduleFields";
 import type { NewTaskDayChoice } from "@/components/tasks/TaskScheduleFields";
+import { TaskStartDeadlineFields } from "@/components/tasks/TaskStartDeadlineFields";
 import {
   resolveScheduledDate,
   TaskScheduleFields,
@@ -28,6 +31,8 @@ export type NewTaskSubmitArgs = {
   description: string | null;
   bucket: Bucket;
   scheduledDate: string | null;
+  startDate: string | null;
+  deadline: string | null;
   subtaskTitles: string[];
   projectId: string | null;
   pendingAttachments: Map<string, File>;
@@ -70,9 +75,46 @@ export function NewTaskDialog({
   const [pickedDate, setPickedDate] = useState(initialDate);
   const [subtasks, setSubtasks] = useState<{ id: string; title: string }[]>([]);
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [startDate, setStartDate] = useState("");
+  const [deadline, setDeadline] = useState<string | null>(null);
+  const [scheduleSource, setScheduleSource] = useState<"auto" | "manual">(
+    "auto",
+  );
+  const [bucketSource, setBucketSource] = useState<"auto" | "manual">("auto");
+  const [projectSource, setProjectSource] = useState<"auto" | "manual">("auto");
+  const [startSource, setStartSource] = useState<"auto" | "manual">("auto");
+  const [deadlineSource, setDeadlineSource] = useState<"auto" | "manual">(
+    "auto",
+  );
+  const [jevSuggesting, setJevSuggesting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const today = todayIso();
+  const parse = useTaskTitleNaturalLanguage(title, today);
+  const scheduledDate = useMemo(
+    () => resolveScheduledDate(dayChoice, pickedDate, today),
+    [dayChoice, pickedDate, today],
+  );
+
+  useTaskFieldSuggest({
+    title,
+    parse,
+    today,
+    scheduledDate,
+    nowCount,
+    scheduleSource,
+    bucketSource,
+    projectSource,
+    startSource,
+    deadlineSource,
+    onProjectId: (id) => setProjectId(id),
+    onBucket: setBucket,
+    onDayChoice: setDayChoice,
+    onPickedDate: setPickedDate,
+    onStartDate: setStartDate,
+    onDeadline: setDeadline,
+    onJevSuggesting: setJevSuggesting,
+  });
 
   const stagingUpload = useCallback<TaskDescriptionUploadFn>(async (file) => {
     if (rejectOversizeFile(file)) {
@@ -102,14 +144,17 @@ export function NewTaskDialog({
     setPickedDate(initialDate);
     setSubtasks([]);
     setProjectId(null);
+    setStartDate("");
+    setDeadline(null);
+    setScheduleSource("auto");
+    setBucketSource("auto");
+    setProjectSource("auto");
+    setStartSource("auto");
+    setDeadlineSource("auto");
+    setJevSuggesting(false);
     setSubmitting(false);
     window.requestAnimationFrame(() => titleRef.current?.focus());
   }, [defaultDayChoice, initialBucket, initialDate, initialDescription, initialTitle, open, today]);
-
-  const scheduledDate = useMemo(
-    () => resolveScheduledDate(dayChoice, pickedDate, today),
-    [dayChoice, pickedDate, today],
-  );
 
   const targetIsToday = scheduledDate === today;
   const isUnscheduled = dayChoice === "unscheduled";
@@ -125,7 +170,11 @@ export function NewTaskDialog({
 
   async function handleSubmit() {
     const trimmed = title.trim();
-    if (!trimmed || submitting) {
+    const saveTitle = parse?.titleForSave.trim() || trimmed;
+    if (!saveTitle || submitting) {
+      return;
+    }
+    if (validateStartBeforeDeadline(startDate || null, deadline)) {
       return;
     }
     const trimmedDescription = description.trim();
@@ -133,10 +182,12 @@ export function NewTaskDialog({
     setSubmitting(true);
     try {
       await onSubmit({
-        title: trimmed,
+        title: saveTitle,
         description: trimmedDescription.length > 0 ? trimmedDescription : null,
         bucket,
         scheduledDate,
+        startDate: startDate || null,
+        deadline,
         subtaskTitles: subtasks.map((subtask) => subtask.title),
         projectId,
         pendingAttachments,
@@ -204,23 +255,45 @@ export function NewTaskDialog({
             bucket={bucket}
             pickedDate={pickedDate}
             nowCount={nowCount}
-            onDayChoiceChange={setDayChoice}
-            onBucketChange={setBucket}
-            onPickedDateChange={setPickedDate}
+            jevSuggesting={jevSuggesting}
+            onDayChoiceChange={(value) => {
+              setScheduleSource("manual");
+              setDayChoice(value);
+            }}
+            onBucketChange={(value) => {
+              setBucketSource("manual");
+              setBucket(value);
+            }}
+            onPickedDateChange={(value) => {
+              setScheduleSource("manual");
+              setPickedDate(value);
+            }}
+          />
+
+          <TaskStartDeadlineFields
+            startDate={startDate}
+            deadline={deadline}
+            onStartDateChange={(value) => {
+              setStartSource("manual");
+              setStartDate(value);
+            }}
+            onDeadlineChange={(value) => {
+              setDeadlineSource("manual");
+              setDeadline(value);
+            }}
           />
 
           <div className="space-y-[8px]">
             <div className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
               Project
             </div>
-            <ProjectPicker value={projectId} onChange={setProjectId} />
-          </div>
-
-          <div className="space-y-[8px]">
-            <div className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
-              Deadline
-            </div>
-            <span className="text-[13px] text-muted-foreground">No deadline</span>
+            <ProjectPicker
+              value={projectId}
+              onChange={(value) => {
+                setProjectSource("manual");
+                setProjectId(value);
+              }}
+            />
           </div>
 
           <div className="space-y-[8px]">

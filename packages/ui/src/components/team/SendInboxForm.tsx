@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { ProjectChip } from "@/components/projects/ProjectChip";
 import { ProjectPicker } from "@/components/projects/ProjectPicker";
+import { DeadlineField } from "@/components/tasks/DeadlineField";
 import { DateField } from "@/components/ui/date-field";
 import {
   useCreateReportProjectMutation,
@@ -34,7 +35,7 @@ export function SendInboxForm({
   const [title, setTitle] = useState("");
   const [note, setNote] = useState("");
   const [startDate, setStartDate] = useState("");
-  const [deadline, setDeadline] = useState("");
+  const [deadline, setDeadline] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
   const selectedProject =
@@ -56,7 +57,7 @@ export function SendInboxForm({
               title: trimmed,
               description: note.trim() ? note.trim() : null,
               startDate: startDate || null,
-              deadline: deadline ? `${deadline}T18:00:00.000Z` : null,
+              deadline,
               projectId: projectId ?? undefined,
             }),
           ),
@@ -65,7 +66,7 @@ export function SendInboxForm({
       setTitle("");
       setNote("");
       setStartDate("");
-      setDeadline("");
+      setDeadline(null);
       setProjectId(null);
       onSent?.();
     } catch (caught) {
@@ -113,7 +114,7 @@ export function SendInboxForm({
           </label>
           <label className="flex flex-col gap-[7px]">
             <span className="text-[12px] text-muted-foreground">Deadline</span>
-            <DateField
+            <DeadlineField
               value={deadline}
               onChange={setDeadline}
               aria-label="Deadline"

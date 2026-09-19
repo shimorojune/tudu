@@ -8,3 +8,6 @@ export * from "./notifications-schema.js";
 export * from "./jira-schema.js";
 export * from "./task-attachments-schema.js";
 export * from "./push-device-tokens-schema.js";
+export * from "./notification-preferences-schema.js";
+export * from "./jira-watch-schema.js";
+export * from "./reminder-delivery-schema.js";

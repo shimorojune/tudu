@@ -4,6 +4,11 @@ export {
   getAuthToken,
   resolveApiUrl,
 } from "./api/baseApi.js";
+export {
+  useGetNotificationSettingsQuery,
+  useUpdateNotificationSettingsMutation,
+  useReportClientVersionMutation,
+} from "./api/notificationSettingsApi.js";
 export { healthApi, useGetHealthQuery, useGetMeQuery } from "./api/healthApi.js";
 export {
   tasksApi,

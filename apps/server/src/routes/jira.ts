@@ -160,7 +160,7 @@ function encrypted(row: JiraConnectionRow) {
   };
 }
 
-async function adapterFor(
+export async function adapterFor(
   db: Db,
   actorId: string,
   adapterFactory: JiraAdapterFactory,

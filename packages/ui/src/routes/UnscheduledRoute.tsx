@@ -449,6 +449,8 @@ export function UnscheduledRoute() {
               description: args.description,
               scheduledDate: args.scheduledDate,
               bucket: args.scheduledDate === null ? null : args.bucket,
+              startDate: args.startDate,
+              deadline: args.deadline,
               projectId: args.projectId,
             }),
           ).unwrap();
