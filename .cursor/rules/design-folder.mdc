@@ -1,0 +1,45 @@
+---
+description: Use design/ assets as the source of truth for UI layout and visuals
+globs: packages/ui/**/*.tsx,packages/ui/**/*.css
+alwaysApply: false
+---
+
+# Design folder is the visual spec
+
+Before creating or changing any user-visible component in `packages/ui`, read the
+relevant files under `design/` and match layout, spacing, typography, color, and
+interaction to that reference. Do not guess pixels or chrome from memory or from
+other apps in the repo alone.
+
+## Where to look
+
+| Path | Use when |
+|------|----------|
+| `design/Tudu.dc.html`, `design/Tudu Android.dc.html` | Full-screen layout, pane structure, platform-specific chrome |
+| `design/assets/theme.css`, `design/assets/tokens.json` | Colors, type scale, spacing, shadows, Dusk dark tokens |
+| `design/assets/README.md` | Logo usage, theme import notes, radius and mono-palette rules |
+| `design/_ds/modernist-*/` | Modernist system: variables, component markup patterns, interaction states |
+| `design/uploads/` | Screenshots, pasted mocks, and palette experiments tied to a change |
+
+## Workflow
+
+1. Identify the screen or control you are touching and open the closest mock or
+   HTML reference in `design/` (or a screenshot in `design/uploads/`).
+2. Align implementation with existing app tokens (`@/lib/brand`, theme CSS in
+   `packages/ui`) and with `design/assets/theme.css` / `tokens.json` when tokens
+   differ or the feature is new.
+3. Reuse assets from `design/assets/` (marks, lockup, icons) instead of
+   redrawing or substituting placeholders.
+4. If the repo UI and `design/` disagree, treat `design/` as authoritative for
+   visual design unless the user explicitly says to keep the current UI.
+
+## Constraints carried from design
+
+- Zero border radius (no `rounded-*`).
+- Archivo typography; mono accent palette; destructive reads via copy or icon,
+  not a separate hue.
+- Lucide icons; 2px rules and flush-left labels where the mock shows them.
+
+When no `design/` reference exists for a new surface, say so in the PR or
+review notes and mirror the nearest existing screen in `design/` plus
+`design/assets/theme.css` until a mock is added.

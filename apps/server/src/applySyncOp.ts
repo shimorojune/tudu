@@ -1813,10 +1813,13 @@ export async function applySyncOp(
         break;
       }
       case "project.delete": {
-        const taskIds = await listLiveTaskIdsForProject(db, op.id);
-        const deleted = await deleteProject(db, actorId, op.id);
-        if (!deleted) {
-          throw new SyncOpError("Project not found", 404);
+        let deleted;
+        let taskIds: string[];
+        try {
+          taskIds = await listLiveTaskIdsForProject(db, op.id);
+          deleted = await deleteProject(db, actorId, op.id);
+        } catch (error) {
+          wrapManager(error);
         }
         const recipients = [deleted.userId];
         const manager = await managerIdForOwner(db, deleted.userId);

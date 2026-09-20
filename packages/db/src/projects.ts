@@ -328,11 +328,15 @@ export async function listLiveTaskIdsForProject(
   return rows.map((row) => row.id);
 }
 
+export function isProjectEligibleForDelete(row: ProjectRow): boolean {
+  return row.deletedAt == null && row.archivedAt != null;
+}
+
 export async function deleteProject(
   db: Db,
   userId: string,
   projectId: string,
-): Promise<ProjectRow | undefined> {
+): Promise<ProjectRow> {
   const existing = await db.query.projects.findFirst({
     where: and(
       eq(projects.id, projectId),
@@ -342,11 +346,14 @@ export async function deleteProject(
   });
 
   if (!existing) {
-    return undefined;
+    throw new ProjectError("Project not found", 404);
+  }
+
+  if (!isProjectEligibleForDelete(existing)) {
+    throw new ProjectError("Archive the project before deleting", 400);
   }
 
   await db
-    .update(tasks)
     .set({ projectId: null })
     .where(and(eq(tasks.projectId, projectId), isNull(tasks.deletedAt)));
 

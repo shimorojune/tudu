@@ -8,6 +8,9 @@ alwaysApply: false
 
 React 19, TanStack Router, shadcn/ui (new-york style), Tailwind v4, lucide icons.
 
+Visual layout and styling follow `design/` (see `design-folder` rule). Read mocks and
+`design/assets/` before changing or adding components.
+
 ## Component shape
 
 Named export, props as a named type, small private helpers above the exported

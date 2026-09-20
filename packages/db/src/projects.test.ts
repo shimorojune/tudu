@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { pickProjectToEnsure } from "@tudu/shared";
-import { isPublicAssignableProject, mapProject, mapProjectRef } from "./projects.js";
+import {
+  isProjectEligibleForDelete,
+  isPublicAssignableProject,
+  mapProject,
+  mapProjectRef,
+} from "./projects.js";
 import type { ProjectRow } from "./projects-schema.js";
 
 const now = new Date("2026-09-11T08:00:00.000Z");
@@ -64,6 +69,14 @@ describe("isPublicAssignableProject", () => {
     expect(isPublicAssignableProject(row({ archivedAt: now }), "user-1")).toBe(
       false,
     );
+  });
+});
+
+describe("isProjectEligibleForDelete", () => {
+  it("allows delete only when the project is archived", () => {
+    expect(isProjectEligibleForDelete(row())).toBe(false);
+    expect(isProjectEligibleForDelete(row({ archivedAt: now }))).toBe(true);
+    expect(isProjectEligibleForDelete(row({ deletedAt: now }))).toBe(false);
   });
 });
 
