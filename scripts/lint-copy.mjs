@@ -8,7 +8,7 @@ const emDash = "\u2014";
 
 try {
   const output = execSync(
-    `rg -n --hidden --glob '!.git' --glob '!node_modules' --glob '!dist' --glob '!pnpm-lock.yaml' --glob '!*.png' --glob '!*.icns' --glob '!*.ico' --glob '!*.zip' --glob '!*.dmg' --glob '!target' '${emDash}' .`,
+    `rg -n --hidden --glob '!.git' --glob '!node_modules' --glob '!dist' --glob '!design' --glob '!pnpm-lock.yaml' --glob '!*.png' --glob '!*.icns' --glob '!*.ico' --glob '!*.zip' --glob '!*.dmg' --glob '!target' '${emDash}' .`,
     { cwd: root, encoding: "utf8" },
   );
 
