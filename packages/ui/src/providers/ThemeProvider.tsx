@@ -26,7 +26,12 @@ import {
   FONT_STORAGE_KEY,
   PALETTE_STORAGE_KEY,
 } from "@/lib/themePalette";
-import type { CustomThemeColors, FontId, PaletteId } from "@/lib/themePalettes";
+import {
+  normalizePaletteId,
+  type CustomThemeColors,
+  type FontId,
+  type PaletteId,
+} from "@/lib/themePalettes";
 
 type ThemeContextValue = {
   preference: ThemePreference;
@@ -113,7 +118,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           stored === "neutral" ||
           stored === "custom"
         ) {
-          setPaletteIdState(stored);
+          setPaletteIdState(normalizePaletteId(stored as PaletteId));
         }
       }
       if (event.key === CUSTOM_COLORS_STORAGE_KEY && event.newValue != null) {

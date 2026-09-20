@@ -2,6 +2,7 @@ import type { ResolvedTheme } from "@/lib/theme";
 import {
   FONT_STACKS,
   getPresetTokens,
+  normalizePaletteId,
   type CustomThemeColors,
   type FontId,
   type PaletteId,
@@ -21,6 +22,7 @@ const MANAGED_KEYS = [
   "--popover-foreground",
   "--primary",
   "--primary-foreground",
+  "--primary-text",
   "--secondary",
   "--secondary-foreground",
   "--muted",
@@ -36,6 +38,7 @@ const MANAGED_KEYS = [
   "--ghost",
   "--rule",
   "--faint",
+  "--tint",
   "--sidebar",
   "--sidebar-foreground",
   "--sidebar-primary",
@@ -49,7 +52,7 @@ const MANAGED_KEYS = [
 
 export function readStoredPaletteId(): PaletteId {
   if (typeof window === "undefined") {
-    return "current";
+    return "modernist";
   }
   const stored = window.localStorage.getItem(PALETTE_STORAGE_KEY);
   if (
@@ -59,9 +62,9 @@ export function readStoredPaletteId(): PaletteId {
     stored === "neutral" ||
     stored === "custom"
   ) {
-    return stored;
+    return normalizePaletteId(stored as PaletteId);
   }
-  return "current";
+  return "modernist";
 }
 
 export function writeStoredPaletteId(paletteId: PaletteId) {
@@ -150,22 +153,22 @@ function hexLuminance(hex: string): number | null {
 function separatorAlphas(
   resolved: ResolvedTheme,
   background?: string,
-): { hair: number; ghost: number; rule: number; faint: number } {
+): { hair: number; ghost: number; rule: number } {
   if (resolved === "dark") {
     const lum = background ? hexLuminance(background) : null;
     if (lum != null && lum > 0.22 && lum < 0.72) {
-      return { hair: 0.06, ghost: 0.1, rule: 0.12, faint: 0.26 };
+      return { hair: 0.06, ghost: 0.1, rule: 0.12 };
     }
-    return { hair: 0.08, ghost: 0.12, rule: 0.16, faint: 0.3 };
+    return { hair: 0.08, ghost: 0.12, rule: 0.16 };
   }
-  return { hair: 0.1, ghost: 0.2, rule: 0.22, faint: 0.34 };
+  return { hair: 0.1, ghost: 0.2, rule: 0.22 };
 }
 
 function inkTints(
   foreground: string,
   resolved: ResolvedTheme,
   background?: string,
-): Pick<ThemeTokenMap, "--hair" | "--ghost" | "--rule" | "--faint"> {
+): Pick<ThemeTokenMap, "--hair" | "--ghost" | "--rule"> {
   const alphas = separatorAlphas(resolved, background);
   if (foreground.startsWith("#")) {
     const r = Number.parseInt(foreground.slice(1, 3), 16);
@@ -175,7 +178,6 @@ function inkTints(
       "--hair": `rgba(${r}, ${g}, ${b}, ${alphas.hair})`,
       "--ghost": `rgba(${r}, ${g}, ${b}, ${alphas.ghost})`,
       "--rule": `rgba(${r}, ${g}, ${b}, ${alphas.rule})`,
-      "--faint": `rgba(${r}, ${g}, ${b}, ${alphas.faint})`,
     };
   }
   const base = foreground.replace(/\s*\/\s*[\d.]+\s*$/, "").trim();
@@ -183,8 +185,34 @@ function inkTints(
     "--hair": `${base} / ${alphas.hair}`,
     "--ghost": `${base} / ${alphas.ghost}`,
     "--rule": `${base} / ${alphas.rule}`,
-    "--faint": `${base} / ${alphas.faint}`,
   };
+}
+
+function selectionTint(foreground: string, resolved: ResolvedTheme): string {
+  const tintAlpha = resolved === "dark" ? 0.06 : 0.035;
+  if (foreground.startsWith("#") && foreground.length === 7) {
+    const r = Number.parseInt(foreground.slice(1, 3), 16);
+    const g = Number.parseInt(foreground.slice(3, 5), 16);
+    const b = Number.parseInt(foreground.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${tintAlpha})`;
+  }
+  const base = foreground.replace(/\s*\/\s*[\d.]+\s*$/, "").trim();
+  return `${base} / ${tintAlpha}`;
+}
+
+function applyDerivedTextTokens(
+  next: ThemeTokenMap,
+  resolved: ResolvedTheme,
+): ThemeTokenMap {
+  const muted = next["--muted-foreground"];
+  const foreground = next["--foreground"];
+  if (muted) {
+    next["--faint"] = muted;
+  }
+  if (foreground) {
+    next["--tint"] = selectionTint(foreground, resolved);
+  }
+  return next;
 }
 
 export function mergeCustomColors(
@@ -224,7 +252,7 @@ export function mergeCustomColors(
       inkTints(foreground, resolved, next["--background"]),
     );
   }
-  return next;
+  return applyDerivedTextTokens(next, resolved);
 }
 
 export function buildThemeTokens(
@@ -232,19 +260,23 @@ export function buildThemeTokens(
   resolved: ResolvedTheme,
   custom: CustomThemeColors,
 ): ThemeTokenMap {
-  const base = getPresetTokens(paletteId, resolved);
+  const normalized = normalizePaletteId(paletteId);
+  const base = getPresetTokens(normalized, resolved);
   const merged =
-    paletteId === "custom"
+    normalized === "custom"
       ? mergeCustomColors(base, custom, resolved)
       : { ...base };
   const foreground = merged["--foreground"];
   if (foreground) {
-    return {
-      ...merged,
-      ...inkTints(foreground, resolved, merged["--background"]),
-    };
+    return applyDerivedTextTokens(
+      {
+        ...merged,
+        ...inkTints(foreground, resolved, merged["--background"]),
+      },
+      resolved,
+    );
   }
-  return merged;
+  return applyDerivedTextTokens(merged, resolved);
 }
 
 export function clearPaletteOverrides(root: HTMLElement) {
@@ -290,11 +322,6 @@ export function applyPaletteToDocument(
   ensureWebFont(fontId);
   const root = document.documentElement;
   clearPaletteOverrides(root);
-
-  if (paletteId === "current" && Object.keys(custom).length === 0) {
-    root.style.setProperty("--font-sans", FONT_STACKS[fontId]);
-    return;
-  }
 
   const tokens = buildThemeTokens(paletteId, resolved, custom);
   for (const [key, value] of Object.entries(tokens)) {

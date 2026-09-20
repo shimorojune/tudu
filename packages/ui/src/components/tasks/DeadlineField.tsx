@@ -1,5 +1,5 @@
 import { format, parseISO } from "date-fns";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { QuickAddCalendarPlacement } from "@/lib/quickAddCalendarPlacement";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -21,6 +21,8 @@ export type DeadlineFieldProps = {
   popoverSide?: "top" | "bottom";
   popoverAlign?: "start" | "center" | "end";
   quickAddShell?: boolean;
+  leadingIcon?: ReactNode;
+  disabled?: boolean;
 };
 
 function splitDeadline(value: string | null): {
@@ -54,6 +56,8 @@ export function DeadlineField({
   triggerClassName,
   compactTriggerLabel,
   quickAddShell = false,
+  leadingIcon,
+  disabled = false,
 }: DeadlineFieldProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
@@ -99,14 +103,17 @@ export function DeadlineField({
           <button
             ref={triggerRef}
             type="button"
+            disabled={disabled}
             aria-label={ariaLabel}
             className={cn(
               "min-w-0 flex-1 border border-rule bg-card px-[11px] py-[9px] text-left text-[13.5px] tabular-nums outline-none",
               !value && !compactTriggerLabel && "text-muted-foreground",
               !value && compactTriggerLabel && "text-muted-foreground",
               triggerClassName,
+              disabled && "opacity-50",
             )}
           >
+            {leadingIcon}
             {label}
           </button>
         </PopoverTrigger>

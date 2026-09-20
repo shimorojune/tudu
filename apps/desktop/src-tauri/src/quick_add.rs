@@ -18,8 +18,8 @@ pub struct QuickAddToggleGuard(pub Mutex<Option<Instant>>);
 
 const TOGGLE_DEBOUNCE: Duration = Duration::from_millis(320);
 
-pub const QUICK_ADD_WINDOW_WIDTH: f64 = 528.0;
-pub const QUICK_ADD_WINDOW_HEIGHT: f64 = 360.0;
+pub const QUICK_ADD_WINDOW_WIDTH: f64 = 590.0;
+pub const QUICK_ADD_WINDOW_HEIGHT: f64 = 320.0;
 
 fn bottom_center_position(
     window: &WebviewWindow,

@@ -899,7 +899,7 @@ export function TaskRow({
                   key={`text-${index}`}
                   className={cn(
                     segment.emphasis && "font-bold text-foreground",
-                    segment.accent && "font-bold text-primary",
+                    segment.accent && "font-bold text-primary-text",
                   )}
                 >
                   {segment.text}

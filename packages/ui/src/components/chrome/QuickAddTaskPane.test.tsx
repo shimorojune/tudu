@@ -35,6 +35,20 @@ vi.mock("@tauri-apps/api/event", () => ({
   emit: vi.fn(),
 }));
 
+vi.mock("@/hooks/useTheme", () => ({
+  useTheme: () => ({
+    resolved: "light",
+    preference: "light",
+    paletteId: "modernist",
+    setPreference: vi.fn(),
+    setPaletteId: vi.fn(),
+    customColors: {},
+    setCustomColors: vi.fn(),
+    fontId: "ar-one-sans",
+    setFontId: vi.fn(),
+  }),
+}));
+
 vi.mock("@/lib/authClient", () => ({
   authClient: {
     useSession: () => ({
@@ -45,6 +59,11 @@ vi.mock("@/lib/authClient", () => ({
 }));
 
 const createTask = vi.fn();
+const parseQuickAddTitle = vi.fn();
+
+vi.mock("@/hooks/useTaskTitleNaturalLanguage", () => ({
+  useTaskTitleNaturalLanguage: (title: string) => parseQuickAddTitle(title),
+}));
 
 vi.mock("@tudu/store", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tudu/store")>();
@@ -65,6 +84,7 @@ vi.mock("@tudu/store", async (importOriginal) => {
 describe("QuickAddTaskPane", () => {
   beforeEach(() => {
     vi.mocked(invoke).mockClear();
+    parseQuickAddTitle.mockReturnValue(null);
     createTask.mockReset();
     createTask.mockReturnValue({
       unwrap: () =>
@@ -103,7 +123,52 @@ describe("QuickAddTaskPane", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled(), { timeout: 2000 });
   });
 
-  it("resizes Quick Add window before the timing date popover opens", async () => {
+  it("shows deadline on the chip when chrono parses one", () => {
+    parseQuickAddTitle.mockReturnValue({
+      titleForSave: "Ship report",
+      deadline: "2026-09-12T12:00:00.000Z",
+      spans: [],
+      dayChoice: "today",
+      pickedDate: "2026-09-11",
+      scheduledDate: "2026-09-11",
+      startDate: null,
+      chipLabel: "Today",
+    });
+
+    render(<QuickAddTaskPane onClose={vi.fn()} onRequestSignIn={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Deadline" })).toHaveTextContent(
+      "Due 12 Sep",
+    );
+  });
+
+  it("submits chrono-parsed deadline on save", async () => {
+    const deadline = "2026-09-12T12:00:00.000Z";
+    parseQuickAddTitle.mockReturnValue({
+      titleForSave: "Ship report",
+      deadline,
+      spans: [],
+      dayChoice: "today",
+      pickedDate: "2026-09-11",
+      scheduledDate: "2026-09-11",
+      startDate: null,
+      chipLabel: "Today",
+    });
+
+    const user = userEvent.setup();
+    render(<QuickAddTaskPane onClose={vi.fn()} onRequestSignIn={vi.fn()} />);
+
+    await user.type(screen.getByPlaceholderText("What needs doing?"), "Ship report");
+    await user.keyboard("{Enter}");
+
+    expect(createTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deadline,
+      }),
+    );
+  });
+
+  it("resizes Quick Add window before the day date popover opens", async () => {
     let finishResize: (() => void) | undefined;
     vi.mocked(invoke).mockImplementation((cmd) => {
       if (cmd === "resize_quick_add_window") {
@@ -117,7 +182,8 @@ describe("QuickAddTaskPane", () => {
     const user = userEvent.setup();
     render(<QuickAddTaskPane onClose={vi.fn()} onRequestSignIn={vi.fn()} />);
 
-    await user.click(screen.getByRole("button", { name: "Start date" }));
+    await user.click(screen.getByRole("button", { name: /^Today/ }));
+    await user.click(screen.getByRole("button", { name: "Task date" }));
 
     expect(invoke).toHaveBeenCalledWith("resize_quick_add_window", {
       width: QUICK_ADD_WINDOW_WIDTH,

@@ -79,7 +79,7 @@ export const WeekCard = forwardRef<HTMLButtonElement, WeekCardProps>(
                 <span
                   key={`${segment.text}-${index}`}
                   className={cn(
-                    segment.accent && "text-primary",
+                    segment.accent && "text-primary-text",
                     segment.emphasis && "font-semibold text-foreground",
                   )}
                 >

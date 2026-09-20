@@ -1,6 +1,11 @@
 import { useTheme } from "@/hooks/useTheme";
 import type { CustomThemeColors, PaletteId } from "@/lib/themePalettes";
-import { FONT_STACKS, PALETTE_PRESETS, PALETTE_PREVIEW_SWATCH } from "@/lib/themePalettes";
+import {
+  FONT_STACKS,
+  PALETTE_PRESETS,
+  PALETTE_PREVIEW_SWATCH,
+  VISIBLE_PALETTE_IDS,
+} from "@/lib/themePalettes";
 import { cn } from "@/lib/utils";
 import {
   Select,
@@ -10,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const presetIds = Object.keys(PALETTE_PRESETS) as Exclude<PaletteId, "custom">[];
+const presetIds = VISIBLE_PALETTE_IDS;
 
 type ColorField = keyof CustomThemeColors;
 
@@ -21,7 +26,11 @@ const colorFields: { key: ColorField; label: string }[] = [
   { key: "background", label: "Background" },
 ];
 
-function PaletteSwatch({ id }: { id: Exclude<PaletteId, "custom"> }) {
+function PaletteSwatch({
+  id,
+}: {
+  id: Exclude<PaletteId, "custom" | "current">;
+}) {
   const swatch = PALETTE_PREVIEW_SWATCH[id];
   return (
     <div className="flex h-[28px] w-full overflow-hidden" aria-hidden>

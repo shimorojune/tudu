@@ -18,7 +18,7 @@ export function renderQuickAddHighlightedTitle(
       nodes.push(text.slice(cursor, span.start));
     }
     nodes.push(
-      <span key={`${span.start}-${span.end}`} className="text-primary">
+      <span key={`${span.start}-${span.end}`} className="text-primary-text">
         {text.slice(span.start, span.end)}
       </span>,
     );

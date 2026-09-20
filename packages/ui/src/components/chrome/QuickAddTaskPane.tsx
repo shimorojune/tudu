@@ -10,38 +10,42 @@ import {
   validateStartBeforeDeadline,
   type Bucket,
 } from "@tudu/shared";
-import { GripVertical, X } from "lucide-react";
+import { X } from "lucide-react";
 import {
   todayIso,
   useCreateTaskMutation,
   useGetTasksForDayQuery,
 } from "@tudu/store";
-import { authClient } from "@/lib/authClient";
-import { createTaskBody } from "@/lib/createTask";
-import { renderQuickAddHighlightedTitle } from "@/lib/quickAddHighlight";
+import { TuduMark } from "@/components/TuduLogo";
+import {
+  formatQuickAddLandsIn,
+  QuickAddCaptureChips,
+} from "@/components/chrome/QuickAddCaptureChips";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { useTheme } from "@/hooks/useTheme";
 import {
   startQuickAddWindowDrag,
   useQuickAddWindowDrag,
 } from "@/hooks/useQuickAddWindowDrag";
 import { useTaskFieldSuggest } from "@/hooks/useTaskFieldSuggest";
 import { useTaskTitleNaturalLanguage } from "@/hooks/useTaskTitleNaturalLanguage";
-import { ProjectPicker } from "@/components/projects/ProjectPicker";
-import { TaskStartDeadlineFields } from "@/components/tasks/TaskStartDeadlineFields";
+import { authClient } from "@/lib/authClient";
+import { createTaskBody } from "@/lib/createTask";
+import { openNowCount } from "@/lib/nowCount";
+import { renderQuickAddHighlightedTitle } from "@/lib/quickAddHighlight";
+import { resetQuickAddWindowHeight } from "@/lib/quickAddWindowResize";
 import {
   type NewTaskDayChoice,
   resolveScheduledDate,
-  TaskScheduleFields,
 } from "@/components/tasks/TaskScheduleFields";
-import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
-import { resetQuickAddWindowHeight } from "@/lib/quickAddWindowResize";
 import { cn } from "@/lib/utils";
 
 const EXIT_MS = 200;
 const HIDE_REQUEST_GRACE_MS = 500;
 
 /** Content width; Tauri window adds 8px outer padding (see quick_add.rs). */
-export const QUICK_ADD_PANEL_WIDTH_PX = 520;
+export const QUICK_ADD_PANEL_WIDTH_PX = 582;
 
 export type QuickAddCloseReason = {
   afterSave?: boolean;
@@ -54,6 +58,22 @@ export type QuickAddTaskPaneProps = {
 
 type AutoSource = "auto" | "manual";
 
+function QuickAddDragDots() {
+  return (
+    <span
+      className="grid shrink-0 grid-cols-2 gap-[3px]"
+      aria-hidden
+    >
+      {Array.from({ length: 6 }).map((_, index) => (
+        <span
+          key={index}
+          className="size-[3px] bg-ghost"
+        />
+      ))}
+    </span>
+  );
+}
+
 export function QuickAddTaskPane({
   onRequestSignIn,
   onClose,
@@ -64,6 +84,7 @@ export function QuickAddTaskPane({
   const openedAtRef = useRef(0);
   const exitFinishedRef = useRef(false);
   const closeAfterSaveRef = useRef(false);
+  const { resolved } = useTheme();
   const { data: session, isPending: sessionPending } = authClient.useSession();
   const [title, setTitle] = useState("");
   const [bucket, setBucket] = useState<Bucket>("next");
@@ -84,14 +105,15 @@ export function QuickAddTaskPane({
   const [exiting, setExiting] = useState(false);
 
   const today = todayIso();
-  const { data: todayTasks } = useGetTasksForDayQuery(today);
-  const nowCount =
-    todayTasks?.tasks.filter((task) => task.bucket === "now").length ?? 0;
-
   const [createTask] = useCreateTaskMutation();
   useQuickAddWindowDrag();
   const parse = useTaskTitleNaturalLanguage(title, today);
   const scheduledDate = resolveScheduledDate(dayChoice, pickedDate, today);
+  const { data: targetDayTasks } = useGetTasksForDayQuery(
+    scheduledDate ?? today,
+    { skip: scheduledDate === null },
+  );
+  const nowCount = openNowCount(targetDayTasks?.tasks ?? []);
 
   useTaskFieldSuggest({
     title,
@@ -320,7 +342,7 @@ export function QuickAddTaskPane({
 
   if (sessionPending) {
     return shell(
-      <div className="border border-rule bg-card px-[14px] py-[12px] text-[13px] text-muted-foreground shadow-sm">
+      <div className="border border-black/35 bg-card px-[14px] py-[12px] text-[13px] text-muted-foreground shadow-none">
         Loading...
       </div>,
     );
@@ -328,7 +350,7 @@ export function QuickAddTaskPane({
 
   if (!session) {
     return shell(
-      <div className="flex items-center justify-between gap-[12px] border border-rule bg-card px-[14px] py-[12px] shadow-sm">
+      <div className="flex items-center justify-between gap-[12px] border border-black/35 bg-card px-[14px] py-[12px] shadow-none">
         <p className="text-[13px] text-muted-foreground">
           Sign in to add tasks from Quick Add.
         </p>
@@ -346,159 +368,149 @@ export function QuickAddTaskPane({
     );
   }
 
-  const quickAddRowLabelClass =
-    "w-[56px] shrink-0 whitespace-nowrap text-[10px] font-extrabold uppercase tracking-[0.08em] text-faint";
-
-  const quickAddTitleLineClass = "h-[20px] leading-[20px]";
+  const quickAddTitleLineClass = "min-h-[24px] leading-[24px]";
   const quickAddTitleTypography = cn(
-    "min-w-0 w-full max-w-full border-0 bg-transparent p-0 text-[15px] font-semibold outline-none",
+    "min-w-0 w-full max-w-full border-0 bg-transparent p-0 text-[21px] tracking-[-0.015em] outline-none",
     quickAddTitleLineClass,
   );
 
-  const hintText = submitting
-    ? null
-    : parse?.chipLabel
-      ? `${parse.chipLabel} · Enter to save · Esc to close`
-      : "Enter to save · Esc to close";
+  const jiraKeyMatch = title.match(/\b([A-Z][A-Z0-9]+-\d+)\b/);
+  const jiraKey = jiraKeyMatch?.[1] ?? null;
+  const landsIn = formatQuickAddLandsIn({
+    dayChoice,
+    pickedDate,
+    today,
+    bucket,
+    jiraKey,
+  });
 
   return shell(
     <div
-      className="flex w-[520px] flex-col border border-rule bg-card shadow-sm"
+      className="flex w-[582px] flex-col overflow-visible border border-black/35 bg-card shadow-none"
       aria-busy={submitting || undefined}
     >
-      <div className="px-[12px] py-[10px]">
-        <div className="flex items-center gap-[8px]">
-          <button
-            type="button"
-            aria-label="Move Quick Add"
-            disabled={submitting}
-            className="inline-flex h-[20px] w-[20px] shrink-0 cursor-grab items-center justify-center text-faint hover:text-muted-foreground active:cursor-grabbing disabled:opacity-40"
-            onMouseDown={(event) => {
-              if (event.button !== 0) {
-                return;
-              }
-              void startQuickAddWindowDrag();
-            }}
-          >
-            <GripVertical className="size-4" aria-hidden />
-          </button>
-          <div className="min-w-0 flex-1">
-            <div className="grid min-w-0 w-full grid-cols-[minmax(0,1fr)] [&>*]:col-start-1 [&>*]:row-start-1 [&>*]:min-w-0">
-              <div
-                ref={titleMirrorRef}
-                aria-hidden
-                className={cn(
-                  quickAddTitleTypography,
-                  "pointer-events-none overflow-x-hidden overflow-y-hidden whitespace-pre text-foreground",
-                )}
-              >
-                {renderQuickAddHighlightedTitle(title, parse?.spans ?? [])}
-                {!title ? (
-                  <span className="text-faint">What needs doing?</span>
-                ) : null}
-              </div>
-              <input
-                ref={titleRef}
-                type="text"
-                value={title}
-                disabled={submitting}
-                placeholder="What needs doing?"
-                className={cn(
-                  quickAddTitleTypography,
-                  "text-transparent caret-foreground placeholder:text-transparent disabled:opacity-70",
-                )}
-                onChange={(event) => {
-                  setTitle(event.target.value);
-                  window.requestAnimationFrame(syncTitleScroll);
-                }}
-                onScroll={syncTitleScroll}
-              />
-            </div>
-          </div>
-          <button
-            type="button"
-            aria-label="Close Quick Add"
-            disabled={submitting}
-            className="inline-flex h-[20px] w-[28px] shrink-0 items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-40"
-            onClick={closeWithAnimation}
-          >
-            <X className="size-4" aria-hidden />
-          </button>
-        </div>
-        <p
-          className="mt-[4px] flex min-h-[16px] items-center gap-[6px] pl-[28px] pr-[36px] text-[11px] text-faint"
+      <div className="flex items-center gap-[13px] px-[14px] py-[17px] pr-[18px]">
+        <button
+          type="button"
+          aria-label="Move Quick Add"
+          disabled={submitting}
+          className="inline-flex h-[22px] cursor-grab items-center justify-center active:cursor-grabbing disabled:opacity-40"
+          onMouseDown={(event) => {
+            if (event.button !== 0) {
+              return;
+            }
+            void startQuickAddWindowDrag();
+          }}
         >
-          {submitting ? (
-            <>
-              <Spinner className="size-3 text-muted-foreground" aria-hidden />
-              <span>Saving task…</span>
-            </>
-          ) : (
-            hintText
-          )}
-        </p>
+          <QuickAddDragDots />
+        </button>
+        <TuduMark
+          className="size-[22px]"
+          onDark={resolved === "dark"}
+        />
+        <div className="min-w-0 flex flex-1 items-center gap-[7px]">
+          <div className="grid min-w-0 w-full flex-1 grid-cols-[minmax(0,1fr)] [&>*]:col-start-1 [&>*]:row-start-1 [&>*]:min-w-0">
+            <div
+              ref={titleMirrorRef}
+              aria-hidden
+              className={cn(
+                quickAddTitleTypography,
+                "pointer-events-none flex items-center overflow-x-hidden overflow-y-hidden whitespace-pre text-foreground",
+              )}
+            >
+              {renderQuickAddHighlightedTitle(title, parse?.spans ?? [])}
+              {!title ? (
+                <span className="text-muted-foreground">What needs doing?</span>
+              ) : null}
+            </div>
+            <input
+              ref={titleRef}
+              type="text"
+              value={title}
+              disabled={submitting}
+              placeholder="What needs doing?"
+              className={cn(
+                quickAddTitleTypography,
+                "text-transparent caret-primary placeholder:text-transparent disabled:opacity-70",
+              )}
+              onChange={(event) => {
+                setTitle(event.target.value);
+                window.requestAnimationFrame(syncTitleScroll);
+              }}
+              onScroll={syncTitleScroll}
+            />
+          </div>
+        </div>
+        <button
+          type="button"
+          aria-label="Close Quick Add"
+          disabled={submitting}
+          className="inline-flex shrink-0 items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-40"
+          onClick={closeWithAnimation}
+        >
+          <X className="size-4" aria-hidden />
+        </button>
       </div>
 
-      <div className="space-y-[8px] overflow-x-hidden overflow-y-visible border-t border-rule px-[12px] py-[10px]">
-        <TaskScheduleFields
-          layout="quickAdd"
-          jevSuggesting={jevSuggesting}
-          dayChoice={dayChoice}
-          bucket={bucket}
-          pickedDate={pickedDate}
-          nowCount={nowCount}
-          onDayChoiceChange={(value) => {
-            setScheduleSource("manual");
-            setDayChoice(value);
-          }}
-          onBucketChange={(value) => {
-            setBucketSource("manual");
-            setBucket(value);
-          }}
-          onPickedDateChange={(value) => {
-            setScheduleSource("manual");
-            setPickedDate(value);
-          }}
-        />
+      <QuickAddCaptureChips
+        dayChoice={dayChoice}
+        bucket={bucket}
+        pickedDate={pickedDate}
+        today={today}
+        nowCount={nowCount}
+        projectId={projectId}
+        title={title}
+        jevSuggesting={jevSuggesting}
+        disabled={submitting}
+        onDayChoiceChange={(value) => {
+          setScheduleSource("manual");
+          setDayChoice(value);
+        }}
+        onPickedDateChange={(value) => {
+          setScheduleSource("manual");
+          setPickedDate(value);
+        }}
+        onBucketChange={(value) => {
+          setBucketSource("manual");
+          setBucket(value);
+        }}
+        onProjectChange={(value) => {
+          setProjectSource("manual");
+          setProjectId(value);
+          if (!value) {
+            setJevProjectName(null);
+          }
+        }}
+        deadline={deadline}
+        onDeadlineChange={(value) => {
+          setDeadlineSource("manual");
+          setDeadline(value);
+        }}
+      />
 
-        <TaskStartDeadlineFields
-          layout="quickAdd"
-          startDate={startDate}
-          deadline={deadline}
-          onStartDateChange={(value) => {
-            setStartSource("manual");
-            setStartDate(value);
-          }}
-          onDeadlineChange={(value) => {
-            setDeadlineSource("manual");
-            setDeadline(value);
-          }}
-        />
-
-        <div className="relative z-10 flex flex-nowrap items-center gap-[8px]">
-          <div
-            className={cn(
-              quickAddRowLabelClass,
-              jevSuggesting && "quick-add-jev-label-shimmer",
-            )}
-          >
-            Project
-          </div>
-          <div className="min-w-0 flex-1">
-          <ProjectPicker
-            compact
-            value={projectId}
-            onChange={(value) => {
-              setProjectSource("manual");
-              setProjectId(value);
-              if (!value) {
-                setJevProjectName(null);
-              }
-            }}
-            triggerClassName="py-[4px] text-[12px]"
-          />
-          </div>
-        </div>
+      <div
+        className="flex flex-wrap items-center gap-x-[14px] gap-y-[6px] border-t border-hair bg-background px-[18px] py-[11px] text-[11.5px]"
+      >
+        {submitting ? (
+          <span className="flex items-center gap-[6px] text-muted-foreground">
+            <Spinner className="size-3" aria-hidden />
+            Saving task…
+          </span>
+        ) : (
+          <span className="text-muted-foreground">
+            Lands in{" "}
+            <span className="font-bold text-foreground">
+              {landsIn.dayPart}
+              {landsIn.bucketPart ? ` · ${landsIn.bucketPart}` : ""}
+            </span>
+            {landsIn.jiraPart ? (
+              <span>, linked to {landsIn.jiraPart}</span>
+            ) : null}
+          </span>
+        )}
+        <span className="ml-auto font-mono text-muted-foreground">
+          Enter save · Esc close
+        </span>
       </div>
     </div>,
   );

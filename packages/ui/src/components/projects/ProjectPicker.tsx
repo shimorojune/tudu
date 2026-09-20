@@ -104,7 +104,13 @@ export function ProjectPicker({
         )}
         aria-label="Project"
       >
-        {selected ? <ProjectChip project={selected} /> : "None"}
+        {selected ? (
+          <ProjectChip project={selected} />
+        ) : compact ? (
+          "No project"
+        ) : (
+          "None"
+        )}
       </PopoverTrigger>
       <PopoverContent
         align="start"

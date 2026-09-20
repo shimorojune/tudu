@@ -24,7 +24,7 @@ function renderPart(part: TimelinePart, index: number) {
       className={cn(
         part.muted && "text-muted-foreground",
         part.bold && "font-bold",
-        part.accent && "text-primary",
+        part.accent && "text-primary-text",
       )}
     >
       {part.text}

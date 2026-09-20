@@ -54,11 +54,25 @@ describe("themePalette", () => {
     expect(customPalette["--primary"]).toBe("#00ff00");
   });
 
-  it("clears inline tokens for current preset and sets font", () => {
+  it("maps faint to muted-foreground and sets primary-text on modernist", () => {
+    const tokens = buildThemeTokens("modernist", "light", {});
+    expect(tokens["--faint"]).toBe(tokens["--muted-foreground"]);
+    expect(tokens["--primary-text"]).toBe("#ae1800");
+    expect(tokens["--primary"]).toBe("#ec3013");
+  });
+
+  it("github light uses its own background", () => {
+    const modernist = getPresetTokens("modernist", "light");
+    const github = getPresetTokens("github", "light");
+    expect(github["--background"]).toBe("#f0f1f0");
+    expect(github["--background"]).not.toBe(modernist["--background"]);
+  });
+
+  it("applies modernist tokens and font to the document", () => {
     document.documentElement.style.setProperty("--primary", "#ff0000");
-    applyPaletteToDocument("current", "light", {}, "system");
+    applyPaletteToDocument("modernist", "light", {}, "system");
     expect(document.documentElement.style.getPropertyValue("--primary")).toBe(
-      "",
+      "#ec3013",
     );
     expect(document.documentElement.style.getPropertyValue("--font-sans")).toBe(
       "system-ui, sans-serif",

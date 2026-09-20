@@ -43,7 +43,7 @@ export function TeamPersonRow({
               <span>
                 Open <span className="tabular-nums text-foreground">{openCount}</span>
               </span>
-              <span className={slippingCount > 0 ? "font-bold text-primary" : undefined}>
+              <span className={slippingCount > 0 ? "font-semibold text-primary-text" : undefined}>
                 Slipping <span className="tabular-nums">{slippingCount}</span>
               </span>
             </div>

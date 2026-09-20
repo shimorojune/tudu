@@ -215,7 +215,7 @@ function JiraIssueRow({
             </div>
           ) : null}
           {selectedLinked ? (
-            <p className="mt-[8px] text-[11.5px] font-semibold text-primary">
+            <p className="mt-[8px] text-[11.5px] font-semibold text-primary-text">
               Selected task linked
             </p>
           ) : null}
