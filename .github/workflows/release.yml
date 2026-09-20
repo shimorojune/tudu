@@ -11,14 +11,6 @@ on:
         options:
           - production
           - staging
-      release_as:
-        description: "Reserved for manual force version (not wired yet)"
-        required: false
-        type: string
-      finish_version:
-        description: "Skip semantic-release; build and publish an existing draft tag (e.g. 0.15.1 or 0.15.1-staging.1)"
-        required: false
-        type: string
 
 permissions:
   contents: write
@@ -33,65 +25,34 @@ jobs:
       new_release_published: ${{ steps.version.outputs.published }}
       new_release_version: ${{ steps.version.outputs.version }}
       release_sha: ${{ steps.version.outputs.release_sha }}
-      finish_only: ${{ steps.version.outputs.finish_only }}
     steps:
-      - name: Validate inputs
-        run: |
-          if [ -n "${{ inputs.release_as }}" ] && [ -n "${{ inputs.finish_version }}" ]; then
-            echo "Use release_as OR finish_version, not both."
-            exit 1
-          fi
-
-      - name: Finish existing release
-        if: inputs.finish_version != ''
-        id: finish
-        run: |
-          TAG="tudu-${{ inputs.finish_version }}"
-          if ! gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release ${TAG} not found. Create a draft release first."
-            exit 1
-          fi
-          echo "published=true" >> "$GITHUB_OUTPUT"
-          echo "version=${{ inputs.finish_version }}" >> "$GITHUB_OUTPUT"
-          echo "finish_only=true" >> "$GITHUB_OUTPUT"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-
       - name: Checkout
-        if: inputs.finish_version == ''
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup pnpm
-        if: inputs.finish_version == ''
         uses: pnpm/action-setup@v4
         with:
           version: 9
 
       - name: Setup Node.js
-        if: inputs.finish_version == ''
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
 
       - name: Install dependencies
-        if: inputs.finish_version == ''
         run: pnpm install --frozen-lockfile
 
       - name: Install ripgrep
-        if: inputs.finish_version == ''
         run: sudo apt-get update && sudo apt-get install -y ripgrep
 
       - name: Lint copy
-        if: inputs.finish_version == ''
         run: pnpm lint:copy
 
       - name: Semantic Release
-        if: inputs.finish_version == ''
         id: semantic
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -127,30 +88,14 @@ jobs:
           echo "published=${PUBLISHED}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
-          echo "finish_only=false" >> "$GITHUB_OUTPUT"
           exit "$EC"
 
       - name: Set release outputs
         id: version
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
         run: |
-          if [ -n "${{ inputs.finish_version }}" ]; then
-            echo "published=${{ steps.finish.outputs.published }}" >> "$GITHUB_OUTPUT"
-            echo "version=${{ steps.finish.outputs.version }}" >> "$GITHUB_OUTPUT"
-            echo "finish_only=${{ steps.finish.outputs.finish_only }}" >> "$GITHUB_OUTPUT"
-            RELEASE_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/tudu-${{ inputs.finish_version }}" --jq '.object.sha' 2>/dev/null || true)
-            if [ -z "$RELEASE_SHA" ]; then
-              RELEASE_SHA=$(gh release view "tudu-${{ inputs.finish_version }}" --json targetCommitish --jq '.targetCommitish' 2>/dev/null || true)
-            fi
-            echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
-          else
-            echo "published=${{ steps.semantic.outputs.published }}" >> "$GITHUB_OUTPUT"
-            echo "version=${{ steps.semantic.outputs.version }}" >> "$GITHUB_OUTPUT"
-            echo "finish_only=${{ steps.semantic.outputs.finish_only }}" >> "$GITHUB_OUTPUT"
-            echo "release_sha=${{ steps.semantic.outputs.release_sha }}" >> "$GITHUB_OUTPUT"
-          fi
+          echo "published=${{ steps.semantic.outputs.published }}" >> "$GITHUB_OUTPUT"
+          echo "version=${{ steps.semantic.outputs.version }}" >> "$GITHUB_OUTPUT"
+          echo "release_sha=${{ steps.semantic.outputs.release_sha }}" >> "$GITHUB_OUTPUT"
 
   build-macos:
     name: Build macOS
@@ -282,7 +227,6 @@ jobs:
     if: >-
       always() &&
       needs.release.outputs.new_release_published == 'true' &&
-      needs.release.outputs.finish_only != 'true' &&
       (needs.build-macos.result == 'failure' ||
        needs.deploy-prod.result == 'failure' ||
        needs.publish-release.result == 'failure')
