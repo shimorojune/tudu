@@ -17,6 +17,9 @@ jobs:
   deploy-staging:
     name: Deploy staging (web + server)
     runs-on: ubuntu-latest
+    concurrency:
+      group: dokploy-deploy
+      cancel-in-progress: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4

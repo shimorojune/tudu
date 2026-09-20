@@ -30,6 +30,10 @@ inputs:
     description: Maximum minutes to wait for deployment completion
     required: false
     default: "45"
+  appear_timeout_minutes:
+    description: Maximum minutes to wait for a new deployment record after trigger
+    required: false
+    default: "10"
 
 runs:
   using: composite
@@ -45,6 +49,7 @@ runs:
         WAIT_FOR_COMPLETION: ${{ inputs.wait_for_completion }}
         POLL_INTERVAL_SECONDS: ${{ inputs.poll_interval_seconds }}
         POLL_TIMEOUT_MINUTES: ${{ inputs.poll_timeout_minutes }}
+        APPEAR_TIMEOUT_MINUTES: ${{ inputs.appear_timeout_minutes }}
       run: |
         set -euo pipefail
         api_url="${DOKPLOY_API_URL%/}"
@@ -152,7 +157,12 @@ runs:
         wait_for_deployment() {
           local before_ids="$1"
           local since="$2"
-          local deadline=$((since + POLL_TIMEOUT_MINUTES * 60))
+          local triggered_at="$3"
+          local deadline=$((triggered_at + POLL_TIMEOUT_MINUTES * 60))
+          local appear_deadline=$((triggered_at + APPEAR_TIMEOUT_MINUTES * 60))
+          local tracked_id=""
+          local retriggers=0
+          local max_retriggers=1
 
           while true; do
             local now
@@ -169,10 +179,29 @@ runs:
               continue
             fi
 
-            local deployment
-            deployment=$(find_deployment "$response" "$before_ids" "$DEPLOY_TITLE" "$DEPLOY_DESCRIPTION" "$since" || true)
+            local deployment=""
+            if [ -n "$tracked_id" ]; then
+              deployment=$(echo "$response" | normalize_deployments | jq -c --arg id "$tracked_id" \
+                '[.[] | select((.deploymentId // .id // "") == $id)] | first // empty')
+            fi
+            if [ -z "$deployment" ] || [ "$deployment" = "null" ]; then
+              deployment=$(find_deployment "$response" "$before_ids" "$DEPLOY_TITLE" "$DEPLOY_DESCRIPTION" "$since" || true)
+            fi
 
             if [ -z "$deployment" ] || [ "$deployment" = "null" ]; then
+              if [ "$now" -ge "$appear_deadline" ] && [ "$retriggers" -lt "$max_retriggers" ]; then
+                retriggers=$((retriggers + 1))
+                echo "No Dokploy deployment record appeared within ${APPEAR_TIMEOUT_MINUTES} minutes. Re-triggering (${retriggers}/${max_retriggers})..."
+                trigger_deployment
+                appear_deadline=$(( $(date +%s) + APPEAR_TIMEOUT_MINUTES * 60 ))
+                sleep "$POLL_INTERVAL_SECONDS"
+                continue
+              fi
+              if [ "$now" -ge "$appear_deadline" ]; then
+                echo "No Dokploy deployment appeared for compose ${DOKPLOY_COMPOSE_ID} after trigger."
+                echo "Check DOKPLOY_COMPOSE_ID and that no other deploy is blocking the Dokploy worker."
+                exit 1
+              fi
               echo "Waiting for Dokploy deployment (title: ${DEPLOY_TITLE})..."
               echo "Known deployments:"
               echo "$response" | normalize_deployments | jq -r '.[] | "- \(.deploymentId // .id // "unknown"): \(.status // "unknown") | \(.title // "" | split("\n")[0])"' | head -5
@@ -183,6 +212,9 @@ runs:
             local status deployment_id
             status=$(echo "$deployment" | jq -r '.status // empty')
             deployment_id=$(echo "$deployment" | jq -r '.deploymentId // .id // empty')
+            if [ -n "$deployment_id" ]; then
+              tracked_id="$deployment_id"
+            fi
 
             echo "Deployment ${deployment_id:-unknown} status: ${status:-unknown}"
 
@@ -193,6 +225,11 @@ runs:
                 ;;
               error)
                 echo "Dokploy deployment failed (deploymentId: ${deployment_id:-unknown})."
+                exit 1
+                ;;
+              cancelled|canceled)
+                echo "Dokploy deployment was cancelled (deploymentId: ${deployment_id:-unknown})."
+                echo "Another deploy may have preempted this one. Retry after other Dokploy jobs finish."
                 exit 1
                 ;;
               pending|running|"")
@@ -210,8 +247,9 @@ runs:
         before_response=$(fetch_deployments)
         before_ids=$(echo "$before_response" | normalize_deployments | jq -r '(.[] | .deploymentId // .id // empty)' | sort -u)
 
+        triggered_at=$(date +%s)
         trigger_deployment
 
         if [ "$WAIT_FOR_COMPLETION" = "true" ]; then
-          wait_for_deployment "$before_ids" "$since_epoch"
+          wait_for_deployment "$before_ids" "$since_epoch" "$triggered_at"
         fi
