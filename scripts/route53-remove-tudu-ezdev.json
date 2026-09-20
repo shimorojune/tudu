@@ -1,20 +1,8 @@
 {
+  "Comment": "Remove Tudu A records from ezdev.net zone Z088735395AHDEDGRJU3. Apply only after confirming with team. AWS profile jenkins.",
   "Changes": [
     {
       "Action": "DELETE",
-      "ResourceRecordSet": {
-        "Name": "tudu.ezdev.net",
-        "Type": "CNAME",
-        "TTL": 300,
-        "ResourceRecords": [
-          {
-            "Value": "eternals2-alb-ext-616121446.us-west-2.elb.amazonaws.com"
-          }
-        ]
-      }
-    },
-    {
-      "Action": "CREATE",
       "ResourceRecordSet": {
         "Name": "tudu.ezdev.net",
         "Type": "A",
@@ -26,19 +14,24 @@
       "Action": "DELETE",
       "ResourceRecordSet": {
         "Name": "api.tudu.ezdev.net",
-        "Type": "CNAME",
+        "Type": "A",
         "TTL": 300,
-        "ResourceRecords": [
-          {
-            "Value": "eternals2-alb-ext-616121446.us-west-2.elb.amazonaws.com"
-          }
-        ]
+        "ResourceRecords": [{ "Value": "213.210.21.191" }]
       }
     },
     {
-      "Action": "CREATE",
+      "Action": "DELETE",
       "ResourceRecordSet": {
-        "Name": "api.tudu.ezdev.net",
+        "Name": "staging.tudu.ezdev.net",
+        "Type": "A",
+        "TTL": 300,
+        "ResourceRecords": [{ "Value": "213.210.21.191" }]
+      }
+    },
+    {
+      "Action": "DELETE",
+      "ResourceRecordSet": {
+        "Name": "api.staging.tudu.ezdev.net",
         "Type": "A",
         "TTL": 300,
         "ResourceRecords": [{ "Value": "213.210.21.191" }]

@@ -10,7 +10,7 @@
 
 - macOS 10.15 or later
 - Apple Silicon Mac (arm64)
-- **0.26.0+** uses production API `https://api.tudu.rraj.dev` on older builds; newer releases use `https://api.tudu.ezdev.net` (both work). Web: `https://tudu.ezdev.net` or `https://tudu.rraj.dev`.
+- Production API and web: `https://api.tudu.rraj.dev` and `https://tudu.rraj.dev`.
 
 ## First launch
 

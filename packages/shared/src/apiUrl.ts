@@ -1,20 +1,16 @@
 const DEFAULT_DEV_API_URL = "http://localhost:3456";
 
 export const PROD_WEB_TO_API: Record<string, string> = {
-  "tudu.ezdev.net": "https://api.tudu.ezdev.net",
   "tudu.rraj.dev": "https://api.tudu.rraj.dev",
-  "staging.tudu.ezdev.net": "https://api.staging.tudu.ezdev.net",
   "staging.tudu.rraj.dev": "https://api.staging.tudu.rraj.dev",
 };
 
-export const PROD_DESKTOP_API_URL = "https://api.tudu.ezdev.net";
+export const PROD_DESKTOP_API_URL = "https://api.tudu.rraj.dev";
 
-export const STAGING_DESKTOP_API_URL = "https://api.staging.tudu.ezdev.net";
+export const STAGING_DESKTOP_API_URL = "https://api.staging.tudu.rraj.dev";
 
 const PROD_API_HOSTS = new Set([
-  "api.tudu.ezdev.net",
   "api.tudu.rraj.dev",
-  "api.staging.tudu.ezdev.net",
   "api.staging.tudu.rraj.dev",
 ]);
 
