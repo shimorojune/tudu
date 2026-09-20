@@ -1,0 +1,161 @@
+/* Tudu · Modernist theme for shadcn/ui + Tailwind v4
+   Drop this into your global stylesheet (after @import "tailwindcss").
+   Radius is 0 on purpose: Modernist rounds nothing. */
+
+@layer base {
+  :root {
+    --background: #f3f2f2;
+    --foreground: #201e1d;
+
+    --card: #fdfcfb;
+    --card-foreground: #201e1d;
+    --popover: #fdfcfb;
+    --popover-foreground: #201e1d;
+
+    --primary: #ec3013;
+    --primary-foreground: #fdfcfb;
+
+    --secondary: #eae9e9;
+    --secondary-foreground: #201e1d;
+
+    --muted: #eae9e9;
+    --muted-foreground: #7d7979;
+
+    --accent: #fff2ef;
+    --accent-foreground: #ae1800;
+
+    /* Mono palette: there is no second hue, so destructive reads as the
+       accent one step down. Pair it with an icon or label, not color alone. */
+    --destructive: #dd2b0f;
+    --destructive-foreground: #fdfcfb;
+
+    --border: #d7d3d3;
+    --input: #bab6b6;
+    --ring: #ec3013;
+
+    --radius: 0rem;
+
+    --chart-1: #ec3013;
+    --chart-2: #ae1800;
+    --chart-3: #ff9783;
+    --chart-4: #605d5d;
+    --chart-5: #bab6b6;
+
+    --sidebar: #eceae8;
+    --sidebar-foreground: #201e1d;
+    --sidebar-primary: #ec3013;
+    --sidebar-primary-foreground: #fdfcfb;
+    --sidebar-accent: #eae9e9;
+    --sidebar-accent-foreground: #201e1d;
+    --sidebar-border: #d7d3d3;
+    --sidebar-ring: #ec3013;
+  }
+
+  /* Dusk — the dark variant from the design canvas */
+  .dark {
+    --background: #302d2a;
+    --foreground: #f0ede8;
+
+    --card: #3a3733;
+    --card-foreground: #f0ede8;
+    --popover: #3a3733;
+    --popover-foreground: #f0ede8;
+
+    --primary: #ec3013;
+    --primary-foreground: #fdfcfb;
+
+    --secondary: #44403b;
+    --secondary-foreground: #f0ede8;
+
+    --muted: #44403b;
+    --muted-foreground: #a8a29a;
+
+    --accent: #4d170e;
+    --accent-foreground: #ffc4b8;
+
+    --destructive: #ff563c;
+    --destructive-foreground: #201e1d;
+
+    --border: #4a4641;
+    --input: #5a554f;
+    --ring: #ff563c;
+
+    --chart-1: #ff563c;
+    --chart-2: #ffc4b8;
+    --chart-3: #ec3013;
+    --chart-4: #a8a29a;
+    --chart-5: #605d5d;
+
+    --sidebar: #3d3833;
+    --sidebar-foreground: #f0ede8;
+    --sidebar-primary: #ec3013;
+    --sidebar-primary-foreground: #fdfcfb;
+    --sidebar-accent: #44403b;
+    --sidebar-accent-foreground: #f0ede8;
+    --sidebar-border: #4a4641;
+    --sidebar-ring: #ff563c;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: 0rem;
+  --radius-md: 0rem;
+  --radius-lg: 0rem;
+  --radius-xl: 0rem;
+
+  --font-sans: Archivo, system-ui, sans-serif;
+  --font-heading: Archivo, system-ui, sans-serif;
+
+  /* Full Modernist ramps, if you want steps beyond the semantic roles */
+  --color-ink-100: #f8f4f4;
+  --color-ink-200: #eae7e7;
+  --color-ink-300: #d7d3d3;
+  --color-ink-400: #bab6b6;
+  --color-ink-500: #9b9797;
+  --color-ink-600: #7d7979;
+  --color-ink-700: #605d5d;
+  --color-ink-800: #444141;
+  --color-ink-900: #2d2b2b;
+  --color-red-100: #fff2ef;
+  --color-red-200: #ffe0d9;
+  --color-red-300: #ffc4b8;
+  --color-red-400: #ff9783;
+  --color-red-500: #ff563c;
+  --color-red-600: #dd2b0f;
+  --color-red-700: #ae1800;
+  --color-red-800: #7c1405;
+  --color-red-900: #4d170e;
+}

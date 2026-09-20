@@ -23,7 +23,8 @@
     "db:migrate": "pnpm --filter @tudu/db db:migrate",
     "db:push": "pnpm --filter @tudu/db db:push",
     "db:seed": "pnpm --filter @tudu/server db:seed",
-    "prepare": "husky"
+    "prepare": "husky",
+    "design:sync": "node scripts/design-sync.js"
   },
   "engines": {
     "node": ">=20"
