@@ -32,7 +32,7 @@ Local helper (writes `.env` and gitignored `.env.dokploy.firebase.snippet` for D
 node scripts/sync-firebase-env.mjs
 ```
 
-If **personal Dokploy MCP** returns 403, regenerate the API key in [infra.rraj.dev](https://infra.rraj.dev) (Profile → API/CLI) and update the `personal-dokploy-mcp` entry in Cursor MCP settings, then ask the agent to merge env via `compose.saveEnvironment`.
+If **personal Dokploy MCP** returns 403, regenerate the API key in [admin.rraj.dev](https://admin.rraj.dev) (Profile → API/CLI) and update the `personal-dokploy-mcp` entry in Cursor MCP settings, then ask the agent to merge env via `compose.saveEnvironment`.
 
 ## Smoke test
 
