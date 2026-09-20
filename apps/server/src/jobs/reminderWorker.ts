@@ -13,7 +13,10 @@ import {
   isSlipping,
   localMinutesInTimezone,
 } from "@tudu/shared";
-import { fetchLatestRelease } from "../routes/updates/github.js";
+import {
+  fetchLatestRelease,
+  resolveUpdatesReleaseChannelFromEnv,
+} from "../routes/updates/github.js";
 import { stripReleaseTag } from "../routes/updates/mapRelease.js";
 import { insertSystemNotificationsWithPush } from "../notifications/delivery.js";
 
@@ -234,7 +237,11 @@ export async function runVersionCheck(db: Db, userId: string): Promise<number> {
     return 0;
   }
 
-  const release = await fetchLatestRelease({ token, repo });
+  const release = await fetchLatestRelease({
+    token,
+    repo,
+    channel: resolveUpdatesReleaseChannelFromEnv(),
+  });
   const latest = stripReleaseTag(release.tag_name);
   if (compareAppVersions(latest, prefs.clientAppVersion) <= 0) {
     return 0;

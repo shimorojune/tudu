@@ -3,12 +3,20 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
+      track:
+        description: "production (stable) or staging (prerelease + staging Dokploy)"
+        required: true
+        type: choice
+        default: production
+        options:
+          - production
+          - staging
       release_as:
         description: "Reserved for manual force version (not wired yet)"
         required: false
         type: string
       finish_version:
-        description: "Skip semantic-release; build and publish an existing draft tag (e.g. 0.15.1)"
+        description: "Skip semantic-release; build and publish an existing draft tag (e.g. 0.15.1 or 0.15.1-staging.1)"
         required: false
         type: string
 
@@ -93,7 +101,11 @@ jobs:
           LOG=semantic-release.log
           : > "$LOG"
 
-          pnpm exec semantic-release 2>&1 | tee "$LOG"
+          if [ "${{ github.event.inputs.track }}" = "staging" ]; then
+            pnpm exec semantic-release --extends ./release.config.staging.cjs 2>&1 | tee "$LOG"
+          else
+            pnpm exec semantic-release 2>&1 | tee "$LOG"
+          fi
           EC=${PIPESTATUS[0]}
 
           PUBLISHED=false
@@ -101,7 +113,7 @@ jobs:
           RELEASE_SHA=""
           if grep -q "Published release" "$LOG"; then
             PUBLISHED=true
-            VERSION=$(grep -oE 'Published release [0-9]+\.[0-9]+\.[0-9]+' "$LOG" | tail -1 | awk '{print $3}')
+            VERSION=$(grep -oE 'Published release [0-9]+\.[0-9]+\.[0-9]+(-staging\.[0-9]+)?' "$LOG" | tail -1 | awk '{print $3}')
           fi
 
           if [ "$PUBLISHED" = "true" ] && [ -n "$VERSION" ]; then
@@ -147,7 +159,7 @@ jobs:
     runs-on: macos-latest
     env:
       ZIP_NAME: Tudu-macOS-v${{ needs.release.outputs.new_release_version }}.zip
-      VITE_API_URL: https://api.tudu.ezdev.net
+      VITE_API_URL: ${{ github.event.inputs.track == 'staging' && 'https://api.staging.tudu.ezdev.net' || 'https://api.tudu.ezdev.net' }}
       VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
       VITE_POSTHOG_HOST: https://us.i.posthog.com
     steps:
@@ -232,18 +244,18 @@ jobs:
       - name: Build web and server
         run: pnpm build
 
-      - name: Migrate prod database
+      - name: Migrate database
         env:
-          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          DATABASE_URL: ${{ github.event.inputs.track == 'staging' && secrets.STAGING_DATABASE_URL || secrets.PROD_DATABASE_URL }}
         run: pnpm db:migrate
 
-      - name: Trigger Dokploy prod deployment
+      - name: Trigger Dokploy deployment
         uses: ./.github/actions/dokploy-deploy-compose
         with:
           api_url: ${{ secrets.DOKPLOY_API_URL }}
           api_key: ${{ secrets.DOKPLOY_API_KEY }}
-          compose_id: ${{ secrets.DOKPLOY_COMPOSE_ID }}
-          title: Release v${{ needs.release.outputs.new_release_version }}
+          compose_id: ${{ github.event.inputs.track == 'staging' && secrets.DOKPLOY_STAGING_COMPOSE_ID || secrets.DOKPLOY_COMPOSE_ID }}
+          title: ${{ github.event.inputs.track == 'staging' && format('Staging release v{0}', needs.release.outputs.new_release_version) || format('Release v{0}', needs.release.outputs.new_release_version) }}
           description: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   publish-release:
@@ -253,7 +265,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Publish release
-        run: gh release edit "tudu-${{ needs.release.outputs.new_release_version }}" --draft=false
+        run: |
+          TAG="tudu-${{ needs.release.outputs.new_release_version }}"
+          if [ "${{ github.event.inputs.track }}" = "staging" ]; then
+            gh release edit "$TAG" --draft=false --prerelease
+          else
+            gh release edit "$TAG" --draft=false
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}

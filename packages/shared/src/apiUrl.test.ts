@@ -17,6 +17,12 @@ describe("resolveApiUrlFromOptions", () => {
     ).toBe("https://api.tudu.rraj.dev");
   });
 
+  it("maps staging ezdev web host to staging API", () => {
+    expect(
+      resolveApiUrlFromOptions({ webHostname: "staging.tudu.ezdev.net" }),
+    ).toBe("https://api.staging.tudu.ezdev.net");
+  });
+
   it("uses VITE_API_URL in dev when host is not prod", () => {
     expect(
       resolveApiUrlFromOptions({

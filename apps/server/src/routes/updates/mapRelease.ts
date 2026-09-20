@@ -12,6 +12,7 @@ export type GitHubRelease = {
   published_at: string;
   body: string | null;
   html_url: string;
+  prerelease?: boolean;
   assets: GitHubReleaseAsset[];
 };
 

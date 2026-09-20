@@ -19,6 +19,7 @@
     "test:e2e:ui": "playwright test --ui --config apps/e2e/playwright.config.ts",
     "commitlint": "commitlint",
     "release": "semantic-release",
+    "release:staging": "semantic-release --extends ./release.config.staging.cjs",
     "db:generate": "pnpm --filter @tudu/db db:generate",
     "db:migrate": "pnpm --filter @tudu/db db:migrate",
     "db:push": "pnpm --filter @tudu/db db:push",

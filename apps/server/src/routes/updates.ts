@@ -5,6 +5,7 @@ import {
   clearReleaseCache,
   fetchLatestRelease,
   fetchReleaseAsset,
+  resolveUpdatesReleaseChannelFromEnv,
   type UpdatesConfig,
 } from "./updates/github.js";
 import {
@@ -26,12 +27,13 @@ function resolveUpdatesConfig(): UpdatesRouteConfig | null {
   const repo = process.env.UPDATES_GITHUB_REPO?.trim() || "eGainDev/tudu";
   const publicBaseUrl =
     process.env.UPDATES_PUBLIC_BASE_URL?.trim() || "https://api.tudu.rraj.dev";
+  const channel = resolveUpdatesReleaseChannelFromEnv();
 
   if (!token) {
     return null;
   }
 
-  return { token, repo, publicBaseUrl };
+  return { token, repo, publicBaseUrl, channel };
 }
 
 export function createUpdatesRoute() {
