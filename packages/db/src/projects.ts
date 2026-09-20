@@ -354,6 +354,7 @@ export async function deleteProject(
   }
 
   await db
+    .update(tasks)
     .set({ projectId: null })
     .where(and(eq(tasks.projectId, projectId), isNull(tasks.deletedAt)));
 
