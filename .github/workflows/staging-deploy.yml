@@ -16,6 +16,9 @@ permissions:
 jobs:
   deploy-staging:
     name: Deploy staging (web + server)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      !startsWith(github.event.head_commit.message, 'chore(release):')
     runs-on: ubuntu-latest
     concurrency:
       group: dokploy-deploy

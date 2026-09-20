@@ -34,6 +34,10 @@ inputs:
     description: Maximum minutes to wait for a new deployment record after trigger
     required: false
     default: "10"
+  cancel_retry_max:
+    description: Re-trigger compose.deploy after cancelled status (Dokploy worker blips)
+    required: false
+    default: "3"
 
 runs:
   using: composite
@@ -50,6 +54,7 @@ runs:
         POLL_INTERVAL_SECONDS: ${{ inputs.poll_interval_seconds }}
         POLL_TIMEOUT_MINUTES: ${{ inputs.poll_timeout_minutes }}
         APPEAR_TIMEOUT_MINUTES: ${{ inputs.appear_timeout_minutes }}
+        CANCEL_RETRY_MAX: ${{ inputs.cancel_retry_max }}
       run: |
         set -euo pipefail
         api_url="${DOKPLOY_API_URL%/}"
@@ -87,10 +92,23 @@ runs:
         }
 
         fetch_deployments() {
-          curl -fsS --retry 0 --connect-timeout 30 --max-time 120 \
+          curl -fsS --retry 5 --retry-all-errors --retry-delay 5 \
+            --connect-timeout 30 --max-time 120 \
             -G "${api_url}/api/deployment.allByCompose" \
             --data-urlencode "composeId=${DOKPLOY_COMPOSE_ID}" \
             -H "x-api-key: ${DOKPLOY_API_KEY}"
+        }
+
+        append_before_id() {
+          local id="$1"
+          if [ -z "$id" ]; then
+            return 0
+          fi
+          if [ -n "$before_ids" ]; then
+            before_ids="${before_ids}"$'\n'"${id}"
+          else
+            before_ids="${id}"
+          fi
         }
 
         normalize_deployments() {
@@ -155,7 +173,7 @@ runs:
         }
 
         wait_for_deployment() {
-          local before_ids="$1"
+          before_ids="$1"
           local since="$2"
           local triggered_at="$3"
           local deadline=$((triggered_at + POLL_TIMEOUT_MINUTES * 60))
@@ -163,6 +181,7 @@ runs:
           local tracked_id=""
           local retriggers=0
           local max_retriggers=1
+          local cancel_retries=0
 
           while true; do
             local now
@@ -228,8 +247,17 @@ runs:
                 exit 1
                 ;;
               cancelled|canceled)
-                echo "Dokploy deployment was cancelled (deploymentId: ${deployment_id:-unknown})."
-                echo "Another deploy may have preempted this one. Retry after other Dokploy jobs finish."
+                if [ "$cancel_retries" -lt "$CANCEL_RETRY_MAX" ]; then
+                  cancel_retries=$((cancel_retries + 1))
+                  echo "Dokploy deployment cancelled (deploymentId: ${deployment_id:-unknown}). Re-triggering (${cancel_retries}/${CANCEL_RETRY_MAX}) in 45s..."
+                  append_before_id "$deployment_id"
+                  tracked_id=""
+                  sleep 45
+                  trigger_deployment
+                  appear_deadline=$(( $(date +%s) + APPEAR_TIMEOUT_MINUTES * 60 ))
+                  continue
+                fi
+                echo "Dokploy deployment was cancelled after ${CANCEL_RETRY_MAX} retries (deploymentId: ${deployment_id:-unknown})."
                 exit 1
                 ;;
               pending|running|"")

@@ -192,6 +192,8 @@ jobs:
           compose_id: ${{ secrets.DOKPLOY_COMPOSE_ID }}
           title: ${{ format('Release v{0}', needs.release.outputs.new_release_version) }}
           description: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          poll_timeout_minutes: "60"
+          cancel_retry_max: "3"
 
   publish-release:
     name: Publish Release
