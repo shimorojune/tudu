@@ -10,7 +10,7 @@
 
 - macOS 10.15 or later
 - Apple Silicon Mac (arm64)
-- Production API and web: `https://api.tudu.rraj.dev` and `https://tudu.rraj.dev`.
+- Production API and web: `https://api.tudu.ezdev.net` and `https://tudu.ezdev.net` (`*.rraj.dev` also works off VPN).
 
 ## First launch
 

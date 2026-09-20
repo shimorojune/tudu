@@ -115,14 +115,14 @@ const prodEnv = await composeOne(prodComposeId);
 const env = parseEnv(prodEnv);
 
 env.set("DATABASE_URL", stagingDb);
-env.set("BETTER_AUTH_URL", "https://api.staging.tudu.rraj.dev");
+env.set("BETTER_AUTH_URL", "https://api.staging.tudu.ezdev.net");
 env.set("BETTER_AUTH_SECRET", randomBytes(32).toString("base64"));
 env.set(
   "CORS_ORIGINS",
-  "https://staging.tudu.rraj.dev,tauri://localhost",
+  "https://staging.tudu.rraj.dev,https://staging.tudu.ezdev.net,tauri://localhost",
 );
-env.set("VITE_API_URL", "https://api.staging.tudu.rraj.dev");
-env.set("UPDATES_PUBLIC_BASE_URL", "https://api.staging.tudu.rraj.dev");
+env.set("VITE_API_URL", "https://api.staging.tudu.ezdev.net");
+env.set("UPDATES_PUBLIC_BASE_URL", "https://api.staging.tudu.ezdev.net");
 env.set("UPDATES_RELEASE_CHANNEL", "staging");
 env.set("ATTACHMENT_STORAGE", "minio");
 env.set("S3_ENDPOINT", s3Endpoint);

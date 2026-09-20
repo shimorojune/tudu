@@ -1,8 +1,7 @@
 {
-  "Comment": "Remove Tudu A records from ezdev.net zone Z088735395AHDEDGRJU3. Apply only after confirming with team. AWS profile jenkins.",
   "Changes": [
     {
-      "Action": "DELETE",
+      "Action": "UPSERT",
       "ResourceRecordSet": {
         "Name": "tudu.ezdev.net",
         "Type": "A",
@@ -11,7 +10,7 @@
       }
     },
     {
-      "Action": "DELETE",
+      "Action": "UPSERT",
       "ResourceRecordSet": {
         "Name": "api.tudu.ezdev.net",
         "Type": "A",
@@ -20,7 +19,7 @@
       }
     },
     {
-      "Action": "DELETE",
+      "Action": "UPSERT",
       "ResourceRecordSet": {
         "Name": "staging.tudu.ezdev.net",
         "Type": "A",
@@ -29,7 +28,7 @@
       }
     },
     {
-      "Action": "DELETE",
+      "Action": "UPSERT",
       "ResourceRecordSet": {
         "Name": "api.staging.tudu.ezdev.net",
         "Type": "A",
