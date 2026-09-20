@@ -1,16 +1,3 @@
-# [0.33.0](https://github.com/eGainDev/tudu/compare/tudu-0.32.0...tudu-0.33.0) (2026-09-20)
-
-
-### Bug Fixes
-
-* **ci:** exclude design folder from em-dash lint ([9837da5](https://github.com/eGainDev/tudu/commit/9837da5efab5783f50d2b30f068f0e9a8e514581))
-
-
-### Features
-
-* **ci:** add staging release track and Dokploy helpers ([845bb69](https://github.com/eGainDev/tudu/commit/845bb69b1362bb9a7cd8d48fafde0a58799b9867))
-* update Quick Add dimensions and enhance theme styling ([906dc44](https://github.com/eGainDev/tudu/commit/906dc4493559fa97768bda8656ec59845bda68bc))
-
 # [0.32.0](https://github.com/eGainDev/tudu/compare/tudu-0.31.0...tudu-0.32.0) (2026-09-19)
 
 
