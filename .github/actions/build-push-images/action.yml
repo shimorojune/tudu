@@ -1,0 +1,144 @@
+name: Build and push container images
+description: Build web and server images with BuildKit GHA cache and push to GHCR
+
+inputs:
+  image_owner:
+    description: GHCR owner (lowercase), e.g. egaindev
+    required: true
+  image_tag:
+    description: Primary image tag (usually github.sha)
+    required: true
+  extra_tags:
+    description: Optional extra tags (comma-separated) applied to both images
+    required: false
+    default: ""
+  vite_api_url:
+    description: VITE_API_URL build arg for web image
+    required: true
+  vite_posthog_key:
+    description: VITE_POSTHOG_KEY build arg for web image
+    required: false
+    default: ""
+  vite_posthog_host:
+    description: VITE_POSTHOG_HOST build arg for web image
+    required: false
+    default: ""
+  vite_firebase_api_key:
+    description: VITE_FIREBASE_API_KEY build arg for web image
+    required: false
+    default: ""
+  vite_firebase_auth_domain:
+    description: VITE_FIREBASE_AUTH_DOMAIN build arg for web image
+    required: false
+    default: ""
+  vite_firebase_project_id:
+    description: VITE_FIREBASE_PROJECT_ID build arg for web image
+    required: false
+    default: ""
+  vite_firebase_messaging_sender_id:
+    description: VITE_FIREBASE_MESSAGING_SENDER_ID build arg for web image
+    required: false
+    default: ""
+  vite_firebase_app_id:
+    description: VITE_FIREBASE_APP_ID build arg for web image
+    required: false
+    default: ""
+  vite_firebase_vapid_key:
+    description: VITE_FIREBASE_VAPID_KEY build arg for web image
+    required: false
+    default: ""
+
+outputs:
+  web_image:
+    description: Full web image reference (ghcr.io/owner/tudu-web:tag)
+    value: ${{ steps.tags.outputs.web_image }}
+  server_image:
+    description: Full server image reference (ghcr.io/owner/tudu-server:tag)
+    value: ${{ steps.tags.outputs.server_image }}
+
+runs:
+  using: composite
+  steps:
+    - name: Log in to GHCR
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Resolve image tags
+      id: tags
+      shell: bash
+      env:
+        IMAGE_OWNER: ${{ inputs.image_owner }}
+        IMAGE_TAG: ${{ inputs.image_tag }}
+        EXTRA_TAGS: ${{ inputs.extra_tags }}
+      run: |
+        set -euo pipefail
+        web="ghcr.io/${IMAGE_OWNER}/tudu-web"
+        server="ghcr.io/${IMAGE_OWNER}/tudu-server"
+        echo "web_image=${web}:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+        echo "server_image=${server}:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+        {
+          echo "${web}:${IMAGE_TAG}"
+          if [ -n "$EXTRA_TAGS" ]; then
+            IFS=',' read -ra extras <<< "$EXTRA_TAGS"
+            for t in "${extras[@]}"; do
+              t="${t#"${t%%[![:space:]]*}"}"
+              t="${t%"${t##*[![:space:]]}"}"
+              [ -z "$t" ] && continue
+              echo "${web}:${t}"
+            done
+          fi
+        } >> web_tags.txt
+        {
+          echo "${server}:${IMAGE_TAG}"
+          if [ -n "$EXTRA_TAGS" ]; then
+            IFS=',' read -ra extras <<< "$EXTRA_TAGS"
+            for t in "${extras[@]}"; do
+              t="${t#"${t%%[![:space:]]*}"}"
+              t="${t%"${t##*[![:space:]]}"}"
+              [ -z "$t" ] && continue
+              echo "${server}:${t}"
+            done
+          fi
+        } >> server_tags.txt
+        echo "web_tags<<EOF" >> "$GITHUB_OUTPUT"
+        cat web_tags.txt >> "$GITHUB_OUTPUT"
+        echo "EOF" >> "$GITHUB_OUTPUT"
+        echo "server_tags<<EOF" >> "$GITHUB_OUTPUT"
+        cat server_tags.txt >> "$GITHUB_OUTPUT"
+        echo "EOF" >> "$GITHUB_OUTPUT"
+
+    - name: Build and push web image
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: apps/web/Dockerfile
+        push: true
+        tags: ${{ steps.tags.outputs.web_tags }}
+        cache-from: type=gha,scope=tudu-web
+        cache-to: type=gha,mode=max,scope=tudu-web
+        build-args: |
+          VITE_API_URL=${{ inputs.vite_api_url }}
+          VITE_POSTHOG_KEY=${{ inputs.vite_posthog_key }}
+          VITE_POSTHOG_HOST=${{ inputs.vite_posthog_host }}
+          VITE_FIREBASE_API_KEY=${{ inputs.vite_firebase_api_key }}
+          VITE_FIREBASE_AUTH_DOMAIN=${{ inputs.vite_firebase_auth_domain }}
+          VITE_FIREBASE_PROJECT_ID=${{ inputs.vite_firebase_project_id }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID=${{ inputs.vite_firebase_messaging_sender_id }}
+          VITE_FIREBASE_APP_ID=${{ inputs.vite_firebase_app_id }}
+          VITE_FIREBASE_VAPID_KEY=${{ inputs.vite_firebase_vapid_key }}
+
+    - name: Build and push server image
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: apps/server/Dockerfile
+        push: true
+        tags: ${{ steps.tags.outputs.server_tags }}
+        cache-from: type=gha,scope=tudu-server
+        cache-to: type=gha,mode=max,scope=tudu-server

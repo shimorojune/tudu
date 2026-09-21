@@ -12,6 +12,7 @@ concurrency:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   deploy-staging:
@@ -26,6 +27,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: GHCR image owner
+        id: ghcr
+        shell: bash
+        run: echo "owner=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -47,13 +53,36 @@ jobs:
       - name: Lint copy
         run: pnpm lint:copy
 
-      - name: Build web and server
-        run: pnpm build
-
       - name: Migrate database
         env:
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
         run: pnpm db:migrate
+
+      - name: Build and push images
+        id: images
+        uses: ./.github/actions/build-push-images
+        with:
+          image_owner: ${{ steps.ghcr.outputs.owner }}
+          image_tag: ${{ github.sha }}
+          vite_api_url: https://api.staging.tudu.ezdev.net
+          vite_posthog_key: ${{ secrets.VITE_POSTHOG_KEY }}
+          vite_posthog_host: https://us.i.posthog.com
+          vite_firebase_api_key: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          vite_firebase_auth_domain: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          vite_firebase_project_id: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          vite_firebase_messaging_sender_id: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          vite_firebase_app_id: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          vite_firebase_vapid_key: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
+
+      - name: Set Dokploy image env
+        uses: ./.github/actions/dokploy-set-compose-env
+        with:
+          api_url: ${{ secrets.DOKPLOY_API_URL }}
+          api_key: ${{ secrets.DOKPLOY_API_KEY }}
+          compose_id: ${{ secrets.DOKPLOY_STAGING_COMPOSE_ID }}
+          env_updates: |
+            TUDU_WEB_IMAGE=${{ steps.images.outputs.web_image }}
+            TUDU_SERVER_IMAGE=${{ steps.images.outputs.server_image }}
 
       - name: Trigger Dokploy deployment
         uses: ./.github/actions/dokploy-deploy-compose
@@ -63,3 +92,4 @@ jobs:
           compose_id: ${{ secrets.DOKPLOY_STAGING_COMPOSE_ID }}
           title: Staging deploy ${{ github.sha }}
           description: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          poll_timeout_minutes: "20"
