@@ -39,6 +39,22 @@ export function NotificationHost() {
   const seeded = useRef(false);
   const viewerId = me?.id;
   const notifications = data?.notifications ?? [];
+  const unreadCount = data?.unreadCount ?? 0;
+
+  useEffect(() => {
+    const nav = navigator as Navigator & {
+      setAppBadge?: (count: number) => Promise<void>;
+      clearAppBadge?: () => Promise<void>;
+    };
+    if (!nav.setAppBadge || !nav.clearAppBadge) {
+      return;
+    }
+    if (unreadCount > 0) {
+      void nav.setAppBadge(unreadCount);
+    } else {
+      void nav.clearAppBadge();
+    }
+  }, [unreadCount]);
 
   useEffect(() => {
     seen.current = new Set();

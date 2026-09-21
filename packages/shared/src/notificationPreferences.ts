@@ -108,36 +108,80 @@ export type NotificationPreferencesUpdate = z.infer<
   typeof notificationPreferencesUpdateSchema
 >;
 
+/** True when all activity event channels are enabled together. */
+export function deriveActivityEnabled(prefs: NotificationPreferences): boolean {
+  return (
+    prefs.inbox &&
+    prefs.comments &&
+    prefs.taskChanges &&
+    prefs.jira &&
+    prefs.jiraAssigned &&
+    prefs.jiraUnassigned &&
+    prefs.jiraComment &&
+    prefs.jiraUpdated
+  );
+}
+
+export function applyActivityEnabled(
+  prefs: NotificationPreferences,
+  enabled: boolean,
+): NotificationPreferences {
+  return {
+    ...prefs,
+    inbox: enabled,
+    comments: enabled,
+    taskChanges: enabled,
+    jira: enabled,
+    jiraAssigned: enabled,
+    jiraUnassigned: enabled,
+    jiraComment: enabled,
+    jiraUpdated: enabled,
+  };
+}
+
+export function applyRemindersEnabled(
+  prefs: NotificationPreferences,
+  enabled: boolean,
+): NotificationPreferences {
+  return {
+    ...prefs,
+    reminders: enabled,
+    remindersFocus: enabled,
+    remindersDigest: enabled,
+    remindersDeadline: enabled,
+    remindersSlipping: enabled,
+  };
+}
+
+export function resolveClientTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || DEFAULT_NOTIFICATION_TIMEZONE;
+  } catch {
+    return DEFAULT_NOTIFICATION_TIMEZONE;
+  }
+}
+
 export function isNotificationKindEnabled(
   prefs: NotificationPreferences,
   kind: string,
 ): boolean {
+  const activity = deriveActivityEnabled(prefs);
   switch (kind) {
     case "inbox":
-      return prefs.inbox;
     case "inbox_declined":
-      return prefs.inbox;
     case "comment":
-      return prefs.comments;
     case "task_changed":
     case "task_deleted":
-      return prefs.taskChanges;
     case "jira_assigned":
-      return prefs.jira && prefs.jiraAssigned;
     case "jira_unassigned":
-      return prefs.jira && prefs.jiraUnassigned;
     case "jira_comment":
-      return prefs.jira && prefs.jiraComment;
     case "jira_updated":
-      return prefs.jira && prefs.jiraUpdated;
+      return activity;
     case "reminder_focus":
-      return prefs.reminders && prefs.remindersFocus;
     case "reminder_digest":
-      return prefs.reminders && prefs.remindersDigest;
     case "reminder_late":
-      return prefs.reminders && prefs.remindersSlipping;
     case "reminder_deadline":
-      return prefs.reminders && prefs.remindersDeadline;
+      return prefs.reminders;
     case "app_update":
       return prefs.appUpdate;
     default:

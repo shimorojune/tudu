@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { describe, expect, it, vi } from "vitest";
 import { makeStore } from "@tudu/store";
+import { defaultNotificationPreferences } from "@tudu/shared";
 import { APP_VERSION } from "@/lib/appVersion";
 import { SettingsRoute } from "./SettingsRoute";
 
@@ -81,6 +82,16 @@ vi.mock("@tudu/store", async (importOriginal) => {
       data: { components: [] },
       isLoading: false,
     }),
+    useGetNotificationSettingsQuery: () => ({
+      data: {
+        ...defaultNotificationPreferences(),
+        lastActiveAt: null,
+        lastJiraPollAt: null,
+        clientAppVersion: null,
+      },
+      isLoading: false,
+    }),
+    useUpdateNotificationSettingsMutation: () => [vi.fn()],
   };
 });
 
@@ -142,7 +153,7 @@ describe("SettingsRoute", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows banner toggles on the notifications page", async () => {
+  it("shows notification toggles on the notifications page", async () => {
     localStorage.clear();
     const user = userEvent.setup();
 
@@ -152,10 +163,10 @@ describe("SettingsRoute", () => {
       </Provider>,
     );
 
-    await user.click(screen.getByRole("button", { name: "Notifications and sync" }));
+    await user.click(screen.getByRole("button", { name: "Notifications" }));
 
-    expect(screen.getByRole("button", { name: "Enable notifications" })).toBeInTheDocument();
-    expect(screen.getByRole("switch", { name: "Inbox notifications" })).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "System alerts" })).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Activity notifications" })).toBeInTheDocument();
   });
 
   it("shows the projects section", async () => {

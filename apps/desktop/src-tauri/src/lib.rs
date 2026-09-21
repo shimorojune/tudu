@@ -52,6 +52,7 @@ pub fn run() {
             present_quick_add_window,
             resize_quick_add_window,
             save_quick_add_window_position,
+            app_icon::set_unread_badge_command,
         ])
         .setup(|app| {
             cleanup::cleanup_legacy_data(&app.handle());

@@ -37,6 +37,7 @@ export function WebPushHost({ children }: { children: ReactNode }) {
       return defaultNotificationOsValue;
     }
     return {
+      getOsPermissionGranted: defaultNotificationOsValue.getOsPermissionGranted,
       async requestOsPermission() {
         const granted = await defaultNotificationOsValue.requestOsPermission();
         if (granted) {

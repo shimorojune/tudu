@@ -58,6 +58,9 @@ export function DesktopNotifications({ children }: { children: ReactNode }) {
 
   const value = useMemo<NotificationOsValue>(
     () => ({
+      async getOsPermissionGranted() {
+        return isPermissionGranted();
+      },
       async requestOsPermission() {
         let granted = await isPermissionGranted();
         if (!granted) {

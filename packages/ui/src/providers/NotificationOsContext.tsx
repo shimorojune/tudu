@@ -1,6 +1,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 
 export type NotificationOsValue = {
+  getOsPermissionGranted: () => Promise<boolean>;
   requestOsPermission: () => Promise<boolean>;
   showOsNotification: (args: {
     title?: string;
@@ -9,6 +10,13 @@ export type NotificationOsValue = {
     onClick: () => void;
   }) => Promise<void>;
 };
+
+async function webGetOsPermissionGranted(): Promise<boolean> {
+  if (typeof Notification === "undefined") {
+    return false;
+  }
+  return Notification.permission === "granted";
+}
 
 async function webRequestPermission(): Promise<boolean> {
   if (typeof Notification === "undefined") {
@@ -42,6 +50,7 @@ async function webShow(args: {
 }
 
 export const defaultNotificationOsValue: NotificationOsValue = {
+  getOsPermissionGranted: webGetOsPermissionGranted,
   requestOsPermission: webRequestPermission,
   showOsNotification: webShow,
 };

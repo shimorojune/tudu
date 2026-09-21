@@ -2,7 +2,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Plus, Search, SlidersHorizontal } from "lucide-react";
 import { isCommandPaletteBlocked } from "@/components/chrome/dialogBlocker";
 import { useCommandPalette } from "@/components/chrome/CommandPaletteContext";
-import { requestAddTask } from "@tudu/store";
+import { requestAddTask, useGetNotificationsQuery } from "@tudu/store";
 import { useDispatch } from "react-redux";
 import { BrandMark } from "@/components/chrome/BrandMark";
 import { DateNav } from "@/components/chrome/DateNav";
@@ -76,6 +76,8 @@ function SettingsLink() {
 
 export function TopNav() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { data: notificationsData } = useGetNotificationsQuery();
+  const unreadCount = notificationsData?.unreadCount ?? 0;
   const search = useRouterState({
     select: (s) => s.location.search as { week?: string },
   });
@@ -89,7 +91,7 @@ export function TopNav() {
       data-testid="top-nav"
       className="flex h-[calc(56px+env(safe-area-inset-top))] shrink-0 items-center gap-[10px] overflow-hidden border-b border-rule bg-card px-[12px] pt-[env(safe-area-inset-top)] xl:gap-[28px] xl:px-[22px]"
     >
-      <BrandMark />
+      <BrandMark showUnreadIndicator={unreadCount > 0} />
       <NavTabs />
       <div className="ml-auto flex min-w-0 shrink-0 items-center gap-[12px] xl:gap-[18px]">
         {onWeek ? (

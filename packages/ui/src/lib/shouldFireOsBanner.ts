@@ -2,7 +2,6 @@ import type { AppNotification } from "@tudu/shared";
 import {
   canDeliverScheduledReminderPush,
   isNotificationKindEnabled,
-  isWithinQuietHours,
   SCHEDULED_REMINDER_KINDS,
 } from "@tudu/shared";
 import type { NotificationPrefs } from "@/lib/notificationPrefs";
@@ -64,8 +63,6 @@ export function shouldFireOsBanner(args: {
     if (!canDeliverScheduledReminderPush(prefs)) {
       return false;
     }
-  } else if (isWithinQuietHours(prefs)) {
-    return false;
   }
   if (!args.windowFocused) {
     return true;

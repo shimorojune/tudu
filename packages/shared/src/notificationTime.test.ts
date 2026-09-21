@@ -58,15 +58,18 @@ describe("isWithinWorkingHours", () => {
 });
 
 describe("canDeliverScheduledReminderPush", () => {
-  it("blocks during quiet hours even on a work day", () => {
+  it("follows working hours only", () => {
     const prefs = {
       ...defaultNotificationPreferences(),
       timezone: "UTC",
       workHoursEnabled: true,
-      quietHoursStart: "22:00",
-      quietHoursEnd: "07:00",
+      workHoursStart: "09:00",
+      workHoursEnd: "18:00",
+      workDays: [1, 2, 3, 4, 5],
     };
     const night = new Date("2026-09-18T23:00:00.000Z");
     expect(canDeliverScheduledReminderPush(prefs, night)).toBe(false);
+    const friday = new Date("2026-09-18T12:00:00.000Z");
+    expect(canDeliverScheduledReminderPush(prefs, friday)).toBe(true);
   });
 });

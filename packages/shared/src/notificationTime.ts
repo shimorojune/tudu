@@ -127,13 +127,7 @@ export function canDeliverScheduledReminderPush(
   prefs: NotificationPreferences,
   now: Date = new Date(),
 ): boolean {
-  if (!canRunScheduledReminders(prefs, now)) {
-    return false;
-  }
-  if (isWithinQuietHours(prefs, now)) {
-    return false;
-  }
-  return true;
+  return canRunScheduledReminders(prefs, now);
 }
 
 function isScheduledReminderKind(kind: string): boolean {
@@ -153,9 +147,6 @@ export function shouldSendPushForNotification(
   }
   if (isScheduledReminderKind(kind)) {
     return canDeliverScheduledReminderPush(prefs, now);
-  }
-  if (isWithinQuietHours(prefs, now)) {
-    return false;
   }
   return true;
 }

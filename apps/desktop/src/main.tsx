@@ -5,6 +5,7 @@ import { AttachmentDownloadProvider } from "@tudu/ui/attachments";
 import { AppProviders } from "@tudu/ui/providers";
 import { DesktopUpdater } from "./DesktopUpdater";
 import { DesktopNotifications } from "./DesktopNotifications";
+import { DesktopUnreadBadge } from "./DesktopUnreadBadge";
 import { desktopDownloadAttachment } from "./desktopDownloadAttachment";
 import "@tudu/ui/styles.css";
 
@@ -13,6 +14,7 @@ createRoot(document.getElementById("root")!).render(
     <AppProviders>
       <AttachmentDownloadProvider download={desktopDownloadAttachment}>
         <DesktopNotifications>
+          <DesktopUnreadBadge />
           <DesktopUpdater>
             <App />
           </DesktopUpdater>

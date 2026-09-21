@@ -2,8 +2,12 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { Provider } from "react-redux";
+import { defaultNotificationPreferences } from "@tudu/shared";
 import { makeStore } from "@tudu/store";
-import { NotificationsSettingsPanel } from "./NotificationsSettingsPanel";
+import {
+  NotificationsSettingsPanel,
+  resetOsPermissionSyncForTests,
+} from "./NotificationsSettingsPanel";
 import { NotificationOsProvider } from "@/providers/NotificationOsContext";
 import { readNotificationPrefs } from "@/lib/notificationPrefs";
 
@@ -15,7 +19,7 @@ vi.mock("@tudu/store", async (importOriginal) => {
     ...actual,
     useGetNotificationSettingsQuery: () => ({
       data: {
-        ...readNotificationPrefs(),
+        ...defaultNotificationPreferences(),
         lastActiveAt: null,
         lastJiraPollAt: null,
         clientAppVersion: null,
@@ -30,17 +34,20 @@ describe("NotificationsSettingsPanel", () => {
   beforeEach(() => {
     localStorage.clear();
     updateSettings.mockClear();
+    resetOsPermissionSyncForTests();
   });
 
-  it("saves kind toggles and can enable banners", async () => {
+  it("saves activity toggle and can enable system alerts", async () => {
     const user = userEvent.setup();
     const requestOsPermission = vi.fn().mockResolvedValue(true);
+    const getOsPermissionGranted = vi.fn().mockResolvedValue(false);
     const store = makeStore();
 
     render(
       <Provider store={store}>
         <NotificationOsProvider
           value={{
+            getOsPermissionGranted,
             requestOsPermission,
             showOsNotification: vi.fn(),
           }}
@@ -50,12 +57,12 @@ describe("NotificationsSettingsPanel", () => {
       </Provider>,
     );
 
-    await user.click(screen.getByRole("switch", { name: "Inbox notifications" }));
+    await user.click(screen.getByRole("switch", { name: "Activity notifications" }));
     expect(readNotificationPrefs().inbox).toBe(false);
 
-    await user.click(screen.getByRole("button", { name: "Enable notifications" }));
+    await user.click(screen.getByRole("switch", { name: "System alerts" }));
     expect(requestOsPermission).toHaveBeenCalled();
     expect(readNotificationPrefs().osEnabled).toBe(true);
-    expect(screen.getByRole("button", { name: "Banners on" })).toBeInTheDocument();
+    expect(screen.getByText("Alerts are on.")).toBeInTheDocument();
   });
 });

@@ -20,7 +20,7 @@ const sections: { id: SettingsSection; label: string }[] = [
   { id: "projects", label: "Projects" },
   { id: "jira", label: "JIRA connection" },
   { id: "manager", label: "Manager, privacy and rollover" },
-  { id: "notifications", label: "Notifications and sync" },
+  { id: "notifications", label: "Notifications" },
 ];
 
 export function SettingsSidebar({
