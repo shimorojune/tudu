@@ -1,3 +1,15 @@
+# [0.34.0](https://github.com/eGainDev/tudu/compare/tudu-0.33.1...tudu-0.34.0) (2026-09-21)
+
+
+### Bug Fixes
+
+* Add Docker Compose configurations for deployment and image building ([1e3693f](https://github.com/eGainDev/tudu/commit/1e3693f02be5bc48a6dae03357a71b41e38522a5))
+
+
+### Features
+
+* Enhance notification system with new reminder features ([4f0f964](https://github.com/eGainDev/tudu/commit/4f0f9643b6827a8640d48f2c26fcfd9e43e4d9c5))
+
 ## [0.33.1](https://github.com/eGainDev/tudu/compare/tudu-0.33.0...tudu-0.33.1) (2026-09-20)
 
 
