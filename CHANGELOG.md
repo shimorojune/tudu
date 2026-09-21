@@ -1,3 +1,10 @@
+# [0.34.0](https://github.com/eGainDev/tudu/compare/tudu-0.33.1...tudu-0.34.0) (2026-09-21)
+
+
+### Features
+
+* Enhance notification system with new reminder features ([4f0f964](https://github.com/eGainDev/tudu/commit/4f0f9643b6827a8640d48f2c26fcfd9e43e4d9c5))
+
 ## [0.33.1](https://github.com/eGainDev/tudu/compare/tudu-0.33.0...tudu-0.33.1) (2026-09-20)
 
 
