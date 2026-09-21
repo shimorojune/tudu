@@ -1,3 +1,12 @@
+## [0.33.1](https://github.com/eGainDev/tudu/compare/tudu-0.33.0...tudu-0.33.1) (2026-09-20)
+
+
+### Bug Fixes
+
+* **ci:** retry cancelled Dokploy prod deploys and skip staging on release ([011fd05](https://github.com/eGainDev/tudu/commit/011fd056c521f3c6575b560482c03705824c386e))
+* **ci:** serialize Dokploy deploys and fail fast on cancel ([bbc6141](https://github.com/eGainDev/tudu/commit/bbc614165088b3440530603722fa5e6c9f951e48))
+* update release workflow and configuration ([3a417e4](https://github.com/eGainDev/tudu/commit/3a417e475ebb78befdffde37b69d46ed367df401))
+
 # [0.33.0](https://github.com/eGainDev/tudu/compare/tudu-0.32.0...tudu-0.33.0) (2026-09-20)
 
 
