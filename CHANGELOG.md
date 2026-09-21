@@ -1,3 +1,10 @@
+## [0.34.1](https://github.com/eGainDev/tudu/compare/tudu-0.34.0...tudu-0.34.1) (2026-09-21)
+
+
+### Bug Fixes
+
+* Enhance notification system with unread badge and permission handling ([d56d423](https://github.com/eGainDev/tudu/commit/d56d423f8e46400535f7cd94a5aaf612f948e8f6))
+
 # [0.34.0](https://github.com/eGainDev/tudu/compare/tudu-0.33.1...tudu-0.34.0) (2026-09-21)
 
 
