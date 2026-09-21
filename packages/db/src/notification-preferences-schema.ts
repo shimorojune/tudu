@@ -23,6 +23,17 @@ export const notificationPreferences = pgTable("notification_preferences", {
   jiraComment: boolean("jira_comment").notNull().default(true),
   jiraUpdated: boolean("jira_updated").notNull().default(true),
   reminders: boolean("reminders").notNull().default(true),
+  remindersFocus: boolean("reminders_focus").notNull().default(true),
+  remindersDigest: boolean("reminders_digest").notNull().default(true),
+  remindersDeadline: boolean("reminders_deadline").notNull().default(true),
+  remindersSlipping: boolean("reminders_slipping").notNull().default(false),
+  focusCheckInMinutes: integer("focus_check_in_minutes")
+    .notNull()
+    .default(90),
+  workHoursEnabled: boolean("work_hours_enabled").notNull().default(true),
+  workHoursStart: text("work_hours_start").notNull().default("09:00"),
+  workHoursEnd: text("work_hours_end").notNull().default("18:00"),
+  workDays: jsonb("work_days").$type<number[]>().notNull().default([1, 2, 3, 4, 5]),
   appUpdate: boolean("app_update").notNull().default(true),
   timezone: text("timezone").notNull().default("UTC"),
   quietHoursStart: text("quiet_hours_start").notNull().default("22:00"),

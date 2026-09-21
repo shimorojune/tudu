@@ -12,12 +12,18 @@ import {
 } from "@tudu/ui/notifications";
 
 const pendingClicks = new Map<number, () => void>();
+const pendingClickQueue: Array<() => void> = [];
 let nextId = 1;
 
 async function revealMainWindow() {
   const window = getCurrentWindow();
   await window.show();
   await window.setFocus();
+}
+
+function runPendingClick(handler: (() => void) | undefined) {
+  void revealMainWindow();
+  handler?.();
 }
 
 export function DesktopNotifications({ children }: { children: ReactNode }) {
@@ -27,13 +33,13 @@ export function DesktopNotifications({ children }: { children: ReactNode }) {
 
     void onAction((notification) => {
       if (notification.id == null) {
-        void revealMainWindow();
+        const fifo = pendingClickQueue.shift();
+        runPendingClick(fifo);
         return;
       }
       const handler = pendingClicks.get(notification.id);
       pendingClicks.delete(notification.id);
-      void revealMainWindow();
-      handler?.();
+      runPendingClick(handler);
     }).then((listener) => {
       if (cancelled) {
         void listener.unregister();
@@ -59,16 +65,17 @@ export function DesktopNotifications({ children }: { children: ReactNode }) {
         }
         return granted;
       },
-      async showOsNotification({ body, onClick }) {
+      async showOsNotification({ title, body, onClick }) {
         const granted = await isPermissionGranted();
         if (!granted) {
           return;
         }
         const id = nextId++;
         pendingClicks.set(id, onClick);
+        pendingClickQueue.push(onClick);
         sendNotification({
           id,
-          title: "Tudu",
+          title: title ?? "Tudu",
           body,
           autoCancel: true,
         });

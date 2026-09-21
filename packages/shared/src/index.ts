@@ -10,6 +10,7 @@ export * from "./sync.js";
 export * from "./notifications.js";
 export * from "./notificationPreferences.js";
 export * from "./notificationTime.js";
+export * from "./notificationPresentation.js";
 export * from "./richTextHtml.js";
 export * from "./attachments.js";
 export * from "./apiUrl.js";

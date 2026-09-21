@@ -1,5 +1,15 @@
 import type { AppNotification } from "@tudu/shared";
+import {
+  canDeliverScheduledReminderPush,
+  isNotificationKindEnabled,
+  isWithinQuietHours,
+  SCHEDULED_REMINDER_KINDS,
+} from "@tudu/shared";
 import type { NotificationPrefs } from "@/lib/notificationPrefs";
+
+function isScheduledReminderKind(kind: string): boolean {
+  return (SCHEDULED_REMINDER_KINDS as readonly string[]).includes(kind);
+}
 
 type InspectorTabName = "details" | "comments" | "timeline";
 
@@ -47,26 +57,14 @@ export function shouldFireOsBanner(args: {
   if (!prefs.osEnabled) {
     return false;
   }
-  if (isInboxKind(notification.kind) && !prefs.inbox) {
+  if (!isNotificationKindEnabled(prefs, notification.kind)) {
     return false;
   }
-  if (notification.kind === "comment" && !prefs.comments) {
-    return false;
-  }
-  if (
-    (notification.kind === "task_changed" ||
-      notification.kind === "task_deleted") &&
-    !prefs.taskChanges
-  ) {
-    return false;
-  }
-  if (notification.kind.startsWith("jira_") && !prefs.jira) {
-    return false;
-  }
-  if (notification.kind.startsWith("reminder_") && !prefs.reminders) {
-    return false;
-  }
-  if (notification.kind === "app_update" && !prefs.appUpdate) {
+  if (isScheduledReminderKind(notification.kind)) {
+    if (!canDeliverScheduledReminderPush(prefs)) {
+      return false;
+    }
+  } else if (isWithinQuietHours(prefs)) {
     return false;
   }
   if (!args.windowFocused) {

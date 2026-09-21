@@ -9,6 +9,7 @@ export const NOTIFICATION_KINDS = [
   "jira_comment",
   "jira_updated",
   "reminder_digest",
+  "reminder_focus",
   "reminder_late",
   "reminder_deadline",
   "app_update",
@@ -129,6 +130,8 @@ export function formatNotificationBody(args: {
     case "jira_updated":
       return `${title} was updated in JIRA`;
     case "reminder_digest":
+      return args.taskTitle;
+    case "reminder_focus":
       return args.taskTitle;
     case "reminder_late":
       return args.taskTitle;

@@ -23,7 +23,12 @@ const row: AppNotification = {
   createdAt: "2026-09-10T08:00:00.000Z",
 };
 
-const prefsOn = { ...defaultNotificationPrefs, osEnabled: true };
+const prefsOn = {
+  ...defaultNotificationPrefs,
+  osEnabled: true,
+  quietHoursStart: "00:00",
+  quietHoursEnd: "00:00",
+};
 
 describe("shouldFireOsBanner", () => {
   it("fires when the window is in the background", () => {

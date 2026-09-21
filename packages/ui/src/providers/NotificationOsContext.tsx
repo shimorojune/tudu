@@ -2,7 +2,12 @@ import { createContext, useContext, type ReactNode } from "react";
 
 export type NotificationOsValue = {
   requestOsPermission: () => Promise<boolean>;
-  showOsNotification: (args: { body: string; onClick: () => void }) => Promise<void>;
+  showOsNotification: (args: {
+    title?: string;
+    body: string;
+    tag?: string;
+    onClick: () => void;
+  }) => Promise<void>;
 };
 
 async function webRequestPermission(): Promise<boolean> {
@@ -16,11 +21,19 @@ async function webRequestPermission(): Promise<boolean> {
   return result === "granted";
 }
 
-async function webShow(args: { body: string; onClick: () => void }): Promise<void> {
+async function webShow(args: {
+  title?: string;
+  body: string;
+  tag?: string;
+  onClick: () => void;
+}): Promise<void> {
   if (typeof Notification === "undefined" || Notification.permission !== "granted") {
     return;
   }
-  const banner = new Notification("Tudu", { body: args.body });
+  const banner = new Notification(args.title ?? "Tudu", {
+    body: args.body,
+    tag: args.tag,
+  });
   banner.onclick = () => {
     window.focus();
     args.onClick();

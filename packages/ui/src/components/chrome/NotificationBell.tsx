@@ -15,6 +15,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { resolveNotificationPresentation } from "@/lib/notificationDisplay";
 import {
   bindNotificationNavigate,
   openNotificationTarget,
@@ -72,6 +73,7 @@ export function NotificationBell() {
           <ul className="max-h-[360px] overflow-y-auto">
             {notifications.map((item) => {
               const unread = item.readAt === null;
+              const presentation = resolveNotificationPresentation(item);
               return (
                 <li key={item.id} className="border-b border-hair last:border-b-0">
                   <button
@@ -79,7 +81,7 @@ export function NotificationBell() {
                     className={cn(
                       "w-full px-[14px] py-[12px] text-left text-[13px] leading-[1.45]",
                       unread
-                        ? "font-semibold text-foreground"
+                        ? "text-foreground"
                         : "text-muted-foreground",
                     )}
                     onClick={() => {
@@ -96,7 +98,26 @@ export function NotificationBell() {
                       setOpen(false);
                     }}
                   >
-                    {item.body}
+                    <div
+                      className={cn(
+                        "text-[13px]",
+                        unread ? "font-semibold" : "font-medium",
+                      )}
+                    >
+                      {presentation.title}
+                    </div>
+                    {presentation.summary ? (
+                      <p className="mt-[4px] text-[12px] text-faint">
+                        {presentation.summary}
+                      </p>
+                    ) : null}
+                    {presentation.lines.length > 0 ? (
+                      <ul className="mt-[6px] list-none space-y-[4px] text-[12px]">
+                        {presentation.lines.map((line) => (
+                          <li key={line}>{line}</li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </button>
                 </li>
               );

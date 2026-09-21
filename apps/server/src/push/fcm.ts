@@ -64,11 +64,15 @@ export async function sendWebPushForNotifications(
     if (tokens.length === 0) {
       continue;
     }
+    const presentation = notification.metadata?.presentation as
+      | { title?: string }
+      | undefined;
     const data: Record<string, string> = {
-      title: "Tudu",
+      title: presentation?.title ?? notification.taskTitle ?? "Tudu",
       body: notification.body,
       notificationId: notification.id,
       kind: notification.kind,
+      tag: notification.kind,
     };
     if (notification.taskId) {
       data.taskId = notification.taskId;

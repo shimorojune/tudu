@@ -12,7 +12,20 @@ export const DEFAULT_JIRA_POLL_IDLE_MINUTES = 20;
 
 export const DEFAULT_DIGEST_TIME_LOCAL = "09:00";
 export const DEFAULT_LATE_REMINDER_MINUTES = 120;
+export const DEFAULT_FOCUS_CHECK_IN_MINUTES = 90;
 export const DEFAULT_DEADLINE_NUDGE_HOURS = [24, 4] as const;
+
+export const DEFAULT_WORK_HOURS_START = "09:00";
+export const DEFAULT_WORK_HOURS_END = "18:00";
+/** ISO weekday: Monday = 1 through Sunday = 7 */
+export const DEFAULT_WORK_DAYS = [1, 2, 3, 4, 5] as const;
+
+export const SCHEDULED_REMINDER_KINDS = [
+  "reminder_focus",
+  "reminder_digest",
+  "reminder_late",
+  "reminder_deadline",
+] as const;
 
 export const JIRA_LINK_MAX_AGE_DAYS = 90;
 
@@ -27,6 +40,15 @@ export const notificationPreferencesSchema = z.object({
   jiraComment: z.boolean(),
   jiraUpdated: z.boolean(),
   reminders: z.boolean(),
+  remindersFocus: z.boolean(),
+  remindersDigest: z.boolean(),
+  remindersDeadline: z.boolean(),
+  remindersSlipping: z.boolean(),
+  focusCheckInMinutes: z.number().int().min(15).max(720),
+  workHoursEnabled: z.boolean(),
+  workHoursStart: z.string(),
+  workHoursEnd: z.string(),
+  workDays: z.array(z.number().int().min(1).max(7)).min(1).max(7),
   appUpdate: z.boolean(),
   timezone: z.string().min(1),
   quietHoursStart: z.string(),
@@ -52,6 +74,15 @@ export const defaultNotificationPreferences = (): NotificationPreferences => ({
   jiraComment: true,
   jiraUpdated: true,
   reminders: true,
+  remindersFocus: true,
+  remindersDigest: true,
+  remindersDeadline: true,
+  remindersSlipping: false,
+  focusCheckInMinutes: DEFAULT_FOCUS_CHECK_IN_MINUTES,
+  workHoursEnabled: true,
+  workHoursStart: DEFAULT_WORK_HOURS_START,
+  workHoursEnd: DEFAULT_WORK_HOURS_END,
+  workDays: [...DEFAULT_WORK_DAYS],
   appUpdate: true,
   timezone: DEFAULT_NOTIFICATION_TIMEZONE,
   quietHoursStart: DEFAULT_QUIET_HOURS_START,
@@ -99,10 +130,14 @@ export function isNotificationKindEnabled(
       return prefs.jira && prefs.jiraComment;
     case "jira_updated":
       return prefs.jira && prefs.jiraUpdated;
+    case "reminder_focus":
+      return prefs.reminders && prefs.remindersFocus;
     case "reminder_digest":
+      return prefs.reminders && prefs.remindersDigest;
     case "reminder_late":
+      return prefs.reminders && prefs.remindersSlipping;
     case "reminder_deadline":
-      return prefs.reminders;
+      return prefs.reminders && prefs.remindersDeadline;
     case "app_update":
       return prefs.appUpdate;
     default:

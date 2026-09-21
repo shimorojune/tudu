@@ -107,6 +107,16 @@ describe("openNotificationTarget", () => {
     expect(store.getState().day.inspectorTab).toBe("comments");
   });
 
+  it("opens Today for focus reminder with no task", () => {
+    const store = makeStore();
+    const navigate = vi.fn();
+    openNotificationTarget(
+      { ...base, kind: "reminder_focus", taskId: null },
+      { viewerId: "priya", dispatch: store.dispatch, navigate },
+    );
+    expect(navigate).toHaveBeenCalledWith({ to: "/", search: {} });
+  });
+
   it("does not open a deleted task", () => {
     const store = makeStore();
     const navigate = vi.fn();

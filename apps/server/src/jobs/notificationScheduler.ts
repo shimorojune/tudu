@@ -1,4 +1,5 @@
 import type { Db } from "@tudu/db";
+import { sql } from "drizzle-orm";
 import { getJiraConnection, getNotificationPreferences, listUsersDueForJiraPoll,
   listUsersDueForReminderCheck,
   listUsersDueForVersionCheck,
@@ -18,14 +19,31 @@ const VERSION_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 let tickInFlight = false;
 
-async function withJobLock(_db: Db, fn: () => Promise<void>): Promise<void> {
+const NOTIFICATION_JOB_LOCK_KEY = 83472901;
+
+async function withJobLock(db: Db, fn: () => Promise<void>): Promise<void> {
   if (tickInFlight) {
     return;
   }
   tickInFlight = true;
+  let locked = false;
   try {
+    const result = await db.execute(
+      sql`SELECT pg_try_advisory_lock(${NOTIFICATION_JOB_LOCK_KEY}) AS locked`,
+    );
+    const rows = Array.isArray(result) ? result : result.rows;
+    const row = rows[0] as { locked?: boolean } | undefined;
+    locked = row?.locked === true;
+    if (!locked) {
+      return;
+    }
     await fn();
   } finally {
+    if (locked) {
+      await db.execute(
+        sql`SELECT pg_advisory_unlock(${NOTIFICATION_JOB_LOCK_KEY})`,
+      );
+    }
     tickInFlight = false;
   }
 }

@@ -13,6 +13,7 @@ messaging.onBackgroundMessage((payload) => {
   const options = {
     body,
     data,
+    tag: data.tag || data.kind || "tudu",
     icon: "/pwa-192.png",
     badge: "/pwa-192.png",
   };

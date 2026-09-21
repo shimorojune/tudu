@@ -121,10 +121,26 @@ export function startWebPushForegroundListener(): void {
     if (Notification.permission !== "granted") {
       return;
     }
-    const banner = new Notification(data.title ?? "Tudu", { body });
+    const tag = data.tag ?? data.kind ?? "tudu";
+    const banner = new Notification(data.title ?? "Tudu", { body, tag });
     banner.onclick = () => {
       window.focus();
       banner.close();
+      let url = "/";
+      if (data.kind === "inbox" || data.kind === "inbox_declined") {
+        url = "/inbox";
+      } else if (data.taskId) {
+        const params = new URLSearchParams();
+        params.set("task", data.taskId);
+        if (data.scheduledDate) {
+          params.set("date", data.scheduledDate);
+        }
+        if (data.kind === "comment") {
+          params.set("tab", "comments");
+        }
+        url = `/?${params.toString()}`;
+      }
+      window.location.assign(url);
     };
   });
 }

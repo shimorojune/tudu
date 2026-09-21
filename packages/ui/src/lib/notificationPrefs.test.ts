@@ -26,6 +26,7 @@ describe("notificationPrefs", () => {
       taskChanges: false,
     });
     expect(readNotificationPrefs()).toEqual({
+      ...defaultNotificationPrefs,
       osEnabled: true,
       inbox: false,
       comments: true,

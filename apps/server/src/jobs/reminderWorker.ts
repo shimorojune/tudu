@@ -9,9 +9,16 @@ import {
 import {
   compareAppVersions,
   DAY_START_HOUR,
+  canRunScheduledReminders,
   effectiveDayIsoInTimezone,
+  formatDeadlinePresentation,
+  formatDigestPresentation,
+  formatFocusCheckInPresentation,
+  formatLateSlippingPresentation,
+  focusSnapshotHash,
   isSlipping,
   localMinutesInTimezone,
+  presentationToBody,
 } from "@tudu/shared";
 import {
   fetchLatestRelease,
@@ -21,23 +28,6 @@ import { stripReleaseTag } from "../routes/updates/mapRelease.js";
 import { insertSystemNotificationsWithPush } from "../notifications/delivery.js";
 
 const LATE_WARMUP_KEY = "late:warmup:v1";
-
-export function formatLateReminderBody(titles: string[]): string | null {
-  const trimmed = titles.map((t) => t.trim()).filter(Boolean);
-  if (trimmed.length === 0) {
-    return null;
-  }
-  if (trimmed.length === 1) {
-    return `Running late: ${trimmed[0]}`;
-  }
-  const shown = trimmed.slice(0, 3);
-  const rest = trimmed.length - shown.length;
-  const list = shown.join(", ");
-  if (rest > 0) {
-    return `Running late: ${list}, and ${rest} more`;
-  }
-  return `Running late: ${list}`;
-}
 
 function parseDigestMinutes(digestTimeLocal: string): number | null {
   const match = /^(\d{1,2}):(\d{2})$/.exec(digestTimeLocal.trim());
@@ -52,6 +42,52 @@ function parseDigestMinutes(digestTimeLocal: string): number | null {
   return hour * 60 + minute;
 }
 
+function digestTimeInsideWorkWindow(
+  digestMinutes: number,
+  prefs: Awaited<ReturnType<typeof ensureNotificationPreferences>>,
+): boolean {
+  if (!prefs.workHoursEnabled) {
+    return true;
+  }
+  const start = parseDigestMinutes(prefs.workHoursStart);
+  const end = parseDigestMinutes(prefs.workHoursEnd);
+  if (start === null || end === null) {
+    return true;
+  }
+  if (start < end) {
+    return digestMinutes >= start && digestMinutes < end;
+  }
+  return digestMinutes >= start || digestMinutes < end;
+}
+
+async function insertReminderNotification(
+  db: Db,
+  args: {
+    userId: string;
+    kind: "reminder_focus" | "reminder_digest" | "reminder_late" | "reminder_deadline";
+    presentation: ReturnType<typeof formatFocusCheckInPresentation>;
+    taskId?: string | null;
+    scheduledDate?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<void> {
+  const body = presentationToBody(args.presentation);
+  const taskTitle = args.presentation.title.slice(0, 48);
+  await insertSystemNotificationsWithPush(db, {
+    recipientUserIds: [args.userId],
+    clientMutationId: null,
+    kind: args.kind,
+    body,
+    taskTitle,
+    taskId: args.taskId ?? null,
+    scheduledDate: args.scheduledDate ?? null,
+    metadata: {
+      ...args.metadata,
+      presentation: args.presentation,
+    },
+  });
+}
+
 export async function runReminderCheck(db: Db, userId: string): Promise<number> {
   const prefs = await ensureNotificationPreferences(db, userId);
   if (!prefs.reminders) {
@@ -59,6 +95,10 @@ export async function runReminderCheck(db: Db, userId: string): Promise<number> 
   }
 
   const now = new Date();
+  if (!canRunScheduledReminders(prefs, now)) {
+    return 0;
+  }
+
   let sent = 0;
   const effectiveDay = effectiveDayIsoInTimezone(prefs.timezone, DAY_START_HOUR, now);
   const tasks = await listIncompleteTasksForUser(db, userId);
@@ -68,9 +108,11 @@ export async function runReminderCheck(db: Db, userId: string): Promise<number> 
   const digestKey = `digest:${effectiveDay}`;
 
   if (
+    prefs.remindersDigest &&
     digestMinutes !== null &&
     currentMinutes >= digestMinutes &&
-    currentMinutes < digestMinutes + 15
+    currentMinutes < digestMinutes + 15 &&
+    digestTimeInsideWorkWindow(digestMinutes, prefs)
   ) {
     const already = await wasReminderSentAfter(
       db,
@@ -90,134 +132,166 @@ export async function runReminderCheck(db: Db, userId: string): Promise<number> 
           task.bucket === "later" ||
           (task.scheduledDate && task.scheduledDate > effectiveDay),
       );
-      const lines: string[] = [];
-      if (todayNow.length > 0) {
-        lines.push(
-          `Working on: ${todayNow
-            .slice(0, 3)
-            .map((task) => task.title)
-            .join(", ")}`,
-        );
-      }
-      if (nextLater) {
-        lines.push(`Next up: ${nextLater.title}`);
-      }
-      if (lines.length === 0) {
-        lines.push("No tasks in focus. Check Today or Later.");
-      }
-      const body = lines.join(" ");
-      await insertSystemNotificationsWithPush(db, {
-        recipientUserIds: [userId],
-        clientMutationId: null,
+      const presentation = formatDigestPresentation({
+        workingOn: todayNow.map((task) => task.title),
+        nextUp: nextLater?.title ?? null,
+      });
+      const primary = todayNow[0];
+      await insertReminderNotification(db, {
+        userId,
         kind: "reminder_digest",
-        body,
-        taskTitle: body.slice(0, 48),
+        presentation,
+        taskId: primary?.id ?? null,
+        scheduledDate: primary?.scheduledDate ?? effectiveDay,
       });
       await recordReminderDelivery(db, userId, digestKey, now);
       sent += 1;
     }
   }
 
-  const notBeforeLate = new Date(
-    now.getTime() - prefs.lateReminderMinutes * 60 * 1000,
-  );
-  const lateDue = [];
-  for (const task of tasks) {
-    const slipping = isSlipping({
-      carriedDays: task.carriedDays ?? 0,
-      deadline: task.deadline?.toISOString() ?? null,
-      now,
-    });
-    if (!slipping) {
-      continue;
-    }
-    const already = await wasReminderSentAfter(
+  if (prefs.remindersFocus) {
+    const focusKeyBase = `focus:snapshot:${effectiveDay}`;
+    const notBeforeFocus = new Date(
+      now.getTime() - prefs.focusCheckInMinutes * 60 * 1000,
+    );
+    const inProgressToday = tasks.filter(
+      (task) =>
+        task.scheduledDate === effectiveDay &&
+        task.bucket === "now" &&
+        task.inProgress,
+    );
+    const snapshot = focusSnapshotHash(inProgressToday.map((task) => task.id));
+    const focusKey = `${focusKeyBase}:${snapshot}`;
+    const alreadyFocus = await wasReminderSentAfter(
       db,
       userId,
-      `late:${task.id}`,
-      notBeforeLate,
+      focusKey,
+      notBeforeFocus,
     );
-    if (!already) {
-      lateDue.push(task);
+    if (!alreadyFocus) {
+      const presentation = formatFocusCheckInPresentation(
+        inProgressToday.map((task) => task.title),
+      );
+      const primary = inProgressToday[0];
+      await insertReminderNotification(db, {
+        userId,
+        kind: "reminder_focus",
+        presentation,
+        taskId: primary?.id ?? null,
+        scheduledDate: primary?.scheduledDate ?? effectiveDay,
+        metadata: {
+          taskIds: inProgressToday.map((task) => task.id),
+          count: inProgressToday.length,
+          snapshotHash: snapshot,
+        },
+      });
+      await recordReminderDelivery(db, userId, focusKey, now);
+      sent += 1;
     }
   }
 
-  if (lateDue.length > 0) {
-    const warmupRow = await getReminderDelivery(db, userId, LATE_WARMUP_KEY);
-    const priorDeliveries = await Promise.all(
-      lateDue.map((task) => getReminderDelivery(db, userId, `late:${task.id}`)),
+  if (prefs.remindersSlipping) {
+    const notBeforeLate = new Date(
+      now.getTime() - prefs.lateReminderMinutes * 60 * 1000,
     );
-    const isInitialBacklog =
-      !warmupRow && priorDeliveries.every((row) => !row);
-
-    if (isInitialBacklog) {
-      for (const task of lateDue) {
-        await recordReminderDelivery(db, userId, `late:${task.id}`, now);
-      }
-      await recordReminderDelivery(db, userId, LATE_WARMUP_KEY, now);
-    } else {
-      if (!warmupRow) {
-        await recordReminderDelivery(db, userId, LATE_WARMUP_KEY, now);
-      }
-      const body = formatLateReminderBody(lateDue.map((task) => task.title));
-      if (body) {
-        const primary = lateDue[0]!;
-        await insertSystemNotificationsWithPush(db, {
-          recipientUserIds: [userId],
-          clientMutationId: null,
-          kind: "reminder_late",
-          body,
-          taskTitle: primary.title,
-          taskId: primary.id,
-          scheduledDate: primary.scheduledDate,
-          metadata: {
-            taskIds: lateDue.map((task) => task.id),
-            count: lateDue.length,
-          },
-        });
-        for (const task of lateDue) {
-          await recordReminderDelivery(db, userId, `late:${task.id}`, now);
-        }
-        sent += 1;
-      }
-    }
-  }
-
-  for (const task of tasks) {
-    if (!task.deadline || task.inProgress) {
-      continue;
-    }
-    const msUntil = task.deadline.getTime() - now.getTime();
-    if (msUntil <= 0) {
-      continue;
-    }
-    const hoursUntil = msUntil / 3_600_000;
-    for (const threshold of prefs.deadlineNudgeHours) {
-      if (hoursUntil > threshold || hoursUntil < threshold - 0.5) {
+    const lateDue = [];
+    for (const task of tasks) {
+      const slipping = isSlipping({
+        carriedDays: task.carriedDays ?? 0,
+        deadline: task.deadline?.toISOString() ?? null,
+        now,
+      });
+      if (!slipping) {
         continue;
       }
-      const key = `deadline:${task.id}:${threshold}h`;
       const already = await wasReminderSentAfter(
         db,
         userId,
-        key,
-        new Date(now.getTime() - threshold * 3_600_000),
+        `late:${task.id}`,
+        notBeforeLate,
       );
-      if (already) {
+      if (!already) {
+        lateDue.push(task);
+      }
+    }
+
+    if (lateDue.length > 0) {
+      const warmupRow = await getReminderDelivery(db, userId, LATE_WARMUP_KEY);
+      const priorDeliveries = await Promise.all(
+        lateDue.map((task) => getReminderDelivery(db, userId, `late:${task.id}`)),
+      );
+      const isInitialBacklog =
+        !warmupRow && priorDeliveries.every((row) => !row);
+
+      if (isInitialBacklog) {
+        for (const task of lateDue) {
+          await recordReminderDelivery(db, userId, `late:${task.id}`, now);
+        }
+        await recordReminderDelivery(db, userId, LATE_WARMUP_KEY, now);
+      } else {
+        if (!warmupRow) {
+          await recordReminderDelivery(db, userId, LATE_WARMUP_KEY, now);
+        }
+        const presentation = formatLateSlippingPresentation(
+          lateDue.map((task) => task.title),
+        );
+        if (presentation) {
+          const primary = lateDue[0]!;
+          await insertReminderNotification(db, {
+            userId,
+            kind: "reminder_late",
+            presentation,
+            taskId: primary.id,
+            scheduledDate: primary.scheduledDate,
+            metadata: {
+              taskIds: lateDue.map((task) => task.id),
+              count: lateDue.length,
+            },
+          });
+          for (const task of lateDue) {
+            await recordReminderDelivery(db, userId, `late:${task.id}`, now);
+          }
+          sent += 1;
+        }
+      }
+    }
+  }
+
+  if (prefs.remindersDeadline) {
+    for (const task of tasks) {
+      if (!task.deadline || task.inProgress) {
         continue;
       }
-      const body = `Due in ${threshold}h and not in progress: ${task.title}`;
-      await insertSystemNotificationsWithPush(db, {
-        recipientUserIds: [userId],
-        clientMutationId: null,
-        kind: "reminder_deadline",
-        body,
-        taskTitle: task.title,
-        taskId: task.id,
-        scheduledDate: task.scheduledDate,
-      });
-      await recordReminderDelivery(db, userId, key, now);
-      sent += 1;
+      const msUntil = task.deadline.getTime() - now.getTime();
+      if (msUntil <= 0) {
+        continue;
+      }
+      const hoursUntil = msUntil / 3_600_000;
+      for (const threshold of prefs.deadlineNudgeHours) {
+        if (hoursUntil > threshold || hoursUntil < threshold - 0.5) {
+          continue;
+        }
+        const key = `deadline:${task.id}:${threshold}h`;
+        const already = await wasReminderSentAfter(
+          db,
+          userId,
+          key,
+          new Date(now.getTime() - threshold * 3_600_000),
+        );
+        if (already) {
+          continue;
+        }
+        const presentation = formatDeadlinePresentation(threshold, task.title);
+        await insertReminderNotification(db, {
+          userId,
+          kind: "reminder_deadline",
+          presentation,
+          taskId: task.id,
+          scheduledDate: task.scheduledDate,
+        });
+        await recordReminderDelivery(db, userId, key, now);
+        sent += 1;
+      }
     }
   }
 
@@ -264,4 +338,10 @@ export async function runVersionCheck(db: Db, userId: string): Promise<number> {
   });
   await recordReminderDelivery(db, userId, deliveryKey, new Date());
   return 1;
+}
+
+// Kept for tests that imported formatLateReminderBody
+export function formatLateReminderBody(titles: string[]): string | null {
+  const presentation = formatLateSlippingPresentation(titles);
+  return presentation ? presentationToBody(presentation) : null;
 }

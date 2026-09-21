@@ -14,6 +14,7 @@ import {
   bindNotificationNavigate,
   openNotificationTarget,
 } from "@/lib/openNotificationTarget";
+import { osNotificationFromItem } from "@/lib/notificationDisplay";
 import {
   shouldAutoReadNotification,
   shouldFireOsBanner,
@@ -96,8 +97,11 @@ export function NotificationHost() {
       ) {
         continue;
       }
+      const osPayload = osNotificationFromItem(item);
       void os.showOsNotification({
-        body: item.body,
+        title: osPayload.title,
+        body: osPayload.body,
+        tag: osPayload.tag,
         onClick: () => {
           if (!viewerId) {
             return;

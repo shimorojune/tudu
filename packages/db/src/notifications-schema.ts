@@ -24,6 +24,7 @@ export const notificationKind = pgEnum("notification_kind", [
   "jira_comment",
   "jira_updated",
   "reminder_digest",
+  "reminder_focus",
   "reminder_late",
   "reminder_deadline",
   "app_update",
