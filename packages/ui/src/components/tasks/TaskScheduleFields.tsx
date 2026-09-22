@@ -12,6 +12,7 @@ type SegmentedOption<T extends string> = {
   value: T;
   label: string;
   hint?: string;
+  disabled?: boolean;
 };
 
 function SegmentedControl<T extends string>({
@@ -36,11 +37,12 @@ function SegmentedControl<T extends string>({
     >
       {options.map((option, index) => {
         const selected = option.value === value;
+        const optionDisabled = disabled || option.disabled;
         return (
           <button
             key={option.value}
             type="button"
-            disabled={disabled}
+            disabled={optionDisabled}
             className={cn(
               "flex items-center gap-[4px] leading-none whitespace-nowrap",
               size === "sm"
@@ -134,6 +136,7 @@ export function TaskScheduleFields({
 
   const targetIsToday = scheduledDate === today;
   const isUnscheduled = dayChoice === "unscheduled";
+  const nowFull = targetIsToday && nowCount >= DEFAULT_NOW_SOFT_CAP;
 
   const labelClass = compact
     ? "text-[10px] font-extrabold uppercase tracking-[0.14em] text-faint"
@@ -200,6 +203,7 @@ export function TaskScheduleFields({
                   value === "now" && targetIsToday
                     ? `${nowCount}/${DEFAULT_NOW_SOFT_CAP}`
                     : undefined,
+                disabled: value === "now" && nowFull,
               }))}
             />
           </div>
@@ -246,6 +250,7 @@ export function TaskScheduleFields({
                 value === "now" && targetIsToday
                   ? `${nowCount} / ${DEFAULT_NOW_SOFT_CAP}`
                   : undefined,
+              disabled: value === "now" && nowFull,
             }))}
           />
           {isUnscheduled ? (

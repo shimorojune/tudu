@@ -47,10 +47,11 @@ export type TaskRowActions = {
   onComplete: (completed: boolean) => void;
   onRename: (title: string) => void;
   onDelete?: () => void;
-  onToggleInProgress?: () => void;
   onMoveToBucket?: (bucket: Bucket) => void;
+  canMoveToNow?: boolean;
   onUnschedule?: () => void;
   onScheduleToToday?: () => void;
+  onScheduleForTomorrow?: () => void;
   onToggleSubtask: (subtaskId: string, done: boolean) => void;
   onRenameSubtask: (subtaskId: string, title: string) => void;
   onDeleteSubtask: (subtaskId: string) => void;
@@ -1064,20 +1065,25 @@ export function TaskRow({
               >
                 Add a subtask
               </ContextMenuItem>
-              {!isCompleted && actions.onToggleInProgress ? (
-                <ContextMenuItem onSelect={() => actions.onToggleInProgress?.()}>
-                  {task.inProgress ? "Clear in progress" : "Mark in progress"}
-                </ContextMenuItem>
-              ) : null}
             </>
           )}
           {menuVariant === "day" && actions.onMoveToBucket ? (
             <>
               {isManager ? null : <ContextMenuSeparator />}
+              {actions.onScheduleForTomorrow ? (
+                <ContextMenuItem
+                  onSelect={() => actions.onScheduleForTomorrow?.()}
+                >
+                  Schedule for tomorrow
+                </ContextMenuItem>
+              ) : null}
               {(["now", "next", "later"] as const).map((targetBucket) => (
                 <ContextMenuItem
                   key={targetBucket}
-                  disabled={targetBucket === bucket}
+                  disabled={
+                    targetBucket === bucket ||
+                    (targetBucket === "now" && actions.canMoveToNow === false)
+                  }
                   onSelect={() => actions.onMoveToBucket?.(targetBucket)}
                 >
                   Move to{" "}

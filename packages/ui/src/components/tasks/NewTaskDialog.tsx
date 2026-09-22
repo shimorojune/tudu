@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Bucket } from "@tudu/shared";
-import { DEFAULT_NOW_SOFT_CAP, validateStartBeforeDeadline } from "@tudu/shared";
+import {
+  DEFAULT_NOW_SOFT_CAP,
+  NOW_CAP_EXCEEDED_MESSAGE,
+  validateStartBeforeDeadline,
+} from "@tudu/shared";
 import { todayIso } from "@tudu/store";
+import { canAddNewTaskToNow } from "@/lib/nowCapGuard";
 import { useTaskFieldSuggest } from "@/hooks/useTaskFieldSuggest";
 import { useTaskTitleNaturalLanguage } from "@/hooks/useTaskTitleNaturalLanguage";
 import type { TaskDescriptionUploadFn } from "@/components/editor/taskDescriptionAttachments";
@@ -18,6 +23,7 @@ import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { FormBusy } from "@/components/forms/FormBusy";
 import { Button } from "@/components/ui/button";
 import { clearPendingAttachmentBlobUrls } from "@/lib/finalizeNewTaskDescriptionAttachments";
+import { TaskTitleNaturalLanguageField } from "@/components/tasks/TaskTitleNaturalLanguageField";
 export type { NewTaskDayChoice } from "@/components/tasks/TaskScheduleFields";
 import type { NewTaskDayChoice } from "@/components/tasks/TaskScheduleFields";
 import { TaskStartDeadlineFields } from "@/components/tasks/TaskStartDeadlineFields";
@@ -159,10 +165,28 @@ export function NewTaskDialog({
   const targetIsToday = scheduledDate === today;
   const isUnscheduled = dayChoice === "unscheduled";
 
-  const projectedNowCount =
-    bucket === "now" && targetIsToday ? nowCount + 1 : nowCount;
-
   const showNowCap = bucket === "now" && targetIsToday;
+  const scheduleError = validateStartBeforeDeadline(startDate || null, deadline);
+  const nowBlocked =
+    targetIsToday &&
+    bucket === "now" &&
+    !canAddNewTaskToNow({
+      today,
+      scheduledDate,
+      bucket,
+      openNowCountOnToday: nowCount,
+    });
+  const enteringTodaysNow =
+    showNowCap &&
+    canAddNewTaskToNow({
+      today,
+      scheduledDate,
+      bucket,
+      openNowCountOnToday: nowCount,
+    });
+  const displayNowCount = enteringTodaysNow ? nowCount + 1 : nowCount;
+  const canSubmit =
+    Boolean(title.trim()) && !scheduleError && !nowBlocked && !submitting;
 
   const submitLabel = isUnscheduled
     ? "Add to Unscheduled"
@@ -174,7 +198,7 @@ export function NewTaskDialog({
     if (!saveTitle || submitting) {
       return;
     }
-    if (validateStartBeforeDeadline(startDate || null, deadline)) {
+    if (scheduleError || nowBlocked) {
       return;
     }
     const trimmedDescription = description.trim();
@@ -226,14 +250,18 @@ export function NewTaskDialog({
         </div>
 
         <FormBusy busy={submitting} className="min-h-0 space-y-[20px] overflow-y-auto px-[24px] py-[20px]">
-          <input
-            ref={titleRef}
-            type="text"
-            value={title}
-            placeholder="What needs doing?"
-            className="w-full border-b border-rule bg-transparent pb-[10px] text-[18px] font-semibold outline-none placeholder:text-faint"
-            onChange={(event) => setTitle(event.target.value)}
-          />
+          <div className="border-b border-rule pb-[10px]">
+            <TaskTitleNaturalLanguageField
+              inputRef={titleRef}
+              value={title}
+              parse={parse}
+              disabled={submitting}
+              placeholder="What needs doing?"
+              mirrorClassName="w-full text-[18px] font-semibold"
+              inputClassName="w-full text-[18px] font-semibold outline-none"
+              onChange={setTitle}
+            />
+          </div>
 
           <div className="space-y-[8px]">
             <div className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
@@ -326,11 +354,17 @@ export function NewTaskDialog({
         </FormBusy>
 
         <div className="flex items-center gap-[16px] border-t border-rule bg-background px-[24px] py-[15px]">
-          {showNowCap ? (
+          {nowBlocked ? (
+            <span className="text-[12.5px] text-destructive">
+              {NOW_CAP_EXCEEDED_MESSAGE}
+            </span>
+          ) : scheduleError ? (
+            <span className="text-[12.5px] text-destructive">{scheduleError}</span>
+          ) : showNowCap ? (
             <span className="text-[12.5px] text-muted-foreground">
               Now will hold{" "}
               <span className="font-bold tabular-nums text-foreground">
-                {projectedNowCount} of {DEFAULT_NOW_SOFT_CAP}
+                {displayNowCount} of {DEFAULT_NOW_SOFT_CAP}
               </span>
             </span>
           ) : (
@@ -346,7 +380,7 @@ export function NewTaskDialog({
           <Button
             type="button"
             loading={submitting}
-            disabled={!title.trim()}
+            disabled={!canSubmit}
             className="inline-flex h-auto items-center gap-[8px] bg-primary px-[15px] py-[8px] text-[13px] font-bold"
             onClick={() => {
               void handleSubmit();

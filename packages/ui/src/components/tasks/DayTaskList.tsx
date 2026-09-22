@@ -46,10 +46,17 @@ import {
 } from "@/lib/completedTasks";
 import { openNowCount } from "@/lib/nowCount";
 import {
+  canMoveTaskToNow,
+  lanesExceedNowCap,
+  NOW_CAP_EXCEEDED_MESSAGE,
+} from "@/lib/nowCapGuard";
+import { toast } from "sonner";
+import {
   buildPullIntoNowLanes,
   moveTaskToBucketLanes,
   unscheduleTaskLanes,
 } from "@/lib/reorder";
+import { offsetIso } from "@/components/tasks/TaskScheduleFields";
 import {
   findContainer,
   itemsFromTasks,
@@ -401,6 +408,13 @@ export function DayTaskList({
     if (lanes.length === 0) {
       return;
     }
+    if (
+      isToday &&
+      lanesExceedNowCap(openTasks, lanes, todayIso())
+    ) {
+      toast.error(NOW_CAP_EXCEEDED_MESSAGE);
+      return;
+    }
     if (isManager && !canReorder) {
       return;
     }
@@ -448,21 +462,28 @@ export function DayTaskList({
             onTaskDeleted?.(taskId);
           }
         : undefined,
-      onToggleInProgress: () => {
-        if (isManager) {
-          return;
-        }
-        const task = tasks.find((entry) => entry.id === taskId);
-        if (!task || task.completedAt !== null) {
-          return;
-        }
-        updateTask({
-          id: taskId,
-          patch: { inProgress: !task.inProgress },
-        });
-      },
+      canMoveToNow: canMoveTaskToNow({
+        openTasks,
+        today: todayIso(),
+        selectedDate,
+        task: tasks.find((entry) => entry.id === taskId)!,
+      }),
       onMoveToBucket: canReorder
         ? (bucket) => {
+            const task = tasks.find((entry) => entry.id === taskId);
+            if (
+              bucket === "now" &&
+              task &&
+              !canMoveTaskToNow({
+                openTasks,
+                today: todayIso(),
+                selectedDate,
+                task,
+              })
+            ) {
+              toast.error(NOW_CAP_EXCEEDED_MESSAGE);
+              return;
+            }
             const lanes = moveTaskToBucketLanes(openTasks, taskId, bucket, selectedDate);
             applyReorder(lanes);
           }
@@ -473,6 +494,22 @@ export function DayTaskList({
             applyReorder(lanes);
           }
         : undefined,
+      onScheduleForTomorrow:
+        canReorder && !isManager
+          ? () => {
+              const task = tasks.find((entry) => entry.id === taskId);
+              if (!task?.bucket) {
+                return;
+              }
+              updateTask({
+                id: taskId,
+                patch: {
+                  scheduledDate: offsetIso(todayIso(), 1),
+                  bucket: task.bucket,
+                },
+              });
+            }
+          : undefined,
       onToggleSubtask: (subtaskId, done) => {
         if (isManager) {
           return;

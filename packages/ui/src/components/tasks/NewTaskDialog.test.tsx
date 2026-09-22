@@ -1,7 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { NOW_CAP_EXCEEDED_MESSAGE } from "@tudu/shared";
 import { NewTaskDialog } from "./NewTaskDialog";
+
+vi.mock("@/hooks/useTaskFieldSuggest", () => ({
+  useTaskFieldSuggest: () => {},
+}));
 
 vi.mock("@tudu/store", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tudu/store")>();
@@ -10,6 +15,10 @@ vi.mock("@tudu/store", async (importOriginal) => {
     todayIso: () => "2026-09-11",
     useGetProjectsQuery: () => ({ data: [], isLoading: false }),
     useCreateProjectMutation: () => [vi.fn(), { isLoading: false }],
+    useQuickAddSuggestMutation: () => [
+      vi.fn().mockReturnValue({ unwrap: () => Promise.reject(new Error("skip")) }),
+      { isLoading: false },
+    ],
   };
 });
 
@@ -67,6 +76,41 @@ describe("NewTaskDialog", () => {
     await user.type(screen.getByPlaceholderText("What needs doing?"), "Ship fix{Enter}");
 
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("disables submit and shows full message when Now is at cap", async () => {
+    const user = userEvent.setup();
+    render(
+      <NewTaskDialog
+        open
+        initialBucket="now"
+        initialDate="2026-09-11"
+        nowCount={5}
+        onOpenChange={vi.fn()}
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    await user.type(screen.getByPlaceholderText("What needs doing?"), "One more");
+
+    const submit = screen.getByRole("button", { name: /Add to Now/i });
+    expect(submit).toBeDisabled();
+    expect(screen.getByText(NOW_CAP_EXCEEDED_MESSAGE)).toBeInTheDocument();
+  });
+
+  it("shows projected open Now count when adding within cap", () => {
+    render(
+      <NewTaskDialog
+        open
+        initialBucket="now"
+        initialDate="2026-09-11"
+        nowCount={4}
+        onOpenChange={vi.fn()}
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    expect(screen.getByText("5 of 5")).toBeInTheDocument();
   });
 
   it("prefills title and description when provided", () => {

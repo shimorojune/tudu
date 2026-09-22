@@ -23,6 +23,9 @@ export type DetailInspectorProps = {
   viewer?: TaskViewer;
   reportUserId?: string;
   reportPermissions?: ManagerPermissions;
+  todayNowCount?: number;
+  canDelete?: boolean;
+  onDelete?: () => void;
 };
 
 export function DetailInspector({
@@ -31,6 +34,9 @@ export function DetailInspector({
   viewer = "owner",
   reportUserId,
   reportPermissions,
+  todayNowCount,
+  canDelete,
+  onDelete,
 }: DetailInspectorProps) {
   if (!task) {
     return <DetailInspectorEmpty />;
@@ -43,6 +49,9 @@ export function DetailInspector({
       viewer={viewer}
       reportUserId={reportUserId}
       reportPermissions={reportPermissions}
+      todayNowCount={todayNowCount}
+      canDelete={canDelete}
+      onDelete={onDelete}
     />
   );
 }
@@ -53,12 +62,18 @@ function DetailInspectorBody({
   viewer,
   reportUserId,
   reportPermissions,
+  todayNowCount,
+  canDelete,
+  onDelete,
 }: {
   task: Task;
   selectedDate: string;
   viewer: TaskViewer;
   reportUserId?: string;
   reportPermissions?: ManagerPermissions;
+  todayNowCount?: number;
+  canDelete?: boolean;
+  onDelete?: () => void;
 }) {
   const dispatch = useDispatch();
   const tab = useSelector((state: RootState) => state.day.inspectorTab);
@@ -101,6 +116,9 @@ function DetailInspectorBody({
               : undefined
           }
           sharedWithName={sharedWithName}
+          todayNowCount={todayNowCount}
+          canDelete={canDelete && !isManager}
+          onDelete={onDelete}
         />
       ) : null}
       {tab === "comments" ? (

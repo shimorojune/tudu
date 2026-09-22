@@ -2,6 +2,7 @@ import { format, isSameDay, parseISO } from "date-fns";
 import { useEffect, useState } from "react";
 import {
   canDeclineInboxCard,
+  canPlaceInNow,
   effectiveDayIso,
   type InboxHistoryItem,
   type InboxPendingItem,
@@ -11,7 +12,9 @@ import {
   useDeclineInboxItemMutation,
   useDeleteTaskMutation,
   useGetInboxQuery,
+  useGetTasksForDayQuery,
 } from "@tudu/store";
+import { openNowCount } from "@/lib/nowCount";
 import { isCommandPaletteBlocked } from "@/components/chrome/dialogBlocker";
 import { useCommandPalette } from "@/components/chrome/CommandPaletteContext";
 import { InboxAcceptControls } from "@/components/inbox/InboxAcceptControls";
@@ -64,12 +67,14 @@ function InboxCard({
   onFocus,
   declining,
   onToggleDecline,
+  openNowCountOnToday,
 }: {
   item: InboxPendingItem;
   focused: boolean;
   onFocus: () => void;
   declining: boolean;
   onToggleDecline: (open: boolean) => void;
+  openNowCountOnToday: number;
 }) {
   const [acceptInbox] = useAcceptInboxItemMutation();
   const [declineInbox, declineState] = useDeclineInboxItemMutation();
@@ -197,6 +202,7 @@ function InboxCard({
         <InboxAcceptControls
           startDate={item.task.startDate}
           today={effectiveDayIso()}
+          openNowCountOnToday={openNowCountOnToday}
           onAccept={({ bucket, scheduledDate }) => {
             void notifyAction(
               () => mutationResult(acceptInbox({ id: item.id, bucket, scheduledDate })),
@@ -275,6 +281,9 @@ function HistoryRow({ item }: { item: InboxHistoryItem }) {
 
 export function InboxRoute() {
   const { data, isLoading, isError } = useGetInboxQuery();
+  const today = effectiveDayIso();
+  const todayTasksQuery = useGetTasksForDayQuery(today);
+  const openNowCountOnToday = openNowCount(todayTasksQuery.data?.tasks ?? []);
   const [acceptInbox] = useAcceptInboxItemMutation();
   const { open: paletteOpen } = useCommandPalette();
   const pending = data?.pending ?? [];
@@ -324,16 +333,29 @@ export function InboxRoute() {
         return;
       }
 
+      const scheduledDate = effectiveDayIso();
+      if (
+        action === "now" &&
+        !canPlaceInNow({
+          today: scheduledDate,
+          targetDate: scheduledDate,
+          targetBucket: "now",
+          openNowCountOnToday,
+        })
+      ) {
+        return;
+      }
+
       void acceptInbox({
         id: active.id,
         bucket: action,
-        scheduledDate: effectiveDayIso(),
+        scheduledDate,
       });
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [acceptInbox, active, paletteOpen]);
+  }, [acceptInbox, active, openNowCountOnToday, paletteOpen]);
 
   if (isLoading) {
     return <InboxSkeleton />;
@@ -413,6 +435,7 @@ export function InboxRoute() {
               onFocus={() => setFocusedId(item.id)}
               declining={decliningId === item.id}
               onToggleDecline={(open) => setDecliningId(open ? item.id : null)}
+              openNowCountOnToday={openNowCountOnToday}
             />
           ))
         )}

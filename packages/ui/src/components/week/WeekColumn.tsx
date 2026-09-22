@@ -143,8 +143,7 @@ export function WeekColumn({
       data-week-col={date}
       className={cn(
         "flex min-h-0 flex-col border-r border-hair",
-        isToday && "bg-[#f6f4f3]",
-        weekend && !isToday && "bg-[#f1efed]",
+        (isToday || (weekend && !isToday)) && "bg-tint",
       )}
     >
       <button

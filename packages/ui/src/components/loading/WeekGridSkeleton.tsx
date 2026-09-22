@@ -86,8 +86,7 @@ export function WeekGridSkeleton({
                 data-week-col={day}
                 className={cn(
                   "flex min-h-0 flex-col border-r border-hair",
-                  isToday && "bg-[#f6f4f3]",
-                  weekend && !isToday && "bg-[#f1efed]",
+                  (isToday || (weekend && !isToday)) && "bg-tint",
                 )}
               >
                 <div className="border-b border-hair px-[14px] py-[10px] text-left">

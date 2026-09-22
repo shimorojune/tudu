@@ -106,7 +106,7 @@ export function WeekPicker({
                 type="button"
                 className={cn(
                   "grid w-full grid-cols-[32px_minmax(0,1fr)_6px] items-center gap-[9px] px-[12px] py-[7px] text-left text-[12.5px]",
-                  selected && "bg-[#f2efec] font-bold text-foreground",
+                  selected && "bg-tint font-bold text-foreground",
                 )}
                 onClick={() => goToWeek(row.weekId)}
               >

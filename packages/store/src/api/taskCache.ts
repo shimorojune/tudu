@@ -7,6 +7,7 @@ import type {
   Task,
   UpdateTaskRequest,
 } from "@tudu/shared";
+import { calendarDayIso, inProgressForPlacement } from "@tudu/shared";
 import type { AppDispatch, RootState } from "../store.js";
 import { baseApi } from "./baseApi.js";
 import { managerApi } from "./managerApi.js";
@@ -39,11 +40,20 @@ function applyLanesToTasks(tasks: Task[], lanes: Lane[]): Task[] {
     if (!placement) {
       return task;
     }
+    const bucket = placement.bucket;
     return {
       ...task,
       scheduledDate: placement.scheduledDate,
-      bucket: placement.bucket,
+      bucket,
       position: placement.position,
+      inProgress:
+        task.completedAt === null
+          ? inProgressForPlacement(
+              bucket,
+              placement.scheduledDate,
+              calendarDayIso(),
+            )
+          : task.inProgress,
     };
   });
 }
@@ -181,7 +191,16 @@ export function mergeTaskPatch(
     }
   }
 
-  if ("inProgress" in patch && next.completedAt === null) {
+  if (
+    ("bucket" in patch || "scheduledDate" in patch) &&
+    next.completedAt === null
+  ) {
+    next.inProgress = inProgressForPlacement(
+      next.bucket,
+      next.scheduledDate,
+      calendarDayIso(),
+    );
+  } else if ("inProgress" in patch && next.completedAt === null) {
     next.inProgress = patchInProgress ?? false;
   }
 
@@ -219,7 +238,11 @@ export function createOptimisticTask(body: CreateTaskRequest, tempId: string): T
     startDate: body.startDate ?? null,
     deadline: body.deadline ?? null,
     completedAt: null,
-    inProgress: false,
+    inProgress: inProgressForPlacement(
+      body.bucket ?? null,
+      body.scheduledDate ?? null,
+      calendarDayIso(),
+    ),
     carriedDays: 0,
     carriedSince: null,
     isPrivate: body.isPrivate ?? false,

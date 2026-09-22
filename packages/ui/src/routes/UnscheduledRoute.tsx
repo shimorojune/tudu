@@ -336,16 +336,6 @@ export function UnscheduledRoute() {
           dispatch(setSelectedTaskId(null));
         }
       },
-      onToggleInProgress: () => {
-        const task = openTasks.find((entry) => entry.id === taskId);
-        if (!task || task.completedAt !== null) {
-          return;
-        }
-        updateTask({
-          id: taskId,
-          patch: { inProgress: !task.inProgress },
-        });
-      },
       onScheduleToToday: () => {
         const lanes = scheduleToTodayLanes(todayTasks, openTasks, taskId, todayIso());
         if (lanes.length > 0) {
@@ -433,7 +423,20 @@ export function UnscheduledRoute() {
           dispatch(clearFocusCommentId());
         }}
       >
-        <DetailInspector task={selectedTask} selectedDate="" />
+        <DetailInspector
+          task={selectedTask}
+          selectedDate={todayIso()}
+          todayNowCount={openNowCount(todayTasks)}
+          canDelete
+          onDelete={
+            selectedTask
+              ? () => {
+                  deleteTask(selectedTask.id);
+                  dispatch(setSelectedTaskId(null));
+                }
+              : undefined
+          }
+        />
       </InspectorSheet>
       <NewTaskDialog
         open={dialogOpen}

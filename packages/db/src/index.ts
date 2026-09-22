@@ -5,6 +5,7 @@ import * as schema from "./schema.js";
 export * from "./schema.js";
 export * from "./projects.js";
 export * from "./tasks.js";
+export * from "./nowCap.js";
 export * from "./activity.js";
 export * from "./rollover.js";
 export * from "./manager.js";

@@ -23,6 +23,7 @@ import type {
   TimelineEvent,
   UpdateTaskRequest,
 } from "@tudu/shared";
+import { calendarDayIso, inProgressForPlacement } from "@tudu/shared";
 
 export type Replica = {
   viewerId: string | null;
@@ -777,7 +778,16 @@ function mergePatch(
     }
   }
 
-  if ("inProgress" in patch && next.completedAt === null) {
+  if (
+    ("bucket" in patch || "scheduledDate" in patch) &&
+    next.completedAt === null
+  ) {
+    next.inProgress = inProgressForPlacement(
+      next.bucket,
+      next.scheduledDate,
+      calendarDayIso(),
+    );
+  } else if ("inProgress" in patch && next.completedAt === null) {
     next.inProgress = patchInProgress ?? false;
   }
 
@@ -795,11 +805,20 @@ function applyReorderToTasks(
       if (!task) {
         return;
       }
+      const bucket = lane.bucket;
       next[taskId] = {
         ...task,
         scheduledDate: lane.scheduledDate,
-        bucket: lane.bucket,
+        bucket,
         position: index,
+        inProgress:
+          task.completedAt === null
+            ? inProgressForPlacement(
+                bucket,
+                lane.scheduledDate,
+                calendarDayIso(),
+              )
+            : task.inProgress,
       };
     });
   }
@@ -822,7 +841,11 @@ function optimisticTask(
     startDate: body.startDate ?? null,
     deadline: body.deadline ?? null,
     completedAt: null,
-    inProgress: false,
+    inProgress: inProgressForPlacement(
+      body.bucket ?? null,
+      body.scheduledDate ?? null,
+      calendarDayIso(),
+    ),
     carriedDays: 0,
     carriedSince: null,
     isPrivate: body.isPrivate ?? false,

@@ -10,6 +10,7 @@ import {
   deleteReportTask,
   findTaskById,
   mapTask,
+  NowCapExceededError,
   ProjectError,
   listTasksForDay,
   listUnscheduledTasks,
@@ -130,10 +131,17 @@ export function createTasksRoute(db: Db) {
 
   app.patch("/tasks/reorder", jsonBody(reorderRequestSchema), async (c) => {
     const { lanes } = c.req.valid("json");
-    const ok = await reorderTasks(db, userId(c), lanes);
+    try {
+      const ok = await reorderTasks(db, userId(c), lanes);
 
-    if (!ok) {
-      return c.json({ error: "One or more tasks were not found" }, 404);
+      if (!ok) {
+        return c.json({ error: "One or more tasks were not found" }, 404);
+      }
+    } catch (error) {
+      if (error instanceof NowCapExceededError) {
+        return c.json({ error: error.message }, 400);
+      }
+      throw error;
     }
 
     return c.body(null, 204);
@@ -176,6 +184,9 @@ export function createTasksRoute(db: Db) {
       if (error instanceof ProjectError) {
         return c.json({ error: error.message }, error.status);
       }
+      if (error instanceof NowCapExceededError) {
+        return c.json({ error: error.message }, 400);
+      }
       throw error;
     }
 
@@ -211,6 +222,9 @@ export function createTasksRoute(db: Db) {
     } catch (error) {
       if (error instanceof ProjectError) {
         return c.json({ error: error.message }, error.status);
+      }
+      if (error instanceof NowCapExceededError) {
+        return c.json({ error: error.message }, 400);
       }
       throw error;
     }

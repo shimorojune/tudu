@@ -39,7 +39,7 @@ export function validateStartBeforeDeadline(
   if (!startDate || !deadline) {
     return null;
   }
-  const deadlineDay = deadline.slice(0, 10);
+  const deadlineDay = isoDateLocal(new Date(deadline));
   if (startDate > deadlineDay) {
     return "Start must be on or before the deadline day";
   }

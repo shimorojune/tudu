@@ -12,6 +12,7 @@ describe("InboxAcceptControls", () => {
       <InboxAcceptControls
         startDate="2026-09-20"
         today="2026-09-10"
+        openNowCountOnToday={0}
         onAccept={onAccept}
       />,
     );
@@ -33,6 +34,7 @@ describe("InboxAcceptControls", () => {
       <InboxAcceptControls
         startDate="2026-09-20"
         today="2026-09-10"
+        openNowCountOnToday={0}
         onAccept={onAccept}
       />,
     );
@@ -56,7 +58,12 @@ describe("InboxAcceptControls", () => {
     const user = userEvent.setup();
 
     render(
-      <InboxAcceptControls startDate={null} today="2026-09-10" onAccept={onAccept} />,
+      <InboxAcceptControls
+        startDate={null}
+        today="2026-09-10"
+        openNowCountOnToday={0}
+        onAccept={onAccept}
+      />,
     );
 
     await user.click(screen.getByRole("button", { name: "Accept another day…" }));

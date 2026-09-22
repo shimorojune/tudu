@@ -1,6 +1,14 @@
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
-import { planTaskTimelineEvents } from "@tudu/shared";
+import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import {
+  assertOpenNowCountWithinCap,
+  calendarDayIso,
+  DEFAULT_NOW_SOFT_CAP,
+  calendarDayIso,
+  inProgressForPlacement,
+  planTaskTimelineEvents,
+} from "@tudu/shared";
 import type { Bucket, JiraTaskLinkSummary, Lane } from "@tudu/shared";
+import { assertNowCapForCreate, assertNowCapForUpdate } from "./nowCap.js";
 import type { Db } from "./index.js";
 import {
   applyTaskPatch,
@@ -243,6 +251,13 @@ export async function createTask(
     await assertAssignableProject(db, input.userId, input.projectId);
   }
 
+  await assertNowCapForCreate(
+    db,
+    input.userId,
+    input.scheduledDate,
+    input.bucket,
+  );
+
   const position = await nextPosition(
     db,
     input.userId,
@@ -252,7 +267,16 @@ export async function createTask(
 
   const rows = await db
     .insert(tasks)
-    .values({ ...input, description: input.description ?? null, position })
+    .values({
+      ...input,
+      description: input.description ?? null,
+      position,
+      inProgress: inProgressForPlacement(
+        input.bucket,
+        input.scheduledDate,
+        calendarDayIso(),
+      ),
+    })
     .returning();
   const row = rows[0]!;
 
@@ -324,12 +348,26 @@ export async function updateTask(
       "scheduledDate" in fields ? fields.scheduledDate ?? null : existing.scheduledDate;
     patch.bucket =
       "bucket" in fields ? fields.bucket ?? null : existing.bucket;
+    await assertNowCapForUpdate(
+      db,
+      userId,
+      existing,
+      patch.scheduledDate ?? null,
+      patch.bucket ?? null,
+    );
     patch.position = await nextPosition(
       db,
       userId,
       patch.scheduledDate ?? null,
       patch.bucket ?? null,
     );
+    if (existing.completedAt === null) {
+      patch.inProgress = inProgressForPlacement(
+        patch.bucket ?? null,
+        patch.scheduledDate ?? null,
+        calendarDayIso(),
+      );
+    }
   }
 
   if (
@@ -441,6 +479,27 @@ export async function reorderTasks(
     return true;
   }
 
+  const today = calendarDayIso();
+  const placementIds = placements.map((placement) => placement.taskId);
+  const capRows = await db.query.tasks.findMany({
+    where: and(
+      eq(tasks.userId, userId),
+      isNull(tasks.deletedAt),
+      or(eq(tasks.scheduledDate, today), inArray(tasks.id, placementIds)),
+    ),
+  });
+  assertOpenNowCountWithinCap({
+    today,
+    beforeTasks: capRows.map((row) => ({
+      id: row.id,
+      scheduledDate: row.scheduledDate,
+      bucket: row.bucket,
+      completedAt: row.completedAt ? row.completedAt.toISOString() : null,
+    })),
+    placements,
+    cap: DEFAULT_NOW_SOFT_CAP,
+  });
+
   const ids = placements.map((placement) => placement.taskId);
 
   const ownedRows = await db.query.tasks.findMany({
@@ -472,6 +531,15 @@ export async function reorderTasks(
 
     const dateChanged = placement.scheduledDate !== before.scheduledDate;
 
+    const inProgress =
+      before.completedAt === null
+        ? inProgressForPlacement(
+            placement.bucket,
+            placement.scheduledDate,
+            calendarDayIso(),
+          )
+        : before.inProgress;
+
     writes.push(
       db
         .update(tasks)
@@ -479,6 +547,7 @@ export async function reorderTasks(
           scheduledDate: placement.scheduledDate,
           bucket: placement.bucket,
           position: placement.position,
+          inProgress,
           ...(dateChanged
             ? { carriedDays: 0, carriedSince: null }
             : {}),

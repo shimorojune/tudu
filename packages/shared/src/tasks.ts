@@ -10,8 +10,8 @@ export const BUCKETS = ["now", "next", "later"] as const;
 export const bucketSchema = z.enum(BUCKETS);
 export type Bucket = z.infer<typeof bucketSchema>;
 
-/** Soft cap on Now. Nudged in the UI, never enforced by the API. Step 11 turns this
-    into a preference in the 3 to 5 range. */
+/** Default max open tasks in today's Now bucket. Enforced in UI and API. Step 11 may
+    expose as a user preference in the 3 to 5 range. */
 export const DEFAULT_NOW_SOFT_CAP = 5;
 
 const isoDateSchema = z

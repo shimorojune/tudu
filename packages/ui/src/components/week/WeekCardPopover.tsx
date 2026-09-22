@@ -88,21 +88,6 @@ export function WeekCardPopover({
                 Move to {bucketLabel(bucket, isToday)}
               </button>
             ))}
-            {!isManager && task.completedAt === null ? (
-              <button
-                type="button"
-                className="px-[14px] py-[8px] text-left text-[13px] hover:bg-foreground/[0.03]"
-                onClick={() => {
-                  updateTask({
-                    id: task.id,
-                    patch: { inProgress: !task.inProgress },
-                  });
-                  onOpenChange(false);
-                }}
-              >
-                {task.inProgress ? "Clear in progress" : "Mark in progress"}
-              </button>
-            ) : null}
             {!isManager ? (
               <button
                 type="button"

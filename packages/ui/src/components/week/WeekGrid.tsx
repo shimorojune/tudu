@@ -49,7 +49,9 @@ import { isTaskDimmed } from "@/lib/projectFilter";
 import { UnscheduledRail } from "@/components/week/UnscheduledRail";
 import { WeekColumn } from "@/components/week/WeekColumn";
 import { WeekCard } from "@/components/week/WeekCard";
+import { lanesExceedNowCap, NOW_CAP_EXCEEDED_MESSAGE } from "@/lib/nowCapGuard";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import { TaskListHeader } from "@/components/tasks/TaskListHeader";
 
 const CONTAINER_SWITCH_HYSTERESIS_PX = 12;
@@ -382,6 +384,11 @@ export function WeekGrid({
       after: items,
       laneFor: weekLaneFor,
     });
+    const today = effectiveDayIso();
+    if (lanes.length > 0 && lanesExceedNowCap(allTasks, lanes, today)) {
+      toast.error(NOW_CAP_EXCEEDED_MESSAGE);
+      return;
+    }
     if (lanes.length > 0) {
       if (viewer === "manager" && reportUserId) {
         reorderReportTasks({ userId: reportUserId, lanes });

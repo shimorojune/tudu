@@ -1,5 +1,11 @@
 import { useState, type ReactNode } from "react";
-import { BUCKETS, defaultAcceptOtherDate, type Bucket } from "@tudu/shared";
+import {
+  BUCKETS,
+  canPlaceInNow,
+  DEFAULT_NOW_SOFT_CAP,
+  defaultAcceptOtherDate,
+  type Bucket,
+} from "@tudu/shared";
 import { DateField } from "@/components/ui/date-field";
 import {
   Popover,
@@ -11,6 +17,7 @@ import { bucketLabel } from "@/lib/buckets";
 export type InboxAcceptControlsProps = {
   startDate: string | null;
   today: string;
+  openNowCountOnToday: number;
   onAccept: (args: { bucket: Bucket; scheduledDate: string }) => void;
   children?: ReactNode;
 };
@@ -18,6 +25,7 @@ export type InboxAcceptControlsProps = {
 export function InboxAcceptControls({
   startDate,
   today,
+  openNowCountOnToday,
   onAccept,
   children,
 }: InboxAcceptControlsProps) {
@@ -29,9 +37,39 @@ export function InboxAcceptControls({
   const otherDayIsToday = pickedDate === today;
 
   function acceptToday(bucket: Bucket) {
+    if (
+      bucket === "now" &&
+      !canPlaceInNow({
+        today,
+        targetDate: today,
+        targetBucket: "now",
+        openNowCountOnToday,
+      })
+    ) {
+      return;
+    }
     setTodayOpen(false);
     onAccept({ bucket, scheduledDate: today });
   }
+
+  function acceptOtherDay(bucket: Bucket, scheduledDate: string) {
+    if (
+      bucket === "now" &&
+      scheduledDate === today &&
+      !canPlaceInNow({
+        today,
+        targetDate: today,
+        targetBucket: "now",
+        openNowCountOnToday,
+      })
+    ) {
+      return;
+    }
+    onAccept({ bucket, scheduledDate });
+  }
+
+  const nowFullToday =
+    openNowCountOnToday >= DEFAULT_NOW_SOFT_CAP;
 
   function openOtherDay() {
     setTodayOpen(false);
@@ -60,8 +98,9 @@ export function InboxAcceptControls({
             <button
               key={bucket}
               type="button"
-              className="border border-rule px-[13px] py-[8px] text-[12.5px]"
-              onClick={() => onAccept({ bucket, scheduledDate: pickedDate })}
+              disabled={bucket === "now" && otherDayIsToday && nowFullToday}
+              className="border border-rule px-[13px] py-[8px] text-[12.5px] disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => acceptOtherDay(bucket, pickedDate)}
             >
               {bucketLabel(bucket, otherDayIsToday)}
             </button>
@@ -96,7 +135,8 @@ export function InboxAcceptControls({
               <button
                 key={bucket}
                 type="button"
-                className="px-[14px] py-[8px] text-left text-[13px] hover:bg-foreground/[0.03]"
+                disabled={bucket === "now" && nowFullToday}
+                className="px-[14px] py-[8px] text-left text-[13px] hover:bg-foreground/[0.03] disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={() => acceptToday(bucket)}
               >
                 {bucketLabel(bucket, true)}

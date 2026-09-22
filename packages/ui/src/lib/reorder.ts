@@ -1,4 +1,10 @@
-import { type Bucket, type Lane, type Task } from "@tudu/shared";
+import {
+  calendarDayIso,
+  inProgressForPlacement,
+  type Bucket,
+  type Lane,
+  type Task,
+} from "@tudu/shared";
 
 export type LaneKey = {
   scheduledDate: string | null;
@@ -178,11 +184,20 @@ export function applyLanesToTasks(tasks: Task[], lanes: Lane[]): Task[] {
     if (!placement) {
       return task;
     }
+    const bucket = placement.bucket;
     return {
       ...task,
       scheduledDate: placement.scheduledDate,
-      bucket: placement.bucket,
+      bucket,
       position: placement.position,
+      inProgress:
+        task.completedAt === null
+          ? inProgressForPlacement(
+              bucket,
+              placement.scheduledDate,
+              calendarDayIso(),
+            )
+          : task.inProgress,
     };
   });
 }

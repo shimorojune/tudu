@@ -222,7 +222,7 @@ describe("TaskRow", () => {
     expect(onCollapse).not.toHaveBeenCalled();
   });
 
-  it("shows Mark in progress in the context menu", async () => {
+  it("shows Schedule for tomorrow in the context menu", async () => {
     const user = userEvent.setup();
 
     render(
@@ -234,7 +234,8 @@ describe("TaskRow", () => {
         onSelect={vi.fn()}
         menuVariant="day"
         actions={defaultActions({
-          onToggleInProgress: vi.fn(),
+          onMoveToBucket: vi.fn(),
+          onScheduleForTomorrow: vi.fn(),
         })}
       />,
     );
@@ -244,7 +245,9 @@ describe("TaskRow", () => {
       target: screen.getByRole("button", { name: /Improve error message/i }),
     });
 
-    expect(screen.getByRole("menuitem", { name: "Mark in progress" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: "Schedule for tomorrow" }),
+    ).toBeInTheDocument();
   });
 
   it("animates the subtask panel open and closed", () => {

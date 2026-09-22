@@ -10,6 +10,16 @@ describe("taskScheduleHelpers", () => {
     expect(iso).toMatch(/^2026-09-19T/);
   });
 
+  it("allows same local day when deadline UTC date is earlier", () => {
+    const deadlineLocalMidnight = new Date(2026, 8, 23, 0, 3, 0);
+    expect(
+      validateStartBeforeDeadline(
+        "2026-09-23",
+        deadlineLocalMidnight.toISOString(),
+      ),
+    ).toBeNull();
+  });
+
   it("rejects start after deadline day", () => {
     expect(
       validateStartBeforeDeadline(

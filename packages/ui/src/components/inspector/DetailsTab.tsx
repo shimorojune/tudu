@@ -1,13 +1,14 @@
 import { format, parseISO } from "date-fns";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
+import { toast } from "sonner";
 import type {
   CreateProjectRequest,
   Project,
   Task,
   TimelineEvent,
 } from "@tudu/shared";
-import { BUCKETS, type Bucket } from "@tudu/shared";
+import { type Bucket } from "@tudu/shared";
 import {
   jiraApi,
   type AppDispatch,
@@ -15,7 +16,15 @@ import {
   useUnlinkJiraTaskMutation,
   useUpdateTaskMutation,
 } from "@tudu/store";
-import { bucketLabel } from "@/lib/buckets";
+import { TaskDeleteDialog } from "@/components/tasks/TaskDeleteDialog";
+import {
+  resolveScheduledDate,
+  TaskScheduleFields,
+  type NewTaskDayChoice,
+} from "@/components/tasks/TaskScheduleFields";
+import { canScheduleInNow, NOW_CAP_EXCEEDED_MESSAGE } from "@/lib/nowCapGuard";
+import { dayChoiceFromTask } from "@/lib/taskScheduleState";
+import { todayIso } from "@tudu/store";
 import {
   formatJiraDueDate,
   jiraStatusClass,
@@ -31,7 +40,6 @@ import { DeadlineField } from "@/components/tasks/DeadlineField";
 import { DateField } from "@/components/ui/date-field";
 import { ProjectPicker } from "@/components/projects/ProjectPicker";
 import { TaskDescriptionField } from "@/components/inspector/TaskDescriptionField";
-import { cn } from "@/lib/utils";
 
 export type DetailsTabProps = {
   task: Task;
@@ -46,6 +54,9 @@ export type DetailsTabProps = {
     body: CreateProjectRequest,
   ) => Promise<{ project: { id: string } }>;
   sharedWithName?: string | null;
+  todayNowCount?: number;
+  canDelete?: boolean;
+  onDelete?: () => void;
 };
 
 function formatFieldDate(isoDate: string | null) {
@@ -91,40 +102,6 @@ function errorMessage(caught: unknown, fallback: string): string {
   return fallback;
 }
 
-function BucketReadOnly({
-  activeBucket,
-  isToday,
-}: {
-  activeBucket: Bucket | null;
-  isToday: boolean;
-}) {
-  if (!activeBucket) {
-    return <span>-</span>;
-  }
-
-  return (
-    <div className="inline-flex w-max border border-rule">
-      {BUCKETS.map((bucket, index) => {
-        const active = bucket === activeBucket;
-        return (
-          <span
-            key={bucket}
-            className={cn(
-              "px-[14px] py-[4px] text-[11.5px]",
-              index > 0 && "border-l border-rule",
-              active
-                ? "bg-foreground font-bold text-card"
-                : "text-muted-foreground",
-            )}
-          >
-            {bucketLabel(bucket, isToday)}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
 export function DetailsTab({
   task,
   selectedDate,
@@ -136,17 +113,67 @@ export function DetailsTab({
   projects,
   onCreateProject,
   sharedWithName = null,
+  todayNowCount = 0,
+  canDelete = false,
+  onDelete,
 }: DetailsTabProps) {
   const dispatch = useDispatch<AppDispatch>();
   const { data: me } = useGetMeQuery();
   const [updateTask] = useUpdateTaskMutation();
   const [unlinkJiraTask] = useUnlinkJiraTaskMutation();
   const [jiraError, setJiraError] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const today = todayIso();
+  const initialSchedule = dayChoiceFromTask(task, today);
+  const [dayChoice, setDayChoice] = useState<NewTaskDayChoice>(
+    initialSchedule.dayChoice,
+  );
+  const [pickedDate, setPickedDate] = useState(initialSchedule.pickedDate);
+  const [bucket, setBucket] = useState<Bucket>(task.bucket ?? "later");
+
+  useEffect(() => {
+    const next = dayChoiceFromTask(task, today);
+    setDayChoice(next.dayChoice);
+    setPickedDate(next.pickedDate);
+    setBucket(task.bucket ?? "later");
+  }, [task.id, task.scheduledDate, task.bucket, today]);
 
   const viewerName = me?.name?.trim() || "You";
   const isOpen = task.completedAt === null;
   const events = withSyntheticCreated(task.id, task.createdAt, timelineEvents);
   const latest = events.slice(0, 2);
+
+  function commitSchedule(
+    nextDayChoice: NewTaskDayChoice,
+    nextBucket: Bucket,
+    nextPickedDate: string,
+  ) {
+    const scheduledDate = resolveScheduledDate(nextDayChoice, nextPickedDate, today);
+    const targetBucket = scheduledDate === null ? null : nextBucket;
+    if (
+      targetBucket === "now" &&
+      !canScheduleInNow({
+        today,
+        targetDate: scheduledDate,
+        openNowCountOnToday: todayNowCount,
+        currentTask: task,
+      })
+    ) {
+      toast.error(NOW_CAP_EXCEEDED_MESSAGE);
+      const reset = dayChoiceFromTask(task, today);
+      setDayChoice(reset.dayChoice);
+      setPickedDate(reset.pickedDate);
+      setBucket(task.bucket ?? "later");
+      return;
+    }
+    updateTask({
+      id: task.id,
+      patch: {
+        scheduledDate,
+        bucket: targetBucket,
+      },
+    });
+  }
 
   async function unlinkJira(issueKey: string) {
     setJiraError(null);
@@ -191,10 +218,41 @@ export function DetailsTab({
           />
         </dd>
 
-        <dt className="text-muted-foreground">Bucket</dt>
-        <dd>
-          <BucketReadOnly activeBucket={task.bucket} isToday={isToday} />
-        </dd>
+        {isOpen && !readOnly ? (
+          <>
+            <dt className="self-start pt-[4px] text-muted-foreground">Schedule</dt>
+            <dd className="col-span-1">
+              <TaskScheduleFields
+                dayChoice={dayChoice}
+                bucket={bucket}
+                pickedDate={pickedDate}
+                nowCount={todayNowCount}
+                compact
+                onDayChoiceChange={(choice) => {
+                  setDayChoice(choice);
+                  commitSchedule(choice, bucket, pickedDate);
+                }}
+                onBucketChange={(nextBucket) => {
+                  setBucket(nextBucket);
+                  commitSchedule(dayChoice, nextBucket, pickedDate);
+                }}
+                onPickedDateChange={(date) => {
+                  setPickedDate(date);
+                  commitSchedule(dayChoice, bucket, date);
+                }}
+              />
+            </dd>
+          </>
+        ) : (
+          <>
+            <dt className="text-muted-foreground">Day</dt>
+            <dd className="tabular-nums">
+              {formatFieldDate(task.scheduledDate)}
+            </dd>
+            <dt className="text-muted-foreground">Bucket</dt>
+            <dd>{task.bucket ?? "-"}</dd>
+          </>
+        )}
 
         <dt className="text-muted-foreground">Start</dt>
         <dd className="tabular-nums">
@@ -235,31 +293,6 @@ export function DetailsTab({
 
         <dt className="text-muted-foreground">Carried</dt>
         <dd className="tabular-nums">{formatCarried(task)}</dd>
-
-        {isOpen && !readOnly ? (
-          <>
-            <dt className="text-muted-foreground">Status</dt>
-            <dd>
-              <button
-                type="button"
-                className={cn(
-                  "border px-[10px] py-[4px] text-[12px] font-semibold",
-                  task.inProgress
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-hair text-muted-foreground hover:border-foreground",
-                )}
-                onClick={() => {
-                  updateTask({
-                    id: task.id,
-                    patch: { inProgress: !task.inProgress },
-                  });
-                }}
-              >
-                {task.inProgress ? "In progress" : "Not in progress"}
-              </button>
-            </dd>
-          </>
-        ) : null}
 
         {sharedWithName && !task.isPrivate ? (
           <>
@@ -328,6 +361,27 @@ export function DetailsTab({
       </dl>
       {jiraError ? (
         <p className="mt-[10px] text-[12px] text-destructive">{jiraError}</p>
+      ) : null}
+
+      {canDelete && onDelete ? (
+        <div className="mt-[22px] border-t border-hair pt-[18px]">
+          <button
+            type="button"
+            className="w-full border border-destructive px-[14px] py-[10px] text-[13px] font-bold text-destructive"
+            onClick={() => setDeleteOpen(true)}
+          >
+            Delete task
+          </button>
+          <TaskDeleteDialog
+            open={deleteOpen}
+            title={task.title}
+            onOpenChange={setDeleteOpen}
+            onConfirm={() => {
+              onDelete();
+              setDeleteOpen(false);
+            }}
+          />
+        </div>
       ) : null}
 
       <div className="mt-[22px] border-t border-hair pt-[18px]">

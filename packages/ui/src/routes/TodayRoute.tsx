@@ -10,8 +10,12 @@ import {
   useUploadTaskAttachmentMutation,
   useGetTasksForDayQuery,
   useGetUnscheduledTasksQuery,
+  useDeleteTaskMutation,
+  todayIso,
   type RootState,
 } from "@tudu/store";
+import { openNowCount } from "@/lib/nowCount";
+import { notifyAction, mutationResult } from "@/lib/notifyAction";
 import { DayTaskList } from "@/components/tasks/DayTaskList";
 import { TaskListHeader } from "@/components/tasks/TaskListHeader";
 import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
@@ -44,6 +48,7 @@ export function TodayRoute() {
   const jiraPreview = useJiraPreview();
 
   const dayQuery = useGetTasksForDayQuery(selectedDate);
+  const todayDayQuery = useGetTasksForDayQuery(todayIso());
   const unscheduledQuery = useGetUnscheduledTasksQuery();
   const tasks = dayQuery.data?.tasks ?? [];
   useDaySearchSync(DAY_TASK_TAB_FIELDS, {
@@ -55,6 +60,8 @@ export function TodayRoute() {
   const [createSubtask] = useCreateSubtaskMutation();
   const [updateTask] = useUpdateTaskMutation();
   const [uploadTaskAttachment] = useUploadTaskAttachmentMutation();
+  const [deleteTask] = useDeleteTaskMutation();
+  const todayNowCount = openNowCount(todayDayQuery.data?.tasks ?? []);
 
   const [firstRunDialogOpen, setFirstRunDialogOpen] = useState(false);
   const [firstRunBucket, setFirstRunBucket] = useState<Bucket>("later");
@@ -62,7 +69,7 @@ export function TodayRoute() {
 
   const unscheduledCount = unscheduledQuery.data?.tasks.length ?? 0;
   const effectiveDay = effectiveDayIso();
-  const nowCount = tasks.filter((task) => task.bucket === "now").length;
+  const nowCount = todayNowCount;
 
   const isFirstRun =
     !dayQuery.isLoading &&
@@ -135,7 +142,29 @@ export function TodayRoute() {
       }
     />
   ) : (
-    <DetailInspector task={selectedTask} selectedDate={selectedDate} />
+    <DetailInspector
+      task={selectedTask}
+      selectedDate={selectedDate}
+      todayNowCount={todayNowCount}
+      canDelete
+      onDelete={
+        selectedTask
+          ? () => {
+              void notifyAction(
+                () => mutationResult(deleteTask(selectedTask.id)),
+                {
+                  success: "Task deleted",
+                  error: "Could not delete the task",
+                },
+              ).then(() => {
+                if (selectedTaskId === selectedTask.id) {
+                  dispatch(setSelectedTaskId(null));
+                }
+              });
+            }
+          : undefined
+      }
+    />
   );
 
   useNewTaskShortcut(() => openFirstRunDialog("later"), { enabled: isFirstRun });
@@ -285,7 +314,27 @@ export function TodayRoute() {
             title="Task details"
             onClose={() => dispatch(setSelectedTaskId(null))}
           >
-            <DetailInspector task={selectedTask} selectedDate={selectedDate} />
+            <DetailInspector
+              task={selectedTask}
+              selectedDate={selectedDate}
+              todayNowCount={todayNowCount}
+              canDelete
+              onDelete={
+                selectedTask
+                  ? () => {
+                      void notifyAction(
+                        () => mutationResult(deleteTask(selectedTask.id)),
+                        {
+                          success: "Task deleted",
+                          error: "Could not delete the task",
+                        },
+                      ).then(() => {
+                        dispatch(setSelectedTaskId(null));
+                      });
+                    }
+                  : undefined
+              }
+            />
           </InspectorSheet>
         )
       ) : null}

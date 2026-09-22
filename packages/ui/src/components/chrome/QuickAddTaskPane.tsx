@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  NOW_CAP_EXCEEDED_MESSAGE,
   stripProjectPhraseFromTitle,
   validateStartBeforeDeadline,
   type Bucket,
@@ -33,7 +34,8 @@ import { useTaskTitleNaturalLanguage } from "@/hooks/useTaskTitleNaturalLanguage
 import { authClient } from "@/lib/authClient";
 import { createTaskBody } from "@/lib/createTask";
 import { openNowCount } from "@/lib/nowCount";
-import { renderQuickAddHighlightedTitle } from "@/lib/quickAddHighlight";
+import { canAddNewTaskToNow } from "@/lib/nowCapGuard";
+import { TaskTitleNaturalLanguageField } from "@/components/tasks/TaskTitleNaturalLanguageField";
 import { resetQuickAddWindowHeight } from "@/lib/quickAddWindowResize";
 import {
   type NewTaskDayChoice,
@@ -79,7 +81,6 @@ export function QuickAddTaskPane({
   onClose,
 }: QuickAddTaskPaneProps) {
   const titleRef = useRef<HTMLInputElement>(null);
-  const titleMirrorRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const openedAtRef = useRef(0);
   const exitFinishedRef = useRef(false);
@@ -239,18 +240,18 @@ export function QuickAddTaskPane({
     return () => window.removeEventListener("quick-add:dev-open", onDevOpen);
   }, [beginOpen]);
 
-  const syncTitleScroll = useCallback(() => {
-    const input = titleRef.current;
-    const mirror = titleMirrorRef.current;
-    if (!input || !mirror) {
-      return;
-    }
-    mirror.scrollLeft = input.scrollLeft;
-  }, []);
-
-  useEffect(() => {
-    syncTitleScroll();
-  }, [title, parse, syncTitleScroll]);
+  const targetIsToday = scheduledDate === today;
+  const scheduleError = validateStartBeforeDeadline(startDate || null, deadline);
+  const nowBlocked =
+    targetIsToday &&
+    bucket === "now" &&
+    scheduledDate !== null &&
+    !canAddNewTaskToNow({
+      today,
+      scheduledDate,
+      bucket,
+      openNowCountOnToday: nowCount,
+    });
 
   async function handleSubmit() {
     const trimmed = title.trim();
@@ -267,7 +268,7 @@ export function QuickAddTaskPane({
       return;
     }
 
-    if (validateStartBeforeDeadline(startDate || null, deadline)) {
+    if (scheduleError || nowBlocked) {
       return;
     }
 
@@ -409,37 +410,19 @@ export function QuickAddTaskPane({
           onDark={resolved === "dark"}
         />
         <div className="min-w-0 flex flex-1 items-center gap-[7px]">
-          <div className="grid min-w-0 w-full flex-1 grid-cols-[minmax(0,1fr)] [&>*]:col-start-1 [&>*]:row-start-1 [&>*]:min-w-0">
-            <div
-              ref={titleMirrorRef}
-              aria-hidden
-              className={cn(
-                quickAddTitleTypography,
-                "pointer-events-none flex items-center overflow-x-hidden overflow-y-hidden whitespace-pre text-foreground",
-              )}
-            >
-              {renderQuickAddHighlightedTitle(title, parse?.spans ?? [])}
-              {!title ? (
-                <span className="text-muted-foreground">What needs doing?</span>
-              ) : null}
-            </div>
-            <input
-              ref={titleRef}
-              type="text"
-              value={title}
-              disabled={submitting}
-              placeholder="What needs doing?"
-              className={cn(
-                quickAddTitleTypography,
-                "text-transparent caret-primary placeholder:text-transparent disabled:opacity-70",
-              )}
-              onChange={(event) => {
-                setTitle(event.target.value);
-                window.requestAnimationFrame(syncTitleScroll);
-              }}
-              onScroll={syncTitleScroll}
-            />
-          </div>
+          <TaskTitleNaturalLanguageField
+            inputRef={titleRef}
+            value={title}
+            parse={parse}
+            disabled={submitting}
+            placeholder="What needs doing?"
+            mirrorClassName={cn(
+              quickAddTitleTypography,
+              "text-foreground",
+            )}
+            inputClassName={quickAddTitleTypography}
+            onChange={setTitle}
+          />
         </div>
         <button
           type="button"
@@ -496,6 +479,10 @@ export function QuickAddTaskPane({
             <Spinner className="size-3" aria-hidden />
             Saving task…
           </span>
+        ) : nowBlocked ? (
+          <span className="text-destructive">{NOW_CAP_EXCEEDED_MESSAGE}</span>
+        ) : scheduleError ? (
+          <span className="text-destructive">{scheduleError}</span>
         ) : (
           <span className="text-muted-foreground">
             Lands in{" "}

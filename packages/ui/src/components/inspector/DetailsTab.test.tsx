@@ -9,6 +9,7 @@ const invalidateTags = vi.hoisted(() => vi.fn());
 const unlinkJiraTask = vi.hoisted(() => vi.fn());
 
 vi.mock("@tudu/store", () => ({
+  todayIso: () => "2026-09-11",
   jiraApi: {
     util: {
       invalidateTags,
@@ -144,6 +145,28 @@ describe("DetailsTab", () => {
     });
     expect(invalidateTags).toHaveBeenCalledWith(["JiraIssue"]);
     expect(dispatch).toHaveBeenCalledWith({ type: "invalidate" });
+  });
+
+  it("shows a delete task control when allowed", async () => {
+    const onDelete = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <DetailsTab
+        task={task}
+        selectedDate="2026-09-11"
+        isToday
+        timelineEvents={[]}
+        onJumpToTimeline={vi.fn()}
+        canDelete
+        onDelete={onDelete}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Delete task" }));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    expect(onDelete).toHaveBeenCalled();
   });
 
   it("shows an inline error when inspector Jira unlink fails", async () => {

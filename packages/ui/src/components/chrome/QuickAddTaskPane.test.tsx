@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { NOW_CAP_EXCEEDED_MESSAGE, type Task } from "@tudu/shared";
 import {
   QUICK_ADD_EXPANDED_HEIGHT_DATE,
   QUICK_ADD_WINDOW_WIDTH,
@@ -60,17 +61,54 @@ vi.mock("@/lib/authClient", () => ({
 
 const createTask = vi.fn();
 const parseQuickAddTitle = vi.fn();
+let suggestBucket: "now" | null = null;
 
 vi.mock("@/hooks/useTaskTitleNaturalLanguage", () => ({
   useTaskTitleNaturalLanguage: (title: string) => parseQuickAddTitle(title),
 }));
+
+vi.mock("@/hooks/useTaskFieldSuggest", () => ({
+  useTaskFieldSuggest: (args: {
+    parse: ReturnType<typeof parseQuickAddTitle>;
+    scheduleSource: string;
+    deadlineSource: string;
+    onBucket: (bucket: "now" | "next" | "later") => void;
+    onDayChoice: (choice: string) => void;
+    onPickedDate: (iso: string) => void;
+    onDeadline: (iso: string | null) => void;
+  }) => {
+    const { useEffect } = require("react");
+    useEffect(() => {
+      if (suggestBucket) {
+        args.onBucket(suggestBucket);
+      }
+      if (args.parse && args.scheduleSource === "auto") {
+        args.onDayChoice(args.parse.dayChoice);
+        args.onPickedDate(args.parse.pickedDate);
+      }
+      if (args.parse?.deadline && args.deadlineSource === "auto") {
+        args.onDeadline(args.parse.deadline);
+      }
+    }, [
+      args.parse,
+      args.scheduleSource,
+      args.deadlineSource,
+      args.onBucket,
+      args.onDayChoice,
+      args.onPickedDate,
+      args.onDeadline,
+    ]);
+  },
+}));
+
+const dayTasks: Task[] = [];
 
 vi.mock("@tudu/store", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tudu/store")>();
   return {
     ...actual,
     todayIso: () => "2026-09-11",
-    useGetTasksForDayQuery: () => ({ data: { tasks: [] } }),
+    useGetTasksForDayQuery: () => ({ data: { tasks: dayTasks } }),
     useCreateTaskMutation: () => [createTask, { isLoading: false }],
     useQuickAddSuggestMutation: () => [
       vi.fn().mockReturnValue({ unwrap: () => Promise.reject(new Error("skip")) }),
@@ -83,6 +121,8 @@ vi.mock("@tudu/store", async (importOriginal) => {
 
 describe("QuickAddTaskPane", () => {
   beforeEach(() => {
+    dayTasks.length = 0;
+    suggestBucket = null;
     vi.mocked(invoke).mockClear();
     parseQuickAddTitle.mockReturnValue(null);
     createTask.mockReset();
@@ -92,6 +132,41 @@ describe("QuickAddTaskPane", () => {
           task: { id: "task-1", title: "Test" },
         }),
     });
+  });
+
+  it("does not create a task on Enter when Now is full", async () => {
+    for (let index = 0; index < 5; index += 1) {
+      dayTasks.push({
+        id: `now-${index}`,
+        title: `Task ${index}`,
+        description: null,
+        scheduledDate: "2026-09-11",
+        bucket: "now",
+        position: index,
+        startDate: null,
+        deadline: null,
+        completedAt: null,
+        inProgress: true,
+        carriedDays: 0,
+        carriedSince: null,
+        isPrivate: false,
+        createdAt: "2026-09-11T00:00:00.000Z",
+        updatedAt: "2026-09-11T00:00:00.000Z",
+        subtasks: [],
+        commentCount: 0,
+        project: null,
+      });
+    }
+
+    suggestBucket = "now";
+    const user = userEvent.setup();
+    render(<QuickAddTaskPane onClose={vi.fn()} onRequestSignIn={vi.fn()} />);
+
+    await user.type(screen.getByPlaceholderText("What needs doing?"), "Overflow");
+    await user.keyboard("{Enter}");
+
+    expect(createTask).not.toHaveBeenCalled();
+    expect(screen.getByText(NOW_CAP_EXCEEDED_MESSAGE)).toBeInTheDocument();
   });
 
   it("submits a titled task on Enter", async () => {
