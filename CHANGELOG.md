@@ -1,3 +1,15 @@
+# [0.35.0](https://github.com/eGainDev/tudu/compare/tudu-0.34.1...tudu-0.35.0) (2026-09-23)
+
+
+### Bug Fixes
+
+* Update task handling for NowCap management ([df2f731](https://github.com/eGainDev/tudu/commit/df2f7314b0320f1ff0884bd4a7b3500939e62559))
+
+
+### Features
+
+* Implement task capacity management for 'Now' bucket ([a1d9cf8](https://github.com/eGainDev/tudu/commit/a1d9cf8a98615247bcd6586810e8305afc53cbd2))
+
 ## [0.34.1](https://github.com/eGainDev/tudu/compare/tudu-0.34.0...tudu-0.34.1) (2026-09-21)
 
 
