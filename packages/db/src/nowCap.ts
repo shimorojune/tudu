@@ -11,7 +11,14 @@ import { tasks, type TaskRow } from "./tasks-schema.js";
 
 export { NowCapExceededError };
 
-function taskBeforeCap(row: TaskRow) {
+type NowCapCountRow = {
+  id: string;
+  scheduledDate: string | null;
+  bucket: Bucket | null;
+  completedAt: Date | null;
+};
+
+function taskBeforeCap(row: NowCapCountRow) {
   return {
     id: row.id,
     scheduledDate: row.scheduledDate,
@@ -40,7 +47,7 @@ export async function countOpenNowForUserOnDate(
       completedAt: true,
     },
   });
-  return countOpenNowOnDate(rows, date);
+  return countOpenNowOnDate(rows.map(taskBeforeCap), date);
 }
 
 export async function assertNowCapForCreate(
