@@ -1,3 +1,11 @@
+## [0.35.1](https://github.com/eGainDev/tudu/compare/tudu-0.35.0...tudu-0.35.1) (2026-09-25)
+
+
+### Bug Fixes
+
+* Restore shared JIRA constant and narrow notification kind mapping ([62b1351](https://github.com/eGainDev/tudu/commit/62b13517d67e8077366f700dbfe1469747a112bd))
+* Revamp notification preferences and introduce regular check system ([5d66c50](https://github.com/eGainDev/tudu/commit/5d66c50c4c5f78ce8994f00dc7f967a6dc0fb9a0))
+
 # [0.35.0](https://github.com/eGainDev/tudu/compare/tudu-0.34.1...tudu-0.35.0) (2026-09-23)
 
 
