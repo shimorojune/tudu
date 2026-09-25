@@ -8,6 +8,8 @@ export const DEFAULT_NOTIFICATION_TIMEZONE = "UTC";
 export const DEFAULT_JIRA_POLL_ACTIVE_MINUTES = 3;
 export const DEFAULT_JIRA_POLL_IDLE_MINUTES = 20;
 
+export const JIRA_LINK_MAX_AGE_DAYS = 90;
+
 export const DEFAULT_WORK_HOURS_START = "09:00";
 export const DEFAULT_WORK_HOURS_END = "18:00";
 /** ISO weekday: Monday = 1 through Sunday = 7 */

@@ -1,6 +1,7 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import {
   formatNotificationBody,
+  NOTIFICATION_KINDS,
   TUDU_SYSTEM_USER_ID,
   type AppNotification,
   type NotificationKind,
@@ -12,12 +13,25 @@ import { notifications, type NotificationRow } from "./notifications-schema.js";
 import { emitSync, uniqueIds } from "./sync.js";
 import type { SyncEvent } from "@tudu/shared";
 
-export function mapNotification(row: NotificationRow): AppNotification {
+function notificationKindFromRow(
+  kind: NotificationRow["kind"],
+): NotificationKind | null {
+  if ((NOTIFICATION_KINDS as readonly string[]).includes(kind)) {
+    return kind as NotificationKind;
+  }
+  return null;
+}
+
+export function mapNotification(row: NotificationRow): AppNotification | null {
+  const kind = notificationKindFromRow(row.kind);
+  if (!kind) {
+    return null;
+  }
   return {
     id: row.id,
     userId: row.userId,
     actorId: row.actorId,
-    kind: row.kind,
+    kind,
     taskId: row.taskId,
     ownerId: row.ownerId,
     commentId: row.commentId,
@@ -44,7 +58,9 @@ export async function listNotifications(
     orderBy: [desc(notifications.createdAt)],
     limit,
   });
-  return rows.map(mapNotification);
+  return rows
+    .map(mapNotification)
+    .filter((row): row is AppNotification => row !== null);
 }
 
 export async function markNotificationRead(
@@ -63,7 +79,7 @@ export async function markNotificationRead(
     return undefined;
   }
   if (existing.readAt) {
-    return mapNotification(existing);
+    return mapNotification(existing) ?? undefined;
   }
   const readAt = new Date();
   const [updated] = await db
@@ -71,7 +87,10 @@ export async function markNotificationRead(
     .set({ readAt })
     .where(eq(notifications.id, id))
     .returning();
-  return updated ? mapNotification(updated) : undefined;
+  if (!updated) {
+    return undefined;
+  }
+  return mapNotification(updated) ?? undefined;
 }
 
 export async function markAllNotificationsRead(
@@ -157,12 +176,16 @@ export async function insertAndEmitNotifications(
 
   const events: SyncEvent[] = [];
   for (const row of rows) {
+    const payload = mapNotification(row);
+    if (!payload) {
+      continue;
+    }
     events.push(
       ...(await emitSync(db, {
         recipientUserIds: [row.userId],
         clientMutationId: input.clientMutationId,
         type: "notification.upsert",
-        payload: mapNotification(row),
+        payload,
       })),
     );
   }
@@ -217,12 +240,16 @@ export async function insertSystemNotifications(
 
   const events: SyncEvent[] = [];
   for (const row of rows) {
+    const payload = mapNotification(row);
+    if (!payload) {
+      continue;
+    }
     events.push(
       ...(await emitSync(db, {
         recipientUserIds: [row.userId],
         clientMutationId: input.clientMutationId,
         type: "notification.upsert",
-        payload: mapNotification(row),
+        payload,
       })),
     );
   }

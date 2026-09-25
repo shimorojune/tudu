@@ -260,9 +260,16 @@ export function matchReportJiraUser(users: JiraUser[], email: string): JiraUser 
   });
 }
 
+export type JiraUserMatchFields = {
+  accountId?: string | null;
+  key?: string | null;
+  name?: string | null;
+  emailAddress?: string | null;
+};
+
 export function isSameJiraUser(
-  a: Pick<JiraUser, "accountId" | "key" | "name" | "emailAddress"> | null | undefined,
-  b: Pick<JiraUser, "accountId" | "key" | "name" | "emailAddress"> | null | undefined,
+  a: JiraUserMatchFields | null | undefined,
+  b: JiraUserMatchFields | null | undefined,
 ): boolean {
   if (!a || !b) {
     return false;

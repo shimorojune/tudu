@@ -192,7 +192,12 @@ export function collectDiffs(args: {
   myself: Parameters<typeof issueAssignedToJiraUser>[1];
   newestComment: {
     commentId: string;
-    author: Parameters<typeof isSameJiraUser>[0];
+    author: {
+      accountId?: string | null;
+      name?: string | null;
+      key?: string | null;
+      emailAddress?: string | null;
+    } | null;
     body: string;
   } | null;
   pending: PendingNotification[];

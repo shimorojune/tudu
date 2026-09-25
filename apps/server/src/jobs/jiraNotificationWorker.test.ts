@@ -15,6 +15,9 @@ const myself = {
   name: "dev.user",
   key: "devuser",
   emailAddress: "dev@example.com",
+  displayName: "Dev User",
+  active: true,
+  avatarUrl: null,
 };
 
 const cached: JiraIssue = {
