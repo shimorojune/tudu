@@ -27,6 +27,7 @@ import {
   updateSubtaskRequestSchema,
   updateTaskRequestSchema,
 } from "./tasks.js";
+import type { NotificationPresentation } from "./notificationPresentation.js";
 
 export function recipientsForTask(args: {
   ownerId: string;
@@ -176,6 +177,7 @@ export const SYNC_EVENT_TYPES = [
   "roster.upsert",
   "reportDay.upsert",
   "notification.upsert",
+  "notification.pulse",
   "notification.readAll",
   "project.upsert",
   "project.delete",
@@ -381,6 +383,13 @@ export const syncEventSchema = z.object({
 });
 
 export type SyncEvent = z.infer<typeof syncEventSchema>;
+
+export type NotificationPulse = {
+  id: string;
+  kind: "regular";
+  presentation: NotificationPresentation;
+  sentAt: string;
+};
 
 export const syncBootstrapViewSchema = z.object({
   key: z.string(),

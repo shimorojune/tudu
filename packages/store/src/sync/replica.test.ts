@@ -972,6 +972,37 @@ describe("notification replica", () => {
     );
     expect(replica.notifications.every((item) => item.readAt)).toBe(true);
   });
+
+  it("stores fresh regular pulses and drops stale replay", () => {
+    const fresh = applyEvent(
+      emptyReplica(),
+      event({
+        type: "notification.pulse",
+        payload: {
+          id: "pulse-1",
+          kind: "regular",
+          presentation: { title: "3 tasks left today", lines: ["2 Now, 1 Next"] },
+          sentAt: new Date().toISOString(),
+        },
+      }),
+    );
+    expect(fresh.latestPulse?.id).toBe("pulse-1");
+    expect(fresh.notifications).toHaveLength(0);
+
+    const stale = applyEvent(
+      emptyReplica(),
+      event({
+        type: "notification.pulse",
+        payload: {
+          id: "pulse-old",
+          kind: "regular",
+          presentation: { title: "Stale", lines: [] },
+          sentAt: new Date(Date.now() - 10 * 60_000).toISOString(),
+        },
+      }),
+    );
+    expect(stale.latestPulse).toBeNull();
+  });
 });
 
 describe("project replica", () => {

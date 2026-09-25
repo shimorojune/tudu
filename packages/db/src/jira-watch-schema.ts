@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import {
+  boolean,
   index,
   pgTable,
   text,
@@ -19,6 +20,7 @@ export const jiraIssueWatchState = pgTable(
     issueId: text("issue_id").notNull(),
     issueKey: text("issue_key").notNull(),
     assigneeAccountId: text("assignee_account_id"),
+    assignedToMe: boolean("assigned_to_me"),
     statusName: text("status_name"),
     priorityName: text("priority_name"),
     dueAt: timestamp("due_at", { withTimezone: true }),

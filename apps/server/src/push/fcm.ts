@@ -50,6 +50,44 @@ function isInvalidTokenError(code: string | undefined): boolean {
   );
 }
 
+export async function sendWebPushPulse(
+  db: Db,
+  args: {
+    userId: string;
+    title: string;
+    body: string;
+  },
+): Promise<void> {
+  const client = await resolveMessaging();
+  if (!client) {
+    return;
+  }
+  const tokens = await listPushDeviceTokensForUser(db, args.userId);
+  if (tokens.length === 0) {
+    return;
+  }
+  const data: Record<string, string> = {
+    title: args.title,
+    body: args.body,
+    kind: "regular",
+    tag: "regular",
+    path: "/today",
+  };
+  const response = await client.sendEachForMulticast({
+    tokens,
+    data,
+  });
+  for (let i = 0; i < response.responses.length; i += 1) {
+    const result = response.responses[i];
+    if (!result?.success && isInvalidTokenError(result?.error?.code)) {
+      const token = tokens[i];
+      if (token) {
+        await softDeletePushDeviceTokenByValue(db, token);
+      }
+    }
+  }
+}
+
 export async function sendWebPushForNotifications(
   db: Db,
   notifications: AppNotification[],

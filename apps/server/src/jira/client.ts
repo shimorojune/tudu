@@ -260,18 +260,29 @@ export function matchReportJiraUser(users: JiraUser[], email: string): JiraUser 
   });
 }
 
+export function isSameJiraUser(
+  a: Pick<JiraUser, "accountId" | "key" | "name" | "emailAddress"> | null | undefined,
+  b: Pick<JiraUser, "accountId" | "key" | "name" | "emailAddress"> | null | undefined,
+): boolean {
+  if (!a || !b) {
+    return false;
+  }
+  return Boolean(
+    (a.emailAddress &&
+      b.emailAddress &&
+      a.emailAddress.toLowerCase() === b.emailAddress.toLowerCase()) ||
+      (a.name && b.name && a.name === b.name) ||
+      (a.key && b.key && a.key === b.key) ||
+      (a.accountId && b.accountId && a.accountId === b.accountId),
+  );
+}
+
 export function issueAssignedToJiraUser(issue: JiraIssue, user: JiraUser): boolean {
   const assignee = issue.assignee;
   if (!assignee) {
     return false;
   }
-  return Boolean(
-    (user.emailAddress &&
-      assignee.emailAddress?.toLowerCase() === user.emailAddress.toLowerCase()) ||
-      (user.name && assignee.name === user.name) ||
-      (user.key && assignee.key === user.key) ||
-      (user.accountId && assignee.accountId === user.accountId),
-  );
+  return isSameJiraUser(assignee, user);
 }
 
 export function buildReportAssignedIssuesJql(

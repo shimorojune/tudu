@@ -1,20 +1,20 @@
 import type { Db } from "@tudu/db";
 import { sql } from "drizzle-orm";
 import { getJiraConnection, getNotificationPreferences, listUsersDueForJiraPoll,
-  listUsersDueForReminderCheck,
+  listUsersDueForRegular,
   listUsersDueForVersionCheck,
   scheduleNextJiraPoll,
-  scheduleNextReminderCheck,
+  scheduleNextRegular,
   scheduleNextVersionCheck,
 } from "@tudu/db";
-import { DEFAULT_JIRA_POLL_IDLE_MINUTES } from "@tudu/shared";
+import { DEFAULT_JIRA_POLL_IDLE_MINUTES, nextRegularSlotStart } from "@tudu/shared";
 import { runJiraNotificationPoll } from "./jiraNotificationWorker.js";
-import { runReminderCheck, runVersionCheck } from "./reminderWorker.js";
+import { runRegularCheck } from "./regularWorker.js";
+import { runVersionCheck } from "./versionWorker.js";
 
 const TICK_MS = 60_000;
 const ACTIVE_WINDOW_MS = 30 * 60 * 1000;
 const BATCH_SIZE = 20;
-const REMINDER_INTERVAL_MS = 5 * 60 * 1000;
 const VERSION_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 let tickInFlight = false;
@@ -92,18 +92,18 @@ async function runTick(db: Db): Promise<void> {
     );
   }
 
-  const reminderUsers = await listUsersDueForReminderCheck(db, now, BATCH_SIZE);
-  for (const row of reminderUsers) {
+  const regularUsers = await listUsersDueForRegular(db, now, BATCH_SIZE);
+  for (const row of regularUsers) {
     try {
-      await runReminderCheck(db, row.userId);
+      await runRegularCheck(db, row.userId);
     } catch (error) {
-      console.error("[notification-jobs] reminders failed", row.userId, error);
+      console.error("[notification-jobs] regular failed", row.userId, error);
     }
-    await scheduleNextReminderCheck(
-      db,
-      row.userId,
-      new Date(now.getTime() + REMINDER_INTERVAL_MS),
-    );
+    const prefs = await getNotificationPreferences(db, row.userId);
+    const nextAt = prefs
+      ? nextRegularSlotStart(prefs, now)
+      : new Date(now.getTime() + 60 * 60_000);
+    await scheduleNextRegular(db, row.userId, nextAt);
   }
 
   const versionUsers = await listUsersDueForVersionCheck(db, now, BATCH_SIZE);

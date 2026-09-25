@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
-  applyActivityEnabled,
-  applyRemindersEnabled,
-  deriveActivityEnabled,
+  REGULAR_INTERVAL_MINUTES,
   resolveClientTimezone,
+  type RegularIntervalMinutes,
 } from "@tudu/shared";
 import {
   defaultNotificationPrefs,
@@ -31,14 +31,16 @@ function PrefRow(props: {
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
   ariaLabel: string;
+  disabled?: boolean;
 }) {
   return (
     <>
-      <span>{props.label}</span>
+      <span className={props.disabled ? "text-faint" : undefined}>{props.label}</span>
       <Switch
         checked={props.checked}
         onCheckedChange={props.onCheckedChange}
         aria-label={props.ariaLabel}
+        disabled={props.disabled}
       />
     </>
   );
@@ -61,6 +63,10 @@ function systemAlertsStatus(args: {
   return "Turn on to allow alerts when Tudu is in the background or closed.";
 }
 
+function isValidHm(value: string): boolean {
+  return /^(\d{1,2}):(\d{2})$/.test(value.trim());
+}
+
 export function NotificationsSettingsPanel() {
   const os = useNotificationOs();
   const { data: serverPrefs, isLoading } = useGetNotificationSettingsQuery();
@@ -72,6 +78,8 @@ export function NotificationsSettingsPanel() {
     null,
   );
   const [permissionDenied, setPermissionDenied] = useState(false);
+  const [workStartDraft, setWorkStartDraft] = useState(prefs.workHoursStart);
+  const [workEndDraft, setWorkEndDraft] = useState(prefs.workHoursEnd);
   const hydratedFromServerRef = useRef(false);
 
   useEffect(() => {
@@ -81,6 +89,8 @@ export function NotificationsSettingsPanel() {
     hydratedFromServerRef.current = true;
     const next = serverPrefsToLocal(serverPrefs);
     setPrefs(next);
+    setWorkStartDraft(next.workHoursStart);
+    setWorkEndDraft(next.workHoursEnd);
     writeNotificationPrefs(next);
   }, [serverPrefs]);
 
@@ -140,6 +150,23 @@ export function NotificationsSettingsPanel() {
     void updateSettings(withTimezone);
   }
 
+  function commitWorkHours(field: "start" | "end") {
+    const draft = field === "start" ? workStartDraft : workEndDraft;
+    if (!isValidHm(draft)) {
+      if (field === "start") {
+        setWorkStartDraft(prefs.workHoursStart);
+      } else {
+        setWorkEndDraft(prefs.workHoursEnd);
+      }
+      return;
+    }
+    if (field === "start") {
+      saveLocal({ ...prefs, workHoursStart: draft.trim() });
+    } else {
+      saveLocal({ ...prefs, workHoursEnd: draft.trim() });
+    }
+  }
+
   async function setSystemAlertsEnabled(enabled: boolean) {
     if (enabled) {
       const granted = await os.requestOsPermission();
@@ -157,7 +184,6 @@ export function NotificationsSettingsPanel() {
     saveLocal({ ...prefs, osEnabled: false });
   }
 
-  const activityEnabled = deriveActivityEnabled(prefs);
   const statusLine = systemAlertsStatus({
     osEnabled: prefs.osEnabled,
     permissionGranted,
@@ -198,98 +224,69 @@ export function NotificationsSettingsPanel() {
 
         <div className="border-t border-hair pt-[20px]">
           <div className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
-            Activity
+            Regular updates
           </div>
           <p className="mt-[8px] max-w-[520px] text-[12px] text-faint">
-            Inbox, comments, task changes, and linked JIRA updates.
+            Fires on the clock during working hours with how many tasks are left
+            today. These alerts do not appear in the bell.
           </p>
           <div className="mt-[12px] grid max-w-[420px] grid-cols-[minmax(0,1fr)_46px] items-center gap-x-[16px] gap-y-[13px] text-[14px]">
             <PrefRow
-              label="Activity on tasks and JIRA"
-              checked={activityEnabled}
-              onCheckedChange={(enabled) =>
-                saveLocal(applyActivityEnabled(prefs, enabled))
+              label="Regular updates"
+              checked={prefs.regularEnabled}
+              onCheckedChange={(regularEnabled) =>
+                saveLocal({ ...prefs, regularEnabled })
               }
-              ariaLabel="Activity notifications"
-            />
-            <PrefRow
-              label="New app versions"
-              checked={prefs.appUpdate}
-              onCheckedChange={(appUpdate) => saveLocal({ ...prefs, appUpdate })}
-              ariaLabel="App update notifications"
-            />
-          </div>
-        </div>
-
-        <div className="border-t border-hair pt-[20px]">
-          <div className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
-            Work reminders
-          </div>
-          <p className="mt-[8px] max-w-[520px] text-[12px] text-faint">
-            Periodic check-ins during working hours: what you are on, what is
-            next, and what needs attention.
-          </p>
-          <div className="mt-[12px] grid max-w-[420px] grid-cols-[minmax(0,1fr)_46px] items-center gap-x-[16px] gap-y-[13px] text-[14px]">
-            <PrefRow
-              label="Work reminder check-ins"
-              checked={prefs.reminders}
-              onCheckedChange={(enabled) =>
-                saveLocal(applyRemindersEnabled(prefs, enabled))
-              }
-              ariaLabel="Work reminder notifications"
+              ariaLabel="Regular update notifications"
             />
           </div>
 
-          {prefs.reminders ? (
+          {prefs.regularEnabled ? (
             <>
-              <div className="mt-[14px] grid max-w-[360px] grid-cols-[1fr_80px] items-center gap-x-[12px] gap-y-[10px] text-[13px]">
-                <span>Check-in interval (minutes)</span>
-                <Input
-                  type="number"
-                  min={15}
-                  max={720}
-                  value={String(prefs.focusCheckInMinutes)}
-                  onChange={(event) => {
-                    const value = Number.parseInt(event.target.value, 10);
-                    if (Number.isFinite(value)) {
-                      saveLocal({ ...prefs, focusCheckInMinutes: value });
-                    }
-                  }}
-                  aria-label="Check-in interval minutes"
-                />
-              </div>
+              <div className="mt-[14px] text-[12px] text-faint">Interval</div>
+              <ToggleGroup
+                type="single"
+                value={String(prefs.regularIntervalMinutes)}
+                onValueChange={(value) => {
+                  if (!value) {
+                    return;
+                  }
+                  const minutes = Number.parseInt(value, 10) as RegularIntervalMinutes;
+                  if (REGULAR_INTERVAL_MINUTES.includes(minutes)) {
+                    saveLocal({ ...prefs, regularIntervalMinutes: minutes });
+                  }
+                }}
+                className="mt-[8px] flex flex-wrap justify-start gap-[8px]"
+                aria-label="Regular update interval"
+              >
+                {REGULAR_INTERVAL_MINUTES.map((minutes) => (
+                  <ToggleGroupItem
+                    key={minutes}
+                    value={String(minutes)}
+                    aria-label={`${minutes} minutes`}
+                    className="border border-hair px-[12px] py-[6px] text-[12px] data-[state=on]:border-ink data-[state=on]:bg-hair"
+                  >
+                    {minutes === 60 ? "1h" : minutes === 120 ? "2h" : `${minutes}m`}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
 
               <div className="mt-[20px] text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
                 Working hours
               </div>
-              <p className="mt-[8px] max-w-[520px] text-[12px] text-faint">
-                Reminders only fire during these hours in your local timezone.
-              </p>
-              <div className="mt-[12px] grid max-w-[420px] grid-cols-[minmax(0,1fr)_46px] items-center gap-x-[16px] gap-y-[13px] text-[14px]">
-                <PrefRow
-                  label="Limit reminders to working hours"
-                  checked={prefs.workHoursEnabled}
-                  onCheckedChange={(workHoursEnabled) =>
-                    saveLocal({ ...prefs, workHoursEnabled })
-                  }
-                  ariaLabel="Working hours limit"
-                />
-              </div>
               <div className="mt-[12px] grid max-w-[360px] grid-cols-[1fr_80px] items-center gap-x-[12px] gap-y-[10px] text-[13px]">
                 <span>Work day starts (HH:MM)</span>
                 <Input
-                  value={prefs.workHoursStart}
-                  onChange={(event) =>
-                    saveLocal({ ...prefs, workHoursStart: event.target.value })
-                  }
+                  value={workStartDraft}
+                  onChange={(event) => setWorkStartDraft(event.target.value)}
+                  onBlur={() => commitWorkHours("start")}
                   aria-label="Work hours start"
                 />
                 <span>Work day ends (HH:MM)</span>
                 <Input
-                  value={prefs.workHoursEnd}
-                  onChange={(event) =>
-                    saveLocal({ ...prefs, workHoursEnd: event.target.value })
-                  }
+                  value={workEndDraft}
+                  onChange={(event) => setWorkEndDraft(event.target.value)}
+                  onBlur={() => commitWorkHours("end")}
                   aria-label="Work hours end"
                 />
               </div>
@@ -334,6 +331,53 @@ export function NotificationsSettingsPanel() {
               </div>
             </>
           ) : null}
+        </div>
+
+        <div className="border-t border-hair pt-[20px]">
+          <div className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
+            Events
+          </div>
+          <p className="mt-[8px] max-w-[520px] text-[12px] text-faint">
+            JIRA, inbox, comments, task changes by others, and new app versions.
+            Events appear in the bell and can alert you anytime.
+          </p>
+          <div className="mt-[12px] grid max-w-[420px] grid-cols-[minmax(0,1fr)_46px] items-center gap-x-[16px] gap-y-[13px] text-[14px]">
+            <PrefRow
+              label="Events"
+              checked={prefs.eventsEnabled}
+              onCheckedChange={(eventsEnabled) =>
+                saveLocal({ ...prefs, eventsEnabled })
+              }
+              ariaLabel="Event notifications"
+            />
+            <PrefRow
+              label="JIRA"
+              checked={prefs.eventsJira}
+              disabled={!prefs.eventsEnabled}
+              onCheckedChange={(eventsJira) =>
+                saveLocal({ ...prefs, eventsJira })
+              }
+              ariaLabel="JIRA event notifications"
+            />
+            <PrefRow
+              label="Inbox"
+              checked={prefs.eventsInbox}
+              disabled={!prefs.eventsEnabled}
+              onCheckedChange={(eventsInbox) =>
+                saveLocal({ ...prefs, eventsInbox })
+              }
+              ariaLabel="Inbox event notifications"
+            />
+            <PrefRow
+              label="Comments"
+              checked={prefs.eventsComments}
+              disabled={!prefs.eventsEnabled}
+              onCheckedChange={(eventsComments) =>
+                saveLocal({ ...prefs, eventsComments })
+              }
+              ariaLabel="Comment event notifications"
+            />
+          </div>
         </div>
       </div>
     </div>

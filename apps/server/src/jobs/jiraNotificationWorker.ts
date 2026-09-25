@@ -17,6 +17,7 @@ import type { JiraIssue, NotificationKind } from "@tudu/shared";
 import { clipNotificationText, isNotificationKindEnabled } from "@tudu/shared";
 import {
   createJiraDataCenterAdapter,
+  isSameJiraUser,
   issueAssignedToJiraUser,
   type JiraAdapterFactory,
 } from "../jira/client.js";
@@ -121,10 +122,12 @@ export async function runJiraNotificationPoll(
       null,
     );
 
+    const assignedToMe = issueAssignedToJiraUser(cached, myself);
     const snapshot = {
       issueId: target.issueId,
       issueKey: target.issueKey,
       assigneeAccountId: cached.assignee?.accountId ?? null,
+      assignedToMe,
       statusName: cached.status.name,
       priorityName: cached.priority ?? null,
       dueAt: dueDateToDate(cached.dueDate),
@@ -143,7 +146,6 @@ export async function runJiraNotificationPoll(
         snapshot,
         cached,
         target,
-        myselfAccountId: myself.accountId ?? null,
         myself,
         newestComment,
         pending,
@@ -174,10 +176,10 @@ export async function runJiraNotificationPoll(
   return sent;
 }
 
-function collectDiffs(args: {
-  prior: Awaited<ReturnType<typeof getJiraWatchState>>;
+export function collectDiffs(args: {
+  prior: NonNullable<Awaited<ReturnType<typeof getJiraWatchState>>>;
   snapshot: {
-    assigneeAccountId: string | null;
+    assignedToMe: boolean;
     statusName: string | null;
     priorityName: string | null;
     dueAt: Date | null;
@@ -187,15 +189,18 @@ function collectDiffs(args: {
   };
   cached: JiraIssue;
   target: LinkedJiraWatchTarget;
-  myselfAccountId: string | null;
   myself: Parameters<typeof issueAssignedToJiraUser>[1];
   newestComment: {
     commentId: string;
-    authorAccountId: string | null;
+    author: Parameters<typeof isSameJiraUser>[0];
     body: string;
   } | null;
   pending: PendingNotification[];
 }): void {
+  if (args.prior.assignedToMe === null) {
+    return;
+  }
+
   const title = displayTitle(args.target);
   const taskId = args.target.taskIds[0] ?? null;
   const base = {
@@ -206,10 +211,8 @@ function collectDiffs(args: {
     metadata: { linkedTaskIds: args.target.taskIds },
   };
 
-  const wasAssigned = args.prior?.assigneeAccountId
-    ? args.prior.assigneeAccountId === args.myselfAccountId
-    : false;
-  const nowAssigned = issueAssignedToJiraUser(args.cached, args.myself);
+  const wasAssigned = args.prior.assignedToMe === true;
+  const nowAssigned = args.snapshot.assignedToMe;
 
   if (!wasAssigned && nowAssigned) {
     args.pending.push({
@@ -227,8 +230,8 @@ function collectDiffs(args: {
 
   if (
     args.newestComment &&
-    args.newestComment.commentId !== args.prior?.lastCommentId &&
-    args.newestComment.authorAccountId !== args.myselfAccountId
+    args.newestComment.commentId !== args.prior.lastCommentId &&
+    !isSameJiraUser(args.newestComment.author, args.myself)
   ) {
     const quote = clipNotificationText(args.newestComment.body, 80);
     args.pending.push({

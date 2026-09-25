@@ -1,14 +1,6 @@
 import type { AppNotification } from "@tudu/shared";
-import {
-  canDeliverScheduledReminderPush,
-  isNotificationKindEnabled,
-  SCHEDULED_REMINDER_KINDS,
-} from "@tudu/shared";
+import { isNotificationKindEnabled } from "@tudu/shared";
 import type { NotificationPrefs } from "@/lib/notificationPrefs";
-
-function isScheduledReminderKind(kind: string): boolean {
-  return (SCHEDULED_REMINDER_KINDS as readonly string[]).includes(kind);
-}
 
 type InspectorTabName = "details" | "comments" | "timeline";
 
@@ -58,11 +50,6 @@ export function shouldFireOsBanner(args: {
   }
   if (!isNotificationKindEnabled(prefs, notification.kind)) {
     return false;
-  }
-  if (isScheduledReminderKind(notification.kind)) {
-    if (!canDeliverScheduledReminderPush(prefs)) {
-      return false;
-    }
   }
   if (!args.windowFocused) {
     return true;

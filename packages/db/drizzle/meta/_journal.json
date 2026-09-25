@@ -134,6 +134,13 @@
       "when": 1789968440815,
       "tag": "0018_superb_argent",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790000000000,
+      "tag": "0019_notifications_revamp",
+      "breakpoints": true
     }
   ]
 }

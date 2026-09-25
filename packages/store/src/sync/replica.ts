@@ -11,6 +11,7 @@ import type {
   JiraTaskLinkSummary,
   JiraUser,
   ManagerPermissions,
+  NotificationPulse,
   Person,
   Project,
   ProjectRef,
@@ -48,6 +49,7 @@ export type Replica = {
   teamByDate: Record<string, TeamResponse>;
   reportDays: Record<string, ReportDayResponse>;
   notifications: AppNotification[];
+  latestPulse: NotificationPulse | null;
   jiraConnection: JiraConnectionStatus;
   jiraIssues: Record<string, JiraIssue>;
   jiraIssueIds: string[];
@@ -80,6 +82,7 @@ export function emptyReplica(): Replica {
     teamByDate: {},
     reportDays: {},
     notifications: [],
+    latestPulse: null,
     jiraConnection: {
       connected: false,
       baseUrl: null,
@@ -130,6 +133,7 @@ function cloneReplica(replica: Replica): Replica {
     teamByDate: { ...replica.teamByDate },
     reportDays: { ...replica.reportDays },
     notifications: [...replica.notifications],
+    latestPulse: replica.latestPulse,
     jiraConnection: replica.jiraConnection,
     jiraIssues: { ...replica.jiraIssues },
     jiraIssueIds: [...replica.jiraIssueIds],
@@ -537,6 +541,15 @@ export function applyEvent(replica: Replica, event: SyncEvent): Replica {
         pending: payload.pending,
         history: payload.history ?? existing?.history ?? [],
       };
+      return next;
+    }
+    case "notification.pulse": {
+      const pulse = event.payload as NotificationPulse;
+      const ageMs = Date.now() - new Date(pulse.sentAt).getTime();
+      if (ageMs > 2 * 60_000) {
+        return next;
+      }
+      next.latestPulse = pulse;
       return next;
     }
     case "notification.upsert": {

@@ -166,7 +166,7 @@ describe("SettingsRoute", () => {
     await user.click(screen.getByRole("button", { name: "Notifications" }));
 
     expect(screen.getByRole("switch", { name: "System alerts" })).toBeInTheDocument();
-    expect(screen.getByRole("switch", { name: "Activity notifications" })).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Event notifications" })).toBeInTheDocument();
   });
 
   it("shows the projects section", async () => {

@@ -70,7 +70,9 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const data = event.notification.data ?? {};
   let url = "/";
-  if (data.kind === "inbox" || data.kind === "inbox_declined") {
+  if (data.kind === "regular" || data.path === "/today") {
+    url = "/";
+  } else if (data.kind === "inbox" || data.kind === "inbox_declined") {
     url = "/inbox";
   } else if (data.taskId) {
     const params = new URLSearchParams();

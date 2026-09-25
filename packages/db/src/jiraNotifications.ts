@@ -102,6 +102,7 @@ export async function upsertJiraWatchState(
     issueId: string;
     issueKey: string;
     assigneeAccountId: string | null;
+    assignedToMe: boolean | null;
     statusName: string | null;
     priorityName: string | null;
     dueAt: Date | null;
@@ -118,6 +119,7 @@ export async function upsertJiraWatchState(
       issueId: snapshot.issueId,
       issueKey: snapshot.issueKey,
       assigneeAccountId: snapshot.assigneeAccountId,
+      assignedToMe: snapshot.assignedToMe,
       statusName: snapshot.statusName,
       priorityName: snapshot.priorityName,
       dueAt: snapshot.dueAt,
@@ -131,6 +133,7 @@ export async function upsertJiraWatchState(
       set: {
         issueKey: snapshot.issueKey,
         assigneeAccountId: snapshot.assigneeAccountId,
+        assignedToMe: snapshot.assignedToMe,
         statusName: snapshot.statusName,
         priorityName: snapshot.priorityName,
         dueAt: snapshot.dueAt,
@@ -174,7 +177,12 @@ export async function listJiraCommentsForIssues(
   {
     issueId: string;
     commentId: string;
-    authorAccountId: string | null;
+    author: {
+      accountId?: string | null;
+      name?: string | null;
+      key?: string | null;
+      emailAddress?: string | null;
+    } | null;
     body: string;
     updatedAt: Date;
   }[]
@@ -199,11 +207,16 @@ export async function listJiraCommentsForIssues(
       ),
     );
   return rows.map((row) => {
-    const author = row.author as { accountId?: string | null };
+    const author = row.author as {
+      accountId?: string | null;
+      name?: string | null;
+      key?: string | null;
+      emailAddress?: string | null;
+    } | null;
     return {
       issueId: row.issueId,
       commentId: row.commentId,
-      authorAccountId: author.accountId ?? null,
+      author,
       body: row.body,
       updatedAt: row.updatedAt,
     };

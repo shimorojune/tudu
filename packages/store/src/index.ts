@@ -76,6 +76,7 @@ export {
   useReorderReportTasksMutation,
   useDeleteReportTaskMutation,
   useGetNotificationsQuery,
+  useLatestPulse,
   useReadNotificationMutation,
   useReadAllNotificationsMutation,
   useGetProjectsQuery,

@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   compareAppVersions,
-  canDeliverScheduledReminderPush,
-  isWithinQuietHours,
   isWithinWorkingHours,
+  listRegularSlotStartsForDay,
+  nextRegularSlotStart,
+  regularSlotAt,
 } from "./notificationTime.js";
 import { defaultNotificationPreferences } from "./notificationPreferences.js";
 
@@ -15,26 +16,11 @@ describe("compareAppVersions", () => {
   });
 });
 
-describe("isWithinQuietHours", () => {
-  it("detects overnight quiet window", () => {
-    const prefs = {
-      timezone: "UTC",
-      quietHoursStart: "22:00",
-      quietHoursEnd: "07:00",
-    };
-    const late = new Date("2026-09-19T23:00:00.000Z");
-    const morning = new Date("2026-09-19T10:00:00.000Z");
-    expect(isWithinQuietHours(prefs, late)).toBe(true);
-    expect(isWithinQuietHours(prefs, morning)).toBe(false);
-  });
-});
-
 describe("isWithinWorkingHours", () => {
   it("blocks weekends when only weekdays are work days", () => {
     const prefs = {
       ...defaultNotificationPreferences(),
       timezone: "UTC",
-      workHoursEnabled: true,
       workHoursStart: "09:00",
       workHoursEnd: "18:00",
       workDays: [1, 2, 3, 4, 5],
@@ -47,7 +33,6 @@ describe("isWithinWorkingHours", () => {
     const prefs = {
       ...defaultNotificationPreferences(),
       timezone: "UTC",
-      workHoursEnabled: true,
       workHoursStart: "09:00",
       workHoursEnd: "18:00",
       workDays: [1, 2, 3, 4, 5],
@@ -57,19 +42,58 @@ describe("isWithinWorkingHours", () => {
   });
 });
 
-describe("canDeliverScheduledReminderPush", () => {
-  it("follows working hours only", () => {
+describe("regularSlotAt", () => {
+  it("returns the active slot for a 30 minute cadence", () => {
     const prefs = {
       ...defaultNotificationPreferences(),
       timezone: "UTC",
-      workHoursEnabled: true,
+      regularIntervalMinutes: 30,
+      workHoursStart: "09:00",
+      workHoursEnd: "18:00",
+      workDays: [1, 2, 3, 4, 5],
+    };
+    const friday = new Date("2026-09-18T09:17:00.000Z");
+    const slot = regularSlotAt(prefs, friday);
+    expect(slot?.slotHm).toBe("09:00");
+  });
+
+  it("returns null outside working hours", () => {
+    const prefs = {
+      ...defaultNotificationPreferences(),
+      timezone: "UTC",
       workHoursStart: "09:00",
       workHoursEnd: "18:00",
       workDays: [1, 2, 3, 4, 5],
     };
     const night = new Date("2026-09-18T23:00:00.000Z");
-    expect(canDeliverScheduledReminderPush(prefs, night)).toBe(false);
-    const friday = new Date("2026-09-18T12:00:00.000Z");
-    expect(canDeliverScheduledReminderPush(prefs, friday)).toBe(true);
+    expect(regularSlotAt(prefs, night)).toBeNull();
+  });
+});
+
+describe("listRegularSlotStartsForDay", () => {
+  it("lists slots strictly before work end", () => {
+    const prefs = {
+      ...defaultNotificationPreferences(),
+      regularIntervalMinutes: 60,
+      workHoursStart: "09:00",
+      workHoursEnd: "12:00",
+    };
+    expect(listRegularSlotStartsForDay(prefs)).toEqual([9 * 60, 10 * 60, 11 * 60]);
+  });
+});
+
+describe("nextRegularSlotStart", () => {
+  it("returns the next boundary after now", () => {
+    const prefs = {
+      ...defaultNotificationPreferences(),
+      timezone: "UTC",
+      regularIntervalMinutes: 30,
+      workHoursStart: "09:00",
+      workHoursEnd: "18:00",
+      workDays: [1, 2, 3, 4, 5],
+    };
+    const friday = new Date("2026-09-18T09:17:00.000Z");
+    const next = nextRegularSlotStart(prefs, friday);
+    expect(next.getTime()).toBeGreaterThan(friday.getTime());
   });
 });

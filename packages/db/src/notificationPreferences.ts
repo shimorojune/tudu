@@ -13,39 +13,20 @@ import {
 } from "./notification-preferences-schema.js";
 
 function mapRow(row: NotificationPreferencesRow): NotificationPreferences {
-  const deadlineNudgeHours = Array.isArray(row.deadlineNudgeHours)
-    ? row.deadlineNudgeHours
-    : [24, 4];
   return notificationPreferencesSchema.parse({
     osEnabled: row.osEnabled,
-    inbox: row.inbox,
-    comments: row.comments,
-    taskChanges: row.taskChanges,
-    jira: row.jira,
-    jiraAssigned: row.jiraAssigned,
-    jiraUnassigned: row.jiraUnassigned,
-    jiraComment: row.jiraComment,
-    jiraUpdated: row.jiraUpdated,
-    reminders: row.reminders,
-    remindersFocus: row.remindersFocus,
-    remindersDigest: row.remindersDigest,
-    remindersDeadline: row.remindersDeadline,
-    remindersSlipping: row.remindersSlipping,
-    focusCheckInMinutes: row.focusCheckInMinutes,
-    workHoursEnabled: row.workHoursEnabled,
+    regularEnabled: row.regularEnabled,
+    regularIntervalMinutes: row.regularIntervalMinutes,
     workHoursStart: row.workHoursStart,
     workHoursEnd: row.workHoursEnd,
     workDays: Array.isArray(row.workDays) ? row.workDays : [1, 2, 3, 4, 5],
-    appUpdate: row.appUpdate,
+    eventsEnabled: row.eventsEnabled,
+    eventsJira: row.eventsJira,
+    eventsInbox: row.eventsInbox,
+    eventsComments: row.eventsComments,
     timezone: row.timezone,
-    quietHoursStart: row.quietHoursStart,
-    quietHoursEnd: row.quietHoursEnd,
     jiraPollActiveMinutes: row.jiraPollActiveMinutes,
     jiraPollIdleMinutes: row.jiraPollIdleMinutes,
-    digestTimeLocal: row.digestTimeLocal,
-    lateReminderMinutes: row.lateReminderMinutes,
-    deadlineNudgeHours,
-    approachingRequiresInProgress: row.approachingRequiresInProgress,
   });
 }
 
@@ -84,14 +65,40 @@ export async function ensureNotificationPreferences(
     .insert(notificationPreferences)
     .values({
       userId,
-      ...defaults,
-      deadlineNudgeHours: defaults.deadlineNudgeHours,
+      osEnabled: defaults.osEnabled,
+      regularEnabled: defaults.regularEnabled,
+      regularIntervalMinutes: defaults.regularIntervalMinutes,
+      workHoursStart: defaults.workHoursStart,
+      workHoursEnd: defaults.workHoursEnd,
+      workDays: defaults.workDays,
+      eventsEnabled: defaults.eventsEnabled,
+      eventsJira: defaults.eventsJira,
+      eventsInbox: defaults.eventsInbox,
+      eventsComments: defaults.eventsComments,
+      timezone: defaults.timezone,
+      jiraPollActiveMinutes: defaults.jiraPollActiveMinutes,
+      jiraPollIdleMinutes: defaults.jiraPollIdleMinutes,
       nextJiraPollAt: new Date(),
-      nextReminderCheckAt: new Date(),
+      nextRegularAt: new Date(),
       nextVersionCheckAt: new Date(),
     })
     .returning();
   return mapNotificationPreferencesResponse(row!);
+}
+
+const REGULAR_SCHEDULE_KEYS: (keyof NotificationPreferences)[] = [
+  "regularEnabled",
+  "regularIntervalMinutes",
+  "workHoursStart",
+  "workHoursEnd",
+  "workDays",
+  "timezone",
+];
+
+export function shouldResetRegularSchedule(
+  patch: NotificationPreferencesUpdate,
+): boolean {
+  return REGULAR_SCHEDULE_KEYS.some((key) => patch[key] !== undefined);
 }
 
 export async function updateNotificationPreferences(
@@ -100,11 +107,12 @@ export async function updateNotificationPreferences(
   patch: NotificationPreferencesUpdate,
 ): Promise<NotificationPreferencesResponse> {
   await ensureNotificationPreferences(db, userId);
+  const resetRegular = shouldResetRegularSchedule(patch);
   const [row] = await db
     .update(notificationPreferences)
     .set({
       ...patch,
-      deadlineNudgeHours: patch.deadlineNudgeHours,
+      ...(resetRegular ? { nextRegularAt: null } : {}),
     })
     .where(eq(notificationPreferences.userId, userId))
     .returning();
@@ -152,7 +160,7 @@ export async function listUsersDueForJiraPoll(
     .limit(limit);
 }
 
-export async function listUsersDueForReminderCheck(
+export async function listUsersDueForRegular(
   db: Db,
   now: Date,
   limit: number,
@@ -162,8 +170,8 @@ export async function listUsersDueForReminderCheck(
     .from(notificationPreferences)
     .where(
       or(
-        isNull(notificationPreferences.nextReminderCheckAt),
-        lte(notificationPreferences.nextReminderCheckAt, now),
+        isNull(notificationPreferences.nextRegularAt),
+        lte(notificationPreferences.nextRegularAt, now),
       ),
     )
     .limit(limit);
@@ -201,14 +209,14 @@ export async function scheduleNextJiraPoll(
     .where(eq(notificationPreferences.userId, userId));
 }
 
-export async function scheduleNextReminderCheck(
+export async function scheduleNextRegular(
   db: Db,
   userId: string,
   at: Date,
 ): Promise<void> {
   await db
     .update(notificationPreferences)
-    .set({ nextReminderCheckAt: at })
+    .set({ nextRegularAt: at })
     .where(eq(notificationPreferences.userId, userId));
 }
 
@@ -222,3 +230,9 @@ export async function scheduleNextVersionCheck(
     .set({ nextVersionCheckAt: at })
     .where(eq(notificationPreferences.userId, userId));
 }
+
+/** @deprecated Use listUsersDueForRegular */
+export const listUsersDueForReminderCheck = listUsersDueForRegular;
+
+/** @deprecated Use scheduleNextRegular */
+export const scheduleNextReminderCheck = scheduleNextRegular;

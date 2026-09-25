@@ -109,6 +109,11 @@ export function useGetInboxCountQuery(_arg?: void, options?: QueryOptions) {
   };
 }
 
+export function useLatestPulse() {
+  const replica = useSelector(selectVisible);
+  return replica.latestPulse;
+}
+
 export function useGetNotificationsQuery(_arg?: void, options?: QueryOptions) {
   const key = options?.skip ? null : viewKey.notifications();
   const query = useView(key);

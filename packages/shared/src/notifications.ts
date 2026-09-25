@@ -8,14 +8,35 @@ export const NOTIFICATION_KINDS = [
   "jira_unassigned",
   "jira_comment",
   "jira_updated",
-  "reminder_digest",
-  "reminder_focus",
-  "reminder_late",
-  "reminder_deadline",
   "app_update",
 ] as const;
 
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+
+export const EVENT_NOTIFICATION_KINDS = NOTIFICATION_KINDS;
+
+export type EventNotificationSource = "jira" | "inbox" | "comments" | "other";
+
+export function eventSourceForKind(kind: string): EventNotificationSource {
+  switch (kind) {
+    case "inbox":
+    case "inbox_declined":
+      return "inbox";
+    case "comment":
+      return "comments";
+    case "jira_assigned":
+    case "jira_unassigned":
+    case "jira_comment":
+    case "jira_updated":
+      return "jira";
+    case "task_changed":
+    case "task_deleted":
+    case "app_update":
+      return "other";
+    default:
+      return "other";
+  }
+}
 
 export const TASK_CHANGE_TIMELINE_TYPES = [
   "renamed",
@@ -129,14 +150,6 @@ export function formatNotificationBody(args: {
       return `New comment on ${title}`;
     case "jira_updated":
       return `${title} was updated in JIRA`;
-    case "reminder_digest":
-      return args.taskTitle;
-    case "reminder_focus":
-      return args.taskTitle;
-    case "reminder_late":
-      return args.taskTitle;
-    case "reminder_deadline":
-      return args.taskTitle;
     case "app_update":
       return args.taskTitle;
     default:

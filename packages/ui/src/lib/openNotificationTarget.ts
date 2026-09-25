@@ -142,16 +142,6 @@ export function openNotificationTarget(
     return;
   }
 
-  if (notification.kind === "reminder_focus" && !notification.taskId) {
-    void args.navigate({ to: "/", search: {} });
-    return;
-  }
-
-  if (notification.kind.startsWith("reminder_")) {
-    openTaskNotification(notification, args, "details");
-    return;
-  }
-
   if (!notification.taskId) {
     return;
   }

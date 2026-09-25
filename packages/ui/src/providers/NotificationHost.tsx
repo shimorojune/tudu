@@ -5,10 +5,12 @@ import { viewKey } from "@tudu/shared";
 import {
   useGetMeQuery,
   useGetNotificationsQuery,
+  useLatestPulse,
   useReadNotificationMutation,
   type AppDispatch,
   type RootState,
 } from "@tudu/store";
+import { presentationOsBody } from "@tudu/shared";
 import { readNotificationPrefs } from "@/lib/notificationPrefs";
 import {
   bindNotificationNavigate,
@@ -36,7 +38,9 @@ export function NotificationHost() {
   const [readOne] = useReadNotificationMutation();
   const os = useNotificationOs();
   const seen = useRef(new Set<string>());
+  const seenPulses = useRef(new Set<string>());
   const seeded = useRef(false);
+  const latestPulse = useLatestPulse();
   const viewerId = me?.id;
   const notifications = data?.notifications ?? [];
   const unreadCount = data?.unreadCount ?? 0;
@@ -58,8 +62,32 @@ export function NotificationHost() {
 
   useEffect(() => {
     seen.current = new Set();
+    seenPulses.current = new Set();
     seeded.current = false;
   }, [viewerId]);
+
+  useEffect(() => {
+    if (!latestPulse || !viewerId) {
+      return;
+    }
+    if (seenPulses.current.has(latestPulse.id)) {
+      return;
+    }
+    seenPulses.current.add(latestPulse.id);
+    const prefs = readNotificationPrefs();
+    if (!prefs.osEnabled || !prefs.regularEnabled) {
+      return;
+    }
+    const body = presentationOsBody(latestPulse.presentation);
+    void os.showOsNotification({
+      title: latestPulse.presentation.title,
+      body,
+      tag: "regular",
+      onClick: () => {
+        void navigate({ to: "/" });
+      },
+    });
+  }, [latestPulse, navigate, os, viewerId]);
 
   useEffect(() => {
     if (viewStatus !== "ready") {

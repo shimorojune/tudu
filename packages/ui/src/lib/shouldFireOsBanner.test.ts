@@ -26,8 +26,6 @@ const row: AppNotification = {
 const prefsOn = {
   ...defaultNotificationPrefs,
   osEnabled: true,
-  quietHoursStart: "00:00",
-  quietHoursEnd: "00:00",
 };
 
 describe("shouldFireOsBanner", () => {
@@ -83,7 +81,7 @@ describe("shouldFireOsBanner", () => {
     expect(
       shouldFireOsBanner({
         notification: row,
-        prefs: { ...prefsOn, comments: false },
+        prefs: { ...prefsOn, eventsComments: false },
         windowFocused: false,
         pathname: "/",
         selectedTaskId: null,

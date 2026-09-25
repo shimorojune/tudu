@@ -42,3 +42,18 @@ export async function wasReminderSentAfter(
   const row = await getReminderDelivery(db, userId, deliveryKey);
   return row ? row.lastSentAt >= notBefore : false;
 }
+
+export async function deleteReminderDelivery(
+  db: Db,
+  userId: string,
+  deliveryKey: string,
+): Promise<void> {
+  await db
+    .delete(reminderDeliveryState)
+    .where(
+      and(
+        eq(reminderDeliveryState.userId, userId),
+        eq(reminderDeliveryState.deliveryKey, deliveryKey),
+      ),
+    );
+}

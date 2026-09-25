@@ -1,49 +1,37 @@
 import { describe, expect, it } from "vitest";
 import {
-  formatFocusCheckInPresentation,
-  formatWorkCheckInPresentation,
-  focusSnapshotHash,
+  formatAllDonePresentation,
+  formatRegularPresentation,
+  presentationOsBody,
 } from "./notificationPresentation.js";
 
-describe("formatFocusCheckInPresentation", () => {
-  it("describes empty in-progress state", () => {
-    const result = formatFocusCheckInPresentation([]);
-    expect(result.title).toBe("Nothing in progress");
-    expect(result.summary).toContain("Today");
+describe("formatRegularPresentation", () => {
+  it("formats total and bucket breakdown", () => {
+    const result = formatRegularPresentation({ now: 2, next: 3, later: 2 });
+    expect(result.title).toBe("7 tasks left today");
+    expect(result.lines[0]).toBe("2 Now, 3 Next, 2 Later");
   });
 
-  it("describes a single task", () => {
-    const result = formatFocusCheckInPresentation(["Ship billing"]);
-    expect(result.title).toBe("In progress");
-    expect(result.lines[0]).toBe("Ship billing");
-  });
-
-  it("lists multiple tasks", () => {
-    const result = formatFocusCheckInPresentation(["A", "B"]);
-    expect(result.title).toBe("2 things in progress");
-    expect(result.lines).toHaveLength(2);
+  it("uses singular title for one task", () => {
+    const result = formatRegularPresentation({ now: 1, next: 0, later: 0 });
+    expect(result.title).toBe("1 task left today");
+    expect(result.lines[0]).toBe("1 Now");
   });
 });
 
-describe("focusSnapshotHash", () => {
-  it("is stable regardless of order", () => {
-    expect(focusSnapshotHash(["b", "a"])).toBe(focusSnapshotHash(["a", "b"]));
+describe("formatAllDonePresentation", () => {
+  it("announces completion", () => {
+    expect(formatAllDonePresentation().title).toBe("All done for today");
   });
 });
 
-describe("formatWorkCheckInPresentation", () => {
-  it("combines in progress, next up, and slipping", () => {
-    const result = formatWorkCheckInPresentation({
-      inProgress: ["Ship billing"],
-      nextUp: "Write docs",
-      slippingCount: 2,
-      nearestDeadlineHours: 4,
-      nearestDeadlineTitle: "Tax filing",
+describe("presentationOsBody", () => {
+  it("prefers summary then lines", () => {
+    const body = presentationOsBody({
+      title: "Title",
+      summary: "Summary",
+      lines: ["Line"],
     });
-    expect(result.title).toBe("Work check-in");
-    expect(result.lines.join(" ")).toContain("In progress");
-    expect(result.lines.join(" ")).toContain("Next up");
-    expect(result.lines.join(" ")).toContain("2 tasks slipping");
-    expect(result.lines.join(" ")).toContain("Due in 4h");
+    expect(body).toBe("Summary");
   });
 });
