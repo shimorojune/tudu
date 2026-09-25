@@ -26,6 +26,8 @@ function dayName(iso: string) {
   return format(parseNoon(iso), "EEEE");
 }
 
+// Banner copy uses calendarDayIso (wall clock). Nav tabs and DayJump use
+// effectiveDayIso so labels match the list you are still on until day-start.
 export function MidnightBanner({ selectedDate, onStartDay }: MidnightBannerProps) {
   const [now, setNow] = useState(() => new Date());
 

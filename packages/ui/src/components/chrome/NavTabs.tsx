@@ -1,11 +1,13 @@
 import { Link } from "@tanstack/react-router";
 import { useLayoutEffect, useRef, useState } from "react";
 import { useSelector } from "react-redux";
-import { todayIso, useGetInboxCountQuery, useGetUnscheduledTasksQuery } from "@tudu/store";
+import { effectiveDayIso } from "@tudu/shared";
+import { useGetInboxCountQuery, useGetUnscheduledTasksQuery } from "@tudu/store";
 import type { RootState } from "@tudu/store";
 import { dateLinkSearch } from "@/lib/daySearch";
 import { dayTabLabel } from "@/lib/dayLabel";
 import { MAIN_NAV_ITEMS } from "@/lib/mainNav";
+import { useLogicalDayClock } from "@/hooks/useLogicalDayClock";
 
 type TabContentProps = {
   label: string;
@@ -102,12 +104,13 @@ function DayTabSlot({ label, to, exact, date }: DayTabSlotProps) {
 }
 
 export function NavTabs() {
+  useLogicalDayClock();
   const { data } = useGetUnscheduledTasksQuery();
   const inboxCountQuery = useGetInboxCountQuery();
   const unscheduledCount = data?.tasks.length ?? 0;
   const inboxCount = inboxCountQuery.data?.count ?? 0;
   const selectedDate = useSelector((state: RootState) => state.day.selectedDate);
-  const dayLabel = dayTabLabel(selectedDate, todayIso());
+  const dayLabel = dayTabLabel(selectedDate, effectiveDayIso());
 
   return (
     <nav

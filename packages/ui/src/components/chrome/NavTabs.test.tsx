@@ -1,7 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
+import { effectiveDayIso } from "@tudu/shared";
 import { describe, expect, it, vi } from "vitest";
-import { makeStore } from "@tudu/store";
+import { makeStore, setSelectedDate } from "@tudu/store";
 import { NavTabs } from "./NavTabs";
 
 const locationState = vi.hoisted(() => ({
@@ -77,6 +78,23 @@ vi.mock("@tudu/store", async (importOriginal) => {
 });
 
 describe("NavTabs", () => {
+  it("labels the effective today after calendar midnight", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 8, 26, 0, 38, 0));
+
+    const store = makeStore();
+    store.dispatch(setSelectedDate("2026-09-25"));
+
+    render(
+      <Provider store={store}>
+        <NavTabs />
+      </Provider>,
+    );
+
+    expect(screen.getByRole("link", { name: "Today" })).toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
   it("keeps Today active when task query params are present", () => {
     locationState.pathname = "/";
     locationState.search = {
@@ -84,8 +102,11 @@ describe("NavTabs", () => {
       tab: "comments",
     };
 
+    const store = makeStore();
+    store.dispatch(setSelectedDate(effectiveDayIso()));
+
     render(
-      <Provider store={makeStore()}>
+      <Provider store={store}>
         <NavTabs />
       </Provider>,
     );
