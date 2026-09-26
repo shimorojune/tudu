@@ -14,7 +14,12 @@ import {
   type LinkedJiraWatchTarget,
 } from "@tudu/db";
 import type { JiraIssue, NotificationKind } from "@tudu/shared";
-import { clipNotificationText, isNotificationKindEnabled } from "@tudu/shared";
+import {
+  clipNotificationText,
+  formatJiraUpdatedPresentation,
+  isNotificationKindEnabled,
+  presentationToBody,
+} from "@tudu/shared";
 import {
   createJiraDataCenterAdapter,
   isSameJiraUser,
@@ -271,11 +276,32 @@ export function collectDiffs(args: {
   }
 
   if (fieldChanges.length > 0) {
+    const presentation = formatJiraUpdatedPresentation({
+      title,
+      prior: {
+        statusName: args.prior.statusName,
+        priorityName: args.prior.priorityName,
+        dueAt: args.prior.dueAt,
+        summary: args.prior.summary,
+        descriptionHash: args.prior.descriptionHash,
+      },
+      current: {
+        statusName: args.snapshot.statusName,
+        priorityName: args.snapshot.priorityName,
+        dueAt: args.snapshot.dueAt,
+        summary: args.snapshot.summary,
+        descriptionHash: args.snapshot.descriptionHash,
+      },
+    });
     args.pending.push({
       kind: "jira_updated",
-      body: `${title}: ${fieldChanges.join(", ")} changed`,
+      body: presentationToBody(presentation),
       ...base,
-      metadata: { ...base.metadata, fields: fieldChanges },
+      metadata: {
+        ...base.metadata,
+        fields: fieldChanges,
+        presentation,
+      },
     });
   }
 }

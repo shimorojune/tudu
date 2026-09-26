@@ -83,3 +83,103 @@ export function formatAllDonePresentation(): NotificationPresentation {
 export function clipPresentationTitle(title: string): string {
   return clipNotificationText(title, 48);
 }
+
+export type JiraUpdatedFieldSnapshot = {
+  statusName: string | null;
+  priorityName: string | null;
+  dueAt: Date | null;
+  summary: string | null;
+  descriptionHash: string | null;
+};
+
+const JIRA_SUMMARY_DELTA_MAX = 48;
+
+function formatJiraDueDateLabel(dueAt: Date | null): string {
+  if (!dueAt) {
+    return "None";
+  }
+  const year = dueAt.getFullYear();
+  const month = String(dueAt.getMonth() + 1).padStart(2, "0");
+  const day = String(dueAt.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function jiraFieldDeltaLine(
+  label: string,
+  prior: string,
+  current: string,
+): string {
+  return `${label}: ${prior} → ${current}`;
+}
+
+export function formatJiraUpdatedPresentation(args: {
+  title: string;
+  prior: JiraUpdatedFieldSnapshot;
+  current: JiraUpdatedFieldSnapshot;
+}): NotificationPresentation {
+  const lines: string[] = [];
+
+  if (args.prior.statusName !== args.current.statusName) {
+    lines.push(
+      jiraFieldDeltaLine(
+        "Status",
+        args.prior.statusName ?? "None",
+        args.current.statusName ?? "None",
+      ),
+    );
+  }
+
+  if (args.prior.priorityName !== args.current.priorityName) {
+    lines.push(
+      jiraFieldDeltaLine(
+        "Priority",
+        args.prior.priorityName ?? "None",
+        args.current.priorityName ?? "None",
+      ),
+    );
+  }
+
+  if (
+    (args.prior.dueAt?.toISOString() ?? null) !==
+    (args.current.dueAt?.toISOString() ?? null)
+  ) {
+    lines.push(
+      jiraFieldDeltaLine(
+        "Due date",
+        formatJiraDueDateLabel(args.prior.dueAt),
+        formatJiraDueDateLabel(args.current.dueAt),
+      ),
+    );
+  }
+
+  if (args.prior.summary !== args.current.summary) {
+    const priorSummary = clipNotificationText(
+      args.prior.summary ?? "",
+      JIRA_SUMMARY_DELTA_MAX,
+    );
+    const currentSummary = clipNotificationText(
+      args.current.summary ?? "",
+      JIRA_SUMMARY_DELTA_MAX,
+    );
+    lines.push(
+      jiraFieldDeltaLine(
+        "Summary",
+        priorSummary || "None",
+        currentSummary || "None",
+      ),
+    );
+  }
+
+  if (args.prior.descriptionHash !== args.current.descriptionHash) {
+    lines.push("Description updated");
+  }
+
+  const summary =
+    lines.length === 1 ? lines[0] : lines.length > 1 ? lines.join(", ") : undefined;
+
+  return {
+    title: args.title,
+    lines,
+    summary,
+  };
+}

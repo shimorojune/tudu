@@ -142,4 +142,52 @@ describe("collectDiffs", () => {
     });
     expect(pending.map((row) => row.kind)).toContain("jira_assigned");
   });
+
+  it("fires jira_updated with status delta presentation", () => {
+    const pending: {
+      kind: string;
+      body: string;
+      taskTitle: string;
+      metadata?: Record<string, unknown>;
+    }[] = [];
+    collectDiffs({
+      prior: {
+        assignedToMe: true,
+        assigneeAccountId: null,
+        statusName: "Open",
+        priorityName: "Major",
+        dueAt: null,
+        summary: "Fix bug",
+        descriptionHash: "x",
+        lastCommentId: null,
+      } as never,
+      snapshot: {
+        assignedToMe: true,
+        statusName: "Done",
+        priorityName: "Major",
+        dueAt: null,
+        summary: "Fix bug",
+        descriptionHash: "x",
+        lastCommentId: null,
+      },
+      cached: {
+        ...cached,
+        status: { id: "2", name: "Done", category: "done", colorName: null },
+      },
+      target,
+      myself,
+      newestComment: null,
+      pending: pending as never,
+    });
+
+    expect(pending).toHaveLength(1);
+    expect(pending[0]?.kind).toBe("jira_updated");
+    expect(pending[0]?.taskTitle).toBe("EGS-1: Fix bug");
+    const presentation = pending[0]?.metadata?.presentation as {
+      lines: string[];
+    };
+    expect(presentation.lines).toContain("Status: Open → Done");
+    expect(pending[0]?.body).not.toMatch(/^EGS-1: Fix bug: status changed/);
+    expect(pending[0]?.body).toContain("Status: Open → Done");
+  });
 });
