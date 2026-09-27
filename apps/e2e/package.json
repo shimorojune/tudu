@@ -8,6 +8,8 @@
     "test:ui": "playwright test --ui"
   },
   "devDependencies": {
-    "@playwright/test": "^1.55.0"
+    "@neondatabase/serverless": "^1.1.0",
+    "@playwright/test": "^1.55.0",
+    "dotenv": "^18.0.4"
   }
 }

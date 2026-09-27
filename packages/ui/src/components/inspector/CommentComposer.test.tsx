@@ -35,8 +35,7 @@ describe("CommentComposer", () => {
     );
 
     expect(screen.getByRole("textbox", { name: "Task comment" })).toHaveAttribute(
-      "aria-disabled",
-      "true",
+      "readonly",
     );
     expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
     expect(createComment).not.toHaveBeenCalled();

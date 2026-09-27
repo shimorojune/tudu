@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { renderWithProviders } from "@/test/render";
 import userEvent from "@testing-library/user-event";
 import type { JiraIssue } from "@tudu/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,7 +14,6 @@ const createSubtask = vi.hoisted(() => vi.fn());
 const updateTask = vi.hoisted(() => vi.fn());
 const uploadTaskAttachment = vi.hoisted(() => vi.fn());
 const invalidateTags = vi.hoisted(() => vi.fn());
-const dispatch = vi.hoisted(() => vi.fn());
 const mutationResult = vi.hoisted(() => ({
   unwrap: () =>
     Promise.resolve({ task: { id: "33333333-3333-4333-8333-333333333333" } }),
@@ -23,8 +23,8 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock("react-redux", () => ({
-  useDispatch: () => dispatch,
+vi.mock("@/hooks/useTaskFieldSuggest", () => ({
+  useTaskFieldSuggest: () => {},
 }));
 
 vi.mock("@tudu/store", async (importOriginal) => {
@@ -44,6 +44,7 @@ vi.mock("@tudu/store", async (importOriginal) => {
     useCreateSubtaskMutation: () => [createSubtask, { isLoading: false }],
     useUpdateTaskMutation: () => [updateTask, { isLoading: false }],
     useUploadTaskAttachmentMutation: () => [uploadTaskAttachment, { isLoading: false }],
+    useQuickAddSuggestMutation: () => [vi.fn(), { isLoading: false }],
   };
 });
 
@@ -82,7 +83,7 @@ describe("SpawnJiraTaskDialog", () => {
   it("opens the new task dialog prefilled and spawns a linked task", async () => {
     const user = userEvent.setup();
     const onCreated = vi.fn();
-    render(
+    renderWithProviders(
       <SpawnJiraTaskDialog
         issue={makeIssue()}
         selectedDate="2026-09-11"
@@ -122,7 +123,6 @@ describe("SendJiraInboxDialog", () => {
   beforeEach(() => {
     spawnReportJiraTask.mockReset();
     invalidateTags.mockReset();
-    dispatch.mockReset();
     invalidateTags.mockReturnValue({ type: "invalidate" });
     spawnReportJiraTask.mockReturnValue(mutationResult);
   });
@@ -130,14 +130,14 @@ describe("SendJiraInboxDialog", () => {
   it("sends a linked report task to inbox", async () => {
     const user = userEvent.setup();
     const onSent = vi.fn();
-    render(
-      <SendJiraInboxDialog
-        issue={makeIssue({ description: null })}
-        reportUserId="priya"
-        reportName="Priya Raman"
-        onOpenChange={vi.fn()}
-        onSent={onSent}
-      />,
+    renderWithProviders(
+        <SendJiraInboxDialog
+          issue={makeIssue({ description: null })}
+          reportUserId="priya"
+          reportName="Priya Raman"
+          onOpenChange={vi.fn()}
+          onSent={onSent}
+        />,
     );
 
     expect(screen.getByLabelText("New task title")).toHaveValue("Remote Jira summary");

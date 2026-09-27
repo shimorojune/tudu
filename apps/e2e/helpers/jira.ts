@@ -1,7 +1,8 @@
 import type { Page } from "@playwright/test";
+import { E2E_SERVER_URL } from "../constants.js";
 
 export async function isJiraConnected(page: Page): Promise<boolean> {
-  const response = await page.request.get("http://localhost:3456/jira/status");
+  const response = await page.request.get(`${E2E_SERVER_URL}/jira/status`);
   if (!response.ok()) {
     return false;
   }

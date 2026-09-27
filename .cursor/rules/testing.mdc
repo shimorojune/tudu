@@ -1,53 +1,41 @@
 ---
-description: Vitest and Testing Library conventions
-globs: **/*.test.ts,**/*.test.tsx
-alwaysApply: false
+description: Test impact review and Vitest conventions
+alwaysApply: true
 ---
 
 # Testing conventions
 
-Vitest with jsdom and Testing Library. The root `vitest.config.ts` only picks up
-`packages/**/*.test.{ts,tsx}`, so tests outside `packages/` will not run.
+Vitest with jsdom and Testing Library. Root config: `vitest.config.ts` includes
+`packages/**/*.test.{ts,tsx}`, `apps/server/**/*.test.ts`, `apps/desktop/**/*.test.ts`,
+and `apps/web/**/*.test.ts`. Database integration tests use `*.db.test.ts` and
+`pnpm test:db` (Neon `E2E_DATABASE_URL` only).
 
-Tests are colocated next to their subject: `DayJump.tsx` and `DayJump.test.tsx`.
+Playwright E2E lives in `apps/e2e/` (`pnpm test:e2e`). See `apps/e2e/README.md`.
 
-## Shape
+## Definition of done (every change)
 
-Import globals explicitly from `vitest` even though `globals: true` is set.
-One `describe` per unit, and test names state the behavior, not the method.
+Before marking work finished:
 
-```tsx
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
-import { DayJump } from "./DayJump";
+1. List changed modules and user-visible routes.
+2. Find covering tests: colocated `*.test.ts(x)` and `apps/e2e/tests/**`.
+3. **Add, edit, or delete** tests to match the change. Remove tests for removed behavior.
+4. Run `pnpm verify`. For UI, server, or DB changes also run `pnpm test:e2e` when
+   `E2E_DATABASE_URL` is configured.
+5. End with a **Test impact** table: changed unit | test file | add/edit/delete | command result.
 
-describe("DayJump", () => {
-  it("selects today by default and jumps to tomorrow", async () => {
-    const store = makeStore();
-    const user = userEvent.setup();
+A task is not done without that table and green commands.
 
-    render(
-      <Provider store={store}>
-        <DayJump />
-      </Provider>,
-    );
+## Unit test shape
 
-    await user.click(screen.getByRole("radio", { name: "Tmr" }));
+Import globals from `vitest`. Colocate tests. One `describe` per unit.
 
-    expect(store.getState().day.selectedDate).toBe(offsetIso(1));
-  });
-});
-```
+- Fresh store: `makeStore()` + `Provider`. Never the shared `store` singleton.
+- Prefer `renderWithProviders` from `packages/ui/src/test/render.tsx` for UI.
+- Query by role and accessible name. Use `userEvent.setup()`.
+- Dates: `offsetIso()` from `packages/ui/src/test/dates.ts`, not hardcoded strings.
 
-## Rules
+## E2E
 
-- Build a fresh store with `makeStore()` per test and wrap in `Provider`. Never
-  import the shared `store` singleton.
-- Query by accessible role and name (`getByRole("radio", { name: "Tmr" })`).
-  Avoid test ids and class selectors.
-- Drive interaction through `userEvent.setup()`, not `fireEvent`.
-- Assert against observable output: rendered text, ARIA state, or store state.
-  Never assert on internal component state.
-- Derive expected dates at runtime with a local helper. Never hardcode a date
-  string, or the test rots overnight.
+- Create data your spec needs (unique titles). Treat seed data as read-only.
+- `@jira` in title skips in CI when Jira is not connected.
+- Pane features: exercise desktop, tablet, and phone projects when layout changes.

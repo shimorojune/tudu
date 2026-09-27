@@ -35,9 +35,10 @@ pnpm monorepo. Workspaces are `apps/*` and `packages/*`.
 ## Commands
 
 ```bash
-pnpm dev          # server + desktop
+pnpm dev          # server + web (Vite 5173)
 pnpm dev:all      # server + desktop + web
-pnpm test         # vitest run
+pnpm verify       # lint:copy + typecheck + vitest
+pnpm test:e2e     # Playwright (needs E2E_DATABASE_URL)
 pnpm lint:copy    # em-dash check
 pnpm db:generate  # after any schema change
 ```

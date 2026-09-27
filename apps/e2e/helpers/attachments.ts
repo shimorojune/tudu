@@ -20,7 +20,11 @@ export const notesTxtPath = path.join(fixturesDir, "notes.txt");
 export async function dismissBlockingOverlays(page: Page) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(120);
+    await page
+      .locator("[data-state=open]")
+      .first()
+      .waitFor({ state: "hidden", timeout: 500 })
+      .catch(() => undefined);
   }
 }
 
@@ -64,7 +68,7 @@ export async function waitForDescriptionImage(page: Page) {
 
 export async function blurDescriptionToSave(page: Page, taskTitle: string) {
   await page.getByRole("heading", { name: taskTitle, exact: true }).click();
-  await page.waitForTimeout(700);
+  await expect(descriptionEditor(page)).toBeVisible();
 }
 
 export async function createTodayTask(page: Page, title: string) {

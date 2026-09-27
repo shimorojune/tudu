@@ -15,8 +15,12 @@ permissions:
   packages: write
 
 jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   deploy-staging:
     name: Deploy staging (web + server)
+    needs: ci
     if: >-
       github.event_name == 'workflow_dispatch' ||
       !startsWith(github.event.head_commit.message, 'chore(release):')

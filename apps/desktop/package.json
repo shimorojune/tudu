@@ -13,7 +13,8 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "icons": "node scripts/generate-icons.mjs",
-    "share": "bash scripts/package-for-sharing.sh"
+    "share": "bash scripts/package-for-sharing.sh",
+    "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",

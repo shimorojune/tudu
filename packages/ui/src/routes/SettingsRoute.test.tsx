@@ -6,7 +6,18 @@ import { describe, expect, it, vi } from "vitest";
 import { makeStore } from "@tudu/store";
 import { defaultNotificationPreferences } from "@tudu/shared";
 import { APP_VERSION } from "@/lib/appVersion";
+import { ThemeProvider } from "@/providers/ThemeProvider";
 import { SettingsRoute } from "./SettingsRoute";
+
+function renderSettings() {
+  return render(
+    <Provider store={makeStore()}>
+      <ThemeProvider>
+        <SettingsRoute />
+      </ThemeProvider>
+    </Provider>,
+  );
+}
 
 const navigate = vi.fn();
 const signOutMock = vi.fn();
@@ -35,6 +46,18 @@ vi.mock("@tanstack/react-router", () => ({
 
 vi.mock("@/lib/signOut", () => ({
   signOut: (...args: unknown[]) => signOutMock(...args),
+}));
+
+vi.mock("@/components/settings/JiraSettingsPanel", () => ({
+  JiraSettingsPanel: () => (
+    <div>
+      <h1>JIRA connection</h1>
+      <label htmlFor="jira-base-url">Jira Data Center URL</label>
+      <input id="jira-base-url" />
+      <label htmlFor="jira-pat">Personal access token</label>
+      <input id="jira-pat" />
+    </div>
+  ),
 }));
 
 vi.mock("@tudu/store", async (importOriginal) => {
@@ -82,6 +105,17 @@ vi.mock("@tudu/store", async (importOriginal) => {
       data: { components: [] },
       isLoading: false,
     }),
+    useGetJiraProjectsQuery: () => ({
+      data: { projects: [] },
+      isLoading: false,
+    }),
+    useGetJiraJqlPresetsQuery: () => ({
+      data: { presets: [] },
+      isLoading: false,
+    }),
+    useCreateJiraJqlPresetMutation: () => [vi.fn(), { isLoading: false }],
+    useUpdateJiraJqlPresetMutation: () => [vi.fn(), { isLoading: false }],
+    useDeleteJiraJqlPresetMutation: () => [vi.fn(), { isLoading: false }],
     useGetNotificationSettingsQuery: () => ({
       data: {
         ...defaultNotificationPreferences(),
@@ -109,11 +143,7 @@ describe("SettingsRoute", () => {
   });
 
   it("shows the signed-in profile and sign out control", () => {
-    render(
-      <Provider store={makeStore()}>
-        <SettingsRoute />
-      </Provider>,
-    );
+    renderSettings();
 
     expect(screen.getAllByText("Test User").length).toBeGreaterThan(0);
     expect(screen.getAllByText("testuser@egain.com").length).toBeGreaterThan(0);
@@ -125,11 +155,7 @@ describe("SettingsRoute", () => {
     signOutMock.mockResolvedValue(undefined);
     const user = userEvent.setup();
 
-    render(
-      <Provider store={makeStore()}>
-        <SettingsRoute />
-      </Provider>,
-    );
+    renderSettings();
 
     await user.click(screen.getByRole("button", { name: "Sign out" }));
 
@@ -140,11 +166,7 @@ describe("SettingsRoute", () => {
   it("shows the general settings panel", async () => {
     const user = userEvent.setup();
 
-    render(
-      <Provider store={makeStore()}>
-        <SettingsRoute />
-      </Provider>,
-    );
+    renderSettings();
 
     await user.click(screen.getByRole("button", { name: "General" }));
 
@@ -157,11 +179,7 @@ describe("SettingsRoute", () => {
     localStorage.clear();
     const user = userEvent.setup();
 
-    render(
-      <Provider store={makeStore()}>
-        <SettingsRoute />
-      </Provider>,
-    );
+    renderSettings();
 
     await user.click(screen.getByRole("button", { name: "Notifications" }));
 
@@ -172,11 +190,7 @@ describe("SettingsRoute", () => {
   it("shows the projects section", async () => {
     const user = userEvent.setup();
 
-    render(
-      <Provider store={makeStore()}>
-        <SettingsRoute />
-      </Provider>,
-    );
+    renderSettings();
 
     await user.click(screen.getByRole("button", { name: "Projects" }));
 
@@ -186,11 +200,7 @@ describe("SettingsRoute", () => {
   it("writes the selected settings section to the URL", async () => {
     const user = userEvent.setup();
 
-    render(
-      <Provider store={makeStore()}>
-        <SettingsRoute />
-      </Provider>,
-    );
+    renderSettings();
 
     await user.click(screen.getByRole("button", { name: "JIRA connection" }));
 
@@ -204,11 +214,7 @@ describe("SettingsRoute", () => {
   it("hydrates the Jira settings section from the URL search", () => {
     searchState.section = "jira";
 
-    render(
-      <Provider store={makeStore()}>
-        <SettingsRoute />
-      </Provider>,
-    );
+    renderSettings();
 
     expect(screen.getByRole("heading", { name: "JIRA connection" })).toBeInTheDocument();
     expect(screen.getByLabelText("Jira Data Center URL")).toBeInTheDocument();

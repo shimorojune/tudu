@@ -33,8 +33,9 @@ retested, and any state that could not be reached.
 ## Step zero: Playwright auth
 
 1. Every user-visible change ships with Playwright specs in `apps/e2e/tests/`.
-2. `apps/e2e/global-setup.ts` runs `pnpm db:seed` and signs in as
-   `testuser@egain.com` / `egain@123`, saving storage state for specs.
+2. E2E resets the Neon `E2E_DATABASE_URL` database, runs `pnpm db:migrate` and
+   `pnpm db:seed`, then `auth.setup.ts` signs in as `testuser@egain.com` /
+   `egain@123` (and manager), saving storage state for specs. See `apps/e2e/README.md`.
 3. Run `pnpm test:e2e` before calling work done. Attach pass output to the
    review report.
 4. Add or extend a spec for every matrix row. No row without a spec.
@@ -64,8 +65,8 @@ Rules:
 ## Playwright spec rules
 
 1. One spec file per feature area (`apps/e2e/jira/`, `apps/e2e/projects/`, etc.).
-2. Tag Jira-connected flows with `@jira` and skip in CI when no Jira token is
-   configured.
+2. Tag Jira-connected flows with `@jira`. CI excludes them via `grepInvert`; specs
+   also skip when `/jira/status` reports not connected.
 3. Use desktop, tablet, and phone projects from `playwright.config.ts` when the
    change touches pane layout.
 4. Assert observable DOM state, not implementation details.

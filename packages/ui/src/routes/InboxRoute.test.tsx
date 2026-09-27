@@ -64,6 +64,11 @@ vi.mock("@tudu/store", () => ({
     isLoading: false,
     isError: false,
   }),
+  useGetTasksForDayQuery: () => ({
+    data: { tasks: [] },
+    isLoading: false,
+    isError: false,
+  }),
 }));
 
 describe("InboxRoute", () => {

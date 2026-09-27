@@ -1,26 +1,45 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
+import { E2E_SERVER_URL, E2E_WEB_URL } from "./constants.js";
+import { e2eServerEnv, e2eWebEnv } from "./env.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const authFile = path.join(__dirname, ".auth", "user.json");
+const repoRoot = path.resolve(__dirname, "../..");
+
+const serverEnv = e2eServerEnv();
+const webEnv = e2eWebEnv();
+
+const isCi = Boolean(process.env.CI);
 
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,
-  forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: process.env.CI ? "github" : "list",
+  forbidOnly: isCi,
+  retries: isCi ? 2 : 0,
+  workers: isCi ? 1 : undefined,
+  reporter: isCi ? "github" : "list",
   globalSetup: "./global-setup.ts",
+  grepInvert: isCi ? /@jira/ : undefined,
   use: {
-    baseURL: "http://localhost:5173",
-    trace: "on-first-retry",
+    baseURL: E2E_WEB_URL,
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
     storageState: authFile,
   },
   projects: [
     {
+      name: "setup",
+      testMatch: /auth\.setup\.ts/,
+      use: {
+        storageState: { cookies: [], origins: [] },
+      },
+    },
+    {
       name: "desktop",
+      dependencies: ["setup"],
+      testIgnore: [/auth\.setup\.ts/],
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1440, height: 900 },
@@ -28,6 +47,8 @@ export default defineConfig({
     },
     {
       name: "tablet",
+      dependencies: ["setup"],
+      testIgnore: [/auth\.setup\.ts/],
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1024, height: 768 },
@@ -35,16 +56,32 @@ export default defineConfig({
     },
     {
       name: "phone",
+      dependencies: ["setup"],
+      testIgnore: [/auth\.setup\.ts/],
       use: {
         ...devices["Pixel 7"],
       },
     },
   ],
-  webServer: {
-    command: "pnpm dev",
-    cwd: path.resolve(__dirname, "../.."),
-    url: "http://localhost:5173",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: [
+    {
+      command: "pnpm --filter @tudu/server dev",
+      cwd: repoRoot,
+      url: `${E2E_SERVER_URL}/health`,
+      reuseExistingServer: false,
+      timeout: 120_000,
+      env: serverEnv,
+    },
+    {
+      command: "pnpm --filter @tudu/web dev -- --port 5174 --strictPort",
+      cwd: repoRoot,
+      url: E2E_WEB_URL,
+      reuseExistingServer: false,
+      timeout: 120_000,
+      env: {
+        ...process.env,
+        ...webEnv,
+      },
+    },
+  ],
 });

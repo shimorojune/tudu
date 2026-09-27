@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hooks": {
+    "stop": [
+      {
+        "command": ".cursor/hooks/test-impact-check.mjs",
+        "loop_limit": 1
+      }
+    ]
+  }
+}

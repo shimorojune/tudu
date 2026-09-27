@@ -26,16 +26,11 @@ const managerAuth = path.join(
   "../../.auth/manager.json",
 );
 
-let sharedAttachmentTitle = "";
-
-test.describe.configure({ mode: "serial" });
-
 test.describe("Task description attachments", () => {
   test("Today: attach image via toolbar and persist after reselect", async ({
     page,
   }) => {
     const title = uniqueAttachmentTitle("Attach today");
-    sharedAttachmentTitle = title;
     await createTodayTask(page, title);
 
     await attachFileViaToolbar(page, tinyPngPath);
@@ -201,21 +196,36 @@ test.describe("Task description attachments", () => {
 });
 
 test.describe("Manager report attachments", () => {
-  test.use({ storageState: managerAuth });
+  test("manager sees report attachment read-only", async ({ browser }) => {
+    const reportTitle = uniqueAttachmentTitle("Manager attach");
+    const userContext = await browser.newContext({
+      storageState: path.join(
+        path.dirname(fileURLToPath(import.meta.url)),
+        "../../.auth/user.json",
+      ),
+    });
+    const userPage = await userContext.newPage();
+    await createTodayTask(userPage, reportTitle);
+    await attachFileViaToolbar(userPage, tinyPngPath);
+    await waitForDescriptionImage(userPage);
+    await blurDescriptionToSave(userPage, reportTitle);
+    await userContext.close();
 
-  test("manager sees report attachment read-only", async ({ page }) => {
-    test.skip(!sharedAttachmentTitle, "Requires serial user attachment task");
-
+    const managerContext = await browser.newContext({
+      storageState: managerAuth,
+    });
+    const page = await managerContext.newPage();
     await page.goto("/team");
     await page.waitForURL("/team");
     await dismissBlockingOverlays(page);
     await page.getByRole("link", { name: "Open day" }).first().click();
     await page.waitForURL(/\/team\/[^/]+/);
 
-    await selectTaskByTitle(page, sharedAttachmentTitle);
+    await selectTaskByTitle(page, reportTitle);
     await waitForDescriptionImage(page);
     await expect(
       descriptionEditor(page).getByRole("button", { name: "Attach file" }),
     ).toHaveCount(0);
+    await managerContext.close();
   });
 });

@@ -496,8 +496,7 @@ describe("JiraIssueDetail", () => {
 
     expect(screen.getByLabelText("Jira summary")).toHaveAttribute("readonly");
     expect(screen.getByRole("textbox", { name: "Jira description" })).toHaveAttribute(
-      "aria-disabled",
-      "true",
+      "readonly",
     );
     expect(screen.queryByLabelText("Jira due date")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Search Jira assignee")).not.toBeInTheDocument();
@@ -537,8 +536,7 @@ describe("JiraIssueDetail", () => {
     await user.click(screen.getByLabelText("Jira due date"));
     expect(screen.getByLabelText("Jira summary")).toHaveAttribute("readonly");
     expect(screen.getByRole("textbox", { name: "Jira description" })).toHaveAttribute(
-      "aria-disabled",
-      "true",
+      "readonly",
     );
     expect(screen.getByLabelText("Jira due date")).toBeInTheDocument();
     expect(screen.queryByLabelText("Search Jira assignee")).not.toBeInTheDocument();

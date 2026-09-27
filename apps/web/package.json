@@ -8,7 +8,8 @@
     "dev": "vite",
     "icons": "node scripts/generate-pwa-icons.mjs",
     "build": "pnpm --filter @tudu/shared build && node scripts/generate-pwa-icons.mjs && node scripts/generate-firebase-messaging-sw.mjs && tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
     "@tudu/shared": "workspace:*",

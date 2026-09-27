@@ -24,14 +24,6 @@ vi.mock("@tauri-apps/api/window", () => ({
   }),
 }));
 
-vi.mock("@tauri-apps/api/window", () => ({
-  getCurrentWindow: () => ({
-    label: "quick-add",
-    scaleFactor: () => Promise.resolve(1),
-    listen: () => Promise.resolve(vi.fn()),
-  }),
-}));
-
 vi.mock("@tauri-apps/api/event", () => ({
   emit: vi.fn(),
 }));
