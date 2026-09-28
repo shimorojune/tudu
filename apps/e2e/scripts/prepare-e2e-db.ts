@@ -16,8 +16,8 @@ if (!e2eUrl) {
 }
 
 const envPath = resolve(repoRoot, ".env");
-let devDatabaseUrl = process.env.DATABASE_URL?.trim();
-if (!devDatabaseUrl && existsSync(envPath)) {
+let devDatabaseUrl: string | undefined;
+if (existsSync(envPath)) {
   const dotenv = parse(readFileSync(envPath, "utf8"));
   devDatabaseUrl = dotenv.DATABASE_URL?.trim();
 }
