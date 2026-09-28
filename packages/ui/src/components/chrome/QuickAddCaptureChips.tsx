@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { format, parseISO } from "date-fns";
 import { Calendar, Link2 } from "lucide-react";
 import { BUCKETS, type Bucket } from "@tudu/shared";
@@ -34,6 +34,8 @@ type QuickAddCaptureChipsProps = {
   onBucketChange: (bucket: Bucket) => void;
   onProjectChange: (projectId: string | null) => void;
   onDeadlineChange: (iso: string | null) => void;
+  attachmentStrip?: ReactNode;
+  tabNoteHint?: boolean;
 };
 
 function deadlineChipLabel(deadline: string | null): string {
@@ -184,6 +186,8 @@ export function QuickAddCaptureChips({
   onBucketChange,
   onProjectChange,
   onDeadlineChange,
+  attachmentStrip,
+  tabNoteHint = false,
 }: QuickAddCaptureChipsProps) {
   const [dayOpen, setDayOpen] = useState(false);
   const [bucketOpen, setBucketOpen] = useState(false);
@@ -376,7 +380,21 @@ export function QuickAddCaptureChips({
         </span>
       ) : null}
 
-      <span className="ml-auto hidden min-w-0 text-[11.5px] text-muted-foreground lg:inline">
+      {attachmentStrip}
+
+      {tabNoteHint ? (
+        <span className="ml-auto inline-flex shrink-0 items-center gap-[6px] text-[11.5px] text-muted-foreground">
+          <code className="font-mono text-[11px] text-foreground">tab</code>
+          for a note
+        </span>
+      ) : null}
+
+      <span
+        className={cn(
+          "hidden min-w-0 text-[11.5px] text-muted-foreground lg:inline",
+          tabNoteHint ? "" : "ml-auto",
+        )}
+      >
         type{" "}
         <code className="font-mono text-[11px] text-foreground">/tmr</code>{" "}
         <code className="font-mono text-[11px] text-foreground">!now</code>{" "}

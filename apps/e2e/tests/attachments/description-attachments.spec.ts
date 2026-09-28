@@ -182,6 +182,17 @@ test.describe("Task description attachments", () => {
     ).toHaveCount(0);
   });
 
+  test("quick add: tab reveals note field hint", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForURL("/");
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event("quick-add:dev-open"));
+    });
+    await expect(page.getByText("for a note")).toBeVisible({ timeout: 10_000 });
+    await page.getByPlaceholder("What needs doing?").press("Tab");
+    await expect(page.getByLabel("Quick Add note")).toBeVisible();
+  });
+
   test("route smoke after attachments feature", async ({ page }) => {
     await page.goto("/");
     await page.waitForURL("/");

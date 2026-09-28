@@ -1,7 +1,8 @@
-import { tasksApi } from "@tudu/store";
+import { setSelectedTaskId, tasksApi } from "@tudu/store";
 import { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "@tanstack/react-router";
+import type { QuickAddTaskCreatedPayload } from "@/components/chrome/QuickAddTaskPane";
 import { isDesktopApp } from "@/lib/commands";
 import { readQuickAddShortcut } from "@/lib/quickAddPrefs";
 
@@ -24,8 +25,13 @@ export function QuickAddMainSync() {
     let unlistenPrefs: (() => void) | undefined;
 
     void import("@tauri-apps/api/event").then(({ listen }) => {
-      void listen("task-created", () => {
+      void listen<QuickAddTaskCreatedPayload>("task-created", (event) => {
         dispatch(tasksApi.util.invalidateTags(["Task"]));
+        const payload = event.payload;
+        if (payload?.open && payload.task?.id) {
+          dispatch(setSelectedTaskId(payload.task.id));
+          void navigate({ to: "/" });
+        }
       }).then((unlistenFn) => {
         unlistenTask = unlistenFn;
       });

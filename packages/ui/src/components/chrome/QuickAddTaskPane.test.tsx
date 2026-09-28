@@ -56,6 +56,8 @@ vi.mock("@/lib/authClient", () => ({
 }));
 
 const createTask = vi.fn();
+const updateTask = vi.fn();
+const uploadTaskAttachment = vi.fn();
 const parseQuickAddTitle = vi.fn();
 let suggestBucket: "now" | null = null;
 
@@ -106,6 +108,23 @@ vi.mock("@tudu/store", async (importOriginal) => {
     todayIso: () => "2026-09-11",
     useGetTasksForDayQuery: () => ({ data: { tasks: dayTasks } }),
     useCreateTaskMutation: () => [createTask, { isLoading: false }],
+    useUpdateTaskMutation: () => [
+      updateTask.mockReturnValue({ unwrap: () => Promise.resolve({}) }),
+      { isLoading: false },
+    ],
+    useUploadTaskAttachmentMutation: () => [
+      uploadTaskAttachment.mockReturnValue({
+        unwrap: () =>
+          Promise.resolve({
+            attachment: {
+              contentUrl: "/attachments/a/content",
+              mimeType: "image/png",
+              fileName: "shot.png",
+            },
+          }),
+      }),
+      { isLoading: false },
+    ],
     useQuickAddSuggestMutation: () => [
       vi.fn().mockReturnValue({ unwrap: () => Promise.reject(new Error("skip")) }),
       { isLoading: false },
@@ -122,6 +141,8 @@ describe("QuickAddTaskPane", () => {
     vi.mocked(invoke).mockClear();
     parseQuickAddTitle.mockReturnValue(null);
     createTask.mockReset();
+    updateTask.mockReset();
+    uploadTaskAttachment.mockReset();
     createTask.mockReturnValue({
       unwrap: () =>
         Promise.resolve({
@@ -237,6 +258,16 @@ describe("QuickAddTaskPane", () => {
         deadline,
       }),
     );
+  });
+
+  it("shows tab note hint and opens note on Tab from title", async () => {
+    const user = userEvent.setup();
+    render(<QuickAddTaskPane onClose={vi.fn()} onRequestSignIn={vi.fn()} />);
+
+    expect(screen.getByText("for a note")).toBeInTheDocument();
+    await user.click(screen.getByPlaceholderText("What needs doing?"));
+    await user.tab();
+    expect(screen.getByLabelText("Quick Add note")).toBeInTheDocument();
   });
 
   it("resizes Quick Add window before the day date popover opens", async () => {

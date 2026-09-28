@@ -12,6 +12,7 @@ export type TaskTitleNaturalLanguageFieldProps = {
   inputRef?: React.RefObject<HTMLInputElement | null>;
   mirrorClassName?: string;
   inputClassName?: string;
+  onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
 };
 
 export function TaskTitleNaturalLanguageField({
@@ -23,6 +24,7 @@ export function TaskTitleNaturalLanguageField({
   inputRef: externalInputRef,
   mirrorClassName,
   inputClassName,
+  onKeyDown,
 }: TaskTitleNaturalLanguageFieldProps) {
   const internalInputRef = useRef<HTMLInputElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
@@ -71,6 +73,7 @@ export function TaskTitleNaturalLanguageField({
           window.requestAnimationFrame(syncTitleScroll);
         }}
         onScroll={syncTitleScroll}
+        onKeyDown={onKeyDown}
       />
     </div>
   );
