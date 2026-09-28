@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync, readFileSync } from "node:fs";
 import { config, parse } from "dotenv";
+import { e2eServerEnv } from "../env.js";
 
 const packageDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(packageDir, "../../..");
@@ -22,17 +23,11 @@ if (existsSync(envPath)) {
   devDatabaseUrl = dotenv.DATABASE_URL?.trim();
 }
 
-const authSecret =
-  process.env.E2E_BETTER_AUTH_SECRET?.trim() ??
-  process.env.BETTER_AUTH_SECRET?.trim();
-
 const migrateEnv: NodeJS.ProcessEnv = {
   ...process.env,
+  ...e2eServerEnv(),
   DATABASE_URL: e2eUrl,
 };
-if (authSecret) {
-  migrateEnv.BETTER_AUTH_SECRET = authSecret;
-}
 
 const resetEnv: NodeJS.ProcessEnv = {
   ...process.env,
