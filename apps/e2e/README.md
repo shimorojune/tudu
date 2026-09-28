@@ -31,3 +31,5 @@ Add to GitHub Actions:
 - `E2E_BETTER_AUTH_SECRET`
 
 CI also sets `NOTIFICATION_JOBS_ENABLED=false` and a fixed `JIRA_TOKEN_ENCRYPTION_KEY` for tests.
+
+If CI Playwright fails with `password authentication failed for user 'neondb_owner'`, the `E2E_DATABASE_URL` secret is stale. Copy a fresh pooled URL from Neon into the repo secret and re-run the workflow.

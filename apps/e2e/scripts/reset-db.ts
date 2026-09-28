@@ -48,7 +48,21 @@ async function main() {
   console.log("E2E database reset complete");
 }
 
+function printConnectionHelp(error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error);
+  if (!message.includes("password authentication failed")) {
+    return;
+  }
+  console.error(
+    "\nE2E Neon connection failed (bad or rotated password).\n" +
+      "- Neon console: reset the role password or create a new pooled connection string for a database whose name contains e2e.\n" +
+      "- Local: update E2E_DATABASE_URL in repo root .env\n" +
+      "- CI: update the GitHub Actions secret E2E_DATABASE_URL (see apps/e2e/README.md)\n",
+  );
+}
+
 main().catch((error) => {
+  printConnectionHelp(error);
   console.error(error);
   process.exit(1);
 });
