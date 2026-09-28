@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { goToTomorrow } from "../../helpers/day-navigation.js";
 import {
   addTaskInBucket,
   ensureTaskListInteractive,
@@ -21,7 +22,7 @@ test.describe("Move task to another day", () => {
       .getByRole("menuitem", { name: "Schedule for tomorrow" })
       .click();
 
-    await page.getByRole("radio", { name: "Tmr" }).click();
+    await goToTomorrow(page);
     await expect(taskRow(page, title)).toBeVisible({ timeout: 15_000 });
   });
 });

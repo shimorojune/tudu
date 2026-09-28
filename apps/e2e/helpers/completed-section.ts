@@ -1,5 +1,6 @@
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { goToYesterday as navigateToYesterday } from "./day-navigation.js";
 
 const SCREENSHOT_DIR = path.join("test-results", "completed-section");
 
@@ -65,12 +66,7 @@ export async function ensureTaskListInteractive(page: Page) {
 }
 
 export async function goToYesterday(page: Page) {
-  const dayJump = page.getByRole("radio", { name: "Yesterday" });
-  if (await dayJump.isVisible()) {
-    await dayJump.click();
-    return;
-  }
-  await page.getByRole("button", { name: "Previous day" }).click();
+  await navigateToYesterday(page);
 }
 
 export async function markTaskComplete(page: Page, title: string) {

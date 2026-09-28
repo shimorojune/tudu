@@ -13,7 +13,9 @@ test.describe("co-workers roster", () => {
     await page.goto(`/o/${slug}/coworkers`);
     await expect(page.getByRole("heading", { name: /In / })).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Invite co-workers" }),
+      page
+        .getByRole("main")
+        .getByRole("button", { name: "Invite co-workers" }),
     ).toBeVisible();
     await expect(
       page.getByText(/Slipping = carried two days or more/),
