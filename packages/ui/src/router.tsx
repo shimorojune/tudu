@@ -175,6 +175,8 @@ const orgCoworkersRoute = createRoute({
 const orgCoworkerDayRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/o/$orgSlug/coworkers/$userId",
+  validateSearch: (search: Record<string, unknown>) =>
+    parseDaySearch(search, DATE_ONLY_FIELDS),
   component: CoworkerDayRoute,
 });
 

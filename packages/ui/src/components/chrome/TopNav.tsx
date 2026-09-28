@@ -5,13 +5,11 @@ import { useCommandPalette } from "@/components/chrome/CommandPaletteContext";
 import { requestAddTask } from "@tudu/store";
 import { useDispatch } from "react-redux";
 import { SpaceSwitcher } from "@/components/orgs/SpaceSwitcher";
-import { DateNav } from "@/components/chrome/DateNav";
-import { DayJump } from "@/components/chrome/DayJump";
 import { NavTabs } from "@/components/chrome/NavTabs";
+import { useDayShortcuts } from "@/hooks/useDayShortcuts";
 import { NotificationBell } from "@/components/chrome/NotificationBell";
 import { WeekPicker } from "@/components/chrome/WeekPicker";
 import { isWeekPath } from "@/lib/weekPath";
-import { isCoworkersPath, isOrgAdminPath, isRequestsPath } from "@/lib/spaceNav";
 import { useSpaceContext } from "@/hooks/useSpaceContext";
 import { useSpaceShortcuts } from "@/hooks/useSpaceShortcuts";
 import { defaultWeekId, weekDaysFromWeekId } from "@/lib/week";
@@ -71,6 +69,7 @@ function SettingsLink() {
 export function TopNav() {
   useSpaceContext();
   useSpaceShortcuts();
+  useDayShortcuts();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const search = useRouterState({
     select: (s) => s.location.search as { week?: string },
@@ -78,11 +77,6 @@ export function TopNav() {
   const onWeek = isWeekPath(pathname);
   const weekId = search.week ?? defaultWeekId();
   const weekDays = weekDaysFromWeekId(weekId);
-  const showDayChrome =
-    !onWeek &&
-    !isRequestsPath(pathname) &&
-    !isCoworkersPath(pathname) &&
-    !isOrgAdminPath(pathname);
 
   return (
     <header
@@ -92,16 +86,7 @@ export function TopNav() {
       <SpaceSwitcher />
       <NavTabs />
       <div className="ml-auto flex min-w-0 shrink-0 items-center gap-[12px] xl:gap-[18px]">
-        {onWeek ? (
-          <WeekPicker weekId={weekId} weekDays={weekDays} />
-        ) : showDayChrome ? (
-          <>
-            <DateNav />
-            <div className="hidden xl:flex">
-              <DayJump />
-            </div>
-          </>
-        ) : null}
+        {onWeek ? <WeekPicker weekId={weekId} weekDays={weekDays} /> : null}
         <div className="h-[20px] w-px bg-hair" />
         <CommandsButton />
         <NotificationBell />

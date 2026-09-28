@@ -5,6 +5,8 @@ describe("commands", () => {
   it("lists expected command ids and groups", () => {
     expect(APP_COMMANDS.map((command) => command.id)).toEqual([
       "go-today",
+      "go-prev-day",
+      "go-next-day",
       "go-week",
       "go-unscheduled",
       "go-settings",
@@ -16,6 +18,8 @@ describe("commands", () => {
     const grouped = commandsByGroup();
     expect(grouped.get("Go")?.map((command) => command.label)).toEqual([
       "Go to Today",
+      "Previous day",
+      "Next day",
       "Go to Week",
       "Go to Unscheduled",
       "Go to Settings",

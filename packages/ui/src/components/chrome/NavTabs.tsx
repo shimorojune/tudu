@@ -1,11 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { useLayoutEffect, useRef, useState } from "react";
-import { useSelector } from "react-redux";
-import { effectiveDayIso } from "@tudu/shared";
 import { useGetUnscheduledTasksQuery } from "@tudu/store";
-import type { RootState } from "@tudu/store";
-import { dateLinkSearch } from "@/lib/daySearch";
-import { dayTabLabel } from "@/lib/dayLabel";
+import { DayTab } from "@/components/chrome/DayTab";
 import { mainNavItems } from "@/lib/mainNav";
 import { useActiveOrgSlug } from "@/hooks/useSpaceContext";
 import { useLogicalDayClock } from "@/hooks/useLogicalDayClock";
@@ -48,60 +43,11 @@ function TabContent({ label, badge, count }: TabContentProps) {
   );
 }
 
-type DayTabSlotProps = {
-  label: string;
-  to: string;
-  exact: boolean;
-  date: string;
-  orgSlug?: string;
-};
-
-function DayTabSlot({ label, to, exact, date, orgSlug }: DayTabSlotProps) {
-  const linkRef = useRef<HTMLAnchorElement>(null);
-  const [width, setWidth] = useState<number>();
-
-  useLayoutEffect(() => {
-    const link = linkRef.current;
-    if (!link) return;
-
-    const sync = () => setWidth(link.getBoundingClientRect().width);
-    sync();
-
-    const observer = new ResizeObserver(sync);
-    observer.observe(link);
-    return () => observer.disconnect();
-  }, []);
-
-  return (
-    <span
-      className="inline-flex overflow-hidden transition-[width] duration-200 ease-out motion-reduce:transition-none"
-      style={{ width }}
-    >
-      <Link
-        ref={linkRef}
-        to={to}
-        params={orgSlug ? { orgSlug } : undefined}
-        search={dateLinkSearch(date)}
-        activeOptions={exact ? { exact: true, includeSearch: false } : { includeSearch: false }}
-        className="group shrink-0 px-px py-[18px] text-muted-foreground"
-        activeProps={{
-          className:
-            "group is-active shrink-0 px-px py-[18px] text-foreground shadow-[inset_0_-2px_0_var(--foreground)]",
-        }}
-      >
-        <TabContent label={label} />
-      </Link>
-    </span>
-  );
-}
-
 export function NavTabs() {
   useLogicalDayClock();
   const orgSlug = useActiveOrgSlug();
   const { data } = useGetUnscheduledTasksQuery();
   const unscheduledCount = data?.tasks.length ?? 0;
-  const selectedDate = useSelector((state: RootState) => state.day.selectedDate);
-  const dayLabel = dayTabLabel(selectedDate, effectiveDayIso());
   const tabs = mainNavItems(orgSlug);
 
   return (
@@ -116,12 +62,10 @@ export function NavTabs() {
 
         if (isDayTab) {
           return (
-            <DayTabSlot
+            <DayTab
               key={tab.to}
-              label={dayLabel}
               to={tab.to}
               exact={tab.exact}
-              date={selectedDate}
               orgSlug={orgParams?.orgSlug}
             />
           );
