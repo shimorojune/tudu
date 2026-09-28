@@ -38,6 +38,9 @@ jobs:
   unit:
     name: Unit tests
     runs-on: ubuntu-latest
+    env:
+      E2E_DATABASE_URL: ${{ secrets.E2E_DATABASE_URL_0 || secrets.E2E_DATABASE_URL }}
+      E2E_BETTER_AUTH_SECRET: ${{ secrets.E2E_BETTER_AUTH_SECRET }}
     steps:
       - uses: actions/checkout@v4
 
@@ -53,6 +56,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm test:coverage
+
+      - run: pnpm test:db
 
   desktop-check:
     name: Desktop Rust check
@@ -76,14 +81,14 @@ jobs:
       - run: cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml
 
   e2e:
-    name: Playwright E2E
+    name: Playwright E2E (${{ matrix.shard }}/5)
     needs: [static, unit]
     runs-on: ubuntu-latest
-    concurrency:
-      group: e2e-db
-      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5]
     env:
-      E2E_DATABASE_URL: ${{ secrets.E2E_DATABASE_URL }}
       E2E_BETTER_AUTH_SECRET: ${{ secrets.E2E_BETTER_AUTH_SECRET }}
       NOTIFICATION_JOBS_ENABLED: "false"
       JIRA_TOKEN_ENCRYPTION_KEY: e2e-jira-encryption-key-32bytes!
@@ -100,19 +105,44 @@ jobs:
           node-version: 20
           cache: pnpm
 
+      - name: Set E2E database URL for shard
+        env:
+          SHARD: ${{ matrix.shard }}
+          E2E_DATABASE_URL_0: ${{ secrets.E2E_DATABASE_URL_0 }}
+          E2E_DATABASE_URL_1: ${{ secrets.E2E_DATABASE_URL_1 }}
+          E2E_DATABASE_URL_2: ${{ secrets.E2E_DATABASE_URL_2 }}
+          E2E_DATABASE_URL_3: ${{ secrets.E2E_DATABASE_URL_3 }}
+          E2E_DATABASE_URL_4: ${{ secrets.E2E_DATABASE_URL_4 }}
+          E2E_DATABASE_URL_LEGACY: ${{ secrets.E2E_DATABASE_URL }}
+        run: |
+          case "$SHARD" in
+            1) URL="$E2E_DATABASE_URL_0" ;;
+            2) URL="$E2E_DATABASE_URL_1" ;;
+            3) URL="$E2E_DATABASE_URL_2" ;;
+            4) URL="$E2E_DATABASE_URL_3" ;;
+            5) URL="$E2E_DATABASE_URL_4" ;;
+            *) echo "Invalid shard $SHARD"; exit 1 ;;
+          esac
+          if [ -z "$URL" ]; then
+            URL="$E2E_DATABASE_URL_LEGACY"
+          fi
+          if [ -z "$URL" ]; then
+            echo "Missing E2E_DATABASE_URL_$((SHARD - 1)) (and no legacy E2E_DATABASE_URL)"
+            exit 1
+          fi
+          echo "E2E_DATABASE_URL=$URL" >> "$GITHUB_ENV"
+
       - run: pnpm install --frozen-lockfile
 
       - name: Install Playwright Chromium
         run: pnpm exec playwright install chromium --with-deps
 
-      - run: pnpm test:db
-
-      - run: pnpm test:e2e
+      - run: pnpm test:e2e -- --shard=${{ matrix.shard }}/5
 
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: |
             apps/e2e/test-results/
             apps/e2e/playwright-report/
