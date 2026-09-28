@@ -4,6 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 import { NOW_CAP_EXCEEDED_MESSAGE } from "@tudu/shared";
 import { NewTaskDialog } from "./NewTaskDialog";
 
+vi.mock("@/hooks/useProjectSpaceScope", () => ({
+  useProjectSpaceScope: () => ({ kind: "personal" as const }),
+}));
+
 vi.mock("@/hooks/useTaskFieldSuggest", () => ({
   useTaskFieldSuggest: () => {},
 }));

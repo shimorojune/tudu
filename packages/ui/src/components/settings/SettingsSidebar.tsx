@@ -5,7 +5,7 @@ export type SettingsSection =
   | "general"
   | "projects"
   | "jira"
-  | "manager"
+  | "organizations"
   | "notifications";
 
 type SettingsSidebarProps = {
@@ -19,7 +19,7 @@ const sections: { id: SettingsSection; label: string }[] = [
   { id: "account", label: "Account and login" },
   { id: "projects", label: "Projects" },
   { id: "jira", label: "JIRA connection" },
-  { id: "manager", label: "Manager, privacy and rollover" },
+  { id: "organizations", label: "Organizations" },
   { id: "notifications", label: "Notifications" },
 ];
 

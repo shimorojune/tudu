@@ -10,7 +10,6 @@ import type {
 import { calendarDayIso, inProgressForPlacement } from "@tudu/shared";
 import type { AppDispatch, RootState } from "../store.js";
 import { baseApi } from "./baseApi.js";
-import { managerApi } from "./managerApi.js";
 import { tasksApi } from "./tasksApi.js";
 
 type TaskQueryEntry = {
@@ -134,16 +133,6 @@ export function patchAllTaskCaches(
       );
     }
 
-    if (entry.endpointName === "getReportDay") {
-      const args = entry.originalArgs as { userId: string; date: string };
-      patches.push(
-        dispatch(
-          managerApi.util.updateQueryData("getReportDay", args, (draft) => {
-            draft.tasks = updater(draft.tasks);
-          }),
-        ),
-      );
-    }
   }
 
   return patches;

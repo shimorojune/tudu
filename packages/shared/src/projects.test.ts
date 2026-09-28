@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createProjectRequestSchema,
+  filterProjectsForSpace,
   pickProjectToEnsure,
   projectNameKey,
   updateProjectRequestSchema,
@@ -10,16 +11,16 @@ describe("createProjectRequestSchema", () => {
   it("trims the name and accepts a color", () => {
     const result = createProjectRequestSchema.parse({
       name: "  EGS  ",
-      color: "ember",
+      color: "vermilion",
     });
 
-    expect(result).toEqual({ name: "EGS", color: "ember" });
+    expect(result).toEqual({ name: "EGS", color: "vermilion" });
   });
 
   it("rejects a blank name", () => {
     const result = createProjectRequestSchema.safeParse({
       name: "   ",
-      color: "ember",
+      color: "vermilion",
     });
 
     expect(result.success).toBe(false);
@@ -92,5 +93,24 @@ describe("pickProjectToEnsure", () => {
 describe("projectNameKey", () => {
   it("is case-insensitive", () => {
     expect(projectNameKey(" Egs ")).toBe("egs");
+  });
+});
+
+describe("filterProjectsForSpace", () => {
+  const sample = [
+    { id: "1", name: "Personal", orgId: null },
+    { id: "2", name: "Org", orgId: "org-a" },
+  ];
+
+  it("keeps personal projects in personal space", () => {
+    expect(filterProjectsForSpace(sample, { kind: "personal" })).toEqual([
+      sample[0],
+    ]);
+  });
+
+  it("keeps matching org projects in org space", () => {
+    expect(
+      filterProjectsForSpace(sample, { kind: "org", orgId: "org-a" }),
+    ).toEqual([sample[1]]);
   });
 });

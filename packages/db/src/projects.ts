@@ -8,6 +8,7 @@ import {
   type ProjectRef,
 } from "@tudu/shared";
 import type { Db } from "./index.js";
+import { requireMemberByOrgId } from "./access.js";
 import { projects, type ProjectRow } from "./projects-schema.js";
 import { tasks } from "./tasks-schema.js";
 
@@ -29,6 +30,7 @@ export function mapProject(row: ProjectRow): Project {
     color: row.color,
     archivedAt: row.archivedAt?.toISOString() ?? null,
     isPrivate: row.isPrivate,
+    orgId: row.orgId ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -56,6 +58,7 @@ export function mapProjectRef(
     color: row.color,
     archivedAt: row.archivedAt?.toISOString() ?? null,
     isPrivate: row.isPrivate,
+    orgId: row.orgId ?? null,
   };
 }
 
@@ -128,6 +131,20 @@ export async function assertAssignableProject(
   return row;
 }
 
+export async function assertProjectMatchesTaskOrg(
+  db: Db,
+  userId: string,
+  projectId: string,
+  taskOrgId: string | null,
+): Promise<ProjectRow> {
+  const row = await assertAssignableProject(db, userId, projectId);
+  const projectOrgId = row.orgId ?? null;
+  if (projectOrgId !== taskOrgId) {
+    throw new ProjectError("Project does not belong to this space", 400);
+  }
+  return row;
+}
+
 export async function assertPublicAssignableProject(
   db: Db,
   userId: string,
@@ -178,6 +195,7 @@ export type CreateProjectInput = {
   name: string;
   color: ProjectColor;
   isPrivate?: boolean;
+  orgId?: string | null;
 };
 
 export async function createProject(
@@ -185,11 +203,18 @@ export async function createProject(
   input: CreateProjectInput,
 ): Promise<ProjectRow> {
   const name = normalizeProjectName(input.name);
+  const orgId = input.orgId ?? null;
+  if (orgId) {
+    await requireMemberByOrgId(db, input.userId, orgId);
+  }
+
   const existing = await db.query.projects.findFirst({
     where: and(
-      eq(projects.userId, input.userId),
       isNull(projects.deletedAt),
       sql`lower(${projects.name}) = ${projectNameKey(name)}`,
+      orgId
+        ? eq(projects.orgId, orgId)
+        : and(eq(projects.userId, input.userId), isNull(projects.orgId)),
     ),
   });
 
@@ -204,7 +229,8 @@ export async function createProject(
       userId: input.userId,
       name,
       color: input.color,
-      isPrivate: input.isPrivate ?? false,
+      isPrivate: orgId ? false : (input.isPrivate ?? false),
+      orgId,
     })
     .returning();
 

@@ -16,13 +16,7 @@ import {
 } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import {
-  BUCKETS,
-  DEFAULT_MANAGER_PERMISSIONS,
-  type Bucket,
-  type ManagerPermissions,
-  type Task,
-} from "@tudu/shared";
+import { BUCKETS, type Bucket, type Task } from "@tudu/shared";
 import {
   useCreateSubtaskMutation,
   useCreateTaskMutation,
@@ -33,8 +27,6 @@ import {
   useUpdateSubtaskMutation,
   useUpdateTaskMutation,
   useUploadTaskAttachmentMutation,
-  useReorderReportTasksMutation,
-  useDeleteReportTaskMutation,
   todayIso,
   selectVisible,
 } from "@tudu/store";
@@ -79,7 +71,11 @@ import {
 } from "@/components/tasks/NewTaskDialog";
 import { patchTaskDescriptionIfAttachmentsChanged } from "@/lib/afterCreateTaskDescription";
 import { createTaskBody } from "@/lib/createTask";
-import type { TaskRowActions, TaskViewer } from "@/components/tasks/TaskRow";
+import { orgIdForSpace } from "@/lib/taskSpace";
+import { MoveToSpaceDialog } from "@/components/orgs/MoveToSpaceDialog";
+import type { TaskOrgBadge, TaskRowActions, TaskViewer } from "@/components/tasks/TaskRow";
+import { mergeSubsetReorder } from "@/lib/spaceTasks";
+import type { CurrentSpace } from "@tudu/store";
 import { useNewTaskShortcut } from "@/hooks/useNewTaskShortcut";
 import { usePointerY } from "@/hooks/usePointerY";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -95,10 +91,11 @@ export type DayTaskListProps = {
   onDeselectTask?: () => void;
   onTaskDeleted?: (id: string) => void;
   viewer?: TaskViewer;
-  reportUserId?: string;
-  reportPermissions?: ManagerPermissions;
   header?: ReactNode;
   highlightTaskId?: string | null;
+  space?: CurrentSpace;
+  aggregateOpenTasks?: Task[];
+  orgBadgeForTask?: (task: Task) => TaskOrgBadge | null;
 };
 
 type DayTaskListDndProps = {
@@ -119,6 +116,7 @@ type DayTaskListDndProps = {
   onFlashComplete: () => void;
   viewer: TaskViewer;
   canDragRows: boolean;
+  orgBadgeForTask?: (task: Task) => TaskOrgBadge | null;
 };
 
 function DayTaskListDnd({
@@ -139,6 +137,7 @@ function DayTaskListDnd({
   onFlashComplete,
   viewer,
   canDragRows,
+  orgBadgeForTask,
 }: DayTaskListDndProps) {
   const remoteMovedTaskIds = useSelector(selectVisible).remoteMovedTaskIds;
   const { droppableRects } = useDndContext();
@@ -311,6 +310,7 @@ function DayTaskListDnd({
           skipSlideForTaskIds={remoteMovedTaskIds}
           viewer={viewer}
           canDragRows={canDragRows}
+          orgBadgeForTask={orgBadgeForTask}
         />
       ))}
       <CompletedSection
@@ -343,19 +343,22 @@ export function DayTaskList({
   onDeselectTask,
   onTaskDeleted,
   viewer = "owner",
-  reportUserId,
-  reportPermissions,
   header,
   highlightTaskId = null,
+  space = { kind: "personal" },
+  aggregateOpenTasks,
+  orgBadgeForTask,
 }: DayTaskListProps) {
+  const [moveTarget, setMoveTarget] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
   const isToday = selectedDate === todayIso();
   const [flashTaskId, setFlashTaskId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogBucket, setDialogBucket] = useState<Bucket>("later");
-  const isManager = viewer === "manager";
-  const permissions = reportPermissions ?? DEFAULT_MANAGER_PERMISSIONS;
-  const canReorder = !isManager || permissions.canReorder;
-  const canDelete = !isManager || permissions.canDelete;
+  const canReorder = true;
+  const canDelete = true;
 
   const { open: openTasks, completed: completedTasks } = useMemo(
     () => splitOpenAndCompleted(tasks),
@@ -367,9 +370,16 @@ export function DayTaskList({
     [openTasks],
   );
 
+  const aggregateBaseItems = useMemo(
+    () =>
+      aggregateOpenTasks
+        ? itemsFromTasks(aggregateOpenTasks, BUCKETS, openTaskContainer)
+        : baseItems,
+    [aggregateOpenTasks, baseItems],
+  );
+
   const groupedForPrompt = useMemo(() => tasksByBucketOpen(openTasks), [openTasks]);
   const showNowClearPrompt =
-    !isManager &&
     isToday &&
     openNowCount(openTasks) === 0 &&
     groupedForPrompt.next.length > 0;
@@ -379,8 +389,6 @@ export function DayTaskList({
   const [uploadTaskAttachment] = useUploadTaskAttachmentMutation();
   const [deleteTask] = useDeleteTaskMutation();
   const [reorderTasks] = useReorderTasksMutation();
-  const [reorderReportTasks] = useReorderReportTasksMutation();
-  const [deleteReportTask] = useDeleteReportTaskMutation();
   const [reorderSubtasks] = useReorderSubtasksMutation();
   const [createSubtask] = useCreateSubtaskMutation();
   const [deleteSubtask] = useDeleteSubtaskMutation();
@@ -391,7 +399,7 @@ export function DayTaskList({
     setDialogOpen(true);
   }, []);
 
-  useNewTaskShortcut(() => openDialog("later"), { enabled: !isManager });
+  useNewTaskShortcut(() => openDialog("later"));
 
   useEffect(() => {
     if (highlightTaskId) {
@@ -415,13 +423,6 @@ export function DayTaskList({
       toast.error(NOW_CAP_EXCEEDED_MESSAGE);
       return;
     }
-    if (isManager && !canReorder) {
-      return;
-    }
-    if (isManager && reportUserId) {
-      reorderReportTasks({ userId: reportUserId, lanes });
-      return;
-    }
     reorderTasks({ lanes });
   }
 
@@ -435,30 +436,17 @@ export function DayTaskList({
   function makeRowActions(taskId: string): TaskRowActions {
     return {
       onComplete: (completed) => {
-        if (isManager) {
-          return;
-        }
         updateTask({ id: taskId, patch: { completed } });
       },
       onRename: (title) => {
-        if (isManager) {
-          return;
-        }
         updateTask({ id: taskId, patch: { title } });
       },
       onDelete: canDelete
         ? () => {
-            if (isManager && reportUserId) {
-              void notifyAction(
-                () => mutationResult(deleteReportTask({ userId: reportUserId, taskId })),
-                { success: "Task deleted", error: "Could not delete the task" },
-              );
-            } else {
-              void notifyAction(
-                () => mutationResult(deleteTask(taskId)),
-                { success: "Task deleted", error: "Could not delete the task" },
-              );
-            }
+            void notifyAction(
+              () => mutationResult(deleteTask(taskId)),
+              { success: "Task deleted", error: "Could not delete the task" },
+            );
             onTaskDeleted?.(taskId);
           }
         : undefined,
@@ -494,8 +482,7 @@ export function DayTaskList({
             applyReorder(lanes);
           }
         : undefined,
-      onScheduleForTomorrow:
-        canReorder && !isManager
+      onScheduleForTomorrow: canReorder
           ? () => {
               const task = tasks.find((entry) => entry.id === taskId);
               if (!task?.bucket) {
@@ -511,40 +498,44 @@ export function DayTaskList({
             }
           : undefined,
       onToggleSubtask: (subtaskId, done) => {
-        if (isManager) {
-          return;
-        }
         updateSubtask({ id: subtaskId, patch: { done } });
       },
       onRenameSubtask: (subtaskId, title) => {
-        if (isManager) {
-          return;
-        }
         updateSubtask({ id: subtaskId, patch: { title } });
       },
       onDeleteSubtask: (subtaskId) => {
-        if (isManager) {
-          return;
-        }
         deleteSubtask(subtaskId);
       },
       onAddSubtask: (title) => {
-        if (isManager) {
-          return;
-        }
         createSubtask({ taskId, body: { title } });
       },
       onReorderSubtasks: (subtaskIds) => {
-        if (isManager) {
-          return;
-        }
         reorderSubtasks({ taskId, body: { subtaskIds } });
       },
+      onMoveToSpace:
+        space.kind === "personal" && !tasks.find((t) => t.id === taskId)?.orgId
+          ? () => {
+              const task = tasks.find((entry) => entry.id === taskId);
+              if (task) {
+                setMoveTarget({ id: task.id, title: task.title });
+              }
+            }
+          : undefined,
     };
   }
 
   function handleReorder(afterItems: ContainerItems) {
-    applyReorder(lanesFromItems({ before: baseItems, after: afterItems, laneFor }));
+    const mergedItems =
+      aggregateOpenTasks && space.kind === "org"
+        ? mergeSubsetReorder(aggregateOpenTasks, afterItems, selectedDate)
+        : afterItems;
+    applyReorder(
+      lanesFromItems({
+        before: aggregateBaseItems,
+        after: mergedItems,
+        laneFor,
+      }),
+    );
   }
 
   async function handleCreateTask(args: NewTaskSubmitArgs) {
@@ -560,6 +551,7 @@ export function DayTaskList({
               startDate: args.startDate,
               deadline: args.deadline,
               projectId: args.projectId,
+              orgId: orgIdForSpace(space),
             }),
           ),
         ),
@@ -621,19 +613,30 @@ export function DayTaskList({
             onFlashComplete={() => setFlashTaskId(null)}
             viewer={viewer}
             canDragRows={canReorder}
+            orgBadgeForTask={orgBadgeForTask}
           />
         </DndContext>
       </ScrollArea>
-      {isManager ? null : (
-        <NewTaskDialog
-          open={dialogOpen}
-          initialBucket={dialogBucket}
-          initialDate={selectedDate}
-          nowCount={openNowCount(openTasks)}
-          onOpenChange={setDialogOpen}
-          onSubmit={handleCreateTask}
+      {moveTarget ? (
+        <MoveToSpaceDialog
+          open={Boolean(moveTarget)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setMoveTarget(null);
+            }
+          }}
+          taskId={moveTarget.id}
+          taskTitle={moveTarget.title}
         />
-      )}
+      ) : null}
+      <NewTaskDialog
+        open={dialogOpen}
+        initialBucket={dialogBucket}
+        initialDate={selectedDate}
+        nowCount={openNowCount(openTasks)}
+        onOpenChange={setDialogOpen}
+        onSubmit={handleCreateTask}
+      />
     </div>
   );
 }

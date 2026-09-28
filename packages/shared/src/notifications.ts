@@ -57,6 +57,7 @@ export type AppNotification = {
   ownerId: string | null;
   commentId: string | null;
   inboxItemId: string | null;
+  orgId: string | null;
   scheduledDate: string | null;
   jiraIssueId: string | null;
   jiraIssueKey: string | null;

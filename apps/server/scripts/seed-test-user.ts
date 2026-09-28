@@ -6,15 +6,12 @@ import {
   createProject,
   createTask,
   ensureProjectForUser,
-  inboxItems,
-  managerLinks,
-  managerPermissions,
   projects,
   tasks,
   updateProject,
   user,
 } from "@tudu/db";
-import { DEFAULT_MANAGER_PERMISSIONS, effectiveDayIso } from "@tudu/shared";
+import { effectiveDayIso } from "@tudu/shared";
 import { and, eq, isNull } from "drizzle-orm";
 import { createAuth } from "../src/auth.js";
 
@@ -65,6 +62,10 @@ async function ensureUser(
     .limit(1);
 
   if (existing[0]) {
+    await db
+      .update(user)
+      .set({ onboardedAt: new Date() })
+      .where(eq(user.id, existing[0].id));
     return existing[0].id;
   }
 
@@ -89,37 +90,12 @@ async function ensureUser(
     throw new Error(`Failed to seed ${email}`);
   }
 
+  await db
+    .update(user)
+    .set({ onboardedAt: new Date() })
+    .where(eq(user.id, created[0].id));
+
   return created[0].id;
-}
-
-async function ensureLink(
-  db: ReturnType<typeof createDb>,
-  managerUserId: string,
-  reportUserId: string,
-) {
-  const existing = await db.query.managerLinks.findFirst({
-    where: and(
-      eq(managerLinks.managerUserId, managerUserId),
-      eq(managerLinks.reportUserId, reportUserId),
-      isNull(managerLinks.deletedAt),
-    ),
-  });
-
-  if (existing) {
-    return existing.id;
-  }
-
-  const [link] = await db
-    .insert(managerLinks)
-    .values({ managerUserId, reportUserId })
-    .returning();
-
-  await db.insert(managerPermissions).values({
-    managerLinkId: link!.id,
-    ...DEFAULT_MANAGER_PERMISSIONS,
-  });
-
-  return link!.id;
 }
 
 async function main() {
@@ -149,18 +125,15 @@ async function main() {
   const marcusId = ids["marcus@egain.com"]!;
   const priyaId = ids["priya@egain.com"]!;
 
-  await ensureLink(db, marcusId, testuserId);
-  await ensureLink(db, testuserId, priyaId);
-
   const egs = await ensureProjectForUser(db, testuserId, {
     name: "EGS",
-    color: "ember",
+    color: "vermilion",
   });
   const home = await ensureProjectForUser(db, testuserId, {
     name: "Home",
     color: "moss",
   });
-  await ensureProjectForUser(db, marcusId, { name: "EGS", color: "ember" });
+  await ensureProjectForUser(db, marcusId, { name: "EGS", color: "vermilion" });
 
   let side = await db.query.projects.findFirst({
     where: and(
@@ -182,93 +155,6 @@ async function main() {
 
   const today = effectiveDayIso();
   const tomorrow = offsetIso(today, 1);
-
-  const pendingFromMarcus = await db.query.inboxItems.findFirst({
-    where: and(
-      eq(inboxItems.fromUserId, marcusId),
-      eq(inboxItems.toUserId, testuserId),
-      eq(inboxItems.status, "pending"),
-      isNull(inboxItems.deletedAt),
-    ),
-  });
-
-  if (!pendingFromMarcus) {
-    const first = await createTask(db, {
-      userId: testuserId,
-      title: "Write up capacity risks for Q4 planning",
-      scheduledDate: null,
-      bucket: null,
-      startDate: tomorrow,
-      deadline: new Date(`${offsetIso(today, 3)}T18:00:00.000Z`),
-      isPrivate: false,
-    });
-    await db.insert(inboxItems).values({
-      taskId: first.id,
-      fromUserId: marcusId,
-      toUserId: testuserId,
-      status: "pending",
-    });
-
-    const second = await createTask(db, {
-      userId: testuserId,
-      title: "Take over the archive migration dry run",
-      scheduledDate: null,
-      bucket: null,
-      startDate: null,
-      deadline: null,
-      isPrivate: false,
-    });
-    await db.insert(inboxItems).values({
-      taskId: second.id,
-      fromUserId: marcusId,
-      toUserId: testuserId,
-      status: "pending",
-    });
-
-    const accepted = await createTask(db, {
-      userId: testuserId,
-      title: "Review Priya's version-comparison patch",
-      scheduledDate: today,
-      bucket: "next",
-      startDate: null,
-      deadline: null,
-      isPrivate: false,
-    });
-    await db.insert(inboxItems).values({
-      taskId: accepted.id,
-      fromUserId: marcusId,
-      toUserId: testuserId,
-      status: "accepted",
-    });
-  }
-
-  const bounced = await db.query.inboxItems.findFirst({
-    where: and(
-      eq(inboxItems.fromUserId, testuserId),
-      eq(inboxItems.toUserId, marcusId),
-      eq(inboxItems.status, "pending"),
-      isNull(inboxItems.deletedAt),
-    ),
-  });
-
-  if (!bounced) {
-    const returned = await createTask(db, {
-      userId: marcusId,
-      title: "Pair with Jun on migration dry run",
-      scheduledDate: null,
-      bucket: null,
-      startDate: null,
-      deadline: null,
-      isPrivate: false,
-    });
-    await db.insert(inboxItems).values({
-      taskId: returned.id,
-      fromUserId: testuserId,
-      toUserId: marcusId,
-      status: "pending",
-      declineReason: "Wednesday is the release cut. Can this move to next week?",
-    });
-  }
 
   const privateTask = await db.query.tasks.findFirst({
     where: and(
@@ -378,7 +264,7 @@ async function main() {
     });
     const priyaEgs = await ensureProjectForUser(db, priyaId, {
       name: "EGS",
-      color: "ember",
+      color: "vermilion",
     });
     const slipping = await createTask(db, {
       userId: priyaId,
@@ -406,7 +292,7 @@ async function main() {
     });
   }
 
-  console.log("Manager graph ready: Marcus manages testuser, testuser manages Priya");
+  console.log("Seed data ready for testuser, Marcus, and Priya");
 }
 
 main().catch((error) => {

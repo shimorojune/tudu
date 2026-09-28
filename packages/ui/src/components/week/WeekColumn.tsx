@@ -30,7 +30,6 @@ export type WeekColumnProps = {
   onHighlight: () => void;
   onPopoverChange: (taskId: string | null) => void;
   viewer?: WeekViewer;
-  reportUserId?: string;
 };
 
 function BucketZone({
@@ -43,7 +42,6 @@ function BucketZone({
   popoverTaskId,
   onPopoverChange,
   viewer,
-  reportUserId,
 }: {
   date: string;
   bucket: Bucket;
@@ -54,7 +52,6 @@ function BucketZone({
   popoverTaskId: string | null;
   onPopoverChange: (taskId: string | null) => void;
   viewer?: WeekViewer;
-  reportUserId?: string;
 }) {
   const remoteMovedTaskIds = useSelector(selectVisible).remoteMovedTaskIds;
   const filterProjectId = useProjectFilterId();
@@ -87,7 +84,6 @@ function BucketZone({
                 open={open}
                 onOpenChange={(next) => onPopoverChange(next ? task.id : null)}
                 viewer={viewer}
-                reportUserId={reportUserId}
               >
                 <SortableWeekCard
                   task={task}
@@ -116,7 +112,6 @@ export function WeekColumn({
   onHighlight,
   onPopoverChange,
   viewer,
-  reportUserId,
 }: WeekColumnProps) {
   const weekend = isWeekendIso(date);
   const dayDate = parseIsoDate(date);
@@ -189,7 +184,6 @@ export function WeekColumn({
             popoverTaskId={popoverTaskId}
             onPopoverChange={onPopoverChange}
             viewer={viewer}
-            reportUserId={reportUserId}
           />
         ))}
       </div>

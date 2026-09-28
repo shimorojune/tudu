@@ -18,7 +18,6 @@ import {
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { effectiveDayIso } from "@tudu/shared";
 import {
-  useReorderReportTasksMutation,
   useReorderTasksMutation,
 } from "@tudu/store";
 import {
@@ -63,7 +62,6 @@ export type WeekGridProps = {
   highlightedDay: string;
   onHighlightDay: (day: string) => void;
   viewer?: WeekViewer;
-  reportUserId?: string;
 };
 
 function containerOf(task: Task): string | null {
@@ -78,7 +76,6 @@ type WeekGridDndProps = WeekGridProps & {
   baseItems: ContainerItems;
   onReorder: (items: ContainerItems) => void;
   viewer: WeekViewer;
-  reportUserId?: string;
 };
 
 function WeekGridDnd({
@@ -89,7 +86,6 @@ function WeekGridDnd({
   highlightedDay,
   onHighlightDay,
   viewer,
-  reportUserId,
 }: WeekGridDndProps) {
   const today = effectiveDayIso();
   const filterProjectId = useProjectFilterId();
@@ -317,7 +313,6 @@ function WeekGridDnd({
               onHighlight={() => onHighlightDay(day)}
               onPopoverChange={setPopoverTaskId}
               viewer={viewer}
-              reportUserId={reportUserId}
             />
           ))}
         </div>
@@ -346,10 +341,8 @@ export function WeekGrid({
   highlightedDay,
   onHighlightDay,
   viewer = "self",
-  reportUserId,
 }: WeekGridProps) {
   const [reorderTasks] = useReorderTasksMutation();
-  const [reorderReportTasks] = useReorderReportTasksMutation();
 
   const allTasks = useMemo(() => {
     const dayTasks = weekDays.flatMap((day) => tasksByDay.get(day) ?? []);
@@ -390,11 +383,7 @@ export function WeekGrid({
       return;
     }
     if (lanes.length > 0) {
-      if (viewer === "manager" && reportUserId) {
-        reorderReportTasks({ userId: reportUserId, lanes });
-      } else {
-        reorderTasks({ lanes });
-      }
+      reorderTasks({ lanes });
     }
   }
 
@@ -415,7 +404,6 @@ export function WeekGrid({
         highlightedDay={highlightedDay}
         onHighlightDay={onHighlightDay}
         viewer={viewer}
-        reportUserId={reportUserId}
       />
     </DndContext>
   );

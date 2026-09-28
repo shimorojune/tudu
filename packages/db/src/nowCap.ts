@@ -31,7 +31,15 @@ export async function countOpenNowForUserOnDate(
   db: Db,
   userId: string,
   date: string,
+  orgId?: string | null,
 ): Promise<number> {
+  const orgClause =
+    orgId === undefined
+      ? undefined
+      : orgId === null
+        ? isNull(tasks.orgId)
+        : eq(tasks.orgId, orgId);
+
   const rows = await db.query.tasks.findMany({
     where: and(
       eq(tasks.userId, userId),
@@ -39,6 +47,8 @@ export async function countOpenNowForUserOnDate(
       eq(tasks.bucket, "now"),
       isNull(tasks.completedAt),
       isNull(tasks.deletedAt),
+      isNull(tasks.pendingRequestId),
+      orgClause,
     ),
     columns: {
       id: true,
@@ -55,12 +65,21 @@ export async function assertNowCapForCreate(
   userId: string,
   scheduledDate: string | null,
   bucket: Bucket | null,
+  orgId: string | null = null,
 ): Promise<void> {
   const today = calendarDayIso();
   if (scheduledDate !== today || bucket !== "now") {
     return;
   }
-  const openNowCount = await countOpenNowForUserOnDate(db, userId, today);
+  if (orgId === null) {
+    return;
+  }
+  const openNowCount = await countOpenNowForUserOnDate(
+    db,
+    userId,
+    today,
+    orgId,
+  );
   if (
     !canPlaceInNow({
       today,
@@ -81,7 +100,15 @@ export async function assertNowCapForUpdate(
   bucket: Bucket | null,
 ): Promise<void> {
   const today = calendarDayIso();
-  const openNowCount = await countOpenNowForUserOnDate(db, userId, today);
+  if (existing.orgId === null) {
+    return;
+  }
+  const openNowCount = await countOpenNowForUserOnDate(
+    db,
+    userId,
+    today,
+    existing.orgId,
+  );
   if (
     !canPlaceInNow({
       today,

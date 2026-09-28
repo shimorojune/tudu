@@ -17,6 +17,7 @@ import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
 import { WeekGrid } from "@/components/week/WeekGrid";
 import { patchTaskDescriptionIfAttachmentsChanged } from "@/lib/afterCreateTaskDescription";
 import { createTaskBody } from "@/lib/createTask";
+import { orgIdForSpace } from "@/lib/taskSpace";
 import { openNowCount } from "@/lib/nowCount";
 import {
   defaultHighlightDay,
@@ -35,6 +36,7 @@ export function WeekRoute() {
   const weekDays = useMemo(() => weekDaysFromWeekId(weekId), [weekId]);
   const today = effectiveDayIso();
   const selectedDate = useSelector((state: RootState) => state.day.selectedDate);
+  const space = useSelector((state: RootState) => state.space.current);
   useDaySearchSync(DATE_ONLY_FIELDS, { weekDays, today });
 
   const { unscheduledQuery, tasksByDay, isLoading, isError } =
@@ -118,6 +120,7 @@ export function WeekRoute() {
               startDate: args.startDate,
               deadline: args.deadline,
               projectId: args.projectId,
+              orgId: orgIdForSpace(space),
             }),
           ).unwrap();
 

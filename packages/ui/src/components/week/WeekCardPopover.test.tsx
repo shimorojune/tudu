@@ -102,7 +102,7 @@ describe("WeekCardPopover", () => {
     expect(screen.getByRole("button", { name: "Move to Priority 2" })).toBeInTheDocument();
   });
 
-  it("hides complete for a manager and opens the report day", async () => {
+  it("hides complete for a manager viewer and opens the day", async () => {
     const user = userEvent.setup();
 
     function Harness() {
@@ -118,7 +118,6 @@ describe("WeekCardPopover", () => {
               open={open}
               onOpenChange={setOpen}
               viewer="manager"
-              reportUserId="priya"
             >
               <SortableWeekCard
                 task={task}
@@ -144,10 +143,8 @@ describe("WeekCardPopover", () => {
     await user.click(screen.getByRole("button", { name: "Open day" }));
 
     expect(navigate).toHaveBeenCalledWith({
-      to: "/team/$userId",
-      params: { userId: "priya" },
+      to: "/",
       search: {
-        send: false,
         date: "2026-09-10",
         task: task.id,
       },

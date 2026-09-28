@@ -27,6 +27,10 @@ vi.mock("react-redux", () => ({
   useDispatch: () => dispatch,
 }));
 
+vi.mock("@/hooks/useProjectSpaceScope", () => ({
+  useProjectSpaceScope: () => ({ kind: "personal" as const }),
+}));
+
 const task: Task = {
   id: "11111111-1111-4111-8111-111111111111",
   title: "Ship it",
@@ -47,7 +51,7 @@ const task: Task = {
   project: {
     id: "33333333-3333-4333-8333-333333333333",
     name: "EGS",
-    color: "ember",
+    color: "vermilion",
     archivedAt: null,
     isPrivate: false,
   },

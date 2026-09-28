@@ -83,54 +83,6 @@ export function syncOpToAnalytics(op: SyncOp): AnalyticsEventPayload | null {
           op_type: op.type,
         },
       };
-    case "inbox.accept":
-      return {
-        event: "inbox_item_accepted",
-        properties: { inbox_item_id: op.id, op_type: op.type },
-      };
-    case "inbox.decline":
-      return {
-        event: "inbox_item_declined",
-        properties: { inbox_item_id: op.id, op_type: op.type },
-      };
-    case "team.invite.create":
-      return {
-        event: "team_invite_sent",
-        properties: { op_type: op.type },
-      };
-    case "team.invite.accept":
-      return {
-        event: "team_invite_accepted",
-        properties: { invite_id: op.id, op_type: op.type },
-      };
-    case "team.invite.decline":
-      return {
-        event: "team_invite_declined",
-        properties: { invite_id: op.id, op_type: op.type },
-      };
-    case "team.task.send":
-      return {
-        event: "inbox_task_sent",
-        properties: {
-          task_id: op.id,
-          report_user_id: op.userId,
-          op_type: op.type,
-        },
-      };
-    case "team.task.reorder":
-      return {
-        event: "report_tasks_reordered",
-        properties: { report_user_id: op.userId, op_type: op.type },
-      };
-    case "team.task.delete":
-      return {
-        event: "report_task_deleted",
-        properties: {
-          task_id: op.taskId,
-          report_user_id: op.userId,
-          op_type: op.type,
-        },
-      };
     case "notification.read":
     case "notification.readAll":
       return null;
@@ -148,15 +100,6 @@ export function syncOpToAnalytics(op: SyncOp): AnalyticsEventPayload | null {
       return {
         event: "project_deleted",
         properties: { project_id: op.id, op_type: op.type },
-      };
-    case "team.project.create":
-      return {
-        event: "report_project_created",
-        properties: {
-          project_id: op.id,
-          report_user_id: op.userId,
-          op_type: op.type,
-        },
       };
     case "jira.link":
       return {
@@ -181,16 +124,6 @@ export function syncOpToAnalytics(op: SyncOp): AnalyticsEventPayload | null {
         event: "jira_task_spawned",
         properties: {
           task_id: op.id,
-          jira_issue_id: op.body.issueId,
-          op_type: op.type,
-        },
-      };
-    case "jira.reportTask.spawn":
-      return {
-        event: "jira_report_task_spawned",
-        properties: {
-          task_id: op.id,
-          report_user_id: op.body.reportUserId,
           jira_issue_id: op.body.issueId,
           op_type: op.type,
         },

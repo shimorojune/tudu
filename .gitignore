@@ -20,6 +20,9 @@ apps/server/.data/
 .DS_Store
 Thumbs.db
 
+# Local QA artefacts (orgs verification loop)
+.qa/
+
 # Logs
 *.log
 npm-debug.log*

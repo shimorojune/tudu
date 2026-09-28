@@ -57,6 +57,12 @@ export type TaskRowActions = {
   onDeleteSubtask: (subtaskId: string) => void;
   onAddSubtask: (title: string) => void;
   onReorderSubtasks: (subtaskIds: string[]) => void;
+  onMoveToSpace?: () => void;
+};
+
+export type TaskOrgBadge = {
+  letter: string;
+  color: string;
 };
 
 export type TaskViewer = "owner" | "manager";
@@ -77,6 +83,7 @@ export type TaskRowProps = {
   viewer?: TaskViewer;
   dimmed?: boolean;
   draggable?: boolean;
+  orgBadge?: TaskOrgBadge | null;
 };
 
 function flashElement(element: HTMLElement | null) {
@@ -662,6 +669,7 @@ export function TaskRow({
   viewer = "owner",
   dimmed = false,
   draggable = true,
+  orgBadge = null,
 }: TaskRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [addingSubtask, setAddingSubtask] = useState(false);
@@ -803,6 +811,11 @@ export function TaskRow({
           onFlashComplete?.();
         }
       }}
+      style={
+        orgBadge
+          ? { borderLeft: `3px solid ${orgBadge.color}` }
+          : undefined
+      }
       className={cn(
         "relative grid cursor-default border-b border-hair outline-none",
         "grid-cols-[13px_19px_minmax(0,1fr)_auto] gap-x-[12px] px-[28px]",
@@ -1097,6 +1110,11 @@ export function TaskRow({
               <ContextMenuItem onSelect={() => actions.onUnschedule?.()}>
                 Unschedule
               </ContextMenuItem>
+              {actions.onMoveToSpace ? (
+                <ContextMenuItem onSelect={() => actions.onMoveToSpace?.()}>
+                  Move to a space
+                </ContextMenuItem>
+              ) : null}
             </>
           ) : menuVariant !== "day" && actions.onScheduleToToday ? (
             <>

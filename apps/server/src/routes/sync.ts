@@ -1,6 +1,10 @@
 import { zValidator } from "@hono/zod-validator";
 import type { Db } from "@tudu/db";
-import { listEventsAfter, touchUserLastActive } from "@tudu/db";
+import {
+  listEventsAfter,
+  touchUserLastActive,
+  touchUserActivity,
+} from "@tudu/db";
 import {
   syncBootstrapRequestSchema,
   syncPushRequestSchema,
@@ -63,6 +67,7 @@ export function createSyncRoute(db: Db, options?: JiraSyncOptions) {
       return c.json({ error: "Unauthorized" }, 401);
     }
     void touchUserLastActive(db, session.user.id).catch(() => {});
+    void touchUserActivity(db, session.user.id).catch(() => {});
     await next();
   });
 

@@ -18,16 +18,9 @@ import { cn } from "@/lib/utils";
 export type WeekPickerProps = {
   weekId: string;
   weekDays: string[];
-  to?: "/week" | "/team/$userId/week";
-  params?: { userId: string };
 };
 
-export function WeekPicker({
-  weekId,
-  weekDays,
-  to = "/week",
-  params,
-}: WeekPickerProps) {
+export function WeekPicker({ weekId, weekDays }: WeekPickerProps) {
   const navigate = useNavigate();
   const label = weekRangeLabel(weekDays[0], weekDays[6]);
   const pickerRows = weekPickerRows({ anchorWeekId: weekId });
@@ -39,14 +32,6 @@ export function WeekPicker({
       delete next.date;
       return next;
     };
-    if (to === "/team/$userId/week" && params) {
-      void navigate({
-        to,
-        params,
-        search,
-      } as never);
-      return;
-    }
     void navigate({ to: "/week", search } as never);
   }
 

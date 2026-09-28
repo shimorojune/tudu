@@ -63,6 +63,7 @@ export const taskSchema = z
     commentCount: z.number().int(),
     project: projectRefSchema.nullable(),
     jiraLinks: z.array(jiraTaskLinkSummarySchema),
+    orgId: z.uuid().nullable().optional(),
   })
   .refine(dayAndBucketPaired, { message: PAIRING_MESSAGE, path: ["bucket"] });
 
@@ -84,6 +85,7 @@ export const createTaskRequestSchema = z
     deadline: z.iso.datetime({ offset: true }).nullable().default(null),
     isPrivate: z.boolean().default(false),
     projectId: z.uuid().nullable().optional(),
+    orgId: z.uuid().nullable().optional(),
   })
   .refine(dayAndBucketPaired, { message: PAIRING_MESSAGE, path: ["bucket"] });
 
@@ -149,6 +151,15 @@ export const reorderRequestSchema = z.object({
 });
 
 export type ReorderRequest = z.infer<typeof reorderRequestSchema>;
+
+export const moveTaskToSpaceRequestSchema = z.object({
+  taskId: z.uuid(),
+  orgId: z.uuid(),
+  projectId: z.uuid().nullable(),
+  isPrivate: z.boolean(),
+});
+
+export type MoveTaskToSpaceRequest = z.infer<typeof moveTaskToSpaceRequestSchema>;
 
 export const createSubtaskRequestSchema = z.object({
   title: z.string().trim().min(1, "A subtask needs a title").max(500),

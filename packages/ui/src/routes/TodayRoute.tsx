@@ -1,6 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { effectiveDayIso, type Bucket, type JiraIssue } from "@tudu/shared";
+import {
+  effectiveDayIso,
+  SPACE_COLOR_HEX,
+  type Bucket,
+  type JiraIssue,
+  type SpaceColor,
+} from "@tudu/shared";
 import {
   setSelectedDate,
   setSelectedTaskId,
@@ -13,7 +19,10 @@ import {
   useDeleteTaskMutation,
   todayIso,
   type RootState,
+  useListSpacesQuery,
 } from "@tudu/store";
+import { filterTasksForSpace, orgBadgeForTask } from "@/lib/spaceTasks";
+import { splitOpenAndCompleted } from "@/lib/completedTasks";
 import { openNowCount } from "@/lib/nowCount";
 import { notifyAction, mutationResult } from "@/lib/notifyAction";
 import { DayTaskList } from "@/components/tasks/DayTaskList";
@@ -21,6 +30,7 @@ import { TaskListHeader } from "@/components/tasks/TaskListHeader";
 import { NewTaskDialog } from "@/components/tasks/NewTaskDialog";
 import { patchTaskDescriptionIfAttachmentsChanged } from "@/lib/afterCreateTaskDescription";
 import { createTaskBody } from "@/lib/createTask";
+import { orgIdForSpace } from "@/lib/taskSpace";
 import { DetailInspector } from "@/components/inspector/DetailInspector";
 import { InspectorSheet } from "@/components/inspector/InspectorSheet";
 import { SpawnJiraTaskDialog } from "@/components/jira/CreateJiraTaskControls";
@@ -47,10 +57,32 @@ export function TodayRoute() {
   const selectedTaskId = useSelector((s: RootState) => s.day.selectedTaskId);
   const jiraPreview = useJiraPreview();
 
+  const space = useSelector((s: RootState) => s.space.current);
+  const { data: spacesData } = useListSpacesQuery();
   const dayQuery = useGetTasksForDayQuery(selectedDate);
   const todayDayQuery = useGetTasksForDayQuery(todayIso());
   const unscheduledQuery = useGetUnscheduledTasksQuery();
-  const tasks = dayQuery.data?.tasks ?? [];
+  const allTasks = dayQuery.data?.tasks ?? [];
+  const tasks = useMemo(
+    () => filterTasksForSpace(allTasks, space),
+    [allTasks, space],
+  );
+  const { open: aggregateOpen } = useMemo(
+    () => splitOpenAndCompleted(allTasks),
+    [allTasks],
+  );
+  const orgById = useMemo(() => {
+    const map = new Map<string, { name: string; color: string }>();
+    for (const entry of spacesData?.spaces ?? []) {
+      if (entry.kind === "org" && entry.orgId && entry.color) {
+        map.set(entry.orgId, {
+          name: entry.name,
+          color: SPACE_COLOR_HEX[entry.color as SpaceColor],
+        });
+      }
+    }
+    return map;
+  }, [spacesData?.spaces]);
   useDaySearchSync(DAY_TASK_TAB_FIELDS, {
     taskFound: dayQuery.isLoading
       ? null
@@ -236,6 +268,7 @@ export function TodayRoute() {
                 startDate: args.startDate,
                 deadline: args.deadline,
                 projectId: args.projectId,
+                orgId: orgIdForSpace(space),
               }),
             ).unwrap();
 
@@ -276,6 +309,19 @@ export function TodayRoute() {
           <div className="flex h-full min-h-0 flex-col bg-card">
             <DayTaskList
               tasks={tasks}
+              space={space}
+              aggregateOpenTasks={
+                space.kind === "org" ? aggregateOpen : undefined
+              }
+              orgBadgeForTask={(task) => {
+                const badge = orgBadgeForTask(task, space, orgById);
+                return badge
+                  ? {
+                      letter: badge.name.slice(0, 1).toUpperCase(),
+                      color: badge.color,
+                    }
+                  : null;
+              }}
               selectedDate={selectedDate}
               selectedTaskId={selectedTaskId}
               highlightTaskId={jiraPreview.highlightTaskId}

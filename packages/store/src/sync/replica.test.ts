@@ -256,116 +256,6 @@ describe("applyEvent", () => {
     ]);
   });
 
-  it("upserts an inbox card", () => {
-    const task = makeTask();
-    const item: InboxPendingItem = {
-      id: "55555555-5555-4555-8555-555555555555",
-      kind: "assigned",
-      from: { id: "marcus", name: "Marcus Bell", email: "marcus@egain.com" },
-      task,
-      declineReason: null,
-      createdAt: now,
-    };
-    const next = applyEvent(
-      emptyReplica(),
-      event({ type: "inbox.upsert", payload: item }),
-    );
-    expect(next.inboxPending).toHaveLength(1);
-    expect(next.inboxPending[0]?.id).toBe(item.id);
-  });
-
-  it("moves an inbox card into history on delete", () => {
-    const task = makeTask();
-    const item: InboxPendingItem = {
-      id: "55555555-5555-4555-8555-555555555555",
-      kind: "assigned",
-      from: { id: "marcus", name: "Marcus Bell", email: "marcus@egain.com" },
-      task,
-      declineReason: null,
-      createdAt: now,
-    };
-    let replica = applyEvent(
-      emptyReplica(),
-      event({ type: "inbox.upsert", payload: item }),
-    );
-    replica = applyEvent(
-      replica,
-      event({
-        type: "inbox.delete",
-        seq: 2,
-        payload: {
-          id: item.id,
-          history: {
-            id: item.id,
-            status: "accepted",
-            title: task.title,
-            from: item.from,
-            bucket: "next",
-            declineReason: null,
-            createdAt: now,
-          },
-        },
-      }),
-    );
-    expect(replica.inboxPending).toHaveLength(0);
-    expect(replica.inboxHistory[0]?.title).toBe("Ship it");
-  });
-
-  it("puts a report inbox snapshot in reportInbox, not the viewer inbox", () => {
-    const task = makeTask({ scheduledDate: null, bucket: null });
-    const item: InboxPendingItem = {
-      id: "55555555-5555-4555-8555-555555555555",
-      kind: "assigned",
-      from: { id: "marcus", name: "Marcus Bell", email: "marcus@egain.com" },
-      task,
-      declineReason: null,
-      createdAt: now,
-    };
-    const next = applyEvent(
-      emptyReplica(),
-      event({
-        type: "reportInbox.upsert",
-        payload: {
-          userId: "priya",
-          report: { id: "priya", name: "Priya Raman", email: "priya@egain.com" },
-          pending: [item],
-          history: [],
-        },
-      }),
-    );
-    expect(next.reportInbox.priya?.pending).toHaveLength(1);
-    expect(next.reportInbox.priya?.pending[0]?.id).toBe(item.id);
-    expect(next.inboxPending).toHaveLength(0);
-  });
-
-  it("clears a waiting card when the report inbox snapshot is empty", () => {
-    const task = makeTask({ scheduledDate: null, bucket: null });
-    const item: InboxPendingItem = {
-      id: "55555555-5555-4555-8555-555555555555",
-      kind: "assigned",
-      from: { id: "marcus", name: "Marcus Bell", email: "marcus@egain.com" },
-      task,
-      declineReason: null,
-      createdAt: now,
-    };
-    let replica = applyEvent(
-      emptyReplica(),
-      event({
-        type: "reportInbox.upsert",
-        payload: { userId: "priya", pending: [item] },
-      }),
-    );
-    replica = applyEvent(
-      replica,
-      event({
-        type: "reportInbox.upsert",
-        seq: 2,
-        payload: { userId: "priya", pending: [] },
-      }),
-    );
-    expect(replica.reportInbox.priya?.pending).toEqual([]);
-  });
-
   it("stores Jira connection, issues, comments, users, and Components", () => {
     const issue = jiraIssue();
     let replica = applyEvent(
@@ -458,29 +348,6 @@ describe("applyEvent", () => {
     expect(replica.jiraIssues[issue.id]?.linkedTasks).toEqual([]);
   });
 
-  it("stores report Jira issue snapshots separately from personal Jira issues", () => {
-    const issue = jiraIssue({
-      linkedTasks: [
-        {
-          taskId: "11111111-1111-4111-8111-111111111111",
-          title: "Public",
-          isPrivate: false,
-        },
-      ],
-    });
-    const next = applyEvent(
-      emptyReplica(),
-      event({
-        type: "jira.reportIssue.upsert",
-        payload: { reportUserId: "priya", issue },
-      }),
-    );
-
-    expect(next.reportJiraIssues.priya).toEqual([issue.id]);
-    expect(next.jiraIssueIds).toEqual([]);
-    expect(next.jiraIssues[issue.id]?.linkedTasks).toEqual(issue.linkedTasks);
-  });
-
   it("clears stale Jira replica data when the connection snapshot changes", () => {
     const issue = jiraIssue();
     let replica = applyEvent(
@@ -503,20 +370,11 @@ describe("applyEvent", () => {
       replica,
       event({ type: "jira.component.upsert", seq: 5, payload: jiraComponent() }),
     );
-    replica = applyEvent(
-      replica,
-      event({
-        type: "jira.reportIssue.upsert",
-        seq: 6,
-        payload: { reportUserId: "report-1", issue },
-      }),
-    );
-
     const next = applyEvent(
       replica,
       event({
         type: "jira.connection",
-        seq: 7,
+        seq: 6,
         payload: jiraConnection({ projectKeys: ["ENG"] }),
       }),
     );
@@ -529,69 +387,6 @@ describe("applyEvent", () => {
     expect(next.jiraUsers).toEqual({});
     expect(next.jiraComponents).toEqual({});
     expect(next.reportJiraIssues).toEqual({});
-  });
-});
-
-describe("team.task.send replica", () => {
-  it("adds a waiting card to that report inbox without touching the viewer inbox", () => {
-    const next = applyOp(
-      { ...emptyReplica(), viewerId: "marcus" },
-      {
-        type: "team.task.send",
-        id: "11111111-1111-4111-8111-111111111111",
-        userId: "priya",
-        body: {
-          title: "Review the brief",
-          description: "Check the latest draft",
-          startDate: "2026-09-14",
-          deadline: null,
-        },
-      },
-    );
-    expect(next.inboxPending).toHaveLength(0);
-    expect(next.reportInbox.priya?.pending).toHaveLength(1);
-    expect(next.reportInbox.priya?.pending[0]?.task.title).toBe("Review the brief");
-    expect(next.reportInbox.priya?.pending[0]?.task.id).toBe(
-      "11111111-1111-4111-8111-111111111111",
-    );
-    expect(next.reportInbox.priya?.pending[0]?.kind).toBe("assigned");
-  });
-
-  it("does not duplicate a waiting card already present for that task", () => {
-    const task = makeTask({
-      id: "11111111-1111-4111-8111-111111111111",
-      title: "Review the brief",
-      scheduledDate: null,
-      bucket: null,
-    });
-    const item: InboxPendingItem = {
-      id: "55555555-5555-4555-8555-555555555555",
-      kind: "assigned",
-      from: { id: "marcus", name: "Marcus Bell", email: "marcus@egain.com" },
-      task,
-      declineReason: null,
-      createdAt: now,
-    };
-    const confirmed = applyEvent(
-      { ...emptyReplica(), viewerId: "marcus" },
-      event({
-        type: "reportInbox.upsert",
-        payload: { userId: "priya", pending: [item] },
-      }),
-    );
-    const next = applyOp(confirmed, {
-      type: "team.task.send",
-      id: task.id,
-      userId: "priya",
-      body: {
-        title: "Review the brief",
-        description: null,
-        startDate: null,
-        deadline: null,
-      },
-    });
-    expect(next.reportInbox.priya?.pending).toHaveLength(1);
-    expect(next.reportInbox.priya?.pending[0]?.id).toBe(item.id);
   });
 });
 
@@ -702,191 +497,6 @@ describe("applyOp", () => {
     expect(next.tasks[second.id]?.position).toBe(0);
   });
 
-  it("moves a report task onto another cached day", () => {
-    const monday = makeTask({
-      scheduledDate: "2026-09-07",
-      bucket: "now",
-      title: "Monday work",
-    });
-    const tuesday = makeTask({
-      id: "77777777-7777-4777-8777-777777777777",
-      scheduledDate: "2026-09-08",
-      bucket: "later",
-      title: "Tuesday work",
-    });
-    let replica = applyEvent(
-      emptyReplica(),
-      event({
-        type: "reportDay.upsert",
-        payload: {
-          report: { id: "priya", name: "Priya Raman", email: "priya@egain.com" },
-          date: "2026-09-07",
-          tasks: [monday],
-          slippingCount: 0,
-        },
-      }),
-    );
-    replica = applyEvent(
-      replica,
-      event({
-        type: "reportDay.upsert",
-        payload: {
-          report: { id: "priya", name: "Priya Raman", email: "priya@egain.com" },
-          date: "2026-09-08",
-          tasks: [tuesday],
-          slippingCount: 0,
-        },
-        seq: 2,
-      }),
-    );
-
-    const next = applyOp(replica, {
-      type: "team.task.reorder",
-      userId: "priya",
-      body: {
-        lanes: [
-          { scheduledDate: "2026-09-07", bucket: "now", taskIds: [] },
-          {
-            scheduledDate: "2026-09-08",
-            bucket: "later",
-            taskIds: [tuesday.id, monday.id],
-          },
-        ],
-      },
-    });
-
-    expect(
-      next.reportDays[reportDayKey("priya", "2026-09-07")]?.tasks.map((task) => task.id),
-    ).toEqual([]);
-    expect(
-      next.reportDays[reportDayKey("priya", "2026-09-08")]?.tasks.map((task) => task.id),
-    ).toEqual([tuesday.id, monday.id]);
-    expect(next.tasks[monday.id]?.scheduledDate).toBe("2026-09-08");
-    expect(next.tasks[monday.id]?.bucket).toBe("later");
-  });
-
-  it("parks a report task on the unscheduled rail", () => {
-    const monday = makeTask({
-      scheduledDate: "2026-09-07",
-      bucket: "now",
-    });
-    const replica = applyEvent(
-      emptyReplica(),
-      event({
-        type: "reportDay.upsert",
-        payload: {
-          report: { id: "priya", name: "Priya Raman", email: "priya@egain.com" },
-          date: "2026-09-07",
-          tasks: [monday],
-          slippingCount: 0,
-        },
-      }),
-    );
-
-    const next = applyOp(replica, {
-      type: "team.task.reorder",
-      userId: "priya",
-      body: {
-        lanes: [
-          { scheduledDate: "2026-09-07", bucket: "now", taskIds: [] },
-          { scheduledDate: null, bucket: null, taskIds: [monday.id] },
-        ],
-      },
-    });
-
-    expect(
-      next.reportDays[reportDayKey("priya", "2026-09-07")]?.tasks.map((task) => task.id),
-    ).toEqual([]);
-    expect(unscheduledForOwner(next, "priya").map((task) => task.id)).toEqual([
-      monday.id,
-    ]);
-  });
-
-  it("drops an unscheduled report task onto a cached day", () => {
-    const parked = makeTask({
-      scheduledDate: null,
-      bucket: null,
-    });
-    let replica = applyEvent(
-      emptyReplica(),
-      event({ type: "task.upsert", payload: { task: parked, ownerId: "priya" } }),
-    );
-    replica = applyEvent(
-      replica,
-      event({
-        type: "reportDay.upsert",
-        payload: {
-          report: { id: "priya", name: "Priya Raman", email: "priya@egain.com" },
-          date: "2026-09-08",
-          tasks: [],
-          slippingCount: 0,
-        },
-        seq: 2,
-      }),
-    );
-
-    const next = applyOp(replica, {
-      type: "team.task.reorder",
-      userId: "priya",
-      body: {
-        lanes: [
-          { scheduledDate: null, bucket: null, taskIds: [] },
-          {
-            scheduledDate: "2026-09-08",
-            bucket: "later",
-            taskIds: [parked.id],
-          },
-        ],
-      },
-    });
-
-    expect(unscheduledForOwner(next, "priya")).toEqual([]);
-    expect(
-      next.reportDays[reportDayKey("priya", "2026-09-08")]?.tasks.map((task) => task.id),
-    ).toEqual([parked.id]);
-  });
-
-  it("keeps a private report task off manager days after reorder", () => {
-    const hidden = makeTask({
-      id: "99999999-9999-4999-8999-999999999999",
-      title: "Private",
-      isPrivate: true,
-      scheduledDate: "2026-09-07",
-      bucket: "later",
-    });
-    const replica = applyEvent(
-      emptyReplica(),
-      event({
-        type: "reportDay.upsert",
-        payload: {
-          report: { id: "priya", name: "Priya Raman", email: "priya@egain.com" },
-          date: "2026-09-07",
-          tasks: [],
-          slippingCount: 0,
-        },
-      }),
-    );
-    replica.tasks[hidden.id] = hidden;
-    replica.owners[hidden.id] = "priya";
-
-    const next = applyOp(replica, {
-      type: "team.task.reorder",
-      userId: "priya",
-      body: {
-        lanes: [
-          {
-            scheduledDate: "2026-09-07",
-            bucket: "later",
-            taskIds: [hidden.id],
-          },
-        ],
-      },
-    });
-
-    expect(
-      next.reportDays[reportDayKey("priya", "2026-09-07")]?.tasks.map((task) => task.id),
-    ).toEqual([]);
-  });
 });
 
 describe("tasksForDay", () => {
@@ -918,6 +528,7 @@ function notice(overrides: Partial<AppNotification> = {}): AppNotification {
     ownerId: "priya",
     commentId: "22222222-2222-4222-8222-222222222222",
     inboxItemId: null,
+    orgId: null,
     scheduledDate: "2026-09-10",
     taskTitle: "Ship it",
     body: "Marcus commented on Ship it: Looks good",
@@ -1010,7 +621,7 @@ describe("project replica", () => {
     id: "33333333-3333-4333-8333-333333333333",
     userId: "priya",
     name: "EGS",
-    color: "ember" as const,
+    color: "vermilion" as const,
     archivedAt: null,
     isPrivate: false,
     createdAt: now,
@@ -1021,7 +632,7 @@ describe("project replica", () => {
     const next = applyOp(emptyReplica(), {
       type: "project.create",
       id: project.id,
-      body: { name: "EGS", color: "ember" },
+      body: { name: "EGS", color: "vermilion" },
     });
     expect(next.projects[project.id]?.name).toBe("EGS");
     expect(next.projects[project.id]?.archivedAt).toBeNull();
@@ -1046,7 +657,7 @@ describe("project replica", () => {
       project: {
         id: project.id,
         name: "EGS",
-        color: "ember",
+        color: "vermilion",
         archivedAt: null,
         isPrivate: false,
       },
@@ -1070,7 +681,7 @@ describe("project replica", () => {
       project: {
         id: project.id,
         name: "EGS",
-        color: "ember",
+        color: "vermilion",
         archivedAt: null,
         isPrivate: false,
       },
@@ -1099,7 +710,7 @@ describe("project replica", () => {
       project: {
         id: project.id,
         name: "EGS",
-        color: "ember",
+        color: "vermilion",
         archivedAt: null,
         isPrivate: false,
       },
@@ -1120,55 +731,4 @@ describe("project replica", () => {
     expect(replica.projects[project.id]).toBeUndefined();
   });
 
-  it("stores a report's public project for the manager", () => {
-    const replica = applyEvent(
-      { ...emptyReplica(), viewerId: "marcus" },
-      event({ type: "project.upsert", payload: project }),
-    );
-    expect(replica.projects[project.id]).toBeUndefined();
-    expect(replica.reportProjects.priya?.[project.id]?.name).toBe("EGS");
-  });
-
-  it("creates a report project from a manager op", () => {
-    const next = applyOp(
-      { ...emptyReplica(), viewerId: "marcus" },
-      {
-        type: "team.project.create",
-        id: project.id,
-        userId: "priya",
-        body: { name: "EGS", color: "ember" },
-      },
-    );
-    expect(next.reportProjects.priya?.[project.id]?.name).toBe("EGS");
-    expect(next.reportProjects.priya?.[project.id]?.isPrivate).toBe(false);
-  });
-
-  it("removes a report project when it becomes private", () => {
-    const task = makeTask({
-      project: {
-        id: project.id,
-        name: "EGS",
-        color: "ember",
-        archivedAt: null,
-        isPrivate: false,
-      },
-    });
-    let replica = applyEvent(
-      { ...emptyReplica(), viewerId: "marcus" },
-      event({ type: "project.upsert", payload: project }),
-    );
-    replica = applyEvent(
-      replica,
-      event({ type: "task.upsert", payload: { task, ownerId: "priya" } }),
-    );
-    replica = applyEvent(
-      replica,
-      event({
-        type: "project.upsert",
-        payload: { ...project, isPrivate: true },
-      }),
-    );
-    expect(replica.reportProjects.priya?.[project.id]).toBeUndefined();
-    expect(replica.tasks[task.id]?.project).toBeNull();
-  });
 });

@@ -2,9 +2,11 @@ import { Bell } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useDispatch } from "react-redux";
+import { SPACE_COLOR_HEX, type SpaceColor } from "@tudu/shared";
 import {
   useGetMeQuery,
   useGetNotificationsQuery,
+  useListSpacesQuery,
   useReadAllNotificationsMutation,
   useReadNotificationMutation,
   type AppDispatch,
@@ -25,6 +27,7 @@ export function NotificationBell() {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const { data: me } = useGetMeQuery();
+  const { data: spacesData } = useListSpacesQuery();
   const { data } = useGetNotificationsQuery();
   const [readOne] = useReadNotificationMutation();
   const [readAll] = useReadAllNotificationsMutation();
@@ -33,6 +36,24 @@ export function NotificationBell() {
   const notifications = data?.notifications ?? [];
   const unreadCount = data?.unreadCount ?? 0;
   const viewerId = me?.id;
+  const orgSpaces = (spacesData?.spaces ?? []).filter(
+    (space) => space.kind === "org",
+  );
+  function orgBadge(orgId: string | null) {
+    if (!orgId) {
+      return null;
+    }
+    const space = orgSpaces.find(
+      (entry) => entry.kind === "org" && entry.orgId === orgId,
+    );
+    if (!space || space.kind !== "org") {
+      return null;
+    }
+    const color = space.color
+      ? SPACE_COLOR_HEX[space.color as SpaceColor]
+      : undefined;
+    return { name: space.name, color };
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -74,6 +95,7 @@ export function NotificationBell() {
             {notifications.map((item) => {
               const unread = item.readAt === null;
               const presentation = resolveNotificationPresentation(item);
+              const badge = orgBadge(item.orgId);
               return (
                 <li key={item.id} className="border-b border-hair last:border-b-0">
                   <button
@@ -98,13 +120,23 @@ export function NotificationBell() {
                       setOpen(false);
                     }}
                   >
-                    <div
-                      className={cn(
-                        "text-[13px]",
-                        unread ? "font-semibold" : "font-medium",
-                      )}
-                    >
-                      {presentation.title}
+                    <div className="flex items-center gap-2">
+                      {badge ? (
+                        <span
+                          className="shrink-0 px-[5px] py-px text-[9px] font-bold uppercase tracking-[0.06em] text-primary-foreground"
+                          style={{ backgroundColor: badge.color }}
+                        >
+                          {badge.name}
+                        </span>
+                      ) : null}
+                      <div
+                        className={cn(
+                          "min-w-0 text-[13px]",
+                          unread ? "font-semibold" : "font-medium",
+                        )}
+                      >
+                        {presentation.title}
+                      </div>
                     </div>
                     {presentation.summary ? (
                       <p className="mt-[4px] text-[12px] text-faint">

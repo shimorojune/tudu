@@ -65,7 +65,17 @@ vi.mock("@tanstack/react-router", async () => {
     );
   });
 
-  return { Link };
+  return {
+    Link,
+    useRouterState: ({
+      select,
+    }: {
+      select: (state: { location: typeof locationState }) => unknown;
+    }) =>
+      select({
+        location: locationState,
+      }),
+  };
 });
 
 vi.mock("@tudu/store", async (importOriginal) => {

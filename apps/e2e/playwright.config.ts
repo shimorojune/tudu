@@ -18,7 +18,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: isCi,
   retries: isCi ? 2 : 0,
-  workers: isCi ? 1 : undefined,
+  workers: 1,
   reporter: isCi ? "github" : "list",
   globalSetup: "./global-setup.ts",
   grepInvert: isCi ? /@jira/ : undefined,
@@ -69,15 +69,16 @@ export default defineConfig({
       cwd: repoRoot,
       url: `${E2E_SERVER_URL}/health`,
       reuseExistingServer: false,
-      timeout: 120_000,
+      timeout: 180_000,
       env: serverEnv,
     },
     {
-      command: "pnpm --filter @tudu/web dev -- --port 5174 --strictPort",
+      command:
+        "pnpm --filter @tudu/web exec vite --port 5174 --strictPort --host 127.0.0.1",
       cwd: repoRoot,
       url: E2E_WEB_URL,
       reuseExistingServer: false,
-      timeout: 120_000,
+      timeout: 180_000,
       env: {
         ...process.env,
         ...webEnv,

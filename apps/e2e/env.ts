@@ -42,6 +42,8 @@ export function e2eServerEnv(): Record<string, string> {
       "e2e-jira-encryption-key-32bytes!",
     ATTACHMENT_STORAGE: "filesystem",
     ATTACHMENT_FS_ROOT: resolve(repoRoot, "apps/server/.data/e2e-attachments"),
+    EMAIL_TRANSPORT: process.env.EMAIL_TRANSPORT?.trim() || "memory",
+    E2E_TEST_ROUTES: process.env.E2E_TEST_ROUTES?.trim() || "1",
   };
 }
 

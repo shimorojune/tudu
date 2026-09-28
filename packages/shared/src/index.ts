@@ -21,6 +21,8 @@ export * from "./taskScheduleHelpers.js";
 export * from "./quickAddNaturalLanguage.js";
 export * from "./quickAddProjectTitle.js";
 export * from "./quickAddSuggest.js";
+export * from "./colors.js";
+export * from "./orgs/index.js";
 
 export type HealthResponse = { status: "ok"; version: string };
 
@@ -29,6 +31,7 @@ export type MeResponse = {
   email: string;
   name: string | null;
   createdAt: string;
+  onboardedAt: string | null;
 };
 
 export const DEFAULT_SERVER_PORT = 3456;

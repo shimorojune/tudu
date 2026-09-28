@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
-import type { JiraIssue, JiraJqlPreset, ManagerPermissions, Task } from "@tudu/shared";
+import type { JiraIssue, JiraJqlPreset, Task } from "@tudu/shared";
 import {
   jiraApi,
   type AppDispatch,
@@ -12,7 +12,6 @@ import {
   useRefreshJiraComponentsMutation,
   useRefreshJiraIssuesMutation,
   useSearchJiraIssuesQuery,
-  useSearchReportJiraIssuesQuery,
 } from "@tudu/store";
 import { Link2, PencilLine, RefreshCcw } from "lucide-react";
 import {
@@ -57,9 +56,6 @@ export type JiraColumnProps = {
   selectedIssueKey?: string | null;
   onPreviewIssue?: (key: string) => void;
   onCreateTask?: (issue: JiraIssue) => void;
-  reportUserId?: string;
-  reportName?: string;
-  reportPermissions?: ManagerPermissions;
 };
 
 function connectionCopy(connected: boolean): {
@@ -145,7 +141,6 @@ function JiraIssueRow({
   onCreateTask,
   onLinkSelected,
   linking,
-  reportUserId,
 }: {
   issue: JiraIssue;
   selected: boolean;
@@ -154,10 +149,9 @@ function JiraIssueRow({
   onCreateTask?: () => void;
   onLinkSelected: () => void;
   linking: boolean;
-  reportUserId?: string;
 }) {
   const selectedLinked = issueContainsSelectedTask(issue, selectedTask);
-  const canLinkSelected = Boolean(selectedTask && !selectedLinked && !reportUserId);
+  const canLinkSelected = Boolean(selectedTask && !selectedLinked);
 
   async function copyKey() {
     try {
@@ -238,7 +232,7 @@ function JiraIssueRow({
         ) : null}
         {onCreateTask ? (
           <ContextMenuItem onSelect={onCreateTask}>
-            {reportUserId ? "Send to inbox" : "Create task"}
+            Create task
           </ContextMenuItem>
         ) : null}
         <ContextMenuSeparator />
@@ -410,9 +404,6 @@ export function JiraColumn({
   selectedIssueKey = null,
   onPreviewIssue,
   onCreateTask,
-  reportUserId,
-  reportName,
-  reportPermissions,
 }: JiraColumnProps) {
   const dispatch = useDispatch<AppDispatch>();
   const [query, setQuery] = useState("");
@@ -464,14 +455,9 @@ export function JiraColumn({
     }),
     [componentIds, customJql, effectiveJqlPresetId, query, startAt],
   );
-  const personalQuery = useSearchJiraIssuesQuery(filters, {
-    skip: !connected || Boolean(reportUserId),
+  const issueQuery = useSearchJiraIssuesQuery(filters, {
+    skip: !connected,
   });
-  const reportQuery = useSearchReportJiraIssuesQuery(
-    { ...filters, userId: reportUserId ?? "" },
-    { skip: !connected || !reportUserId },
-  );
-  const issueQuery = reportUserId ? reportQuery : personalQuery;
   const total = issueQuery.data?.total ?? accumulatedIssues.length;
   const hasMore = issueQuery.data?.hasMore ?? false;
   const listSynced = appliedFilterKey === filterKey;
@@ -590,16 +576,12 @@ export function JiraColumn({
       return;
     }
     setListError(null);
-    if (reportUserId) {
-      await reportQuery.refetch();
-      return;
-    }
     await refreshIssues().unwrap();
     await issueQuery.refetch();
   }
 
   async function linkSelected(issue: JiraIssue) {
-    if (!selectedTask || reportUserId) {
+    if (!selectedTask) {
       return;
     }
     setListError(null);
@@ -623,7 +605,6 @@ export function JiraColumn({
   }
 
   void selectedDate;
-  void reportPermissions;
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-card">
@@ -632,15 +613,7 @@ export function JiraColumn({
           <span className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
             JIRA
           </span>
-          {reportName ? (
-            <span className="truncate text-[11.5px] text-muted-foreground">
-              assigned to {reportName}
-            </span>
-          ) : (
-            <span className="text-[11.5px] text-muted-foreground">
-              assigned to me
-            </span>
-          )}
+          <span className="text-[11.5px] text-muted-foreground">assigned to me</span>
           {connected ? (
             <button
               type="button"
@@ -748,14 +721,9 @@ export function JiraColumn({
                   issue={issue}
                   selected={selectedIssueKey === issue.key}
                   selectedTask={selectedTask}
-                  reportUserId={reportUserId}
                   linking={linking}
                   onPreview={() => onPreviewIssue?.(issue.key)}
-                  onCreateTask={
-                    onCreateTask && (!reportUserId || reportPermissions?.canSendInbox)
-                      ? () => onCreateTask(issue)
-                      : undefined
-                  }
+                  onCreateTask={onCreateTask ? () => onCreateTask(issue) : undefined}
                   onLinkSelected={() => void linkSelected(issue)}
                 />
               ))}

@@ -11,25 +11,15 @@ import {
   type SettingsSection,
 } from "@/components/settings/SettingsSidebar";
 import { GeneralSettingsPanel } from "@/components/settings/GeneralSettingsPanel";
-import { SettingsStubPanel } from "@/components/settings/SettingsStubPanel";
+import { OrganizationsSettingsPanel } from "@/components/settings/OrganizationsSettingsPanel";
 import { APP_VERSION } from "@/lib/appVersion";
-
-const stubTitles: Record<
-  Exclude<
-    SettingsSection,
-    "account" | "general" | "notifications" | "projects" | "jira"
-  >,
-  string
-> = {
-  manager: "Manager, privacy and rollover",
-};
 
 const settingsSections = new Set<SettingsSection>([
   "account",
   "general",
   "projects",
   "jira",
-  "manager",
+  "organizations",
   "notifications",
 ]);
 
@@ -78,9 +68,9 @@ export function SettingsRoute() {
           <ProjectsSettingsPanel />
         ) : section === "jira" ? (
           <JiraSettingsPanel />
-        ) : (
-          <SettingsStubPanel title={stubTitles[section]} />
-        )}
+        ) : section === "organizations" ? (
+          <OrganizationsSettingsPanel />
+        ) : null}
       </div>
     </div>
   );

@@ -1,13 +1,15 @@
 import { useMemo, useState } from "react";
-import { type ProjectColor } from "@tudu/shared";
+import { filterProjectsForSpace, type ProjectColor } from "@tudu/shared";
 import {
   selectVisible,
   useCreateProjectMutation,
   useDeleteProjectMutation,
   useGetProjectsQuery,
   useUpdateProjectMutation,
+  type RootState,
 } from "@tudu/store";
 import { useSelector } from "react-redux";
+import { orgIdForSpace } from "@/lib/taskSpace";
 import { Button } from "@/components/ui/button";
 import { FormBusy } from "@/components/forms/FormBusy";
 import {
@@ -42,13 +44,18 @@ function ProjectsSectionHeader({
 }
 
 export function ProjectsSettingsPanel() {
+  const space = useSelector((state: RootState) => state.space.current);
   const { data: projects = [], isLoading } = useGetProjectsQuery();
+  const scopedProjects = useMemo(
+    () => filterProjectsForSpace(projects, space),
+    [projects, space],
+  );
   const replica = useSelector(selectVisible);
   const [createProject, createState] = useCreateProjectMutation();
   const [updateProject] = useUpdateProjectMutation();
   const [deleteProject, deleteState] = useDeleteProjectMutation();
   const [name, setName] = useState("");
-  const [color, setColor] = useState<ProjectColor>("ember");
+  const [color, setColor] = useState<ProjectColor>("vermilion");
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -66,12 +73,12 @@ export function ProjectsSettingsPanel() {
   }, [replica.tasks]);
 
   const inPickers = useMemo(
-    () => projects.filter((project) => project.archivedAt === null),
-    [projects],
+    () => scopedProjects.filter((project) => project.archivedAt === null),
+    [scopedProjects],
   );
   const archived = useMemo(
-    () => projects.filter((project) => project.archivedAt !== null),
-    [projects],
+    () => scopedProjects.filter((project) => project.archivedAt !== null),
+    [scopedProjects],
   );
 
   async function handleCreate() {
@@ -82,7 +89,14 @@ export function ProjectsSettingsPanel() {
     setError(null);
     try {
       await notifyAction(
-        () => mutationResult(createProject({ name: trimmed, color })),
+        () =>
+          mutationResult(
+            createProject({
+              name: trimmed,
+              color,
+              orgId: orgIdForSpace(space),
+            }),
+          ),
         { success: "Project created", error: "Could not create that project" },
       );
       setName("");

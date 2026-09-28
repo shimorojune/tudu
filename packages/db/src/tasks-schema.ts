@@ -12,6 +12,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema.js";
+import { orgs } from "./orgs-schema.js";
 import { projects } from "./projects-schema.js";
 
 /** Declaration order matters: Postgres sorts an enum by the order its values were
@@ -44,6 +45,9 @@ export const tasks = pgTable(
     carriedDays: integer("carried_days").notNull().default(0),
     carriedSince: date("carried_since", { mode: "string" }),
     isPrivate: boolean("is_private").notNull().default(false),
+    orgId: uuid("org_id").references(() => orgs.id, { onDelete: "cascade" }),
+    /** When set, task is a pending new-task request and hidden from day lists. */
+    pendingRequestId: uuid("pending_request_id"),
     projectId: uuid("project_id").references(() => projects.id, {
       onDelete: "set null",
     }),
@@ -59,6 +63,13 @@ export const tasks = pgTable(
   (table) => [
     index("tasks_lane_idx").on(
       table.userId,
+      table.scheduledDate,
+      table.bucket,
+      table.position,
+    ),
+    index("tasks_user_org_day_idx").on(
+      table.userId,
+      table.orgId,
       table.scheduledDate,
       table.bucket,
       table.position,

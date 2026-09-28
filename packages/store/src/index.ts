@@ -9,7 +9,12 @@ export {
   useUpdateNotificationSettingsMutation,
   useReportClientVersionMutation,
 } from "./api/notificationSettingsApi.js";
-export { healthApi, useGetHealthQuery, useGetMeQuery } from "./api/healthApi.js";
+export {
+  healthApi,
+  useGetHealthQuery,
+  useGetMeQuery,
+  useCompleteOnboardingMutation,
+} from "./api/healthApi.js";
 export {
   tasksApi,
   useUploadTaskAttachmentMutation,
@@ -102,6 +107,16 @@ export {
   useUpdateJiraIssueDueDateMutation,
   useUpdateJiraIssueAssigneeMutation,
   useCreateJiraCommentMutation,
+  useGetRequestsQuery,
+  useRequestSendMutation,
+  useRequestReassignMutation,
+  useRequestProposeMutation,
+  useRequestAcceptMutation,
+  useRequestDeclineMutation,
+  useRequestWithdrawMutation,
+  useRequestReturnedTakeMutation,
+  useRequestReturnedResendMutation,
+  useRequestReturnedDiscardMutation,
 } from "./sync/hooks.js";
 export { startSync, stopSync } from "./sync/client.js";
 export { resetSync, selectVisible } from "./sync/slice.js";
@@ -131,3 +146,35 @@ export {
 export { makeStore, store } from "./store.js";
 export type { RootState, AppDispatch } from "./store.js";
 export { managerApi } from "./api/managerApi.js";
+export {
+  orgsApi,
+  useListSpacesQuery,
+  useGetOrgQuery,
+  useCreateOrgMutation,
+  useUpdateOrgMutation,
+  useListOrgInvitesQuery,
+  useListOrgAuditQuery,
+  useLeaveOrgMutation,
+  useDeleteOrgMutation,
+  useListOrgMembersQuery,
+  useListCoworkerRosterQuery,
+  useGetCoworkerDayQuery,
+  useCreateOrgInviteMutation,
+  useResendOrgInviteMutation,
+  useRevokeOrgInviteMutation,
+  useRegenerateJoinLinkMutation,
+  useApproveJoinRequestMutation,
+  useDeclineJoinRequestMutation,
+  useGetHandoverPreviewQuery,
+  useGetInvitePreviewQuery,
+  useAcceptInviteMutation,
+  useListMyInvitesQuery,
+  useGetJoinPreviewQuery,
+  useRequestJoinMutation,
+} from "./api/orgsApi.js";
+export {
+  setCurrentSpace,
+  clearOrgSpace,
+  type CurrentSpace,
+} from "./slices/spaceSlice.js";
+export { useMoveTaskToSpaceMutation } from "./sync/hooks.js";

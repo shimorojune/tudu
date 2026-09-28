@@ -25,6 +25,7 @@
     "positioner:allow-move-window",
     "notification:default",
     "dialog:default",
+    "deep-link:default",
     {
       "identifier": "fs:allow-write-file",
       "allow": [{ "path": "$HOME/**" }, { "path": "$DOWNLOAD/**" }]

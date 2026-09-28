@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, inArray, isNull, lt } from "drizzle-orm";
-import { permitManagerAction, type ManagerPermissions, type TimelineEventDraft } from "@tudu/shared";
+import type { TimelineEventDraft } from "@tudu/shared";
 import type { Db } from "./index.js";
+import { resolveTaskAccess } from "./access.js";
 import {
   comments,
   timelineEvents,
@@ -8,7 +9,6 @@ import {
   type TimelineEventRow,
 } from "./activity-schema.js";
 import { tasks, type TaskRow } from "./tasks-schema.js";
-import { managerLinks } from "./manager-schema.js";
 
 export type CommentWithAuthor = CommentRow & {
   author: { id: string; name: string; email: string };
@@ -35,42 +35,8 @@ export async function canActorCommentOnTask(
   actorId: string,
   taskId: string,
 ): Promise<boolean> {
-  const task = await db.query.tasks.findFirst({
-    where: and(eq(tasks.id, taskId), isNull(tasks.deletedAt)),
-    columns: { userId: true, isPrivate: true },
-  });
-  if (!task) {
-    return false;
-  }
-  if (task.userId === actorId) {
-    return true;
-  }
-  const link = await db.query.managerLinks.findFirst({
-    where: and(
-      eq(managerLinks.managerUserId, actorId),
-      eq(managerLinks.reportUserId, task.userId),
-      isNull(managerLinks.deletedAt),
-    ),
-    with: { permissions: true },
-  });
-  const permissions = link?.permissions
-    ? ({
-        canSeeDay: link.permissions.canSeeDay,
-        canSendInbox: link.permissions.canSendInbox,
-        canComment: link.permissions.canComment,
-        canReorder: link.permissions.canReorder,
-        canDelete: link.permissions.canDelete,
-        canEdit: link.permissions.canEdit,
-        canComplete: link.permissions.canComplete,
-        canSeePrivate: link.permissions.canSeePrivate,
-        canEditDeadlines: link.permissions.canEditDeadlines,
-      } satisfies ManagerPermissions)
-    : null;
-  return Boolean(
-    permissions &&
-      permitManagerAction(permissions, "comment") &&
-      (!task.isPrivate || permissions.canSeePrivate),
-  );
+  const role = await resolveTaskAccess(db, actorId, taskId);
+  return role === "owner" || role === "reader";
 }
 
 export function taskRowToSnapshot(

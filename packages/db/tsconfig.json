@@ -9,5 +9,10 @@
     "noEmit": false
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/manager.ts",
+    "src/manager-schema.ts",
+    "src/**/*.db.test.ts"
+  ]
 }

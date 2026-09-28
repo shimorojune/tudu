@@ -1,9 +1,5 @@
 import type { Db } from "@tudu/db";
-import {
-  findReportVisibleJiraIssue,
-  listJiraProjectKeys,
-} from "@tudu/db";
-import type { JiraIssue, ManagerPermissions } from "@tudu/shared";
+import { listJiraProjectKeys } from "@tudu/db";
 
 export class JiraAccessError extends Error {
   constructor(
@@ -49,24 +45,4 @@ export async function ensureConfiguredJiraProjectKey(
   if (!configured.includes(projectKey.trim().toUpperCase())) {
     throw new JiraAccessError("Jira project is not configured", 400);
   }
-}
-
-export async function requireReportVisibleJiraIssue(
-  db: Db,
-  managerUserId: string,
-  reportUserId: string,
-  issueIdOrKey: string,
-  permissions: Pick<ManagerPermissions, "canSeeDay" | "canSeePrivate"> | null,
-): Promise<JiraIssue> {
-  const issue = await findReportVisibleJiraIssue(
-    db,
-    managerUserId,
-    reportUserId,
-    issueIdOrKey,
-    permissions,
-  );
-  if (!issue) {
-    throw new JiraAccessError("Jira issue is not visible for this report", 403);
-  }
-  return issue;
 }

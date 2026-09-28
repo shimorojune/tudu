@@ -43,6 +43,7 @@ export function mapTask(row: TaskRowWithSubtasks, options?: MapTaskOptions): Tas
       hidePrivate: options?.hidePrivateProjects,
     }),
     jiraLinks: row.jiraLinks ?? [],
+    orgId: row.orgId ?? null,
   };
 }
 

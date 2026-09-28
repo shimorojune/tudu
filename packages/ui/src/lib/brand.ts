@@ -1,4 +1,5 @@
 import type { ProjectColor } from "@tudu/shared";
+import { SPACE_COLOR_HEX } from "@tudu/shared";
 
 /** Tudu brand colors and mark geometry from assets/tokens.json */
 
@@ -25,14 +26,21 @@ export const TUDU_FULL_PALETTE: [number, number, number][] = [
   [32, 29, 42],
 ];
 
-export const PROJECT_COLOR_RGB: Record<ProjectColor, [number, number, number]> = {
-  ember: [236, 48, 19],
-  rust: [174, 24, 0],
-  clay: [255, 86, 60],
-  ink: [32, 29, 42],
-  stone: [240, 237, 232],
-  moss: [48, 23, 14],
-};
+function hexToRgb(hex: string): [number, number, number] {
+  const normalized = hex.replace("#", "");
+  const red = Number.parseInt(normalized.slice(0, 2), 16);
+  const green = Number.parseInt(normalized.slice(2, 4), 16);
+  const blue = Number.parseInt(normalized.slice(4, 6), 16);
+  return [red, green, blue];
+}
+
+export const PROJECT_COLOR_RGB: Record<ProjectColor, [number, number, number]> =
+  Object.fromEntries(
+    Object.entries(SPACE_COLOR_HEX).map(([name, hex]) => [
+      name,
+      hexToRgb(hex),
+    ]),
+  ) as Record<ProjectColor, [number, number, number]>;
 
 export function projectColorCss(color: ProjectColor): string {
   const [red, green, blue] = PROJECT_COLOR_RGB[color];

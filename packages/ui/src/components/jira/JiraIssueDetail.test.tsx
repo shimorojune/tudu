@@ -350,7 +350,7 @@ describe("JiraIssueDetail", () => {
     expect(body.compareDocumentPosition(existingComment) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("opens send-to-inbox from the preview button on a report", async () => {
+  it("opens create-task from the preview button", async () => {
     const user = userEvent.setup();
     const onCreateTask = vi.fn();
     render(
@@ -358,19 +358,16 @@ describe("JiraIssueDetail", () => {
         issueIdOrKey="EGS-123"
         selectedTask={null}
         selectedDate="2026-09-11"
-        reportUserId="priya"
-        reportName="Priya Raman"
         onBack={() => {}}
         onCreateTask={onCreateTask}
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Send to inbox" }));
+    await user.click(screen.getByRole("button", { name: "Create task" }));
 
     expect(onCreateTask).toHaveBeenCalledWith(
       expect.objectContaining({ key: "EGS-123" }),
     );
-    expect(spawnReportJiraTask).not.toHaveBeenCalled();
   });
 
   it("shows Jira detail failures instead of loading forever", () => {
@@ -470,77 +467,4 @@ describe("JiraIssueDetail", () => {
     expect(screen.queryByText("No Jira comments yet.")).not.toBeInTheDocument();
   });
 
-  it("hides report Jira field, comment, and create controls when manager permissions deny them", () => {
-    const permissions: ManagerPermissions = {
-      canSeeDay: true,
-      canSendInbox: false,
-      canComment: false,
-      canReorder: true,
-      canDelete: true,
-      canEdit: false,
-      canComplete: false,
-      canSeePrivate: false,
-      canEditDeadlines: false,
-    };
-    render(
-      <JiraIssueDetail
-        issueIdOrKey="EGS-123"
-        selectedTask={null}
-        selectedDate="2026-09-11"
-        reportUserId="priya"
-        reportName="Priya Raman"
-        reportPermissions={permissions}
-        onBack={() => {}}
-      />,
-    );
-
-    expect(screen.getByLabelText("Jira summary")).toHaveAttribute("readonly");
-    expect(screen.getByRole("textbox", { name: "Jira description" })).toHaveAttribute(
-      "readonly",
-    );
-    expect(screen.queryByLabelText("Jira due date")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Search Jira assignee")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Save Jira fields" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Send to inbox" })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Jira comment")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Add Jira comment" })).not.toBeInTheDocument();
-    expect(screen.getByText("You cannot comment on Jira for this report.")).toBeInTheDocument();
-  });
-
-  it("limits report Jira edits to deadline and comments when only those permissions are granted", async () => {
-    const user = userEvent.setup();
-    const permissions: ManagerPermissions = {
-      canSeeDay: true,
-      canSendInbox: true,
-      canComment: true,
-      canReorder: true,
-      canDelete: true,
-      canEdit: false,
-      canComplete: false,
-      canSeePrivate: false,
-      canEditDeadlines: true,
-    };
-    render(
-      <JiraIssueDetail
-        issueIdOrKey="EGS-123"
-        selectedTask={null}
-        selectedDate="2026-09-11"
-        reportUserId="priya"
-        reportName="Priya Raman"
-        reportPermissions={permissions}
-        onBack={() => {}}
-        onCreateTask={vi.fn()}
-      />,
-    );
-
-    await user.click(screen.getByLabelText("Jira due date"));
-    expect(screen.getByLabelText("Jira summary")).toHaveAttribute("readonly");
-    expect(screen.getByRole("textbox", { name: "Jira description" })).toHaveAttribute(
-      "readonly",
-    );
-    expect(screen.getByLabelText("Jira due date")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Search Jira assignee")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Send to inbox" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Jira comment")).toBeInTheDocument();
-  });
 });

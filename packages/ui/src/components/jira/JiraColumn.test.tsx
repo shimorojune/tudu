@@ -327,7 +327,6 @@ describe("JiraColumn", () => {
       <JiraColumn
         selectedTask={null}
         selectedDate="2026-09-11"
-        reportUserId="priya"
         reportName="Priya Raman"
       />,
     );

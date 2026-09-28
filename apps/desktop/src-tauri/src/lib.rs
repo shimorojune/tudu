@@ -37,6 +37,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_deep_link::init())
         .manage(QuickAddShortcutState(Mutex::new(
             DEFAULT_QUICK_ADD_ACCELERATOR.to_string(),
         )))

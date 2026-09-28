@@ -11,7 +11,16 @@ export const healthApi = baseApi.injectEndpoints({
       query: () => "/me",
       providesTags: ["Me"],
     }),
+    completeOnboarding: builder.mutation<MeResponse, void>({
+      query: () => ({
+        url: "/me",
+        method: "PATCH",
+        body: { completeOnboarding: true },
+      }),
+      invalidatesTags: ["Me"],
+    }),
   }),
 });
 
-export const { useGetHealthQuery, useGetMeQuery } = healthApi;
+export const { useGetHealthQuery, useGetMeQuery, useCompleteOnboardingMutation } =
+  healthApi;

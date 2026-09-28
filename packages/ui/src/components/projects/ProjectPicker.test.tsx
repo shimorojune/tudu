@@ -5,6 +5,10 @@ import { ProjectPicker } from "./ProjectPicker";
 
 const createProject = vi.fn();
 
+vi.mock("@/hooks/useProjectSpaceScope", () => ({
+  useProjectSpaceScope: () => ({ kind: "personal" as const }),
+}));
+
 vi.mock("@tudu/store", () => ({
   useGetProjectsQuery: () => ({
     data: [
@@ -12,7 +16,7 @@ vi.mock("@tudu/store", () => ({
         id: "11111111-1111-4111-8111-111111111111",
         userId: "user-1",
         name: "EGS",
-        color: "ember",
+        color: "vermilion",
         archivedAt: null,
         isPrivate: false,
         createdAt: "2026-09-11T08:00:00.000Z",
@@ -48,7 +52,7 @@ describe("ProjectPicker", () => {
             id: "55555555-5555-4555-8555-555555555555",
             userId: "report",
             name: "Their EGS",
-            color: "ember",
+            color: "vermilion",
             archivedAt: null,
             isPrivate: false,
             createdAt: "2026-09-11T08:00:00.000Z",
@@ -90,7 +94,7 @@ describe("ProjectPicker", () => {
             id: "55555555-5555-4555-8555-555555555555",
             userId: "report",
             name: "Their EGS",
-            color: "ember",
+            color: "vermilion",
             archivedAt: null,
             isPrivate: false,
             createdAt: "2026-09-11T08:00:00.000Z",
@@ -114,7 +118,7 @@ describe("ProjectPicker", () => {
         fallback={{
           id: "55555555-5555-4555-8555-555555555555",
           name: "Their EGS",
-          color: "ember",
+          color: "vermilion",
           archivedAt: null,
           isPrivate: false,
         }}

@@ -52,7 +52,7 @@ function ProjectColorSwatches({
           aria-label={key}
           className={cn(
             "shrink-0",
-            key === "stone" && "border border-rule",
+            key === "graphite" && "border border-rule",
             selected === key &&
               "outline outline-2 outline-foreground outline-offset-2",
           )}

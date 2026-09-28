@@ -61,6 +61,7 @@
     "@radix-ui/react-slot": "^1.2.3",
     "@tanstack/react-router": "^1.170.32",
     "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-deep-link": "^2.5.0",
     "@tiptap/core": "^3.31.3",
     "@tiptap/extension-file-handler": "^3.31.3",
     "@tiptap/extension-find-and-replace": "^3.31.3",

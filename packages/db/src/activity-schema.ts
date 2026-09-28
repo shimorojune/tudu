@@ -38,6 +38,7 @@ export const timelineEventType = pgEnum("timeline_event_type", [
   "jira_assignee_changed",
   "jira_commented",
   "jira_external_overwrite",
+  "moved_to_space",
 ]);
 
 export const comments = pgTable(

@@ -27,6 +27,7 @@ export const TIMELINE_EVENT_TYPES = [
   "jira_assignee_changed",
   "jira_commented",
   "jira_external_overwrite",
+  "moved_to_space",
 ] as const;
 
 export type TimelineEventType = (typeof TIMELINE_EVENT_TYPES)[number];

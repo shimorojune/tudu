@@ -40,37 +40,26 @@ describe("recipientsForTask", () => {
 });
 
 describe("viewKey", () => {
-  it("round-trips day, inbox, and report day", () => {
+  it("round-trips day and maps legacy manager keys to unscheduled", () => {
     expect(parseViewKey(viewKey.day("2026-09-10"))).toEqual({
       type: "day",
       date: "2026-09-10",
     });
-    expect(parseViewKey(viewKey.inbox())).toEqual({ type: "inbox" });
+    expect(parseViewKey("inbox")).toEqual({ type: "unscheduled" });
     expect(parseViewKey(viewKey.notifications())).toEqual({
       type: "notifications",
     });
-    expect(parseViewKey(viewKey.reportDay("u1", "2026-09-10"))).toEqual({
-      type: "reportDay",
-      userId: "u1",
-      date: "2026-09-10",
+    expect(parseViewKey("reportDay:u1:2026-09-10")).toEqual({
+      type: "unscheduled",
     });
     expect(parseViewKey(viewKey.projects())).toEqual({ type: "projects" });
     expect(parseViewKey(viewKey.project("11111111-1111-4111-8111-111111111111"))).toEqual({
       type: "project",
       projectId: "11111111-1111-4111-8111-111111111111",
     });
-    expect(parseViewKey(viewKey.reportProjects("u1"))).toEqual({
-      type: "reportProjects",
-      userId: "u1",
-    });
-    expect(parseViewKey(viewKey.reportUnscheduled("u1"))).toEqual({
-      type: "reportUnscheduled",
-      userId: "u1",
-    });
-    expect(parseViewKey(viewKey.reportInbox("u1"))).toEqual({
-      type: "reportInbox",
-      userId: "u1",
-    });
+    expect(parseViewKey("reportProjects:u1")).toEqual({ type: "unscheduled" });
+    expect(parseViewKey("reportUnscheduled:u1")).toEqual({ type: "unscheduled" });
+    expect(parseViewKey("reportInbox:u1")).toEqual({ type: "unscheduled" });
     expect(parseViewKey(viewKey.jira())).toEqual({ type: "jira" });
     expect(parseViewKey(viewKey.jiraComponents())).toEqual({
       type: "jiraComponents",
@@ -80,10 +69,11 @@ describe("viewKey", () => {
       type: "jiraIssue",
       issueIdOrKey: "EGS-100493",
     });
-    expect(parseViewKey(viewKey.reportJira("u1"))).toEqual({
-      type: "reportJira",
-      userId: "u1",
+    expect(parseViewKey(viewKey.requests("personal"))).toEqual({
+      type: "requests",
+      space: "personal",
     });
+    expect(parseViewKey("reportJira:u1")).toEqual({ type: "unscheduled" });
   });
 });
 
@@ -91,6 +81,8 @@ describe("Jira sync contracts", () => {
   it("accepts Jira event types", () => {
     expect(SYNC_EVENT_TYPES).toEqual(
       expect.arrayContaining([
+      "request.upsert",
+      "request.delete",
       "jira.connection",
       "jira.issue.upsert",
       "jira.issue.delete",
@@ -99,7 +91,6 @@ describe("Jira sync contracts", () => {
       "jira.link.delete",
       "jira.user.upsert",
       "jira.component.upsert",
-      "jira.reportIssue.upsert",
       ]),
     );
   });

@@ -27,6 +27,7 @@
     "db:migrate": "pnpm --filter @tudu/db db:migrate",
     "db:push": "pnpm --filter @tudu/db db:push",
     "db:seed": "pnpm --filter @tudu/server db:seed",
+    "db:seed:orgs-demo": "pnpm --filter @tudu/server db:seed:orgs-demo",
     "prepare": "husky",
     "design:sync": "node scripts/design-sync.js"
   },

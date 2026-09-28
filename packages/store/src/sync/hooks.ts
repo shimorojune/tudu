@@ -1,24 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  DEFAULT_MANAGER_PERMISSIONS,
-  effectiveDayIso,
-  isSlipping,
   viewKey,
-  type AcceptInboxRequest,
   type CreateJiraIssueRequest,
-  type CreateInviteRequest,
   type CreateProjectRequest,
   type CreateSubtaskRequest,
   type CreateTaskRequest,
-  type DeclineInboxRequest,
   type LinkJiraTaskRequest,
+  type MoveTaskToSpaceRequest,
   type ReorderRequest,
   type ReorderSubtasksRequest,
   type RolloverRequest,
-  type SendInboxTaskRequest,
   type SpawnJiraTaskRequest,
-  type SpawnReportJiraTaskRequest,
   type TimelineResponse,
   type UpdateCommentRequest,
   type UpdateJiraIssueFieldsRequest,
@@ -31,16 +24,14 @@ import { getAuthToken, resolveApiUrl } from "../api/baseApi.js";
 import type { AppDispatch, RootState } from "../store.js";
 import { enqueue, subscribeView } from "./client.js";
 import {
-  reportDayKey,
   jiraCommentsForIssue,
   jiraComponentsForList,
   jiraIssueFromReplica,
   jiraIssuesForList,
   jiraUsersForList,
-  reportJiraIssuesForUser,
+  requestsForSpace,
   tasksForDay,
   tasksForProject,
-  unscheduledForOwner,
   unscheduledTasks,
 } from "./replica.js";
 import { selectVisible } from "./slice.js";
@@ -86,19 +77,14 @@ export function useGetUnscheduledTasksQuery(_arg?: void, options?: QueryOptions)
   return { ...query, data };
 }
 
-export function useGetInboxQuery(_arg?: void, options?: QueryOptions) {
-  const key = options?.skip ? null : viewKey.inbox();
-  const query = useView(key);
-  const replica = useSelector(selectVisible);
-  const data = useMemo(
-    () => ({
-      pending: replica.inboxPending,
-      history: replica.inboxHistory,
-      count: replica.inboxPending.length,
-    }),
-    [replica],
-  );
-  return { ...query, data };
+export function useGetInboxQuery(_arg?: void, _options?: QueryOptions) {
+  return {
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    data: { pending: [], history: [], count: 0 },
+  };
+
 }
 
 export function useGetInboxCountQuery(_arg?: void, options?: QueryOptions) {
@@ -128,83 +114,34 @@ export function useGetNotificationsQuery(_arg?: void, options?: QueryOptions) {
   return { ...query, data };
 }
 
-export function useGetTeamQuery(date?: string | void, options?: QueryOptions) {
-  const resolved = date || effectiveDayIso();
-  const key = options?.skip ? null : viewKey.team(resolved);
-  const query = useView(key);
-  const replica = useSelector(selectVisible);
-  const data = replica.teamByDate[resolved];
-  return { ...query, data };
+export function useGetTeamQuery(_date?: string | void, _options?: QueryOptions) {
+  return { isLoading: false, isError: false, isFetching: false, data: undefined };
 }
 
 export function useGetReportDayQuery(
-  arg: { userId: string; date: string },
-  options?: QueryOptions,
+  _arg: { userId: string; date: string },
+  _options?: QueryOptions,
 ) {
-  const key = options?.skip ? null : viewKey.reportDay(arg.userId, arg.date);
-  const query = useView(key);
-  const replica = useSelector(selectVisible);
-  const stored = replica.reportDays[reportDayKey(arg.userId, arg.date)];
-  const data = useMemo(() => {
-    if (stored) {
-      return stored;
-    }
-    const tasks = Object.values(replica.tasks).filter(
-      (task) =>
-        replica.owners[task.id] === arg.userId && task.scheduledDate === arg.date,
-    );
-    if (tasks.length === 0) {
-      return undefined;
-    }
-    return {
-      report: { id: arg.userId, name: "", email: "" },
-      permissions: DEFAULT_MANAGER_PERMISSIONS,
-      date: arg.date,
-      tasks,
-      slippingCount: tasks.filter((task) =>
-        isSlipping({
-          carriedDays: task.carriedDays,
-          deadline: task.deadline,
-        }),
-      ).length,
-    };
-  }, [stored, replica, arg.userId, arg.date]);
-  return { ...query, data };
+  return { isLoading: false, isError: false, isFetching: false, data: undefined };
 }
 
 export function useGetReportUnscheduledQuery(
-  userId: string,
-  options?: QueryOptions,
+  _userId: string,
+  _options?: QueryOptions,
 ) {
-  const key = options?.skip || !userId ? null : viewKey.reportUnscheduled(userId);
-  const query = useView(key);
-  const replica = useSelector(selectVisible);
-  const data = useMemo(
-    () => ({ tasks: userId ? unscheduledForOwner(replica, userId) : [] }),
-    [replica, userId],
-  );
-  return { ...query, data };
+  return { isLoading: false, isError: false, isFetching: false, data: { tasks: [] } };
 }
 
 export function useGetReportInboxQuery(
-  userId: string,
-  options?: QueryOptions,
+  _userId: string,
+  _options?: QueryOptions,
 ) {
-  const key = options?.skip || !userId ? null : viewKey.reportInbox(userId);
-  const query = useView(key);
-  const replica = useSelector(selectVisible);
-  const data = useMemo(() => {
-    const bucket = userId ? replica.reportInbox[userId] : undefined;
-    const pending = bucket?.pending ?? [];
-    return {
-      report: bucket?.report,
-      permissions: bucket?.permissions,
-      pending,
-      history: bucket?.history ?? [],
-      count: pending.length,
-    };
-  }, [replica, userId]);
-  return { ...query, data };
+  return {
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    data: { pending: [], history: [], count: 0 },
+  };
 }
 
 export function useGetCommentsQuery(taskId: string, options?: QueryOptions) {
@@ -263,17 +200,10 @@ export function useGetJiraIssuesQuery(options?: QueryOptions) {
 }
 
 export function useGetReportJiraIssuesQuery(
-  userId: string,
-  options?: QueryOptions,
+  _userId: string,
+  _options?: QueryOptions,
 ) {
-  const key = options?.skip || !userId ? null : viewKey.reportJira(userId);
-  const query = useView(key);
-  const replica = useSelector(selectVisible);
-  const data = useMemo(
-    () => ({ issues: userId ? reportJiraIssuesForUser(replica, userId) : [] }),
-    [replica, userId],
-  );
-  return { ...query, data };
+  return { isLoading: false, isError: false, isFetching: false, data: { issues: [] } };
 }
 
 export function useGetJiraIssueQuery(
@@ -362,6 +292,16 @@ function withUnwrap<T>(promise: Promise<T>) {
   return Object.assign(promise, { unwrap: () => promise });
 }
 
+function useRemovedManagerMutation<TArg = unknown>() {
+  const trigger = useCallback((_: TArg) => {
+    const promise = Promise.reject<void>(
+      new Error("Manager and inbox flows were removed"),
+    );
+    return withUnwrap(promise);
+  }, []);
+  return [trigger, { isLoading: false }] as const;
+}
+
 function useOp<Arg>(toOp: (arg: Arg) => Parameters<typeof enqueue>[0]) {
   const dispatch = useDispatch<AppDispatch>();
   const [isLoading, setLoading] = useState(false);
@@ -413,6 +353,13 @@ export function useDeleteTaskMutation() {
 export function useReorderTasksMutation() {
   return useOp((body: ReorderRequest) => ({
     type: "task.reorder" as const,
+    body,
+  }));
+}
+
+export function useMoveTaskToSpaceMutation() {
+  return useOp((body: MoveTaskToSpaceRequest) => ({
+    type: "task.moveToSpace" as const,
     body,
   }));
 }
@@ -482,69 +429,44 @@ export function useDeleteCommentMutation() {
 }
 
 export function useAcceptInboxItemMutation() {
-  return useOp((arg: { id: string } & AcceptInboxRequest) => ({
-    type: "inbox.accept" as const,
-    id: arg.id,
-    body: {
-      bucket: arg.bucket,
-      ...(arg.scheduledDate ? { scheduledDate: arg.scheduledDate } : {}),
-    },
-  }));
+  return useRemovedManagerMutation();
 }
+
 
 export function useDeclineInboxItemMutation() {
-  return useOp((arg: { id: string } & DeclineInboxRequest) => ({
-    type: "inbox.decline" as const,
-    id: arg.id,
-    body: { reason: arg.reason },
-  }));
+  return useRemovedManagerMutation();
 }
+
 
 export function useCreateTeamInviteMutation() {
-  return useOp((body: CreateInviteRequest) => ({
-    type: "team.invite.create" as const,
-    body,
-  }));
+  return useRemovedManagerMutation();
 }
+
 
 export function useAcceptTeamInviteMutation() {
-  return useOp((id: string) => ({ type: "team.invite.accept" as const, id }));
+  return useRemovedManagerMutation();
 }
+
 
 export function useDeclineTeamInviteMutation() {
-  return useOp((id: string) => ({ type: "team.invite.decline" as const, id }));
+  return useRemovedManagerMutation();
 }
+
 
 export function useSendInboxTaskMutation() {
-  return useOp((arg: { userId: string } & SendInboxTaskRequest) => ({
-    type: "team.task.send" as const,
-    id: crypto.randomUUID(),
-    userId: arg.userId,
-    body: {
-      title: arg.title,
-      description: arg.description,
-      startDate: arg.startDate,
-      deadline: arg.deadline,
-      projectId: arg.projectId,
-    },
-  }));
+  return useRemovedManagerMutation();
 }
+
 
 export function useReorderReportTasksMutation() {
-  return useOp((arg: { userId: string } & ReorderRequest) => ({
-    type: "team.task.reorder" as const,
-    userId: arg.userId,
-    body: { lanes: arg.lanes },
-  }));
+  return useRemovedManagerMutation();
 }
 
+
 export function useDeleteReportTaskMutation() {
-  return useOp((arg: { userId: string; taskId: string }) => ({
-    type: "team.task.delete" as const,
-    userId: arg.userId,
-    taskId: arg.taskId,
-  }));
+  return useRemovedManagerMutation();
 }
+
 
 export function useReadNotificationMutation() {
   return useOp((id: string) => ({ type: "notification.read" as const, id }));
@@ -591,12 +513,9 @@ export function useSpawnJiraTaskMutation() {
 }
 
 export function useSpawnReportJiraTaskMutation() {
-  return useOp((body: SpawnReportJiraTaskRequest) => ({
-    type: "jira.reportTask.spawn" as const,
-    id: crypto.randomUUID(),
-    body,
-  }));
+  return useRemovedManagerMutation();
 }
+
 
 export function useCreateJiraIssueMutation() {
   return useOp((body: CreateJiraIssueRequest) => ({
@@ -698,44 +617,107 @@ export function useDeleteProjectMutation() {
 }
 
 export function useGetReportProjectsQuery(
-  userId: string,
-  options?: QueryOptions,
+  _userId: string,
+  _options?: QueryOptions,
 ) {
-  const key = options?.skip || !userId ? null : viewKey.reportProjects(userId);
-  const query = useView(key);
-  const replica = useSelector(selectVisible);
-  const data = useMemo(() => {
-    const bucket = replica.reportProjects[userId] ?? {};
-    return Object.values(bucket).sort((a, b) => {
-      if (Boolean(a.archivedAt) !== Boolean(b.archivedAt)) {
-        return a.archivedAt ? 1 : -1;
-      }
-      return a.name.localeCompare(b.name);
-    });
-  }, [replica.reportProjects, userId]);
-  return { ...query, data };
+  return { isLoading: false, isError: false, isFetching: false, data: [] };
 }
 
 export function useCreateReportProjectMutation() {
-  const dispatch = useDispatch<AppDispatch>();
-  const [isLoading, setLoading] = useState(false);
-  const trigger = useCallback(
-    (arg: { userId: string; body: CreateProjectRequest }) => {
-      const id = crypto.randomUUID();
-      setLoading(true);
-      const promise = dispatch(
-        enqueue({
-          type: "team.project.create",
-          id,
-          userId: arg.userId,
-          body: arg.body,
-        }),
-      )
-        .then(() => ({ project: { id } }))
-        .finally(() => setLoading(false));
-      return withUnwrap(promise);
-    },
-    [dispatch],
-  );
-  return [trigger, { isLoading }] as const;
+  return useRemovedManagerMutation();
 }
+
+export function useGetRequestsQuery(space: string, options?: QueryOptions) {
+  const key = options?.skip || !space ? null : viewKey.requests(space);
+  const query = useView(key);
+  const replica = useSelector(selectVisible);
+  const viewerId = replica.viewerId;
+  const data = useMemo(() => {
+    const requests = requestsForSpace(replica, space, viewerId);
+    const incoming = requests.filter(
+      (row) => row.status === "pending" && row.to.id === viewerId,
+    );
+    const sent = requests.filter(
+      (row) => row.status === "pending" && row.from.id === viewerId,
+    );
+    const recent = requests.filter((row) => row.status !== "pending");
+    const returned = requests.filter(
+      (row) =>
+        row.kind === "new_task" &&
+        row.status === "declined" &&
+        row.from.id === viewerId,
+    );
+    return { requests, incoming, sent, recent, returned };
+  }, [replica, space, viewerId]);
+  return { ...query, data };
+}
+
+export function useRequestSendMutation() {
+  return useOp((body: import("@tudu/shared").RequestSendBody) => ({
+    type: "request.send" as const,
+    id: crypto.randomUUID(),
+    body,
+  }));
+}
+
+export function useRequestReassignMutation() {
+  return useOp((body: import("@tudu/shared").RequestReassignBody) => ({
+    type: "request.reassign" as const,
+    id: crypto.randomUUID(),
+    body,
+  }));
+}
+
+export function useRequestProposeMutation() {
+  return useOp((body: import("@tudu/shared").RequestProposeBody) => ({
+    type: "request.propose" as const,
+    id: crypto.randomUUID(),
+    body,
+  }));
+}
+
+export function useRequestAcceptMutation() {
+  return useOp((body: import("@tudu/shared").RequestAcceptBody) => ({
+    type: "request.accept" as const,
+    body,
+  }));
+}
+
+export function useRequestDeclineMutation() {
+  return useOp((body: import("@tudu/shared").RequestDeclineBody) => ({
+    type: "request.decline" as const,
+    body,
+  }));
+}
+
+export function useRequestWithdrawMutation() {
+  return useOp((requestId: string) => ({
+    type: "request.withdraw" as const,
+    body: { requestId },
+  }));
+}
+
+export function useRequestReturnedTakeMutation() {
+  return useOp((body: import("@tudu/shared").RequestReturnedTakeBody) => ({
+    type: "request.returned.take" as const,
+    body,
+  }));
+}
+
+export function useRequestReturnedResendMutation() {
+  return useOp(
+    (body: import("@tudu/shared").RequestReturnedResendBody & { newRequestId?: string }) => ({
+      type: "request.returned.resend" as const,
+      id: body.newRequestId ?? crypto.randomUUID(),
+      body: { requestId: body.requestId, toUserId: body.toUserId },
+    }),
+  );
+}
+
+export function useRequestReturnedDiscardMutation() {
+  return useOp((requestId: string) => ({
+    type: "request.returned.discard" as const,
+    body: { requestId },
+  }));
+}
+

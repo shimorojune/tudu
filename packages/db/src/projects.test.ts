@@ -15,12 +15,14 @@ function row(overrides: Partial<ProjectRow> = {}): ProjectRow {
     id: "11111111-1111-4111-8111-111111111111",
     userId: "user-1",
     name: "EGS",
-    color: "ember",
+    color: "vermilion",
     archivedAt: null,
     isPrivate: false,
     createdAt: now,
     updatedAt: now,
     deletedAt: null,
+    orgId: null,
+    createdBy: null,
     ...overrides,
   };
 }
@@ -31,9 +33,10 @@ describe("mapProject", () => {
       id: "11111111-1111-4111-8111-111111111111",
       userId: "user-1",
       name: "EGS",
-      color: "ember",
+      color: "vermilion",
       archivedAt: null,
       isPrivate: false,
+      orgId: null,
       createdAt: "2026-09-11T08:00:00.000Z",
       updatedAt: "2026-09-11T08:00:00.000Z",
     });
@@ -43,9 +46,10 @@ describe("mapProject", () => {
     expect(mapProjectRef(row({ archivedAt: now }))).toEqual({
       id: "11111111-1111-4111-8111-111111111111",
       name: "EGS",
-      color: "ember",
+      color: "vermilion",
       archivedAt: "2026-09-11T08:00:00.000Z",
       isPrivate: false,
+      orgId: null,
     });
   });
 

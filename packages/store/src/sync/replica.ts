@@ -19,12 +19,16 @@ import type {
   SyncEvent,
   SyncOp,
   Task,
-  TeamInvite,
+  TaskRequestView,
   TeamResponse,
   TimelineEvent,
   UpdateTaskRequest,
 } from "@tudu/shared";
-import { calendarDayIso, inProgressForPlacement } from "@tudu/shared";
+import {
+  calendarDayIso,
+  inProgressForPlacement,
+  PERSONAL_REQUESTS_SPACE,
+} from "@tudu/shared";
 
 export type Replica = {
   viewerId: string | null;
@@ -59,6 +63,7 @@ export type Replica = {
   jiraComponents: Record<string, JiraComponent>;
   reportJiraIssues: Record<string, string[]>;
   remoteMovedTaskIds: string[];
+  requests: Record<string, TaskRequestView>;
 };
 
 export type PendingMutation = {
@@ -99,6 +104,7 @@ export function emptyReplica(): Replica {
     jiraComponents: {},
     reportJiraIssues: {},
     remoteMovedTaskIds: [],
+    requests: {},
   };
 }
 
@@ -153,6 +159,7 @@ function cloneReplica(replica: Replica): Replica {
       ]),
     ),
     remoteMovedTaskIds: [...replica.remoteMovedTaskIds],
+    requests: { ...replica.requests },
   };
 }
 
@@ -468,81 +475,6 @@ export function applyEvent(replica: Replica, event: SyncEvent): Replica {
       );
       return next;
     }
-    case "inbox.upsert": {
-      const payload = event.payload as InboxPendingItem | { history: InboxHistoryItem[] };
-      if ("history" in payload && Array.isArray(payload.history) && !("task" in payload)) {
-        next.inboxHistory = payload.history;
-        return next;
-      }
-      const item = payload as InboxPendingItem;
-      const index = next.inboxPending.findIndex((row) => row.id === item.id);
-      next.inboxPending =
-        index === -1
-          ? [...next.inboxPending, item]
-          : next.inboxPending.map((row) => (row.id === item.id ? item : row));
-      return next;
-    }
-    case "inbox.delete": {
-      const payload = event.payload as { id: string; history?: InboxHistoryItem };
-      next.inboxPending = next.inboxPending.filter((item) => item.id !== payload.id);
-      if (payload.history) {
-        next.inboxHistory = [
-          payload.history,
-          ...next.inboxHistory.filter((item) => item.id !== payload.history!.id),
-        ];
-      }
-      return next;
-    }
-    case "invite.upsert": {
-      const invite = event.payload as TeamInvite;
-      for (const [date, team] of Object.entries(next.teamByDate)) {
-        const list =
-          invite.direction === "incoming" ? team.incomingInvites : team.outgoingInvites;
-        const index = list.findIndex((row) => row.id === invite.id);
-        const updated =
-          index === -1
-            ? [...list, invite]
-            : list.map((row) => (row.id === invite.id ? invite : row));
-        next.teamByDate[date] = {
-          ...team,
-          incomingInvites:
-            invite.direction === "incoming" ? updated : team.incomingInvites,
-          outgoingInvites:
-            invite.direction === "outgoing" ? updated : team.outgoingInvites,
-        };
-      }
-      return next;
-    }
-    case "roster.upsert": {
-      const payload = event.payload as { date: string; team: TeamResponse };
-      next.teamByDate[payload.date] = payload.team;
-      return next;
-    }
-    case "reportDay.upsert": {
-      const payload = event.payload as ReportDayResponse;
-      next.reportDays[reportDayKey(payload.report.id, payload.date)] = payload;
-      for (const task of payload.tasks) {
-        upsertTask(next, task, payload.report.id, false);
-      }
-      return next;
-    }
-    case "reportInbox.upsert": {
-      const payload = event.payload as {
-        userId: string;
-        report?: Person;
-        permissions?: ManagerPermissions;
-        pending: InboxPendingItem[];
-        history?: InboxHistoryItem[];
-      };
-      const existing = next.reportInbox[payload.userId];
-      next.reportInbox[payload.userId] = {
-        report: payload.report ?? existing?.report,
-        permissions: payload.permissions ?? existing?.permissions,
-        pending: payload.pending,
-        history: payload.history ?? existing?.history ?? [],
-      };
-      return next;
-    }
     case "notification.pulse": {
       const pulse = event.payload as NotificationPulse;
       const ageMs = Date.now() - new Date(pulse.sentAt).getTime();
@@ -579,15 +511,6 @@ export function applyEvent(replica: Replica, event: SyncEvent): Replica {
     }
     case "jira.issue.upsert": {
       upsertJiraIssue(next, event.payload as JiraIssue, "personal");
-      return next;
-    }
-    case "jira.reportIssue.upsert": {
-      const payload = event.payload as { reportUserId: string; issue: JiraIssue };
-      upsertJiraIssue(next, payload.issue, "cache");
-      const issueIds = next.reportJiraIssues[payload.reportUserId] ?? [];
-      next.reportJiraIssues[payload.reportUserId] = issueIds.includes(payload.issue.id)
-        ? issueIds
-        : [...issueIds, payload.issue.id];
       return next;
     }
     case "jira.issue.delete": {
@@ -648,6 +571,25 @@ export function applyEvent(replica: Replica, event: SyncEvent): Replica {
     case "project.delete": {
       const id = (event.payload as { id: string }).id;
       removeProject(next, id);
+      return next;
+    }
+    case "request.upsert": {
+      const row = event.payload as TaskRequestView;
+      next.requests[row.id] = row;
+      return next;
+    }
+    case "request.delete": {
+      const id = (event.payload as { id: string }).id;
+      delete next.requests[id];
+      return next;
+    }
+    case "space.revoked": {
+      const orgId = (event.payload as { orgId: string }).orgId;
+      for (const [id, row] of Object.entries(next.requests)) {
+        if (row.orgId === orgId) {
+          delete next.requests[id];
+        }
+      }
       return next;
     }
     default:
@@ -868,6 +810,7 @@ function optimisticTask(
     commentCount: 0,
     project: projectRefFromReplica(replica, body.projectId),
     jiraLinks: [],
+    orgId: body.orgId ?? null,
   };
 }
 
@@ -902,6 +845,22 @@ export function applyOp(replica: Replica, op: SyncOp): Replica {
     }
     case "task.reorder": {
       next.tasks = applyReorderToTasks(next.tasks, op.body.lanes);
+      return next;
+    }
+    case "task.moveToSpace": {
+      const task = next.tasks[op.body.taskId];
+      if (!task) {
+        return next;
+      }
+      next.tasks[op.body.taskId] = {
+        ...task,
+        orgId: op.body.orgId,
+        isPrivate: op.body.isPrivate,
+        project: op.body.projectId
+          ? projectRefFromReplica(next, op.body.projectId)
+          : null,
+        updatedAt: new Date().toISOString(),
+      };
       return next;
     }
     case "task.rollover": {
@@ -1017,108 +976,6 @@ export function applyOp(replica: Replica, op: SyncOp): Replica {
       }
       return next;
     }
-    case "inbox.accept":
-    case "inbox.decline": {
-      const item = next.inboxPending.find((row) => row.id === op.id);
-      next.inboxPending = next.inboxPending.filter((row) => row.id !== op.id);
-      if (item) {
-        const status = op.type === "inbox.accept" ? "accepted" : "declined";
-        next.inboxHistory = [
-          {
-            id: item.id,
-            status,
-            title: item.task.title,
-            from: item.from,
-            bucket: op.type === "inbox.accept" ? op.body.bucket : null,
-            declineReason:
-              op.type === "inbox.decline" ? op.body.reason : item.declineReason,
-            createdAt: item.createdAt,
-          },
-          ...next.inboxHistory,
-        ];
-      }
-      return next;
-    }
-    case "team.invite.create": {
-      return next;
-    }
-    case "team.invite.accept":
-    case "team.invite.decline": {
-      for (const [date, team] of Object.entries(next.teamByDate)) {
-        next.teamByDate[date] = {
-          ...team,
-          incomingInvites: team.incomingInvites.filter((invite) => invite.id !== op.id),
-        };
-      }
-      return next;
-    }
-    case "team.task.send": {
-      const existing = next.reportInbox[op.userId] ?? {
-        pending: [] as InboxPendingItem[],
-        history: [] as InboxHistoryItem[],
-      };
-      if (existing.pending.some((item) => item.task.id === op.id)) {
-        return next;
-      }
-      const now = new Date().toISOString();
-      const from =
-        Object.values(next.teamByDate)
-          .map((team) => team.manager)
-          .find((person) => person && person.id === next.viewerId) ?? {
-          id: next.viewerId ?? "",
-          name: "",
-          email: "",
-        };
-      const item: InboxPendingItem = {
-        id: op.id,
-        kind: "assigned",
-        from,
-        task: {
-          id: op.id,
-          title: op.body.title,
-          description: op.body.description ?? null,
-          scheduledDate: null,
-          bucket: null,
-          position: 0,
-          startDate: op.body.startDate ?? null,
-          deadline: op.body.deadline ?? null,
-          completedAt: null,
-          inProgress: false,
-          carriedDays: 0,
-          carriedSince: null,
-          isPrivate: false,
-          createdAt: now,
-          updatedAt: now,
-          subtasks: [],
-          commentCount: 0,
-          project: projectRefFromReplica(next, op.body.projectId),
-          jiraLinks: [],
-        },
-        declineReason: null,
-        createdAt: now,
-      };
-      next.reportInbox[op.userId] = {
-        ...existing,
-        pending: [item, ...existing.pending],
-      };
-      return next;
-    }
-    case "team.task.reorder": {
-      next.tasks = applyReorderToTasks(next.tasks, op.body.lanes);
-      const movedIds = new Set(op.body.lanes.flatMap((lane) => lane.taskIds));
-      for (const taskId of movedIds) {
-        const task = next.tasks[taskId];
-        if (!task) {
-          continue;
-        }
-        syncTaskIntoReportDays(next, task, op.userId);
-      }
-      return next;
-    }
-    case "team.task.delete": {
-      removeTask(next, op.taskId);
-      return next;
-    }
     case "notification.read": {
       const readAt = new Date().toISOString();
       next.notifications = next.notifications.map((item) =>
@@ -1171,20 +1028,6 @@ export function applyOp(replica: Replica, op: SyncOp): Replica {
     }
     case "project.delete": {
       removeProject(next, op.id);
-      return next;
-    }
-    case "team.project.create": {
-      const now = new Date().toISOString();
-      storeProject(next, {
-        id: op.id,
-        userId: op.userId,
-        name: op.body.name,
-        color: op.body.color,
-        archivedAt: null,
-        isPrivate: false,
-        createdAt: now,
-        updatedAt: now,
-      });
       return next;
     }
     default: {
@@ -1345,6 +1188,26 @@ export function jiraUsersForList(replica: Replica): JiraUser[] {
     }
     return a.displayName.localeCompare(b.displayName);
   });
+}
+
+export function requestsForSpace(
+  replica: Replica,
+  space: string,
+  viewerId: string | null,
+): TaskRequestView[] {
+  const rows = Object.values(replica.requests);
+  const filtered =
+    space === PERSONAL_REQUESTS_SPACE
+      ? rows
+      : rows.filter((row) => row.orgId === space);
+  if (!viewerId) {
+    return filtered;
+  }
+  return filtered
+    .filter(
+      (row) => row.from.id === viewerId || row.to.id === viewerId,
+    )
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
 export { reportDayKey };

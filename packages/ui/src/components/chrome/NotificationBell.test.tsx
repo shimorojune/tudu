@@ -18,6 +18,7 @@ vi.mock("@tudu/store", async (importOriginal) => {
   return {
     ...actual,
     useGetMeQuery: () => ({ data: { id: "priya" } }),
+    useListSpacesQuery: () => ({ data: { spaces: [] } }),
     useGetNotificationsQuery: () => ({
       data: {
         unreadCount: 1,
@@ -31,6 +32,7 @@ vi.mock("@tudu/store", async (importOriginal) => {
             ownerId: "priya",
             commentId: "22222222-2222-4222-8222-222222222222",
             inboxItemId: null,
+            orgId: null,
             scheduledDate: "2026-09-10",
             taskTitle: "Ship it",
             body: "Marcus commented on Ship it: Looks good",

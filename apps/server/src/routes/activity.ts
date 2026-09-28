@@ -1,7 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
 import type { Db } from "@tudu/db";
 import {
-  assertManagerAction,
   createComment,
   listCommentsForTask,
   listTimelineForTask,
@@ -94,7 +93,6 @@ export function createActivityRoute(db: Db) {
       return c.json({ error: "Task not found" }, 404);
     }
 
-    assertManagerAction(access, "see");
     const rows = await listCommentsForTask(db, c.req.param("id"));
     const response: CommentsResponse = { comments: rows.map(toComment) };
 
@@ -107,9 +105,7 @@ export function createActivityRoute(db: Db) {
       return c.json({ error: "Task not found" }, 404);
     }
 
-    try {
-      assertManagerAction(access, "comment");
-    } catch {
+    if (access !== "owner" && access !== "reader") {
       return c.json({ error: "Not allowed" }, 403);
     }
 
@@ -160,12 +156,6 @@ export function createActivityRoute(db: Db) {
     const access = await resolveTaskAccess(db, userId(c), c.req.param("id"));
     if (!access) {
       return c.json({ error: "Task not found" }, 404);
-    }
-
-    try {
-      assertManagerAction(access, "see");
-    } catch {
-      return c.json({ error: "Not allowed" }, 403);
     }
 
     const { before, limit } = c.req.valid("query");

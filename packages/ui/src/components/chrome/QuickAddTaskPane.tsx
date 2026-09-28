@@ -17,6 +17,7 @@ import {
   useCreateTaskMutation,
   useGetTasksForDayQuery,
 } from "@tudu/store";
+import { useProjectSpaceScope } from "@/hooks/useProjectSpaceScope";
 import { TuduMark } from "@/components/TuduLogo";
 import {
   formatQuickAddLandsIn,
@@ -106,6 +107,7 @@ export function QuickAddTaskPane({
   const [exiting, setExiting] = useState(false);
 
   const today = todayIso();
+  const spaceScope = useProjectSpaceScope();
   const [createTask] = useCreateTaskMutation();
   useQuickAddWindowDrag();
   const parse = useTaskTitleNaturalLanguage(title, today);
@@ -283,6 +285,7 @@ export function QuickAddTaskPane({
           startDate: startDate || null,
           deadline,
           projectId,
+          orgId: spaceScope.kind === "org" ? spaceScope.orgId : null,
         }),
       ).unwrap();
 

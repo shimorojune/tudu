@@ -13,6 +13,7 @@ const base: AppNotification = {
   ownerId: "priya",
   commentId: "22222222-2222-4222-8222-222222222222",
   inboxItemId: null,
+  orgId: null,
   scheduledDate: "2026-09-10",
   jiraIssueId: null,
   jiraIssueKey: null,
@@ -46,7 +47,7 @@ describe("openNotificationTarget", () => {
     });
   });
 
-  it("opens the report day for a manager", () => {
+  it("opens the scheduled day for any viewer", () => {
     const store = makeStore();
     const navigate = vi.fn();
     openNotificationTarget(base, {
@@ -55,13 +56,11 @@ describe("openNotificationTarget", () => {
       navigate,
     });
     expect(navigate).toHaveBeenCalledWith({
-      to: "/team/$userId",
-      params: { userId: "priya" },
+      to: "/",
       search: taskLinkSearch({
         date: base.scheduledDate ?? "",
         taskId: base.taskId ?? "",
         tab: "comments",
-        extra: { send: false },
       }),
     });
     expect(store.getState().day.inspectorTab).toBe("comments");
@@ -74,7 +73,7 @@ describe("openNotificationTarget", () => {
       { ...base, kind: "inbox_declined", scheduledDate: null },
       { viewerId: "marcus", dispatch: store.dispatch, navigate },
     );
-    expect(navigate).toHaveBeenCalledWith({ to: "/inbox" });
+    expect(navigate).toHaveBeenCalledWith({ to: "/unscheduled" });
     expect(store.getState().day.selectedTaskId).toBeNull();
   });
 
@@ -85,7 +84,7 @@ describe("openNotificationTarget", () => {
       { ...base, kind: "inbox", taskId: base.taskId },
       { viewerId: "priya", dispatch: store.dispatch, navigate },
     );
-    expect(navigate).toHaveBeenCalledWith({ to: "/inbox" });
+    expect(navigate).toHaveBeenCalledWith({ to: "/unscheduled" });
   });
 
   it("goes to Unscheduled when the task has no day", () => {

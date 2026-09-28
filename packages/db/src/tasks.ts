@@ -17,7 +17,7 @@ import {
   taskRowToSnapshot,
 } from "./activity.js";
 import { timelineEvents } from "./activity-schema.js";
-import { assertAssignableProject, projectNameById } from "./projects.js";
+import { assertProjectMatchesTaskOrg, projectNameById } from "./projects.js";
 import type { ProjectRow } from "./projects-schema.js";
 import { linkSummariesForTasks } from "./jira.js";
 import { subtasks, tasks, type SubtaskRow, type TaskRow } from "./tasks-schema.js";
@@ -64,13 +64,13 @@ export function planReorder(lanes: Lane[]): TaskPlacement[] {
 
 /** Qualify inbox_items by name. Interpolating `${inboxItems.taskId}` inside a
     tasks query makes Drizzle rewrite it as `"tasks"."task_id"`. */
+export function notPendingRequest() {
+  return isNull(tasks.pendingRequestId);
+}
+
+/** @deprecated use notPendingRequest */
 export function notPendingInbox() {
-  return sql`not exists (
-    select 1 from "inbox_items"
-    where "inbox_items"."task_id" = ${tasks.id}
-      and "inbox_items"."status" = 'pending'
-      and "inbox_items"."deleted_at" is null
-  )`;
+  return notPendingRequest();
 }
 
 function laneFilter(
@@ -240,6 +240,7 @@ export type CreateTaskInput = {
   deadline: Date | null;
   isPrivate: boolean;
   projectId?: string | null;
+  orgId?: string | null;
 };
 
 export async function createTask(
@@ -247,7 +248,12 @@ export async function createTask(
   input: CreateTaskInput,
 ): Promise<TaskRow> {
   if (input.projectId) {
-    await assertAssignableProject(db, input.userId, input.projectId);
+    await assertProjectMatchesTaskOrg(
+      db,
+      input.userId,
+      input.projectId,
+      input.orgId ?? null,
+    );
   }
 
   await assertNowCapForCreate(
@@ -255,6 +261,7 @@ export async function createTask(
     input.userId,
     input.scheduledDate,
     input.bucket,
+    input.orgId ?? null,
   );
 
   const position = await nextPosition(
@@ -390,7 +397,12 @@ export async function updateTask(
   }
 
   if ("projectId" in fields && fields.projectId && fields.projectId !== existing.projectId) {
-    await assertAssignableProject(db, userId, fields.projectId);
+    await assertProjectMatchesTaskOrg(
+      db,
+      userId,
+      fields.projectId,
+      existing.orgId ?? null,
+    );
   }
 
   const afterRow = applyTaskPatch(existing, patch);

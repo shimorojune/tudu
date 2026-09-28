@@ -3,13 +3,9 @@ import { renderWithProviders } from "@/test/render";
 import userEvent from "@testing-library/user-event";
 import type { JiraIssue } from "@tudu/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  SendJiraInboxDialog,
-  SpawnJiraTaskDialog,
-} from "./CreateJiraTaskControls";
+import { SpawnJiraTaskDialog } from "./CreateJiraTaskControls";
 
 const spawnJiraTask = vi.hoisted(() => vi.fn());
-const spawnReportJiraTask = vi.hoisted(() => vi.fn());
 const createSubtask = vi.hoisted(() => vi.fn());
 const updateTask = vi.hoisted(() => vi.fn());
 const uploadTaskAttachment = vi.hoisted(() => vi.fn());
@@ -40,7 +36,6 @@ vi.mock("@tudu/store", async (importOriginal) => {
     useGetProjectsQuery: () => ({ data: [], isLoading: false }),
     useCreateProjectMutation: () => [vi.fn(), { isLoading: false }],
     useSpawnJiraTaskMutation: () => [spawnJiraTask, { isLoading: false }],
-    useSpawnReportJiraTaskMutation: () => [spawnReportJiraTask, { isLoading: false }],
     useCreateSubtaskMutation: () => [createSubtask, { isLoading: false }],
     useUpdateTaskMutation: () => [updateTask, { isLoading: false }],
     useUploadTaskAttachmentMutation: () => [uploadTaskAttachment, { isLoading: false }],
@@ -119,42 +114,3 @@ describe("SpawnJiraTaskDialog", () => {
   });
 });
 
-describe("SendJiraInboxDialog", () => {
-  beforeEach(() => {
-    spawnReportJiraTask.mockReset();
-    invalidateTags.mockReset();
-    invalidateTags.mockReturnValue({ type: "invalidate" });
-    spawnReportJiraTask.mockReturnValue(mutationResult);
-  });
-
-  it("sends a linked report task to inbox", async () => {
-    const user = userEvent.setup();
-    const onSent = vi.fn();
-    renderWithProviders(
-        <SendJiraInboxDialog
-          issue={makeIssue({ description: null })}
-          reportUserId="priya"
-          reportName="Priya Raman"
-          onOpenChange={vi.fn()}
-          onSent={onSent}
-        />,
-    );
-
-    expect(screen.getByLabelText("New task title")).toHaveValue("Remote Jira summary");
-    await user.click(screen.getByRole("button", { name: "Send to inbox" }));
-
-    expect(spawnReportJiraTask).toHaveBeenCalledWith({
-      issueId: "10001",
-      title: "Remote Jira summary",
-      description: null,
-      scheduledDate: null,
-      bucket: null,
-      startDate: null,
-      deadline: "2026-09-12T18:00:00.000Z",
-      projectId: null,
-      reportUserId: "priya",
-    });
-    expect(invalidateTags).toHaveBeenCalledWith(["JiraIssue"]);
-    expect(onSent).toHaveBeenCalled();
-  });
-});

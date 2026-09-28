@@ -42,6 +42,10 @@ vi.mock("@/hooks/useTheme", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useProjectSpaceScope", () => ({
+  useProjectSpaceScope: () => ({ kind: "personal" as const }),
+}));
+
 vi.mock("@/lib/authClient", () => ({
   authClient: {
     useSession: () => ({

@@ -2,11 +2,12 @@ import { Link } from "@tanstack/react-router";
 import { useLayoutEffect, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { effectiveDayIso } from "@tudu/shared";
-import { useGetInboxCountQuery, useGetUnscheduledTasksQuery } from "@tudu/store";
+import { useGetUnscheduledTasksQuery } from "@tudu/store";
 import type { RootState } from "@tudu/store";
 import { dateLinkSearch } from "@/lib/daySearch";
 import { dayTabLabel } from "@/lib/dayLabel";
-import { MAIN_NAV_ITEMS } from "@/lib/mainNav";
+import { mainNavItems } from "@/lib/mainNav";
+import { useActiveOrgSlug } from "@/hooks/useSpaceContext";
 import { useLogicalDayClock } from "@/hooks/useLogicalDayClock";
 
 type TabContentProps = {
@@ -23,10 +24,6 @@ function TabContent({ label, badge, count }: TabContentProps) {
       </span>
     ) : null;
 
-  // Holds two tabular digits so Team never moves as the count crosses 9. Sized
-  // against the bold twin below, which is the wider of the two and so sets the
-  // column: two bold digits measure 14.42px at 11.5px Archivo. A 3 digit count
-  // would still nudge Team.
   const countNode =
     count !== undefined ? (
       <span className="min-w-[15px] text-[11.5px] tabular-nums text-faint">{count}</span>
@@ -56,17 +53,13 @@ type DayTabSlotProps = {
   to: string;
   exact: boolean;
   date: string;
+  orgSlug?: string;
 };
 
-function DayTabSlot({ label, to, exact, date }: DayTabSlotProps) {
+function DayTabSlot({ label, to, exact, date, orgSlug }: DayTabSlotProps) {
   const linkRef = useRef<HTMLAnchorElement>(null);
   const [width, setWidth] = useState<number>();
 
-  // The label swaps between "Today" and a date, so the tab's natural width
-  // changes. Mirroring it onto an explicit width lets CSS animate the resize,
-  // which slides the tabs after it instead of snapping them. A ResizeObserver
-  // covers every cause of a width change: label swap, active weight, and the
-  // webfont landing after first paint.
   useLayoutEffect(() => {
     const link = linkRef.current;
     if (!link) return;
@@ -87,10 +80,9 @@ function DayTabSlot({ label, to, exact, date }: DayTabSlotProps) {
       <Link
         ref={linkRef}
         to={to}
+        params={orgSlug ? { orgSlug } : undefined}
         search={dateLinkSearch(date)}
         activeOptions={exact ? { exact: true, includeSearch: false } : { includeSearch: false }}
-        // shrink-0 keeps the link at its natural width while the slot animates
-        // past it, so the measurement above can never feed back on itself.
         className="group shrink-0 px-px py-[18px] text-muted-foreground"
         activeProps={{
           className:
@@ -105,20 +97,22 @@ function DayTabSlot({ label, to, exact, date }: DayTabSlotProps) {
 
 export function NavTabs() {
   useLogicalDayClock();
+  const orgSlug = useActiveOrgSlug();
   const { data } = useGetUnscheduledTasksQuery();
-  const inboxCountQuery = useGetInboxCountQuery();
   const unscheduledCount = data?.tasks.length ?? 0;
-  const inboxCount = inboxCountQuery.data?.count ?? 0;
   const selectedDate = useSelector((state: RootState) => state.day.selectedDate);
   const dayLabel = dayTabLabel(selectedDate, effectiveDayIso());
+  const tabs = mainNavItems(orgSlug);
 
   return (
     <nav
       aria-label="Main"
       className="hidden items-center gap-[20px] self-stretch text-[13.5px] xl:flex"
     >
-      {MAIN_NAV_ITEMS.map((tab) => {
-        const isDayTab = "dayTab" in tab && tab.dayTab;
+      {tabs.map((tab) => {
+        const isDayTab = Boolean(tab.dayTab);
+        const orgParams =
+          orgSlug && tab.to.startsWith("/o/") ? { orgSlug } : undefined;
 
         if (isDayTab) {
           return (
@@ -128,6 +122,7 @@ export function NavTabs() {
               to={tab.to}
               exact={tab.exact}
               date={selectedDate}
+              orgSlug={orgParams?.orgSlug}
             />
           );
         }
@@ -136,6 +131,7 @@ export function NavTabs() {
           <Link
             key={tab.to}
             to={tab.to}
+            params={orgParams}
             activeOptions={
               tab.exact ? { exact: true, includeSearch: false } : { includeSearch: false }
             }
@@ -147,8 +143,8 @@ export function NavTabs() {
           >
             <TabContent
               label={tab.label}
-              badge={"badge" in tab ? inboxCount : undefined}
-              count={"count" in tab ? unscheduledCount : undefined}
+              count={tab.count ? unscheduledCount : undefined}
+              badge={tab.badge ? 0 : undefined}
             />
           </Link>
         );

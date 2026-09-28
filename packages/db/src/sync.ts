@@ -1,7 +1,7 @@
 import { and, asc, eq, gt, sql } from "drizzle-orm";
 import { recipientsForTask, type SyncEvent, type SyncEventType } from "@tudu/shared";
 import type { Db } from "./index.js";
-import { findLiveLinkForReport } from "./manager.js";
+import { liveOrgMemberUserIds } from "./access.js";
 import { syncEvents, syncMutations } from "./sync-schema.js";
 import { tasks } from "./tasks-schema.js";
 
@@ -12,31 +12,34 @@ export type EmitSyncInput = {
   payload: unknown;
 };
 
-export async function managerIdForOwner(
-  db: Db,
-  ownerId: string,
-): Promise<string | null> {
-  const link = await findLiveLinkForReport(db, ownerId);
-  return link?.managerUserId ?? null;
-}
-
 export async function recipientsForTaskId(
   db: Db,
   taskId: string,
 ): Promise<string[]> {
   const row = await db.query.tasks.findFirst({
     where: eq(tasks.id, taskId),
-    columns: { userId: true, isPrivate: true },
+    columns: {
+      userId: true,
+      isPrivate: true,
+      orgId: true,
+      pendingRequestId: true,
+    },
   });
   if (!row) {
     return [];
   }
-  const managerUserId = await managerIdForOwner(db, row.userId);
-  return recipientsForTask({
-    ownerId: row.userId,
-    isPrivate: row.isPrivate,
-    managerUserId,
-  });
+  if (row.pendingRequestId !== null) {
+    return [row.userId];
+  }
+  if (row.isPrivate || row.orgId === null) {
+    return recipientsForTask({
+      ownerId: row.userId,
+      isPrivate: row.isPrivate,
+      managerUserId: null,
+    });
+  }
+  const members = await liveOrgMemberUserIds(db, row.orgId);
+  return uniqueIds([row.userId, ...members]);
 }
 
 export function uniqueIds(ids: string[]): string[] {

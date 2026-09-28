@@ -64,6 +64,11 @@
     }
   },
   "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["tudu"]
+      }
+    },
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDIxOUM5NDhEMjBERDFCRjUKUldUMUc5MGdqWlNjSWJQRmJub0hNSk5rcEEwS3VJRDVtSmdWbnF2VHVzQW1UcG1lajRlVG82RG8K",
       "endpoints": [

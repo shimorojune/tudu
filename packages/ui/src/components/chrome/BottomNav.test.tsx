@@ -71,11 +71,14 @@ vi.mock("@tanstack/react-router", async () => {
   return { Link };
 });
 
+vi.mock("@/hooks/useSpaceContext", () => ({
+  useActiveOrgSlug: () => null,
+}));
+
 vi.mock("@tudu/store", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tudu/store")>();
   return {
     ...actual,
-    useGetInboxCountQuery: () => ({ data: { count: 2 } }),
     useGetUnscheduledTasksQuery: () => ({
       data: { tasks: [{ id: "u1" }, { id: "u2" }, { id: "u3" }] },
     }),
@@ -97,15 +100,17 @@ describe("BottomNav", () => {
     expect(nav).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Today/ })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: /Week/ })).toHaveAttribute("href", "/week");
-    expect(screen.getByRole("link", { name: /Inbox/ })).toHaveAttribute("href", "/inbox");
+    expect(screen.getByRole("link", { name: /Requests/ })).toHaveAttribute(
+      "href",
+      "/requests",
+    );
     expect(screen.getByRole("link", { name: /Unscheduled/ })).toHaveAttribute(
       "href",
       "/unscheduled",
     );
-    expect(screen.getByRole("link", { name: /Team/ })).toHaveAttribute("href", "/team");
   });
 
-  it("shows inbox badge and unscheduled count", () => {
+  it("shows unscheduled count", () => {
     locationState.pathname = "/";
     locationState.search = {};
 
@@ -115,7 +120,6 @@ describe("BottomNav", () => {
       </Provider>,
     );
 
-    expect(screen.getByRole("link", { name: /Inbox/ }).textContent).toContain("2");
     expect(screen.getByRole("link", { name: /Unscheduled/ }).textContent).toContain(
       "3",
     );

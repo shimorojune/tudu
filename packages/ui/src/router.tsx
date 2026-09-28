@@ -11,14 +11,16 @@ import { SignInRoute } from "@/routes/SignInRoute";
 import { SignUpRoute } from "@/routes/SignUpRoute";
 import { TodayRoute } from "@/routes/TodayRoute";
 import { WeekRoute } from "@/routes/WeekRoute";
-import { InboxRoute } from "@/routes/InboxRoute";
-import { TeamRoute } from "@/routes/TeamRoute";
-import { ReportDayRoute } from "@/routes/ReportDayRoute";
-import { ReportWeekRoute } from "@/routes/ReportWeekRoute";
-import { ReportInboxRoute } from "@/routes/ReportInboxRoute";
 import { SettingsRoute } from "@/routes/SettingsRoute";
 import { UnscheduledRoute } from "@/routes/UnscheduledRoute";
 import { ProjectRoute } from "@/routes/ProjectRoute";
+import { RequestsRoute } from "@/routes/RequestsRoute";
+import { CoworkersRoute } from "@/routes/CoworkersRoute";
+import { CoworkerDayRoute } from "@/routes/CoworkerDayRoute";
+import { OrgAdminRoute } from "@/routes/OrgAdminRoute";
+import { InviteAcceptRoute } from "@/routes/InviteAcceptRoute";
+import { JoinRoute } from "@/routes/JoinRoute";
+import { WelcomeRoute } from "@/routes/WelcomeRoute";
 import {
   DATE_ONLY_FIELDS,
   DAY_TASK_TAB_FIELDS,
@@ -27,14 +29,20 @@ import {
 } from "@/lib/daySearch";
 import { parseProjectSearch } from "@/lib/projectFilter";
 import { AnalyticsPageView } from "@/providers/AnalyticsPageView";
+import { useDesktopDeepLinks } from "@/hooks/useDesktopDeepLinks";
 
-const rootRoute = createRootRoute({
-  component: () => (
+function RootOutlet() {
+  useDesktopDeepLinks();
+  return (
     <>
       <AnalyticsPageView />
       <Outlet />
     </>
-  ),
+  );
+}
+
+const rootRoute = createRootRoute({
+  component: RootOutlet,
 });
 
 const authLayoutRoute = createRoute({
@@ -61,6 +69,15 @@ const appLayoutRoute = createRoute({
   component: AppShell,
 });
 
+const welcomeRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/welcome",
+  validateSearch: (search: Record<string, unknown>) => ({
+    orgSlug: typeof search.orgSlug === "string" ? search.orgSlug : undefined,
+  }),
+  component: WelcomeRoute,
+});
+
 const todayRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/",
@@ -82,49 +99,10 @@ const weekRoute = createRoute({
   component: WeekRoute,
 });
 
-const inboxRoute = createRoute({
+const requestsRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
-  path: "/inbox",
-  component: InboxRoute,
-});
-
-const teamRoute = createRoute({
-  getParentRoute: () => appLayoutRoute,
-  path: "/team",
-  validateSearch: (search: Record<string, unknown>) =>
-    parseDaySearch(search, DATE_ONLY_FIELDS),
-  component: TeamRoute,
-});
-
-const reportWeekRoute = createRoute({
-  getParentRoute: () => appLayoutRoute,
-  path: "/team/$userId/week",
-  validateSearch: (search: Record<string, unknown>) => ({
-    week: typeof search.week === "string" ? search.week : undefined,
-    ...parseProjectSearch(search),
-    ...parseDaySearch(search, DATE_ONLY_FIELDS),
-  }),
-  component: ReportWeekRoute,
-});
-
-const reportInboxRoute = createRoute({
-  getParentRoute: () => appLayoutRoute,
-  path: "/team/$userId/inbox",
-  validateSearch: (search: Record<string, unknown>) => ({
-    send: search.send === true || search.send === "1" || search.send === "true",
-  }),
-  component: ReportInboxRoute,
-});
-
-const reportDayRoute = createRoute({
-  getParentRoute: () => appLayoutRoute,
-  path: "/team/$userId",
-  validateSearch: (search: Record<string, unknown>) => ({
-    send: search.send === true || search.send === "1" || search.send === "true",
-    ...parseProjectSearch(search),
-    ...parseDaySearch(search, DAY_TASK_TAB_FIELDS),
-  }),
-  component: ReportDayRoute,
+  path: "/requests",
+  component: RequestsRoute,
 });
 
 const unscheduledRoute = createRoute({
@@ -151,19 +129,92 @@ const projectRoute = createRoute({
   component: ProjectRoute,
 });
 
+const orgTodayRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/o/$orgSlug",
+  validateSearch: (search: Record<string, unknown>) => ({
+    ...parseProjectSearch(search),
+    ...parseDaySearch(search, DAY_TASK_TAB_FIELDS),
+  }),
+  component: TodayRoute,
+});
+
+const orgWeekRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/o/$orgSlug/week",
+  validateSearch: (search: Record<string, unknown>) => ({
+    week: typeof search.week === "string" ? search.week : undefined,
+    ...parseProjectSearch(search),
+    ...parseDaySearch(search, DATE_ONLY_FIELDS),
+  }),
+  component: WeekRoute,
+});
+
+const orgRequestsRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/o/$orgSlug/requests",
+  component: RequestsRoute,
+});
+
+const orgUnscheduledRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/o/$orgSlug/unscheduled",
+  validateSearch: (search: Record<string, unknown>) => ({
+    ...parseProjectSearch(search),
+    ...parseDaySearch(search, TASK_TAB_FIELDS),
+  }),
+  component: UnscheduledRoute,
+});
+
+const orgCoworkersRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/o/$orgSlug/coworkers",
+  component: CoworkersRoute,
+});
+
+const orgCoworkerDayRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/o/$orgSlug/coworkers/$userId",
+  component: CoworkerDayRoute,
+});
+
+const orgAdminRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/o/$orgSlug/admin",
+  component: OrgAdminRoute,
+});
+
+const inviteAcceptRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/invite/$token",
+  component: InviteAcceptRoute,
+});
+
+const joinRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/join/$code",
+  component: JoinRoute,
+});
+
 const routeTree = rootRoute.addChildren([
   authLayoutRoute.addChildren([signInRoute, signUpRoute]),
+  inviteAcceptRoute,
+  joinRoute,
   appLayoutRoute.addChildren([
+    welcomeRoute,
     todayRoute,
     weekRoute,
-    inboxRoute,
+    requestsRoute,
     unscheduledRoute,
-    teamRoute,
-    reportWeekRoute,
-    reportInboxRoute,
-    reportDayRoute,
     settingsRoute,
     projectRoute,
+    orgTodayRoute,
+    orgWeekRoute,
+    orgRequestsRoute,
+    orgUnscheduledRoute,
+    orgCoworkersRoute,
+    orgCoworkerDayRoute,
+    orgAdminRoute,
   ]),
 ]);
 

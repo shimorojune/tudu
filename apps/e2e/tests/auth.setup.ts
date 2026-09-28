@@ -7,6 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const authDir = path.join(__dirname, "../.auth");
 const authFile = path.join(authDir, "user.json");
 const managerAuthFile = path.join(authDir, "manager.json");
+const priyaAuthFile = path.join(authDir, "priya.json");
 
 async function signInAndSave(
   email: string,
@@ -33,4 +34,8 @@ setup("authenticate test user", async () => {
 
 setup("authenticate manager", async () => {
   await signInAndSave("marcus@egain.com", "egain@123", managerAuthFile);
+});
+
+setup("authenticate priya", async () => {
+  await signInAndSave("priya@egain.com", "egain@123", priyaAuthFile);
 });

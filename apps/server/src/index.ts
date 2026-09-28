@@ -6,7 +6,10 @@ import { createApp, resolveServerPort } from "./app.js";
 import { shutdownAnalytics } from "./analytics/posthog.js";
 
 const serverDir = dirname(fileURLToPath(import.meta.url));
-config({ path: resolve(serverDir, "../../../.env") });
+config({
+  path: resolve(serverDir, "../../../.env"),
+  override: false,
+});
 
 const { app } = createApp({ startNotificationScheduler: true });
 

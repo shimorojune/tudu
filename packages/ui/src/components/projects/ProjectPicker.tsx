@@ -1,15 +1,15 @@
 import { useMemo, useState } from "react";
 import {
   PROJECT_COLORS,
+  filterProjectsForSpace,
   type CreateProjectRequest,
   type Project,
   type ProjectColor,
   type ProjectRef,
+  type ProjectSpaceFilter,
 } from "@tudu/shared";
-import {
-  useCreateProjectMutation,
-  useGetProjectsQuery,
-} from "@tudu/store";
+import { useCreateProjectMutation, useGetProjectsQuery } from "@tudu/store";
+import { useProjectSpaceScope } from "@/hooks/useProjectSpaceScope";
 import { ProjectChip } from "@/components/projects/ProjectChip";
 import { projectColorCss } from "@/lib/brand";
 import { cn } from "@/lib/utils";
@@ -32,6 +32,7 @@ export type ProjectPickerProps = {
     body: CreateProjectRequest,
   ) => Promise<{ project: { id: string } }>;
   fallback?: ProjectRef | null;
+  spaceScope?: ProjectSpaceFilter;
 };
 
 export function ProjectPicker({
@@ -44,16 +45,22 @@ export function ProjectPicker({
   projects: projectsProp,
   onCreate,
   fallback = null,
+  spaceScope,
 }: ProjectPickerProps) {
   const { data: ownProjects = [] } = useGetProjectsQuery({
     skip: projectsProp !== undefined,
   });
-  const projects = projectsProp ?? ownProjects;
+  const space = useProjectSpaceScope(spaceScope);
+  const scopedProjects = useMemo(
+    () => filterProjectsForSpace(projectsProp ?? ownProjects, space),
+    [projectsProp, ownProjects, space],
+  );
+  const projects = scopedProjects;
   const [createProject, { isLoading }] = useCreateProjectMutation();
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
-  const [color, setColor] = useState<ProjectColor>("ember");
+  const [color, setColor] = useState<ProjectColor>("vermilion");
 
   const live = useMemo(
     () => projects.filter((project) => project.archivedAt === null),
@@ -73,9 +80,14 @@ export function ProjectPicker({
     if (!trimmed || isLoading) {
       return;
     }
+    const body: CreateProjectRequest = {
+      name: trimmed,
+      color,
+      orgId: space.kind === "org" ? space.orgId : null,
+    };
     const result = onCreate
-      ? await onCreate({ name: trimmed, color })
-      : await createProject({ name: trimmed, color }).unwrap();
+      ? await onCreate(body)
+      : await createProject(body).unwrap();
     onChange(result.project.id);
     setCreating(false);
     setName("");

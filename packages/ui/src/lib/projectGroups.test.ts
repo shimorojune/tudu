@@ -23,7 +23,7 @@ function task(overrides: Partial<Task>): Task {
     project: {
       id: "33333333-3333-4333-8333-333333333333",
       name: "EGS",
-      color: "ember",
+      color: "vermilion",
       archivedAt: null,
       isPrivate: false,
     },

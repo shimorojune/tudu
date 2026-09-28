@@ -1,28 +1,19 @@
+import { randomUUID } from "node:crypto";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { Db } from "@tudu/db";
 import {
-  ManagerActionError,
-  acceptInboxItem,
-  acceptManagerInvite,
   assertAssignableProject,
-  assertManagerAction,
+  canActorCommentOnTask,
   claimMutation,
   createComment,
-  createManagerInvite,
-  assertPublicAssignableProject,
   createProject,
-  createProjectForReport,
   createSubtask,
   createTask,
   currentSyncSeq,
-  declineInboxItem,
-  declineManagerInvite,
   deleteProject,
-  deleteReportTask,
   emitSync,
   eventsForMutation,
   findCachedJiraIssue,
-  findLiveLink,
   getJiraConnection,
   getJiraConnectionStatus,
   insertTimelineEvents,
@@ -31,76 +22,72 @@ import {
   listJiraComments,
   listJiraComponents,
   listJiraIssues,
-  listReportJiraIssues,
   listJiraUsers,
   linkedJiraIssueRefsForTask,
   findTaskById,
   listCommentsForTask,
-  listInbox,
   listLiveTaskIdsForProject,
   listProjectsForUser,
-  listPublicProjectsForUser,
-  listReportDayTasks,
-  listReportInbox,
-  listReportUnscheduledTasks,
   listTasksForDay,
   listTasksForProject,
-  listTeam,
   listTimelineForTask,
   listUnscheduledTasks,
   loadTaskWithSubtasks,
-  managerIdForOwner,
   mapComment,
   mapProject,
   mapTask,
   mapTimelineEvent,
+  mapTaskRequest,
+  acceptTaskRequest,
+  declineTaskRequest,
+  proposeTaskEdit,
+  reassignTaskRequest,
+  recipientsForRequest,
+  RequestError,
+  returnedDiscardTaskRequest,
+  returnedResendTaskRequest,
+  returnedTakeTaskRequest,
+  sendNewTaskRequest,
+  withdrawTaskRequest,
+  outdateProposalsOnTaskChange,
   recipientsForTaskId,
   releaseMutation,
-  reorderReportTasks,
   reorderSubtasks,
   reorderTasks,
   resolveTaskAccess,
   rollOverTasks,
-  sendInboxTask,
   softDeleteComment,
   softDeleteSubtask,
   softDeleteTask,
   subtasks,
   tasks,
-  uniqueIds,
   updateComment,
   updateProject,
   updateSubtask,
   updateTask,
   findProjectById,
   ProjectError,
-  user,
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
-  managerVisibleJiraLinkedTasks,
-  type TaskAccess,
   type UpdateTaskFields,
   unlinkTaskFromJiraIssue,
   upsertJiraComments,
   upsertJiraIssue,
+  listTaskRequestsForView,
+  taskRequests,
+  moveTaskToSpace,
+  MoveToSpaceError,
 } from "@tudu/db";
 import { insertAndEmitNotificationsWithPush } from "./notificationsWithPush.js";
 import {
-  effectiveDayIso,
-  isSlipping,
   isTaskChangeTimelineType,
   jiraIssueToTaskLinkSummary,
   parseViewKey,
   type JiraComment,
   type JiraIssue,
-  type ManagerPermissions,
-  type InboxHistoryItem,
-  type InboxPendingItem,
   type SyncEvent,
   type SyncOp,
-  type TeamInvite,
-  type TeamResponse,
   type UpdateTaskRequest,
 } from "@tudu/shared";
 import {
@@ -112,7 +99,6 @@ import {
   ensureAllowedJiraBaseUrl,
   ensureConfiguredJiraProjectKey,
   JiraAccessError,
-  requireReportVisibleJiraIssue,
 } from "./jira/access.js";
 import { decryptJiraToken } from "./jira/crypto.js";
 import { notifySync } from "./syncHub.js";
@@ -156,17 +142,56 @@ function toUpdateFields(patch: UpdateTaskRequest): UpdateTaskFields {
   return fields;
 }
 
-function wrapManager(error: unknown): never {
-  if (error instanceof ManagerActionError) {
-    throw new SyncOpError(error.message, error.status);
-  }
+function wrapSyncError(error: unknown): never {
   if (error instanceof JiraAccessError) {
     throw new SyncOpError(error.message, error.status);
   }
   if (error instanceof ProjectError) {
     throw new SyncOpError(error.message, error.status);
   }
+  if (error instanceof RequestError) {
+    throw new SyncOpError(error.message, error.status);
+  }
   throw error;
+}
+
+async function emitRequestUpsert(
+  db: Db,
+  requestId: string,
+  clientMutationId: string | null,
+): Promise<SyncEvent[]> {
+  const row = await db.query.taskRequests.findFirst({
+    where: eq(taskRequests.id, requestId),
+  });
+  if (!row) {
+    return [];
+  }
+  const task = await loadTaskWithSubtasks(db, row.taskId);
+  if (!task) {
+    return [];
+  }
+  const payload = await mapTaskRequest(db, row, task);
+  return emitSync(db, {
+    recipientUserIds: recipientsForRequest(row.fromUserId, row.toUserId),
+    clientMutationId,
+    type: "request.upsert",
+    payload,
+  });
+}
+
+async function emitRequestDelete(
+  db: Db,
+  requestId: string,
+  fromUserId: string,
+  toUserId: string,
+  clientMutationId: string | null,
+): Promise<SyncEvent[]> {
+  return emitSync(db, {
+    recipientUserIds: recipientsForRequest(fromUserId, toUserId),
+    clientMutationId,
+    type: "request.delete",
+    payload: { id: requestId },
+  });
 }
 
 export function jiraDueDateFromDeadline(deadline: string | null): string | null {
@@ -188,35 +213,6 @@ export function taskPatchChangesDeadline(
     jiraDueDateFromDeadline(patch.deadline ?? null) !==
     jiraDueDateFromDeadline(previousDeadline?.toISOString() ?? null)
   );
-}
-
-type JiraFieldPatch = Partial<
-  Pick<JiraIssue, "summary" | "description" | "dueDate" | "assignee">
->;
-
-export function canWriteReportJiraFields(
-  permissions: ManagerPermissions,
-  fields: JiraFieldPatch,
-): boolean {
-  if (!permissions.canSeeDay) {
-    return false;
-  }
-  const writesIssueFields =
-    "summary" in fields || "description" in fields || "assignee" in fields;
-  const writesDueDate = "dueDate" in fields;
-  if (writesIssueFields && !permissions.canEdit) {
-    return false;
-  }
-  if (writesDueDate && !permissions.canEditDeadlines) {
-    return false;
-  }
-  return writesIssueFields || writesDueDate;
-}
-
-export function canCreateReportJiraComment(
-  permissions: ManagerPermissions,
-): boolean {
-  return permissions.canSeeDay && permissions.canComment;
 }
 
 export type JiraSyncOptions = {
@@ -248,68 +244,23 @@ async function requireJiraAdapter(
   });
 }
 
-async function assertReportAccess(
-  db: Db,
-  actorId: string,
-  reportUserId: string,
-): Promise<NonNullable<Awaited<ReturnType<typeof findLiveLink>>>> {
-  const link = await findLiveLink(db, actorId, reportUserId);
-  if (!link?.permissions?.canSeeDay) {
-    throw new SyncOpError("Not a report of yours", 403);
-  }
-  return link;
-}
-
-async function assertReportJiraFieldAccess(
-  db: Db,
-  actorId: string,
-  reportUserId: string,
-  fields: JiraFieldPatch,
-): Promise<NonNullable<Awaited<ReturnType<typeof findLiveLink>>>> {
-  const link = await assertReportAccess(db, actorId, reportUserId);
-  if (!link.permissions || !canWriteReportJiraFields(link.permissions, fields)) {
-    throw new SyncOpError("Not allowed", 403);
-  }
-  return link;
-}
-
-async function assertReportJiraCommentAccess(
-  db: Db,
-  actorId: string,
-  reportUserId: string,
-): Promise<NonNullable<Awaited<ReturnType<typeof findLiveLink>>>> {
-  const link = await assertReportAccess(db, actorId, reportUserId);
-  if (!link.permissions || !canCreateReportJiraComment(link.permissions)) {
-    throw new SyncOpError("Not allowed", 403);
-  }
-  return link;
-}
-
-function assertReportJiraTaskSpawnAccess(
-  permissions: ManagerPermissions | null | undefined,
-): void {
-  if (!permissions?.canSendInbox) {
-    throw new SyncOpError("Not allowed to send tasks", 403);
-  }
-}
-
 async function taskOwnerForJiraLink(
   db: Db,
   actorId: string,
   taskId: string,
-): Promise<{ ownerUserId: string; access: TaskAccess }> {
-  const access = await resolveTaskAccess(db, actorId, taskId);
-  if (!access) {
+): Promise<{ ownerUserId: string }> {
+  const role = await resolveTaskAccess(db, actorId, taskId);
+  if (!role) {
     throw new SyncOpError("Task not found", 404);
   }
-  if (access.role === "manager") {
-    try {
-      assertManagerAction(access, "edit");
-    } catch {
-      throw new SyncOpError("Not allowed", 403);
-    }
+  if (role !== "owner") {
+    throw new SyncOpError("Not allowed", 403);
   }
-  return { ownerUserId: access.task.userId, access };
+  const task = await loadTaskWithSubtasks(db, taskId);
+  if (!task) {
+    throw new SyncOpError("Task not found", 404);
+  }
+  return { ownerUserId: task.userId };
 }
 
 async function linkedTaskIdsForIssue(
@@ -341,21 +292,6 @@ async function emitJiraIssueSnapshot(
     clientMutationId,
     type: "jira.issue.upsert",
     payload: issue,
-  });
-}
-
-async function emitReportJiraIssueSnapshot(
-  db: Db,
-  managerUserId: string,
-  reportUserId: string,
-  issue: JiraIssue,
-  clientMutationId: string | null,
-): Promise<SyncEvent[]> {
-  return emitSync(db, {
-    recipientUserIds: [managerUserId],
-    clientMutationId,
-    type: "jira.reportIssue.upsert",
-    payload: { reportUserId, issue },
   });
 }
 
@@ -454,18 +390,10 @@ async function linkedTimelineTaskIds(
   ownerUserId: string,
   issueId: string,
 ): Promise<string[]> {
-  if (actorId === ownerUserId) {
-    return linkedTaskIdsForIssue(db, ownerUserId, issueId);
+  if (actorId !== ownerUserId) {
+    return [];
   }
-
-  const link = await assertReportAccess(db, actorId, ownerUserId);
-  const visible = await managerVisibleJiraLinkedTasks(
-    db,
-    ownerUserId,
-    issueId,
-    link.permissions,
-  );
-  return visible.map((task) => task.taskId);
+  return linkedTaskIdsForIssue(db, ownerUserId, issueId);
 }
 
 async function appendJiraTimelineForIssue(
@@ -494,9 +422,8 @@ async function updateLinkedTaskDeadlines(
   ownerUserId: string,
   issue: JiraIssue,
   clientMutationId: string | null,
-  permissions?: Pick<ManagerPermissions, "canSeePrivate" | "canEditDeadlines"> | null,
 ): Promise<SyncEvent[]> {
-  if (actorId !== ownerUserId && !permissions?.canEditDeadlines) {
+  if (actorId !== ownerUserId) {
     return [];
   }
   const taskIds = await linkedTaskIdsForIssue(db, ownerUserId, issue.id);
@@ -510,9 +437,6 @@ async function updateLinkedTaskDeadlines(
       eq(tasks.userId, ownerUserId),
       inArray(tasks.id, taskIds),
       isNull(tasks.deletedAt),
-      ...(actorId !== ownerUserId && !permissions?.canSeePrivate
-        ? [eq(tasks.isPrivate, false)]
-        : []),
     ),
   });
   const events: SyncEvent[] = [];
@@ -580,56 +504,6 @@ function opAssignee(assignee: unknown): JiraIssue["assignee"] | undefined {
   return (assignee ?? null) as JiraIssue["assignee"];
 }
 
-function mapTeam(team: Awaited<ReturnType<typeof listTeam>>): TeamResponse {
-  return {
-    reports: team.reports,
-    manager: team.manager,
-    outgoingInvites: team.outgoingInvites.map(toInvite),
-    incomingInvites: team.incomingInvites.map(toInvite),
-  };
-}
-
-function toInvite(row: {
-  id: string;
-  email: string;
-  direction: "outgoing" | "incoming";
-  inviter: TeamInvite["inviter"];
-  createdAt: Date;
-}): TeamInvite {
-  return {
-    id: row.id,
-    email: row.email,
-    direction: row.direction,
-    inviter: row.inviter,
-    createdAt: row.createdAt.toISOString(),
-  };
-}
-
-function toPending(row: Awaited<ReturnType<typeof listInbox>>["pending"][number]): InboxPendingItem {
-  return {
-    id: row.item.id,
-    kind: row.kind,
-    from: row.from,
-    task: mapTask(row.task),
-    declineReason: row.item.declineReason,
-    createdAt: row.item.createdAt.toISOString(),
-  };
-}
-
-function toHistory(
-  row: Awaited<ReturnType<typeof listInbox>>["history"][number],
-): InboxHistoryItem {
-  return {
-    id: row.item.id,
-    status: row.item.status === "accepted" ? "accepted" : "declined",
-    title: row.title,
-    from: row.from,
-    bucket: row.item.status === "accepted" ? row.bucket : null,
-    declineReason: row.item.declineReason,
-    createdAt: row.item.createdAt.toISOString(),
-  };
-}
-
 async function emitAndNotify(events: SyncEvent[]): Promise<SyncEvent[]> {
   notifySync(events.map((event) => event.recipientUserId));
   return events;
@@ -675,20 +549,6 @@ async function emitTaskSnapshot(
     );
   }
 
-  if (task.isPrivate) {
-    const manager = await managerIdForOwner(db, task.userId);
-    if (manager) {
-      events.push(
-        ...(await emitSync(db, {
-          recipientUserIds: [manager],
-          clientMutationId,
-          type: "task.hide",
-          payload: { id: taskId },
-        })),
-      );
-    }
-  }
-
   return events;
 }
 
@@ -702,39 +562,12 @@ async function emitProjectFanout(
     return [];
   }
 
-  const events = await emitSync(db, {
+  return emitSync(db, {
     recipientUserIds: [row.userId],
     clientMutationId,
     type: "project.upsert",
     payload: mapProject(row),
   });
-
-  const manager = await managerIdForOwner(db, row.userId);
-  if (!manager || manager === row.userId) {
-    return events;
-  }
-
-  if (row.isPrivate) {
-    events.push(
-      ...(await emitSync(db, {
-        recipientUserIds: [manager],
-        clientMutationId,
-        type: "project.delete",
-        payload: { id: row.id },
-      })),
-    );
-    return events;
-  }
-
-  events.push(
-    ...(await emitSync(db, {
-      recipientUserIds: [manager],
-      clientMutationId,
-      type: "project.upsert",
-      payload: mapProject(row),
-    })),
-  );
-  return events;
 }
 
 async function emitLatestTimeline(
@@ -754,74 +587,6 @@ async function emitLatestTimeline(
     type: "timeline.append",
     payload: mapTimelineEvent(row),
   });
-}
-
-async function emitRosterForOwner(
-  db: Db,
-  ownerId: string,
-  clientMutationId: string | null,
-): Promise<SyncEvent[]> {
-  const manager = await managerIdForOwner(db, ownerId);
-  if (!manager) {
-    return [];
-  }
-  const date = effectiveDayIso();
-  try {
-    const team = await listTeam(db, manager, date);
-    return emitSync(db, {
-      recipientUserIds: [manager],
-      clientMutationId,
-      type: "roster.upsert",
-      payload: { date, team: mapTeam(team) },
-    });
-  } catch {
-    return [];
-  }
-}
-
-async function emitInboxForUser(
-  db: Db,
-  userId: string,
-  clientMutationId: string | null,
-): Promise<SyncEvent[]> {
-  const { pending } = await listInbox(db, userId);
-  const events: SyncEvent[] = [];
-  for (const row of pending) {
-    events.push(
-      ...(await emitSync(db, {
-        recipientUserIds: [userId],
-        clientMutationId,
-        type: "inbox.upsert",
-        payload: toPending(row),
-      })),
-    );
-  }
-  return events;
-}
-
-async function emitReportInboxForManager(
-  db: Db,
-  managerUserId: string,
-  reportUserId: string,
-  clientMutationId: string | null,
-): Promise<SyncEvent[]> {
-  try {
-    const result = await listReportInbox(db, managerUserId, reportUserId);
-    return emitSync(db, {
-      recipientUserIds: [managerUserId],
-      clientMutationId,
-      type: "reportInbox.upsert",
-      payload: {
-        userId: reportUserId,
-        report: result.report,
-        permissions: result.permissions,
-        pending: result.pending.map(toPending),
-        history: result.history.map(toHistory),
-      },
-    });
-  } catch {
-    return [];
-  }
 }
 
 export async function applySyncOp(
@@ -857,102 +622,77 @@ export async function applySyncOp(
           deadline: op.body.deadline ? new Date(op.body.deadline) : null,
           isPrivate: op.body.isPrivate ?? false,
           projectId: op.body.projectId ?? null,
+          orgId: op.body.orgId ?? null,
         });
         await push(await emitTaskSnapshot(db, op.id, clientMutationId));
         await push(await emitLatestTimeline(db, op.id, clientMutationId));
-        await push(await emitRosterForOwner(db, actorId, clientMutationId));
         break;
       }
       case "task.update": {
-        const access = await resolveTaskAccess(db, actorId, op.id);
-        if (!access) {
+        const role = await resolveTaskAccess(db, actorId, op.id);
+        if (role !== "owner") {
+          throw new SyncOpError(
+            role === null ? "Task not found" : "Not allowed",
+            role === null ? 404 : 403,
+          );
+        }
+        const existing = await findTaskById(db, actorId, op.id);
+        if (!existing) {
           throw new SyncOpError("Task not found", 404);
         }
-        let updated;
-        let pushedJiraDueDateIssues: JiraIssue[] = [];
-        if (access.role === "owner") {
-          if (
-            "projectId" in op.patch &&
-            op.patch.projectId &&
-            op.patch.projectId !== access.task.projectId
-          ) {
-            await assertAssignableProject(db, actorId, op.patch.projectId);
-          }
-          if (taskPatchChangesDeadline(op.patch, access.task.deadline)) {
-            pushedJiraDueDateIssues = await updateLinkedJiraDueDates(
-              db,
-              actorId,
-              op.id,
-              jiraDueDateFromDeadline(op.patch.deadline ?? null),
-              options,
-            );
-          }
-          updated = await updateTask(db, actorId, op.id, toUpdateFields(op.patch));
-        } else {
-          const keys = Object.keys(op.patch);
-          if (keys.length !== 1 || !("projectId" in op.patch)) {
-            throw new SyncOpError("Not allowed", 403);
-          }
-          if (op.patch.projectId) {
-            await assertPublicAssignableProject(
-              db,
-              access.task.userId,
-              op.patch.projectId,
-            );
-          }
-          updated = await updateTask(db, access.task.userId, op.id, {
-            projectId: op.patch.projectId ?? null,
-          });
+        if (
+          "projectId" in op.patch &&
+          op.patch.projectId &&
+          op.patch.projectId !== existing.projectId
+        ) {
+          await assertAssignableProject(db, actorId, op.patch.projectId);
         }
+        let pushedJiraDueDateIssues: JiraIssue[] = [];
+        if (taskPatchChangesDeadline(op.patch, existing.deadline)) {
+          pushedJiraDueDateIssues = await updateLinkedJiraDueDates(
+            db,
+            actorId,
+            op.id,
+            jiraDueDateFromDeadline(op.patch.deadline ?? null),
+            options,
+          );
+        }
+        const updated = await updateTask(db, actorId, op.id, toUpdateFields(op.patch));
         if (!updated) {
           throw new SyncOpError("Task not found", 404);
         }
-        await push(await emitTaskSnapshot(db, op.id, clientMutationId));
-        await push(await emitLatestTimeline(db, op.id, clientMutationId));
-        await push(await emitRosterForOwner(db, actorId, clientMutationId));
-        for (const issue of pushedJiraDueDateIssues) {
-          await push(await syncOwnerIssue(db, actorId, issue, clientMutationId));
-        }
-        if (actorId !== access.task.userId) {
-          const latest = await listTimelineForTask(db, op.id, { limit: 1 });
-          const row = latest[0];
-          if (row && isTaskChangeTimelineType(row.type)) {
+        const loaded = await loadTaskWithSubtasks(db, op.id);
+        if (loaded) {
+          const outdated = await outdateProposalsOnTaskChange(db, loaded);
+          for (const row of outdated) {
             await push(
-              await insertAndEmitNotificationsWithPush(db, {
-                recipientUserIds: [access.task.userId],
-                actorId,
-                clientMutationId,
-                kind: "task_changed",
-                taskTitle: updated.title,
-                changeType: row.type,
-                taskId: op.id,
-                ownerId: access.task.userId,
-                scheduledDate: updated.scheduledDate,
-              }),
+              await emitRequestUpsert(db, row.id, clientMutationId),
             );
           }
+        }
+        await push(await emitTaskSnapshot(db, op.id, clientMutationId));
+        await push(await emitLatestTimeline(db, op.id, clientMutationId));
+        for (const issue of pushedJiraDueDateIssues) {
+          await push(await syncOwnerIssue(db, actorId, issue, clientMutationId));
         }
         break;
       }
       case "task.delete": {
-        const access = await resolveTaskAccess(db, actorId, op.id);
-        if (!access) {
+        const role = await resolveTaskAccess(db, actorId, op.id);
+        if (role !== "owner") {
+          throw new SyncOpError(
+            role === null ? "Task not found" : "Not allowed",
+            role === null ? 404 : 403,
+          );
+        }
+        const existing = await findTaskById(db, actorId, op.id);
+        if (!existing) {
           throw new SyncOpError("Task not found", 404);
         }
         const recipients = await recipientsForTaskId(db, op.id);
-        const ownerId = access.task.userId;
-        const deletedTitle = access.task.title;
-        const deletedDate = access.task.scheduledDate;
-        if (access.role === "manager") {
-          const deleted = await deleteReportTask(db, actorId, op.id);
-          if (!deleted) {
-            throw new SyncOpError("Task not found", 404);
-          }
-        } else {
-          const deleted = await softDeleteTask(db, actorId, op.id);
-          if (!deleted) {
-            throw new SyncOpError("Task not found", 404);
-          }
+        const deleted = await softDeleteTask(db, actorId, op.id);
+        if (!deleted) {
+          throw new SyncOpError("Task not found", 404);
         }
         await push(
           await emitSync(db, {
@@ -962,21 +702,6 @@ export async function applySyncOp(
             payload: { id: op.id },
           }),
         );
-        if (actorId !== ownerId) {
-          await push(
-            await insertAndEmitNotificationsWithPush(db, {
-              recipientUserIds: [ownerId],
-              actorId,
-              clientMutationId,
-              kind: "task_deleted",
-              taskTitle: deletedTitle,
-              taskId: op.id,
-              ownerId,
-              scheduledDate: deletedDate,
-            }),
-          );
-        }
-        await push(await emitRosterForOwner(db, ownerId, clientMutationId));
         break;
       }
       case "task.reorder": {
@@ -989,7 +714,31 @@ export async function applySyncOp(
           await push(await emitTaskSnapshot(db, taskId, clientMutationId));
           await push(await emitLatestTimeline(db, taskId, clientMutationId));
         }
-        await push(await emitRosterForOwner(db, actorId, clientMutationId));
+        break;
+      }
+      case "task.moveToSpace": {
+        try {
+          await moveTaskToSpace(db, {
+            userId: actorId,
+            taskId: op.body.taskId,
+            orgId: op.body.orgId,
+            projectId: op.body.projectId,
+            isPrivate: op.body.isPrivate,
+          });
+        } catch (error) {
+          if (error instanceof MoveToSpaceError) {
+            const status =
+              error.status === 404
+                ? 404
+                : error.status === 403
+                  ? 403
+                  : 400;
+            throw new SyncOpError(error.message, status);
+          }
+          throw error;
+        }
+        await push(await emitTaskSnapshot(db, op.body.taskId, clientMutationId));
+        await push(await emitLatestTimeline(db, op.body.taskId, clientMutationId));
         break;
       }
       case "task.rollover": {
@@ -998,7 +747,6 @@ export async function applySyncOp(
           await push(await emitTaskSnapshot(db, taskId, clientMutationId));
           await push(await emitLatestTimeline(db, taskId, clientMutationId));
         }
-        await push(await emitRosterForOwner(db, actorId, clientMutationId));
         break;
       }
       case "subtask.create": {
@@ -1036,14 +784,12 @@ export async function applySyncOp(
         break;
       }
       case "comment.create": {
-        const access = await resolveTaskAccess(db, actorId, op.taskId);
-        if (!access) {
-          throw new SyncOpError("Task not found", 404);
-        }
-        try {
-          assertManagerAction(access, "comment");
-        } catch {
+        if (!(await canActorCommentOnTask(db, actorId, op.taskId))) {
           throw new SyncOpError("Not allowed", 403);
+        }
+        const task = await loadTaskWithSubtasks(db, op.taskId);
+        if (!task) {
+          throw new SyncOpError("Task not found", 404);
         }
         const created = await createComment(db, actorId, op.taskId, op.body.body, op.id);
         if (!created) {
@@ -1062,28 +808,22 @@ export async function applySyncOp(
         await push(await emitLatestTimeline(db, op.taskId, clientMutationId));
         await push(
           await insertAndEmitNotificationsWithPush(db, {
-            recipientUserIds: recipients,
+            recipientUserIds: recipients.filter((id) => id !== actorId),
             actorId,
             clientMutationId,
             kind: "comment",
-            taskTitle: access.task.title,
+            taskTitle: task.title,
             commentQuote: created.body,
             taskId: op.taskId,
-            ownerId: access.task.userId,
+            ownerId: task.userId,
             commentId: created.id,
-            scheduledDate: access.task.scheduledDate,
+            scheduledDate: task.scheduledDate,
           }),
         );
         break;
       }
       case "comment.update": {
-        const access = await resolveTaskAccess(db, actorId, op.taskId);
-        if (!access) {
-          throw new SyncOpError("Task not found", 404);
-        }
-        try {
-          assertManagerAction(access, "comment");
-        } catch {
+        if (!(await canActorCommentOnTask(db, actorId, op.taskId))) {
           throw new SyncOpError("Not allowed", 403);
         }
         const updated = await updateComment(db, actorId, op.id, op.patch.body);
@@ -1103,13 +843,7 @@ export async function applySyncOp(
         break;
       }
       case "comment.delete": {
-        const access = await resolveTaskAccess(db, actorId, op.taskId);
-        if (!access) {
-          throw new SyncOpError("Task not found", 404);
-        }
-        try {
-          assertManagerAction(access, "comment");
-        } catch {
+        if (!(await canActorCommentOnTask(db, actorId, op.taskId))) {
           throw new SyncOpError("Not allowed", 403);
         }
         const deleted = await softDeleteComment(db, actorId, op.id);
@@ -1129,263 +863,8 @@ export async function applySyncOp(
         await push(await emitLatestTimeline(db, op.taskId, clientMutationId));
         break;
       }
-      case "inbox.accept": {
-        try {
-          const task = await acceptInboxItem(
-            db,
-            actorId,
-            op.id,
-            op.body.bucket,
-            effectiveDayIso(),
-            op.body.scheduledDate,
-          );
-          const { history } = await listInbox(db, actorId);
-          const row = history.find((item) => item.item.id === op.id);
-          await push(
-            await emitSync(db, {
-              recipientUserIds: [actorId],
-              clientMutationId,
-              type: "inbox.delete",
-              payload: {
-                id: op.id,
-                history: row ? toHistory(row) : undefined,
-              },
-            }),
-          );
-          await push(await emitTaskSnapshot(db, task.id, clientMutationId));
-          await push(await emitLatestTimeline(db, task.id, clientMutationId));
-          await push(await emitRosterForOwner(db, actorId, clientMutationId));
-          const managerId = await managerIdForOwner(db, actorId);
-          if (managerId) {
-            await push(
-              await emitReportInboxForManager(db, managerId, actorId, clientMutationId),
-            );
-          }
-        } catch (error) {
-          wrapManager(error);
-        }
-        break;
-      }
-      case "inbox.decline": {
-        try {
-          const bounced = await declineInboxItem(db, actorId, op.id, op.body.reason);
-          const { history } = await listInbox(db, actorId);
-          const row = history.find((item) => item.item.id === op.id);
-          await push(
-            await emitSync(db, {
-              recipientUserIds: [actorId],
-              clientMutationId,
-              type: "inbox.delete",
-              payload: {
-                id: op.id,
-                history: row ? toHistory(row) : undefined,
-              },
-            }),
-          );
-          await push(await emitInboxForUser(db, bounced.toUserId, clientMutationId));
-          const managerId = await managerIdForOwner(db, actorId);
-          if (managerId) {
-            await push(
-              await emitReportInboxForManager(db, managerId, actorId, clientMutationId),
-            );
-          }
-          const bouncedTask = await loadTaskWithSubtasks(db, bounced.taskId);
-          if (bouncedTask) {
-            await push(
-              await insertAndEmitNotificationsWithPush(db, {
-                recipientUserIds: [bounced.toUserId],
-                actorId,
-                clientMutationId,
-                kind: "inbox_declined",
-                taskTitle: bouncedTask.title,
-                commentQuote: op.body.reason,
-                taskId: bounced.taskId,
-                ownerId: bounced.toUserId,
-                inboxItemId: bounced.id,
-                scheduledDate: bouncedTask.scheduledDate,
-              }),
-            );
-          }
-        } catch (error) {
-          wrapManager(error);
-        }
-        break;
-      }
-      case "team.invite.create": {
-        try {
-          const created = await createManagerInvite(db, actorId, op.body.email);
-          const date = effectiveDayIso();
-          const team = await listTeam(db, actorId, date);
-          await push(
-            await emitSync(db, {
-              recipientUserIds: [actorId],
-              clientMutationId,
-              type: "roster.upsert",
-              payload: { date, team: mapTeam(team) },
-            }),
-          );
-          const invitee = await db.query.user.findFirst({
-            where: eq(user.email, created.email),
-          });
-          if (invitee && invitee.id !== actorId) {
-            const inviteeTeam = await listTeam(db, invitee.id, date);
-            await push(
-              await emitSync(db, {
-                recipientUserIds: [invitee.id],
-                clientMutationId,
-                type: "roster.upsert",
-                payload: { date, team: mapTeam(inviteeTeam) },
-              }),
-            );
-          }
-        } catch (error) {
-          wrapManager(error);
-        }
-        break;
-      }
-      case "team.invite.accept": {
-        try {
-          await acceptManagerInvite(db, actorId, op.id);
-          const date = effectiveDayIso();
-          const team = await listTeam(db, actorId, date);
-          await push(
-            await emitSync(db, {
-              recipientUserIds: [actorId],
-              clientMutationId,
-              type: "roster.upsert",
-              payload: { date, team: mapTeam(team) },
-            }),
-          );
-          if (team.manager) {
-            const managerTeam = await listTeam(db, team.manager.id, date);
-            await push(
-              await emitSync(db, {
-                recipientUserIds: [team.manager.id],
-                clientMutationId,
-                type: "roster.upsert",
-                payload: { date, team: mapTeam(managerTeam) },
-              }),
-            );
-          }
-        } catch (error) {
-          wrapManager(error);
-        }
-        break;
-      }
-      case "team.invite.decline": {
-        try {
-          await declineManagerInvite(db, actorId, op.id);
-          const date = effectiveDayIso();
-          const team = await listTeam(db, actorId, date);
-          await push(
-            await emitSync(db, {
-              recipientUserIds: [actorId],
-              clientMutationId,
-              type: "roster.upsert",
-              payload: { date, team: mapTeam(team) },
-            }),
-          );
-        } catch (error) {
-          wrapManager(error);
-        }
-        break;
-      }
-      case "team.task.send": {
-        try {
-          const sent = await sendInboxTask(db, actorId, op.userId, {
-            id: op.id,
-            title: op.body.title,
-            description: op.body.description ?? null,
-            startDate: op.body.startDate ?? null,
-            deadline: op.body.deadline ? new Date(op.body.deadline) : null,
-            projectId: op.body.projectId,
-          });
-          if (sent.task.projectId) {
-            await push(await emitProjectFanout(db, sent.task.projectId, clientMutationId));
-          }
-          await push(await emitInboxForUser(db, op.userId, clientMutationId));
-          await push(
-            await emitReportInboxForManager(db, actorId, op.userId, clientMutationId),
-          );
-          await push(await emitLatestTimeline(db, sent.task.id, clientMutationId));
-          await push(
-            await insertAndEmitNotificationsWithPush(db, {
-              recipientUserIds: [op.userId],
-              actorId,
-              clientMutationId,
-              kind: "inbox",
-              taskTitle: sent.task.title,
-              taskId: sent.task.id,
-              ownerId: op.userId,
-              inboxItemId: sent.item.id,
-              scheduledDate: sent.task.scheduledDate,
-            }),
-          );
-        } catch (error) {
-          wrapManager(error);
-        }
-        break;
-      }
-      case "team.task.reorder": {
-        try {
-          const ok = await reorderReportTasks(db, actorId, op.userId, op.body.lanes);
-          if (!ok) {
-            throw new SyncOpError("Task not found", 404);
-          }
-          const taskIds = [...new Set(op.body.lanes.flatMap((lane) => lane.taskIds))];
-          for (const taskId of taskIds) {
-            await push(await emitTaskSnapshot(db, taskId, clientMutationId));
-          }
-          await push(await emitRosterForOwner(db, op.userId, clientMutationId));
-        } catch (error) {
-          wrapManager(error);
-        }
-        break;
-      }
-      case "team.task.delete": {
-        const access = await resolveTaskAccess(db, actorId, op.taskId);
-        if (!access) {
-          throw new SyncOpError("Task not found", 404);
-        }
-        const recipients = await recipientsForTaskId(db, op.taskId);
-        const deletedTitle = access.task.title;
-        const deletedDate = access.task.scheduledDate;
-        const ownerId = access.task.userId;
-        try {
-          const deleted = await deleteReportTask(db, actorId, op.taskId);
-          if (!deleted) {
-            throw new SyncOpError("Task not found", 404);
-          }
-        } catch (error) {
-          wrapManager(error);
-        }
-        await push(
-          await emitSync(db, {
-            recipientUserIds: uniqueIds([...recipients, actorId, op.userId]),
-            clientMutationId,
-            type: "task.delete",
-            payload: { id: op.taskId },
-          }),
-        );
-        if (actorId !== ownerId) {
-          await push(
-            await insertAndEmitNotificationsWithPush(db, {
-              recipientUserIds: [ownerId],
-              actorId,
-              clientMutationId,
-              kind: "task_deleted",
-              taskTitle: deletedTitle,
-              taskId: op.taskId,
-              ownerId,
-              scheduledDate: deletedDate,
-            }),
-          );
-        }
-        await push(await emitRosterForOwner(db, op.userId, clientMutationId));
-        break;
-      }
       case "jira.link": {
-        const { ownerUserId, access } = await taskOwnerForJiraLink(db, actorId, op.taskId);
+        const { ownerUserId } = await taskOwnerForJiraLink(db, actorId, op.taskId);
         const adapter = await requireJiraAdapter(db, actorId, options);
         const issue = await adapter.getIssue(op.issueIdOrKey);
         await upsertJiraIssue(db, ownerUserId, issue);
@@ -1410,7 +889,6 @@ export async function applySyncOp(
             ownerUserId,
             issue,
             clientMutationId,
-            access.permissions,
           ),
         );
         await push(await emitTaskSnapshot(db, op.taskId, clientMutationId));
@@ -1499,82 +977,6 @@ export async function applySyncOp(
         await push(await syncOwnerIssue(db, actorId, issue, clientMutationId));
         break;
       }
-      case "jira.reportTask.spawn": {
-        const link = await assertReportAccess(db, actorId, op.body.reportUserId);
-        assertReportJiraTaskSpawnAccess(link.permissions);
-        await requireReportVisibleJiraIssue(
-          db,
-          actorId,
-          op.body.reportUserId,
-          op.body.issueId,
-          link.permissions,
-        );
-        const adapter = await requireJiraAdapter(db, actorId, options);
-        const issue = await adapter.getIssue(op.body.issueId);
-        const sent = await sendInboxTask(db, actorId, op.body.reportUserId, {
-          id: op.id,
-          title: op.body.title,
-          description: op.body.description ?? null,
-          startDate: op.body.startDate,
-          deadline: op.body.deadline
-            ? new Date(op.body.deadline)
-            : deadlineFromJiraDueDate(issue.dueDate),
-          projectId: op.body.projectId ?? undefined,
-        });
-        await upsertJiraIssue(db, op.body.reportUserId, issue);
-        await upsertJiraIssue(db, actorId, issue);
-        await linkTaskToJiraIssue(db, {
-          userId: op.body.reportUserId,
-          taskId: sent.task.id,
-          issueId: issue.id,
-          issueKey: issue.key,
-        });
-        await insertTimelineEvents(db, sent.task.id, actorId, [
-          {
-            type: "jira_linked",
-            data: { issueId: issue.id, issueKey: issue.key },
-          },
-        ]);
-        await push(await emitInboxForUser(db, op.body.reportUserId, clientMutationId));
-        await push(
-          await emitReportInboxForManager(
-            db,
-            actorId,
-            op.body.reportUserId,
-            clientMutationId,
-          ),
-        );
-        await push(await emitLatestTimeline(db, sent.task.id, clientMutationId));
-        await push(await emitJiraIssueSnapshot(db, actorId, issue, clientMutationId));
-        const reportIssue = (
-          await listReportJiraIssues(db, actorId, op.body.reportUserId, link.permissions)
-        ).find((row) => row.id === issue.id || row.key === issue.key);
-        if (reportIssue) {
-          await push(
-            await emitReportJiraIssueSnapshot(
-              db,
-              actorId,
-              op.body.reportUserId,
-              reportIssue,
-              clientMutationId,
-            ),
-          );
-        }
-        await push(
-          await insertAndEmitNotificationsWithPush(db, {
-            recipientUserIds: [op.body.reportUserId],
-            actorId,
-            clientMutationId,
-            kind: "inbox",
-            taskTitle: sent.task.title,
-            taskId: sent.task.id,
-            ownerId: op.body.reportUserId,
-            inboxItemId: sent.item.id,
-            scheduledDate: sent.task.scheduledDate,
-          }),
-        );
-        break;
-      }
       case "jira.issue.create": {
         let ownerUserId = actorId;
         let linkAccess: Awaited<ReturnType<typeof taskOwnerForJiraLink>> | null = null;
@@ -1608,7 +1010,6 @@ export async function applySyncOp(
               ownerUserId,
               issue,
               clientMutationId,
-              linkAccess?.access.permissions,
             ),
           );
           await push(await emitTaskSnapshot(db, op.body.linkTaskId, clientMutationId));
@@ -1619,30 +1020,13 @@ export async function applySyncOp(
         break;
       }
       case "jira.issue.updateFields": {
-        const ownerUserId = op.body.reportUserId ?? actorId;
+        const ownerUserId = actorId;
         const fields = {
           ...("summary" in op.body ? { summary: op.body.summary } : {}),
           ...("description" in op.body ? { description: op.body.description } : {}),
           ...("dueDate" in op.body ? { dueDate: op.body.dueDate } : {}),
           ...("assignee" in op.body ? { assignee: op.body.assignee } : {}),
         };
-        let permissions: ManagerPermissions | null = null;
-        if (op.body.reportUserId) {
-          const link = await assertReportJiraFieldAccess(
-            db,
-            actorId,
-            op.body.reportUserId,
-            fields,
-          );
-          permissions = link.permissions;
-          await requireReportVisibleJiraIssue(
-            db,
-            actorId,
-            op.body.reportUserId,
-            op.body.issueIdOrKey,
-            link.permissions,
-          );
-        }
         const before = await findCachedJiraIssue(db, ownerUserId, op.body.issueIdOrKey);
         const adapter = await requireJiraAdapter(db, actorId, options);
         const issue = await adapter.updateIssue(op.body.issueIdOrKey, fields);
@@ -1682,7 +1066,6 @@ export async function applySyncOp(
               ownerUserId,
               issue,
               clientMutationId,
-              permissions,
             ),
           );
         }
@@ -1738,17 +1121,7 @@ export async function applySyncOp(
         break;
       }
       case "jira.comment.create": {
-        const ownerUserId = op.reportUserId ?? actorId;
-        if (op.reportUserId) {
-          const link = await assertReportJiraCommentAccess(db, actorId, op.reportUserId);
-          await requireReportVisibleJiraIssue(
-            db,
-            actorId,
-            op.reportUserId,
-            op.issueIdOrKey,
-            link.permissions,
-          );
-        }
+        const ownerUserId = actorId;
         const adapter = await requireJiraAdapter(db, actorId, options);
         releaseOnError = false;
         const comment = await adapter.addComment(op.issueIdOrKey, op.body);
@@ -1793,6 +1166,7 @@ export async function applySyncOp(
           name: op.body.name,
           color: op.body.color,
           isPrivate: op.body.isPrivate,
+          orgId: op.body.orgId ?? null,
         });
         await push(await emitProjectFanout(db, created.id, clientMutationId));
         break;
@@ -1819,16 +1193,11 @@ export async function applySyncOp(
           taskIds = await listLiveTaskIdsForProject(db, op.id);
           deleted = await deleteProject(db, actorId, op.id);
         } catch (error) {
-          wrapManager(error);
-        }
-        const recipients = [deleted.userId];
-        const manager = await managerIdForOwner(db, deleted.userId);
-        if (manager && manager !== deleted.userId) {
-          recipients.push(manager);
+          wrapSyncError(error);
         }
         await push(
           await emitSync(db, {
-            recipientUserIds: recipients,
+            recipientUserIds: [deleted.userId],
             clientMutationId,
             type: "project.delete",
             payload: { id: deleted.id },
@@ -1836,19 +1205,6 @@ export async function applySyncOp(
         );
         for (const taskId of taskIds) {
           await push(await emitTaskSnapshot(db, taskId, clientMutationId));
-        }
-        break;
-      }
-      case "team.project.create": {
-        try {
-          const created = await createProjectForReport(db, actorId, op.userId, {
-            id: op.id,
-            name: op.body.name,
-            color: op.body.color,
-          });
-          await push(await emitProjectFanout(db, created.id, clientMutationId));
-        } catch (error) {
-          wrapManager(error);
         }
         break;
       }
@@ -1864,6 +1220,115 @@ export async function applySyncOp(
         );
         break;
       }
+      case "request.send": {
+        const result = await sendNewTaskRequest(db, actorId, {
+          orgId: op.body.orgId,
+          toUserId: op.body.toUserId,
+          title: op.body.title,
+          description: op.body.description ?? null,
+          suggestedBucket: op.body.suggestedBucket ?? null,
+          suggestedDeadline: op.body.suggestedDeadline ?? null,
+          subtasks: op.body.subtasks,
+          jiraIssueKey: op.body.jiraIssueKey ?? null,
+          message: op.body.message ?? null,
+          requestId: op.id,
+          taskId: randomUUID(),
+        });
+        await push(await emitRequestUpsert(db, result.request.id, clientMutationId));
+        await push(await emitTaskSnapshot(db, result.task.id, clientMutationId));
+        break;
+      }
+      case "request.reassign": {
+        const result = await reassignTaskRequest(db, actorId, {
+          taskId: op.body.taskId,
+          toUserId: op.body.toUserId,
+          message: op.body.message ?? null,
+          requestId: op.id,
+        });
+        await push(await emitRequestUpsert(db, result.request.id, clientMutationId));
+        break;
+      }
+      case "request.propose": {
+        const result = await proposeTaskEdit(db, actorId, {
+          taskId: op.body.taskId,
+          fields: op.body.fields,
+          message: op.body.message ?? null,
+          requestId: op.id,
+        });
+        await push(await emitRequestUpsert(db, result.request.id, clientMutationId));
+        break;
+      }
+      case "request.accept": {
+        const result = await acceptTaskRequest(db, actorId, {
+          requestId: op.body.requestId,
+          fields: op.body.fields,
+          bucket: op.body.bucket,
+        });
+        await push(await emitRequestUpsert(db, result.request.id, clientMutationId));
+        await push(await emitTaskSnapshot(db, result.task.id, clientMutationId));
+        await push(await emitLatestTimeline(db, result.task.id, clientMutationId));
+        break;
+      }
+      case "request.decline": {
+        const result = await declineTaskRequest(db, actorId, {
+          requestId: op.body.requestId,
+          reason: op.body.reason ?? null,
+        });
+        await push(await emitRequestUpsert(db, result.request.id, clientMutationId));
+        await push(await emitTaskSnapshot(db, result.task.id, clientMutationId));
+        break;
+      }
+      case "request.withdraw": {
+        const row = await withdrawTaskRequest(db, actorId, op.body.requestId);
+        await push(await emitRequestUpsert(db, row.id, clientMutationId));
+        if (row.kind === "new_task") {
+          await push(
+            await emitSync(db, {
+              recipientUserIds: recipientsForRequest(row.fromUserId, row.toUserId),
+              clientMutationId,
+              type: "task.delete",
+              payload: { id: row.taskId },
+            }),
+          );
+        }
+        break;
+      }
+      case "request.returned.take": {
+        const result = await returnedTakeTaskRequest(db, actorId, {
+          requestId: op.body.requestId,
+          bucket: op.body.bucket,
+        });
+        await push(await emitRequestUpsert(db, result.request.id, clientMutationId));
+        await push(await emitTaskSnapshot(db, result.task.id, clientMutationId));
+        break;
+      }
+      case "request.returned.resend": {
+        const result = await returnedResendTaskRequest(db, actorId, {
+          requestId: op.body.requestId,
+          toUserId: op.body.toUserId,
+          newRequestId: op.id,
+        });
+        await push(await emitRequestUpsert(db, result.request.id, clientMutationId));
+        await push(await emitTaskSnapshot(db, result.task.id, clientMutationId));
+        break;
+      }
+      case "request.returned.discard": {
+        const row = await returnedDiscardTaskRequest(
+          db,
+          actorId,
+          op.body.requestId,
+        );
+        await push(await emitRequestUpsert(db, row.id, clientMutationId));
+        await push(
+          await emitSync(db, {
+            recipientUserIds: [actorId],
+            clientMutationId,
+            type: "task.delete",
+            payload: { id: row.taskId },
+          }),
+        );
+        break;
+      }
       default:
         break;
     }
@@ -1874,7 +1339,7 @@ export async function applySyncOp(
     if (error instanceof SyncOpError) {
       throw error;
     }
-    wrapManager(error);
+    wrapSyncError(error);
   }
 
   await emitAndNotify(collected);
@@ -1944,14 +1409,6 @@ export async function bootstrapViews(
         }
         break;
       }
-      case "inbox": {
-        const { pending, history } = await listInbox(db, userId);
-        for (const row of pending) {
-          events.push(synthetic("inbox.upsert", toPending(row)));
-        }
-        events.push(synthetic("inbox.upsert", { history: history.map(toHistory) }));
-        break;
-      }
       case "notifications": {
         const rows = await listNotifications(db, userId, 100);
         for (const row of rows) {
@@ -1990,107 +1447,8 @@ export async function bootstrapViews(
         }
         break;
       }
-      case "reportJira": {
-        const link = await findLiveLink(db, userId, view.userId);
-        if (!link?.permissions?.canSeeDay) {
-          break;
-        }
-        const issues = await listReportJiraIssues(
-          db,
-          userId,
-          view.userId,
-          link.permissions,
-        );
-        for (const issue of issues) {
-          events.push(
-            synthetic("jira.reportIssue.upsert", {
-              reportUserId: view.userId,
-              issue,
-            }),
-          );
-        }
-        break;
-      }
-      case "team": {
-        try {
-          const team = await listTeam(db, userId, view.date);
-          events.push(synthetic("roster.upsert", { date: view.date, team: mapTeam(team) }));
-        } catch {
-          break;
-        }
-        break;
-      }
-      case "reportDay": {
-        try {
-          const result = await listReportDayTasks(db, userId, view.userId, view.date);
-          const tasks = result.tasks.map((row) =>
-            mapTask(row, { hidePrivateProjects: true }),
-          );
-          events.push(
-            synthetic("reportDay.upsert", {
-              report: result.report,
-              permissions: result.permissions,
-              date: view.date,
-              tasks,
-              slippingCount: result.tasks.filter((task) =>
-                isSlipping({
-                  carriedDays: task.carriedDays,
-                  deadline: task.deadline?.toISOString() ?? null,
-                }),
-              ).length,
-            }),
-          );
-        } catch {
-          break;
-        }
-        break;
-      }
-      case "reportUnscheduled": {
-        try {
-          const result = await listReportUnscheduledTasks(db, userId, view.userId);
-          for (const row of result.tasks) {
-            events.push(
-              synthetic("task.upsert", {
-                task: mapTask(row, { hidePrivateProjects: true }),
-                ownerId: view.userId,
-              }),
-            );
-          }
-        } catch {
-          break;
-        }
-        break;
-      }
-      case "reportInbox": {
-        try {
-          const result = await listReportInbox(db, userId, view.userId);
-          events.push(
-            synthetic("reportInbox.upsert", {
-              userId: view.userId,
-              report: result.report,
-              permissions: result.permissions,
-              pending: result.pending.map(toPending),
-              history: result.history.map(toHistory),
-            }),
-          );
-        } catch {
-          break;
-        }
-        break;
-      }
       case "projects": {
         const rows = await listProjectsForUser(db, userId);
-        for (const row of rows) {
-          events.push(synthetic("project.upsert", mapProject(row)));
-        }
-        break;
-      }
-      case "reportProjects": {
-        const link = await findLiveLink(db, userId, view.userId);
-        if (!link?.permissions) {
-          break;
-        }
-        const rows = await listPublicProjectsForUser(db, view.userId);
         for (const row of rows) {
           events.push(synthetic("project.upsert", mapProject(row)));
         }
@@ -2110,14 +1468,16 @@ export async function bootstrapViews(
         }
         break;
       }
-      case "taskDetail": {
-        const access = await resolveTaskAccess(db, userId, view.taskId);
-        if (!access) {
-          break;
+      case "requests": {
+        const rows = await listTaskRequestsForView(db, userId, view.space);
+        for (const row of rows) {
+          events.push(synthetic("request.upsert", row));
         }
-        try {
-          assertManagerAction(access, "see");
-        } catch {
+        break;
+      }
+      case "taskDetail": {
+        const role = await resolveTaskAccess(db, userId, view.taskId);
+        if (!role) {
           break;
         }
         const task = await loadTaskWithSubtasks(db, view.taskId);
@@ -2125,7 +1485,7 @@ export async function bootstrapViews(
           events.push(
             synthetic("task.upsert", {
               task: mapTask(task, {
-                hidePrivateProjects: access.role === "manager",
+                hidePrivateProjects: role === "reader",
               }),
               ownerId: task.userId,
             }),

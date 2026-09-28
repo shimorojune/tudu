@@ -1,4 +1,5 @@
-import { createDb, ensureSystemUser, type Db } from "@tudu/db";
+import { createDb, ensureSystemUser, user, type Db } from "@tudu/db";
+import { eq } from "drizzle-orm";
 import {
   DEFAULT_SERVER_PORT,
   type HealthResponse,
@@ -11,10 +12,16 @@ import { startNotificationScheduler } from "./jobs/notificationScheduler.js";
 import { createActivityRoute } from "./routes/activity.js";
 import { createJiraRoute } from "./routes/jira.js";
 import { createLinkPreviewRoute } from "./routes/linkPreview.js";
-import { createManagerRoute } from "./routes/manager.js";
 import { createPushRoute } from "./routes/push.js";
 import { createQuickAddSuggestRoute } from "./routes/quickAddSuggest.js";
 import { createSettingsRoute } from "./routes/settings.js";
+import { createOrgsRoute } from "./routes/orgs.js";
+import { createInvitesRoute } from "./routes/invites.js";
+import { createJoinRoute } from "./routes/join.js";
+import {
+  assertSafeTestRoutes,
+  createTestOutboxRoute,
+} from "./routes/testOutbox.js";
 import { createSyncRoute } from "./routes/sync.js";
 import { createTaskAttachmentsRoute } from "./routes/taskAttachments.js";
 import { createTasksRoute } from "./routes/tasks.js";
@@ -51,6 +58,8 @@ export type TuduApp = {
 };
 
 export function createApp(options: CreateAppOptions = {}): TuduApp {
+  assertSafeTestRoutes();
+
   const databaseUrl =
     options.databaseUrl === undefined
       ? process.env.DATABASE_URL
@@ -95,6 +104,25 @@ export function createApp(options: CreateAppOptions = {}): TuduApp {
     app.use("*", createSessionMiddleware(auth));
   }
 
+  async function meResponseForUser(userId: string): Promise<MeResponse | null> {
+    if (!db) {
+      return null;
+    }
+    const row = await db.query.user.findFirst({
+      where: eq(user.id, userId),
+    });
+    if (!row) {
+      return null;
+    }
+    return {
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      createdAt: row.createdAt.toISOString(),
+      onboardedAt: row.onboardedAt?.toISOString() ?? null,
+    };
+  }
+
   app.get("/me", async (c) => {
     const session = c.get("session");
 
@@ -102,12 +130,38 @@ export function createApp(options: CreateAppOptions = {}): TuduApp {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const response: MeResponse = {
-      id: session.user.id,
-      email: session.user.email,
-      name: session.user.name,
-      createdAt: new Date(session.user.createdAt).toISOString(),
+    const response = await meResponseForUser(session.user.id);
+    if (!response) {
+      return c.json({ error: "User not found" }, 404);
+    }
+
+    return c.json(response);
+  });
+
+  app.patch("/me", async (c) => {
+    const session = c.get("session");
+
+    if (!session?.user) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+    if (!db) {
+      return c.json({ error: "Database not configured" }, 503);
+    }
+
+    const body = (await c.req.json().catch(() => ({}))) as {
+      completeOnboarding?: boolean;
     };
+    if (body.completeOnboarding) {
+      await db
+        .update(user)
+        .set({ onboardedAt: new Date() })
+        .where(eq(user.id, session.user.id));
+    }
+
+    const response = await meResponseForUser(session.user.id);
+    if (!response) {
+      return c.json({ error: "User not found" }, 404);
+    }
 
     return c.json(response);
   });
@@ -118,7 +172,6 @@ export function createApp(options: CreateAppOptions = {}): TuduApp {
     });
     app.route("/", createSyncRoute(db));
     app.route("/", createJiraRoute(db));
-    app.route("/", createManagerRoute(db));
     app.route("/", createTasksRoute(db));
     app.route("/", createTaskAttachmentsRoute(db));
     app.route("/", createActivityRoute(db));
@@ -126,6 +179,12 @@ export function createApp(options: CreateAppOptions = {}): TuduApp {
     app.route("/", createQuickAddSuggestRoute(db));
     app.route("/", createPushRoute(db));
     app.route("/", createSettingsRoute(db));
+    app.route("/orgs", createOrgsRoute(db));
+    app.route("/", createInvitesRoute(db));
+    app.route("/", createJoinRoute(db));
+    if (process.env.E2E_TEST_ROUTES === "1") {
+      app.route("/", createTestOutboxRoute());
+    }
 
     if (options.startNotificationScheduler !== false) {
       const jobsEnabled = process.env.NOTIFICATION_JOBS_ENABLED !== "false";

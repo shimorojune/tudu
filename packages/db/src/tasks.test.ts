@@ -75,7 +75,7 @@ describe("planSubtaskReorder", () => {
 });
 
 describe("notPendingInbox", () => {
-  it("qualifies inbox_items.task_id, not tasks.task_id", () => {
+  it("filters tasks without a pending request", () => {
     const qb = new QueryBuilder();
     const { sql } = qb
       .select({ id: tasks.id })
@@ -83,8 +83,7 @@ describe("notPendingInbox", () => {
       .where(notPendingInbox())
       .toSQL();
 
-    expect(sql).toContain('"inbox_items"."task_id"');
-    expect(sql).toContain('"inbox_items"."status"');
-    expect(sql).not.toContain('"tasks"."task_id"');
+    expect(sql).toContain('"pending_request_id"');
+    expect(sql).toContain("is null");
   });
 });

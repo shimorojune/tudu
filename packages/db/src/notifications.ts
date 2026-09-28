@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import {
   formatNotificationBody,
   NOTIFICATION_KINDS,
@@ -35,7 +35,8 @@ export function mapNotification(row: NotificationRow): AppNotification | null {
     taskId: row.taskId,
     ownerId: row.ownerId,
     commentId: row.commentId,
-    inboxItemId: row.inboxItemId,
+    inboxItemId: null,
+    orgId: row.orgId ?? null,
     scheduledDate: row.scheduledDate,
     jiraIssueId: row.jiraIssueId ?? null,
     jiraIssueKey: row.jiraIssueKey ?? null,
@@ -46,6 +47,35 @@ export function mapNotification(row: NotificationRow): AppNotification | null {
     readAt: row.readAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+export async function unreadNotificationCountsByOrg(
+  db: Db,
+  userId: string,
+): Promise<Map<string, number>> {
+  const rows = await db
+    .select({
+      orgId: notifications.orgId,
+      value: count(),
+    })
+    .from(notifications)
+    .where(
+      and(
+        eq(notifications.userId, userId),
+        isNull(notifications.readAt),
+        isNull(notifications.deletedAt),
+        isNotNull(notifications.orgId),
+      ),
+    )
+    .groupBy(notifications.orgId);
+
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    if (row.orgId) {
+      map.set(row.orgId, Number(row.value));
+    }
+  }
+  return map;
 }
 
 export async function listNotifications(
@@ -133,7 +163,7 @@ export type InsertNotificationInput = {
   taskId?: string | null;
   ownerId?: string | null;
   commentId?: string | null;
-  inboxItemId?: string | null;
+  requestId?: string | null;
   scheduledDate?: string | null;
 };
 
@@ -166,7 +196,7 @@ export async function insertAndEmitNotifications(
         taskId: input.taskId ?? null,
         ownerId: input.ownerId ?? null,
         commentId: input.commentId ?? null,
-        inboxItemId: input.inboxItemId ?? null,
+        requestId: input.requestId ?? null,
         scheduledDate: input.scheduledDate ?? null,
         taskTitle: input.taskTitle.trim(),
         body,

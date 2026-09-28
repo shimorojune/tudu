@@ -12,7 +12,10 @@ import type {
 } from "@tudu/shared";
 import type { Db } from "./index.js";
 import { user } from "./auth-schema.js";
-import type { ManagerPermissionRow } from "./manager-schema.js";
+type ManagerPermissionRow = {
+  canSeeDay: boolean;
+  canSeePrivate: boolean;
+};
 import { tasks } from "./tasks-schema.js";
 import {
   jiraComponents,

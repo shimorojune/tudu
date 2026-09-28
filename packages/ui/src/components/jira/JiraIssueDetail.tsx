@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import type { JiraIssue, JiraUser, ManagerPermissions, Task } from "@tudu/shared";
-import { DEFAULT_MANAGER_PERMISSIONS } from "@tudu/shared";
+import type { JiraIssue, JiraUser, Task } from "@tudu/shared";
 import {
   jiraApi,
   type AppDispatch,
@@ -43,9 +42,6 @@ type JiraIssueDetailProps = {
   issueIdOrKey: string;
   selectedTask: Task | null;
   selectedDate: string;
-  reportUserId?: string;
-  reportName?: string;
-  reportPermissions?: ManagerPermissions;
   backLabel?: string;
   onBack: () => void;
   onLinked?: () => void;
@@ -167,21 +163,19 @@ function JiraUserSearch({
 export function JiraIssueDetail({
   issueIdOrKey,
   selectedTask,
-  reportUserId,
-  reportPermissions,
   onBack,
   onLinked,
   onCreateTask,
 }: JiraIssueDetailProps) {
   const dispatch = useDispatch<AppDispatch>();
-  const { data, isError, refetch: refetchIssue } = useGetJiraIssueRestQuery(
-    { issueIdOrKey, ...(reportUserId ? { reportUserId } : {}) },
-  );
+  const { data, isError, refetch: refetchIssue } = useGetJiraIssueRestQuery({
+    issueIdOrKey,
+  });
   const issue = data?.issue;
   const issueReady =
     issue != null && jiraIssueMatchesSelection(issue, issueIdOrKey);
   const commentsQuery = useGetJiraCommentsRestQuery(
-    { issueIdOrKey, ...(reportUserId ? { reportUserId } : {}) },
+    { issueIdOrKey },
     { skip: !issueReady },
   );
   const comments = commentsQuery.data?.comments ?? [];
@@ -209,16 +203,12 @@ export function JiraIssueDetail({
   }, [issue]);
 
   const editable = useMemo(() => new Set(issue?.editableFields ?? []), [issue]);
-  const reportMode = Boolean(reportUserId);
-  const permissions = reportPermissions ?? DEFAULT_MANAGER_PERMISSIONS;
-  const canEditReportFields = !reportMode || permissions.canEdit;
-  const canEditReportDeadline = !reportMode || permissions.canEditDeadlines;
-  const canComment = !reportMode || permissions.canComment;
-  const canSpawnTask = !reportMode || permissions.canSendInbox;
-  const canEditSummary = editable.has("summary") && canEditReportFields;
-  const canEditDescription = editable.has("description") && canEditReportFields;
-  const canEditDueDate = editable.has("duedate") && canEditReportDeadline;
-  const canEditAssignee = editable.has("assignee") && canEditReportFields;
+  const canEditSummary = editable.has("summary");
+  const canEditDescription = editable.has("description");
+  const canEditDueDate = editable.has("duedate");
+  const canEditAssignee = editable.has("assignee");
+  const canComment = true;
+  const canSpawnTask = true;
   const selectedAlreadyLinked = issue ? linkedSelectedTask(issue, selectedTask) : false;
   const renderedDescription = useMemo(
     () => (issue?.renderedDescription ? sanitizeJiraRenderedHtml(issue.renderedDescription) : null),
@@ -260,7 +250,7 @@ export function JiraIssueDetail({
   }
 
   async function unlinkTask(taskId: string) {
-    if (!issue || isUnlinking || reportUserId) {
+    if (!issue || isUnlinking) {
       return;
     }
     setError(null);
@@ -287,14 +277,12 @@ export function JiraIssueDetail({
     }
     const body: {
       issueIdOrKey: string;
-      reportUserId?: string;
       summary?: string;
       description?: string | null;
       dueDate?: string | null;
       assignee?: JiraUser | null;
     } = {
       issueIdOrKey: issue.key,
-      ...(reportUserId ? { reportUserId } : {}),
     };
     if (canEditSummary && summary.trim() !== issue.summary) {
       body.summary = summary.trim();
@@ -342,7 +330,6 @@ export function JiraIssueDetail({
         () =>
           createComment({
             issueIdOrKey: issue.key,
-            ...(reportUserId ? { reportUserId } : {}),
             body: trimmed,
           }).unwrap(),
         {
@@ -400,7 +387,7 @@ export function JiraIssueDetail({
               className="ml-auto h-auto bg-primary px-[11px] py-[6px] text-[12px] font-bold"
               onClick={() => onCreateTask(issue)}
             >
-              {reportUserId ? "Send to inbox" : "Create task"}
+              Create task
             </Button>
           ) : null}
           <a
@@ -507,7 +494,7 @@ export function JiraIssueDetail({
             <span className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
               Linked Tudu Tasks
             </span>
-            {selectedTask && !selectedAlreadyLinked && !reportUserId ? (
+            {selectedTask && !selectedAlreadyLinked ? (
               <Button
                 type="button"
                 variant="outline"
@@ -532,17 +519,15 @@ export function JiraIssueDetail({
                   {task.isPrivate ? (
                     <span className="text-[11px] text-faint">Private</span>
                   ) : null}
-                  {!reportUserId ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      loading={isUnlinking}
-                      className="h-auto px-[6px] py-[2px] text-[11.5px] text-muted-foreground"
-                      onClick={() => void unlinkTask(task.taskId)}
-                    >
-                      Unlink
-                    </Button>
-                  ) : null}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    loading={isUnlinking}
+                    className="h-auto px-[6px] py-[2px] text-[11.5px] text-muted-foreground"
+                    onClick={() => void unlinkTask(task.taskId)}
+                  >
+                    Unlink
+                  </Button>
                 </div>
               ))
             ) : (

@@ -1,12 +1,10 @@
 import { Outlet } from "@tanstack/react-router";
 import { CommandPalette } from "@/components/chrome/CommandPalette";
 import { CommandPaletteProvider } from "@/components/chrome/CommandPaletteContext";
-import { InviteBanner } from "@/components/chrome/InviteBanner";
 import { BottomNav } from "@/components/chrome/BottomNav";
 import { TopNav } from "@/components/chrome/TopNav";
 import { UpdateBanner } from "@/components/chrome/UpdateBanner";
 import { QuickAddMainSync } from "@/lib/quickAddMainSync";
-
 export function RootLayout() {
   return (
     <CommandPaletteProvider>
@@ -15,7 +13,6 @@ export function RootLayout() {
         <TopNav />
         <CommandPalette />
         <UpdateBanner />
-        <InviteBanner />
         <main className="min-h-0 flex-1 overflow-hidden">
           <Outlet />
         </main>

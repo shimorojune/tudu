@@ -45,7 +45,7 @@ describe("isTaskDimmed", () => {
     const matched = task({
       id: projectId,
       name: "EGS",
-      color: "ember",
+      color: "vermilion",
       archivedAt: null,
       isPrivate: false,
     });
@@ -78,7 +78,7 @@ describe("mergeReportFilterProjects", () => {
     const chipTask = task({
       id: projectId,
       name: "EGS",
-      color: "ember",
+      color: "vermilion",
       archivedAt: null,
       isPrivate: false,
     });

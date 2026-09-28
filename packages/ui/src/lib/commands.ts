@@ -6,9 +6,7 @@ export type CommandAction =
       to:
         | "/"
         | "/week"
-        | "/inbox"
         | "/unscheduled"
-        | "/team"
         | "/settings"
         | "/projects/$projectId";
       goToToday?: boolean;
@@ -43,25 +41,11 @@ export const APP_COMMANDS: readonly AppCommand[] = [
     action: { kind: "navigate", to: "/week" },
   },
   {
-    id: "go-inbox",
-    group: "Go",
-    label: "Go to Inbox",
-    keywords: ["inbox", "manager"],
-    action: { kind: "navigate", to: "/inbox" },
-  },
-  {
     id: "go-unscheduled",
     group: "Go",
     label: "Go to Unscheduled",
     keywords: ["unscheduled", "backlog", "undated"],
     action: { kind: "navigate", to: "/unscheduled" },
-  },
-  {
-    id: "go-team",
-    group: "Go",
-    label: "Go to Team",
-    keywords: ["team", "reports", "roster"],
-    action: { kind: "navigate", to: "/team" },
   },
   {
     id: "go-settings",

@@ -8,6 +8,7 @@ export function createTaskBody(args: {
   startDate?: string | null;
   deadline?: string | null;
   projectId?: string | null;
+  orgId?: string | null;
 }): CreateTaskRequest {
   const trimmedDescription = args.description?.trim();
   const startDate = args.startDate?.trim() || null;
@@ -23,5 +24,6 @@ export function createTaskBody(args: {
     deadline: args.deadline ?? null,
     isPrivate: false,
     projectId: args.projectId ?? null,
+    orgId: args.orgId ?? null,
   };
 }

@@ -8,7 +8,6 @@ import {
   createJiraRoute,
   ensureConfiguredJiraProjectKey,
   jiraRouteError,
-  requireReportVisibleJiraIssue,
   shouldAdvanceJiraRefreshCursor,
 } from "./jira.js";
 import type { SessionEnv } from "../session-middleware.js";
@@ -238,81 +237,7 @@ describe("ensureConfiguredJiraProjectKey", () => {
   });
 });
 
-describe("requireReportVisibleJiraIssue", () => {
-  it("rejects report issue access when the cached issue is not report-visible", async () => {
-    const permissions = { canSeeDay: true, canSeePrivate: false };
-    findReportVisibleJiraIssue.mockResolvedValue(undefined);
-
-    await expect(
-      requireReportVisibleJiraIssue(
-        {} as never,
-        "manager-1",
-        "report-1",
-        "EGS-100493",
-        permissions,
-      ),
-    ).rejects.toMatchObject({
-      message: "Jira issue is not visible for this report",
-      status: 403,
-    });
-  });
-
-  it("returns the cached report-visible issue", async () => {
-    const cached = issue();
-    const permissions = { canSeeDay: true, canSeePrivate: false };
-    findReportVisibleJiraIssue.mockResolvedValue(cached);
-
-    await expect(
-      requireReportVisibleJiraIssue(
-        {} as never,
-        "manager-1",
-        "report-1",
-        "EGS-100493",
-        permissions,
-      ),
-    ).resolves.toBe(cached);
-  });
-});
-
-describe("report Jira REST authorization", () => {
-  it("rejects report issue detail before opening Jira when the issue is not report-visible", async () => {
-    const adapterFactory = vi.fn(() => ({ getIssue: vi.fn() }) as unknown as JiraAdapter);
-    findLiveLink.mockResolvedValue({
-      permissions: { canSeeDay: true, canSeePrivate: false },
-    });
-    findReportVisibleJiraIssue.mockResolvedValue(undefined);
-
-    const response = await appWithSession(adapterFactory).request(
-      "/jira/issue?issueIdOrKey=EGS-100493&reportUserId=report-1",
-    );
-
-    expect(response.status).toBe(403);
-    await expect(response.json()).resolves.toEqual({
-      error: "Jira issue is not visible for this report",
-    });
-    expect(adapterFactory).not.toHaveBeenCalled();
-    expect(getJiraConnection).not.toHaveBeenCalled();
-  });
-
-  it("rejects report comment reads before opening Jira when the issue is not report-visible", async () => {
-    const adapterFactory = vi.fn(() => ({ listComments: vi.fn() }) as unknown as JiraAdapter);
-    findLiveLink.mockResolvedValue({
-      permissions: { canSeeDay: true, canSeePrivate: false },
-    });
-    findReportVisibleJiraIssue.mockResolvedValue(undefined);
-
-    const response = await appWithSession(adapterFactory).request(
-      "/jira/comments?issueIdOrKey=EGS-100493&reportUserId=report-1",
-    );
-
-    expect(response.status).toBe(403);
-    await expect(response.json()).resolves.toEqual({
-      error: "Jira issue is not visible for this report",
-    });
-    expect(adapterFactory).not.toHaveBeenCalled();
-    expect(getJiraConnection).not.toHaveBeenCalled();
-  });
-
+describe("Jira REST authorization", () => {
   it("rejects create metadata outside the configured project scope before opening Jira", async () => {
     const adapterFactory = vi.fn(() => ({ getCreateMetadata: vi.fn() }) as unknown as JiraAdapter);
     listJiraProjectKeys.mockResolvedValue(["EGS"]);
@@ -506,72 +431,6 @@ describe("Jira JQL presets", () => {
     expect(response.status).toBe(200);
     const jql = String(searchIssues.mock.calls[0]?.[0] ?? "");
     expect(jql).toBe(fullJql);
-  });
-});
-
-describe("GET /jira/report/issues", () => {
-  it("returns a specific empty reason when the report has no matching Jira user", async () => {
-    findLiveLink.mockResolvedValue({
-      permissions: { canSeeDay: true, canSeePrivate: false },
-    });
-    const findUsers = vi.fn(async () => []);
-    const searchIssues = vi.fn();
-
-    const response = await connectedApp({ findUsers, searchIssues }).request(
-      "/jira/report/issues?userId=priya",
-    );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      issues: [],
-      reason: "no-jira-user",
-    });
-    expect(searchIssues).not.toHaveBeenCalled();
-  });
-
-  it("falls back to cached assigned issues when live JQL fails", async () => {
-    findLiveLink.mockResolvedValue({
-      permissions: { canSeeDay: true, canSeePrivate: false },
-    });
-    listJiraProjectKeys.mockResolvedValue(["EGS"]);
-    const cachedIssue = issue({
-      assignee: {
-        accountId: null,
-        key: null,
-        name: "priya",
-        displayName: "Priya Raman",
-        emailAddress: "priya@egain.com",
-        active: true,
-        avatarUrl: null,
-      },
-    });
-    listJiraIssues.mockResolvedValue([cachedIssue]);
-    const findUsers = vi.fn(async () => [
-      {
-        accountId: null,
-        key: null,
-        name: "priya",
-        displayName: "Priya Raman",
-        emailAddress: "priya@egain.com",
-        active: true,
-        avatarUrl: null,
-      },
-    ]);
-    const searchIssues = vi.fn(async () => {
-      throw new Error("JQL failed");
-    });
-
-    const response = await connectedApp({ findUsers, searchIssues }).request(
-      "/jira/report/issues?userId=priya",
-    );
-
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as {
-      issues: Array<{ key: string }>;
-    };
-    expect(body.issues).toHaveLength(1);
-    expect(body.issues[0].key).toBe("EGS-100493");
-    expect(searchIssues).toHaveBeenCalled();
   });
 });
 

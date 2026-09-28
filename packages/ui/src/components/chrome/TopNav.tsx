@@ -1,31 +1,25 @@
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { Plus, Search, SlidersHorizontal } from "lucide-react";
 import { isCommandPaletteBlocked } from "@/components/chrome/dialogBlocker";
 import { useCommandPalette } from "@/components/chrome/CommandPaletteContext";
-import { requestAddTask, useGetNotificationsQuery } from "@tudu/store";
+import { requestAddTask } from "@tudu/store";
 import { useDispatch } from "react-redux";
-import { BrandMark } from "@/components/chrome/BrandMark";
+import { SpaceSwitcher } from "@/components/orgs/SpaceSwitcher";
 import { DateNav } from "@/components/chrome/DateNav";
 import { DayJump } from "@/components/chrome/DayJump";
 import { NavTabs } from "@/components/chrome/NavTabs";
 import { NotificationBell } from "@/components/chrome/NotificationBell";
 import { WeekPicker } from "@/components/chrome/WeekPicker";
-import { isWeekPath, reportUserIdFromPath } from "@/lib/reportPath";
+import { isWeekPath } from "@/lib/weekPath";
+import { isCoworkersPath, isOrgAdminPath, isRequestsPath } from "@/lib/spaceNav";
+import { useSpaceContext } from "@/hooks/useSpaceContext";
+import { useSpaceShortcuts } from "@/hooks/useSpaceShortcuts";
 import { defaultWeekId, weekDaysFromWeekId } from "@/lib/week";
 
-function NewTaskButton({ reportUserId }: { reportUserId: string | null }) {
+function NewTaskButton() {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
 
   function handleClick() {
-    if (reportUserId) {
-      void navigate({
-        to: "/team/$userId/inbox",
-        params: { userId: reportUserId },
-        search: { send: true },
-      });
-      return;
-    }
     dispatch(requestAddTask());
   }
 
@@ -75,44 +69,43 @@ function SettingsLink() {
 }
 
 export function TopNav() {
+  useSpaceContext();
+  useSpaceShortcuts();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { data: notificationsData } = useGetNotificationsQuery();
-  const unreadCount = notificationsData?.unreadCount ?? 0;
   const search = useRouterState({
     select: (s) => s.location.search as { week?: string },
   });
   const onWeek = isWeekPath(pathname);
-  const reportUserId = reportUserIdFromPath(pathname);
   const weekId = search.week ?? defaultWeekId();
   const weekDays = weekDaysFromWeekId(weekId);
+  const showDayChrome =
+    !onWeek &&
+    !isRequestsPath(pathname) &&
+    !isCoworkersPath(pathname) &&
+    !isOrgAdminPath(pathname);
 
   return (
     <header
       data-testid="top-nav"
       className="flex h-[calc(56px+env(safe-area-inset-top))] shrink-0 items-center gap-[10px] overflow-hidden border-b border-rule bg-card px-[12px] pt-[env(safe-area-inset-top)] xl:gap-[28px] xl:px-[22px]"
     >
-      <BrandMark showUnreadIndicator={unreadCount > 0} />
+      <SpaceSwitcher />
       <NavTabs />
       <div className="ml-auto flex min-w-0 shrink-0 items-center gap-[12px] xl:gap-[18px]">
         {onWeek ? (
-          <WeekPicker
-            weekId={weekId}
-            weekDays={weekDays}
-            to={reportUserId ? "/team/$userId/week" : "/week"}
-            params={reportUserId ? { userId: reportUserId } : undefined}
-          />
-        ) : (
+          <WeekPicker weekId={weekId} weekDays={weekDays} />
+        ) : showDayChrome ? (
           <>
             <DateNav />
             <div className="hidden xl:flex">
               <DayJump />
             </div>
           </>
-        )}
+        ) : null}
         <div className="h-[20px] w-px bg-hair" />
         <CommandsButton />
         <NotificationBell />
-        <NewTaskButton reportUserId={reportUserId} />
+        <NewTaskButton />
         <SettingsLink />
       </div>
     </header>

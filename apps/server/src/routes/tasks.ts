@@ -7,7 +7,6 @@ import type {
 import {
   createSubtask,
   createTask,
-  deleteReportTask,
   findTaskById,
   mapTask,
   NowCapExceededError,
@@ -246,20 +245,8 @@ export function createTasksRoute(db: Db) {
 
   app.delete("/tasks/:id", async (c) => {
     const access = await resolveTaskAccess(db, userId(c), c.req.param("id"));
-    if (!access) {
+    if (access !== "owner") {
       return c.json({ error: "Task not found" }, 404);
-    }
-
-    if (access.role === "manager") {
-      try {
-        const deleted = await deleteReportTask(db, userId(c), c.req.param("id"));
-        if (!deleted) {
-          return c.json({ error: "Task not found" }, 404);
-        }
-        return c.body(null, 204);
-      } catch {
-        return c.json({ error: "Not allowed" }, 403);
-      }
     }
 
     const deleted = await softDeleteTask(db, userId(c), c.req.param("id"));

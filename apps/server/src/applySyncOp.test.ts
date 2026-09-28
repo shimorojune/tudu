@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_MANAGER_PERMISSIONS } from "@tudu/shared";
 import {
-  canCreateReportJiraComment,
-  canWriteReportJiraFields,
   deadlineFromJiraDueDate,
   jiraDueDateFromDeadline,
   taskPatchChangesDeadline,
@@ -40,34 +37,5 @@ describe("taskPatchChangesDeadline", () => {
         previous,
       ),
     ).toBe(true);
-  });
-});
-
-describe("report Jira write permissions", () => {
-  it("separates Jira field edits, due date edits, and comments", () => {
-    expect(
-      canWriteReportJiraFields(DEFAULT_MANAGER_PERMISSIONS, {
-        summary: "Updated",
-      }),
-    ).toBe(false);
-    expect(
-      canWriteReportJiraFields(
-        { ...DEFAULT_MANAGER_PERMISSIONS, canEditDeadlines: true },
-        { dueDate: "2026-09-18" },
-      ),
-    ).toBe(true);
-    expect(
-      canWriteReportJiraFields(
-        { ...DEFAULT_MANAGER_PERMISSIONS, canEdit: true },
-        { summary: "Updated", dueDate: "2026-09-18" },
-      ),
-    ).toBe(false);
-    expect(canCreateReportJiraComment(DEFAULT_MANAGER_PERMISSIONS)).toBe(true);
-    expect(
-      canCreateReportJiraComment({
-        ...DEFAULT_MANAGER_PERMISSIONS,
-        canComment: false,
-      }),
-    ).toBe(false);
   });
 });

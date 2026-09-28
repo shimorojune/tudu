@@ -12,6 +12,7 @@ const row: AppNotification = {
   ownerId: "priya",
   commentId: "c1",
   inboxItemId: null,
+  orgId: null,
   scheduledDate: "2026-09-10",
   jiraIssueId: null,
   jiraIssueKey: null,
@@ -59,7 +60,7 @@ describe("shouldFireOsBanner", () => {
         notification: { ...row, kind: "inbox" },
         prefs: prefsOn,
         windowFocused: true,
-        pathname: "/inbox",
+        pathname: "/unscheduled",
         selectedTaskId: null,
       }),
     ).toBe(false);
@@ -71,7 +72,7 @@ describe("shouldFireOsBanner", () => {
         notification: { ...row, kind: "inbox_declined" },
         prefs: prefsOn,
         windowFocused: true,
-        pathname: "/inbox",
+        pathname: "/unscheduled",
         selectedTaskId: null,
       }),
     ).toBe(false);

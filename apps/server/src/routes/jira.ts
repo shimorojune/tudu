@@ -7,7 +7,6 @@ import {
   disconnectJiraConnection,
   findCachedJiraIssue,
   findJiraJqlPreset,
-  findLiveLink,
   getJiraConnection,
   getJiraConnectionStatus,
   listJiraComments,
@@ -15,7 +14,6 @@ import {
   listJiraIssues,
   listJiraJqlPresets,
   listJiraProjectKeys,
-  managerVisibleJiraLinkedTasks,
   readJiraRefreshCursor,
   replaceJiraComponents,
   resetAssignedJiraIssues,
@@ -39,7 +37,6 @@ import {
   jiraIssueSearchQuerySchema,
   jiraOpenQuerySchema,
   jiraProjectKeysRequestSchema,
-  jiraReportQuerySchema,
   jiraUserSearchQuerySchema,
   normalizeJiraBaseUrl,
   parseJiraIssueKeyOrUrl,
@@ -76,13 +73,12 @@ import {
   ensureAllowedJiraBaseUrl,
   ensureConfiguredJiraProjectKey,
   JiraAccessError,
-  requireReportVisibleJiraIssue,
 } from "../jira/access.js";
 import { prependKeyIssueToSearchResults } from "../jira/search.js";
 import { decryptJiraToken, encryptJiraToken } from "../jira/crypto.js";
 import type { SessionEnv } from "../session-middleware.js";
 
-export { ensureConfiguredJiraProjectKey, requireReportVisibleJiraIssue };
+export { ensureConfiguredJiraProjectKey };
 
 type JiraRouteOptions = {
   adapterFactory?: JiraAdapterFactory;
@@ -317,34 +313,6 @@ async function selectedJqlPreset(
   return preset.jql;
 }
 
-async function decorateReportIssues(
-  db: Db,
-  actorId: string,
-  reportUserId: string,
-  permissions: NonNullable<Awaited<ReturnType<typeof findLiveLink>>>["permissions"],
-  issues: JiraIssue[],
-): Promise<JiraIssue[]> {
-  const reportIssues = [];
-  for (const issue of issues) {
-    const row = await upsertJiraIssue(db, actorId, issue);
-    const links = await managerVisibleJiraLinkedTasks(
-      db,
-      reportUserId,
-      row.issueId,
-      permissions,
-    );
-    reportIssues.push({ ...issue, linkedTasks: links });
-  }
-  return reportIssues;
-}
-
-async function reportUserEmail(db: Db, reportUserId: string): Promise<string | null> {
-  const row = await db.query.user.findFirst({
-    where: eq(user.id, reportUserId),
-    columns: { email: true },
-  });
-  return row?.email ?? null;
-}
 
 export function createJiraRoute(db: Db, options: JiraRouteOptions = {}) {
   const app = new Hono<SessionEnv>();
@@ -548,39 +516,14 @@ export function createJiraRoute(db: Db, options: JiraRouteOptions = {}) {
   app.get("/jira/issue", queryParams(jiraIssueDetailQuerySchema), async (c) => {
     const actorId = userId(c);
     const query = c.req.valid("query");
-    let reportLink: Awaited<ReturnType<typeof findLiveLink>> | undefined;
-    if (query.reportUserId) {
-      reportLink = await findLiveLink(db, actorId, query.reportUserId);
-      if (!reportLink?.permissions?.canSeeDay) {
-        return c.json({ error: "Not a report of yours" }, 403);
-      }
-      await requireReportVisibleJiraIssue(
-        db,
-        actorId,
-        query.reportUserId,
-        query.issueIdOrKey,
-        reportLink.permissions,
-      );
-    }
     const adapter = await adapterFor(db, actorId, adapterFactory);
     if (!adapter) {
       return c.json({ error: "Jira is not connected" }, 400);
     }
     const issue = await adapter.getIssue(query.issueIdOrKey);
-    if (!query.reportUserId) {
-      return c.json({
-        issue: await cachedJiraIssueAfterUpsert(db, actorId, issue),
-      } satisfies JiraIssueResponse);
-    }
-    await upsertJiraIssue(db, actorId, issue);
-    const visibleIssue = await requireReportVisibleJiraIssue(
-      db,
-      actorId,
-      query.reportUserId,
-      issue.id,
-      reportLink?.permissions ?? null,
-    );
-    return c.json({ issue: { ...issue, linkedTasks: visibleIssue.linkedTasks } } satisfies JiraIssueResponse);
+    return c.json({
+      issue: await cachedJiraIssueAfterUpsert(db, actorId, issue),
+    } satisfies JiraIssueResponse);
   });
 
   app.get(
@@ -602,19 +545,6 @@ export function createJiraRoute(db: Db, options: JiraRouteOptions = {}) {
   app.get("/jira/comments", queryParams(jiraIssueDetailQuerySchema), async (c) => {
     const actorId = userId(c);
     const query = c.req.valid("query");
-    if (query.reportUserId) {
-      const link = await findLiveLink(db, actorId, query.reportUserId);
-      if (!link?.permissions?.canSeeDay) {
-        return c.json({ error: "Not a report of yours" }, 403);
-      }
-      await requireReportVisibleJiraIssue(
-        db,
-        actorId,
-        query.reportUserId,
-        query.issueIdOrKey,
-        link.permissions,
-      );
-    }
     const adapter = await adapterFor(db, actorId, adapterFactory);
     if (!adapter) {
       return c.json({ comments: [] });
@@ -631,22 +561,6 @@ export function createJiraRoute(db: Db, options: JiraRouteOptions = {}) {
   app.post("/jira/comments", jsonBody(createJiraCommentRequestSchema), async (c) => {
     const actorId = userId(c);
     const body = c.req.valid("json");
-    if (body.reportUserId) {
-      const link = await findLiveLink(db, actorId, body.reportUserId);
-      if (!link?.permissions?.canSeeDay) {
-        return c.json({ error: "Not a report of yours" }, 403);
-      }
-      if (!link.permissions.canComment) {
-        return c.json({ error: "Not allowed" }, 403);
-      }
-      await requireReportVisibleJiraIssue(
-        db,
-        actorId,
-        body.reportUserId,
-        body.issueIdOrKey,
-        link.permissions,
-      );
-    }
     const adapter = await adapterFor(db, actorId, adapterFactory);
     if (!adapter) {
       return c.json({ error: "Jira is not connected" }, 400);
@@ -668,67 +582,6 @@ export function createJiraRoute(db: Db, options: JiraRouteOptions = {}) {
         token: decryptJiraToken(encrypted(connection)),
       }).browseUrl(c.req.valid("query").issueKey),
     } satisfies JiraIssueUrlResponse);
-  });
-
-  app.get("/jira/report/issues", queryParams(jiraReportQuerySchema), async (c) => {
-    const actorId = userId(c);
-    const query = c.req.valid("query");
-    const link = await findLiveLink(db, actorId, query.userId);
-    if (!link?.permissions?.canSeeDay) {
-      return c.json({ error: "Not a report of yours" }, 403);
-    }
-    const adapter = await adapterFor(db, actorId, adapterFactory);
-    if (!adapter) {
-      return c.json({ issues: [] } satisfies JiraIssuesResponse);
-    }
-    const email = await reportUserEmail(db, query.userId);
-    if (!email) {
-      return c.json({ issues: [], reason: "no-jira-user" } satisfies JiraIssuesResponse);
-    }
-    const jiraUser = await findReportJiraUser(adapter, email);
-    if (!jiraUser) {
-      return c.json({ issues: [], reason: "no-jira-user" } satisfies JiraIssuesResponse);
-    }
-    await upsertJiraUsers(db, actorId, [jiraUser]);
-    const projectKeys = await listJiraProjectKeys(db, actorId);
-    const filters = {
-      query: query.q,
-      componentIds: query.componentIds,
-      presetJql: await selectedJqlPreset(db, actorId, query.jqlPresetId),
-      jql: query.jql,
-    };
-    let issues: JiraIssue[];
-    let total = 0;
-    let hasMore = false;
-    try {
-      const searchResult = await adapter.searchIssues(
-        buildReportAssignedIssuesJql(jiraUser, projectKeys, filters),
-        { maxResults: query.limit, startAt: query.startAt },
-      );
-      issues = searchResult.issues;
-      total = searchResult.total;
-      hasMore = query.startAt + issues.length < total;
-    } catch {
-      const cached = await listJiraIssues(db, actorId);
-      const filtered = cached
-        .filter((issue) => issueAssignedToJiraUser(issue, jiraUser))
-        .filter((issue) => matchesReportIssueFilters(issue, filters));
-      total = filtered.length;
-      issues = filtered.slice(query.startAt, query.startAt + query.limit);
-      hasMore = query.startAt + issues.length < total;
-    }
-    return c.json({
-      issues: await decorateReportIssues(
-        db,
-        actorId,
-        query.userId,
-        link.permissions,
-        issues,
-      ),
-      total,
-      startAt: query.startAt,
-      hasMore,
-    } satisfies JiraIssuesResponse);
   });
 
   return app;

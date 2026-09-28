@@ -3,37 +3,22 @@ import { openTask, todayIso, type AppDispatch } from "@tudu/store";
 import { TASK_TAB_FIELDS, taskLinkSearch } from "@/lib/daySearch";
 
 export type NotificationSearch = {
-  send?: boolean;
   date?: string;
   task?: string;
   tab?: "comments" | "timeline";
   jira?: string;
+  section?: string;
 };
 
 export type NotificationNavigate = (opts: {
-  to: "/" | "/inbox" | "/unscheduled" | "/team/$userId" | "/settings";
-  params?: { userId: string };
-  search?: NotificationSearch & { section?: string };
+  to: "/" | "/unscheduled" | "/settings" | "/week";
+  search?: NotificationSearch;
 }) => unknown;
 
 export function bindNotificationNavigate(
-  navigate: (opts: {
-    to: "/" | "/inbox" | "/unscheduled" | "/team/$userId" | "/settings";
-    params?: { userId: string };
-    search?: NotificationSearch & { section?: string };
-  }) => unknown,
+  navigate: NotificationNavigate,
 ): NotificationNavigate {
-  return (opts) => {
-    if (opts.to === "/team/$userId") {
-      void navigate({
-        to: "/team/$userId",
-        params: { userId: opts.params?.userId ?? "" },
-        search: opts.search ?? { send: false },
-      });
-      return;
-    }
-    void navigate({ to: opts.to, search: opts.search });
-  };
+  return (opts) => navigate(opts);
 }
 
 function openTaskNotification(
@@ -50,8 +35,6 @@ function openTaskNotification(
   }
   const focusCommentId =
     notification.kind === "comment" ? notification.commentId : null;
-  const isOwner =
-    !notification.ownerId || notification.ownerId === args.viewerId;
   const date = notification.scheduledDate ?? todayIso();
 
   args.dispatch(
@@ -62,20 +45,6 @@ function openTaskNotification(
       focusCommentId,
     }),
   );
-
-  if (!isOwner && notification.ownerId) {
-    void args.navigate({
-      to: "/team/$userId",
-      params: { userId: notification.ownerId },
-      search: taskLinkSearch({
-        date,
-        taskId: notification.taskId,
-        tab: inspectorTab,
-        extra: { send: false },
-      }),
-    });
-    return;
-  }
 
   if (!notification.scheduledDate) {
     void args.navigate({
@@ -120,7 +89,7 @@ export function openNotificationTarget(
   }
 
   if (notification.kind === "inbox" || notification.kind === "inbox_declined") {
-    void args.navigate({ to: "/inbox" });
+    void args.navigate({ to: "/unscheduled" });
     return;
   }
 

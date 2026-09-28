@@ -23,7 +23,7 @@ export function shouldAutoReadNotification(args: {
     return false;
   }
   if (isInboxKind(notification.kind)) {
-    return args.pathname.startsWith("/inbox");
+    return args.pathname.startsWith("/unscheduled");
   }
   if (notification.kind !== "comment" || !notification.taskId) {
     return false;
@@ -54,7 +54,7 @@ export function shouldFireOsBanner(args: {
   if (!args.windowFocused) {
     return true;
   }
-  if (isInboxKind(notification.kind) && args.pathname.startsWith("/inbox")) {
+  if (isInboxKind(notification.kind) && args.pathname.startsWith("/unscheduled")) {
     return false;
   }
   if (notification.taskId && args.selectedTaskId === notification.taskId) {

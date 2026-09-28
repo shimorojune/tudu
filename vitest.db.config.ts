@@ -5,8 +5,11 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
-    include: ["**/*.db.test.ts"],
-    exclude: [],
+    include: [
+      "packages/db/**/*.db.test.ts",
+      "apps/server/**/*.db.test.ts",
+    ],
+    exclude: ["**/node_modules/**"],
     testTimeout: 60_000,
     hookTimeout: 120_000,
     globalSetup: ["./vitest.db.setup.ts"],

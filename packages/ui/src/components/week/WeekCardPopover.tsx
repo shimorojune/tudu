@@ -4,9 +4,7 @@ import { useState } from "react";
 import type { Bucket, Task } from "@tudu/shared";
 import { BUCKETS } from "@tudu/shared";
 import {
-  useDeleteReportTaskMutation,
   useDeleteTaskMutation,
-  useReorderReportTasksMutation,
   useReorderTasksMutation,
   useUpdateTaskMutation,
   setSelectedDate,
@@ -33,7 +31,6 @@ export type WeekCardPopoverProps = {
   onOpenChange: (open: boolean) => void;
   children: ReactNode;
   viewer?: WeekViewer;
-  reportUserId?: string;
 };
 
 export function WeekCardPopover({
@@ -45,26 +42,19 @@ export function WeekCardPopover({
   onOpenChange,
   children,
   viewer = "self",
-  reportUserId,
 }: WeekCardPopoverProps) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [updateTask] = useUpdateTaskMutation();
   const [deleteTask] = useDeleteTaskMutation();
-  const [deleteReportTask] = useDeleteReportTaskMutation();
   const [reorderTasks] = useReorderTasksMutation();
-  const [reorderReportTasks] = useReorderReportTasksMutation();
   const isManager = viewer === "manager";
 
   function moveToBucket(bucket: Bucket) {
     const lanes = moveTaskToBucketLanes(dayTasks, task.id, bucket, scheduledDate);
     if (lanes.length > 0) {
-      if (isManager && reportUserId) {
-        reorderReportTasks({ userId: reportUserId, lanes });
-      } else {
-        reorderTasks({ lanes });
-      }
+      reorderTasks({ lanes });
     }
     onOpenChange(false);
   }
@@ -120,18 +110,6 @@ export function WeekCardPopover({
                 dispatch(setSelectedDate(scheduledDate));
                 dispatch(setSelectedTaskId(task.id));
                 onOpenChange(false);
-                if (isManager && reportUserId) {
-                  void navigate({
-                    to: "/team/$userId",
-                    params: { userId: reportUserId },
-                    search: taskLinkSearch({
-                      date: scheduledDate,
-                      taskId: task.id,
-                      extra: { send: false },
-                    }),
-                  });
-                  return;
-                }
                 void navigate({
                   to: "/",
                   search: taskLinkSearch({
@@ -151,11 +129,7 @@ export function WeekCardPopover({
         title={task.title}
         onOpenChange={setDeleteOpen}
         onConfirm={() => {
-          if (isManager && reportUserId) {
-            deleteReportTask({ userId: reportUserId, taskId: task.id });
-          } else {
-            deleteTask(task.id);
-          }
+          deleteTask(task.id);
           setDeleteOpen(false);
         }}
       />

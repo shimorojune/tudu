@@ -41,6 +41,7 @@ export function SignUpRoute() {
     }
 
     capture("signed_up", { origin: "client" });
+    window.location.assign("/welcome");
   }
 
   return (

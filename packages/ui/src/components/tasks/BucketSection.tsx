@@ -6,7 +6,12 @@ import { Plus } from "lucide-react";
 import { DEFAULT_NOW_SOFT_CAP, type Bucket, type Task } from "@tudu/shared";
 import { noSortingStrategy } from "@/lib/dragSort";
 import { cn } from "@/lib/utils";
-import { TaskRow, type TaskRowActions, type TaskViewer } from "@/components/tasks/TaskRow";
+import {
+  TaskRow,
+  type TaskOrgBadge,
+  type TaskRowActions,
+  type TaskViewer,
+} from "@/components/tasks/TaskRow";
 import { useProjectFilterId } from "@/hooks/useProjectFilterId";
 import { isTaskDimmed } from "@/lib/projectFilter";
 
@@ -33,6 +38,7 @@ export type BucketSectionProps = {
   skipSlideForTaskIds?: string[];
   viewer?: TaskViewer;
   canDragRows?: boolean;
+  orgBadgeForTask?: (task: Task) => TaskOrgBadge | null;
 };
 
 export function BucketSection({
@@ -58,6 +64,7 @@ export function BucketSection({
   skipSlideForTaskIds,
   viewer = "owner",
   canDragRows = true,
+  orgBadgeForTask,
 }: BucketSectionProps) {
   const filterProjectId = useProjectFilterId();
   const isNow = bucket === "now";
@@ -170,6 +177,7 @@ export function BucketSection({
               viewer={viewer}
               dimmed={isTaskDimmed(task, filterProjectId)}
               draggable={canDragRows}
+              orgBadge={orgBadgeForTask?.(task) ?? null}
             />
           ))}
         </SortableContext>

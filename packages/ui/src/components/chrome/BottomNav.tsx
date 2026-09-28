@@ -9,44 +9,50 @@ import {
 import { useSelector } from "react-redux";
 import {
   todayIso,
-  useGetInboxCountQuery,
   useGetUnscheduledTasksQuery,
   type RootState,
 } from "@tudu/store";
 import { dateLinkSearch } from "@/lib/daySearch";
-import { MAIN_NAV_ITEMS } from "@/lib/mainNav";
+import { mainNavItems } from "@/lib/mainNav";
+import { useActiveOrgSlug } from "@/hooks/useSpaceContext";
 
 const icons = {
-  "/": CalendarDays,
-  "/week": CalendarRange,
-  "/inbox": Inbox,
-  "/unscheduled": LayoutList,
-  "/team": Users,
+  Today: CalendarDays,
+  Week: CalendarRange,
+  Requests: Inbox,
+  Unscheduled: LayoutList,
+  "Co-workers": Users,
 } as const;
 
 export function BottomNav() {
+  const orgSlug = useActiveOrgSlug();
   const unscheduledQuery = useGetUnscheduledTasksQuery();
-  const inboxCountQuery = useGetInboxCountQuery();
   const unscheduledCount = unscheduledQuery.data?.tasks.length ?? 0;
-  const inboxCount = inboxCountQuery.data?.count ?? 0;
   const selectedDate = useSelector((state: RootState) => state.day.selectedDate);
+  const tabs = mainNavItems(orgSlug);
 
   return (
     <nav
       aria-label="Main"
       className="flex shrink-0 border-t border-rule bg-card pb-[env(safe-area-inset-bottom)] xl:hidden"
     >
-      {MAIN_NAV_ITEMS.map((item) => {
-        const Icon = icons[item.to];
-        const badge = "badge" in item ? inboxCount : undefined;
-        const count = "count" in item ? unscheduledCount : undefined;
-        const mark = (badge && badge > 0 ? badge : null) ?? (count && count > 0 ? count : null);
+      {tabs.map((item) => {
+        const Icon = icons[item.label as keyof typeof icons] ?? CalendarDays;
+        const count = item.count ? unscheduledCount : undefined;
+        const mark = count && count > 0 ? count : null;
+        const orgParams =
+          orgSlug && item.to.startsWith("/o/") ? { orgSlug } : undefined;
 
         return (
           <Link
             key={item.to}
             to={item.to}
-            search={item.to === "/" ? dateLinkSearch(selectedDate || todayIso()) : undefined}
+            params={orgParams}
+            search={
+              item.dayTab
+                ? dateLinkSearch(selectedDate || todayIso())
+                : undefined
+            }
             activeOptions={
               item.exact ? { exact: true, includeSearch: false } : { includeSearch: false }
             }

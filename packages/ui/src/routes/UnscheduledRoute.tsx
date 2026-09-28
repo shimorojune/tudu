@@ -58,6 +58,7 @@ import {
 } from "@/lib/dragCollision";
 import { patchTaskDescriptionIfAttachmentsChanged } from "@/lib/afterCreateTaskDescription";
 import { createTaskBody } from "@/lib/createTask";
+import { orgIdForSpace } from "@/lib/taskSpace";
 import { openNowCount } from "@/lib/nowCount";
 import { splitOpenAndCompleted } from "@/lib/completedTasks";
 import { cn } from "@/lib/utils";
@@ -271,6 +272,7 @@ function UnscheduledDnd({
 export function UnscheduledRoute() {
   const dispatch = useDispatch();
   const selectedTaskId = useSelector((state: RootState) => state.day.selectedTaskId);
+  const space = useSelector((state: RootState) => state.space.current);
   const { data, isLoading, isError } = useGetUnscheduledTasksQuery();
   const { data: todayData } = useGetTasksForDayQuery(todayIso());
   useDaySearchSync(TASK_TAB_FIELDS, {
@@ -455,6 +457,7 @@ export function UnscheduledRoute() {
               startDate: args.startDate,
               deadline: args.deadline,
               projectId: args.projectId,
+              orgId: orgIdForSpace(space),
             }),
           ).unwrap();
 

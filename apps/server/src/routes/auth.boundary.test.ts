@@ -19,6 +19,7 @@ describe("auth boundary", () => {
         email: session.user.email,
         name: session.user.name,
         createdAt: new Date(session.user.createdAt).toISOString(),
+        onboardedAt: null,
       };
 
       return c.json(response);

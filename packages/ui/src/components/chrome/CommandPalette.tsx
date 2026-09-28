@@ -1,14 +1,7 @@
 import { useCallback, useEffect } from "react";
-import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useDispatch } from "react-redux";
-import {
-  goToToday,
-  requestAddTask,
-  useAcceptInboxItemMutation,
-  useGetInboxQuery,
-  useGetProjectsQuery,
-} from "@tudu/store";
-import { effectiveDayIso, type Bucket } from "@tudu/shared";
+import { goToToday, requestAddTask, useGetProjectsQuery } from "@tudu/store";
 import { useCommandPalette } from "@/components/chrome/CommandPaletteContext";
 import {
   buildAppCommands,
@@ -31,27 +24,12 @@ import { isCommandPaletteBlocked } from "@/components/chrome/dialogBlocker";
 
 const GROUP_ORDER: CommandGroupName[] = ["Go", "Actions"];
 
-const INBOX_ACCEPT: { id: string; label: string; bucket: Bucket; shortcut: string }[] = [
-  { id: "inbox-now", label: "Accept into Now", bucket: "now", shortcut: "Cmd+1" },
-  { id: "inbox-next", label: "Accept into Next", bucket: "next", shortcut: "Cmd+2" },
-  { id: "inbox-later", label: "Accept into Later", bucket: "later", shortcut: "Cmd+3" },
-];
-
 export function CommandPalette() {
   const { open, setOpen } = useCommandPalette();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { data: projects = [] } = useGetProjectsQuery();
   const grouped = commandsByGroup(buildAppCommands(projects));
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const onInbox = pathname === "/inbox";
-  const { data: inbox } = useGetInboxQuery(undefined, {
-    skip: !onInbox,
-  });
-  const [acceptInbox] = useAcceptInboxItemMutation();
-  const pending = inbox?.pending[0] ?? null;
-  const inboxActions = onInbox && pending ? INBOX_ACCEPT : [];
-
   const jumpToThisWeek = useCallback(() => {
     void navigate({ to: "/week", search: { week: defaultWeekId() } });
   }, [navigate]);
@@ -168,30 +146,6 @@ export function CommandPalette() {
             </CommandGroup>
           );
         })}
-        {inboxActions.length > 0 ? (
-          <CommandGroup heading="Inbox">
-            {inboxActions.map((item) => (
-              <CommandItem
-                key={item.id}
-                value={`${item.label} inbox accept ${item.bucket}`}
-                onSelect={() => {
-                  if (!pending) {
-                    return;
-                  }
-                  setOpen(false);
-                  void acceptInbox({
-                    id: pending.id,
-                    bucket: item.bucket,
-                    scheduledDate: effectiveDayIso(),
-                  });
-                }}
-              >
-                <span>{item.label}</span>
-                <CommandShortcut>{item.shortcut}</CommandShortcut>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        ) : null}
       </CommandList>
       <div className="flex items-center justify-between border-t border-hair bg-background px-[18px] py-[12px] text-[11.5px] text-muted-foreground">
         <span>Type to filter commands</span>

@@ -1,16 +1,10 @@
 import { z } from "zod";
+import { SPACE_COLOR_NAMES, type SpaceColor } from "./colors.js";
 
-export const PROJECT_COLORS = [
-  "ember",
-  "rust",
-  "clay",
-  "ink",
-  "stone",
-  "moss",
-] as const;
+export const PROJECT_COLORS = SPACE_COLOR_NAMES;
+export type ProjectColor = SpaceColor;
 
 export const projectColorSchema = z.enum(PROJECT_COLORS);
-export type ProjectColor = z.infer<typeof projectColorSchema>;
 
 export const projectNameSchema = z
   .string()
@@ -24,6 +18,7 @@ export const projectRefSchema = z.object({
   color: projectColorSchema,
   archivedAt: z.iso.datetime({ offset: true }).nullable(),
   isPrivate: z.boolean().default(false),
+  orgId: z.uuid().nullable().optional(),
 });
 
 export type ProjectRef = z.infer<typeof projectRefSchema>;
@@ -40,6 +35,7 @@ export const createProjectRequestSchema = z.object({
   name: projectNameSchema,
   color: projectColorSchema,
   isPrivate: z.boolean().optional(),
+  orgId: z.uuid().nullable().optional(),
 });
 
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
@@ -64,6 +60,20 @@ export function normalizeProjectName(name: string): string {
 
 export function projectNameKey(name: string): string {
   return normalizeProjectName(name).toLowerCase();
+}
+
+export type ProjectSpaceFilter =
+  | { kind: "personal" }
+  | { kind: "org"; orgId: string };
+
+export function filterProjectsForSpace<T extends { orgId?: string | null }>(
+  projects: T[],
+  space: ProjectSpaceFilter,
+): T[] {
+  if (space.kind === "personal") {
+    return projects.filter((project) => project.orgId == null);
+  }
+  return projects.filter((project) => project.orgId === space.orgId);
 }
 
 export type EnsureProjectCandidate = {

@@ -10,7 +10,8 @@ import {
 } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema.js";
 import { comments } from "./activity-schema.js";
-import { inboxItems } from "./manager-schema.js";
+import { orgs } from "./orgs-schema.js";
+import { taskRequests } from "./task-requests-schema.js";
 import { tasks } from "./tasks-schema.js";
 
 export const notificationKind = pgEnum("notification_kind", [
@@ -46,7 +47,8 @@ export const notifications = pgTable(
     commentId: uuid("comment_id").references(() => comments.id, {
       onDelete: "set null",
     }),
-    inboxItemId: uuid("inbox_item_id").references(() => inboxItems.id, {
+    orgId: uuid("org_id").references(() => orgs.id, { onDelete: "set null" }),
+    requestId: uuid("request_id").references(() => taskRequests.id, {
       onDelete: "set null",
     }),
     scheduledDate: text("scheduled_date"),

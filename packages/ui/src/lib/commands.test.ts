@@ -6,9 +6,7 @@ describe("commands", () => {
     expect(APP_COMMANDS.map((command) => command.id)).toEqual([
       "go-today",
       "go-week",
-      "go-inbox",
       "go-unscheduled",
-      "go-team",
       "go-settings",
       "new-task",
       "jump-this-week",
@@ -19,9 +17,7 @@ describe("commands", () => {
     expect(grouped.get("Go")?.map((command) => command.label)).toEqual([
       "Go to Today",
       "Go to Week",
-      "Go to Inbox",
       "Go to Unscheduled",
-      "Go to Team",
       "Go to Settings",
       "Go to Settings Projects",
     ]);
