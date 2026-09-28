@@ -39,7 +39,7 @@ jobs:
     name: Unit tests
     runs-on: ubuntu-latest
     env:
-      E2E_DATABASE_URL: ${{ secrets.E2E_DATABASE_URL_0 || secrets.E2E_DATABASE_URL }}
+      E2E_DATABASE_URL: ${{ secrets['E2E_DATABASE_URL_0'] || secrets.E2E_DATABASE_URL }}
       E2E_BETTER_AUTH_SECRET: ${{ secrets.E2E_BETTER_AUTH_SECRET }}
     steps:
       - uses: actions/checkout@v4
@@ -108,11 +108,11 @@ jobs:
       - name: Set E2E database URL for shard
         env:
           SHARD: ${{ matrix.shard }}
-          E2E_DATABASE_URL_0: ${{ secrets.E2E_DATABASE_URL_0 }}
-          E2E_DATABASE_URL_1: ${{ secrets.E2E_DATABASE_URL_1 }}
-          E2E_DATABASE_URL_2: ${{ secrets.E2E_DATABASE_URL_2 }}
-          E2E_DATABASE_URL_3: ${{ secrets.E2E_DATABASE_URL_3 }}
-          E2E_DATABASE_URL_4: ${{ secrets.E2E_DATABASE_URL_4 }}
+          E2E_DATABASE_URL_0: ${{ secrets['E2E_DATABASE_URL_0'] }}
+          E2E_DATABASE_URL_1: ${{ secrets['E2E_DATABASE_URL_1'] }}
+          E2E_DATABASE_URL_2: ${{ secrets['E2E_DATABASE_URL_2'] }}
+          E2E_DATABASE_URL_3: ${{ secrets['E2E_DATABASE_URL_3'] }}
+          E2E_DATABASE_URL_4: ${{ secrets['E2E_DATABASE_URL_4'] }}
           E2E_DATABASE_URL_LEGACY: ${{ secrets.E2E_DATABASE_URL }}
         run: |
           case "$SHARD" in
