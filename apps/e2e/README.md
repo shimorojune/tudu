@@ -32,4 +32,11 @@ Add to GitHub Actions:
 
 CI also sets `NOTIFICATION_JOBS_ENABLED=false` and a fixed `JIRA_TOKEN_ENCRYPTION_KEY` for tests.
 
-If CI Playwright fails with `password authentication failed for user 'neondb_owner'`, the `E2E_DATABASE_URL` secret is stale. Copy a fresh pooled URL from Neon into the repo secret and re-run the workflow.
+If CI Playwright fails with `password authentication failed for user 'neondb_owner'`, the `E2E_DATABASE_URL` secret is stale. In Neon, reset the role password or copy a new **pooled** URL for `tudu_e2e`, then update **both** repo root `.env` and the GitHub secret (plain URL, no quotes). Confirm locally:
+
+```bash
+pnpm test:e2e:check-db
+pnpm test:e2e
+```
+
+Then re-run the failed Playwright job on the PR or push to trigger CI.
