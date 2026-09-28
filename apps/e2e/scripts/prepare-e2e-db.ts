@@ -22,10 +22,17 @@ if (existsSync(envPath)) {
   devDatabaseUrl = dotenv.DATABASE_URL?.trim();
 }
 
-const migrateEnv = {
+const authSecret =
+  process.env.E2E_BETTER_AUTH_SECRET?.trim() ??
+  process.env.BETTER_AUTH_SECRET?.trim();
+
+const migrateEnv: NodeJS.ProcessEnv = {
   ...process.env,
   DATABASE_URL: e2eUrl,
 };
+if (authSecret) {
+  migrateEnv.BETTER_AUTH_SECRET = authSecret;
+}
 
 const resetEnv: NodeJS.ProcessEnv = {
   ...process.env,
