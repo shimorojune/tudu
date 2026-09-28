@@ -27,11 +27,15 @@ const migrateEnv = {
   DATABASE_URL: e2eUrl,
 };
 
-const resetEnv = {
+const resetEnv: NodeJS.ProcessEnv = {
   ...process.env,
   E2E_DATABASE_URL: e2eUrl,
-  DATABASE_URL: devDatabaseUrl,
 };
+if (devDatabaseUrl) {
+  resetEnv.DATABASE_URL = devDatabaseUrl;
+} else {
+  delete resetEnv.DATABASE_URL;
+}
 
 execSync("pnpm --filter @tudu/e2e exec tsx scripts/reset-db.ts", {
   cwd: repoRoot,
