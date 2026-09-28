@@ -12,10 +12,12 @@ import { useSelector } from "react-redux";
 import { orgIdForSpace } from "@/lib/taskSpace";
 import { Button } from "@/components/ui/button";
 import { FormBusy } from "@/components/forms/FormBusy";
+import { ProjectSettingsRow } from "@/components/settings/ProjectSettingsRow";
 import {
-  ProjectColorSwatches,
-  ProjectSettingsRow,
-} from "@/components/settings/ProjectSettingsRow";
+  ColourPicker,
+  type ColourClash,
+} from "@/components/ui-custom/ColourPicker";
+import { nextFreeColor } from "@tudu/shared";
 import { notifyAction, mutationResult } from "@/lib/notifyAction";
 import { cn } from "@/lib/utils";
 
@@ -81,6 +83,38 @@ export function ProjectsSettingsPanel() {
     [scopedProjects],
   );
 
+  function clashesForProject(projectId: string): ColourClash[] {
+    const clashes: ColourClash[] = [];
+    const seen = new Set<ProjectColor>();
+    for (const row of inPickers) {
+      if (row.id === projectId || seen.has(row.color)) {
+        continue;
+      }
+      seen.add(row.color);
+      clashes.push({
+        color: row.color,
+        shortCode: row.name.slice(0, 3).toUpperCase(),
+      });
+    }
+    return clashes;
+  }
+
+  const createClashes = useMemo((): ColourClash[] => {
+    const seen = new Set<ProjectColor>();
+    const clashes: ColourClash[] = [];
+    for (const row of inPickers) {
+      if (seen.has(row.color)) {
+        continue;
+      }
+      seen.add(row.color);
+      clashes.push({
+        color: row.color,
+        shortCode: row.name.slice(0, 3).toUpperCase(),
+      });
+    }
+    return clashes;
+  }, [inPickers]);
+
   async function handleCreate() {
     const trimmed = name.trim();
     if (!trimmed) {
@@ -100,6 +134,7 @@ export function ProjectsSettingsPanel() {
         { success: "Project created", error: "Could not create that project" },
       );
       setName("");
+      setColor(nextFreeColor(inPickers.map((project) => project.color)));
     } catch {
       setError("Could not create that project");
     }
@@ -179,7 +214,13 @@ export function ProjectsSettingsPanel() {
               Create
             </Button>
           </div>
-          <ProjectColorSwatches selected={color} onSelect={setColor} />
+          <ColourPicker
+            compact
+            label="Colour"
+            value={color}
+            clashes={createClashes}
+            onChange={setColor}
+          />
           {error ? <p className="text-[12px] text-destructive">{error}</p> : null}
         </FormBusy>
       </form>
@@ -209,6 +250,7 @@ export function ProjectsSettingsPanel() {
               onCancelRename={() => setEditingId(null)}
               onUpdate={(patch) => updateProject({ id: project.id, patch })}
               onDelete={() => deleteProject(project.id)}
+              colourClashes={clashesForProject(project.id)}
             />
           ))}
         </ul>

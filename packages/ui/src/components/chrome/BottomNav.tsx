@@ -9,9 +9,11 @@ import {
 import { useSelector } from "react-redux";
 import {
   todayIso,
+  useGetRequestsQuery,
   useGetUnscheduledTasksQuery,
   type RootState,
 } from "@tudu/store";
+import { useRequestsSpace } from "@/hooks/useRequestsSpace";
 import { dateLinkSearch } from "@/lib/daySearch";
 import { mainNavItems } from "@/lib/mainNav";
 import { useActiveOrgSlug } from "@/hooks/useSpaceContext";
@@ -28,6 +30,9 @@ export function BottomNav() {
   const orgSlug = useActiveOrgSlug();
   const unscheduledQuery = useGetUnscheduledTasksQuery();
   const unscheduledCount = unscheduledQuery.data?.tasks.length ?? 0;
+  const requestsSpace = useRequestsSpace();
+  const requestsQuery = useGetRequestsQuery(requestsSpace);
+  const incomingRequestCount = requestsQuery.data?.incoming.length ?? 0;
   const selectedDate = useSelector((state: RootState) => state.day.selectedDate);
   const tabs = mainNavItems(orgSlug);
 
@@ -39,7 +44,13 @@ export function BottomNav() {
       {tabs.map((item) => {
         const Icon = icons[item.label as keyof typeof icons] ?? CalendarDays;
         const count = item.count ? unscheduledCount : undefined;
-        const mark = count && count > 0 ? count : null;
+        const badge = item.badge ? incomingRequestCount : undefined;
+        const mark =
+          badge && badge > 0
+            ? badge
+            : count && count > 0
+              ? count
+              : null;
         const orgParams =
           orgSlug && item.to.startsWith("/o/") ? { orgSlug } : undefined;
 

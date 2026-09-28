@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { useGetUnscheduledTasksQuery } from "@tudu/store";
+import { useGetRequestsQuery, useGetUnscheduledTasksQuery } from "@tudu/store";
+import { useRequestsSpace } from "@/hooks/useRequestsSpace";
 import { DayTab } from "@/components/chrome/DayTab";
 import { mainNavItems } from "@/lib/mainNav";
 import { useActiveOrgSlug } from "@/hooks/useSpaceContext";
@@ -48,6 +49,9 @@ export function NavTabs() {
   const orgSlug = useActiveOrgSlug();
   const { data } = useGetUnscheduledTasksQuery();
   const unscheduledCount = data?.tasks.length ?? 0;
+  const requestsSpace = useRequestsSpace();
+  const { data: requestsData } = useGetRequestsQuery(requestsSpace);
+  const incomingRequestCount = requestsData?.incoming.length ?? 0;
   const tabs = mainNavItems(orgSlug);
 
   return (
@@ -88,7 +92,7 @@ export function NavTabs() {
             <TabContent
               label={tab.label}
               count={tab.count ? unscheduledCount : undefined}
-              badge={tab.badge ? 0 : undefined}
+              badge={tab.badge ? incomingRequestCount : undefined}
             />
           </Link>
         );

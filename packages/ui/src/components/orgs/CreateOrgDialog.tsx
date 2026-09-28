@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { projectColorCss } from "@/lib/brand";
 import { notifyAction, mutationResult } from "@/lib/notifyAction";
 
 export type CreateOrgDialogProps = {
@@ -80,7 +81,20 @@ export function CreateOrgDialog({ open, onOpenChange }: CreateOrgDialogProps) {
                 className="text-[13.5px]"
               />
             </label>
-            <ColourPicker value={color} onChange={setColor} label="Badge" />
+            <ColourPicker value={color} onChange={setColor} label="Badge" compact />
+            <div className="flex flex-col gap-2 border border-rule bg-card px-3 py-3">
+              <span className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
+                How it shows
+              </span>
+              <span className="inline-flex w-fit items-center gap-2 text-[13px] font-semibold">
+                <span
+                  className="size-[10px] shrink-0"
+                  style={{ background: projectColorCss(color) }}
+                  aria-hidden
+                />
+                {name.trim() || "Organization name"}
+              </span>
+            </div>
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-[14px] gap-y-1 border-t border-hair pt-4">
               <div className="flex flex-col gap-1">
                 <span className="text-[14px]">Anyone with the link can join</span>

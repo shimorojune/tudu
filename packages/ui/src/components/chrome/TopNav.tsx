@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Plus, Search, SlidersHorizontal } from "lucide-react";
+import { Plus, Search, SlidersHorizontal, UserPlus } from "lucide-react";
+import { useState } from "react";
 import { isCommandPaletteBlocked } from "@/components/chrome/dialogBlocker";
 import { useCommandPalette } from "@/components/chrome/CommandPaletteContext";
 import { requestAddTask } from "@tudu/store";
@@ -10,7 +11,12 @@ import { useDayShortcuts } from "@/hooks/useDayShortcuts";
 import { NotificationBell } from "@/components/chrome/NotificationBell";
 import { WeekPicker } from "@/components/chrome/WeekPicker";
 import { isWeekPath } from "@/lib/weekPath";
-import { useSpaceContext } from "@/hooks/useSpaceContext";
+import { InviteDialog } from "@/components/orgs/InviteDialog";
+import { useActiveOrgSlug, useSpaceContext } from "@/hooks/useSpaceContext";
+import {
+  isCoworkersRosterPath,
+  isTodayRoutePath,
+} from "@/lib/spaceNav";
 import { useSpaceShortcuts } from "@/hooks/useSpaceShortcuts";
 import { defaultWeekId, weekDaysFromWeekId } from "@/lib/week";
 
@@ -66,11 +72,29 @@ function SettingsLink() {
   );
 }
 
+function InviteCoworkersButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label="Invite co-workers"
+      className="flex size-[36px] shrink-0 items-center justify-center text-muted-foreground hover:text-foreground xl:h-auto xl:w-auto xl:gap-[7px] xl:border xl:border-rule xl:px-[13px] xl:py-[7px] xl:text-[12.5px] xl:font-bold"
+      onClick={onClick}
+    >
+      <UserPlus size={15} strokeWidth={1.8} />
+      <span className="hidden xl:inline">Invite co-workers</span>
+    </button>
+  );
+}
+
 export function TopNav() {
   useSpaceContext();
   useSpaceShortcuts();
   useDayShortcuts();
+  const orgSlug = useActiveOrgSlug();
+  const [inviteOpen, setInviteOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const showNewTask = isTodayRoutePath(pathname, orgSlug);
+  const showInvite = isCoworkersRosterPath(pathname, orgSlug);
   const search = useRouterState({
     select: (s) => s.location.search as { week?: string },
   });
@@ -90,9 +114,19 @@ export function TopNav() {
         <div className="h-[20px] w-px bg-hair" />
         <CommandsButton />
         <NotificationBell />
-        <NewTaskButton />
+        {showInvite ? (
+          <InviteCoworkersButton onClick={() => setInviteOpen(true)} />
+        ) : null}
+        {showNewTask ? <NewTaskButton /> : null}
         <SettingsLink />
       </div>
+      {orgSlug && showInvite ? (
+        <InviteDialog
+          slug={orgSlug}
+          open={inviteOpen}
+          onOpenChange={setInviteOpen}
+        />
+      ) : null}
     </header>
   );
 }
