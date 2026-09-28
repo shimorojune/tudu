@@ -62,6 +62,9 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Install GTK/glib build deps
+        run: sudo apt-get update && sudo apt-get install -y libglib2.0-dev pkg-config
+
       - run: cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml
 
   e2e:
