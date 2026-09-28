@@ -55,17 +55,21 @@ export function deriveKeyPrefixFromName(name: string): string {
     if (!"AEIOU".includes(ch) && !chars.includes(ch)) {
       chars.push(ch);
     }
-    if (chars.length >= KEY_PREFIX_MAX) {
+    const targetLength = Math.min(4, KEY_PREFIX_MAX);
+    if (chars.length >= targetLength) {
       break;
     }
   }
 
-  for (const ch of cleaned) {
-    if (chars.length >= KEY_PREFIX_MAX) {
-      break;
-    }
-    if (!chars.includes(ch)) {
-      chars.push(ch);
+  const targetLength = Math.min(4, KEY_PREFIX_MAX);
+  if (chars.length < targetLength) {
+    for (const ch of cleaned) {
+      if (chars.length >= targetLength) {
+        break;
+      }
+      if (!chars.includes(ch)) {
+        chars.push(ch);
+      }
     }
   }
 

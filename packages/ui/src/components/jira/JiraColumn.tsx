@@ -43,6 +43,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { JiraIssueListSkeleton } from "@/components/loading/JiraSkeletons";
 import { notifyAction } from "@/lib/notifyAction";
 import {
+  formatJiraDueDate,
   jiraIssueMeta,
   jiraStatusClass,
   jiraStatusLabel,
@@ -54,7 +55,6 @@ import {
   linkedTasksInSelectedDay,
 } from "@/lib/jiraInMyDay";
 import { JiraInMyDayLine } from "@/components/jira/JiraInMyDayLine";
-import { formatJiraDueDate } from "./jiraFormat";
 
 export type JiraColumnProps = {
   selectedTask: Task | null;

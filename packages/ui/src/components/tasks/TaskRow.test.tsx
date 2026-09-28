@@ -61,6 +61,8 @@ const fixtureTask: Task = {
   commentCount: 0,
   project: null,
   jiraLinks: [],
+  taskNumber: 7,
+  taskKey: "ME-7",
   subtasks: [
     {
       id: "22222222-2222-4222-8222-222222222222",
@@ -136,7 +138,7 @@ describe("TaskRow", () => {
       />,
     );
 
-    expect(screen.getByText("JIRA EGS-123")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "EGS-123" })).toBeInTheDocument();
   });
 
   it("applies selected row treatment without shifting horizontal padding", () => {
