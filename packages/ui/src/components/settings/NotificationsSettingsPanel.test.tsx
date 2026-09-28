@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { Provider } from "react-redux";
@@ -84,8 +84,17 @@ describe("NotificationsSettingsPanel", () => {
       </Provider>,
     );
 
+    await waitFor(() => {
+      expect(
+        screen.getByRole("switch", { name: "JIRA event notifications" }),
+      ).toBeEnabled();
+    });
     await user.click(screen.getByRole("switch", { name: "Event notifications" }));
-    expect(screen.getByRole("switch", { name: "JIRA event notifications" })).toBeDisabled();
+    await waitFor(() => {
+      expect(
+        screen.getByRole("switch", { name: "JIRA event notifications" }),
+      ).toBeDisabled();
+    });
   });
 
   it("persists interval selection", async () => {

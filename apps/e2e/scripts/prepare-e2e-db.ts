@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { config, parse } from "dotenv";
 
 const packageDir = dirname(fileURLToPath(import.meta.url));
@@ -15,8 +15,12 @@ if (!e2eUrl) {
   process.exit(1);
 }
 
-const dotenv = parse(readFileSync(resolve(repoRoot, ".env"), "utf8"));
-const devDatabaseUrl = dotenv.DATABASE_URL?.trim();
+const envPath = resolve(repoRoot, ".env");
+let devDatabaseUrl = process.env.DATABASE_URL?.trim();
+if (!devDatabaseUrl && existsSync(envPath)) {
+  const dotenv = parse(readFileSync(envPath, "utf8"));
+  devDatabaseUrl = dotenv.DATABASE_URL?.trim();
+}
 
 const migrateEnv = {
   ...process.env,
