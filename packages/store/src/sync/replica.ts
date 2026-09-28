@@ -26,6 +26,8 @@ import type {
 } from "@tudu/shared";
 import {
   calendarDayIso,
+  DEFAULT_PERSONAL_KEY_PREFIX,
+  formatTaskKey,
   inProgressForPlacement,
   PERSONAL_REQUESTS_SPACE,
 } from "@tudu/shared";
@@ -811,6 +813,8 @@ function optimisticTask(
     project: projectRefFromReplica(replica, body.projectId),
     jiraLinks: [],
     orgId: body.orgId ?? null,
+    taskNumber: 1,
+    taskKey: formatTaskKey(DEFAULT_PERSONAL_KEY_PREFIX, 1),
   };
 }
 

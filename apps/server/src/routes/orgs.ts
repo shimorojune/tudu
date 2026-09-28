@@ -27,6 +27,9 @@ import {
   transferOwnership,
   updateMemberRole,
   updateOrg,
+  setOrgKeyPrefix,
+  TaskKeyError,
+  liveOrgMemberUserIds,
 } from "@tudu/db";
 import {
   createOrgBodySchema,
@@ -36,9 +39,11 @@ import {
   transferOwnershipBodySchema,
   updateMemberRoleBodySchema,
   updateOrgBodySchema,
+  updateOrgKeyPrefixBodySchema,
   type SpaceListItem,
 } from "@tudu/shared";
 import { Hono } from "hono";
+import { notifySync } from "../syncHub.js";
 import { sendEmail } from "../email/index.js";
 import { renderInviteEmail } from "../email/templates/invite.js";
 import {
@@ -120,6 +125,39 @@ export function createOrgsRoute(db: Db) {
       return c.json(mapped.body, mapped.status as 404);
     }
   });
+
+  app.patch(
+    "/:slug/key-prefix",
+    zValidator("json", updateOrgKeyPrefixBodySchema),
+    async (c) => {
+      const user = sessionUser(c);
+      if (!user) {
+        return c.json({ error: "Unauthorized" }, 401);
+      }
+      try {
+        const keyPrefix = await setOrgKeyPrefix(
+          db,
+          user.id,
+          c.req.param("slug"),
+          c.req.valid("json").keyPrefix,
+        );
+        const org = await db.query.orgs.findFirst({
+          where: eq(orgs.slug, c.req.param("slug")),
+        });
+        if (org) {
+          const members = await liveOrgMemberUserIds(db, org.id);
+          notifySync(members);
+        }
+        return c.json({ keyPrefix });
+      } catch (error) {
+        if (error instanceof TaskKeyError) {
+          return c.json({ error: error.message }, error.status as 409);
+        }
+        const mapped = mapOrgError(error);
+        return c.json(mapped.body, mapped.status as 403);
+      }
+    },
+  );
 
   app.patch("/:slug", zValidator("json", updateOrgBodySchema), async (c) => {
     const user = sessionUser(c);

@@ -92,8 +92,17 @@ describe("taskMetaSegments", () => {
     );
 
     expect(segments.at(-1)).toEqual({
-      kind: "text",
-      text: "JIRA EGS-123, ENG-9",
+      kind: "jira",
+      keys: [
+        {
+          key: "EGS-123",
+          browseUrl: "https://jira.example.test/browse/EGS-123",
+        },
+        {
+          key: "ENG-9",
+          browseUrl: "https://jira.example.test/browse/ENG-9",
+        },
+      ],
     });
   });
 });

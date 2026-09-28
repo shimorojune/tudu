@@ -44,6 +44,8 @@ function stubTask(row: CoworkerDayTask, date: string): Task {
     project: null,
     jiraLinks: [],
     orgId: null,
+    taskNumber: row.taskNumber,
+    taskKey: row.taskKey,
   };
 }
 

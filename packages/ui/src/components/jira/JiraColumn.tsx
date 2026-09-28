@@ -13,7 +13,7 @@ import {
   useRefreshJiraIssuesMutation,
   useSearchJiraIssuesQuery,
 } from "@tudu/store";
-import { Link2, PencilLine, RefreshCcw } from "lucide-react";
+import { ExternalLink, Link2, PencilLine, RefreshCcw } from "lucide-react";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -49,10 +49,17 @@ import {
   jiraStatusStyle,
 } from "./jiraFormat";
 import { cn } from "@/lib/utils";
+import {
+  issueTetheredOnDay,
+  linkedTasksInSelectedDay,
+} from "@/lib/jiraInMyDay";
+import { JiraInMyDayLine } from "@/components/jira/JiraInMyDayLine";
+import { formatJiraDueDate } from "./jiraFormat";
 
 export type JiraColumnProps = {
   selectedTask: Task | null;
   selectedDate: string;
+  dayTasksById?: ReadonlyMap<string, Task>;
   selectedIssueKey?: string | null;
   onPreviewIssue?: (key: string) => void;
   onCreateTask?: (issue: JiraIssue) => void;
@@ -137,6 +144,8 @@ function JiraIssueRow({
   issue,
   selected,
   selectedTask,
+  selectedDate,
+  dayTasksById,
   onPreview,
   onCreateTask,
   onLinkSelected,
@@ -145,6 +154,8 @@ function JiraIssueRow({
   issue: JiraIssue;
   selected: boolean;
   selectedTask: Task | null;
+  selectedDate: string;
+  dayTasksById: ReadonlyMap<string, Task>;
   onPreview: () => void;
   onCreateTask?: () => void;
   onLinkSelected: () => void;
@@ -152,6 +163,18 @@ function JiraIssueRow({
 }) {
   const selectedLinked = issueContainsSelectedTask(issue, selectedTask);
   const canLinkSelected = Boolean(selectedTask && !selectedLinked);
+  const tethered = issueTetheredOnDay(issue, selectedDate, dayTasksById);
+  const tasksInDay = linkedTasksInSelectedDay(
+    issue,
+    selectedDate,
+    dayTasksById,
+  );
+  const dueTodayExtra =
+    issue.dueDate === selectedDate
+      ? "due today"
+      : issue.dueDate
+        ? `due ${formatJiraDueDate(issue.dueDate)}`
+        : undefined;
 
   async function copyKey() {
     try {
@@ -168,6 +191,8 @@ function JiraIssueRow({
           className={cn(
             "border-b border-hair px-[18px] py-[14px]",
             selected && "bg-foreground/[0.03]",
+            tethered &&
+              "bg-foreground/[0.03] shadow-[inset_3px_0_0_0_var(--primary)]",
           )}
         >
           <button
@@ -178,7 +203,7 @@ function JiraIssueRow({
             onClick={onPreview}
           >
             <div className="flex items-center gap-[8px]">
-              <span className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-faint">
+              <span className="font-mono text-[11.5px] tracking-[-0.01em] text-muted-foreground">
                 {issue.key}
               </span>
               <span
@@ -187,6 +212,16 @@ function JiraIssueRow({
               >
                 {jiraStatusLabel(issue)}
               </span>
+              <a
+                href={issue.browseUrl}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Open ${issue.key} in Jira`}
+                className="ml-auto text-muted-foreground hover:text-foreground"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <ExternalLink size={12} strokeWidth={1.8} aria-hidden />
+              </a>
             </div>
             <h3 className="mt-[5px] text-[14px] font-semibold leading-[1.35] tracking-[-0.01em]">
               {issue.summary}
@@ -196,7 +231,13 @@ function JiraIssueRow({
             </p>
           </button>
 
-          {issue.linkedTasks.length > 0 ? (
+          {tethered ? (
+            <JiraInMyDayLine
+              tasks={tasksInDay}
+              selectedDate={selectedDate}
+              extra={dueTodayExtra}
+            />
+          ) : issue.linkedTasks.length > 0 ? (
             <div className="mt-[8px] flex flex-wrap gap-[6px]">
               {issue.linkedTasks.map((task) => (
                 <span
@@ -208,7 +249,7 @@ function JiraIssueRow({
               ))}
             </div>
           ) : null}
-          {selectedLinked ? (
+          {selectedLinked && !tethered ? (
             <p className="mt-[8px] text-[11.5px] font-semibold text-primary-text">
               Selected task linked
             </p>
@@ -401,6 +442,7 @@ function JiraJqlFilter({
 export function JiraColumn({
   selectedTask,
   selectedDate,
+  dayTasksById = new Map(),
   selectedIssueKey = null,
   onPreviewIssue,
   onCreateTask,
@@ -604,8 +646,6 @@ export function JiraColumn({
     }
   }
 
-  void selectedDate;
-
   return (
     <div className="flex h-full min-h-0 flex-col bg-card">
       <header className="shrink-0 border-b border-hair px-[18px] pb-[12px] pt-[20px]">
@@ -721,6 +761,8 @@ export function JiraColumn({
                   issue={issue}
                   selected={selectedIssueKey === issue.key}
                   selectedTask={selectedTask}
+                  selectedDate={selectedDate}
+                  dayTasksById={dayTasksById}
                   linking={linking}
                   onPreview={() => onPreviewIssue?.(issue.key)}
                   onCreateTask={onCreateTask ? () => onCreateTask(issue) : undefined}

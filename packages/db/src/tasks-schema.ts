@@ -9,6 +9,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema.js";
@@ -46,6 +47,8 @@ export const tasks = pgTable(
     carriedSince: date("carried_since", { mode: "string" }),
     isPrivate: boolean("is_private").notNull().default(false),
     orgId: uuid("org_id").references(() => orgs.id, { onDelete: "cascade" }),
+    /** Monotonic per space (personal user or org). Stable for the life of the task. */
+    taskNumber: integer("task_number").notNull(),
     /** When set, task is a pending new-task request and hidden from day lists. */
     pendingRequestId: uuid("pending_request_id"),
     projectId: uuid("project_id").references(() => projects.id, {
@@ -74,6 +77,12 @@ export const tasks = pgTable(
       table.bucket,
       table.position,
     ),
+    uniqueIndex("tasks_personal_number_uidx")
+      .on(table.userId, table.taskNumber)
+      .where(sql`${table.orgId} is null`),
+    uniqueIndex("tasks_org_number_uidx")
+      .on(table.orgId, table.taskNumber)
+      .where(sql`${table.orgId} is not null`),
     /** The whole point of step 2's model decision. A task has a day and a bucket, or
         neither. Postgres indexes and compares nulls fine, so the Unscheduled lane is
         just the lane where both are null. */

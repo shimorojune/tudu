@@ -7,6 +7,8 @@ export {
 export {
   useGetNotificationSettingsQuery,
   useUpdateNotificationSettingsMutation,
+  useGetSpacePrefixSettingsQuery,
+  useUpdateSpacePrefixSettingsMutation,
   useReportClientVersionMutation,
 } from "./api/notificationSettingsApi.js";
 export {
@@ -152,6 +154,7 @@ export {
   useGetOrgQuery,
   useCreateOrgMutation,
   useUpdateOrgMutation,
+  useUpdateOrgKeyPrefixMutation,
   useListOrgInvitesQuery,
   useListOrgAuditQuery,
   useLeaveOrgMutation,

@@ -3,6 +3,7 @@ export * from "./projects-schema.js";
 export * from "./tasks-schema.js";
 export * from "./activity-schema.js";
 export * from "./orgs-schema.js";
+export * from "./task-keys-schema.js";
 export * from "./task-requests-schema.js";
 export * from "./sync-schema.js";
 export * from "./notifications-schema.js";

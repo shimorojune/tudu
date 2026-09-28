@@ -31,6 +31,9 @@ import { AUTOSAVE_MS } from "@/lib/autosave";
 import { cn } from "@/lib/utils";
 import { ProjectChip } from "@/components/projects/ProjectChip";
 import { taskMetaSegments } from "@/lib/taskMeta";
+import { TaskMetaSegments } from "@/components/tasks/TaskMetaSegments";
+import { TaskOrgChip } from "@/components/tasks/TaskOrgChip";
+import { copyTaskKeyToClipboard } from "@/lib/copyTaskKey";
 import { CarryDots } from "@/components/tasks/CarryDots";
 import { SubtaskComposer } from "@/components/tasks/SubtaskComposer";
 import { TaskDeleteDialog } from "@/components/tasks/TaskDeleteDialog";
@@ -61,7 +64,7 @@ export type TaskRowActions = {
 };
 
 export type TaskOrgBadge = {
-  letter: string;
+  name: string;
   color: string;
 };
 
@@ -811,11 +814,6 @@ export function TaskRow({
           onFlashComplete?.();
         }
       }}
-      style={
-        orgBadge
-          ? { borderLeft: `3px solid ${orgBadge.color}` }
-          : undefined
-      }
       className={cn(
         "relative grid cursor-default border-b border-hair outline-none",
         "grid-cols-[13px_19px_minmax(0,1fr)_auto] gap-x-[12px] px-[28px]",
@@ -855,7 +853,7 @@ export function TaskRow({
               : undefined,
           )}
         >
-          <span className="relative inline-block max-w-full">
+          <span className="relative inline-block min-w-0 max-w-full">
             {isManager ? (
               <span className={titleClass(bucket, isCompleted, false)}>
                 <LinkifiedText text={task.title} />
@@ -897,29 +895,19 @@ export function TaskRow({
             {richTextToPlainPreview(task.description)}
           </p>
         ) : null}
-        {segments.length > 0 || task.project ? (
+        {segments.length > 0 || task.project || task.taskKey ? (
           <div className="mt-[4px] flex flex-wrap items-center gap-[9px] text-[12.5px] tabular-nums text-muted-foreground">
+            <span className="font-mono text-[12px] font-semibold text-foreground">
+              {task.taskKey}
+            </span>
+            {task.project || segments.length > 0 ? (
+              <span className="text-ghost">·</span>
+            ) : null}
             {task.project ? <ProjectChip project={task.project} /> : null}
             {task.project && segments.length > 0 ? (
               <span className="text-ghost">·</span>
             ) : null}
-            {segments.map((segment, index) =>
-              segment.kind === "dot" ? (
-                <span key={`dot-${index}`} className="text-ghost">
-                  ·
-                </span>
-              ) : (
-                <span
-                  key={`text-${index}`}
-                  className={cn(
-                    segment.emphasis && "font-bold text-foreground",
-                    segment.accent && "font-bold text-primary-text",
-                  )}
-                >
-                  {segment.text}
-                </span>
-              ),
-            )}
+            <TaskMetaSegments segments={segments} />
           </div>
         ) : null}
         <div
@@ -1036,13 +1024,16 @@ export function TaskRow({
           </div>
         </div>
       </div>
-      <CarryDots
-        carriedDays={task.carriedDays}
-        slipping={isSlipping({
-          carriedDays: task.carriedDays,
-          deadline: task.deadline,
-        })}
-      />
+      <div className="flex shrink-0 flex-col items-end gap-[6px] self-start pt-px">
+        {orgBadge ? <TaskOrgChip badge={orgBadge} /> : null}
+        <CarryDots
+          carriedDays={task.carriedDays}
+          slipping={isSlipping({
+            carriedDays: task.carriedDays,
+            deadline: task.deadline,
+          })}
+        />
+      </div>
     </div>
   );
 
@@ -1069,6 +1060,11 @@ export function TaskRow({
             <>
               <ContextMenuItem onSelect={() => setIsEditing(true)}>
                 Rename
+              </ContextMenuItem>
+              <ContextMenuItem
+                onSelect={() => void copyTaskKeyToClipboard(task.taskKey)}
+              >
+                Copy task ID
               </ContextMenuItem>
               <ContextMenuItem
                 onSelect={() => {

@@ -42,6 +42,20 @@ export const orgsApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: [{ type: "OrgSpaces", id: "LIST" }],
     }),
+    updateOrgKeyPrefix: builder.mutation<
+      { keyPrefix: string },
+      { slug: string; keyPrefix: string }
+    >({
+      query: ({ slug, keyPrefix }) => ({
+        url: `/orgs/${slug}/key-prefix`,
+        method: "PATCH",
+        body: { keyPrefix },
+      }),
+      invalidatesTags: (_result, _error, { slug }) => [
+        { type: "Org", id: slug },
+        { type: "OrgSpaces", id: "LIST" },
+      ],
+    }),
     updateOrg: builder.mutation<
       Pick<OrgDetail, "slug" | "name" | "color" | "allowedDomains" | "joinLinkEnabled">,
       { slug: string; body: UpdateOrgBody }
@@ -228,6 +242,7 @@ export const {
   useGetOrgQuery,
   useCreateOrgMutation,
   useUpdateOrgMutation,
+  useUpdateOrgKeyPrefixMutation,
   useListOrgInvitesQuery,
   useListOrgAuditQuery,
   useLeaveOrgMutation,

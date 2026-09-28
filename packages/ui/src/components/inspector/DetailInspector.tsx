@@ -12,6 +12,7 @@ import { DetailsTab } from "@/components/inspector/DetailsTab";
 import { DetailInspectorEmpty } from "@/components/inspector/DetailInspectorEmpty";
 import { InspectorTabs } from "@/components/inspector/InspectorTabs";
 import { TimelineTab } from "@/components/inspector/TimelineTab";
+import { useCopyTaskKeyShortcut } from "@/hooks/useCopyTaskKeyShortcut";
 
 export type DetailInspectorProps = {
   task: Task | null;
@@ -28,6 +29,8 @@ export function DetailInspector({
   canDelete,
   onDelete,
 }: DetailInspectorProps) {
+  useCopyTaskKeyShortcut(task);
+
   if (!task) {
     return <DetailInspectorEmpty />;
   }

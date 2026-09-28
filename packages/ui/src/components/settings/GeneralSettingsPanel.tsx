@@ -11,6 +11,11 @@ import {
 import { emitQuickAddShortcutChanged } from "@/lib/quickAddMainSync";
 import { ThemeModePicker } from "@/components/settings/ThemeModePicker";
 import { ThemePalettePicker } from "@/components/settings/ThemePalettePicker";
+import { KeyPrefixField } from "@/components/settings/KeyPrefixField";
+import {
+  useGetSpacePrefixSettingsQuery,
+  useUpdateSpacePrefixSettingsMutation,
+} from "@tudu/store";
 
 async function tryRegisterShortcut(accelerator: string): Promise<boolean> {
   try {
@@ -36,6 +41,8 @@ async function resumeQuickAddShortcuts(): Promise<void> {
 }
 
 export function GeneralSettingsPanel() {
+  const { data: spacePrefix } = useGetSpacePrefixSettingsQuery();
+  const [updateSpacePrefix] = useUpdateSpacePrefixSettingsMutation();
   const desktop = isDesktopApp();
   const [shortcut, setShortcut] = useState(() => readQuickAddShortcut());
   const [recording, setRecording] = useState(false);
@@ -112,6 +119,18 @@ export function GeneralSettingsPanel() {
       <div className="mt-[28px]">
         <ThemeModePicker />
         <ThemePalettePicker />
+      {spacePrefix ? (
+        <section className="mt-[28px] border-t border-hair pt-[28px]">
+          <KeyPrefixField
+            value={spacePrefix.personalKeyPrefix}
+            locked={spacePrefix.prefixLocked}
+            label="Personal task ID prefix"
+            onSave={async (keyPrefix) => {
+              await updateSpacePrefix({ keyPrefix }).unwrap();
+            }}
+          />
+        </section>
+      ) : null}
       </div>
 
       {desktop ? (

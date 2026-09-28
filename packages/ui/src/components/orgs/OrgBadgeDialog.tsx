@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import type { ProjectColor } from "@tudu/shared";
-import { useGetOrgQuery, useUpdateOrgMutation } from "@tudu/store";
+import {
+  useGetOrgQuery,
+  useUpdateOrgKeyPrefixMutation,
+  useUpdateOrgMutation,
+} from "@tudu/store";
+import { KeyPrefixField } from "@/components/settings/KeyPrefixField";
 import { ColourPicker } from "@/components/orgs/ColourPicker";
 import { FormBusy } from "@/components/forms/FormBusy";
 import { Button } from "@/components/ui/button";
@@ -28,6 +33,7 @@ export function OrgBadgeDialog({
 }: OrgBadgeDialogProps) {
   const { data: org } = useGetOrgQuery(slug, { skip: !open });
   const [updateOrg, updateState] = useUpdateOrgMutation();
+  const [updateKeyPrefix] = useUpdateOrgKeyPrefixMutation();
   const [color, setColor] = useState<ProjectColor>("vermilion");
 
   useEffect(() => {
@@ -71,6 +77,17 @@ export function OrgBadgeDialog({
             </div>
             <ColourPicker value={color} onChange={setColor} label="Task colour" />
           </div>
+          {org ? (
+            <div className="mt-[20px] border-t border-hair pt-[20px]">
+              <KeyPrefixField
+                value={org.keyPrefix}
+                locked={org.keyPrefixLocked}
+                onSave={async (keyPrefix) => {
+                  await updateKeyPrefix({ slug, keyPrefix }).unwrap();
+                }}
+              />
+            </div>
+          ) : null}
         </FormBusy>
         <DialogFooter className="border-t border-rule px-[22px] py-[14px] sm:justify-start">
           <Button

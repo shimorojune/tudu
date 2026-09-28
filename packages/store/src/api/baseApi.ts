@@ -55,6 +55,7 @@ export const baseApi = createApi({
     "JiraJqlPreset",
     "JiraUser",
     "NotificationSettings",
+    "SpacePrefixSettings",
     "OrgSpaces",
     "Org",
     "OrgInvites",

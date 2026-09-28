@@ -20,6 +20,11 @@ import { timelineEvents } from "./activity-schema.js";
 import { assertProjectMatchesTaskOrg, projectNameById } from "./projects.js";
 import type { ProjectRow } from "./projects-schema.js";
 import { linkSummariesForTasks } from "./jira.js";
+import {
+  allocateNextTaskNumber,
+  keyPrefixesForTasks,
+  scopeKey,
+} from "./taskKeys.js";
 import { subtasks, tasks, type SubtaskRow, type TaskRow } from "./tasks-schema.js";
 
 export type TaskRowWithSubtasks = TaskRow & {
@@ -27,6 +32,7 @@ export type TaskRowWithSubtasks = TaskRow & {
   commentCount: number;
   project: ProjectRow | null;
   jiraLinks: JiraTaskLinkSummary[];
+  keyPrefix?: string;
 };
 
 export type TaskPlacement = {
@@ -108,12 +114,17 @@ async function attachCommentCounts(
     db,
     rows.map((row) => row.id),
   );
+  const prefixes = await keyPrefixesForTasks(
+    db,
+    rows.map((row) => ({ userId: row.userId, orgId: row.orgId })),
+  );
 
   return rows.map((row) => ({
     ...row,
     project: row.project ?? null,
     commentCount: counts.get(row.id) ?? 0,
     jiraLinks: links.get(row.id) ?? [],
+    keyPrefix: prefixes.get(scopeKey(row.userId, row.orgId)),
   }));
 }
 
@@ -270,6 +281,11 @@ export async function createTask(
     input.scheduledDate,
     input.bucket,
   );
+  const taskNumber = await allocateNextTaskNumber(
+    db,
+    input.userId,
+    input.orgId ?? null,
+  );
 
   const rows = await db
     .insert(tasks)
@@ -277,6 +293,7 @@ export async function createTask(
       ...input,
       description: input.description ?? null,
       position,
+      taskNumber,
       inProgress: inProgressForPlacement(
         input.bucket,
         input.scheduledDate,

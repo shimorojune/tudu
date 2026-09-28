@@ -20,6 +20,24 @@ export const notificationSettingsApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ["NotificationSettings"],
     }),
+    getSpacePrefixSettings: builder.query<
+      { personalKeyPrefix: string; prefixLocked: boolean },
+      void
+    >({
+      query: () => "/settings/space-prefix",
+      providesTags: ["SpacePrefixSettings"],
+    }),
+    updateSpacePrefixSettings: builder.mutation<
+      { personalKeyPrefix: string; prefixLocked: boolean },
+      { keyPrefix: string }
+    >({
+      query: (body) => ({
+        url: "/settings/space-prefix",
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: ["SpacePrefixSettings", "OrgSpaces"],
+    }),
     reportClientVersion: builder.mutation<{ ok: boolean }, { version: string }>({
       query: (body) => ({
         url: "/settings/client-version",
@@ -33,5 +51,7 @@ export const notificationSettingsApi = baseApi.injectEndpoints({
 export const {
   useGetNotificationSettingsQuery,
   useUpdateNotificationSettingsMutation,
+  useGetSpacePrefixSettingsQuery,
+  useUpdateSpacePrefixSettingsMutation,
   useReportClientVersionMutation,
 } = notificationSettingsApi;
