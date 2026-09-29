@@ -14,8 +14,8 @@ describe("migrationFileHash", () => {
 
 describe("detectLastAppliedTag", () => {
   it("prefers task_number when present", async () => {
-    const sql = async (strings: TemplateStringsArray) => {
-      const query = strings.join("");
+    const sql = async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      const query = `${strings.join("")}|${values.join("|")}`;
       if (query.includes("task_number")) {
         return [{ "?column?": 1 }];
       }
@@ -25,13 +25,30 @@ describe("detectLastAppliedTag", () => {
     await expect(detectLastAppliedTag(sql)).resolves.toBe("0022_task_ids");
   });
 
-  it("detects orgs with moved_to_space enum", async () => {
-    const sql = async (strings: TemplateStringsArray) => {
+  it("detects timeline_event_type without orgs (staging drift case)", async () => {
+    const sql = async (strings: TemplateStringsArray, ...values: unknown[]) => {
       const query = strings.join("");
+      if (query.includes("pg_enum") || query.includes("information_schema")) {
+        return [];
+      }
+      if (values.includes("timeline_event_type")) {
+        return [{ "?column?": 1 }];
+      }
+      return [];
+    };
+
+    await expect(detectLastAppliedTag(sql)).resolves.toBe(
+      "0001_flaky_captain_stacy",
+    );
+  });
+
+  it("detects orgs with moved_to_space enum", async () => {
+    const sql = async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      const query = `${strings.join("")}|${values.join("|")}`;
       if (query.includes("task_number")) {
         return [];
       }
-      if (query.includes("table_name = 'orgs'")) {
+      if (query.includes("|orgs|")) {
         return [{ "?column?": 1 }];
       }
       if (query.includes("moved_to_space")) {
