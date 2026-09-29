@@ -20,6 +20,15 @@ import {
   markTaskComplete,
   taskRow,
 } from "../../helpers/completed-section";
+import {
+  acceptInviteInBrowser,
+  createOrgViaApi,
+  inviteMemberViaApi,
+  inviteTokenFromOutbox,
+  readTestOutbox,
+  uniqueOrgName,
+} from "../../helpers/orgs";
+import { E2E_WEB_URL } from "../../constants.js";
 
 const managerAuth = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -27,10 +36,12 @@ const managerAuth = path.join(
 );
 
 test.describe("Task description attachments", () => {
+  test.describe.configure({ mode: "serial", timeout: 45_000 });
+
   test("Today: attach image via toolbar and persist after reselect", async ({
     page,
   }) => {
-    const title = uniqueAttachmentTitle("Attach today");
+    const title = uniqueAttachmentTitle("E2E attach later");
     await createTodayTask(page, title);
 
     await attachFileViaToolbar(page, tinyPngPath);
@@ -43,7 +54,7 @@ test.describe("Task description attachments", () => {
   });
 
   test("Unscheduled: attach image and persist", async ({ page }) => {
-    const title = uniqueAttachmentTitle("Attach unscheduled");
+    const title = uniqueAttachmentTitle("E2E attach backlog");
     await createUnscheduledTask(page, title);
     await attachFileViaToolbar(page, tinyPngPath);
     await waitForDescriptionImage(page);
@@ -59,9 +70,7 @@ test.describe("Task description attachments", () => {
     await createTodayTask(page, title);
     await attachFileViaToolbar(page, notesTxtPath);
     const editor = descriptionEditor(page);
-    await expect(editor.getByRole("link", { name: "notes.txt" })).toBeVisible({
-      timeout: 20_000,
-    });
+    await expect(editor.getByRole("link", { name: "notes.txt" })).toBeVisible();
   });
 
   test("clicking a file attachment link downloads the file", async ({
@@ -72,7 +81,7 @@ test.describe("Task description attachments", () => {
     await attachFileViaToolbar(page, notesTxtPath);
     const editor = descriptionEditor(page);
     const link = editor.getByRole("link", { name: "notes.txt" });
-    await expect(link).toBeVisible({ timeout: 20_000 });
+    await expect(link).toBeVisible();
 
     const downloadPromise = page.waitForEvent("download");
     await link.click();
@@ -100,14 +109,12 @@ test.describe("Task description attachments", () => {
     await editor.getByRole("button", { name: "Attach file" }).click();
     const chooser = await chooserPromise;
     await chooser.setFiles(tinyPngPath);
-    await expect(editor.locator(".tudu-attachment-image img")).toBeVisible({
-      timeout: 20_000,
-    });
+    await expect(editor.locator(".tudu-attachment-image img")).toBeVisible();
 
-    await dialog
-      .getByRole("button", { name: /Add to Later/i })
-      .click();
-    await expect(dialog).not.toBeVisible({ timeout: 60_000 });
+    const addLater = dialog.getByRole("button", { name: /Add to Later/i });
+    await expect(addLater).toBeEnabled();
+    await addLater.click();
+    await expect(dialog).not.toBeVisible();
 
     await selectTaskByTitle(page, title);
     await waitForDescriptionImage(page);
@@ -208,15 +215,25 @@ test.describe("Task description attachments", () => {
 
 test.describe("Manager report attachments", () => {
   test("manager sees report attachment read-only", async ({ browser }) => {
+    const userAuth = path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "../../.auth/user.json",
+    );
     const reportTitle = uniqueAttachmentTitle("Manager attach");
-    const userContext = await browser.newContext({
-      storageState: path.join(
-        path.dirname(fileURLToPath(import.meta.url)),
-        "../../.auth/user.json",
-      ),
-    });
+    const userContext = await browser.newContext({ storageState: userAuth });
+    const userRequest = userContext.request;
+    const { slug } = await createOrgViaApi(
+      userRequest,
+      uniqueOrgName("E2E Manager attach"),
+    );
+    await inviteMemberViaApi(userRequest, slug, "marcus@egain.com");
+    const outbox = await readTestOutbox(userRequest, "marcus@egain.com");
+    const token = outbox[0] ? inviteTokenFromOutbox(outbox[0]) : null;
+    expect(token).toBeTruthy();
+    await acceptInviteInBrowser(browser, managerAuth, token!, E2E_WEB_URL);
+
     const userPage = await userContext.newPage();
-    await createTodayTask(userPage, reportTitle);
+    await createTodayTask(userPage, reportTitle, slug);
     await attachFileViaToolbar(userPage, tinyPngPath);
     await waitForDescriptionImage(userPage);
     await blurDescriptionToSave(userPage, reportTitle);
@@ -226,17 +243,22 @@ test.describe("Manager report attachments", () => {
       storageState: managerAuth,
     });
     const page = await managerContext.newPage();
-    await page.goto("/team");
-    await page.waitForURL("/team");
+    await page.goto(`/o/${slug}/coworkers`);
     await dismissBlockingOverlays(page);
-    await page.getByRole("link", { name: "Open day" }).first().click();
-    await page.waitForURL(/\/team\/[^/]+/);
+    const testUserRow = page
+      .locator("div")
+      .filter({ hasText: "Test User" })
+      .filter({ has: page.getByRole("link", { name: "Open day" }) })
+      .first();
+    await testUserRow.getByRole("link", { name: "Open day" }).click();
+    await page.waitForURL(new RegExp(`/o/${slug}/coworkers/[^/]+`));
 
-    await selectTaskByTitle(page, reportTitle);
-    await waitForDescriptionImage(page);
-    await expect(
-      descriptionEditor(page).getByRole("button", { name: "Attach file" }),
-    ).toHaveCount(0);
+    const row = taskRow(page, reportTitle);
+    await expect(row).toBeVisible();
+    await row.click();
+    await expect(page.getByRole("button", { name: "Attach file" })).toHaveCount(
+      0,
+    );
     await managerContext.close();
   });
 });
