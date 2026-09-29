@@ -17,6 +17,7 @@ permissions:
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
+    secrets: inherit
 
   deploy-staging:
     name: Deploy staging (web + server)
