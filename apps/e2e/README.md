@@ -19,15 +19,23 @@ E2E_BETTER_AUTH_SECRET=<32+ random bytes>
 | Command | Purpose |
 |---------|---------|
 | `pnpm test:e2e` | Reset DB, migrate, seed, run Playwright |
+| `pnpm test:e2e:check-db` | Verify `E2E_DATABASE_URL` |
 | `pnpm test:e2e:ui` | Playwright UI mode |
 
-E2E uses server port **3457** and web port **5174** (see `constants.ts`).
+E2E uses server port **3457** and web port **5174** (see `constants.ts`). Playwright uses **`workers: 1`**.
 
-## CI secrets
+## CI
 
-Add to GitHub Actions:
+- **Pull requests** run static checks, unit tests (including `pnpm test:db`), and desktop Rust check. Playwright does **not** run on every PR.
+- **Scheduled E2E** runs on GitHub Actions twice daily (9:00 and 18:00 IST) and via **workflow dispatch** on the `E2E scheduled` workflow. See [`.github/workflows/e2e-scheduled.yml`](../../.github/workflows/e2e-scheduled.yml).
 
-- `E2E_DATABASE_URL` (same Neon DB; serialized job concurrency)
-- `E2E_BETTER_AUTH_SECRET`
+Secrets: `E2E_DATABASE_URL`, `E2E_BETTER_AUTH_SECRET`. Scheduled jobs also set `NOTIFICATION_JOBS_ENABLED=false` and a fixed `JIRA_TOKEN_ENCRYPTION_KEY`.
 
-CI also sets `NOTIFICATION_JOBS_ENABLED=false` and a fixed `JIRA_TOKEN_ENCRYPTION_KEY` for tests.
+When you change user-visible UI or API behavior, update `apps/e2e/tests/**` and run `pnpm test:e2e` locally when `E2E_DATABASE_URL` is configured.
+
+If Playwright fails with `password authentication failed`, refresh the pooled URL in Neon, update `.env` and the GitHub secret, then re-run:
+
+```bash
+pnpm test:e2e:check-db
+pnpm test:e2e
+```

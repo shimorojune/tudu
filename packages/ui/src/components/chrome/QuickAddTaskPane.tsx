@@ -3,6 +3,8 @@ import {
   useEffect,
   useRef,
   useState,
+  type ClipboardEvent,
+  type DragEvent,
   type ReactNode,
 } from "react";
 import {
@@ -16,6 +18,8 @@ import {
   todayIso,
   useCreateTaskMutation,
   useGetTasksForDayQuery,
+  useUpdateTaskMutation,
+  useUploadTaskAttachmentMutation,
 } from "@tudu/store";
 import { useProjectSpaceScope } from "@/hooks/useProjectSpaceScope";
 import { TuduMark } from "@/components/TuduLogo";
@@ -43,6 +47,17 @@ import {
   resolveScheduledDate,
 } from "@/components/tasks/TaskScheduleFields";
 import { cn } from "@/lib/utils";
+import { patchTaskDescriptionIfAttachmentsChanged } from "@/lib/afterCreateTaskDescription";
+import { QuickAddAttachmentStrip } from "@/components/chrome/QuickAddAttachmentStrip";
+import {
+  stageFilesFromList,
+  usePendingTaskAttachments,
+} from "@/hooks/usePendingTaskAttachments";
+import {
+  plainQuickAddNoteToDescriptionHtml,
+  quickAddNoteAtLineCap,
+  quickAddNoteLineCount,
+} from "@/lib/quickAddNote";
 
 const EXIT_MS = 200;
 const HIDE_REQUEST_GRACE_MS = 500;
@@ -52,6 +67,11 @@ export const QUICK_ADD_PANEL_WIDTH_PX = 582;
 
 export type QuickAddCloseReason = {
   afterSave?: boolean;
+};
+
+export type QuickAddTaskCreatedPayload = {
+  task: { id: string };
+  open?: boolean;
 };
 
 export type QuickAddTaskPaneProps = {
@@ -82,13 +102,20 @@ export function QuickAddTaskPane({
   onClose,
 }: QuickAddTaskPaneProps) {
   const titleRef = useRef<HTMLInputElement>(null);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const descriptionHtmlRef = useRef<string | null>(null);
   const openedAtRef = useRef(0);
   const exitFinishedRef = useRef(false);
   const closeAfterSaveRef = useRef(false);
   const { resolved } = useTheme();
   const { data: session, isPending: sessionPending } = authClient.useSession();
   const [title, setTitle] = useState("");
+  const [note, setNote] = useState("");
+  const [noteFocused, setNoteFocused] = useState(false);
+  const [dragDepth, setDragDepth] = useState(0);
+  const [pendingDropCount, setPendingDropCount] = useState(0);
   const [bucket, setBucket] = useState<Bucket>("next");
   const [dayChoice, setDayChoice] = useState<NewTaskDayChoice>("today");
   const [pickedDate, setPickedDate] = useState(() => todayIso());
@@ -109,6 +136,15 @@ export function QuickAddTaskPane({
   const today = todayIso();
   const spaceScope = useProjectSpaceScope();
   const [createTask] = useCreateTaskMutation();
+  const [uploadTaskAttachment] = useUploadTaskAttachmentMutation();
+  const [updateTask] = useUpdateTaskMutation();
+  const {
+    pendingAttachmentsRef,
+    stagedFiles,
+    stageFile,
+    removeFile,
+    clear: clearAttachments,
+  } = usePendingTaskAttachments();
   useQuickAddWindowDrag();
   const parse = useTaskTitleNaturalLanguage(title, today);
   const scheduledDate = resolveScheduledDate(dayChoice, pickedDate, today);
@@ -141,8 +177,18 @@ export function QuickAddTaskPane({
     onJevSuggesting: setJevSuggesting,
   });
 
+  const syncDescriptionFromNote = useCallback((nextNote: string) => {
+    descriptionHtmlRef.current = plainQuickAddNoteToDescriptionHtml(nextNote);
+  }, []);
+
   const resetForm = useCallback(() => {
     setTitle("");
+    setNote("");
+    setNoteFocused(false);
+    setDragDepth(0);
+    setPendingDropCount(0);
+    descriptionHtmlRef.current = null;
+    clearAttachments();
     setBucket("next");
     setDayChoice("today");
     setPickedDate(today);
@@ -158,7 +204,7 @@ export function QuickAddTaskPane({
     setSubmitting(false);
     setJevSuggesting(false);
     void resetQuickAddWindowHeight();
-  }, [today]);
+  }, [today, clearAttachments]);
 
   const beginOpen = useCallback(() => {
     exitFinishedRef.current = false;
@@ -255,7 +301,7 @@ export function QuickAddTaskPane({
       openNowCountOnToday: nowCount,
     });
 
-  async function handleSubmit() {
+  async function handleSubmit(openAfterSave = false) {
     const trimmed = title.trim();
     if (!trimmed || submitting || !session) {
       return;
@@ -276,10 +322,12 @@ export function QuickAddTaskPane({
 
     setSubmitting(true);
     try {
+      const description = descriptionHtmlRef.current;
+      const pendingAttachments = new Map(pendingAttachmentsRef.current);
       const result = await createTask(
         createTaskBody({
           title: saveTitle,
-          description: null,
+          description,
           scheduledDate,
           bucket: scheduledDate === null ? null : bucket,
           startDate: startDate || null,
@@ -289,8 +337,23 @@ export function QuickAddTaskPane({
         }),
       ).unwrap();
 
+      await patchTaskDescriptionIfAttachmentsChanged(
+        result.task.id,
+        description,
+        pendingAttachments,
+        (input) => uploadTaskAttachment(input).unwrap(),
+        (nextDescription) =>
+          updateTask({
+            id: result.task.id,
+            patch: { description: nextDescription },
+          }).unwrap(),
+      );
+
       const { emit } = await import("@tauri-apps/api/event");
-      await emit("task-created", { task: result.task });
+      await emit("task-created", {
+        task: result.task,
+        open: openAfterSave,
+      } satisfies QuickAddTaskCreatedPayload);
       closeAfterSaveRef.current = true;
       closeWithAnimation();
     } finally {
@@ -304,10 +367,112 @@ export function QuickAddTaskPane({
       closeWithAnimation();
       return;
     }
-    if (event.key === "Enter") {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "u") {
       event.preventDefault();
-      void handleSubmit();
+      fileInputRef.current?.click();
+      return;
     }
+    if (
+      (event.metaKey || event.ctrlKey) &&
+      event.key === "Enter"
+    ) {
+      event.preventDefault();
+      void handleSubmit(true);
+      return;
+    }
+    if (event.key === "Enter" && !event.shiftKey) {
+      const target = event.target;
+      if (target === noteRef.current) {
+        return;
+      }
+      event.preventDefault();
+      void handleSubmit(false);
+      return;
+    }
+    if (event.key === "Tab" && event.target === titleRef.current && !event.shiftKey) {
+      event.preventDefault();
+      setNoteFocused(true);
+      window.requestAnimationFrame(() => noteRef.current?.focus());
+      return;
+    }
+    if (event.key === "Tab" && event.target === noteRef.current && event.shiftKey) {
+      event.preventDefault();
+      titleRef.current?.focus();
+    }
+  }
+
+  function handleNoteChange(value: string) {
+    const lines = value.split("\n");
+    if (lines.length > 3) {
+      value = lines.slice(0, 3).join("\n");
+    }
+    setNote(value);
+    syncDescriptionFromNote(value);
+  }
+
+  function handlePaste(event: ClipboardEvent<HTMLDivElement>) {
+    const items = event.clipboardData?.items;
+    if (!items) {
+      return;
+    }
+    const files: File[] = [];
+    for (const item of items) {
+      if (item.kind === "file") {
+        const file = item.getAsFile();
+        if (file) {
+          files.push(file);
+        }
+      }
+    }
+    if (files.length === 0) {
+      return;
+    }
+    event.preventDefault();
+    stageFilesFromList(
+      files,
+      stageFile,
+      (next) => {
+        descriptionHtmlRef.current = next;
+      },
+      descriptionHtmlRef.current,
+    );
+  }
+
+  function handleDragEnter(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    if (event.dataTransfer.types.includes("Files")) {
+      setDragDepth((value) => value + 1);
+      setPendingDropCount(event.dataTransfer.items.length);
+    }
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDragDepth((value) => Math.max(0, value - 1));
+  }
+
+  function handleDragOver(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDragDepth(0);
+    if (!event.dataTransfer.files.length) {
+      return;
+    }
+    stageFilesFromList(
+      event.dataTransfer.files,
+      stageFile,
+      (next) => {
+        descriptionHtmlRef.current = next;
+      },
+      descriptionHtmlRef.current,
+    );
+  }
+
+  function openFilePicker() {
+    fileInputRef.current?.click();
   }
 
   function handlePanelAnimationEnd(
@@ -388,11 +553,41 @@ export function QuickAddTaskPane({
     jiraKey,
   });
 
+  const showNote = noteFocused || note.trim().length > 0;
+  const noteAtCap = quickAddNoteAtLineCap(note);
+  const imageCount = stagedFiles.length;
+
   return shell(
     <div
-      className="flex w-[582px] flex-col overflow-visible border border-black/35 bg-card shadow-none"
+      className="relative flex w-[582px] flex-col overflow-visible border border-black/35 bg-card shadow-none"
       aria-busy={submitting || undefined}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      onPaste={handlePaste}
     >
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          const files = event.target.files;
+          if (!files) {
+            return;
+          }
+          stageFilesFromList(
+            files,
+            stageFile,
+            (next) => {
+              descriptionHtmlRef.current = next;
+            },
+            descriptionHtmlRef.current,
+          );
+          event.target.value = "";
+        }}
+      />
       <div className="flex items-center gap-[13px] px-[14px] py-[17px] pr-[18px]">
         <button
           type="button"
@@ -425,6 +620,13 @@ export function QuickAddTaskPane({
             )}
             inputClassName={quickAddTitleTypography}
             onChange={setTitle}
+            onKeyDown={(event) => {
+              if (event.key === "Tab" && !event.shiftKey) {
+                event.preventDefault();
+                setNoteFocused(true);
+                window.requestAnimationFrame(() => noteRef.current?.focus());
+              }
+            }}
           />
         </div>
         <button
@@ -437,6 +639,26 @@ export function QuickAddTaskPane({
           <X className="size-4" aria-hidden />
         </button>
       </div>
+
+      {showNote ? (
+        <div className="-mt-[8px] px-[18px] pb-[12px] pl-[71px]">
+          <textarea
+            ref={noteRef}
+            value={note}
+            rows={Math.min(3, Math.max(1, quickAddNoteLineCount(note)))}
+            disabled={submitting}
+            placeholder="Add a note"
+            aria-label="Quick Add note"
+            className={cn(
+              "w-full resize-none border-0 bg-transparent p-0 text-[14px] leading-[1.5] text-muted-foreground outline-none",
+              noteAtCap && "line-clamp-3",
+            )}
+            onFocus={() => setNoteFocused(true)}
+            onBlur={() => setNoteFocused(false)}
+            onChange={(event) => handleNoteChange(event.target.value)}
+          />
+        </div>
+      ) : null}
 
       <QuickAddCaptureChips
         dayChoice={dayChoice}
@@ -472,7 +694,31 @@ export function QuickAddTaskPane({
           setDeadlineSource("manual");
           setDeadline(value);
         }}
+        tabNoteHint={!showNote}
+        attachmentStrip={
+          <QuickAddAttachmentStrip
+            stagedFiles={stagedFiles}
+            disabled={submitting}
+            onAttachClick={openFilePicker}
+            onRemove={removeFile}
+          />
+        }
       />
+
+      {dragDepth > 0 ? (
+        <div
+          className="pointer-events-none absolute inset-0 z-10 flex items-center gap-[12px] border-2 border-foreground bg-card/90 px-[24px]"
+          aria-hidden
+        >
+          <span className="text-[16px] font-bold">
+            Drop to attach {pendingDropCount > 0 ? pendingDropCount : ""} file
+            {pendingDropCount === 1 ? "" : "s"}
+          </span>
+          <span className="text-[12.5px] text-muted-foreground">
+            they go with the task
+          </span>
+        </div>
+      ) : null}
 
       <div
         className="flex flex-wrap items-center gap-x-[14px] gap-y-[6px] border-t border-hair bg-background px-[18px] py-[11px] text-[11.5px]"
@@ -486,6 +732,13 @@ export function QuickAddTaskPane({
           <span className="text-destructive">{NOW_CAP_EXCEEDED_MESSAGE}</span>
         ) : scheduleError ? (
           <span className="text-destructive">{scheduleError}</span>
+        ) : noteAtCap ? (
+          <span className="text-muted-foreground">
+            <span className="font-bold text-foreground">
+              Three lines is the bar&apos;s limit
+            </span>
+            <span> · keep going in the task</span>
+          </span>
         ) : (
           <span className="text-muted-foreground">
             Lands in{" "}
@@ -493,13 +746,20 @@ export function QuickAddTaskPane({
               {landsIn.dayPart}
               {landsIn.bucketPart ? ` · ${landsIn.bucketPart}` : ""}
             </span>
+            {note.trim() ? <span> · note</span> : null}
+            {imageCount > 0 ? (
+              <span>
+                {" "}
+                · {imageCount} image{imageCount === 1 ? "" : "s"}
+              </span>
+            ) : null}
             {landsIn.jiraPart ? (
               <span>, linked to {landsIn.jiraPart}</span>
             ) : null}
           </span>
         )}
         <span className="ml-auto font-mono text-muted-foreground">
-          Enter save · Esc close
+          {noteAtCap ? "Cmd+Enter save and open" : "Enter save · Esc close"}
         </span>
       </div>
     </div>,

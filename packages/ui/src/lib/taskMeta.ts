@@ -33,7 +33,8 @@ function formatStart(startDate: string, selectedDate: string): string | null {
 
 export type MetaSegment =
   | { kind: "text"; text: string; emphasis?: boolean; accent?: boolean }
-  | { kind: "dot" };
+  | { kind: "dot" }
+  | { kind: "jira"; keys: { key: string; browseUrl: string }[] };
 
 /** Ordered meta segments for the task row meta line. JIRA key is step 10. */
 export function taskMetaSegments(
@@ -79,8 +80,11 @@ export function taskMetaSegments(
       segments.push({ kind: "dot" });
     }
     segments.push({
-      kind: "text",
-      text: `JIRA ${task.jiraLinks.map((link) => link.key).join(", ")}`,
+      kind: "jira",
+      keys: task.jiraLinks.map((link) => ({
+        key: link.key,
+        browseUrl: link.browseUrl,
+      })),
     });
   }
 

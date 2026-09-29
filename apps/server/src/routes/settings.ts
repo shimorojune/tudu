@@ -2,11 +2,15 @@ import { zValidator } from "@hono/zod-validator";
 import type { Db } from "@tudu/db";
 import {
   ensureNotificationPreferences,
+  getPersonalSpaceSettings,
   setClientAppVersion,
+  setPersonalKeyPrefix,
+  TaskKeyError,
   updateNotificationPreferences,
 } from "@tudu/db";
 import {
   notificationPreferencesUpdateSchema,
+  updateKeyPrefixBodySchema,
   type NotificationPreferencesResponse,
 } from "@tudu/shared";
 import { z } from "zod";
@@ -46,6 +50,43 @@ export function createSettingsRoute(db: Db) {
       );
       const response: NotificationPreferencesResponse = prefs;
       return c.json(response);
+    },
+  );
+
+  app.get("/settings/space-prefix", async (c) => {
+    const session = c.get("session");
+    if (!session?.user) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+    const settings = await getPersonalSpaceSettings(db, session.user.id);
+    return c.json(settings);
+  });
+
+  app.put(
+    "/settings/space-prefix",
+    zValidator("json", updateKeyPrefixBodySchema),
+    async (c) => {
+      const session = c.get("session");
+      if (!session?.user) {
+        return c.json({ error: "Unauthorized" }, 401);
+      }
+      try {
+        const { keyPrefix } = c.req.valid("json");
+        const personalKeyPrefix = await setPersonalKeyPrefix(
+          db,
+          session.user.id,
+          keyPrefix,
+        );
+        return c.json({
+          personalKeyPrefix,
+          prefixLocked: false,
+        });
+      } catch (error) {
+        if (error instanceof TaskKeyError) {
+          return c.json({ error: error.message }, error.status as 409);
+        }
+        throw error;
+      }
     },
   );
 

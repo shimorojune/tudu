@@ -40,6 +40,8 @@ import { DeadlineField } from "@/components/tasks/DeadlineField";
 import { DateField } from "@/components/ui/date-field";
 import { ProjectPicker } from "@/components/projects/ProjectPicker";
 import { TaskDescriptionField } from "@/components/inspector/TaskDescriptionField";
+import { TaskIdTagFromTask } from "@/components/tasks/TaskIdTag";
+import { copyTaskKeyToClipboard } from "@/lib/copyTaskKey";
 
 export type DetailsTabProps = {
   task: Task;
@@ -204,6 +206,13 @@ export function DetailsTab({
       />
 
       <dl className="mt-[22px] grid grid-cols-[78px_minmax(0,1fr)] items-center gap-x-[16px] gap-y-[13px] text-[13px]">
+        <dt className="text-muted-foreground">Task ID</dt>
+        <dd>
+          <TaskIdTagFromTask
+            task={task}
+            onCopy={(taskKey) => void copyTaskKeyToClipboard(taskKey)}
+          />
+        </dd>
         <dt className="text-muted-foreground">Project</dt>
         <dd>
           <ProjectPicker

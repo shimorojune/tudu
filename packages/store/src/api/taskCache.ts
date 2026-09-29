@@ -7,7 +7,12 @@ import type {
   Task,
   UpdateTaskRequest,
 } from "@tudu/shared";
-import { calendarDayIso, inProgressForPlacement } from "@tudu/shared";
+import {
+  calendarDayIso,
+  DEFAULT_PERSONAL_KEY_PREFIX,
+  formatTaskKey,
+  inProgressForPlacement,
+} from "@tudu/shared";
 import type { AppDispatch, RootState } from "../store.js";
 import { baseApi } from "./baseApi.js";
 import { tasksApi } from "./tasksApi.js";
@@ -241,6 +246,8 @@ export function createOptimisticTask(body: CreateTaskRequest, tempId: string): T
     commentCount: 0,
     project: null,
     jiraLinks: [],
+    taskNumber: 1,
+    taskKey: formatTaskKey(DEFAULT_PERSONAL_KEY_PREFIX, 1),
   };
 }
 

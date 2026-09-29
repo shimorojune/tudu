@@ -2,6 +2,7 @@ import { forwardRef, type ComponentPropsWithoutRef } from "react";
 import type { Task } from "@tudu/shared";
 import { ProjectChip } from "@/components/projects/ProjectChip";
 import { taskMetaSegments } from "@/lib/taskMeta";
+import { TaskMetaSegments } from "@/components/tasks/TaskMetaSegments";
 import { LinkifiedText } from "@/components/text/LinkifiedText";
 import { cn } from "@/lib/utils";
 
@@ -67,26 +68,7 @@ export const WeekCard = forwardRef<HTMLButtonElement, WeekCardProps>(
                 ·
               </span>
             ) : null}
-            {segments.map((segment, index) => {
-              if (segment.kind === "dot") {
-                return (
-                  <span key={`dot-${index}`} className="text-faint" aria-hidden>
-                    ·
-                  </span>
-                );
-              }
-              return (
-                <span
-                  key={`${segment.text}-${index}`}
-                  className={cn(
-                    segment.accent && "text-primary-text",
-                    segment.emphasis && "font-semibold text-foreground",
-                  )}
-                >
-                  {segment.text}
-                </span>
-              );
-            })}
+            <TaskMetaSegments segments={segments} />
           </div>
         ) : null}
       </button>

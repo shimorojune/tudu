@@ -83,6 +83,10 @@ export function TodayRoute() {
     }
     return map;
   }, [spacesData?.spaces]);
+  const dayTasksById = useMemo(
+    () => new Map(allTasks.map((task) => [task.id, task])),
+    [allTasks],
+  );
   useDaySearchSync(DAY_TASK_TAB_FIELDS, {
     taskFound: dayQuery.isLoading
       ? null
@@ -152,6 +156,7 @@ export function TodayRoute() {
       selectedTask={selectedTask}
       selectedDate={selectedDate}
       selectedIssueKey={jiraPreview.previewIssueKey}
+      dayTasksById={dayTasksById}
       onPreviewIssue={jiraPreview.setPreviewIssueKey}
       onCreateTask={setSpawnIssue}
     />
@@ -317,7 +322,7 @@ export function TodayRoute() {
                 const badge = orgBadgeForTask(task, space, orgById);
                 return badge
                   ? {
-                      letter: badge.name.slice(0, 1).toUpperCase(),
+                      name: badge.name,
                       color: badge.color,
                     }
                   : null;

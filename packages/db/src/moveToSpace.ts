@@ -5,6 +5,7 @@ import type { Db } from "./index.js";
 import { assertNowCapForCreate, NowCapExceededError } from "./nowCap.js";
 import { orgAuditLog } from "./orgs-schema.js";
 import { projects } from "./projects-schema.js";
+import { allocateNextTaskNumber } from "./taskKeys.js";
 import { findTaskById } from "./tasks.js";
 import { tasks } from "./tasks-schema.js";
 
@@ -88,12 +89,19 @@ export async function moveTaskToSpace(
     throw error;
   }
 
+  const taskNumber = await allocateNextTaskNumber(
+    db,
+    input.userId,
+    input.orgId,
+  );
+
   await db
     .update(tasks)
     .set({
       orgId: input.orgId,
       projectId: input.projectId,
       isPrivate: input.isPrivate,
+      taskNumber,
       updatedAt: new Date(),
     })
     .where(and(eq(tasks.id, input.taskId), eq(tasks.userId, input.userId)));

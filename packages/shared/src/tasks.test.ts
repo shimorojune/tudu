@@ -161,6 +161,8 @@ describe("taskSchema", () => {
           browseUrl: "https://beetle.egain.com/browse/EGS-100493",
         },
       ],
+      taskNumber: 100493,
+      taskKey: "ME-100493",
     });
 
     expect(task.jiraLinks[0]?.summary).toBe("Improve archive permission error");

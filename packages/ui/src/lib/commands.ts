@@ -14,7 +14,8 @@ export type CommandAction =
       params?: { projectId: string };
     }
   | { kind: "requestAddTask" }
-  | { kind: "jumpToThisWeek" };
+  | { kind: "jumpToThisWeek" }
+  | { kind: "shiftDay"; delta: -1 | 1 };
 
 export type AppCommand = {
   id: string;
@@ -31,7 +32,24 @@ export const APP_COMMANDS: readonly AppCommand[] = [
     group: "Go",
     label: "Go to Today",
     keywords: ["today", "home", "day"],
+    shortcut: "Cmd+T",
     action: { kind: "navigate", to: "/", goToToday: true },
+  },
+  {
+    id: "go-prev-day",
+    group: "Go",
+    label: "Previous day",
+    keywords: ["day", "yesterday", "back"],
+    shortcut: "Cmd+←",
+    action: { kind: "shiftDay", delta: -1 },
+  },
+  {
+    id: "go-next-day",
+    group: "Go",
+    label: "Next day",
+    keywords: ["day", "tomorrow", "forward"],
+    shortcut: "Cmd+→",
+    action: { kind: "shiftDay", delta: 1 },
   },
   {
     id: "go-week",

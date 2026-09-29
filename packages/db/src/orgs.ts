@@ -36,6 +36,10 @@ import {
 } from "./access.js";
 import type { Db } from "./index.js";
 import {
+  allocateUniqueOrgKeyPrefix,
+  countTasksInScope,
+} from "./taskKeys.js";
+import {
   orgAuditLog,
   orgInvites,
   orgJoinRequests,
@@ -134,12 +138,14 @@ export async function createOrg(
   const slug = await allocateSlug(db, name);
   const joinCode = `${slug}-${joinCodeSuffix()}`;
   const color = input.color ?? DEFAULT_ORG_COLOR;
+  const keyPrefix = await allocateUniqueOrgKeyPrefix(db, name);
 
   const [org] = await db
     .insert(orgs)
     .values({
       slug,
       name,
+      keyPrefix,
       color,
       joinCode,
       joinLinkEnabled: input.joinLinkEnabled ?? false,
@@ -359,6 +365,9 @@ export async function getOrgDetail(
     id: live.org.id,
     slug: live.org.slug,
     name: live.org.name,
+    keyPrefix: live.org.keyPrefix,
+    keyPrefixLocked:
+      (await countTasksInScope(db, userId, live.org.id)) > 0,
     color: live.org.color,
     hasLogo: live.org.logoStorageKey !== null,
     joinLinkEnabled: live.org.joinLinkEnabled,

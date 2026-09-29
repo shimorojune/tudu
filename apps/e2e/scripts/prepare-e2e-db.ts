@@ -1,8 +1,9 @@
 import { execSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { config, parse } from "dotenv";
+import { e2eServerEnv } from "../env.js";
 
 const packageDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(packageDir, "../../..");
@@ -15,19 +16,28 @@ if (!e2eUrl) {
   process.exit(1);
 }
 
-const dotenv = parse(readFileSync(resolve(repoRoot, ".env"), "utf8"));
-const devDatabaseUrl = dotenv.DATABASE_URL?.trim();
+const envPath = resolve(repoRoot, ".env");
+let devDatabaseUrl: string | undefined;
+if (existsSync(envPath)) {
+  const dotenv = parse(readFileSync(envPath, "utf8"));
+  devDatabaseUrl = dotenv.DATABASE_URL?.trim();
+}
 
-const migrateEnv = {
+const migrateEnv: NodeJS.ProcessEnv = {
   ...process.env,
+  ...e2eServerEnv(),
   DATABASE_URL: e2eUrl,
 };
 
-const resetEnv = {
+const resetEnv: NodeJS.ProcessEnv = {
   ...process.env,
   E2E_DATABASE_URL: e2eUrl,
-  DATABASE_URL: devDatabaseUrl,
 };
+if (devDatabaseUrl) {
+  resetEnv.DATABASE_URL = devDatabaseUrl;
+} else {
+  delete resetEnv.DATABASE_URL;
+}
 
 execSync("pnpm --filter @tudu/e2e exec tsx scripts/reset-db.ts", {
   cwd: repoRoot,

@@ -64,6 +64,8 @@ export const taskSchema = z
     project: projectRefSchema.nullable(),
     jiraLinks: z.array(jiraTaskLinkSummarySchema),
     orgId: z.uuid().nullable().optional(),
+    taskNumber: z.number().int().positive(),
+    taskKey: z.string(),
   })
   .refine(dayAndBucketPaired, { message: PAIRING_MESSAGE, path: ["bucket"] });
 

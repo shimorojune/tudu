@@ -230,6 +230,38 @@ describe("JiraColumn", () => {
     refreshJiraComponents.mockReturnValue(mutationResult);
   });
 
+  it("shows in my day line when a linked task is on the selected day", async () => {
+    const task = makeTask({
+      id: "22222222-2222-4222-8222-222222222222",
+      scheduledDate: "2026-09-11",
+      bucket: "next",
+      subtasks: [
+        {
+          id: "sub-1",
+          taskId: "22222222-2222-4222-8222-222222222222",
+          title: "One",
+          done: true,
+          position: 0,
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+    });
+    const dayTasksById = new Map([[task.id, task]]);
+    render(
+      <JiraColumn
+        selectedTask={null}
+        selectedDate="2026-09-11"
+        dayTasksById={dayTasksById}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/in my day/)).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Existing linked task")).not.toBeInTheDocument();
+  });
+
   it("keeps the issue list visible and reports preview clicks", async () => {
     const user = userEvent.setup();
     const onPreviewIssue = vi.fn();

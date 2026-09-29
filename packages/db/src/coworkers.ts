@@ -4,7 +4,7 @@ import type {
   CoworkerDayTask,
   CoworkerRosterEntry,
 } from "@tudu/shared";
-import { isSlipping } from "@tudu/shared";
+import { formatTaskKey, isSlipping } from "@tudu/shared";
 import { AccessError, requireMember } from "./access.js";
 import type { Db } from "./index.js";
 import { getUserLastSeen } from "./userActivity.js";
@@ -105,15 +105,19 @@ export async function listCoworkerRoster(
 
 export type CoworkerDaySummary = Omit<CoworkerDayResponse, "tasks">;
 
-function serializeCoworkerDayTask(row: {
-  id: string;
-  title: string;
-  bucket: "now" | "next" | "later" | null;
-  position: number;
-  completedAt: Date | null;
-  deadline: Date | null;
-  carriedDays: number;
-}): CoworkerDayTask {
+function serializeCoworkerDayTask(
+  row: {
+    id: string;
+    title: string;
+    bucket: "now" | "next" | "later" | null;
+    position: number;
+    completedAt: Date | null;
+    deadline: Date | null;
+    carriedDays: number;
+    taskNumber: number;
+  },
+  keyPrefix: string,
+): CoworkerDayTask {
   return {
     id: row.id,
     title: row.title,
@@ -122,6 +126,8 @@ function serializeCoworkerDayTask(row: {
     completedAt: row.completedAt?.toISOString() ?? null,
     deadline: row.deadline?.toISOString() ?? null,
     carriedDays: row.carriedDays,
+    taskNumber: row.taskNumber,
+    taskKey: formatTaskKey(keyPrefix, row.taskNumber),
   };
 }
 
@@ -168,6 +174,7 @@ export async function getCoworkerDay(
       deadline: true,
       carriedDays: true,
       isPrivate: true,
+      taskNumber: true,
     },
     orderBy: [tasks.bucket, tasks.position],
   });
@@ -194,7 +201,9 @@ export async function getCoworkerDay(
     privateHiddenCount: privateCount,
     nowCount: nowOpen,
     nowCap: 5,
-    tasks: visible.map(serializeCoworkerDayTask),
+    tasks: visible.map((task) =>
+      serializeCoworkerDayTask(task, live.org.keyPrefix),
+    ),
   };
 }
 

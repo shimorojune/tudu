@@ -1,17 +1,17 @@
 import { useMemo, useState } from "react";
 import {
-  PROJECT_COLORS,
   filterProjectsForSpace,
+  nextFreeColor,
   type CreateProjectRequest,
   type Project,
   type ProjectColor,
   type ProjectRef,
   type ProjectSpaceFilter,
 } from "@tudu/shared";
+import { ColourPicker, type ColourClash } from "@/components/ui-custom/ColourPicker";
 import { useCreateProjectMutation, useGetProjectsQuery } from "@tudu/store";
 import { useProjectSpaceScope } from "@/hooks/useProjectSpaceScope";
 import { ProjectChip } from "@/components/projects/ProjectChip";
-import { projectColorCss } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 import {
   Popover,
@@ -66,6 +66,21 @@ export function ProjectPicker({
     () => projects.filter((project) => project.archivedAt === null),
     [projects],
   );
+  const colourClashes = useMemo((): ColourClash[] => {
+    const seen = new Set<ProjectColor>();
+    const clashes: ColourClash[] = [];
+    for (const project of live) {
+      if (seen.has(project.color)) {
+        continue;
+      }
+      seen.add(project.color);
+      clashes.push({
+        color: project.color,
+        shortCode: project.name.slice(0, 3).toUpperCase(),
+      });
+    }
+    return clashes;
+  }, [live]);
   const selected =
     live.find((project) => project.id === value) ??
     projects.find((project) => project.id === value) ??
@@ -144,21 +159,13 @@ export function ProjectPicker({
               className="border border-rule bg-transparent px-[8px] py-[6px] text-[13px] outline-none"
               onChange={(event) => setName(event.target.value)}
             />
-            <div className="flex flex-wrap gap-[6px]">
-              {PROJECT_COLORS.map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  aria-label={key}
-                  className={cn(
-                    "size-[16px]",
-                    color === key && "outline outline-2 outline-foreground outline-offset-2",
-                  )}
-                  style={{ backgroundColor: projectColorCss(key) }}
-                  onClick={() => setColor(key)}
-                />
-              ))}
-            </div>
+            <ColourPicker
+              compact
+              label="Colour"
+              value={color}
+              clashes={colourClashes}
+              onChange={setColor}
+            />
             <div className="flex gap-[8px]">
               <button
                 type="button"
@@ -213,7 +220,10 @@ export function ProjectPicker({
             <button
               type="button"
               className="border-t border-hair px-[12px] py-[8px] text-left text-[12.5px] text-muted-foreground"
-              onClick={() => setCreating(true)}
+              onClick={() => {
+                setColor(nextFreeColor(live.map((project) => project.color)));
+                setCreating(true);
+              }}
             >
               New project
             </button>

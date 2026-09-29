@@ -11,17 +11,16 @@ test("rights reference matches design 5.10 labels", async ({ page }) => {
   await page.goto("/settings?section=organizations");
   await page.getByRole("button", { name: "Who can do what" }).click();
 
-  const readRow = page
-    .locator("div")
-    .filter({
-      hasText: "Read a co-worker's day, week and timelines",
-    })
-    .first();
-  await expect(readRow.getByText("Anyone", { exact: true })).toBeVisible();
+  const readLabel = page.getByText(
+    "Read a co-worker's day, week and timelines",
+    { exact: true },
+  );
+  await expect(
+    readLabel.locator("xpath=..").getByText("Anyone", { exact: true }),
+  ).toBeVisible();
 
-  const reorderRow = page
-    .locator("div")
-    .filter({ hasText: "Reorder my buckets" })
-    .first();
-  await expect(reorderRow.getByText("Manager", { exact: true })).toBeVisible();
+  const reorderLabel = page.getByText("Reorder my buckets", { exact: true });
+  await expect(
+    reorderLabel.locator("xpath=..").getByText("Manager", { exact: true }),
+  ).toBeVisible();
 });

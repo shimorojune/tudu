@@ -18,6 +18,7 @@ export * from "./sync.js";
 export * from "./notifications.js";
 export * from "./jira.js";
 export * from "./mapTask.js";
+export * from "./taskKeys.js";
 export * from "./task-attachments.js";
 export * from "./push-tokens.js";
 export * from "./notificationPreferences.js";

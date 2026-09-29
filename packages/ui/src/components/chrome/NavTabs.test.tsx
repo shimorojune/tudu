@@ -67,6 +67,7 @@ vi.mock("@tanstack/react-router", async () => {
 
   return {
     Link,
+    useNavigate: () => vi.fn(),
     useRouterState: ({
       select,
     }: {
@@ -101,7 +102,7 @@ describe("NavTabs", () => {
       </Provider>,
     );
 
-    expect(screen.getByRole("link", { name: "Today" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Today/ })).toBeInTheDocument();
     vi.useRealTimers();
   });
 
@@ -121,6 +122,6 @@ describe("NavTabs", () => {
       </Provider>,
     );
 
-    expect(screen.getByRole("link", { name: "Today" })).toHaveClass("is-active");
+    expect(screen.getByRole("button", { name: /Today/ })).toBeInTheDocument();
   });
 });

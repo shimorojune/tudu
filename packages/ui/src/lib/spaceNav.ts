@@ -40,6 +40,26 @@ export function orgNavPath(
   return `/o/${orgSlug}/${segment}`;
 }
 
+export function isTodayRoutePath(
+  pathname: string,
+  orgSlug: string | null,
+): boolean {
+  if (!orgSlug) {
+    return pathname === "/";
+  }
+  return pathname === `/o/${orgSlug}`;
+}
+
+export function isCoworkersRosterPath(
+  pathname: string,
+  orgSlug: string | null,
+): boolean {
+  if (!orgSlug) {
+    return false;
+  }
+  return pathname === `/o/${orgSlug}/coworkers`;
+}
+
 export function personalNavPath(
   segment: "week" | "requests" | "unscheduled",
 ): string {

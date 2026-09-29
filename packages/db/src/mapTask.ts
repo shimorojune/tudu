@@ -1,3 +1,4 @@
+import { formatTaskKey } from "@tudu/shared";
 import type { Comment, Subtask, Task, TimelineEvent } from "@tudu/shared";
 import type { CommentWithAuthor, TimelineEventWithActor } from "./activity.js";
 import { mapProjectRef } from "./projects.js";
@@ -18,6 +19,7 @@ export function mapSubtask(row: SubtaskRow): Subtask {
 
 export type MapTaskOptions = {
   hidePrivateProjects?: boolean;
+  keyPrefix?: string;
 };
 
 export function mapTask(row: TaskRowWithSubtasks, options?: MapTaskOptions): Task {
@@ -44,6 +46,11 @@ export function mapTask(row: TaskRowWithSubtasks, options?: MapTaskOptions): Tas
     }),
     jiraLinks: row.jiraLinks ?? [],
     orgId: row.orgId ?? null,
+    taskNumber: row.taskNumber,
+    taskKey: formatTaskKey(
+      options?.keyPrefix ?? row.keyPrefix ?? "ME",
+      row.taskNumber,
+    ),
   };
 }
 

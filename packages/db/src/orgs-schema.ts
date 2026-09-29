@@ -89,6 +89,7 @@ export const orgs = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     slug: text("slug").notNull().unique(),
     name: text("name").notNull(),
+    keyPrefix: text("key_prefix").notNull(),
     color: spaceColor("color").notNull().default("vermilion"),
     logoStorageKey: text("logo_storage_key"),
     joinLinkEnabled: boolean("join_link_enabled").notNull().default(false),
@@ -105,7 +106,10 @@ export const orgs = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [index("orgs_created_by_idx").on(table.createdBy)],
+  (table) => [
+    index("orgs_created_by_idx").on(table.createdBy),
+    uniqueIndex("orgs_key_prefix_uidx").on(table.keyPrefix),
+  ],
 );
 
 export const orgMembers = pgTable(

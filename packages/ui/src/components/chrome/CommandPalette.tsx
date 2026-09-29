@@ -10,6 +10,7 @@ import {
   type AppCommand,
   type CommandGroup as CommandGroupName,
 } from "@/lib/commands";
+import { useNavigateDay } from "@/hooks/useNavigateDay";
 import { defaultWeekId } from "@/lib/week";
 import {
   CommandDialog,
@@ -30,6 +31,7 @@ export function CommandPalette() {
   const dispatch = useDispatch();
   const { data: projects = [] } = useGetProjectsQuery();
   const grouped = commandsByGroup(buildAppCommands(projects));
+  const { shiftDay } = useNavigateDay();
   const jumpToThisWeek = useCallback(() => {
     void navigate({ to: "/week", search: { week: defaultWeekId() } });
   }, [navigate]);
@@ -72,11 +74,14 @@ export function CommandPalette() {
         case "jumpToThisWeek":
           jumpToThisWeek();
           return;
+        case "shiftDay":
+          shiftDay(command.action.delta);
+          return;
         default:
           return;
       }
     },
-    [dispatch, jumpToThisWeek, navigate],
+    [dispatch, jumpToThisWeek, navigate, shiftDay],
   );
 
   useEffect(() => {

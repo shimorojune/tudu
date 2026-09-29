@@ -12,6 +12,7 @@ import { DetailsTab } from "@/components/inspector/DetailsTab";
 import { DetailInspectorEmpty } from "@/components/inspector/DetailInspectorEmpty";
 import { InspectorTabs } from "@/components/inspector/InspectorTabs";
 import { TimelineTab } from "@/components/inspector/TimelineTab";
+import { useCopyTaskKeyShortcut } from "@/hooks/useCopyTaskKeyShortcut";
 
 export type DetailInspectorProps = {
   task: Task | null;
@@ -28,14 +29,17 @@ export function DetailInspector({
   canDelete,
   onDelete,
 }: DetailInspectorProps) {
-  if (!task) {
-    return <DetailInspectorEmpty />;
-  }
-
+  useCopyTaskKeyShortcut(task);
   const dispatch = useDispatch();
   const tab = useSelector((state: RootState) => state.day.inspectorTab);
   const isToday = selectedDate === todayIso();
-  const { data: timelineData } = useGetTimelineQuery(task.id);
+  const { data: timelineData } = useGetTimelineQuery(task?.id ?? "", {
+    skip: !task,
+  });
+
+  if (!task) {
+    return <DetailInspectorEmpty />;
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">

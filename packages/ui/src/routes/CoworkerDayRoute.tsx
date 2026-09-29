@@ -1,4 +1,4 @@
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useParams, useSearch } from "@tanstack/react-router";
 import {
   effectiveDayIso,
   type CoworkerDayTask,
@@ -19,6 +19,7 @@ import { CommentsTab } from "@/components/inspector/CommentsTab";
 import { InspectorSheet } from "@/components/inspector/InspectorSheet";
 import { Button } from "@/components/ui/button";
 import { useViewportBand } from "@/hooks/useViewportBand";
+import { CoworkerDayStepper } from "@/components/chrome/CoworkerDayStepper";
 
 function stubTask(row: CoworkerDayTask, date: string): Task {
   const stamp = new Date().toISOString();
@@ -43,6 +44,8 @@ function stubTask(row: CoworkerDayTask, date: string): Task {
     project: null,
     jiraLinks: [],
     orgId: null,
+    taskNumber: row.taskNumber,
+    taskKey: row.taskKey,
   };
 }
 
@@ -60,7 +63,8 @@ export function CoworkerDayRoute() {
     orgSlug: string;
     userId: string;
   };
-  const date = effectiveDayIso();
+  const { date: searchDate } = useSearch({ strict: false });
+  const date = searchDate ?? effectiveDayIso();
   const { data, isLoading } = useGetCoworkerDayQuery({
     slug: orgSlug,
     userId,
@@ -126,11 +130,12 @@ export function CoworkerDayRoute() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule px-[22px] py-[18px]">
-        <div>
+        <div className="flex min-w-0 flex-col gap-2">
           <h1 className="text-[18px] font-bold tracking-[-0.02em]">{name}</h1>
           <p className="text-[12.5px] text-muted-foreground">
-            {data?.orgName ?? "Organization"} · {date}
+            {data?.orgName ?? "Organization"}
           </p>
+          <CoworkerDayStepper date={date} />
         </div>
         <div className="flex gap-2">
           {orgId && membersData?.members && me?.id && me.id !== userId ? (

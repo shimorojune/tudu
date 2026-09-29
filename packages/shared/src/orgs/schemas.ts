@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { OrgRole } from "./types.js";
 import { SPACE_COLOR_NAMES } from "../colors.js";
+import { updateKeyPrefixBodySchema } from "../taskKeys.js";
 
 export const orgRoleSchema = z.enum(["owner", "member"]);
 
@@ -26,6 +27,8 @@ export const updateOrgBodySchema = z.object({
   allowedDomains: z.array(z.string()).optional(),
   joinLinkEnabled: z.boolean().optional(),
 });
+
+export const updateOrgKeyPrefixBodySchema = updateKeyPrefixBodySchema;
 
 export type UpdateOrgBody = z.infer<typeof updateOrgBodySchema>;
 
@@ -86,6 +89,8 @@ export type OrgDetail = {
   id: string;
   slug: string;
   name: string;
+  keyPrefix: string;
+  keyPrefixLocked: boolean;
   color: (typeof SPACE_COLOR_NAMES)[number];
   hasLogo: boolean;
   joinLinkEnabled: boolean;
@@ -134,6 +139,8 @@ export type CoworkerDayTask = {
   completedAt: string | null;
   deadline: string | null;
   carriedDays: number;
+  taskNumber: number;
+  taskKey: string;
 };
 
 export type CoworkerDayResponse = {

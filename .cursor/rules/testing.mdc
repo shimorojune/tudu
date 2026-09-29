@@ -19,8 +19,8 @@ Before marking work finished:
 1. List changed modules and user-visible routes.
 2. Find covering tests: colocated `*.test.ts(x)` and `apps/e2e/tests/**`.
 3. **Add, edit, or delete** tests to match the change. Remove tests for removed behavior.
-4. Run `pnpm verify`. For UI, server, or DB changes also run `pnpm test:e2e` when
-   `E2E_DATABASE_URL` is configured.
+4. Run `pnpm verify`. For UI, server, or DB changes also run `pnpm test:e2e` locally when
+   `E2E_DATABASE_URL` is configured (PR CI does not run Playwright; scheduled E2E does).
 5. End with a **Test impact** table: changed unit | test file | add/edit/delete | command result.
 
 A task is not done without that table and green commands.

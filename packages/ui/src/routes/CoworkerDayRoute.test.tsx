@@ -87,6 +87,8 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
   return {
     ...actual,
     useParams: () => ({ orgSlug: "acme", userId: "peer" }),
+    useSearch: () => ({ date: "2099-01-15" }),
+    useNavigate: () => vi.fn(),
     Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
       <a href={to}>{children}</a>
     ),

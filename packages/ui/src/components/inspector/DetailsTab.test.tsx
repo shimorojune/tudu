@@ -57,6 +57,8 @@ const task: Task = {
   },
   jiraLinks: [],
   subtasks: [],
+  taskNumber: 42,
+  taskKey: "ME-42",
 };
 
 describe("DetailsTab", () => {

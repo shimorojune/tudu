@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { PROJECT_COLORS, type Project, type ProjectColor } from "@tudu/shared";
+import { type Project, type ProjectColor } from "@tudu/shared";
+import {
+  ColourPicker,
+  type ColourClash,
+} from "@/components/ui-custom/ColourPicker";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -28,44 +32,11 @@ type ProjectSettingsRowProps = {
     isPrivate?: boolean;
   }) => Promise<unknown>;
   onDelete: () => Promise<unknown>;
+  colourClashes?: ColourClash[];
 };
 
 function taskCountLabel(count: number): string {
   return count === 1 ? "1 task" : `${count} tasks`;
-}
-
-function ProjectColorSwatches({
-  selected,
-  onSelect,
-  size = 18,
-}: {
-  selected: ProjectColor;
-  onSelect: (color: ProjectColor) => void;
-  size?: number;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-[9px]">
-      {PROJECT_COLORS.map((key) => (
-        <button
-          key={key}
-          type="button"
-          aria-label={key}
-          className={cn(
-            "shrink-0",
-            key === "graphite" && "border border-rule",
-            selected === key &&
-              "outline outline-2 outline-foreground outline-offset-2",
-          )}
-          style={{
-            width: size,
-            height: size,
-            backgroundColor: projectColorCss(key),
-          }}
-          onClick={() => onSelect(key)}
-        />
-      ))}
-    </div>
-  );
 }
 
 export function ProjectSettingsRow({
@@ -81,6 +52,7 @@ export function ProjectSettingsRow({
   onCancelRename,
   onUpdate,
   onDelete,
+  colourClashes = [],
 }: ProjectSettingsRowProps) {
   const [colourOpen, setColourOpen] = useState(false);
   const archived = variant === "archived";
@@ -195,10 +167,13 @@ export function ProjectSettingsRow({
                     Colour
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align="end" className="w-auto p-[12px]">
-                  <ProjectColorSwatches
-                    selected={project.color}
-                    onSelect={(key) => {
+                <PopoverContent align="end" className="w-auto border-0 bg-transparent p-0 shadow-none">
+                  <ColourPicker
+                    compact
+                    label="Colour"
+                    value={project.color}
+                    clashes={colourClashes}
+                    onChange={(key) => {
                       void onUpdate({ color: key });
                       setColourOpen(false);
                     }}
@@ -231,4 +206,3 @@ export function ProjectSettingsRow({
   );
 }
 
-export { ProjectColorSwatches };

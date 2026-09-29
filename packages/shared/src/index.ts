@@ -1,4 +1,5 @@
 export * from "./tasks.js";
+export * from "./taskKeys.js";
 export * from "./nowCap.js";
 export * from "./inProgressFromBucket.js";
 export * from "./jira.js";

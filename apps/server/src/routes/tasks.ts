@@ -8,7 +8,10 @@ import {
   createSubtask,
   createTask,
   findTaskById,
+  findTaskByKey,
+  loadTaskWithSubtasks,
   mapTask,
+  TaskKeyError,
   NowCapExceededError,
   ProjectError,
   listTasksForDay,
@@ -121,6 +124,31 @@ export function createTasksRoute(db: Db) {
 
   // Literal segments must be registered before their /:id equivalents, or Hono
   // matches "unscheduled" and "reorder" as task ids.
+  app.get("/tasks/by-key/:key", async (c) => {
+    const rawKey = c.req.param("key");
+    try {
+      const hit = await findTaskByKey(db, userId(c), rawKey);
+      if (!hit) {
+        return c.json({ error: "Task not found" }, 404);
+      }
+      const access = await resolveTaskAccess(db, userId(c), hit.taskId);
+      if (!access) {
+        return c.json({ error: "Task not found" }, 404);
+      }
+      const row = await loadTaskWithSubtasks(db, hit.taskId);
+      if (!row) {
+        return c.json({ error: "Task not found" }, 404);
+      }
+      const response: TaskResponse = { task: toTask(row) };
+      return c.json(response);
+    } catch (error) {
+      if (error instanceof TaskKeyError) {
+        return c.json({ error: error.message }, error.status as 404);
+      }
+      throw error;
+    }
+  });
+
   app.get("/tasks/unscheduled", async (c) => {
     const rows = await listUnscheduledTasks(db, userId(c));
     const response: TasksResponse = { tasks: rows.map(toTask) };

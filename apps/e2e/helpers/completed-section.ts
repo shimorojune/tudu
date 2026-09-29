@@ -1,5 +1,6 @@
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { goToYesterday as navigateToYesterday } from "./day-navigation.js";
 
 const SCREENSHOT_DIR = path.join("test-results", "completed-section");
 
@@ -20,6 +21,7 @@ export async function addTaskInBucket(
   bucket: "Now" | "Next" | "Later" | "Priority 1" | "Priority 2" | "Priority 3",
   title: string,
 ) {
+  await page.keyboard.press("Escape");
   const submitBucket =
     bucket === "Priority 1"
       ? "Priority 1"
@@ -36,10 +38,13 @@ export async function addTaskInBucket(
 
   const dialog = page.getByRole("dialog", { name: "New task" });
   await expect(dialog).toBeVisible();
-  await dialog.locator('input[placeholder="What needs doing?"]').fill(title);
-  await dialog
-    .getByRole("button", { name: new RegExp(`Add to ${submitBucket}`, "i") })
-    .click();
+  const titleInput = dialog.locator('input[placeholder="What needs doing?"]');
+  await titleInput.fill(title);
+  const submit = dialog.getByRole("button", {
+    name: new RegExp(`Add to ${submitBucket}`, "i"),
+  });
+  await expect(submit).toBeEnabled();
+  await titleInput.press("ControlOrMeta+Enter");
   await expect(dialog).not.toBeVisible();
   await expect(taskRow(page, title)).toBeVisible();
 }
@@ -47,12 +52,15 @@ export async function addTaskInBucket(
 export async function addUnscheduledTask(page: Page, title: string) {
   await page.getByRole("button", { name: "Add task" }).first().click();
   const dialog = page.getByRole("dialog", { name: "New task" });
-  await dialog.locator('input[placeholder="What needs doing?"]').fill(title);
+  const titleInput = dialog.locator('input[placeholder="What needs doing?"]');
+  await titleInput.fill(title);
   await dialog
     .locator("button")
     .filter({ hasText: /^Unscheduled$/ })
     .click();
-  await dialog.getByRole("button", { name: "Add to Unscheduled" }).click();
+  const submit = dialog.getByRole("button", { name: "Add to Unscheduled" });
+  await expect(submit).toBeEnabled();
+  await titleInput.press("ControlOrMeta+Enter");
   await expect(dialog).not.toBeVisible();
   await expect(taskRow(page, title)).toBeVisible();
 }
@@ -65,12 +73,7 @@ export async function ensureTaskListInteractive(page: Page) {
 }
 
 export async function goToYesterday(page: Page) {
-  const dayJump = page.getByRole("radio", { name: "Yesterday" });
-  if (await dayJump.isVisible()) {
-    await dayJump.click();
-    return;
-  }
-  await page.getByRole("button", { name: "Previous day" }).click();
+  await navigateToYesterday(page);
 }
 
 export async function markTaskComplete(page: Page, title: string) {

@@ -8,6 +8,13 @@ vi.mock("@/lib/commands", () => ({
   isDesktopApp: () => false,
 }));
 
+vi.mock("@tudu/store", () => ({
+  useGetSpacePrefixSettingsQuery: () => ({
+    data: { personalKeyPrefix: "ME", prefixLocked: false },
+  }),
+  useUpdateSpacePrefixSettingsMutation: () => [vi.fn()],
+}));
+
 describe("GeneralSettingsPanel", () => {
   beforeEach(() => {
     localStorage.clear();
