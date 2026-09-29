@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "NODE_OPTIONS='--conditions=development' tsx watch src/index.ts",
     "build": "pnpm --filter @tudu/shared build && pnpm --filter @tudu/db build && tsc",
+    "typecheck": "pnpm --filter @tudu/shared build && pnpm --filter @tudu/db build && tsc --noEmit",
     "start": "node dist/index.js",
     "db:seed": "NODE_OPTIONS='--conditions=development' tsx scripts/seed-test-user.ts",
     "db:seed:orgs-demo": "NODE_OPTIONS='--conditions=development' tsx scripts/seed-orgs-demo.ts"

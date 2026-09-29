@@ -81,7 +81,6 @@ import {
 } from "@tudu/db";
 import { insertAndEmitNotificationsWithPush } from "./notificationsWithPush.js";
 import {
-  isTaskChangeTimelineType,
   jiraIssueToTaskLinkSummary,
   parseViewKey,
   type JiraComment,
@@ -106,7 +105,7 @@ import { notifySync } from "./syncHub.js";
 export class SyncOpError extends Error {
   constructor(
     message: string,
-    readonly status: 400 | 403 | 404,
+    readonly status: 400 | 403 | 404 | 409 | 422,
   ) {
     super(message);
     this.name = "SyncOpError";
@@ -179,20 +178,6 @@ async function emitRequestUpsert(
   });
 }
 
-async function emitRequestDelete(
-  db: Db,
-  requestId: string,
-  fromUserId: string,
-  toUserId: string,
-  clientMutationId: string | null,
-): Promise<SyncEvent[]> {
-  return emitSync(db, {
-    recipientUserIds: recipientsForRequest(fromUserId, toUserId),
-    clientMutationId,
-    type: "request.delete",
-    payload: { id: requestId },
-  });
-}
 
 export function jiraDueDateFromDeadline(deadline: string | null): string | null {
   return deadline ? deadline.slice(0, 10) : null;

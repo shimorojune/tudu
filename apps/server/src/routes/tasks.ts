@@ -234,8 +234,8 @@ export function createTasksRoute(db: Db) {
       return c.json({ error: "Task not found" }, 404);
     }
 
-    if (access.role === "manager") {
-      return c.json({ error: "Managers cannot edit tasks" }, 403);
+    if (access !== "owner") {
+      return c.json({ error: "Task not found" }, 404);
     }
 
     let updated;

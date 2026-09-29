@@ -1,5 +1,4 @@
 import { zValidator } from "@hono/zod-validator";
-import { eq } from "drizzle-orm";
 import type { Db, JiraConnectionRow } from "@tudu/db";
 import {
   createJiraJqlPreset,
@@ -19,7 +18,6 @@ import {
   resetAssignedJiraIssues,
   replaceJiraProjectKeys,
   updateJiraRefreshCursor,
-  user,
   updateJiraJqlPreset,
   upsertJiraComments,
   upsertJiraConnection,
@@ -50,7 +48,6 @@ import {
   type JiraJqlPresetResponse,
   type JiraJqlPresetsResponse,
   type JiraProjectsResponse,
-  type JiraUser,
   type JiraUsersResponse,
 } from "@tudu/shared";
 import { Hono } from "hono";
@@ -61,11 +58,8 @@ import {
   buildAssignedCachedIssuesJql,
   buildAssignedIssuesJql,
   buildChangedCachedIssuesJql,
-  buildReportAssignedIssuesJql,
   createJiraDataCenterAdapter,
-  issueAssignedToJiraUser,
   JiraHttpError,
-  matchReportJiraUser,
   type JiraAdapter,
   type JiraAdapterFactory,
 } from "../jira/client.js";
@@ -253,49 +247,6 @@ export async function refreshAssignedJiraIssues(
     startAt,
     hasMore: startAt + filteredIssues.length < searchResult.total,
   };
-}
-
-async function findReportJiraUser(
-  adapter: JiraAdapter,
-  email: string,
-): Promise<JiraUser | undefined> {
-  const queries = [email];
-  const localPart = email.includes("@") ? email.slice(0, email.indexOf("@")) : "";
-  if (localPart && localPart !== email) {
-    queries.push(localPart);
-  }
-  const found: JiraUser[] = [];
-  for (const query of queries) {
-    const users = await adapter.findUsers(query, { limit: 20 });
-    found.push(...users);
-  }
-  return matchReportJiraUser(found, email);
-}
-
-function matchesReportIssueFilters(
-  issue: JiraIssue,
-  filters: {
-    query?: string;
-    componentIds?: string[];
-    presetJql?: string | null;
-    jql?: string | null;
-  },
-): boolean {
-  const query = filters.query?.trim().toLowerCase();
-  if (query) {
-    const haystack = `${issue.key} ${issue.summary} ${issue.description ?? ""}`.toLowerCase();
-    if (!haystack.includes(query)) {
-      return false;
-    }
-  }
-  const componentIds = filters.componentIds ?? [];
-  if (componentIds.length > 0) {
-    const issueComponentIds = new Set(issue.components.map((component) => component.id));
-    if (!componentIds.some((id) => issueComponentIds.has(id))) {
-      return false;
-    }
-  }
-  return issue.status.category !== "done";
 }
 
 async function selectedJqlPreset(
