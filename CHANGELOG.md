@@ -1,3 +1,35 @@
+# [0.36.0](https://github.com/eGainDev/tudu/compare/tudu-0.35.1...tudu-0.36.0) (2026-10-01)
+
+
+### Bug Fixes
+
+* **ci:** install full Tauri GTK deps on Linux ([d117c9b](https://github.com/eGainDev/tudu/commit/d117c9b67db3c666d274b29b619c74a0b6fbf039))
+* **ci:** pass repo secrets into reusable CI workflow ([e99ae67](https://github.com/eGainDev/tudu/commit/e99ae67627d74691fd7b714444fcc519702d4457))
+* **ci:** stabilize UI typecheck and desktop cargo on Linux ([4b39b35](https://github.com/eGainDev/tudu/commit/4b39b35d16d11d2bebf7b97d0d9d9a1866271bac))
+* **ci:** use bracket syntax for E2E_DATABASE_URL_N secrets ([bfe290a](https://github.com/eGainDev/tudu/commit/bfe290ac2ed66f6250626a3afe3823cc3db33c39))
+* **ci:** use E2E_DATABASE_URL secret for unit test:db job ([5f03ce2](https://github.com/eGainDev/tudu/commit/5f03ce289532c081ef91843393a222a2a4e14b7b))
+* **db:** backfill drizzle journal when schema exists without history ([85e0374](https://github.com/eGainDev/tudu/commit/85e03745c67b4f8c47e5a891737ebef8f1540b00))
+* **db:** repair partial drizzle journal and improve migration detection ([fb3745e](https://github.com/eGainDev/tudu/commit/fb3745e9ec067ca6d65ed93114868316b0a8f8b5))
+* **e2e:** pass auth secret into CI database seed ([3097f24](https://github.com/eGainDev/tudu/commit/3097f2416334be63f7f1c1808736b71f0d36f368))
+* **e2e:** prepare DB without local .env on CI ([83f9b20](https://github.com/eGainDev/tudu/commit/83f9b204cc3b2153804835e9337b83326d6d93f4))
+* **e2e:** read dev DATABASE_URL only from repo .env ([9e4c893](https://github.com/eGainDev/tudu/commit/9e4c89335f96bf178708be5ec3dc5084ae0a76a5))
+* **e2e:** repair inspector hooks and day navigation helpers ([d1abd28](https://github.com/eGainDev/tudu/commit/d1abd2827e107a4d53c4fef6bbbaee9200043dde))
+* **e2e:** reuse server env for database seed in CI ([835e1f0](https://github.com/eGainDev/tudu/commit/835e1f0fcb5d73d69466634e2a71710278337751))
+* **e2e:** unset DATABASE_URL during CI reset when no dev .env ([a647cf6](https://github.com/eGainDev/tudu/commit/a647cf693ca104484666eb05a1dcc0ad40859375))
+* effective-day Today UX and Playwright E2E stability ([cbe21c3](https://github.com/eGainDev/tudu/commit/cbe21c3d99f95628c89291f91ff75ef76d6404e8))
+* **server:** satisfy tsc in Docker build for staging deploy ([69eda23](https://github.com/eGainDev/tudu/commit/69eda233f17e2d5b2ba3570b1b9257d76baebd1c))
+* tighten task key derivation and test fixtures ([c25f7f5](https://github.com/eGainDev/tudu/commit/c25f7f5556abcc998739c4beba2737948c6f4aff))
+* Update DayJump and NavTabs components to use effective day logic ([c51d6f5](https://github.com/eGainDev/tudu/commit/c51d6f55f28595299a8c354f37e6f912637ba5a6))
+
+
+### Features
+
+* Enhance JIRA notification handling with status update presentation ([cc84dfc](https://github.com/eGainDev/tudu/commit/cc84dfcf8e442c8f7ea886551d181cb5b1470e4c))
+* **ui:** colour picker 8b, toolbar 5.1b, requests badge ([9e9b5f2](https://github.com/eGainDev/tudu/commit/9e9b5f200c2cf7c9c912ebb02dc18de37b4427fe))
+* **ui:** colour picker 8b, toolbar 5.1b, requests badge ([a6878ad](https://github.com/eGainDev/tudu/commit/a6878ad9ffafaf95d48df09467fc23ed2949b495))
+* **ui:** move day switcher into Today tab per design 9a ([1dd0378](https://github.com/eGainDev/tudu/commit/1dd03784a76075a8dc6078483b4a1efa19656d39))
+* **ui:** Quick Add attachments and note line (PR6) ([a990b2b](https://github.com/eGainDev/tudu/commit/a990b2b7d6ad07e7a921ac750607ff84e608a5d0))
+
 ## [0.35.1](https://github.com/eGainDev/tudu/compare/tudu-0.35.0...tudu-0.35.1) (2026-09-25)
 
 
