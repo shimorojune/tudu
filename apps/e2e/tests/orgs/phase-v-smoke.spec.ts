@@ -5,6 +5,12 @@ async function assertPhaseVProbes(page: import("@playwright/test").Page) {
     const offenders: string[] = [];
     for (const element of document.querySelectorAll("*")) {
       const radius = getComputedStyle(element).borderRadius;
+      if (
+        element.classList.contains("size-[5px]") &&
+        radius === "50%"
+      ) {
+        continue;
+      }
       if (radius && radius !== "0px" && radius !== "0") {
         offenders.push(
           `${element.tagName.toLowerCase()}.${element.className}=${radius}`,

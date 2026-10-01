@@ -225,6 +225,28 @@ export type DaySearchPlan =
       toast?: DaySearchIssue | "missingTask";
     };
 
+/** Avoid clearing a deep-linked task while the day query is still catching up after create or patch. */
+export function resolveDaySearchTaskFound(input: {
+  isLoading: boolean;
+  isFetching: boolean;
+  selectedTaskId: string | null;
+  taskIds: readonly string[];
+}): boolean | null {
+  if (input.isLoading) {
+    return null;
+  }
+  if (!input.selectedTaskId) {
+    return true;
+  }
+  if (input.taskIds.includes(input.selectedTaskId)) {
+    return true;
+  }
+  if (input.isFetching) {
+    return null;
+  }
+  return false;
+}
+
 export function planDaySearchSync(input: {
   fields: DaySearchFields;
   parsed: DaySearch;

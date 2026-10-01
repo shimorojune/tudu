@@ -1,9 +1,9 @@
 import { useDispatch, useSelector } from "react-redux";
 import type { Task } from "@tudu/shared";
+import { effectiveDayIso } from "@tudu/shared";
 import {
   setInspectorTab,
   setSelectedTaskId,
-  todayIso,
   useGetTimelineQuery,
   type RootState,
 } from "@tudu/store";
@@ -32,7 +32,7 @@ export function DetailInspector({
   useCopyTaskKeyShortcut(task);
   const dispatch = useDispatch();
   const tab = useSelector((state: RootState) => state.day.inspectorTab);
-  const isToday = selectedDate === todayIso();
+  const isToday = selectedDate === effectiveDayIso();
   const { data: timelineData } = useGetTimelineQuery(task?.id ?? "", {
     skip: !task,
   });

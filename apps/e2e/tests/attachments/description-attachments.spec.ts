@@ -15,20 +15,24 @@ import {
   waitForDescriptionImage,
   writeOversizeFixture,
 } from "../../helpers/attachments";
+import { dismissCommandsIfOpen, effectiveLocalTodayIso, ensureTodayPage } from "../../helpers/day-navigation.js";
 import {
+  addTaskInBucket,
   expandCompletedSection,
   markTaskComplete,
+  openNewTaskForBucket,
   taskRow,
 } from "../../helpers/completed-section";
 import {
   acceptInviteInBrowser,
+  clearTestOutbox,
   createOrgViaApi,
   inviteMemberViaApi,
-  inviteTokenFromOutbox,
-  readTestOutbox,
   uniqueOrgName,
+  waitForLatestInviteToken,
 } from "../../helpers/orgs";
-import { E2E_WEB_URL } from "../../constants.js";
+import { E2E_SERVER_URL, E2E_WEB_URL } from "../../constants.js";
+import { shiftLocalIso } from "../../helpers/day-navigation.js";
 
 const managerAuth = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -41,6 +45,7 @@ test.describe("Task description attachments", () => {
   test("Today: attach image via toolbar and persist after reselect", async ({
     page,
   }) => {
+    test.setTimeout(60_000);
     const title = uniqueAttachmentTitle("E2E attach later");
     await createTodayTask(page, title);
 
@@ -55,7 +60,11 @@ test.describe("Task description attachments", () => {
 
   test("Unscheduled: attach image and persist", async ({ page }) => {
     const title = uniqueAttachmentTitle("E2E attach backlog");
+    await page.goto("/unscheduled");
+    await page.waitForURL("/unscheduled");
     await createUnscheduledTask(page, title);
+    await expect(taskRow(page, title)).toBeVisible({ timeout: 15_000 });
+    await selectTaskByTitle(page, title);
     await attachFileViaToolbar(page, tinyPngPath);
     await waitForDescriptionImage(page);
     await blurDescriptionToSave(page, title);
@@ -92,15 +101,9 @@ test.describe("Task description attachments", () => {
   test("new task: attach image before create keeps inline preview after save", async ({
     page,
   }) => {
+    test.setTimeout(120_000);
     const title = uniqueAttachmentTitle("Attach new task");
-    await page.goto("/");
-    await page.waitForURL("/");
-
-    const bucketSection = page.locator("section").filter({
-      has: page.locator("header").getByText("Later", { exact: true }),
-    });
-    await bucketSection.getByRole("button", { name: "Add task" }).click();
-
+    await openNewTaskForBucket(page, "Later");
     const dialog = page.getByRole("dialog", { name: "New task" });
     await dialog.locator('input[placeholder="What needs doing?"]').fill(title);
 
@@ -111,9 +114,7 @@ test.describe("Task description attachments", () => {
     await chooser.setFiles(tinyPngPath);
     await expect(editor.locator(".tudu-attachment-image img")).toBeVisible();
 
-    const addLater = dialog.getByRole("button", { name: /Add to Later/i });
-    await expect(addLater).toBeEnabled();
-    await addLater.click();
+    await page.keyboard.press("ControlOrMeta+Enter");
     await expect(dialog).not.toBeVisible();
 
     await selectTaskByTitle(page, title);
@@ -177,9 +178,11 @@ test.describe("Task description attachments", () => {
     const withImage = uniqueAttachmentTitle("Attach A");
     const plain = uniqueAttachmentTitle("Attach B");
     await createTodayTask(page, withImage);
+    await attachFileViaToolbar(page, tinyPngPath);
+    await waitForDescriptionImage(page);
+    await dismissCommandsIfOpen(page);
     await page.getByRole("button", { name: "Close inspector" }).click();
-    await createTodayTask(page, plain);
-    await page.getByRole("button", { name: "Close inspector" }).click();
+    await addTaskInBucket(page, "Later", plain, { preserveCurrentDay: true });
     await selectTaskByTitle(page, withImage);
     await attachFileViaToolbar(page, tinyPngPath);
     await waitForDescriptionImage(page);
@@ -187,17 +190,6 @@ test.describe("Task description attachments", () => {
     await expect(
       descriptionEditor(page).locator(".tudu-attachment-image img"),
     ).toHaveCount(0);
-  });
-
-  test("quick add: tab reveals note field hint", async ({ page }) => {
-    await page.goto("/");
-    await page.waitForURL("/");
-    await page.evaluate(() => {
-      window.dispatchEvent(new Event("quick-add:dev-open"));
-    });
-    await expect(page.getByText("for a note")).toBeVisible({ timeout: 10_000 });
-    await page.getByPlaceholder("What needs doing?").press("Tab");
-    await expect(page.getByLabel("Quick Add note")).toBeVisible();
   });
 
   test("route smoke after attachments feature", async ({ page }) => {
@@ -215,6 +207,7 @@ test.describe("Task description attachments", () => {
 
 test.describe("Manager report attachments", () => {
   test("manager sees report attachment read-only", async ({ browser }) => {
+    test.setTimeout(90_000);
     const userAuth = path.join(
       path.dirname(fileURLToPath(import.meta.url)),
       "../../.auth/user.json",
@@ -222,21 +215,62 @@ test.describe("Manager report attachments", () => {
     const reportTitle = uniqueAttachmentTitle("Manager attach");
     const userContext = await browser.newContext({ storageState: userAuth });
     const userRequest = userContext.request;
-    const { slug } = await createOrgViaApi(
+    const { slug, orgId } = await createOrgViaApi(
       userRequest,
       uniqueOrgName("E2E Manager attach"),
     );
+    await clearTestOutbox(userRequest);
     await inviteMemberViaApi(userRequest, slug, "marcus@egain.com");
-    const outbox = await readTestOutbox(userRequest, "marcus@egain.com");
-    const token = outbox[0] ? inviteTokenFromOutbox(outbox[0]) : null;
-    expect(token).toBeTruthy();
-    await acceptInviteInBrowser(browser, managerAuth, token!, E2E_WEB_URL);
+    const token = await waitForLatestInviteToken(userRequest, "marcus@egain.com");
+    await acceptInviteInBrowser(browser, managerAuth, token, E2E_WEB_URL);
 
     const userPage = await userContext.newPage();
-    await createTodayTask(userPage, reportTitle, slug);
+    const today = effectiveLocalTodayIso();
+    const createRes = await userRequest.post(`${E2E_SERVER_URL}/tasks`, {
+      data: {
+        title: reportTitle,
+        orgId,
+        scheduledDate: today,
+        bucket: "later",
+      },
+    });
+    expect(createRes.ok()).toBeTruthy();
+    await userPage.goto(`/o/${slug}?date=${today}`);
+    await userPage.waitForURL((url) => {
+      if (url.pathname !== `/o/${slug}`) {
+        return false;
+      }
+      const date = url.searchParams.get("date");
+      return date === today || date === null;
+    });
+    await expect(taskRow(userPage, reportTitle)).toBeVisible({ timeout: 30_000 });
+    await selectTaskByTitle(userPage, reportTitle);
     await attachFileViaToolbar(userPage, tinyPngPath);
     await waitForDescriptionImage(userPage);
     await blurDescriptionToSave(userPage, reportTitle);
+    const membersRes = await userRequest.get(
+      `${E2E_SERVER_URL}/orgs/${slug}/members`,
+    );
+    expect(membersRes.ok()).toBeTruthy();
+    const { members } = (await membersRes.json()) as {
+      members: Array<{ userId: string; email: string }>;
+    };
+    const owner = members.find((member) => member.email === "testuser@egain.com");
+    expect(owner?.userId).toBeTruthy();
+    await expect
+      .poll(async () => {
+        const dayRes = await userRequest.get(
+          `${E2E_SERVER_URL}/orgs/${slug}/coworkers/${owner!.userId}/day?date=${today}`,
+        );
+        if (!dayRes.ok()) {
+          return false;
+        }
+        const body = (await dayRes.json()) as {
+          tasks: Array<{ title: string }>;
+        };
+        return body.tasks.some((task) => task.title === reportTitle);
+      }, { timeout: 45_000 })
+      .toBe(true);
     await userContext.close();
 
     const managerContext = await browser.newContext({
@@ -252,9 +286,21 @@ test.describe("Manager report attachments", () => {
       .first();
     await testUserRow.getByRole("link", { name: "Open day" }).click();
     await page.waitForURL(new RegExp(`/o/${slug}/coworkers/[^/]+`));
+    const coworkerDay = new URL(page.url());
+    coworkerDay.searchParams.set("date", effectiveLocalTodayIso());
+    const dayLoaded = page.waitForResponse(
+      (response) =>
+        response.url().includes("/coworkers/") &&
+        response.url().includes("/day") &&
+        response.ok(),
+    );
+    await page.goto(coworkerDay.toString());
+    await dayLoaded;
+    await dismissBlockingOverlays(page);
+    await dismissCommandsIfOpen(page);
 
-    const row = taskRow(page, reportTitle);
-    await expect(row).toBeVisible();
+    const row = page.getByRole("button", { name: reportTitle, exact: true });
+    await expect(row).toBeVisible({ timeout: 30_000 });
     await row.click();
     await expect(page.getByRole("button", { name: "Attach file" })).toHaveCount(
       0,

@@ -38,6 +38,13 @@ export function TaskDescriptionField({
   );
 
   useEffect(() => {
+    focusedRef.current = false;
+    const next = description ?? "";
+    setValue(next);
+    lastSaved.current = next;
+  }, [taskId]);
+
+  useEffect(() => {
     if (focusedRef.current) {
       return;
     }
@@ -73,6 +80,7 @@ export function TaskDescriptionField({
       }}
     >
       <RichTextEditor
+        key={taskId}
         mode="html"
         value={value}
         readOnly={readOnly}

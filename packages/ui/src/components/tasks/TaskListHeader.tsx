@@ -19,6 +19,7 @@ export function TaskListHeader({
       data-panel-id={dataPanelId}
       className={cn(
         "flex shrink-0 items-center justify-between gap-[10px] border-b border-hair px-[18px] py-[10px]",
+        "max-xl:sticky max-xl:top-0 max-xl:z-20 max-xl:bg-background",
         className,
       )}
     >

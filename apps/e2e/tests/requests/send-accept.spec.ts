@@ -48,7 +48,7 @@ test.describe("requests send and accept", () => {
 
     const priyaContext = await browser.newContext({ storageState: priyaAuth });
     const priyaPage = await priyaContext.newPage();
-    await priyaPage.goto("/requests");
+    await priyaPage.goto(`/o/${slug}/requests`);
     await expect(priyaPage.getByText(taskTitle)).toBeVisible();
     await priyaPage.getByRole("button", { name: "Accept into Next" }).click();
     await expect(priyaPage.getByText(/Accepted|Recent outcomes/i)).toBeVisible({

@@ -2,10 +2,12 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
+import { useRouterState } from "@tanstack/react-router";
 
 type CommandPaletteContextValue = {
   open: boolean;
@@ -19,6 +21,12 @@ const CommandPaletteContext = createContext<CommandPaletteContextValue | null>(
 
 export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const searchStr = useRouterState({ select: (state) => state.location.searchStr });
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname, searchStr]);
 
   const openPalette = useCallback(() => {
     setOpen(true);
@@ -42,4 +50,9 @@ export function useCommandPalette() {
     throw new Error("useCommandPalette must be used within CommandPaletteProvider");
   }
   return context;
+}
+
+/** For modals that should close the palette when open but render outside tests without a provider. */
+export function useOptionalCommandPalette() {
+  return useContext(CommandPaletteContext);
 }

@@ -2,7 +2,14 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { NOW_CAP_EXCEEDED_MESSAGE } from "@tudu/shared";
-import { NewTaskDialog } from "./NewTaskDialog";
+
+vi.mock("@tudu/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tudu/shared")>();
+  return {
+    ...actual,
+    effectiveDayIso: () => "2026-09-11",
+  };
+});
 
 vi.mock("@/hooks/useProjectSpaceScope", () => ({
   useProjectSpaceScope: () => ({ kind: "personal" as const }),
@@ -25,6 +32,8 @@ vi.mock("@tudu/store", async (importOriginal) => {
     ],
   };
 });
+
+import { NewTaskDialog } from "./NewTaskDialog";
 
 describe("NewTaskDialog", () => {
   it("submits title and description together", async () => {

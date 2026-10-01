@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { ensureTodayPage, dismissCommandsIfOpen, effectiveLocalTodayIso, goToDate, localTodayIso, shiftLocalIso } from "../../helpers/day-navigation.js";
 import {
   addTaskInBucket,
   addUnscheduledTask,
@@ -15,8 +16,7 @@ import {
 
 test.describe("Completed section on Today", () => {
   test("open tasks stay in buckets; completed moves below Later", async ({ page }) => {
-    await page.goto("/");
-    await page.waitForURL("/");
+    await ensureTodayPage(page);
 
     const title = uniqueTitle("Completed bucket move");
     await addTaskInBucket(page, "Now", title);
@@ -50,14 +50,22 @@ test.describe("Completed section on Today", () => {
 });
 
 test.describe("Completed section on a past day", () => {
-  test("uses Priority labels and keeps completed out of buckets", async ({ page }) => {
-    await page.goto("/");
-    await page.waitForURL("/");
+  test("uses Priority labels and keeps completed out of buckets", async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await ensureTodayPage(page);
+    const yesterday = shiftLocalIso(effectiveLocalTodayIso(), -1);
+    await goToDate(page, yesterday);
+    await dismissCommandsIfOpen(page);
+    await expect(
+      page.locator("section").filter({
+        has: page.locator("header").getByText("Priority 1", { exact: true }),
+      }),
+    ).toBeVisible({ timeout: 15_000 });
 
-    await goToYesterday(page);
-
-    const title = uniqueTitle("Yesterday completed");
-    await addTaskInBucket(page, "Priority 3", title);
+    const title = uniqueTitle("E2E yday done");
+    await addTaskInBucket(page, "Priority 3", title, { preserveCurrentDay: true });
     await markTaskComplete(page, title);
 
     const laterSection = page.locator("section").filter({
@@ -72,8 +80,9 @@ test.describe("Completed section on a past day", () => {
 
 test.describe("Completed section on Unscheduled", () => {
   test("splits open backlog from completed rows", async ({ page }) => {
-    await page.goto("/unscheduled");
-    await page.waitForURL("/unscheduled");
+    await page.goto("/unscheduled", { waitUntil: "domcontentloaded" });
+    await dismissCommandsIfOpen(page);
+    await expect(page).toHaveURL(/\/unscheduled/);
 
     const title = uniqueTitle("Unscheduled completed");
     await addUnscheduledTask(page, title);
@@ -104,7 +113,7 @@ test.describe("Completed section collapse preference", () => {
     await expect(taskRow(page, title)).toBeVisible();
 
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.getByTestId("task-list-header")).toBeVisible();
+    await ensureTodayPage(page);
     await ensureTaskListInteractive(page);
 
     await expect(page.getByTestId("completed-section-toggle")).toHaveAttribute(

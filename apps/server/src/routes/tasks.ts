@@ -206,6 +206,7 @@ export function createTasksRoute(db: Db) {
         deadline: body.deadline ? new Date(body.deadline) : null,
         isPrivate: body.isPrivate,
         projectId: body.projectId ?? null,
+        orgId: body.orgId ?? null,
       });
     } catch (error) {
       if (error instanceof ProjectError) {

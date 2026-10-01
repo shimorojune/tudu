@@ -10,6 +10,7 @@ import {
   taskRow,
   uniqueTitle,
 } from "./completed-section";
+import { dismissCommandsIfOpen, ensureTodayPage } from "./day-navigation.js";
 
 const helpersDir = path.dirname(fileURLToPath(import.meta.url));
 const fixturesDir = path.join(helpersDir, "..", "fixtures");
@@ -18,14 +19,7 @@ export const tinyPngPath = path.join(fixturesDir, "tiny.png");
 export const notesTxtPath = path.join(fixturesDir, "notes.txt");
 
 export async function dismissBlockingOverlays(page: Page) {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    await page.keyboard.press("Escape");
-    await page
-      .locator("[data-state=open]")
-      .first()
-      .waitFor({ state: "hidden", timeout: 500 })
-      .catch(() => undefined);
-  }
+  await dismissCommandsIfOpen(page);
 }
 
 export function descriptionEditor(page: Page) {
@@ -33,19 +27,27 @@ export function descriptionEditor(page: Page) {
 }
 
 export async function selectTaskByTitle(page: Page, title: string) {
-  await dismissBlockingOverlays(page);
+  await dismissCommandsIfOpen(page);
+  await ensureTaskListInteractive(page);
   const row = taskRow(page, title);
   await expect(row).toBeVisible();
-  await row.scrollIntoViewIfNeeded();
-  await row.click();
-  if (page.url().includes("/unscheduled")) {
-    await expect(page.getByRole("dialog")).toBeVisible();
-  }
   const detailsTab = page.getByRole("tab", { name: "Details" });
+  const editor = descriptionEditor(page);
+  const inspector = detailsTab.or(editor);
+
+  await expect(inspector)
+    .toBeVisible({ timeout: 5_000 })
+    .catch(async () => {
+      await row.scrollIntoViewIfNeeded();
+      await row.click();
+      await dismissCommandsIfOpen(page);
+    });
+
   if (await detailsTab.isVisible()) {
     await detailsTab.click();
   }
-  await expect(descriptionEditor(page)).toBeVisible();
+
+  await expect(editor).toBeVisible({ timeout: 15_000 });
 }
 
 export async function attachFileViaToolbar(page: Page, filePath: string) {
@@ -71,15 +73,11 @@ export async function createTodayTask(
   title: string,
   orgSlug?: string,
 ) {
-  await dismissBlockingOverlays(page);
   if (orgSlug) {
-    await page.goto(`/o/${orgSlug}`);
-    await page.waitForURL(new RegExp(`/o/${orgSlug}(\\?|$)`));
+    await ensureTodayPage(page, orgSlug);
   } else {
-    await page.goto("/");
-    await page.waitForURL("/");
+    await ensureTodayPage(page);
   }
-  await dismissBlockingOverlays(page);
   await addTaskInBucket(page, "Later", title);
   await selectTaskByTitle(page, title);
 }
@@ -89,11 +87,14 @@ export async function createUnscheduledTask(page: Page, title: string) {
   await page.waitForURL("/unscheduled");
   await ensureTaskListInteractive(page);
   await addUnscheduledTask(page, title);
-  await selectTaskByTitle(page, title);
 }
 
-export function uniqueAttachmentTitle(_prefix: string) {
-  return `E2E-attach-${Date.now()}`;
+let attachmentTitleSeq = 0;
+
+export function uniqueAttachmentTitle(prefix: string) {
+  attachmentTitleSeq += 1;
+  const slug = prefix.replace(/\s+/g, "-");
+  return `E2E-attach-${Date.now()}-${attachmentTitleSeq}-${slug}`;
 }
 
 export async function writeOversizeFixture(): Promise<string> {

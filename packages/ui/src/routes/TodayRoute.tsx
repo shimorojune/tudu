@@ -10,6 +10,7 @@ import {
 import {
   setSelectedDate,
   setSelectedTaskId,
+  openTask,
   useCreateSubtaskMutation,
   useCreateTaskMutation,
   useUpdateTaskMutation,
@@ -49,10 +50,12 @@ import { useJiraPreview } from "@/hooks/useJiraPreview";
 import { useNewTaskShortcut } from "@/hooks/useNewTaskShortcut";
 import { useRolloverOnFocus } from "@/hooks/useRolloverOnFocus";
 import { useViewportBand } from "@/hooks/useViewportBand";
-import { DAY_TASK_TAB_FIELDS } from "@/lib/daySearch";
+import { DAY_TASK_TAB_FIELDS, resolveDaySearchTaskFound } from "@/lib/daySearch";
+import { useOptionalCommandPalette } from "@/components/chrome/CommandPaletteContext";
 
 export function TodayRoute() {
   const dispatch = useDispatch();
+  const commandPalette = useOptionalCommandPalette();
   const selectedDate = useSelector((s: RootState) => s.day.selectedDate);
   const selectedTaskId = useSelector((s: RootState) => s.day.selectedTaskId);
   const jiraPreview = useJiraPreview();
@@ -87,10 +90,15 @@ export function TodayRoute() {
     () => new Map(allTasks.map((task) => [task.id, task])),
     [allTasks],
   );
+  const effectiveDay = effectiveDayIso();
   useDaySearchSync(DAY_TASK_TAB_FIELDS, {
-    taskFound: dayQuery.isLoading
-      ? null
-      : !selectedTaskId || tasks.some((task) => task.id === selectedTaskId),
+    today: effectiveDay,
+    taskFound: resolveDaySearchTaskFound({
+      isLoading: dayQuery.isLoading,
+      isFetching: dayQuery.isFetching,
+      selectedTaskId,
+      taskIds: allTasks.map((task) => task.id),
+    }),
   });
   const [createTask] = useCreateTaskMutation();
   const [createSubtask] = useCreateSubtaskMutation();
@@ -104,7 +112,6 @@ export function TodayRoute() {
   const [spawnIssue, setSpawnIssue] = useState<JiraIssue | null>(null);
 
   const unscheduledCount = unscheduledQuery.data?.tasks.length ?? 0;
-  const effectiveDay = effectiveDayIso();
   const nowCount = todayNowCount;
 
   const isFirstRun =
@@ -118,7 +125,9 @@ export function TodayRoute() {
   const band = useViewportBand();
 
   const selectedTask =
-    tasks.find((t) => t.id === selectedTaskId) ?? null;
+    selectedTaskId != null
+      ? (dayTasksById.get(selectedTaskId) ?? null)
+      : null;
 
   function openFirstRunDialog(bucket: Bucket = "later") {
     setFirstRunBucket(bucket);
@@ -126,8 +135,15 @@ export function TodayRoute() {
   }
 
   function selectTask(id: string) {
+    commandPalette?.setOpen(false);
     jiraPreview.clearPreview();
-    dispatch(setSelectedTaskId(id));
+    dispatch(
+      openTask({
+        date: null,
+        taskId: id,
+        inspectorTab: "details",
+      }),
+    );
   }
 
   const spawnDialog = (

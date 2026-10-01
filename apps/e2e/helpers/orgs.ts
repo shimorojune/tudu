@@ -1,6 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { APIRequestContext, Browser } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { E2E_SERVER_URL } from "../constants.js";
 
 const e2eDir = path.dirname(fileURLToPath(import.meta.url));
@@ -41,6 +42,29 @@ export function inviteTokenFromOutbox(message: TestOutboxMessage): string | null
   return match?.[1] ?? null;
 }
 
+export async function latestInviteToken(
+  request: APIRequestContext,
+  email: string,
+): Promise<string | null> {
+  const messages = await readTestOutbox(request, email);
+  const latest = messages.at(-1);
+  return latest ? inviteTokenFromOutbox(latest) : null;
+}
+
+export async function waitForLatestInviteToken(
+  request: APIRequestContext,
+  email: string,
+): Promise<string> {
+  let token: string | null = null;
+  await expect
+    .poll(async () => {
+      token = await latestInviteToken(request, email);
+      return token;
+    })
+    .not.toBeNull();
+  return token!;
+}
+
 export async function createOrgViaApi(
   request: APIRequestContext,
   name: string,
@@ -79,7 +103,12 @@ export async function acceptInviteInBrowser(
   const context = await browser.newContext({ storageState: storagePath });
   const page = await context.newPage();
   await page.goto(`${webBaseUrl}/invite/${token}`);
-  await page.getByRole("button", { name: "Accept invite" }).click();
-  await page.waitForURL(/\/(o\/|welcome|\?)/);
+  await expect(page.getByRole("heading", { name: /^Join / })).toBeVisible({
+    timeout: 30_000,
+  });
+  const accept = page.getByRole("button", { name: "Accept invite" });
+  await expect(accept).toBeEnabled({ timeout: 30_000 });
+  await accept.click();
+  await page.waitForURL(/\/(o\/|welcome|\?)/, { timeout: 60_000 });
   await context.close();
 }

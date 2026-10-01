@@ -6,7 +6,11 @@ import {
 } from "../../helpers/completed-section";
 
 test.describe("Drag reorder", () => {
-  test("reorders tasks within a bucket via drag handle", async ({ page }) => {
+  test("reorders tasks within a bucket via drag handle", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name === "phone",
+      "phone layout hides drag handles until hover",
+    );
     const first = `Drag A ${Date.now()}`;
     const second = `Drag B ${Date.now()}`;
     await page.goto("/");
@@ -20,7 +24,7 @@ test.describe("Drag reorder", () => {
     await expect(firstRow).toBeVisible();
     await expect(secondRow).toBeVisible();
 
-    const handle = firstRow.getByRole("button", { name: "Drag to reorder" });
+    const handle = firstRow.locator(".cursor-grab").first();
     await handle.dragTo(secondRow);
     await expect(taskRow(page, first)).toBeVisible();
   });

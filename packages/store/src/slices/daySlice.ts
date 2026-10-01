@@ -1,4 +1,5 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import { effectiveDayIso } from "@tudu/shared";
 
 function isoDate(date: Date) {
   const year = date.getFullYear();
@@ -46,7 +47,7 @@ export const daySlice = createSlice({
     },
     goToToday(state) {
       state.selectedTaskId = null;
-      state.selectedDate = todayIso();
+      state.selectedDate = effectiveDayIso();
     },
     setSelectedTaskId(state, action: PayloadAction<string | null>) {
       state.selectedTaskId = action.payload;

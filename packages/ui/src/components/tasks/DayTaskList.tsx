@@ -16,7 +16,7 @@ import {
 } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { BUCKETS, type Bucket, type Task } from "@tudu/shared";
+import { BUCKETS, effectiveDayIso, type Bucket, type Task } from "@tudu/shared";
 import {
   useCreateSubtaskMutation,
   useCreateTaskMutation,
@@ -27,7 +27,6 @@ import {
   useUpdateSubtaskMutation,
   useUpdateTaskMutation,
   useUploadTaskAttachmentMutation,
-  todayIso,
   selectVisible,
 } from "@tudu/store";
 import { bucketLabel } from "@/lib/buckets";
@@ -80,6 +79,8 @@ import { useNewTaskShortcut } from "@/hooks/useNewTaskShortcut";
 import { usePointerY } from "@/hooks/usePointerY";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { notifyAction, mutationResult } from "@/lib/notifyAction";
+import { useViewportBand } from "@/hooks/useViewportBand";
+import { cn } from "@/lib/utils";
 
 const CONTAINER_SWITCH_HYSTERESIS_PX = 12;
 
@@ -353,12 +354,14 @@ export function DayTaskList({
     id: string;
     title: string;
   } | null>(null);
-  const isToday = selectedDate === todayIso();
+  const logicalToday = effectiveDayIso();
+  const isToday = selectedDate === logicalToday;
   const [flashTaskId, setFlashTaskId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogBucket, setDialogBucket] = useState<Bucket>("later");
   const canReorder = true;
   const canDelete = true;
+  const band = useViewportBand();
 
   const { open: openTasks, completed: completedTasks } = useMemo(
     () => splitOpenAndCompleted(tasks),
@@ -418,7 +421,7 @@ export function DayTaskList({
     }
     if (
       isToday &&
-      lanesExceedNowCap(openTasks, lanes, todayIso())
+      lanesExceedNowCap(openTasks, lanes, logicalToday)
     ) {
       toast.error(NOW_CAP_EXCEEDED_MESSAGE);
       return;
@@ -452,7 +455,7 @@ export function DayTaskList({
         : undefined,
       canMoveToNow: canMoveTaskToNow({
         openTasks,
-        today: todayIso(),
+        today: logicalToday,
         selectedDate,
         task: tasks.find((entry) => entry.id === taskId)!,
       }),
@@ -464,7 +467,7 @@ export function DayTaskList({
               task &&
               !canMoveTaskToNow({
                 openTasks,
-                today: todayIso(),
+                today: logicalToday,
                 selectedDate,
                 task,
               })
@@ -491,7 +494,7 @@ export function DayTaskList({
               updateTask({
                 id: taskId,
                 patch: {
-                  scheduledDate: offsetIso(todayIso(), 1),
+                  scheduledDate: offsetIso(logicalToday, 1),
                   bucket: task.bucket,
                 },
               });
@@ -583,7 +586,19 @@ export function DayTaskList({
   return (
     <div className="flex h-full min-h-0 flex-col">
       {header}
-      <ScrollArea className="min-h-0 flex-1">
+      <ScrollArea
+        className="min-h-0 flex-1"
+        viewportClassName={cn(
+          band === "phone" &&
+            "scroll-pt-[52px] scroll-pb-[calc(72px+env(safe-area-inset-bottom,0px))]",
+        )}
+      >
+        <div
+          className={cn(
+            band === "phone" &&
+              "pb-[calc(72px+env(safe-area-inset-bottom,0px))]",
+          )}
+        >
         <DndContext
           sensors={sensors}
           collisionDetection={taskCollisionDetection}
@@ -616,6 +631,7 @@ export function DayTaskList({
             orgBadgeForTask={orgBadgeForTask}
           />
         </DndContext>
+        </div>
       </ScrollArea>
       {moveTarget ? (
         <MoveToSpaceDialog

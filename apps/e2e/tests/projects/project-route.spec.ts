@@ -1,12 +1,16 @@
 import { expect, test } from "@playwright/test";
+import {
+  dismissCommandsIfOpen,
+  runPaletteCommand,
+} from "../../helpers/day-navigation.js";
 
 test.describe("Project route", () => {
-  test("opens first project from settings list", async ({ page }) => {
-    await page.goto("/settings?section=projects");
-    await page.waitForURL(/section=projects/);
-    const projectLink = page.getByRole("link").filter({ hasText: /EGS|Home/i }).first();
-    await expect(projectLink).toBeVisible({ timeout: 15_000 });
-    await projectLink.click();
+  test("opens a seeded project from the command palette", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForURL((url) => url.pathname === "/");
+    await dismissCommandsIfOpen(page);
+    await runPaletteCommand(page, "Open project EGS");
     await expect(page).toHaveURL(/\/projects\//);
+    await expect(page.getByText("Ship EGS capacity notes")).toBeVisible();
   });
 });

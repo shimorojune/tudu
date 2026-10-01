@@ -19,6 +19,14 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+vi.mock("@tudu/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tudu/shared")>();
+  return {
+    ...actual,
+    effectiveDayIso: () => "2026-09-11",
+  };
+});
+
 vi.mock("@/hooks/useTaskFieldSuggest", () => ({
   useTaskFieldSuggest: () => {},
 }));

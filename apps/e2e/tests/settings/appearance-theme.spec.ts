@@ -22,17 +22,11 @@ test.describe("settings appearance", () => {
     await page.getByRole("button", { name: "Dark" }).click();
     await page.getByRole("button", { name: "Neutral" }).click();
 
-    await expect(page.locator("html")).toHaveCSS(
-      "--background",
-      /oklch\(0\.16/,
-    );
+    await expect(page.locator("html")).toHaveCSS("--background", "#171717");
 
     await page.reload();
     await page.waitForURL(/\/settings/);
 
-    await expect(page.locator("html")).toHaveCSS(
-      "--background",
-      /oklch\(0\.16/,
-    );
+    await expect(page.locator("html")).toHaveCSS("--background", "#171717");
   });
 });

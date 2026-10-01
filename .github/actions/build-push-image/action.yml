@@ -1,0 +1,117 @@
+name: Build and push one container image
+description: Build one Tudu image with BuildKit GHA cache and push to GHCR
+
+inputs:
+  image_owner:
+    description: GHCR owner (lowercase), e.g. egaindev
+    required: true
+  image_name:
+    description: Repository name under GHCR (tudu-web or tudu-server)
+    required: true
+  image_tag:
+    description: Primary image tag (usually github.sha)
+    required: true
+  dockerfile:
+    description: Dockerfile path relative to repo root
+    required: true
+  cache_scope:
+    description: GHA cache scope (tudu-web or tudu-server)
+    required: true
+  extra_tags:
+    description: Optional extra tags (comma-separated)
+    required: false
+    default: ""
+  vite_api_url:
+    description: VITE_API_URL build arg (web only)
+    required: false
+    default: ""
+  vite_posthog_key:
+    required: false
+    default: ""
+  vite_posthog_host:
+    required: false
+    default: ""
+  vite_firebase_api_key:
+    required: false
+    default: ""
+  vite_firebase_auth_domain:
+    required: false
+    default: ""
+  vite_firebase_project_id:
+    required: false
+    default: ""
+  vite_firebase_messaging_sender_id:
+    required: false
+    default: ""
+  vite_firebase_app_id:
+    required: false
+    default: ""
+  vite_firebase_vapid_key:
+    required: false
+    default: ""
+
+outputs:
+  image:
+    description: Full image reference (ghcr.io/owner/name:tag)
+    value: ${{ steps.tags.outputs.image }}
+
+runs:
+  using: composite
+  steps:
+    - name: Log in to GHCR
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Resolve image tags
+      id: tags
+      shell: bash
+      env:
+        IMAGE_OWNER: ${{ inputs.image_owner }}
+        IMAGE_NAME: ${{ inputs.image_name }}
+        IMAGE_TAG: ${{ inputs.image_tag }}
+        EXTRA_TAGS: ${{ inputs.extra_tags }}
+      run: |
+        set -euo pipefail
+        base="ghcr.io/${IMAGE_OWNER}/${IMAGE_NAME}"
+        echo "image=${base}:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+        {
+          echo "${base}:${IMAGE_TAG}"
+          if [ -n "$EXTRA_TAGS" ]; then
+            IFS=',' read -ra extras <<< "$EXTRA_TAGS"
+            for t in "${extras[@]}"; do
+              t="${t#"${t%%[![:space:]]*}"}"
+              t="${t%"${t##*[![:space:]]}"}"
+              [ -z "$t" ] && continue
+              echo "${base}:${t}"
+            done
+          fi
+        } >> tags.txt
+        echo "tags<<EOF" >> "$GITHUB_OUTPUT"
+        cat tags.txt >> "$GITHUB_OUTPUT"
+        echo "EOF" >> "$GITHUB_OUTPUT"
+
+    - name: Build and push
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: ${{ inputs.dockerfile }}
+        push: true
+        tags: ${{ steps.tags.outputs.tags }}
+        cache-from: type=gha,scope=${{ inputs.cache_scope }}
+        cache-to: type=gha,mode=max,scope=${{ inputs.cache_scope }}
+        build-args: |
+          VITE_API_URL=${{ inputs.vite_api_url }}
+          VITE_POSTHOG_KEY=${{ inputs.vite_posthog_key }}
+          VITE_POSTHOG_HOST=${{ inputs.vite_posthog_host }}
+          VITE_FIREBASE_API_KEY=${{ inputs.vite_firebase_api_key }}
+          VITE_FIREBASE_AUTH_DOMAIN=${{ inputs.vite_firebase_auth_domain }}
+          VITE_FIREBASE_PROJECT_ID=${{ inputs.vite_firebase_project_id }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID=${{ inputs.vite_firebase_messaging_sender_id }}
+          VITE_FIREBASE_APP_ID=${{ inputs.vite_firebase_app_id }}
+          VITE_FIREBASE_VAPID_KEY=${{ inputs.vite_firebase_vapid_key }}

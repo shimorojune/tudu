@@ -11,6 +11,8 @@ permissions:
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
+    with:
+      skip_desktop: true
     secrets: inherit
 
   release:
@@ -147,17 +149,16 @@ jobs:
             "dist/${ZIP_NAME}" \
             --clobber
 
-  deploy-prod:
-    name: Deploy Web + Server
+  build-web:
+    name: Build web image (prod)
     needs: release
     if: needs.release.outputs.new_release_published == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-    concurrency:
-      group: dokploy-deploy
-      cancel-in-progress: false
+    outputs:
+      image: ${{ steps.image.outputs.image }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -168,6 +169,72 @@ jobs:
         id: ghcr
         shell: bash
         run: echo "owner=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        id: image
+        uses: ./.github/actions/build-push-image
+        with:
+          image_owner: ${{ steps.ghcr.outputs.owner }}
+          image_name: tudu-web
+          image_tag: ${{ needs.release.outputs.release_sha || github.sha }}
+          extra_tags: v${{ needs.release.outputs.new_release_version }}
+          dockerfile: apps/web/Dockerfile
+          cache_scope: tudu-web
+          vite_api_url: https://api.tudu.ezdev.net
+          vite_posthog_key: ${{ secrets.VITE_POSTHOG_KEY }}
+          vite_posthog_host: https://us.i.posthog.com
+          vite_firebase_api_key: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          vite_firebase_auth_domain: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          vite_firebase_project_id: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          vite_firebase_messaging_sender_id: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          vite_firebase_app_id: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          vite_firebase_vapid_key: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
+
+  build-server:
+    name: Build server image (prod)
+    needs: release
+    if: needs.release.outputs.new_release_published == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.release_sha || format('tudu-{0}', needs.release.outputs.new_release_version) }}
+
+      - name: GHCR image owner
+        id: ghcr
+        shell: bash
+        run: echo "owner=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        id: image
+        uses: ./.github/actions/build-push-image
+        with:
+          image_owner: ${{ steps.ghcr.outputs.owner }}
+          image_name: tudu-server
+          image_tag: ${{ needs.release.outputs.release_sha || github.sha }}
+          extra_tags: v${{ needs.release.outputs.new_release_version }}
+          dockerfile: apps/server/Dockerfile
+          cache_scope: tudu-server
+
+  deploy-prod:
+    name: Deploy Web + Server
+    needs: [release, build-web, build-server]
+    if: needs.release.outputs.new_release_published == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: dokploy-deploy-prod
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.release_sha || format('tudu-{0}', needs.release.outputs.new_release_version) }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -183,33 +250,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install ripgrep
-        run: sudo apt-get update && sudo apt-get install -y ripgrep
-
-      - name: Lint copy
-        run: pnpm lint:copy
-
       - name: Migrate database
         env:
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
         run: pnpm db:migrate
-
-      - name: Build and push images
-        id: images
-        uses: ./.github/actions/build-push-images
-        with:
-          image_owner: ${{ steps.ghcr.outputs.owner }}
-          image_tag: ${{ needs.release.outputs.release_sha || github.sha }}
-          extra_tags: v${{ needs.release.outputs.new_release_version }}
-          vite_api_url: https://api.tudu.ezdev.net
-          vite_posthog_key: ${{ secrets.VITE_POSTHOG_KEY }}
-          vite_posthog_host: https://us.i.posthog.com
-          vite_firebase_api_key: ${{ secrets.VITE_FIREBASE_API_KEY }}
-          vite_firebase_auth_domain: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-          vite_firebase_project_id: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-          vite_firebase_messaging_sender_id: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-          vite_firebase_app_id: ${{ secrets.VITE_FIREBASE_APP_ID }}
-          vite_firebase_vapid_key: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
 
       - name: Set Dokploy image env
         uses: ./.github/actions/dokploy-set-compose-env
@@ -218,8 +262,8 @@ jobs:
           api_key: ${{ secrets.DOKPLOY_API_KEY }}
           compose_id: ${{ secrets.DOKPLOY_COMPOSE_ID }}
           env_updates: |
-            TUDU_WEB_IMAGE=${{ steps.images.outputs.web_image }}
-            TUDU_SERVER_IMAGE=${{ steps.images.outputs.server_image }}
+            TUDU_WEB_IMAGE=${{ needs.build-web.outputs.image }}
+            TUDU_SERVER_IMAGE=${{ needs.build-server.outputs.image }}
 
       - name: Trigger Dokploy deployment
         uses: ./.github/actions/dokploy-deploy-compose

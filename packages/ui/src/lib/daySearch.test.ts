@@ -14,6 +14,7 @@ import {
   parseTaskSearch,
   planDaySearchSync,
   rawSearchFromString,
+  resolveDaySearchTaskFound,
   serializeDaySearch,
 } from "./daySearch";
 
@@ -174,6 +175,41 @@ describe("findDaySearchIssues", () => {
     expect(
       findDaySearchIssues({ tab: "details" }, { tab: true }),
     ).toEqual([]);
+  });
+});
+
+describe("resolveDaySearchTaskFound", () => {
+  it("returns null while loading", () => {
+    expect(
+      resolveDaySearchTaskFound({
+        isLoading: true,
+        isFetching: false,
+        selectedTaskId: taskId,
+        taskIds: [],
+      }),
+    ).toBeNull();
+  });
+
+  it("returns null when selected task is not listed yet but query is fetching", () => {
+    expect(
+      resolveDaySearchTaskFound({
+        isLoading: false,
+        isFetching: true,
+        selectedTaskId: taskId,
+        taskIds: [],
+      }),
+    ).toBeNull();
+  });
+
+  it("returns false when load settled and task is missing", () => {
+    expect(
+      resolveDaySearchTaskFound({
+        isLoading: false,
+        isFetching: false,
+        selectedTaskId: taskId,
+        taskIds: [],
+      }),
+    ).toBe(false);
   });
 });
 

@@ -33,6 +33,8 @@ Secrets: `E2E_DATABASE_URL`, `E2E_BETTER_AUTH_SECRET`. Scheduled jobs also set `
 
 When you change user-visible UI or API behavior, update `apps/e2e/tests/**` and run `pnpm test:e2e` locally when `E2E_DATABASE_URL` is configured.
 
+Quick Add (desktop quick-add window) is covered by `packages/ui/src/components/chrome/QuickAddTaskPane.test.tsx`. Web Playwright runs against the Vite shell only, which does not mount that pane.
+
 If Playwright fails with `password authentication failed`, refresh the pooled URL in Neon, update `.env` and the GitHub secret, then re-run:
 
 ```bash

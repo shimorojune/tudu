@@ -3,9 +3,9 @@ import type { Bucket } from "@tudu/shared";
 import {
   DEFAULT_NOW_SOFT_CAP,
   NOW_CAP_EXCEEDED_MESSAGE,
+  effectiveDayIso,
   validateStartBeforeDeadline,
 } from "@tudu/shared";
-import { todayIso } from "@tudu/store";
 import { canAddNewTaskToNow } from "@/lib/nowCapGuard";
 import { useTaskFieldSuggest } from "@/hooks/useTaskFieldSuggest";
 import { useTaskTitleNaturalLanguage } from "@/hooks/useTaskTitleNaturalLanguage";
@@ -24,6 +24,7 @@ import { FormBusy } from "@/components/forms/FormBusy";
 import { Button } from "@/components/ui/button";
 import { clearPendingAttachmentBlobUrls } from "@/lib/finalizeNewTaskDescriptionAttachments";
 import { TaskTitleNaturalLanguageField } from "@/components/tasks/TaskTitleNaturalLanguageField";
+import { useOptionalCommandPalette } from "@/components/chrome/CommandPaletteContext";
 export type { NewTaskDayChoice } from "@/components/tasks/TaskScheduleFields";
 import type { NewTaskDayChoice } from "@/components/tasks/TaskScheduleFields";
 import { TaskStartDeadlineFields } from "@/components/tasks/TaskStartDeadlineFields";
@@ -72,6 +73,7 @@ export function NewTaskDialog({
   onOpenChange,
   onSubmit,
 }: NewTaskDialogProps) {
+  const commandPalette = useOptionalCommandPalette();
   const titleRef = useRef<HTMLInputElement>(null);
   const pendingAttachmentsRef = useRef<Map<string, File>>(new Map());
   const [title, setTitle] = useState("");
@@ -95,7 +97,7 @@ export function NewTaskDialog({
   const [jevSuggesting, setJevSuggesting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const today = todayIso();
+  const today = effectiveDayIso();
   const parse = useTaskTitleNaturalLanguage(title, today);
   const scheduledDate = useMemo(
     () => resolveScheduledDate(dayChoice, pickedDate, today),
@@ -152,8 +154,9 @@ export function NewTaskDialog({
     setProjectId(null);
     setStartDate("");
     setDeadline(null);
-    setScheduleSource("auto");
-    setBucketSource("auto");
+    const onPastDay = initialDate !== today;
+    setScheduleSource(onPastDay ? "manual" : "auto");
+    setBucketSource(onPastDay ? "manual" : "auto");
     setProjectSource("auto");
     setStartSource("auto");
     setDeadlineSource("auto");
@@ -161,6 +164,18 @@ export function NewTaskDialog({
     setSubmitting(false);
     window.requestAnimationFrame(() => titleRef.current?.focus());
   }, [defaultDayChoice, initialBucket, initialDate, initialDescription, initialTitle, open, today]);
+
+  useEffect(() => {
+    if (open && commandPalette) {
+      commandPalette.setOpen(false);
+    }
+  }, [open, commandPalette]);
+
+  useEffect(() => {
+    if (!open && commandPalette) {
+      commandPalette.setOpen(false);
+    }
+  }, [open, commandPalette]);
 
   const targetIsToday = scheduledDate === today;
   const isUnscheduled = dayChoice === "unscheduled";
@@ -217,6 +232,7 @@ export function NewTaskDialog({
         pendingAttachments,
       });
       clearPendingAttachmentBlobUrls(pendingAttachmentsRef.current);
+      commandPalette?.setOpen(false);
       onOpenChange(false);
     } finally {
       setSubmitting(false);

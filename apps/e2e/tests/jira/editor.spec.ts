@@ -1,12 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { isJiraConnected } from "../../helpers/jira";
+import { ensureTodayPage } from "../../helpers/day-navigation.js";
+import { openNewTaskForBucket } from "../../helpers/completed-section.js";
 
 test.describe("rich text editor", () => {
   test("renders Tiptap for new task description", async ({ page }) => {
-    await page.goto("/");
-    await page.waitForURL("/");
+    await ensureTodayPage(page);
 
-    await page.getByRole("button", { name: "Add task" }).first().click();
+    await openNewTaskForBucket(page, "Now");
     await expect(page.getByPlaceholder("What needs doing?")).toBeVisible();
 
     const editor = page.getByTestId("rich-text-editor");

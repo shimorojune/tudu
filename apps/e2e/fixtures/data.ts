@@ -9,12 +9,14 @@ export async function createTaskForToday(
   request: APIRequestContext,
   title: string,
   date: string,
+  orgId?: string,
 ) {
   const response = await request.post(`${E2E_SERVER_URL}/tasks`, {
     data: {
       title,
       bucket: "later",
       scheduledDate: date,
+      ...(orgId ? { orgId } : {}),
     },
   });
   if (!response.ok()) {

@@ -18,4 +18,26 @@ describe("TaskDescriptionField", () => {
 
     expect(screen.getByRole("textbox", { name: "Task description" })).toBeInTheDocument();
   });
+
+  it("shows the new task description when taskId changes", () => {
+    const { rerender } = render(
+      <TaskDescriptionField
+        taskId="11111111-1111-4111-8111-111111111111"
+        description="<p>Task A</p>"
+      />,
+    );
+    expect(screen.getByRole("textbox", { name: "Task description" })).toHaveTextContent(
+      "Task A",
+    );
+
+    rerender(
+      <TaskDescriptionField
+        taskId="22222222-2222-4222-8222-222222222222"
+        description="<p>Task B</p>"
+      />,
+    );
+    expect(screen.getByRole("textbox", { name: "Task description" })).toHaveTextContent(
+      "Task B",
+    );
+  });
 });

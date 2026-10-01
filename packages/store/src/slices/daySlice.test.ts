@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   daySlice,
   goToToday,
@@ -11,6 +11,14 @@ import {
 } from "./daySlice.js";
 
 describe("daySlice selection", () => {
+  it("goToToday uses the effective day (before day-start hour)", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-06T02:00:00"));
+    const state = daySlice.reducer(undefined, goToToday());
+    expect(state.selectedDate).toBe("2026-09-05");
+    vi.useRealTimers();
+  });
+
   it("clears selectedTaskId when the date changes", () => {
     let state = daySlice.reducer(undefined, setSelectedTaskId("abc"));
     expect(state.selectedTaskId).toBe("abc");

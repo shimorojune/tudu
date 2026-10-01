@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import type { Bucket } from "@tudu/shared";
-import { BUCKETS, DEFAULT_NOW_SOFT_CAP } from "@tudu/shared";
-import { todayIso } from "@tudu/store";
+import { BUCKETS, DEFAULT_NOW_SOFT_CAP, effectiveDayIso } from "@tudu/shared";
 import { DateField } from "@/components/ui/date-field";
 import { bucketLabel } from "@/lib/buckets";
 import { cn } from "@/lib/utils";
@@ -120,7 +119,7 @@ export function TaskScheduleFields({
   onBucketChange,
   onPickedDateChange,
 }: TaskScheduleFieldsProps) {
-  const today = todayIso();
+  const today = effectiveDayIso();
   const scheduledDate = useMemo(() => {
     if (dayChoice === "unscheduled") {
       return null;

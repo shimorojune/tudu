@@ -4,10 +4,12 @@ import { makeStore } from "@tudu/store";
 import { Provider } from "react-redux";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { CommandPalette } from "./CommandPalette";
+import { CommandPaletteSelectionSync } from "./CommandPaletteSelectionSync";
 import {
   CommandPaletteProvider,
   useCommandPalette,
 } from "./CommandPaletteContext";
+import { setSelectedTaskId } from "@tudu/store";
 
 function OpenCommandsButton() {
   const { openPalette } = useCommandPalette();
@@ -23,9 +25,11 @@ const navigate = vi.fn();
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
   useRouterState: (opts?: {
-    select?: (state: { location: { pathname: string } }) => unknown;
+    select?: (state: {
+      location: { pathname: string; searchStr: string };
+    }) => unknown;
   }) => {
-    const snapshot = { location: { pathname: "/" } };
+    const snapshot = { location: { pathname: "/", searchStr: "" } };
     return opts?.select ? opts.select(snapshot) : snapshot;
   },
 }));
@@ -182,6 +186,31 @@ describe("CommandPalette", () => {
     expect(navigate).toHaveBeenCalledWith({
       to: "/week",
       search: { week: expect.stringMatching(/^\d{4}-W\d{2}$/) },
+    });
+  });
+
+  it("closes when a task is selected in the store", async () => {
+    const user = userEvent.setup();
+    const store = makeStore();
+    render(
+      <Provider store={store}>
+        <CommandPaletteProvider>
+          <CommandPaletteSelectionSync />
+          <OpenCommandsButton />
+          <CommandPalette />
+        </CommandPaletteProvider>
+      </Provider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Commands" }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+
+    await act(() => {
+      store.dispatch(setSelectedTaskId("task-1"));
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
   });
 });
