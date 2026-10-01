@@ -1,6 +1,8 @@
 import type {
   CreateOrgBody,
   CreateOrgInviteBody,
+  CreateOrgInviteResponse,
+  ResendOrgInviteResponse,
   HandoverPreview,
   InvitePreview,
   JoinPreview,
@@ -134,7 +136,7 @@ export const orgsApi = baseApi.injectEndpoints({
       ],
     }),
     createOrgInvite: builder.mutation<
-      { id: string },
+      CreateOrgInviteResponse,
       { slug: string; body: CreateOrgInviteBody }
     >({
       query: ({ slug, body }) => ({
@@ -147,7 +149,10 @@ export const orgsApi = baseApi.injectEndpoints({
         { type: "Org", id: slug },
       ],
     }),
-    resendOrgInvite: builder.mutation<void, { slug: string; inviteId: string }>(
+    resendOrgInvite: builder.mutation<
+      ResendOrgInviteResponse,
+      { slug: string; inviteId: string }
+    >(
       {
         query: ({ slug, inviteId }) => ({
           url: `/orgs/${slug}/invites/${inviteId}/resend`,

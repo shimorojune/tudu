@@ -43,6 +43,15 @@ export const createOrgInviteBodySchema = z.object({
 
 export type CreateOrgInviteBody = z.infer<typeof createOrgInviteBodySchema>;
 
+export type CreateOrgInviteResponse = {
+  id: string;
+  emailDelivered: boolean;
+};
+
+export type ResendOrgInviteResponse = {
+  emailDelivered: boolean;
+};
+
 export const handoverBodySchema = z.object({
   handoverTo: z.string().min(1).optional(),
 });

@@ -1,4 +1,4 @@
-import { resolveApiUrlFromOptions } from "@tudu/shared";
+import { resolveApiUrlFromOptions, resolveWebAppBaseUrlFromOptions } from "@tudu/shared";
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
 let authTokenGetter: (() => Promise<string | null>) | null = null;
@@ -16,6 +16,21 @@ export function resolveApiUrl() {
   const isTauri = import.meta.env?.TAURI_ENV_PLATFORM !== undefined;
 
   return resolveApiUrlFromOptions({
+    viteApiUrl,
+    isTauri,
+    webHostname: hostname,
+  });
+}
+
+export function resolveWebAppBaseUrl() {
+  const viteApiUrl = import.meta.env?.VITE_API_URL;
+  const hostname =
+    typeof globalThis.location?.hostname === "string"
+      ? globalThis.location.hostname
+      : undefined;
+  const isTauri = import.meta.env?.TAURI_ENV_PLATFORM !== undefined;
+
+  return resolveWebAppBaseUrlFromOptions({
     viteApiUrl,
     isTauri,
     webHostname: hostname,

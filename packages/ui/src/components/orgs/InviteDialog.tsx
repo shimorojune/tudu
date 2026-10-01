@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { OrgRole } from "@tudu/shared";
 import {
+  resolveWebAppBaseUrl,
   useApproveJoinRequestMutation,
   useCreateOrgInviteMutation,
   useDeclineJoinRequestMutation,
@@ -28,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { mutationResult, notifyAction } from "@/lib/notifyAction";
+import { toast } from "sonner";
 
 export type InviteDialogProps = {
   slug: string;
@@ -55,11 +57,7 @@ export function InviteDialog({ slug, open, onOpenChange }: InviteDialogProps) {
     if (!code) {
       return "";
     }
-    const origin =
-      typeof globalThis.location?.origin === "string"
-        ? globalThis.location.origin
-        : "";
-    return `${origin}/join/${code}`;
+    return `${resolveWebAppBaseUrl()}/join/${code}`;
   }, [invitesPayload?.joinCode]);
 
   async function handleInvite() {
@@ -68,17 +66,19 @@ export function InviteDialog({ slug, open, onOpenChange }: InviteDialogProps) {
       return;
     }
     try {
-      await notifyAction(
-        () =>
-          mutationResult(
-            createInvite({ slug, body: { email: trimmed, role } }),
-          ),
-        { success: "Invite sent", error: "Could not send invite" },
+      const result = await mutationResult(
+        createInvite({ slug, body: { email: trimmed, role } }),
+      );
+      const payload = result as { emailDelivered?: boolean };
+      toast.success(
+        payload.emailDelivered
+          ? "Invite sent"
+          : "Invite saved. Email is not configured; share the join link.",
       );
       setEmail("");
       void refetch();
     } catch {
-      // Toast already shown.
+      toast.error("Could not send invite");
     }
   }
 
@@ -204,13 +204,21 @@ export function InviteDialog({ slug, open, onOpenChange }: InviteDialogProps) {
                 size="sm"
                 disabled={!invite.canResend}
                 onClick={() =>
-                  void notifyAction(
-                    () =>
-                      mutationResult(
+                  void (async () => {
+                    try {
+                      const result = await mutationResult(
                         resendInvite({ slug, inviteId: invite.id }),
-                      ),
-                    { success: "Invite resent", error: "Could not resend" },
-                  )
+                      );
+                      const payload = result as { emailDelivered?: boolean };
+                      toast.success(
+                        payload.emailDelivered
+                          ? "Invite resent"
+                          : "Invite still pending. Email is not configured.",
+                      );
+                    } catch {
+                      toast.error("Could not resend");
+                    }
+                  })()
                 }
               >
                 Resend

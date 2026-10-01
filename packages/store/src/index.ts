@@ -3,6 +3,7 @@ export {
   baseApi,
   getAuthToken,
   resolveApiUrl,
+  resolveWebAppBaseUrl,
 } from "./api/baseApi.js";
 export {
   useGetNotificationSettingsQuery,

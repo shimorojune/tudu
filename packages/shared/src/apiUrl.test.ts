@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   resolveApiUrlFromOptions,
   resolveUpdatesPublicBaseUrl,
+  resolveWebAppBaseUrlFromOptions,
 } from "./apiUrl.js";
 
 describe("resolveApiUrlFromOptions", () => {
@@ -36,6 +37,38 @@ describe("resolveApiUrlFromOptions", () => {
     expect(
       resolveApiUrlFromOptions({ isTauri: true }),
     ).toBe("https://api.tudu.ezdev.net");
+  });
+});
+
+describe("resolveWebAppBaseUrlFromOptions", () => {
+  it("maps ezdev web host to ezdev web URL", () => {
+    expect(
+      resolveWebAppBaseUrlFromOptions({ webHostname: "tudu.ezdev.net" }),
+    ).toBe("https://tudu.ezdev.net");
+  });
+
+  it("maps prod API URL to matching web URL", () => {
+    expect(
+      resolveWebAppBaseUrlFromOptions({
+        viteApiUrl: "https://api.tudu.rraj.dev",
+        isTauri: true,
+      }),
+    ).toBe("https://tudu.rraj.dev");
+  });
+
+  it("defaults Tauri prod to ezdev web URL", () => {
+    expect(resolveWebAppBaseUrlFromOptions({ isTauri: true })).toBe(
+      "https://tudu.ezdev.net",
+    );
+  });
+
+  it("uses localhost web URL for local API", () => {
+    expect(
+      resolveWebAppBaseUrlFromOptions({
+        viteApiUrl: "http://localhost:3456",
+        isTauri: true,
+      }),
+    ).toBe("http://localhost:5173");
   });
 });
 

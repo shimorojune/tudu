@@ -1,4 +1,5 @@
 import { OrgActionError } from "@tudu/db";
+import { resolveWebAppBaseUrlFromApiUrl } from "@tudu/shared";
 
 export function mapOrgError(error: unknown): { status: number; body: { error: string; code: string } } {
   if (error instanceof OrgActionError) {
@@ -11,7 +12,16 @@ export function mapOrgError(error: unknown): { status: number; body: { error: st
 }
 
 export function resolveAppBaseUrl(): string {
-  return (
-    process.env.APP_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:5173"
-  );
+  const explicit = process.env.APP_BASE_URL?.trim().replace(/\/$/, "");
+  if (explicit) {
+    return explicit;
+  }
+  const authUrl = process.env.BETTER_AUTH_URL?.trim().replace(/\/$/, "");
+  if (authUrl) {
+    const mapped = resolveWebAppBaseUrlFromApiUrl(authUrl);
+    if (mapped) {
+      return mapped;
+    }
+  }
+  return "http://localhost:5173";
 }

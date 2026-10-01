@@ -68,7 +68,7 @@ async function sendInviteEmail(
   to: string,
   token: string,
   expiresAt: Date,
-) {
+): Promise<boolean> {
   const inviteUrl = `${resolveAppBaseUrl()}/invite/${token}`;
   const rendered = renderInviteEmail({
     inviterName: inviterName ?? "A co-worker",
@@ -76,12 +76,13 @@ async function sendInviteEmail(
     inviteUrl,
     expiresOn: expiresAt.toLocaleDateString("en-US"),
   });
-  await sendEmail({
+  const { delivered } = await sendEmail({
     to,
     subject: rendered.subject,
     html: rendered.html,
     text: rendered.text,
   });
+  return delivered;
 }
 
 export function createOrgsRoute(db: Db) {
@@ -400,14 +401,14 @@ export function createOrgsRoute(db: Db) {
           c.req.param("slug"),
           body,
         );
-        await sendInviteEmail(
+        const emailDelivered = await sendInviteEmail(
           user.name,
           (await getOrgDetail(db, user.id, c.req.param("slug"))).name,
           invite.email,
           token,
           invite.expiresAt,
         );
-        return c.json({ id: invite.id }, 201);
+        return c.json({ id: invite.id, emailDelivered }, 201);
       } catch (error) {
         const mapped = mapOrgError(error);
         return c.json(mapped.body, mapped.status as 409);
@@ -445,14 +446,14 @@ export function createOrgsRoute(db: Db) {
         c.req.param("slug"),
         c.req.param("id"),
       );
-      await sendInviteEmail(
+      const emailDelivered = await sendInviteEmail(
         user.name,
         (await getOrgDetail(db, user.id, c.req.param("slug"))).name,
         invite.email,
         token,
         invite.expiresAt,
       );
-      return c.body(null, 204);
+      return c.json({ emailDelivered });
     } catch (error) {
       const mapped = mapOrgError(error);
       return c.json(mapped.body, mapped.status as 429);

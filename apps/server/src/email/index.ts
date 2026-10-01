@@ -92,9 +92,13 @@ export async function getEmailTransport(): Promise<EmailTransport> {
   return transport;
 }
 
-export async function sendEmail(input: SendEmailInput): Promise<void> {
+export async function sendEmail(
+  input: SendEmailInput,
+): Promise<{ delivered: boolean }> {
+  const mode = process.env.EMAIL_TRANSPORT ?? "disabled";
   const active = await getEmailTransport();
   await active.send(input);
+  return { delivered: mode !== "disabled" };
 }
 
 export function readMemoryOutbox(to?: string): SentEmail[] {
