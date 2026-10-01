@@ -6,11 +6,6 @@ on:
     branches-ignore:
       - master
   workflow_call:
-    inputs:
-      skip_desktop:
-        description: Skip Tauri cargo check (web and server deploy only)
-        type: boolean
-        default: false
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -66,7 +61,6 @@ jobs:
 
   desktop-check:
     name: Desktop Rust check
-    if: ${{ inputs.skip_desktop != true }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

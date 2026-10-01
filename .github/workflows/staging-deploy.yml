@@ -17,8 +17,6 @@ permissions:
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
-    with:
-      skip_desktop: true
     secrets: inherit
 
   build-web:

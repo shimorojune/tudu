@@ -11,8 +11,6 @@ permissions:
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
-    with:
-      skip_desktop: true
     secrets: inherit
 
   release:
@@ -224,7 +222,7 @@ jobs:
 
   deploy-prod:
     name: Deploy Web + Server
-    needs: [release, build-web, build-server]
+    needs: [release, build-macos, build-web, build-server]
     if: needs.release.outputs.new_release_published == 'true'
     runs-on: ubuntu-latest
     concurrency:
