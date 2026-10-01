@@ -76,6 +76,8 @@ describe("DayTab", () => {
       </Provider>,
     );
 
-    expect(screen.getByRole("link", { name: "Today" })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Previous day/)).toBeDisabled();
+    expect(screen.getByLabelText(/Next day/)).toBeDisabled();
+    expect(screen.getByRole("link", { name: /Today/ })).toBeInTheDocument();
   });
 });

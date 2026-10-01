@@ -252,6 +252,36 @@ describe("TaskRow", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows Schedule… in the context menu when handler is provided", async () => {
+    const onOpenScheduleDialog = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <TaskRow
+        task={fixtureTask}
+        bucket="now"
+        selected={false}
+        selectedDate="2026-09-05"
+        onSelect={vi.fn()}
+        menuVariant="day"
+        actions={defaultActions({
+          onMoveToBucket: vi.fn(),
+          onScheduleForTomorrow: vi.fn(),
+          onOpenScheduleDialog,
+        })}
+      />,
+    );
+
+    await user.pointer({
+      keys: "[MouseRight>]",
+      target: screen.getByRole("button", { name: /Improve error message/i }),
+    });
+
+    expect(screen.getByRole("menuitem", { name: "Schedule…" })).toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "Schedule…" }));
+    expect(onOpenScheduleDialog).toHaveBeenCalled();
+  });
+
   it("animates the subtask panel open and closed", () => {
     const { container, rerender } = render(
       <TaskRow

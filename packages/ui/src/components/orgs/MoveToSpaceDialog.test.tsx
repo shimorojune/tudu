@@ -69,9 +69,14 @@ describe("MoveToSpaceDialog", () => {
       await screen.findByRole("dialog", { name: /Move to a space/ }),
     ).toBeInTheDocument();
     expect(await screen.findByText("Acme")).toBeInTheDocument();
-    await waitFor(() => {
-      expect(screen.getByText(/co-workers will be able to read this task/)).toBeInTheDocument();
-    });
+    expect(
+      screen.getByText(/co-workers will be able to read this task/),
+    ).toBeInTheDocument();
     expect(screen.getByText(/cannot come back to Personal/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Personal tasks can move to an organization once/),
+    ).toBeInTheDocument();
+    const orgButtons = screen.getAllByRole("button", { name: "Acme" });
+    expect(orgButtons.length).toBeGreaterThan(0);
   });
 });

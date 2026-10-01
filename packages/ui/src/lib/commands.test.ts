@@ -31,6 +31,15 @@ describe("commands", () => {
     ]);
   });
 
+  it("navigates to settings general from go-settings", () => {
+    const command = APP_COMMANDS.find((entry) => entry.id === "go-settings");
+    expect(command?.action).toEqual({
+      kind: "navigate",
+      to: "/settings",
+      search: { section: "general" },
+    });
+  });
+
   it("adds filter and open commands for live projects", () => {
     const commands = projectCommands([
       {

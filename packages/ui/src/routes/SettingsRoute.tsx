@@ -26,7 +26,7 @@ const settingsSections = new Set<SettingsSection>([
 function sectionFromSearch(section: string | undefined): SettingsSection {
   return section && settingsSections.has(section as SettingsSection)
     ? (section as SettingsSection)
-    : "account";
+    : "general";
 }
 
 export function SettingsRoute() {
@@ -39,6 +39,17 @@ export function SettingsRoute() {
   useEffect(() => {
     setSection(sectionFromSearch(search.section));
   }, [search.section]);
+
+  useEffect(() => {
+    if (search.section) {
+      return;
+    }
+    void navigate({
+      to: "/settings",
+      search: { section: "general" },
+      replace: true,
+    });
+  }, [navigate, search.section]);
 
   function selectSection(next: SettingsSection) {
     setSection(next);

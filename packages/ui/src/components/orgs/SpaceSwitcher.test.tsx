@@ -14,6 +14,15 @@ const server = setupServer(
         { kind: "personal", name: "Personal", taskCount: 1 },
         {
           kind: "org",
+          name: "Solo Org",
+          slug: "solo",
+          orgId: "org-solo",
+          color: "cobalt",
+          role: "owner",
+          memberCount: 1,
+        },
+        {
+          kind: "org",
           name: "Acme",
           slug: "acme",
           orgId: "org-1",
@@ -54,6 +63,8 @@ describe("SpaceSwitcher", () => {
 
     await user.click(screen.getByRole("button", { name: "Switch space" }));
     expect(await screen.findByText("Acme")).toBeInTheDocument();
+    expect(screen.getByText("Organization · 1 person")).toBeInTheDocument();
+    expect(screen.getByText("Organization · 3 people")).toBeInTheDocument();
     expect(screen.getByText(/Alt\+1|Ctrl\+1/)).toBeInTheDocument();
     expect(screen.getByText(/Alt\+2|Ctrl\+2/)).toBeInTheDocument();
     await user.click(screen.getByText("New organization"));

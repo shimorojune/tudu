@@ -20,17 +20,20 @@ function SegmentedControl<T extends string>({
   onChange,
   disabled = false,
   size = "md",
+  compact = false,
 }: {
   value: T;
   options: SegmentedOption<T>[];
   onChange: (next: T) => void;
   disabled?: boolean;
   size?: "md" | "sm";
+  compact?: boolean;
 }) {
   return (
     <div
       className={cn(
         "inline-flex max-w-full border border-rule",
+        compact && "flex-wrap",
         disabled && "cursor-not-allowed opacity-50",
       )}
     >
@@ -212,12 +215,18 @@ export function TaskScheduleFields({
   }
 
   return (
-    <div className={cn("space-y-[10px]", !compact && "space-y-[8px]")}>
+    <div
+      className={cn(
+        "space-y-[10px] min-w-0 max-w-full",
+        !compact && "space-y-[8px]",
+      )}
+    >
       <div className="space-y-[6px]">
         <div className={labelClass}>Day</div>
         <div className="flex flex-wrap items-center gap-[10px]">
           <SegmentedControl
             size={segmentSize}
+            compact={compact}
             value={dayChoice}
             onChange={onDayChoiceChange}
             options={dayOptions}
@@ -239,6 +248,7 @@ export function TaskScheduleFields({
         <div className="flex flex-wrap items-center gap-[10px]">
           <SegmentedControl
             size={segmentSize}
+            compact={compact}
             value={bucket}
             disabled={isUnscheduled}
             onChange={onBucketChange}

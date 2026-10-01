@@ -132,6 +132,7 @@ vi.mock("@tudu/store", async (importOriginal) => {
 describe("SettingsRoute", () => {
   beforeEach(() => {
     searchState.section = undefined;
+    navigate.mockReset();
     connectJira.mockReset();
     disconnectJira.mockReset();
     updateJiraProjectKeys.mockReset();
@@ -142,8 +143,24 @@ describe("SettingsRoute", () => {
     refreshJiraComponents.mockReturnValue(mutationResult);
   });
 
-  it("shows the signed-in profile and sign out control", () => {
+  it("defaults to the general settings panel", () => {
     renderSettings();
+
+    expect(
+      screen.getByRole("heading", { name: "General", level: 1 }),
+    ).toBeInTheDocument();
+    expect(navigate).toHaveBeenCalledWith({
+      to: "/settings",
+      search: { section: "general" },
+      replace: true,
+    });
+  });
+
+  it("shows the signed-in profile and sign out control", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+
+    await user.click(screen.getByRole("button", { name: "Account and login" }));
 
     expect(screen.getAllByText("Test User").length).toBeGreaterThan(0);
     expect(screen.getAllByText("testuser@egain.com").length).toBeGreaterThan(0);
@@ -157,6 +174,7 @@ describe("SettingsRoute", () => {
 
     renderSettings();
 
+    await user.click(screen.getByRole("button", { name: "Account and login" }));
     await user.click(screen.getByRole("button", { name: "Sign out" }));
 
     expect(signOutMock).toHaveBeenCalledTimes(1);

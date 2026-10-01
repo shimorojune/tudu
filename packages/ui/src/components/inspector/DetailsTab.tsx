@@ -192,8 +192,9 @@ export function DetailsTab({
 
   return (
     <div
-      className="min-h-0 flex-1 overflow-y-auto px-[24px] py-[22px]"
+      className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-[24px] py-[22px]"
       data-ph-mask="true"
+      data-testid="details-tab-panel"
     >
       <h2 className="text-[19px] font-extrabold leading-[1.3] tracking-[-0.018em]">
         {task.title}
@@ -230,7 +231,7 @@ export function DetailsTab({
         {isOpen && !readOnly ? (
           <>
             <dt className="self-start pt-[4px] text-muted-foreground">Schedule</dt>
-            <dd className="col-span-1">
+            <dd className="col-span-1 min-w-0">
               <TaskScheduleFields
                 dayChoice={dayChoice}
                 bucket={bucket}

@@ -21,6 +21,7 @@ import {
 import { useNavigateDay } from "@/hooks/useNavigateDay";
 import { useScheduledDates } from "@/hooks/useScheduledDates";
 import type { DayButton } from "react-day-picker";
+import { cn } from "@/lib/utils";
 
 type DayTabProps = {
   to: string;
@@ -71,7 +72,7 @@ export function DayTab({ to, exact, orgSlug }: DayTabProps) {
   const isActive = isDayTabRouteActive(pathname, to);
   const primary = dayTabLabel(selectedDate, today);
   const secondary = dayTabSubLabel(selectedDate, today);
-  const showBackChip = isActive && selectedDate !== today;
+  const showBackChip = selectedDate !== today;
   const prevIso = shiftIso(selectedDate, -1);
   const nextIso = shiftIso(selectedDate, 1);
   const selected = parseISO(`${selectedDate}T12:00:00`);
@@ -97,25 +98,14 @@ export function DayTab({ to, exact, orgSlug }: DayTabProps) {
     return () => observer.disconnect();
   }, [isActive, primary, secondary, showBackChip]);
 
-  const inactiveLabel = dayTabLabel(selectedDate, today);
-
-  if (!isActive) {
-    return (
-      <Link
-        to={to}
-        params={orgSlug ? { orgSlug } : undefined}
-        search={dateLinkSearch(selectedDate)}
-        activeOptions={exact ? { exact: true, includeSearch: false } : { includeSearch: false }}
-        className="group shrink-0 px-px py-[18px] text-muted-foreground"
-        activeProps={{
-          className:
-            "group is-active shrink-0 px-px py-[18px] text-foreground shadow-[inset_0_-2px_0_var(--foreground)]",
-        }}
-      >
-        <span className="font-bold">{inactiveLabel}</span>
-      </Link>
-    );
-  }
+  const dateLabel = (
+    <>
+      <span className="text-[13.5px] font-bold leading-tight">{primary}</span>
+      <span className="text-[11px] leading-tight text-muted-foreground">
+        {secondary}
+      </span>
+    </>
+  );
 
   return (
     <span
@@ -124,80 +114,124 @@ export function DayTab({ to, exact, orgSlug }: DayTabProps) {
     >
       <span
         ref={linkRef}
-        className="group is-active flex shrink-0 items-center gap-[2px] px-px py-[10px] text-foreground shadow-[inset_0_-2px_0_var(--foreground)]"
+        className={cn(
+          "group flex shrink-0 items-center gap-[2px] px-px py-[10px]",
+          isActive
+            ? "is-active text-foreground shadow-[inset_0_-2px_0_var(--foreground)]"
+            : "text-muted-foreground",
+        )}
       >
         <button
           type="button"
+          disabled={!isActive}
           aria-label={`Previous day, ${dayArrowTooltip(prevIso)}`}
-          title={`Previous day  ⌘←`}
-          className="grid size-[26px] place-items-center text-muted-foreground hover:bg-tint hover:text-foreground"
-          onClick={() => shiftDay(-1)}
+          title={isActive ? "Previous day  ⌘←" : undefined}
+          className={cn(
+            "grid size-[26px] place-items-center text-muted-foreground",
+            isActive && "hover:bg-tint hover:text-foreground",
+            !isActive && "cursor-not-allowed opacity-40",
+          )}
+          onClick={() => {
+            if (isActive) {
+              shiftDay(-1);
+            }
+          }}
         >
           <ChevronLeft size={14} strokeWidth={1.8} />
         </button>
-        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              aria-label={`${primary}, ${secondary}. Pick a date`}
-              className="flex min-w-0 flex-col items-center px-[6px] py-[2px] text-center hover:bg-tint"
-            >
-              <span className="text-[13.5px] font-bold leading-tight">{primary}</span>
-              <span className="text-[11px] leading-tight text-muted-foreground">
-                {secondary}
-              </span>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent
-            align="start"
-            sideOffset={6}
-            className="w-auto border-t-2 border-t-foreground p-0"
-          >
-            <Calendar
-              mode="single"
-              selected={selected}
-              onSelect={(date) => {
-                if (!date) {
-                  return;
-                }
-                goToDate(format(date, "yyyy-MM-dd"));
-                setCalendarOpen(false);
-              }}
-              components={calendarComponents}
-              classNames={{
-                day: "relative",
-                day_button: "",
-              }}
-            />
-            <div className="flex items-center justify-between border-t border-hair px-3 py-2">
+        {isActive ? (
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
               <button
                 type="button"
-                className="text-[12.5px] font-semibold text-primary-text hover:underline"
-                onClick={() => {
-                  backToToday();
+                aria-label={`${primary}, ${secondary}. Pick a date`}
+                className="flex min-w-0 flex-col items-center px-[6px] py-[2px] text-center hover:bg-tint"
+              >
+                {dateLabel}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="start"
+              sideOffset={6}
+              className="w-auto border-t-2 border-t-foreground p-0"
+            >
+              <Calendar
+                mode="single"
+                selected={selected}
+                onSelect={(date) => {
+                  if (!date) {
+                    return;
+                  }
+                  goToDate(format(date, "yyyy-MM-dd"));
                   setCalendarOpen(false);
                 }}
-              >
-                Today
-              </button>
-              <span className="text-[11px] text-faint">⌘T</span>
-            </div>
-          </PopoverContent>
-        </Popover>
+                components={calendarComponents}
+                classNames={{
+                  day: "relative",
+                  day_button: "",
+                }}
+              />
+              <div className="flex items-center justify-between border-t border-hair px-3 py-2">
+                <button
+                  type="button"
+                  className="text-[12.5px] font-semibold text-primary-text hover:underline"
+                  onClick={() => {
+                    backToToday();
+                    setCalendarOpen(false);
+                  }}
+                >
+                  Today
+                </button>
+                <span className="text-[11px] text-faint">⌘T</span>
+              </div>
+            </PopoverContent>
+          </Popover>
+        ) : (
+          <Link
+            to={to}
+            params={orgSlug ? { orgSlug } : undefined}
+            search={dateLinkSearch(selectedDate)}
+            activeOptions={
+              exact ? { exact: true, includeSearch: false } : { includeSearch: false }
+            }
+            className="flex min-w-0 flex-col items-center px-[6px] py-[2px] text-center hover:bg-tint"
+            aria-label={`${primary}, ${secondary}. Go to Today`}
+          >
+            {dateLabel}
+          </Link>
+        )}
         <button
           type="button"
+          disabled={!isActive}
           aria-label={`Next day, ${dayArrowTooltip(nextIso)}`}
-          title={`Next day  ⌘→`}
-          className="grid size-[26px] place-items-center text-muted-foreground hover:bg-tint hover:text-foreground"
-          onClick={() => shiftDay(1)}
+          title={isActive ? "Next day  ⌘→" : undefined}
+          className={cn(
+            "grid size-[26px] place-items-center text-muted-foreground",
+            isActive && "hover:bg-tint hover:text-foreground",
+            !isActive && "cursor-not-allowed opacity-40",
+          )}
+          onClick={() => {
+            if (isActive) {
+              shiftDay(1);
+            }
+          }}
         >
           <ChevronRight size={14} strokeWidth={1.8} />
         </button>
         {showBackChip ? (
           <button
             type="button"
-            className="ml-[6px] border border-rule bg-card px-[8px] py-[4px] text-[11.5px] font-semibold text-muted-foreground hover:text-foreground"
-            onClick={backToToday}
+            disabled={!isActive}
+            className={cn(
+              "ml-[6px] border border-rule bg-card px-[8px] py-[4px] text-[11.5px] font-semibold text-muted-foreground",
+              isActive && "hover:text-foreground",
+              !isActive && "cursor-not-allowed opacity-40",
+            )}
+            onClick={() => {
+              if (isActive) {
+                backToToday();
+              }
+            }}
           >
             Back to today
           </button>

@@ -17,6 +17,9 @@ test.describe("co-workers roster", () => {
         .getByRole("main")
         .getByRole("button", { name: "Invite co-workers" }),
     ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Invite co-workers" })).toHaveCount(
+      1,
+    );
     await expect(
       page.getByText(/Slipping = carried two days or more/),
     ).toBeVisible();

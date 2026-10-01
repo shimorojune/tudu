@@ -52,7 +52,7 @@ const MANAGED_KEYS = [
 
 export function readStoredPaletteId(): PaletteId {
   if (typeof window === "undefined") {
-    return "modernist";
+    return "neutral";
   }
   const stored = window.localStorage.getItem(PALETTE_STORAGE_KEY);
   if (
@@ -64,7 +64,7 @@ export function readStoredPaletteId(): PaletteId {
   ) {
     return normalizePaletteId(stored as PaletteId);
   }
-  return "modernist";
+  return "neutral";
 }
 
 export function writeStoredPaletteId(paletteId: PaletteId) {

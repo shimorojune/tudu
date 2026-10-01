@@ -55,6 +55,7 @@ export type TaskRowActions = {
   onUnschedule?: () => void;
   onScheduleToToday?: () => void;
   onScheduleForTomorrow?: () => void;
+  onOpenScheduleDialog?: () => void;
   onToggleSubtask: (subtaskId: string, done: boolean) => void;
   onRenameSubtask: (subtaskId: string, title: string) => void;
   onDeleteSubtask: (subtaskId: string) => void;
@@ -1044,7 +1045,12 @@ export function TaskRow({
   const hasContextActions =
     !isManager ||
     (menuVariant === "day" && Boolean(actions.onMoveToBucket)) ||
-    (menuVariant !== "day" && Boolean(actions.onScheduleToToday)) ||
+    (menuVariant !== "day" &&
+      Boolean(
+        actions.onScheduleToToday ||
+          actions.onScheduleForTomorrow ||
+          actions.onOpenScheduleDialog,
+      )) ||
     Boolean(actions.onDelete);
 
   if (!hasContextActions) {
@@ -1086,6 +1092,11 @@ export function TaskRow({
                   Schedule for tomorrow
                 </ContextMenuItem>
               ) : null}
+              {actions.onOpenScheduleDialog ? (
+                <ContextMenuItem onSelect={() => actions.onOpenScheduleDialog?.()}>
+                  Schedule…
+                </ContextMenuItem>
+              ) : null}
               {(["now", "next", "later"] as const).map((targetBucket) => (
                 <ContextMenuItem
                   key={targetBucket}
@@ -1108,16 +1119,38 @@ export function TaskRow({
               </ContextMenuItem>
               {actions.onMoveToSpace ? (
                 <ContextMenuItem onSelect={() => actions.onMoveToSpace?.()}>
-                  Move to a space
+                  Move to organization…
                 </ContextMenuItem>
               ) : null}
             </>
-          ) : menuVariant !== "day" && actions.onScheduleToToday ? (
+          ) : menuVariant !== "day" &&
+            (actions.onScheduleToToday ||
+              actions.onScheduleForTomorrow ||
+              actions.onOpenScheduleDialog) ? (
             <>
               <ContextMenuSeparator />
-              <ContextMenuItem onSelect={() => actions.onScheduleToToday?.()}>
-                Schedule to today
-              </ContextMenuItem>
+              {actions.onScheduleToToday ? (
+                <ContextMenuItem onSelect={() => actions.onScheduleToToday?.()}>
+                  Schedule to today
+                </ContextMenuItem>
+              ) : null}
+              {actions.onScheduleForTomorrow ? (
+                <ContextMenuItem
+                  onSelect={() => actions.onScheduleForTomorrow?.()}
+                >
+                  Schedule for tomorrow
+                </ContextMenuItem>
+              ) : null}
+              {actions.onOpenScheduleDialog ? (
+                <ContextMenuItem onSelect={() => actions.onOpenScheduleDialog?.()}>
+                  Schedule…
+                </ContextMenuItem>
+              ) : null}
+              {actions.onMoveToSpace ? (
+                <ContextMenuItem onSelect={() => actions.onMoveToSpace?.()}>
+                  Move to organization…
+                </ContextMenuItem>
+              ) : null}
             </>
           ) : null}
           {actions.onDelete ? (

@@ -70,7 +70,7 @@ export const APP_COMMANDS: readonly AppCommand[] = [
     group: "Go",
     label: "Go to Settings",
     keywords: ["settings", "preferences", "account"],
-    action: { kind: "navigate", to: "/settings" },
+    action: { kind: "navigate", to: "/settings", search: { section: "general" } },
   },
   {
     id: "new-task",

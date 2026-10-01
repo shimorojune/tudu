@@ -97,7 +97,7 @@ export function RichTextEditor({
   return (
     <div
       className={cn(
-        "rich-text-editor min-h-[160px] w-full max-w-full border border-rule bg-card",
+        "rich-text-editor min-h-[160px] min-w-0 w-full max-w-full overflow-x-hidden border border-rule bg-card",
         readOnly && "opacity-80",
         className,
       )}

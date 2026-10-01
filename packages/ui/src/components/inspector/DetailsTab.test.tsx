@@ -209,4 +209,25 @@ describe("DetailsTab", () => {
     expect(await screen.findByText("Jira link not found")).toBeInTheDocument();
     expect(dispatch).not.toHaveBeenCalled();
   });
+
+  it("does not overflow horizontally in a narrow inspector width", () => {
+    const { container } = render(
+      <div style={{ width: 280 }}>
+        <DetailsTab
+          task={task}
+          selectedDate="2026-09-11"
+          isToday
+          timelineEvents={[]}
+          onJumpToTimeline={vi.fn()}
+        />
+      </div>,
+    );
+
+    const panel = container.querySelector("[data-testid='details-tab-panel']");
+    expect(panel).toBeTruthy();
+    if (!(panel instanceof HTMLElement)) {
+      throw new Error("expected details panel element");
+    }
+    expect(panel.scrollWidth).toBeLessThanOrEqual(panel.clientWidth + 1);
+  });
 });

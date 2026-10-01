@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { formatCountedNoun } from "@/lib/formatCountedNoun";
 import { notifyAction, mutationResult } from "@/lib/notifyAction";
 
 export type MoveToSpaceDialogProps = {
@@ -51,12 +52,10 @@ export function MoveToSpaceDialog({
   });
   const memberCount = membersData?.members?.length ?? 0;
 
-  const colorHex = useMemo(() => {
-    if (!selected?.color) {
-      return "var(--foreground)";
-    }
-    return SPACE_COLOR_HEX[selected.color as SpaceColor];
-  }, [selected?.color]);
+  const coworkerPhrase = useMemo(() => {
+    const label = formatCountedNoun(memberCount, "co-worker");
+    return `${label} will be able to read this task`;
+  }, [memberCount]);
 
   async function handleMove() {
     if (!selectedOrgId) {
@@ -90,15 +89,22 @@ export function MoveToSpaceDialog({
           <p className="text-[12.5px] text-muted-foreground line-clamp-2">
             {taskTitle}
           </p>
+          <p className="text-[12px] text-faint">
+            Personal tasks can move to an organization once.
+          </p>
         </DialogHeader>
-        <div className="flex flex-col">
-          <div
-            className="flex items-center gap-[11px] border-b border-hair bg-tint px-5 py-3"
-          >
-            <span className="size-[14px] border-[1.5px] border-rule bg-card" />
-            <span className="text-[13.5px] font-semibold">Personal</span>
-            <span className="ml-auto text-[11.5px] text-faint">where it is now</span>
-          </div>
+        <div className="px-5 pt-[14px] pb-[6px] text-[10px] font-extrabold uppercase tracking-[0.14em] text-faint">
+          Current space
+        </div>
+        <div className="flex items-center gap-[11px] border-b border-hair bg-tint px-5 py-3">
+          <span className="size-[14px] border-[1.5px] border-rule bg-card" />
+          <span className="text-[13.5px] font-semibold">Personal</span>
+          <span className="ml-auto text-[11.5px] text-faint">where it is now</span>
+        </div>
+        <div className="px-5 pt-[14px] pb-[6px] text-[10px] font-extrabold uppercase tracking-[0.14em] text-faint">
+          Move to
+        </div>
+        <div className="flex flex-col border-b border-hair">
           {orgSpaces.map((space) => {
             const active = space.orgId === selectedOrgId;
             const hex = space.color
@@ -108,7 +114,7 @@ export function MoveToSpaceDialog({
               <button
                 key={space.orgId ?? space.slug}
                 type="button"
-                className="flex items-center gap-[11px] border-b border-hair px-5 py-3 text-left"
+                className="flex items-center gap-[11px] border-b border-hair px-5 py-3 text-left last:border-b-0"
                 style={
                   active
                     ? { boxShadow: "inset 2px 0 0 var(--foreground)" }
@@ -122,9 +128,7 @@ export function MoveToSpaceDialog({
                 />
                 <span
                   className={
-                    active
-                      ? "text-[13.5px] font-semibold"
-                      : "text-[13.5px]"
+                    active ? "text-[13.5px] font-semibold" : "text-[13.5px]"
                   }
                 >
                   {space.name}
@@ -134,26 +138,20 @@ export function MoveToSpaceDialog({
           })}
         </div>
         {selected ? (
-          <div className="flex gap-[11px] border-b border-hair bg-background px-5 py-[14px]">
-            <span
-              className="mt-[2px] size-[13px] flex-none"
-              style={{ backgroundColor: colorHex }}
-            />
+          <div className="border-b border-hair bg-background px-5 py-[14px]">
             <p className="text-[12.5px] leading-[1.55] text-muted-foreground">
               In {selected.name},{" "}
               <span className="font-semibold text-foreground">
-                {memberCount} co-worker{memberCount === 1 ? "" : "s"} will be
-                able to read this task
+                {coworkerPhrase}
               </span>
-              , and anyone there can propose edits to it. Its comments and
-              history move with it.
+              , and anyone there can propose edits to it. Its comments and history
+              move with it.
+            </p>
+            <p className="mt-[10px] text-[12px] leading-[1.55] text-faint">
+              One-way: it cannot come back to Personal.
             </p>
           </div>
         ) : null}
-        <p className="flex gap-[11px] border-b border-rule px-5 py-[13px] text-[12px] leading-[1.55] text-faint">
-          <span className="mt-[2px] size-[13px] flex-none border-[1.5px] border-ghost" />
-          One-way: it cannot come back to Personal.
-        </p>
         <div className="flex items-center gap-3 px-5 py-3">
           <Switch
             id="move-space-private"

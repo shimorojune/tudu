@@ -38,6 +38,7 @@ import {
 import { openNowCount } from "@/lib/nowCount";
 import {
   canMoveTaskToNow,
+  canScheduleInNow,
   lanesExceedNowCap,
   NOW_CAP_EXCEEDED_MESSAGE,
 } from "@/lib/nowCapGuard";
@@ -72,6 +73,7 @@ import { patchTaskDescriptionIfAttachmentsChanged } from "@/lib/afterCreateTaskD
 import { createTaskBody } from "@/lib/createTask";
 import { orgIdForSpace } from "@/lib/taskSpace";
 import { MoveToSpaceDialog } from "@/components/orgs/MoveToSpaceDialog";
+import { ScheduleTaskDialog } from "@/components/tasks/ScheduleTaskDialog";
 import type { TaskOrgBadge, TaskRowActions, TaskViewer } from "@/components/tasks/TaskRow";
 import { mergeSubsetReorder } from "@/lib/spaceTasks";
 import type { CurrentSpace } from "@tudu/store";
@@ -354,6 +356,12 @@ export function DayTaskList({
     id: string;
     title: string;
   } | null>(null);
+  const [scheduleTarget, setScheduleTarget] = useState<{
+    id: string;
+    title: string;
+    scheduledDate: string | null;
+    bucket: Bucket | null;
+  } | null>(null);
   const logicalToday = effectiveDayIso();
   const isToday = selectedDate === logicalToday;
   const [flashTaskId, setFlashTaskId] = useState<string | null>(null);
@@ -486,20 +494,31 @@ export function DayTaskList({
           }
         : undefined,
       onScheduleForTomorrow: canReorder
-          ? () => {
-              const task = tasks.find((entry) => entry.id === taskId);
-              if (!task?.bucket) {
-                return;
-              }
-              updateTask({
-                id: taskId,
-                patch: {
-                  scheduledDate: offsetIso(logicalToday, 1),
-                  bucket: task.bucket,
-                },
+        ? () => {
+            const task = tasks.find((entry) => entry.id === taskId);
+            const targetBucket = task?.bucket ?? "later";
+            updateTask({
+              id: taskId,
+              patch: {
+                scheduledDate: offsetIso(logicalToday, 1),
+                bucket: targetBucket,
+              },
+            });
+          }
+        : undefined,
+      onOpenScheduleDialog: canReorder
+        ? () => {
+            const task = tasks.find((entry) => entry.id === taskId);
+            if (task) {
+              setScheduleTarget({
+                id: task.id,
+                title: task.title,
+                scheduledDate: task.scheduledDate,
+                bucket: task.bucket,
               });
             }
-          : undefined,
+          }
+        : undefined,
       onToggleSubtask: (subtaskId, done) => {
         updateSubtask({ id: subtaskId, patch: { done } });
       },
@@ -643,6 +662,40 @@ export function DayTaskList({
           }}
           taskId={moveTarget.id}
           taskTitle={moveTarget.title}
+        />
+      ) : null}
+      {scheduleTarget ? (
+        <ScheduleTaskDialog
+          open={Boolean(scheduleTarget)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setScheduleTarget(null);
+            }
+          }}
+          taskTitle={scheduleTarget.title}
+          initialScheduledDate={scheduleTarget.scheduledDate}
+          initialBucket={scheduleTarget.bucket}
+          nowCount={openNowCount(openTasks)}
+          onConfirm={({ scheduledDate, bucket }) => {
+            const task = tasks.find((entry) => entry.id === scheduleTarget.id);
+            if (
+              bucket === "now" &&
+              !canScheduleInNow({
+                today: logicalToday,
+                targetDate: scheduledDate,
+                openNowCountOnToday: openNowCount(openTasks),
+                currentTask: task,
+              })
+            ) {
+              toast.error(NOW_CAP_EXCEEDED_MESSAGE);
+              return;
+            }
+            updateTask({
+              id: scheduleTarget.id,
+              patch: { scheduledDate, bucket },
+            });
+            setScheduleTarget(null);
+          }}
         />
       ) : null}
       <NewTaskDialog

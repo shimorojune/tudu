@@ -42,7 +42,7 @@ export function DetailInspector({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden bg-background">
       <InspectorTabs
         active={tab}
         commentCount={task.commentCount}

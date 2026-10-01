@@ -41,6 +41,12 @@ import {
   type RootState,
 } from "@tudu/store";
 import { scheduleToTodayLanes } from "@/lib/reorder";
+import { offsetIso } from "@/components/tasks/TaskScheduleFields";
+import { canScheduleInNow, NOW_CAP_EXCEEDED_MESSAGE } from "@/lib/nowCapGuard";
+import { toast } from "sonner";
+import { MoveToSpaceDialog } from "@/components/orgs/MoveToSpaceDialog";
+import { ScheduleTaskDialog } from "@/components/tasks/ScheduleTaskDialog";
+import { effectiveDayIso } from "@tudu/shared";
 import {
   containerDroppableId,
   itemsFromTasks,
@@ -70,6 +76,7 @@ import { useProjectFilterId } from "@/hooks/useProjectFilterId";
 import { isTaskDimmed } from "@/lib/projectFilter";
 import { DetailInspector } from "@/components/inspector/DetailInspector";
 import { InspectorSheet } from "@/components/inspector/InspectorSheet";
+import { useViewportBand } from "@/hooks/useViewportBand";
 import { useDaySearchSync } from "@/hooks/useDaySearchSync";
 import { useNewTaskShortcut } from "@/hooks/useNewTaskShortcut";
 import { TASK_TAB_FIELDS } from "@/lib/daySearch";
@@ -284,6 +291,16 @@ export function UnscheduledRoute() {
   });
   const [flashTaskId, setFlashTaskId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [moveTarget, setMoveTarget] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  const [scheduleTarget, setScheduleTarget] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  const band = useViewportBand();
+  const logicalToday = effectiveDayIso();
 
   const [createTask] = useCreateTaskMutation();
   const [updateTask] = useUpdateTaskMutation();
@@ -323,6 +340,24 @@ export function UnscheduledRoute() {
   const showInspector = selectedTask !== null;
   const baseItems = itemsFromTasks(openTasks, [CONTAINER], () => CONTAINER);
   const todayTasks = todayData?.tasks ?? [];
+  const todayNowCount = openNowCount(todayTasks);
+
+  const inspector = (
+    <DetailInspector
+      task={selectedTask}
+      selectedDate={todayIso()}
+      todayNowCount={todayNowCount}
+      canDelete
+      onDelete={
+        selectedTask
+          ? () => {
+              deleteTask(selectedTask.id);
+              dispatch(setSelectedTaskId(null));
+            }
+          : undefined
+      }
+    />
+  );
 
   function makeRowActions(taskId: string): TaskRowActions {
     return {
@@ -339,11 +374,41 @@ export function UnscheduledRoute() {
         }
       },
       onScheduleToToday: () => {
-        const lanes = scheduleToTodayLanes(todayTasks, openTasks, taskId, todayIso());
+        const lanes = scheduleToTodayLanes(
+          todayTasks,
+          openTasks,
+          taskId,
+          todayIso(),
+        );
         if (lanes.length > 0) {
           reorderTasks({ lanes });
         }
       },
+      onScheduleForTomorrow: () => {
+        updateTask({
+          id: taskId,
+          patch: {
+            scheduledDate: offsetIso(logicalToday, 1),
+            bucket: "later",
+          },
+        });
+      },
+      onOpenScheduleDialog: () => {
+        const task = sourceTasks.find((entry) => entry.id === taskId);
+        if (task) {
+          setScheduleTarget({ id: task.id, title: task.title });
+        }
+      },
+      onMoveToSpace:
+        space.kind === "personal" &&
+        !sourceTasks.find((t) => t.id === taskId)?.orgId
+          ? () => {
+              const task = sourceTasks.find((entry) => entry.id === taskId);
+              if (task) {
+                setMoveTarget({ id: task.id, title: task.title });
+              }
+            }
+          : undefined,
       onToggleSubtask: (subtaskId, done) => {
         updateSubtask({ id: subtaskId, patch: { done } });
       },
@@ -370,7 +435,8 @@ export function UnscheduledRoute() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-card">
+    <div className="flex h-full min-h-0 bg-card">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <header className="flex items-center gap-[11px] px-[16px] pb-[8px] pt-[24px] md:px-[28px]">
         <span className="text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-faint">
           Unscheduled
@@ -416,36 +482,76 @@ export function UnscheduledRoute() {
           />
         </DndContext>
       </ScrollArea>
-      <InspectorSheet
-        open={showInspector}
-        title="Task details"
-        onClose={() => {
-          dispatch(setSelectedTaskId(null));
-          dispatch(setInspectorTab("details"));
-          dispatch(clearFocusCommentId());
-        }}
-      >
-        <DetailInspector
-          task={selectedTask}
-          selectedDate={todayIso()}
-          todayNowCount={openNowCount(todayTasks)}
-          canDelete
-          onDelete={
-            selectedTask
-              ? () => {
-                  deleteTask(selectedTask.id);
-                  dispatch(setSelectedTaskId(null));
-                }
-              : undefined
-          }
+      </div>
+      {band === "phone" ? (
+        <InspectorSheet
+          open={showInspector}
+          title="Task details"
+          onClose={() => {
+            dispatch(setSelectedTaskId(null));
+            dispatch(setInspectorTab("details"));
+            dispatch(clearFocusCommentId());
+          }}
+        >
+          {inspector}
+        </InspectorSheet>
+      ) : (
+        <aside className="hidden w-[360px] shrink-0 border-l border-hair md:block">
+          {inspector}
+        </aside>
+      )}
+      {moveTarget ? (
+        <MoveToSpaceDialog
+          open={Boolean(moveTarget)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setMoveTarget(null);
+            }
+          }}
+          taskId={moveTarget.id}
+          taskTitle={moveTarget.title}
         />
-      </InspectorSheet>
+      ) : null}
+      {scheduleTarget ? (
+        <ScheduleTaskDialog
+          open={Boolean(scheduleTarget)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setScheduleTarget(null);
+            }
+          }}
+          taskTitle={scheduleTarget.title}
+          initialScheduledDate={null}
+          initialBucket={null}
+          nowCount={todayNowCount}
+          onConfirm={({ scheduledDate, bucket }) => {
+            const task = sourceTasks.find((entry) => entry.id === scheduleTarget.id);
+            if (
+              bucket === "now" &&
+              !canScheduleInNow({
+                today: logicalToday,
+                targetDate: scheduledDate,
+                openNowCountOnToday: todayNowCount,
+                currentTask: task,
+              })
+            ) {
+              toast.error(NOW_CAP_EXCEEDED_MESSAGE);
+              return;
+            }
+            updateTask({
+              id: scheduleTarget.id,
+              patch: { scheduledDate, bucket },
+            });
+            setScheduleTarget(null);
+          }}
+        />
+      ) : null}
       <NewTaskDialog
         open={dialogOpen}
         initialBucket="later"
         initialDate={todayIso()}
         defaultDayChoice="unscheduled"
-        nowCount={openNowCount(todayTasks)}
+        nowCount={todayNowCount}
         onOpenChange={setDialogOpen}
         onSubmit={async (args) => {
           const result = await createTask(

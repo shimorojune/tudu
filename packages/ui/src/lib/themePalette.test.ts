@@ -5,6 +5,8 @@ import {
   contrastForeground,
   deriveElevatedSurface,
   mergeCustomColors,
+  readStoredPaletteId,
+  PALETTE_STORAGE_KEY,
 } from "@/lib/themePalette";
 import { getPresetTokens } from "@/lib/themePalettes";
 
@@ -12,6 +14,13 @@ describe("themePalette", () => {
   beforeEach(() => {
     document.documentElement.classList.remove("dark");
     document.documentElement.removeAttribute("style");
+    window.localStorage.removeItem(PALETTE_STORAGE_KEY);
+  });
+
+  it("defaults to neutral when nothing is stored", () => {
+    expect(readStoredPaletteId()).toBe("neutral");
+    const tokens = buildThemeTokens("neutral", "dark", {});
+    expect(tokens["--background"]).toBe("#171717");
   });
 
   it("picks light or dark text from primary luminance", () => {

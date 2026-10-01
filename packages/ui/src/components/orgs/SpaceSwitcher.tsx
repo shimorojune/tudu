@@ -1,13 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { Check, ChevronDown, Link2, Plus } from "lucide-react";
-import type { SpaceListItem } from "@tudu/shared";
-import { SPACE_COLOR_HEX } from "@tudu/shared";
-import { useListSpacesQuery } from "@tudu/store";
 import { CreateOrgDialog } from "@/components/orgs/CreateOrgDialog";
 import { JoinWithLinkDialog } from "@/components/orgs/JoinWithLinkDialog";
-import { useEffectiveOrgSlug } from "@/hooks/useSpaceContext";
-import { spaceShortcutHint } from "@/hooks/useSpaceShortcuts";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +8,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useEffectiveOrgSlug } from "@/hooks/useSpaceContext";
+import { spaceShortcutHint } from "@/hooks/useSpaceShortcuts";
+import { formatCountedNoun } from "@/lib/formatCountedNoun";
 import { cn } from "@/lib/utils";
+import { Link, useNavigate } from "@tanstack/react-router";
+import type { SpaceListItem } from "@tudu/shared";
+import { SPACE_COLOR_HEX } from "@tudu/shared";
+import { useListSpacesQuery } from "@tudu/store";
+import { Check, Link2, Plus } from "lucide-react";
+import { useMemo, useState } from "react";
 
 function spaceSubtitle(space: SpaceListItem): string {
   if (space.kind === "personal") {
@@ -24,11 +25,8 @@ function spaceSubtitle(space: SpaceListItem): string {
   }
   const people =
     space.memberCount !== undefined
-      ? `${space.memberCount} people`
+      ? formatCountedNoun(space.memberCount, "person")
       : "Organization";
-  if (space.role === "owner") {
-    return `Organization · you own it`;
-  }
   return `Organization · ${people}`;
 }
 
@@ -110,14 +108,14 @@ export function SpaceSwitcher() {
               ) : null}
             </div>
             <span className="hidden min-w-0 flex-col truncate xl:flex">
-              <span className="truncate text-[13.5px] font-bold tracking-[-0.01em]">
+              <span className="truncate text-[13.5px] font-bold tracking-[-0.01em] text-left">
                 {active.name}
               </span>
-              <span className="truncate text-[11px] text-faint">
+              <span className="truncate text-[11px] text-faint text-left">
                 {spaceSubtitle(active)}
               </span>
             </span>
-            <ChevronDown className="hidden size-[14px] text-muted-foreground xl:block" />
+            {/* <ChevronDown className="hidden size-[14px] text-muted-foreground xl:block" /> */}
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-[320px]">

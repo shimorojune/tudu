@@ -144,6 +144,26 @@ export function unscheduleTaskLanes(tasks: Task[], taskId: string): Lane[] {
   });
 }
 
+export function scheduleTaskToDateLanes(
+  dayTasks: Task[],
+  unscheduledTasks: Task[],
+  taskId: string,
+  scheduledDate: string,
+  bucket: Bucket,
+): Lane[] {
+  const all = [...dayTasks, ...unscheduledTasks];
+  const grouped = groupTasksByLane(all);
+  const targetKey = laneKey({ scheduledDate, bucket });
+  const targetIds = orderedIds(grouped.get(targetKey) ?? []);
+  targetIds.push(taskId);
+  return buildReorderLanes({
+    tasks: all,
+    activeId: taskId,
+    target: { scheduledDate, bucket },
+    targetIndex: targetIds.length - 1,
+  });
+}
+
 export function scheduleToTodayLanes(
   dayTasks: Task[],
   unscheduledTasks: Task[],

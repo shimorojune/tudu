@@ -5,6 +5,7 @@ import {
   buildPullIntoNowLanes,
   buildReorderLanes,
   moveTaskToBucketLanes,
+  scheduleTaskToDateLanes,
   unscheduleTaskLanes,
 } from "./reorder";
 
@@ -164,6 +165,26 @@ describe("unscheduleTaskLanes", () => {
     expect(lanes).toEqual([
       { scheduledDate: "2026-09-06", bucket: "later", taskIds: [] },
       { scheduledDate: null, bucket: null, taskIds: ["a"] },
+    ]);
+  });
+});
+
+describe("scheduleTaskToDateLanes", () => {
+  it("places an unscheduled task on a dated bucket lane", () => {
+    const dayTasks = [makeTask("a", "now", 0, "2026-09-06")];
+    const unscheduled = [makeTask("b", null, 0, null)];
+
+    const lanes = scheduleTaskToDateLanes(
+      dayTasks,
+      unscheduled,
+      "b",
+      "2026-09-08",
+      "next",
+    );
+
+    expect(lanes).toEqual([
+      { scheduledDate: null, bucket: null, taskIds: [] },
+      { scheduledDate: "2026-09-08", bucket: "next", taskIds: ["b"] },
     ]);
   });
 });
