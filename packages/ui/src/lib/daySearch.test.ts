@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { effectiveDayIso } from "@tudu/shared";
 import { todayIso } from "@tudu/store";
 import {
   dateLinkSearch,
@@ -294,5 +295,24 @@ describe("planDaySearchSync", () => {
     });
     expect(plan.toast).toBeUndefined();
     expect(plan.hydrate).toEqual({ taskId: null, inspectorTab: "details" });
+  });
+
+  it("omits effective today from the URL when Redux matches before day start", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-01T02:00:00"));
+    const today = effectiveDayIso();
+    expect(today).toBe("2026-09-30");
+
+    const plan = planDaySearchSync({
+      fields: { date: true, task: true, tab: true },
+      parsed: { date: today },
+      redux: { date: today, taskId: null, tab: "details" },
+      today,
+      urlChanged: false,
+      reduxChanged: true,
+      issues: [],
+    });
+    expect(plan.write).toEqual({});
+    vi.useRealTimers();
   });
 });

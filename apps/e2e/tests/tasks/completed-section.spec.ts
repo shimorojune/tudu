@@ -1,18 +1,24 @@
 import { expect, test } from "@playwright/test";
-import { ensureTodayPage, dismissCommandsIfOpen, effectiveLocalTodayIso, goToDate, localTodayIso, shiftLocalIso } from "../../helpers/day-navigation.js";
+import {
+  dismissCommandsIfOpen,
+  effectiveLocalTodayIso,
+  ensureTodayPage,
+  goToDate,
+  shiftLocalIso,
+} from "../../helpers/day-navigation.js";
 import {
   addTaskInBucket,
   addUnscheduledTask,
   bucketSection,
   captureReviewScreenshot,
   ensureTaskListInteractive,
+  expectCompletedSectionAfterBuckets,
   expandCompletedSection,
-  goToYesterday,
   markTaskComplete,
   markTaskIncomplete,
   taskRow,
   uniqueTitle,
-} from "../../helpers/completed-section";
+} from "../../helpers/completed-section.js";
 
 test.describe("Completed section on Today", () => {
   test("open tasks stay in buckets; completed moves below Later", async ({ page }) => {
@@ -126,29 +132,15 @@ test.describe("Completed section collapse preference", () => {
 });
 
 test.describe("Completed section viewport matrix", () => {
-  test("tablet layout keeps completed below buckets", async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== "tablet", "tablet project only");
+  test("completed section follows open buckets in the layout", async ({ page }) => {
+    test.setTimeout(60_000);
+    await ensureTodayPage(page);
 
-    await page.goto("/");
-    await page.waitForURL("/");
-
-    const title = uniqueTitle("Tablet completed");
+    const title = uniqueTitle("Layout completed");
     await addTaskInBucket(page, "Later", title);
     await markTaskComplete(page, title);
     await expandCompletedSection(page);
-    await captureReviewScreenshot(page, "tablet-completed");
-  });
-
-  test("phone layout keeps completed below buckets", async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== "phone", "phone project only");
-
-    await page.goto("/");
-    await page.waitForURL("/");
-
-    const title = uniqueTitle("Phone completed");
-    await addTaskInBucket(page, "Now", title);
-    await markTaskComplete(page, title);
-    await expandCompletedSection(page);
-    await captureReviewScreenshot(page, "phone-completed");
+    await expect(taskRow(page, title)).toBeVisible();
+    await expectCompletedSectionAfterBuckets(page);
   });
 });

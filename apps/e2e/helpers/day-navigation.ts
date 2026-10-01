@@ -32,7 +32,13 @@ export async function goToDate(page: Page, iso: string) {
   const base =
     pathname === "/" || pathname.endsWith("/today") ? "/" : pathname;
   await page.goto(`${base}?date=${iso}`);
-  await page.waitForURL((url) => url.searchParams.get("date") === iso);
+  await page.waitForURL((url) => {
+    const date = url.searchParams.get("date");
+    if (date === iso) {
+      return true;
+    }
+    return date === null && iso === effectiveLocalTodayIso();
+  });
 }
 
 function commandsPaletteOpen(page: Page) {

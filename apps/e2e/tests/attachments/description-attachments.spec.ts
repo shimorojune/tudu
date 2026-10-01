@@ -18,6 +18,7 @@ import {
 import { dismissCommandsIfOpen, effectiveLocalTodayIso, ensureTodayPage } from "../../helpers/day-navigation.js";
 import {
   addTaskInBucket,
+  ensureTaskListInteractive,
   expandCompletedSection,
   markTaskComplete,
   openNewTaskForBucket,
@@ -175,6 +176,7 @@ test.describe("Task description attachments", () => {
   });
 
   test("switching tasks does not show stale attachment", async ({ page }) => {
+    test.setTimeout(90_000);
     const withImage = uniqueAttachmentTitle("Attach A");
     const plain = uniqueAttachmentTitle("Attach B");
     await createTodayTask(page, withImage);
@@ -182,6 +184,8 @@ test.describe("Task description attachments", () => {
     await waitForDescriptionImage(page);
     await dismissCommandsIfOpen(page);
     await page.getByRole("button", { name: "Close inspector" }).click();
+    await ensureTaskListInteractive(page);
+    await dismissBlockingOverlays(page);
     await addTaskInBucket(page, "Later", plain, { preserveCurrentDay: true });
     await selectTaskByTitle(page, withImage);
     await attachFileViaToolbar(page, tinyPngPath);

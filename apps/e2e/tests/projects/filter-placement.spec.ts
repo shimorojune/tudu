@@ -1,5 +1,24 @@
 import { expect, test } from "@playwright/test";
-import { ensureTodayPage } from "../../helpers/day-navigation.js";
+import type { Page } from "@playwright/test";
+import {
+  addTaskInBucketWithProject,
+  ensureTaskListInteractive,
+  taskRow,
+  uniqueTitle,
+} from "../../helpers/completed-section.js";
+import {
+  dismissCommandsIfOpen,
+  effectiveLocalTodayIso,
+  ensureTodayPage,
+} from "../../helpers/day-navigation.js";
+
+async function openProjectFilter(page: Page) {
+  await dismissCommandsIfOpen(page);
+  await ensureTaskListInteractive(page);
+  const header = page.getByTestId("task-list-header");
+  await expect(header).toBeVisible();
+  await header.getByRole("button").first().click();
+}
 
 test.describe("project filter placement", () => {
   test("lives in the task list header, not the top nav", async ({ page }) => {
@@ -14,22 +33,31 @@ test.describe("project filter placement", () => {
   });
 
   test("filters visible tasks when a project is selected", async ({ page }) => {
+    test.setTimeout(90_000);
     await ensureTodayPage(page);
 
-    const rowsBefore = await page.locator('[data-task-row="true"]').count();
-    if (rowsBefore === 0) {
-      test.skip();
-    }
+    const egsTitle = uniqueTitle("Filter EGS");
+    const homeTitle = uniqueTitle("Filter Home");
+    await addTaskInBucketWithProject(page, "Later", egsTitle, "EGS");
+    await addTaskInBucketWithProject(page, "Later", homeTitle, "Home");
+    await dismissCommandsIfOpen(page);
+    await ensureTaskListInteractive(page);
 
-    await page.getByTestId("task-list-header").getByRole("button", { name: "All projects" }).click();
-    const projectOptions = page.getByRole("button").filter({ hasNotText: "All projects" });
-    const optionCount = await projectOptions.count();
-    if (optionCount === 0) {
-      test.skip();
-    }
+    await expect(taskRow(page, egsTitle)).toBeVisible();
+    await expect(taskRow(page, homeTitle)).toBeVisible();
 
-    await projectOptions.first().click();
-    const rowsAfter = await page.locator('[data-task-row="true"]').count();
-    expect(rowsAfter).toBeLessThanOrEqual(rowsBefore);
+    await openProjectFilter(page);
+    await page.getByRole("button").filter({ hasText: "EGS" }).last().click({ force: true });
+
+    await expect(taskRow(page, egsTitle)).not.toHaveClass(/opacity-35/);
+    await expect(taskRow(page, homeTitle)).toHaveClass(/opacity-35/);
+
+    await page.goto(`/?date=${effectiveLocalTodayIso()}`);
+    await dismissCommandsIfOpen(page);
+    await ensureTaskListInteractive(page);
+    await expect(taskRow(page, egsTitle)).toBeVisible();
+    await expect(taskRow(page, homeTitle)).toBeVisible();
+    await expect(taskRow(page, egsTitle)).not.toHaveClass(/opacity-35/);
+    await expect(taskRow(page, homeTitle)).not.toHaveClass(/opacity-35/);
   });
 });

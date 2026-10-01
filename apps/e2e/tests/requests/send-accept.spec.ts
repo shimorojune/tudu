@@ -7,9 +7,8 @@ import {
   clearTestOutbox,
   createOrgViaApi,
   inviteMemberViaApi,
-  inviteTokenFromOutbox,
-  readTestOutbox,
   uniqueOrgName,
+  waitForLatestInviteToken,
 } from "../../helpers/orgs.js";
 
 const marcusAuth = path.join(authDir, "manager.json");
@@ -29,10 +28,8 @@ test.describe("requests send and accept", () => {
     const { slug, orgId } = await createOrgViaApi(marcusRequest, orgName);
     await inviteMemberViaApi(marcusRequest, slug, "priya@egain.com");
 
-    const outbox = await readTestOutbox(marcusRequest, "priya@egain.com");
-    const token = outbox[0] ? inviteTokenFromOutbox(outbox[0]) : null;
-    expect(token).toBeTruthy();
-    await acceptInviteInBrowser(browser, priyaAuth, token!, E2E_WEB_URL);
+    const token = await waitForLatestInviteToken(marcusRequest, "priya@egain.com");
+    await acceptInviteInBrowser(browser, priyaAuth, token, E2E_WEB_URL);
 
     const marcusPage = await marcusContext.newPage();
     await marcusPage.goto(`/o/${slug}/coworkers`);

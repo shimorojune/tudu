@@ -153,7 +153,11 @@ export async function addTaskInBucket(
   await expect(submit).toBeEnabled();
   await page.keyboard.press("ControlOrMeta+Enter");
   await expect(dialog).not.toBeVisible();
-  await expect(taskRow(page, title)).toBeVisible();
+  await expect(async () => {
+    const row = taskRow(page, title);
+    await row.scrollIntoViewIfNeeded();
+    await expect(row).toBeVisible();
+  }).toPass({ timeout: 30_000 });
 }
 
 export async function addUnscheduledTask(page: Page, title: string) {
@@ -179,7 +183,11 @@ export async function addUnscheduledTask(page: Page, title: string) {
   await expect(submit).toBeEnabled();
   await page.keyboard.press("ControlOrMeta+Enter");
   await expect(dialog).not.toBeVisible();
-  await expect(taskRow(page, title)).toBeVisible();
+  await expect(async () => {
+    const row = taskRow(page, title);
+    await row.scrollIntoViewIfNeeded();
+    await expect(row).toBeVisible();
+  }).toPass({ timeout: 30_000 });
 }
 
 export async function ensureTaskListInteractive(page: Page) {
@@ -220,6 +228,66 @@ export function bucketSection(page: Page, bucket: "Now" | "Next" | "Later") {
   return page.locator("section").filter({
     has: page.locator("header").getByText(bucket, { exact: true }),
   });
+}
+
+export async function pickProjectInNewTaskDialog(
+  dialog: import("@playwright/test").Locator,
+  page: Page,
+  projectName: string,
+) {
+  await dialog.getByRole("button", { name: "Project" }).click();
+  await page
+    .getByRole("button")
+    .filter({ hasText: projectName })
+    .last()
+    .click();
+  await dismissCommandsIfOpen(page);
+}
+
+export async function addTaskInBucketWithProject(
+  page: Page,
+  bucket: "Now" | "Next" | "Later",
+  title: string,
+  projectName: string,
+) {
+  const dialog = await openNewTaskForBucket(page, bucket);
+  await pickProjectInNewTaskDialog(dialog, page, projectName);
+  const titleInput = dialog.locator('input[placeholder="What needs doing?"]');
+  await titleInput.fill(title);
+  await page.keyboard.press("ControlOrMeta+Enter");
+  await expect(dialog).not.toBeVisible();
+  await expect(async () => {
+    const row = taskRow(page, title);
+    await row.scrollIntoViewIfNeeded();
+    await expect(row).toBeVisible();
+  }).toPass({ timeout: 30_000 });
+}
+
+export async function rowCenterY(page: Page, title: string): Promise<number> {
+  const box = await taskRow(page, title).boundingBox();
+  if (!box) {
+    throw new Error(`No bounding box for task row: ${title}`);
+  }
+  return box.y + box.height / 2;
+}
+
+/** Completed block must appear after the Later bucket in document order. */
+export async function expectCompletedSectionAfterBuckets(page: Page) {
+  const follows = await page.evaluate(() => {
+    const completed = document.querySelector('[data-testid="completed-section"]');
+    const laterHeader = [...document.querySelectorAll("section header")].find(
+      (header) => header.textContent?.trim().startsWith("Later"),
+    );
+    const laterSection = laterHeader?.closest("section");
+    if (!completed || !laterSection) {
+      return false;
+    }
+    return (
+      laterSection.compareDocumentPosition(completed) &
+      Node.DOCUMENT_POSITION_FOLLOWING
+    ) !== 0;
+  });
+  expect(follows).toBe(true);
 }
 
 export function uniqueTitle(prefix: string) {
