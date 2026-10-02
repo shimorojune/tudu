@@ -169,6 +169,13 @@
       "when": 1790400000000,
       "tag": "0023_oauth_provider",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790500000000,
+      "tag": "0024_drop_account_issuer",
+      "breakpoints": true
     }
   ]
 }

@@ -3,7 +3,9 @@ CREATE TABLE "jwks" (
 	"public_key" text NOT NULL,
 	"private_key" text NOT NULL,
 	"created_at" timestamp NOT NULL,
-	"expires_at" timestamp
+	"expires_at" timestamp,
+	"alg" text,
+	"crv" text
 );
 --> statement-breakpoint
 CREATE TABLE "oauth_client" (
