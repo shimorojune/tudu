@@ -1,8 +1,15 @@
 import type { Db } from "@tudu/db";
 import * as schema from "@tudu/db/schema";
+import { oauthProvider } from "@better-auth/oauth-provider";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { bearer } from "better-auth/plugins";
+import { bearer, jwt } from "better-auth/plugins";
+import {
+  resolveOAuthConsentPage,
+  resolveOAuthLoginPage,
+  resolveTuduApiResourceIdentifier,
+} from "./resolveOAuthPages.js";
+import { TUDU_OAUTH_SCOPES } from "./oauthScopes.js";
 
 export function createAuth(db: Db, trustedOrigins: string[]) {
   const secret = process.env.BETTER_AUTH_SECRET;
@@ -16,6 +23,8 @@ export function createAuth(db: Db, trustedOrigins: string[]) {
     throw new Error("Missing BETTER_AUTH_URL");
   }
 
+  const apiResource = resolveTuduApiResourceIdentifier();
+
   return betterAuth({
     database: drizzleAdapter(db, {
       provider: "pg",
@@ -24,7 +33,27 @@ export function createAuth(db: Db, trustedOrigins: string[]) {
     emailAndPassword: {
       enabled: true,
     },
-    plugins: [bearer()],
+    plugins: [
+      bearer(),
+      jwt(),
+      oauthProvider({
+        loginPage: resolveOAuthLoginPage(),
+        consentPage: resolveOAuthConsentPage(),
+        scopes: [
+          "openid",
+          "profile",
+          "email",
+          "offline_access",
+          ...TUDU_OAUTH_SCOPES,
+        ],
+        allowDynamicClientRegistration: true,
+        enforcePerClientResources: false,
+        resources: [apiResource],
+        clientRegistrationDefaultResources: [apiResource],
+        clientRegistrationAllowedScopes: [...TUDU_OAUTH_SCOPES],
+        clientRegistrationDefaultScopes: [...TUDU_OAUTH_SCOPES],
+      }),
+    ],
     secret,
     baseURL,
     trustedOrigins,

@@ -6,10 +6,11 @@
   "license": "MIT",
   "scripts": {
     "dev": "pnpm --parallel --filter @tudu/server --filter @tudu/web run dev",
-    "dev:all": "pnpm --parallel --filter @tudu/server --filter @tudu/desktop --filter @tudu/web run dev",
+    "dev:all": "pnpm --parallel --filter @tudu/server --filter @tudu/desktop --filter @tudu/web --filter @tudu/mcp run dev",
     "dev:desktop": "pnpm --filter @tudu/desktop dev",
     "dev:web": "pnpm --filter @tudu/web dev",
     "dev:server": "pnpm --filter @tudu/server dev",
+    "dev:mcp": "pnpm --filter @tudu/mcp dev",
     "build": "pnpm -r build",
     "tauri:build": "pnpm --filter @tudu/desktop tauri:build",
     "lint:copy": "node scripts/lint-copy.mjs",

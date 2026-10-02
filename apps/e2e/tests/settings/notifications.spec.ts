@@ -14,7 +14,10 @@ test("notification settings load and toggle events", async ({ page }) => {
     exact: true,
   });
   await expect(eventsMaster).toBeVisible();
-  await eventsMaster.click();
+  if ((await eventsMaster.getAttribute("aria-checked")) === "true") {
+    await eventsMaster.click();
+  }
+  await expect(eventsMaster).toHaveAttribute("aria-checked", "false");
   await expect(
     page.getByRole("switch", { name: "JIRA event notifications" }),
   ).toBeDisabled();

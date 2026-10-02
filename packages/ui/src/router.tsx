@@ -20,6 +20,7 @@ import { CoworkerDayRoute } from "@/routes/CoworkerDayRoute";
 import { OrgAdminRoute } from "@/routes/OrgAdminRoute";
 import { InviteAcceptRoute } from "@/routes/InviteAcceptRoute";
 import { JoinRoute } from "@/routes/JoinRoute";
+import { OAuthConsentRoute } from "@/routes/OAuthConsentRoute";
 import { WelcomeRoute } from "@/routes/WelcomeRoute";
 import {
   DATE_ONLY_FIELDS,
@@ -198,10 +199,17 @@ const joinRoute = createRoute({
   component: JoinRoute,
 });
 
+const oauthConsentRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/oauth/consent",
+  component: OAuthConsentRoute,
+});
+
 const routeTree = rootRoute.addChildren([
   authLayoutRoute.addChildren([signInRoute, signUpRoute]),
   inviteAcceptRoute,
   joinRoute,
+  oauthConsentRoute,
   appLayoutRoute.addChildren([
     welcomeRoute,
     todayRoute,

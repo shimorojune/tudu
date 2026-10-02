@@ -37,6 +37,18 @@
       "types": "./src/components/chrome/QuickAddTaskPane.tsx",
       "import": "./src/components/chrome/QuickAddTaskPane.tsx",
       "default": "./src/components/chrome/QuickAddTaskPane.tsx"
+    },
+    "./mcp-widgets/TaskListWidget": {
+      "import": "./src/mcp-widgets/TaskListWidget.tsx",
+      "default": "./src/mcp-widgets/TaskListWidget.tsx"
+    },
+    "./mcp-widgets/TaskDetailWidget": {
+      "import": "./src/mcp-widgets/TaskDetailWidget.tsx",
+      "default": "./src/mcp-widgets/TaskDetailWidget.tsx"
+    },
+    "./mcp-widgets/SpacePickerWidget": {
+      "import": "./src/mcp-widgets/SpacePickerWidget.tsx",
+      "default": "./src/mcp-widgets/SpacePickerWidget.tsx"
     }
   },
   "peerDependencies": {
@@ -45,6 +57,7 @@
   },
   "dependencies": {
     "@atlaskit/editor-wikimarkup-transformer": "^12.2.0",
+    "@better-auth/oauth-provider": "1.7.7",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
@@ -79,7 +92,7 @@
     "@tiptap/starter-kit": "^3.31.3",
     "@tudu/shared": "workspace:*",
     "@tudu/store": "workspace:*",
-    "better-auth": "^1.7.2",
+    "better-auth": "^1.7.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

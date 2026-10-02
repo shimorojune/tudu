@@ -47,6 +47,9 @@ export async function selectTaskByTitle(page: Page, title: string) {
     await detailsTab.click();
   }
 
+  await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
   await expect(editor).toBeVisible({ timeout: 15_000 });
 }
 

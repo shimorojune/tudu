@@ -26,7 +26,9 @@ import { createSyncRoute } from "./routes/sync.js";
 import { createTaskAttachmentsRoute } from "./routes/taskAttachments.js";
 import { createTasksRoute } from "./routes/tasks.js";
 import { createUpdatesRoute } from "./routes/updates.js";
+import { mountOAuthAuthorizationServerMetadata } from "./oauthDiscovery.js";
 import {
+  createOAuthScopeMiddleware,
   createSessionMiddleware,
   type SessionEnv,
 } from "./session-middleware.js";
@@ -101,7 +103,12 @@ export function createApp(options: CreateAppOptions = {}): TuduApp {
   });
 
   if (auth) {
-    app.use("*", createSessionMiddleware(auth));
+    mountOAuthAuthorizationServerMetadata(app, auth);
+  }
+
+  if (auth && db) {
+    app.use("*", createSessionMiddleware(auth, db));
+    app.use("*", createOAuthScopeMiddleware());
   }
 
   async function meResponseForUser(userId: string): Promise<MeResponse | null> {

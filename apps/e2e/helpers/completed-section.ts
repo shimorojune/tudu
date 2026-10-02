@@ -86,6 +86,7 @@ export async function openNewTaskForBucket(
   if (options?.preserveCurrentDay) {
     await dismissCommandsIfOpen(page);
     await dismissMidnightBannerIfVisible(page);
+    await ensureTaskListInteractive(page);
   } else {
     await ensureTodayPage(page);
   }
@@ -101,26 +102,21 @@ export async function openNewTaskForBucket(
 
   const project = test.info().project.name;
   if (project === "phone") {
-    await expect(async () => {
-      await dismissCommandsIfOpen(page);
-      await dismissMidnightBannerIfVisible(page);
-      await page.keyboard.press("n");
-      await expect(page.getByRole("dialog", { name: "New task" })).toBeVisible();
-    }).toPass({ timeout: 30_000 });
-  } else {
-    const bucketSection = page.locator("section").filter({
-      has: page.locator("header").getByText(bucket, { exact: true }),
-    });
-    const addTask = bucketSection.getByRole("button", { name: "Add task" });
-    await bucketSection.scrollIntoViewIfNeeded();
-    await addTask.evaluate((element) => {
-      element.scrollIntoView({ block: "start", inline: "nearest" });
-    });
-    await expect(async () => {
-      await addTask.scrollIntoViewIfNeeded();
-      await addTask.click({ timeout: 2000 });
-    }).toPass({ timeout: 20_000 });
+    await ensureTaskListInteractive(page);
   }
+
+  const bucketSection = page.locator("section").filter({
+    has: page.locator("header").getByText(bucket, { exact: true }),
+  });
+  const addTask = bucketSection.getByRole("button", { name: "Add task" });
+  await bucketSection.scrollIntoViewIfNeeded();
+  await addTask.evaluate((element) => {
+    element.scrollIntoView({ block: "start", inline: "nearest" });
+  });
+  await expect(async () => {
+    await addTask.scrollIntoViewIfNeeded();
+    await addTask.click({ timeout: 2000 });
+  }).toPass({ timeout: 20_000 });
 
   const dialog = page.getByRole("dialog", { name: "New task" });
   await expect(dialog).toBeVisible();
@@ -151,8 +147,9 @@ export async function addTaskInBucket(
     name: new RegExp(`Add to ${submitBucket}`, "i"),
   });
   await expect(submit).toBeEnabled();
+  await dismissCommandsIfOpen(page);
   await page.keyboard.press("ControlOrMeta+Enter");
-  await expect(dialog).not.toBeVisible();
+  await expect(dialog).not.toBeVisible({ timeout: 15_000 });
   await expect(async () => {
     const row = taskRow(page, title);
     await row.scrollIntoViewIfNeeded();

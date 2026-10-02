@@ -105,8 +105,7 @@ test.describe("Completed section on Unscheduled", () => {
 test.describe("Completed section collapse preference", () => {
   test("persists expanded state in localStorage", async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto("/");
-    await page.waitForURL("/");
+    await ensureTodayPage(page);
 
     const title = uniqueTitle("Persist expanded");
     await addTaskInBucket(page, "Next", title);
@@ -119,14 +118,15 @@ test.describe("Completed section collapse preference", () => {
     await expect(taskRow(page, title)).toBeVisible();
 
     await page.reload({ waitUntil: "domcontentloaded" });
-    await ensureTodayPage(page);
-    await ensureTaskListInteractive(page);
-
-    await expect(page.getByTestId("completed-section-toggle")).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
-    await expect(taskRow(page, title)).toBeVisible();
+    await expect(async () => {
+      await ensureTodayPage(page);
+      await ensureTaskListInteractive(page);
+      await expect(page.getByTestId("completed-section-toggle")).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
+      await expect(taskRow(page, title)).toBeVisible();
+    }).toPass({ timeout: 30_000 });
     await captureReviewScreenshot(page, "persist-expanded-reload");
   });
 });

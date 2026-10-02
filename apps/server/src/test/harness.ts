@@ -45,6 +45,7 @@ export function createSessionTestApp(
       } else {
         c.set("session", null);
       }
+      c.set("oauthScopes", null);
       await next();
     }),
   );

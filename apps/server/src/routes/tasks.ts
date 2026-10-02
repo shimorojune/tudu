@@ -67,7 +67,22 @@ function queryParams<T extends z.ZodType>(schema: T) {
 
 const dayQuerySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a YYYY-MM-DD date"),
+  orgId: z.string().uuid().optional(),
 });
+
+const unscheduledQuerySchema = z.object({
+  orgId: z.string().uuid().optional(),
+});
+
+export function filterTasksForOrg<T extends { orgId: string | null }>(
+  rows: T[],
+  orgId: string | undefined,
+): T[] {
+  if (orgId) {
+    return rows.filter((row) => row.orgId === orgId);
+  }
+  return rows.filter((row) => row.orgId === null);
+}
 
 function toTask(row: TaskRowWithSubtasks): Task {
   return mapTask(row);
@@ -149,8 +164,12 @@ export function createTasksRoute(db: Db) {
     }
   });
 
-  app.get("/tasks/unscheduled", async (c) => {
-    const rows = await listUnscheduledTasks(db, userId(c));
+  app.get("/tasks/unscheduled", queryParams(unscheduledQuerySchema), async (c) => {
+    const { orgId } = c.req.valid("query");
+    const rows = filterTasksForOrg(
+      await listUnscheduledTasks(db, userId(c)),
+      orgId,
+    );
     const response: TasksResponse = { tasks: rows.map(toTask) };
 
     return c.json(response);
@@ -183,8 +202,11 @@ export function createTasksRoute(db: Db) {
   });
 
   app.get("/tasks", queryParams(dayQuerySchema), async (c) => {
-    const { date } = c.req.valid("query");
-    const rows = await listTasksForDay(db, userId(c), date);
+    const { date, orgId } = c.req.valid("query");
+    const rows = filterTasksForOrg(
+      await listTasksForDay(db, userId(c), date),
+      orgId,
+    );
     const response: TasksResponse = { tasks: rows.map(toTask) };
 
     return c.json(response);

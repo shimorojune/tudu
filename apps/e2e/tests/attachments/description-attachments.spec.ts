@@ -168,11 +168,13 @@ test.describe("Task description attachments", () => {
 
     await markTaskComplete(page, title);
     await expandCompletedSection(page);
-    await taskRow(page, title).click();
+    await selectTaskByTitle(page, title);
     await waitForDescriptionImage(page);
-    await expect(
-      descriptionEditor(page).getByRole("button", { name: "Attach file" }),
-    ).toHaveCount(0);
+    await expect(async () => {
+      await expect(
+        descriptionEditor(page).getByRole("button", { name: "Attach file" }),
+      ).toHaveCount(0);
+    }).toPass({ timeout: 15_000 });
   });
 
   test("switching tasks does not show stale attachment", async ({ page }) => {
@@ -191,9 +193,11 @@ test.describe("Task description attachments", () => {
     await attachFileViaToolbar(page, tinyPngPath);
     await waitForDescriptionImage(page);
     await selectTaskByTitle(page, plain);
-    await expect(
-      descriptionEditor(page).locator(".tudu-attachment-image img"),
-    ).toHaveCount(0);
+    await expect(async () => {
+      await expect(
+        descriptionEditor(page).locator(".tudu-attachment-image img"),
+      ).toHaveCount(0);
+    }).toPass({ timeout: 15_000 });
   });
 
   test("route smoke after attachments feature", async ({ page }) => {

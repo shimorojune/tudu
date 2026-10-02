@@ -185,10 +185,12 @@ export async function openCommandPalette(page: Page) {
 }
 
 export async function runPaletteCommand(page: Page, name: string) {
-  await openCommandPalette(page);
-  const input = commandPaletteSearch(page).first();
-  await input.fill(name);
-  await expect(page.getByRole("option", { name })).toBeVisible();
-  await page.keyboard.press("Enter");
-  await expect(input).toBeHidden({ timeout: 15_000 });
+  await expect(async () => {
+    await openCommandPalette(page);
+    const input = commandPaletteSearch(page).first();
+    await input.fill(name);
+    await expect(page.getByRole("option", { name })).toBeVisible();
+    await page.keyboard.press("Enter");
+    await expect(input).toBeHidden({ timeout: 15_000 });
+  }).toPass({ timeout: 30_000 });
 }

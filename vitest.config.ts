@@ -42,6 +42,7 @@ export default defineConfig({
       "packages/*/src/**/*.test.{ts,tsx}",
       "apps/desktop/src/**/*.test.ts",
       "apps/server/src/**/*.test.ts",
+      "apps/mcp/src/**/*.test.ts",
       "apps/web/src/**/*.test.ts",
     ],
     exclude: ["**/node_modules/**", "**/dist/**", "**/*.db.test.ts"],
