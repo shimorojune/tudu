@@ -35,6 +35,24 @@
         "TTL": 300,
         "ResourceRecords": [{ "Value": "213.210.21.191" }]
       }
+    },
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "mcp.tudu.ezdev.net",
+        "Type": "A",
+        "TTL": 300,
+        "ResourceRecords": [{ "Value": "213.210.21.191" }]
+      }
+    },
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "mcp.staging.tudu.ezdev.net",
+        "Type": "A",
+        "TTL": 300,
+        "ResourceRecords": [{ "Value": "213.210.21.191" }]
+      }
     }
   ]
 }

@@ -48,3 +48,19 @@ services:
     depends_on:
       - server
     restart: unless-stopped
+
+  mcp:
+    build:
+      context: .
+      dockerfile: apps/mcp/Dockerfile
+    expose:
+      - "3100"
+    depends_on:
+      - server
+    environment:
+      PORT: "3100"
+      TUDU_API_URL: ${TUDU_API_URL:-http://server:3456}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      MCP_PUBLIC_URL: ${MCP_PUBLIC_URL:-http://localhost:3100}
+      TUDU_API_RESOURCE_URL: ${TUDU_API_RESOURCE_URL:-${BETTER_AUTH_URL}}
+    restart: unless-stopped

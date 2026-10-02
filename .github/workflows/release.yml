@@ -220,9 +220,41 @@ jobs:
           dockerfile: apps/server/Dockerfile
           cache_scope: tudu-server
 
+  build-mcp:
+    name: Build MCP image (prod)
+    needs: release
+    if: needs.release.outputs.new_release_published == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.release_sha || format('tudu-{0}', needs.release.outputs.new_release_version) }}
+
+      - name: GHCR image owner
+        id: ghcr
+        shell: bash
+        run: echo "owner=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        id: image
+        uses: ./.github/actions/build-push-image
+        with:
+          image_owner: ${{ steps.ghcr.outputs.owner }}
+          image_name: tudu-mcp
+          image_tag: ${{ needs.release.outputs.release_sha || github.sha }}
+          extra_tags: v${{ needs.release.outputs.new_release_version }}
+          dockerfile: apps/mcp/Dockerfile
+          cache_scope: tudu-mcp
+
   deploy-prod:
-    name: Deploy Web + Server
-    needs: [release, build-macos, build-web, build-server]
+    name: Deploy Web + Server + MCP
+    needs: [release, build-macos, build-web, build-server, build-mcp]
     if: needs.release.outputs.new_release_published == 'true'
     runs-on: ubuntu-latest
     concurrency:
@@ -262,6 +294,7 @@ jobs:
           env_updates: |
             TUDU_WEB_IMAGE=${{ needs.build-web.outputs.image }}
             TUDU_SERVER_IMAGE=${{ needs.build-server.outputs.image }}
+            TUDU_MCP_IMAGE=${{ needs.build-mcp.outputs.image }}
 
       - name: Trigger Dokploy deployment
         uses: ./.github/actions/dokploy-deploy-compose

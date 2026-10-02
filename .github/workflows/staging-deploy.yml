@@ -90,9 +90,40 @@ jobs:
           dockerfile: apps/server/Dockerfile
           cache_scope: tudu-server
 
+  build-mcp:
+    name: Build MCP image
+    needs: ci
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      !startsWith(github.event.head_commit.message, 'chore(release):')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: GHCR image owner
+        id: ghcr
+        shell: bash
+        run: echo "owner=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        id: image
+        uses: ./.github/actions/build-push-image
+        with:
+          image_owner: ${{ steps.ghcr.outputs.owner }}
+          image_name: tudu-mcp
+          image_tag: ${{ github.sha }}
+          dockerfile: apps/mcp/Dockerfile
+          cache_scope: tudu-mcp
+
   deploy-staging:
-    name: Deploy staging (web + server)
-    needs: [build-web, build-server]
+    name: Deploy staging (web + server + mcp)
+    needs: [build-web, build-server, build-mcp]
     if: >-
       github.event_name == 'workflow_dispatch' ||
       !startsWith(github.event.head_commit.message, 'chore(release):')
@@ -132,6 +163,7 @@ jobs:
           env_updates: |
             TUDU_WEB_IMAGE=${{ needs.build-web.outputs.image }}
             TUDU_SERVER_IMAGE=${{ needs.build-server.outputs.image }}
+            TUDU_MCP_IMAGE=${{ needs.build-mcp.outputs.image }}
 
       - name: Trigger Dokploy deployment
         uses: ./.github/actions/dokploy-deploy-compose
