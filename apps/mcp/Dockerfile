@@ -12,7 +12,7 @@ COPY packages/shared/package.json packages/shared/
 COPY packages/ui/package.json packages/ui/
 RUN pnpm install --frozen-lockfile --filter @tudu/mcp...
 COPY . .
-RUN pnpm --filter @tudu/shared build
+RUN pnpm --filter @tudu/mcp exec tsc -p packages/shared
 RUN pnpm --filter @tudu/mcp build
 
 FROM node:24-alpine AS runner
