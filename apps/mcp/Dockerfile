@@ -21,4 +21,4 @@ COPY --from=build /app/apps/mcp/dist ./dist
 COPY --from=build /app/apps/mcp/package.json ./package.json
 COPY --from=build /app/node_modules ./node_modules
 EXPOSE 3100
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/__entry.js"]

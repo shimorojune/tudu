@@ -6,5 +6,5 @@
     "jsx": "react-jsx",
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/views/**/*.tsx"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/views/**/*.tsx", ".skybridge/views.d.ts"]
 }
