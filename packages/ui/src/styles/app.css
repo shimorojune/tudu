@@ -103,3 +103,28 @@
   white-space: nowrap;
   transition: width var(--dur-arrive) var(--ease-settle);
 }
+
+/* AccountMenu and DayHeader pops: the design's pop classes (tp-acct-pop, tp-dh-pop), floated by Radix Popover.
+   The popper wrapper positions them, so the stylesheet's absolute offsets are reset here; they keep its tp-pop-in
+   and ease out like the Menu above, from the corner Radix anchors them at. */
+[data-radix-popper-content-wrapper] > :is(.tp-acct-pop, .tp-dh-pop) {
+  position: relative;
+  inset: auto;
+  z-index: 60;
+  transform-origin: var(--radix-popover-content-transform-origin);
+}
+:is(.tp-acct-pop, .tp-dh-pop)[data-state='open'] {
+  animation: tp-pop-in var(--dur-menu) var(--ease-arrive) both;
+}
+:is(.tp-acct-pop, .tp-dh-pop)[data-state='closed'] {
+  animation: tp-pop-out 130ms var(--ease-leave) both;
+}
+:is(.tp-acct-pop, .tp-dh-pop)[data-state='closed'][data-side='top'] {
+  animation-name: tp-pop-out-up;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tp-acct-pop,
+  .tp-dh-pop {
+    animation-duration: 120ms !important;
+  }
+}

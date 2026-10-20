@@ -13,3 +13,4 @@ blob-report/
 reports/
 .vite/
 apps/desktop/src-tauri/target/
+.local/

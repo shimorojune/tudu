@@ -72,3 +72,52 @@ export {
   type CalendarPreset,
   type CalendarHint,
 } from './components/MiniCalendar';
+
+// Sign in (chunk 01)
+export { CodeField, type CodeFieldProps } from './components/CodeField';
+export {
+  AuthLayer,
+  AuthArt,
+  AUTH_LEAVE_MS,
+  type AuthLayerProps,
+  type AuthArtProps,
+} from './components/AuthLayer';
+export {
+  SignIn,
+  SignInError,
+  countdown,
+  EMAIL_PATTERN,
+  DONE_DELAY_MS,
+  DEFAULT_RESEND_SECONDS,
+  type SignInProps,
+  type SignInInitial,
+  type SignInStep,
+  type SignInErrorKind,
+} from './components/SignIn';
+
+// The shell (chunk 01)
+export { JiraMark, type JiraMarkProps } from './components/JiraMark';
+export { PersonDot, type PersonDotProps, type PersonDotPerson } from './components/PersonDot';
+export { SpaceTile, type SpaceTileProps, type SpaceTileSpace } from './components/SpaceTile';
+export {
+  Sidebar,
+  Count,
+  type SidebarProps,
+  type SidebarItem,
+  type SidebarDay,
+  type SidebarSpace,
+  type SidebarApp,
+  type CountProps,
+} from './components/Sidebar';
+export {
+  TopBar,
+  type TopBarProps,
+  type TopBarUser,
+  type TopBarViews,
+  type TopBarJira,
+} from './components/TopBar';
+export { BottomTabs, type BottomTabsProps, type BottomTab } from './components/BottomTabs';
+export { Fab, type FabProps } from './components/Fab';
+export { AccountMenu, type AccountMenuProps, type AccountMenuPerson } from './components/AccountMenu';
+export { DayProgress, REWARD_MS, type DayProgressProps } from './components/DayProgress';
+export { DayHeader, type DayHeaderProps } from './components/DayHeader';

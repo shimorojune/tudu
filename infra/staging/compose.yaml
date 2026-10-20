@@ -1,0 +1,29 @@
+# Staging, as deployed by Dokploy (project Tudu, environment staging, service tudu-staging-app).
+# Images are built on the Dokploy host by the CI runner (.github/workflows/deploy-staging.yml) and used
+# straight from the host's image store: no registry, no pull.
+services:
+  api:
+    image: tudu-api:staging
+    pull_policy: never
+    environment:
+      NODE_ENV: production
+      PORT: '3456'
+      DATABASE_URL: ${DATABASE_URL}
+      AUTH_SECRET: ${AUTH_SECRET}
+      BASE_URL: https://api.staging.tudu.ezdev.net
+      CORS_ORIGINS: https://staging.tudu.ezdev.net,tauri://localhost,http://tauri.localhost
+      EMAIL_TRANSPORT: resend
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_FROM: Tudu <sign-in@mail.tudu.ezdev.net>
+    networks:
+      - dokploy-network
+    restart: unless-stopped
+  web:
+    image: tudu-web:staging
+    pull_policy: never
+    networks:
+      - dokploy-network
+    restart: unless-stopped
+networks:
+  dokploy-network:
+    external: true

@@ -1,0 +1,50 @@
+name: Deploy staging
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-deploy:
+    name: Build images on the host and deploy
+    runs-on: [self-hosted, dokploy]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the API image
+        run: docker build -f apps/server/Dockerfile -t tudu-api:staging -t tudu-api:${{ github.sha }} .
+      - name: Build the web image
+        run: docker build -f apps/web/Dockerfile --build-arg VITE_API_URL=https://api.staging.tudu.ezdev.net -t tudu-web:staging -t tudu-web:${{ github.sha }} .
+      - name: Deploy through Dokploy
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          COMPOSE_ID: ${{ secrets.DOKPLOY_STAGING_COMPOSE_ID }}
+        run: node scripts/dokploy-deploy.mjs "$COMPOSE_ID" "staging ${{ github.sha }}"
+      - name: Wait for the API
+        run: |
+          for i in $(seq 1 40); do
+            if curl -fsS https://api.staging.tudu.ezdev.net/health >/dev/null; then echo up; exit 0; fi
+            sleep 5
+          done
+          echo "api did not come up"; exit 1
+
+  smoke:
+    name: Smoke test staging
+    needs: build-and-deploy
+    runs-on: [self-hosted, dokploy]
+    steps:
+      - uses: actions/checkout@v4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm e2e smoke
+        env:
+          E2E_BASE_URL: https://staging.tudu.ezdev.net
+          E2E_API_URL: https://api.staging.tudu.ezdev.net
+          CI: 'true'

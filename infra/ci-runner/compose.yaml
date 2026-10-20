@@ -11,11 +11,13 @@ services:
         ENV DEBIAN_FRONTEND=noninteractive
         # The runner is .NET: with invariant globalization it needs no ICU package.
         ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+        # The docker CLI talks to the host's daemon over the mounted socket, so deploy jobs build images on the host.
         RUN npm install -g pnpm@9.15.9 \
-         && useradd -m -s /bin/bash runner \
          && mkdir -p /actions-runner /work \
-         && chown -R runner:runner /actions-runner /work /ms-playwright
-        USER runner
+         && arch=$$(uname -m) && case "$$arch" in aarch64|arm64) da=aarch64;; x86_64) da=x86_64;; esac \
+         && curl -fsSL "https://download.docker.com/linux/static/stable/$${da}/docker-27.5.1.tgz" | tar xz -C /tmp \
+         && mv /tmp/docker/docker /usr/local/bin/docker && rm -rf /tmp/docker
+        ENV RUNNER_ALLOW_RUNASROOT=1
         WORKDIR /actions-runner
         RUN set -e; arch=$(uname -m); case "$$arch" in aarch64|arm64) ra=arm64;; x86_64) ra=x64;; *) echo "unsupported $$arch"; exit 1;; esac; \
             ver=$(curl -fsSL https://api.github.com/repos/actions/runner/releases/latest | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).tag_name.replace(/^v/,'')"); \
@@ -32,9 +34,7 @@ services:
         fi
         exec ./run.sh
         ENTRY
-        USER root
         RUN chmod +x /entrypoint.sh
-        USER runner
         ENTRYPOINT ["/entrypoint.sh"]
     environment:
       REPO_URL: https://github.com/eGainDev/tudu
@@ -50,7 +50,8 @@ services:
     volumes:
       - runner-config:/actions-runner
       - runner-work:/work
-      - pnpm-store:/home/runner/.local/share/pnpm/store
+      - pnpm-store:/root/.local/share/pnpm/store
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - dokploy-network
     restart: unless-stopped
