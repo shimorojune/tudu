@@ -22,6 +22,7 @@ import {
   type TaskDetailTask,
 } from '@tudu/ui';
 import { useEffect, useState } from 'react';
+import { API_URL } from '../../app/config';
 import { initialsOf } from '../../app/session';
 import { taskStore } from '../../app/tasks';
 import type { Viewport } from '../../app/viewport';
@@ -91,6 +92,7 @@ export function TaskPanel(p: TaskPanelProps) {
   // Neighbours on the task's day, for the arrows.
   const list = useQuery({ ...taskStore.dayQuery(spaceId, day, today), enabled: !!shown && !!detail?.day })
     .data?.tasks;
+  const projects = useQuery({ ...taskStore.projectsQuery(spaceId), enabled: !!shown }).data ?? [];
   const at = list?.findIndex((t) => t.id === id) ?? -1;
   const prev = at > 0 ? list![at - 1] : undefined;
   const next = at >= 0 && list && at < list.length - 1 ? list[at + 1] : undefined;
@@ -139,6 +141,7 @@ export function TaskPanel(p: TaskPanelProps) {
       carried: d.carriedFrom && !d.done ? carriedLabel(d.carriedFrom, today) : undefined,
       due: d.due,
       visibility: d.visibility,
+      projectId: d.projectId,
       notes: d.notes,
       subtasks: d.subtasks.map((s) => ({ key: s.id, title: s.title, done: s.done })),
       comments: d.comments.map((c) => ({
@@ -164,6 +167,8 @@ export function TaskPanel(p: TaskPanelProps) {
         me={{ initials: initialsOf(p.me.name, p.me.email), name: p.me.name || p.me.email }}
         visibility={[{ value: 'space', label: 'Only you' }]}
         calendar={{ marks: marks ?? {} }}
+        projects={projects}
+        fileBase={API_URL}
         turnDir={shown?.dir}
         backLabel={backLabel}
         compact={compact}
@@ -179,7 +184,10 @@ export function TaskPanel(p: TaskPanelProps) {
         }}
         onDue={(due) => taskStore.due(d.id, due)}
         onVisibility={(v) => taskStore.visibility(d.id, v)}
+        onProject={(projectId) => taskStore.setProject(d.id, projectId)}
+        onNewProject={(name) => taskStore.createProject(spaceId, name)}
         onNotes={(html) => taskStore.notes(d.id, html)}
+        onAttach={(file, onProgress) => taskStore.upload(spaceId, file, d.id, onProgress)}
         onAddSubtask={(title) => taskStore.addSubtask(spaceId, d.id, title)}
         onRenameSubtask={(s, title) => taskStore.renameSubtask(d.id, s.key, title)}
         onToggleSubtask={(s, done) => taskStore.crossSubtask(d.id, s.key, done)}

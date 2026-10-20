@@ -6,7 +6,7 @@ import type { HistoryEvent } from './tasks';
 export function historyWords(e: HistoryEvent, today: IsoDate): string {
   switch (e.kind) {
     case 'created':
-      return 'Created';
+      return e.source === 'quick-add' ? 'Created from Quick Add' : 'Created';
     case 'due.set':
       return `Due date set to ${formatDay(e.due)}`;
     case 'due.cleared':

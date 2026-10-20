@@ -22,6 +22,13 @@
       "when": 1792516739908,
       "tag": "0002_task-detail",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792523178729,
+      "tag": "0003_quick-add",
+      "breakpoints": true
     }
   ]
 }

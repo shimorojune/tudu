@@ -7,6 +7,8 @@ import {
   type DayResponse,
   type IsoDate,
   type MarksResponse,
+  PROJECTS_CHANGED,
+  type ProjectsChangedEvent,
   type SyncResponse,
   type TaskRefResponse,
   type TasksChangedEvent,
@@ -18,6 +20,7 @@ import {
   applyBatch,
   marksOf,
   membersOf,
+  projectsOf,
   resolveRef,
   roleIn,
   rollForward,
@@ -46,6 +49,17 @@ export async function announce(
     clientId,
   };
   for (const userId of await membersOf(db, spaceId)) hub.publish(userId, TASKS_CHANGED, event);
+}
+
+/** Tell everyone in a space its projects changed. */
+export async function announceProjects(
+  db: Db,
+  hub: EventHub,
+  spaceId: string,
+  clientId: string | null,
+): Promise<void> {
+  const event: ProjectsChangedEvent = { spaceId, clientId };
+  for (const userId of await membersOf(db, spaceId)) hub.publish(userId, PROJECTS_CHANGED, event);
 }
 
 /** Days, the dots on the calendar, and the sync endpoint the outbox replays changes to. */
@@ -91,6 +105,13 @@ export function taskRoutes(db: Db, hub: EventHub) {
     return c.json(body);
   });
 
+  r.get('/spaces/:spaceId/projects', requireSession, async (c) => {
+    const userId = c.get('session')!.user.id;
+    const { spaceId } = c.req.param();
+    if (!(await roleIn(db, userId, spaceId))) return c.json({ error: 'You’re not in that space.' }, 403);
+    return c.json({ projects: await projectsOf(db, spaceId) });
+  });
+
   r.get('/spaces/:spaceId/marks', requireSession, async (c) => {
     const userId = c.get('session')!.user.id;
     const { spaceId } = c.req.param();
@@ -110,18 +131,22 @@ export function taskRoutes(db: Db, hub: EventHub) {
     const { clientId, mutations } = parsed.data;
     const { results, applied } = await applyBatch(db, userId, mutations);
 
-    const touched = [...new Set(applied.map((a) => a.taskId))];
+    const touched = [...new Set(applied.filter((a) => !a.projects).map((a) => a.taskId))];
     const deleted = [...new Set(applied.filter((a) => a.deleted).map((a) => a.taskId))];
     const body: SyncResponse = { results, tasks: await tasksById(db, touched), deleted };
 
-    const bySpace = new Map<string, { days: Array<IsoDate | null>; tasks: string[] }>();
+    const bySpace = new Map<string, { days: Array<IsoDate | null>; tasks: string[]; projects: boolean }>();
     for (const a of applied) {
-      const s = bySpace.get(a.spaceId) ?? { days: [], tasks: [] };
+      const s = bySpace.get(a.spaceId) ?? { days: [], tasks: [], projects: false };
       s.days.push(...a.days);
-      if (a.days.length || a.deleted) s.tasks.push(a.taskId);
+      if (!a.projects && (a.days.length || a.deleted)) s.tasks.push(a.taskId);
+      if (a.projects) s.projects = true;
       bySpace.set(a.spaceId, s);
     }
-    for (const [spaceId, s] of bySpace) await announce(db, hub, spaceId, s.days, s.tasks, clientId);
+    for (const [spaceId, s] of bySpace) {
+      await announce(db, hub, spaceId, s.days, s.tasks, clientId);
+      if (s.projects) await announceProjects(db, hub, spaceId, clientId);
+    }
     return c.json(body);
   });
 

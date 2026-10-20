@@ -1,9 +1,9 @@
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
-import type { DayResponse, SyncResponse, Task, TaskDetail } from '@tudu/core';
+import type { DayResponse, Project, SyncResponse, Task, TaskDetail } from '@tudu/core';
 import { createApi } from './api';
 import { MemoryOutboxStore } from './outbox';
-import { TaskStore, applyToDay, dayKey, taskKey, type DayData } from './tasks';
+import { TaskStore, applyToDay, dayKey, projectsKey, taskKey, type DayData } from './tasks';
 
 const SPACE = 'space-1';
 const SUN = '2026-10-18';
@@ -23,6 +23,7 @@ function task(id: string, title: string, day: string, position: number, extra: P
     carriedFrom: null,
     due: null,
     visibility: 'space',
+    projectId: null,
     subtasks: [],
     subsDone: 0,
     subsTotal: 0,
@@ -38,7 +39,7 @@ function detailOf(t: Task): TaskDetail {
 }
 
 /** A pretend server: days held in memory, sync answered by a function the test sets. */
-function setup(days: Record<string, Task[]>) {
+function setup(days: Record<string, Task[]>, projects: Project[] = []) {
   const calls: string[] = [];
   let answer: (body: {
     mutations: Array<{ id: string; type: string; payload: { id: string } }>;
@@ -52,6 +53,27 @@ function setup(days: Record<string, Task[]>) {
     calls.push(`${init?.method ?? 'GET'} ${u.pathname}`);
     if (u.pathname === '/api/sync') {
       return new Response(JSON.stringify(answer(JSON.parse(String(init!.body)))), { status: 200 });
+    }
+    if (u.pathname.endsWith('/projects')) {
+      return new Response(JSON.stringify({ projects }), { status: 200 });
+    }
+    if (u.pathname.endsWith('/files')) {
+      const body = init!.body as FormData;
+      const file = body.get('file') as File;
+      if (file.size > 25 * 1024 * 1024)
+        return new Response('{"error":"That file is too big. Files can be up to 25 MB."}', { status: 413 });
+      return new Response(
+        JSON.stringify({
+          id: `att-${file.name}`,
+          spaceId: SPACE,
+          taskId: body.get('taskId'),
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          createdAt: '',
+        }),
+        { status: 201 },
+      );
     }
     const m = /\/tasks\/([^/]+)$/.exec(u.pathname);
     if (m) {
@@ -80,6 +102,12 @@ function setup(days: Record<string, Task[]>) {
   });
   const read = (day: string) => queryClient.getQueryData<DayData>(dayKey(SPACE, day))?.tasks ?? [];
   const readTask = (id: string) => queryClient.getQueryData<TaskDetail>(taskKey(SPACE, id));
+  const readProjects = () => queryClient.getQueryData<Project[]>(projectsKey(SPACE)) ?? [];
+  const loadProjects = async () => {
+    const data = await queryClient.fetchQuery(store.projectsQuery(SPACE));
+    new QueryObserver(queryClient, store.projectsQuery(SPACE)).subscribe(() => {});
+    return data;
+  };
   const loadTask = async (id: string) => {
     const data = await queryClient.fetchQuery(store.taskQuery(SPACE, id));
     new QueryObserver(queryClient, store.taskQuery(SPACE, id)).subscribe(() => {});
@@ -104,6 +132,8 @@ function setup(days: Record<string, Task[]>) {
     load,
     readTask,
     loadTask,
+    readProjects,
+    loadProjects,
     settle,
     answer: (fn: typeof answer) => (answer = fn),
   };
@@ -336,5 +366,94 @@ describe('C03-U22 delete, restore and live events for a task', () => {
     });
     await new Promise((r) => setTimeout(r, 20));
     expect(t.calls).toEqual([]);
+  });
+});
+
+describe('C04-U14 projects and a task from Quick Add', () => {
+  it('C04-U14 a new project shows at once with the next colour; set project shows on the row and in the panel', async () => {
+    const t = setup({ [SUN]: [task('t1', 'One', SUN, 1024)] }, [
+      {
+        id: 'p1',
+        spaceId: SPACE,
+        name: 'Northwind',
+        color: '#3d5a80',
+        position: 1024,
+        createdAt: '2026-10-01T00:00:00.000Z',
+      },
+    ]);
+    await t.load(SUN);
+    await t.loadTask('t1');
+    await t.loadProjects();
+    const p2 = t.store.createProject(SPACE, ' Platform ');
+    expect(t.readProjects().map((p) => [p.name, p.color])).toEqual([
+      ['Northwind', '#3d5a80'],
+      ['Platform', '#5b7553'],
+    ]);
+    t.store.setProject('t1', p2);
+    expect(t.read(SUN)[0]!.projectId).toBe(p2);
+    expect(t.readTask('t1')!.projectId).toBe(p2);
+    t.store.updateProject(SPACE, p2, { name: 'Platform team' });
+    expect(t.readProjects()[1]!.name).toBe('Platform team');
+    t.store.deleteProject(SPACE, p2);
+    expect(t.readProjects().map((p) => p.id)).toEqual(['p1']);
+    expect(t.read(SUN)[0]!.projectId).toBeNull();
+    expect(t.readTask('t1')!.projectId).toBeNull();
+    await t.settle();
+    expect(await t.store.idle()).toBe(true);
+  });
+
+  it('C04-U14 a task from Quick Add lands with its due day, project, notes and files, and queues as one change', async () => {
+    const t = setup({ [SUN]: [] });
+    await t.load(SUN);
+    const sent: Array<{ type: string; payload: Record<string, unknown> }> = [];
+    t.answer((body) => {
+      sent.push(...(body.mutations as never[]));
+      return { results: body.mutations.map((m) => ({ id: m.id, status: 'ok' })), tasks: [], deleted: [] };
+    });
+    const id = t.store.create(SPACE, SUN, 'Send the offsite agenda', undefined, {
+      due: '2026-10-22',
+      projectId: null,
+      notes: '<p>Keep it to one page.</p>',
+      attachments: ['att-1'],
+      source: 'quick-add',
+    });
+    const row = t.read(SUN)[0]!;
+    expect([row.id, row.title, row.due, row.projectId]).toEqual([
+      id,
+      'Send the offsite agenda',
+      '2026-10-22',
+      null,
+    ]);
+    await t.settle();
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.type).toBe('task.create');
+    expect(sent[0]!.payload).toMatchObject({
+      due: '2026-10-22',
+      notes: '<p>Keep it to one page.</p>',
+      attachments: ['att-1'],
+      source: 'quick-add',
+    });
+  });
+
+  it('C04-U14 a live event for projects reads them again', async () => {
+    const t = setup({ [SUN]: [] });
+    await t.loadProjects();
+    t.calls.length = 0;
+    t.store.onEvent({ id: '1', type: 'projects.changed', data: { spaceId: SPACE, clientId: 'tab-b' } });
+    await vi.waitFor(() => expect(t.calls).toEqual([`GET /api/spaces/${SPACE}/projects`]));
+  });
+});
+
+describe('C04-U15 uploads', () => {
+  it('C04-U15 an upload answers with the attachment; a refused one throws with the server’s words', async () => {
+    const t = setup({ [SUN]: [] });
+    const small = new File([new Uint8Array(1200)], 'spec.pdf', { type: 'application/pdf' });
+    const saved = await t.store.upload(SPACE, small, null);
+    expect(saved).toMatchObject({ id: 'att-spec.pdf', name: 'spec.pdf', size: 1200, taskId: null });
+    const big = new File([new Uint8Array(26 * 1024 * 1024)], 'big.bin');
+    await expect(t.store.upload(SPACE, big, 't1')).rejects.toThrow(
+      'That file is too big. Files can be up to 25 MB.',
+    );
+    expect(t.calls.filter((c) => c === `POST /api/spaces/${SPACE}/files`)).toHaveLength(2);
   });
 });

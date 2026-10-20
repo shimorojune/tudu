@@ -219,3 +219,42 @@
   gap: 18px;
   padding-top: 8px;
 }
+
+/* Quick Add (chunk 04) */
+/* New project, asked for on the spot inside the picker. */
+.tp-pm-new {
+  width: 240px;
+  padding-bottom: 6px;
+}
+.tp-pm-field {
+  display: flex;
+  gap: 6px;
+  padding: 2px 8px 2px;
+}
+.tp-root .tp-pm-field input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  outline: none;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  color: var(--foreground);
+}
+.tp-root .tp-pm-field input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+/* A file chip while it uploads: the fill grows behind the name; a failed one reads in red. */
+.tp-qa-file-up {
+  background:
+    linear-gradient(to right, var(--selection) calc(var(--qa-up, 0) * 100%), transparent 0), var(--secondary);
+}
+.tp-qa-file-err {
+  color: var(--destructive);
+}
+.tp-qa-file-err .tp-qa-fsize {
+  color: var(--destructive);
+}

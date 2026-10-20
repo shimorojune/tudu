@@ -254,3 +254,34 @@ describe('TaskRow subtasks and due (chunk 03)', () => {
     expect(container.querySelector('.tp-sg-due')).not.toHaveClass('tp-od');
   });
 });
+
+describe('TaskRow project (chunk 04)', () => {
+  it('C04-U11 the project dot and name sit in the byline after the Jira key; brief rows keep them', () => {
+    const { container, rerender } = render(
+      <TaskRow
+        title="Run the migration"
+        id="ME-47"
+        comments={1}
+        jira="TUDU-219"
+        project={{ name: 'Platform', color: '#5b7553' }}
+      />,
+    );
+    const byline = container.querySelector('.tp-byline')!;
+    expect(byline.textContent).toBe('1 comment·TUDU-219·Platform·ME-47');
+    const dot = byline.querySelector('.tp-sg-project .tp-dot') as HTMLElement;
+    expect(dot.style.background).toBe('rgb(91, 117, 83)');
+    expect(
+      screen.getByRole('button', { name: 'Project · Platform. Show all tasks in Platform' }),
+    ).toBeInTheDocument();
+    rerender(
+      <TaskRow
+        title="Run the migration"
+        id="ME-47"
+        comments={1}
+        project={{ name: 'Platform', color: '#5b7553' }}
+        brief
+      />,
+    );
+    expect(container.querySelector('.tp-byline')!.textContent).toBe('Platform');
+  });
+});

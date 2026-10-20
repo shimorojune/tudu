@@ -144,7 +144,6 @@ export {
   TaskDetail,
   TaskDetailSkeleton,
   COMMENT_FRESH_MS,
-  POP_LEAVE_MS,
   type TaskDetailProps,
   type TaskDetailTask,
   type DetailComment,
@@ -160,3 +159,17 @@ export {
   type RichTextEditorProps,
   type RichTextContentProps,
 } from './components/RichTextEditor';
+
+// Quick Add (chunk 04)
+export { Linger, POP_LEAVE_MS } from './lib/linger';
+export { ProjectMenu, type ProjectMenuProps, type ProjectOption } from './components/ProjectMenu';
+export {
+  QuickAdd,
+  QA_CLOSE_AFTER_MS,
+  QA_LEAVE_MS,
+  QA_LEAVE_PHONE_MS,
+  type QuickAddProps,
+  type QuickAddDraft,
+  type QuickAddFile,
+  type QuickAddResult,
+} from './components/QuickAdd';

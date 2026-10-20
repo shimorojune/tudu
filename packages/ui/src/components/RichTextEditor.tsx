@@ -1,4 +1,6 @@
 import { cleanHtml, isEmptyHtml as htmlIsEmpty } from '@tudu/core';
+import { Attachment, withFileBase, withoutFileBase } from './attachment';
+import { showToast } from './Toast';
 import Highlight from '@tiptap/extension-highlight';
 import Subscript from '@tiptap/extension-subscript';
 import Superscript from '@tiptap/extension-superscript';
@@ -43,6 +45,13 @@ export interface RichTextEditorProps {
   onSubmit?: (html: string) => void;
   submitLabel?: string;
   onCancel?: () => void;
+  /** "Attach a file": upload it and get back what the chip needs. Without it the button stays out. */
+  onAttach?: (
+    file: File,
+    onProgress?: (ratio: number) => void,
+  ) => Promise<{ id: string; name: string; size: number }>;
+  /** Where attachment chips link: the API's origin. */
+  fileBase?: string;
   className?: string;
 }
 
@@ -82,6 +91,9 @@ const I = {
     <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
   ),
   mark: <path d="m9 11-6 6v3h9l3-3M22 12l-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4" />,
+  attach: (
+    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+  ),
   code: <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" />,
   more: (
     <>
@@ -148,8 +160,9 @@ const STYLES = [
 ] as const;
 
 /** The editor's extensions: exactly what the cleaner keeps. */
-export function editorExtensions() {
+export function editorExtensions(fileBase = '') {
   return [
+    Attachment.configure({ base: fileBase }),
     StarterKit.configure({
       heading: { levels: [2, 3] },
       link: {
@@ -186,6 +199,8 @@ export function RichTextEditor(p: RichTextEditorProps) {
   const [empty, setEmpty] = useState(() => htmlIsEmpty(toHtml(p.value)));
   const [menu, setMenu] = useState<null | 'style' | 'link' | 'more'>(null);
   const [link, setLink] = useState('');
+  const [attaching, setAttaching] = useState(false);
+  const fileEl = useRef<HTMLInputElement | null>(null);
   const cb = useRef(p);
   useLayoutEffect(() => {
     cb.current = p;
@@ -193,8 +208,8 @@ export function RichTextEditor(p: RichTextEditorProps) {
 
   const editor = useEditor(
     {
-      extensions: editorExtensions(),
-      content: toHtml(p.value),
+      extensions: editorExtensions(p.fileBase),
+      content: withFileBase(toHtml(p.value), p.fileBase),
       editable: !p.readOnly,
       autofocus: p.autoFocus ? 'end' : false,
       editorProps: {
@@ -210,12 +225,12 @@ export function RichTextEditor(p: RichTextEditorProps) {
       onUpdate: ({ editor: e }) => {
         const em = e.isEmpty;
         setEmpty(em);
-        cb.current.onInput?.(e.getHTML(), em);
+        cb.current.onInput?.(withoutFileBase(e.getHTML(), cb.current.fileBase), em);
       },
       onFocus: () => setFocused(true),
       onBlur: ({ editor: e }) => {
         setFocused(false);
-        cb.current.onBlur?.(e.isEmpty ? '' : e.getHTML(), e.isEmpty);
+        cb.current.onBlur?.(e.isEmpty ? '' : withoutFileBase(e.getHTML(), cb.current.fileBase), e.isEmpty);
       },
     },
     [p.resetKey],
@@ -310,10 +325,30 @@ export function RichTextEditor(p: RichTextEditorProps) {
 
   function submit() {
     if (!editor || editor.isEmpty || !p.onSubmit) return;
-    p.onSubmit(cleanHtml(editor.getHTML()));
+    p.onSubmit(cleanHtml(withoutFileBase(editor.getHTML(), p.fileBase)));
     // The box empties and keeps the caret, ready for the next comment.
     editor.chain().clearContent(true).focus().run();
     setEmpty(true);
+  }
+
+  async function attach(file: File | undefined) {
+    if (!file || !editor || !p.onAttach || attaching) return;
+    setAttaching(true);
+    try {
+      const saved = await p.onAttach(file);
+      editor
+        .chain()
+        .focus()
+        .insertContent([
+          { type: 'attachment', attrs: { id: saved.id, name: saved.name, size: saved.size } },
+          { type: 'text', text: ' ' },
+        ])
+        .run();
+    } catch (err) {
+      showToast((err as { message?: string })?.message || 'Couldn’t attach the file.');
+    } finally {
+      setAttaching(false);
+    }
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
@@ -430,6 +465,24 @@ export function RichTextEditor(p: RichTextEditorProps) {
           <Ic name="code" />
         </RTB>
       )}
+      {p.onAttach && (lvl < 3 || comment) ? (
+        <RTB label={attaching ? 'Attaching…' : 'Attach a file'} onClick={() => fileEl.current?.click()}>
+          <Ic name="attach" />
+        </RTB>
+      ) : null}
+      {p.onAttach ? (
+        <input
+          ref={fileEl}
+          type="file"
+          hidden
+          tabIndex={-1}
+          aria-label="Choose a file to attach"
+          onChange={(e) => {
+            void attach(e.target.files?.[0]);
+            e.target.value = '';
+          }}
+        />
+      ) : null}
       <span className="tp-rte-sp" />
       {comment ? null : (
         <div className="tp-rte-dd">
@@ -451,6 +504,14 @@ export function RichTextEditor(p: RichTextEditorProps) {
                   lvl >= 2 && { label: 'Numbered list', onSelect: () => more((c) => c.toggleOrderedList()) },
                   lvl >= 2 && { label: 'Code', onSelect: () => more((c) => c.toggleCode()) },
                   lvl >= 3 && { label: 'Checklist', onSelect: () => more((c) => c.toggleTaskList()) },
+                  lvl >= 3 &&
+                    p.onAttach && {
+                      label: 'Attach a file',
+                      onSelect: () => {
+                        setMenu(null);
+                        fileEl.current?.click();
+                      },
+                    },
                   { label: 'Superscript', onSelect: () => more((c) => c.toggleSuperscript()) },
                   { label: 'Subscript', onSelect: () => more((c) => c.toggleSubscript()) },
                   { label: 'Align left', onSelect: () => more((c) => c.setTextAlign('left')) },
@@ -506,15 +567,17 @@ export function RichTextEditor(p: RichTextEditorProps) {
 export interface RichTextContentProps {
   html: string;
   compact?: boolean;
+  /** Where attachment chips link: the API's origin. */
+  fileBase?: string;
   className?: string;
 }
 
 /** The same writing, read-only (comments). The HTML is cleaned again here, so nothing but words ever renders. */
-export function RichTextContent({ html, compact, className }: RichTextContentProps) {
+export function RichTextContent({ html, compact, fileBase, className }: RichTextContentProps) {
   return (
     <div
       className={cx('tp-root tp-prose', compact && 'tp-compact', className)}
-      dangerouslySetInnerHTML={{ __html: cleanHtml(toHtml(html)) }}
+      dangerouslySetInnerHTML={{ __html: withFileBase(cleanHtml(toHtml(html)), fileBase) }}
     />
   );
 }

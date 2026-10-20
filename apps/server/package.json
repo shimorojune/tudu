@@ -11,6 +11,7 @@
     "auth:generate": "pnpm dlx @better-auth/cli@latest generate --config auth.config.ts --output ../../packages/db/src/auth-schema.ts -y"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1154.0",
     "@better-auth/drizzle-adapter": "^1.7.12",
     "@hono/node-server": "^2.1.5",
     "@tudu/core": "workspace:^",

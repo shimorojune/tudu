@@ -28,6 +28,16 @@ const api = spawn('node', ['--import', 'tsx', 'src/index.ts'], {
     CORS_ORIGINS: `http://localhost:${process.env.E2E_WEB_PORT ?? '5173'}`,
     EMAIL_TRANSPORT: 'outbox',
     TEST_ROUTES: '1',
+    // Attachments: the CI runner has a RustFS bucket; a laptop without Docker keeps them in memory.
+    ...(process.env.TUDU_CI_S3_ENDPOINT
+      ? {
+          STORAGE_DRIVER: 's3',
+          S3_ENDPOINT: process.env.TUDU_CI_S3_ENDPOINT,
+          S3_BUCKET: process.env.TUDU_CI_S3_BUCKET ?? 'tudu-ci',
+          S3_ACCESS_KEY_ID: process.env.TUDU_CI_S3_ACCESS_KEY_ID,
+          S3_SECRET_ACCESS_KEY: process.env.TUDU_CI_S3_SECRET_ACCESS_KEY,
+        }
+      : { STORAGE_DRIVER: 'memory' }),
   },
 });
 

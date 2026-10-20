@@ -44,6 +44,9 @@ const TAG_RE =
   /<\/?([a-zA-Z][a-zA-Z0-9]*)((?:\s+[^\s"'<>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>`]+))?)*)\s*\/?>|<!--[\s\S]*?-->|<[!?/][^>]*>/g;
 const ATTR_RE = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'<>`]+)))?/g;
 const SAFE_URL = /^(https?:|mailto:)/i;
+/** An attachment chip links to the API's own file route. */
+const FILE_URL = /^\/api\/files\/[A-Za-z0-9_-]+$/;
+const ATT_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const ALIGN = /^\s*text-align:\s*(left|center|right)\s*;?\s*$/;
 
 function cleanAttrs(tag: string, raw: string): string {
@@ -56,6 +59,18 @@ function cleanAttrs(tag: string, raw: string): string {
     const v = value.replace(/&quot;/g, '"').trim();
     if (tag === 'a' && name === 'href' && SAFE_URL.test(v)) {
       out.push(`href="${esc(v)}" rel="noopener noreferrer" target="_blank"`);
+    } else if (tag === 'a' && name === 'href' && FILE_URL.test(v)) {
+      out.push(`href="${esc(v)}" target="_blank"`);
+    } else if (tag === 'a' && name === 'class' && v === 'tp-att') {
+      out.push('class="tp-att" data-type="attachment" contenteditable="false"');
+    } else if (tag === 'a' && name === 'data-id' && ATT_ID.test(v)) {
+      out.push(`data-id="${v}"`);
+    } else if (tag === 'a' && name === 'data-name') {
+      out.push(`data-name="${esc(v.slice(0, 255))}"`);
+    } else if (tag === 'a' && name === 'data-size' && /^\d{1,12}$/.test(v)) {
+      out.push(`data-size="${v}"`);
+    } else if (tag === 'span' && name === 'class' && (v === 'tp-att-i' || v === 'tp-att-s')) {
+      out.push(`class="${v}"`);
     } else if ((tag === 'ul' || tag === 'li') && name === 'data-type' && /^(taskList|taskItem)$/.test(v)) {
       out.push(`data-type="${v}"`);
     } else if (tag === 'li' && name === 'data-checked' && /^(true|false)$/.test(v)) {

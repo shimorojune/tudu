@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type {
+  Attachment,
   DayResponse,
   MarksResponse,
   SyncResponse,
@@ -8,6 +9,9 @@ import type {
   TaskDetail,
   TasksChangedEvent,
 } from '@tudu/core';
+import { eq, schema } from '@tudu/db';
+import { sweepAttachments } from './files';
+import type { MemoryStorage } from './storage';
 import { get, post, signIn, startServer, type Jar } from '../test/harness';
 
 let server: ReturnType<typeof startServer>;
@@ -319,6 +323,7 @@ describe('tasks and sync', () => {
         'id',
         'number',
         'position',
+        'projectId',
         'ref',
         'spaceId',
         'subsDone',
@@ -639,3 +644,264 @@ describe('task detail (chunk 03)', () => {
     expect((await get(server.app, '/api/tasks/ref/ME-2', p.jar)).status).toBe(404);
   });
 });
+
+describe('projects and Quick Add (chunk 04)', () => {
+  async function projects(p: Person) {
+    const res = await get(server.app, `/api/spaces/${p.spaceId}/projects`, p.jar);
+    expect(res.status).toBe(200);
+    return ((await res.json()) as { projects: Array<{ id: string; name: string; color: string }> }).projects;
+  }
+
+  it('C04-A01 projects: create with the next colour, rename, recolour, delete; a deleted project leaves its tasks without one; 403 for strangers', async () => {
+    const p = await person();
+    const a = randomUUID();
+    const b = randomUUID();
+    const t = randomUUID();
+    await sync(p, [
+      m('project.create', { id: a, spaceId: p.spaceId, name: ' Northwind ' }),
+      m('project.create', { id: b, spaceId: p.spaceId, name: 'Platform' }),
+      create(p, 'Deploy', SUN, 1024, t),
+      m('task.project', { id: t, projectId: b }),
+    ]);
+    let list = await projects(p);
+    expect(list.map((x) => [x.name, x.color])).toEqual([
+      ['Northwind', '#3d5a80'],
+      ['Platform', '#5b7553'],
+    ]);
+    await sync(p, [
+      m('project.update', { id: b, spaceId: p.spaceId, name: 'Platform team', color: '#8a5a00' }),
+    ]);
+    list = await projects(p);
+    expect(list[1]).toMatchObject({ name: 'Platform team', color: '#8a5a00' });
+    expect((await detail(p, t)).projectId).toBe(b);
+    await sync(p, [m('project.delete', { id: b, spaceId: p.spaceId })]);
+    expect((await projects(p)).map((x) => x.name)).toEqual(['Northwind']);
+    expect((await detail(p, t)).projectId).toBeNull();
+    const gone = await sync(p, [m('project.update', { id: b, spaceId: p.spaceId, name: 'Back?' })]);
+    expect(gone.results[0]).toMatchObject({ status: 'rejected', code: 410 });
+    const stranger = await person();
+    const refused = await sync(stranger, [
+      m('project.create', { id: randomUUID(), spaceId: p.spaceId, name: 'Mine' }),
+    ]);
+    expect(refused.results[0]).toMatchObject({ status: 'rejected', code: 403 });
+    expect((await get(server.app, `/api/spaces/${p.spaceId}/projects`, stranger.jar)).status).toBe(403);
+    const bad = await sync(p, [m('project.create', { id: randomUUID(), spaceId: p.spaceId, name: '   ' })]);
+    expect(bad.results[0]).toMatchObject({ status: 'rejected', code: 400 });
+  });
+
+  it('C04-A02 set a task’s project: last write wins; a project from another space is refused; the day’s rows carry it', async () => {
+    const p = await person();
+    const other = await person();
+    const a = randomUUID();
+    const foreign = randomUUID();
+    const t = randomUUID();
+    await sync(p, [
+      m('project.create', { id: a, spaceId: p.spaceId, name: 'Home' }),
+      create(p, 'Bills', SUN, 1024, t),
+    ]);
+    await sync(other, [m('project.create', { id: foreign, spaceId: other.spaceId, name: 'Theirs' })]);
+    const later = m('task.project', { id: t, projectId: a });
+    const earlier = m('task.project', { id: t, projectId: null }, '2026-10-18T08:00:00.000Z');
+    await sync(p, [later, earlier]);
+    expect((await day(p, SUN)).tasks[0]!.projectId).toBe(a);
+    const refused = await sync(p, [m('task.project', { id: t, projectId: foreign })]);
+    expect(refused.results[0]).toMatchObject({ status: 'rejected', code: 400 });
+    expect((await detail(p, t)).projectId).toBe(a);
+  });
+
+  it('C04-A03 a task from Quick Add lands with its due day, notes, project and files; its history says so', async () => {
+    const p = await person();
+    const a = randomUUID();
+    const t = randomUUID();
+    const up = await upload(p, 'spec.pdf', 'application/pdf', 1200);
+    await sync(p, [
+      m('project.create', { id: a, spaceId: p.spaceId, name: 'Northwind' }),
+      m('task.create', {
+        id: t,
+        spaceId: p.spaceId,
+        title: 'Send the offsite agenda',
+        day: SUN,
+        position: 1024,
+        due: '2026-10-22',
+        projectId: a,
+        notes: '<p>Keep it to one page.<script>x()</script></p>',
+        attachments: [up.id],
+        source: 'quick-add',
+      }),
+    ]);
+    const d = await detail(p, t);
+    expect(d).toMatchObject({ due: '2026-10-22', projectId: a });
+    expect(d.notes).toBe(
+      `<p>Keep it to one page.</p><p><a class="tp-att" data-type="attachment" contenteditable="false" href="/api/files/${up.id}" target="_blank" data-id="${up.id}" data-name="spec.pdf" data-size="1200"><span class="tp-att-i"></span>spec.pdf<span class="tp-att-s">1 KB</span></a></p>`,
+    );
+    expect(d.history.map((e) => [e.kind, (e as { source?: string }).source ?? null])).toEqual([
+      ['created', 'quick-add'],
+      ['due.set', null],
+    ]);
+    const file = await (await get(server.app, `/api/files/${up.id}`, p.jar)).text();
+    expect(file.length).toBe(1200);
+    // the file now belongs to the task
+    const row = await server.db.select().from(schema.attachments).where(eq(schema.attachments.id, up.id));
+    expect(row[0]!.taskId).toBe(t);
+    const foreign = await sync(p, [
+      create(p, 'Bad', SUN, 2048),
+      m('task.create', {
+        id: randomUUID(),
+        spaceId: p.spaceId,
+        title: 'Bad project',
+        day: SUN,
+        position: 3072,
+        projectId: randomUUID(),
+      }),
+    ]);
+    expect(foreign.results[1]).toMatchObject({ status: 'rejected', code: 400 });
+  });
+
+  it('C04-A04 upload: a file lands in the bucket under the space; over 25 MB is refused; no file is 400', async () => {
+    const p = await person();
+    const saved = await upload(p, 'venue map.png', 'image/png', 50_000);
+    expect(saved).toMatchObject({
+      spaceId: p.spaceId,
+      taskId: null,
+      name: 'venue map.png',
+      size: 50_000,
+      type: 'image/png',
+    });
+    const key = `spaces/${p.spaceId}/${saved.id}`;
+    expect((server.storage as MemoryStorage).objects.has(key)).toBe(true);
+    const big = await uploadRaw(p, 'big.bin', 'application/octet-stream', 25 * 1024 * 1024 + 1);
+    expect(big.status).toBe(413);
+    const none = await post(server.app, `/api/spaces/${p.spaceId}/files`, {}, p.jar);
+    expect(none.status).toBe(400);
+    const stranger = await person();
+    const refused = await uploadRaw(stranger, 'x.txt', 'text/plain', 10, p.spaceId);
+    expect(refused.status).toBe(403);
+    const bad = await uploadRaw(p, 'x.txt', 'text/plain', 10, undefined, 'no-such-task');
+    expect(bad.status).toBe(404);
+  });
+
+  it('C04-A05 download: a member streams it back with its name and type; a stranger gets 403; an unknown id 404', async () => {
+    const p = await person();
+    const saved = await upload(p, 'notes.txt', 'text/plain', 20);
+    const res = await get(server.app, `/api/files/${saved.id}`, p.jar);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('text/plain');
+    expect(res.headers.get('content-disposition')).toBe("inline; filename*=UTF-8''notes.txt");
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+    expect((await res.text()).length).toBe(20);
+    const dl = await get(server.app, `/api/files/${saved.id}?download=1`, p.jar);
+    expect(dl.headers.get('content-disposition')).toMatch(/^attachment;/);
+    const html = await upload(p, 'page.html', 'text/html', 20);
+    expect(
+      (await get(server.app, `/api/files/${html.id}`, p.jar)).headers.get('content-disposition'),
+    ).toMatch(/^attachment;/);
+    const stranger = await person();
+    expect((await get(server.app, `/api/files/${saved.id}`, stranger.jar)).status).toBe(403);
+    expect((await get(server.app, `/api/files/${randomUUID()}`, p.jar)).status).toBe(404);
+  });
+
+  it('C04-A06 attachment chips in notes and comments survive the cleaner with their id, name and size', async () => {
+    const p = await person();
+    const t = randomUUID();
+    const c = randomUUID();
+    const chip =
+      '<a class="tp-att" href="/api/files/abc-1" data-id="abc-1" data-name="spec.pdf" data-size="1200" onclick="x()"><span class="tp-att-i"></span>spec.pdf<span class="tp-att-s">1 KB</span></a>';
+    await sync(p, [
+      create(p, 'With files', SUN, 1024, t),
+      m('task.notes', { id: t, notes: `<p>See ${chip}</p>` }),
+      m('comment.create', { id: c, taskId: t, html: `<p>Also ${chip}</p>` }),
+    ]);
+    const d = await detail(p, t);
+    const kept =
+      '<a class="tp-att" data-type="attachment" contenteditable="false" href="/api/files/abc-1" target="_blank" data-id="abc-1" data-name="spec.pdf" data-size="1200"><span class="tp-att-i"></span>spec.pdf<span class="tp-att-s">1 KB</span></a>';
+    expect(d.notes).toBe(`<p>See ${kept}</p>`);
+    expect(d.comments[0]!.html).toBe(`<p>Also ${kept}</p>`);
+  });
+
+  it('C04-A07 the sweep: a file for a task that never came goes after a day; a deleted task’s files go a day later; live ones stay', async () => {
+    const p = await person();
+    const t = randomUUID();
+    const orphan = await upload(p, 'orphan.txt', 'text/plain', 5);
+    const fresh = await upload(p, 'fresh.txt', 'text/plain', 5);
+    const kept = await upload(p, 'kept.txt', 'text/plain', 5);
+    await sync(p, [
+      m('task.create', {
+        id: t,
+        spaceId: p.spaceId,
+        title: 'Keeper',
+        day: SUN,
+        position: 1024,
+        attachments: [kept.id],
+      }),
+    ]);
+    const gone = randomUUID();
+    const dropped = await upload(p, 'dropped.txt', 'text/plain', 5);
+    await sync(p, [
+      m('task.create', {
+        id: gone,
+        spaceId: p.spaceId,
+        title: 'Going',
+        day: SUN,
+        position: 2048,
+        attachments: [dropped.id],
+      }),
+    ]);
+    await sync(p, [m('task.delete', { id: gone })]);
+    // age the orphan and the deleted task by a day
+    const old = new Date(Date.now() - 25 * 60 * 60 * 1000);
+    await server.db
+      .update(schema.attachments)
+      .set({ createdAt: old })
+      .where(eq(schema.attachments.id, orphan.id));
+    await server.db.update(schema.tasks).set({ deletedAt: old }).where(eq(schema.tasks.id, gone));
+    expect(await sweepAttachments(server.db, server.storage)).toBe(2);
+    expect((await get(server.app, `/api/files/${orphan.id}`, p.jar)).status).toBe(404);
+    expect((await get(server.app, `/api/files/${dropped.id}`, p.jar)).status).toBe(404);
+    expect((await get(server.app, `/api/files/${fresh.id}`, p.jar)).status).toBe(200);
+    expect((await get(server.app, `/api/files/${kept.id}`, p.jar)).status).toBe(200);
+    expect((server.storage as MemoryStorage).objects.has(`spaces/${p.spaceId}/${orphan.id}`)).toBe(false);
+  });
+
+  it('C04-A08 every project change tells the space’s people, and nobody else', async () => {
+    const p = await person();
+    const stranger = await person();
+    const mine: Array<{ type: string; data: unknown }> = [];
+    const theirs: unknown[] = [];
+    const off1 = server.hub.subscribe(p.userId, (e) => mine.push(e));
+    const off2 = server.hub.subscribe(stranger.userId, (e) => theirs.push(e));
+    const a = randomUUID();
+    await sync(p, [m('project.create', { id: a, spaceId: p.spaceId, name: 'Home' })], 'tab-9');
+    await sync(p, [m('project.update', { id: a, spaceId: p.spaceId, name: 'House' })], 'tab-9');
+    await sync(p, [m('project.delete', { id: a, spaceId: p.spaceId })], 'tab-9');
+    off1();
+    off2();
+    expect(mine.map((e) => e.type)).toEqual(['projects.changed', 'projects.changed', 'projects.changed']);
+    expect(mine[0]!.data).toEqual({ spaceId: p.spaceId, clientId: 'tab-9' });
+    expect(theirs).toEqual([]);
+  });
+});
+
+async function uploadRaw(
+  p: Person,
+  name: string,
+  type: string,
+  size: number,
+  spaceId = p.spaceId,
+  taskId?: string,
+) {
+  const form = new FormData();
+  form.append('file', new File([new Uint8Array(size)], name, { type }), name);
+  if (taskId) form.append('taskId', taskId);
+  const res = await server.app.request(`/api/spaces/${spaceId}/files`, {
+    method: 'POST',
+    headers: { origin: 'http://localhost:5173', cookie: p.jar.header() },
+    body: form,
+  });
+  return res;
+}
+
+async function upload(p: Person, name: string, type: string, size: number): Promise<Attachment> {
+  const res = await uploadRaw(p, name, type, size);
+  expect(res.status).toBe(201);
+  return (await res.json()) as Attachment;
+}

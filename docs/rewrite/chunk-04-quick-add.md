@@ -1,6 +1,7 @@
 # Chunk 04 · Quick Add
 
-Status: proposed, 21 Oct 2026. Awaiting your approval of the scope, the choices below and the test table.
+Status: approved 21 Oct 2026 (all five choices as proposed), built on branch `rewrite/04-quick-add`. Tests in
+[docs/tests/chunk-04.md](../tests/chunk-04.md); deviations in [design-deviations.md](design-deviations.md).
 
 Boards: 03 Quick Add (desktop, dark, tablet, phone, the floating bar, the seven states, motion), 00 The task row
 (the project dot), 02 Task detail (the Project fact). The bar is the design system's QuickAdd; its reference source
@@ -45,7 +46,7 @@ Out of scope: "Looks like a task you have" (word matches arrive with Search, chu
 are in later.md), the global summon, tray and the Tauri window (11), For someone and Send (08), the project
 filter on the Backlog (06), Jira (10).
 
-## Choices for you
+## Choices (approved as proposed)
 
 1. **New projects from the picker.** The canvas draws no place to make a project. The picker's last line,
    "New project…", asks for a name on the spot and gives it the next colour from the design's muted palette;
@@ -64,58 +65,58 @@ filter on the Backlog (06), Jira (10).
 
 Unit (`packages/ui`, `packages/client`, `packages/core`):
 
-| ID      | Component   | Case                                                                                                                                      |
-| ------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| C04-U01 | QuickAdd    | Just opened: the line focused, Planned "Today" in the brand tone, Due and Project empty, the foot says "Lands on Today", Add task off   |
-| C04-U02 | QuickAdd    | Planned: Today, Tomorrow, Backlog and the calendar; the chip and the foot follow ("Lands in Backlog"); the chip eases its width         |
-| C04-U03 | QuickAdd    | Due: the hover hint says how far; the chip reads "Due Thu 22 Oct", red when overdue; Remove due date clears it                            |
-| C04-U04 | QuickAdd    | Project: the list with dots, No project; New project… asks for a name and adds it with the next colour                                   |
-| C04-U05 | QuickAdd    | The note line fades up on the note button, keeps three lines, folds away when left empty; the foot says "note"                            |
-| C04-U06 | QuickAdd    | Files: the attach button, a paste and a drop add chips with their size; dropping shows the outline; × removes one; the foot counts them |
-| C04-U07 | QuickAdd    | Add: Enter or the button; onSave gets the draft; "Adding…" holds the form, "Added" then onAdd and onClose after 650ms; a rejected save keeps the draft and toasts |
-| C04-U08 | QuickAdd    | Esc closes a picker first, then the bar; the × and the veil close it; the draft is still there when it opens again                        |
-| C04-U09 | QuickAdd    | Phone: the sheet with the grabber, the foot with the buttons and Add, pickers open upward, the keyboard height moves the sheet            |
-| C04-U10 | QuickAdd    | Reduced motion and the leaving states: the bar fades, 150ms out (210 on phones)                                                           |
-| C04-U11 | TaskRow     | The project dot and name in the byline, after the Jira key; brief rows keep it                                                            |
-| C04-U12 | TaskDetail  | The Project fact: picker with dots, No project, New project…; "Add to a project" when empty                                               |
-| C04-U13 | Editor      | Attach a file inserts the chip at the caret with name and size; the chip renders read-only with a link; the cleaner keeps it             |
-| C04-U14 | client      | Set project, create a project, and a task made from Quick Add with notes and a project apply at once and queue; the row and panel follow |
-| C04-U15 | client      | Uploads: progress, done, failed (toast); an upload while offline is refused before it starts                                              |
-| C04-U16 | core        | Project colours: the palette in order, the next free one, wrapping; project names trimmed, 1 to 60 characters                            |
-| C04-U17 | core        | The foot's words: "Lands on Today", "Lands on Tomorrow", "Lands on Thu 22 Oct", "Lands in Backlog", with project, due, note and file counts |
+| ID      | Component  | Case                                                                                                                                                              |
+| ------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C04-U01 | QuickAdd   | Just opened: the line focused, Planned "Today" in the brand tone, Due and Project empty, the foot says "Lands on Today", Add task off                             |
+| C04-U02 | QuickAdd   | Planned: Today, Tomorrow, Backlog and the calendar; the chip and the foot follow ("Lands in Backlog"); the chip eases its width                                   |
+| C04-U03 | QuickAdd   | Due: the hover hint says how far; the chip reads "Due Thu 22 Oct", red when overdue; Remove due date clears it                                                    |
+| C04-U04 | QuickAdd   | Project: the list with dots, No project; New project… asks for a name and adds it with the next colour                                                            |
+| C04-U05 | QuickAdd   | The note line fades up on the note button, keeps three lines, folds away when left empty; the foot says "note"                                                    |
+| C04-U06 | QuickAdd   | Files: the attach button, a paste and a drop add chips with their size; dropping shows the outline; × removes one; the foot counts them                           |
+| C04-U07 | QuickAdd   | Add: Enter or the button; onSave gets the draft; "Adding…" holds the form, "Added" then onAdd and onClose after 650ms; a rejected save keeps the draft and toasts |
+| C04-U08 | QuickAdd   | Esc closes a picker first, then the bar; the × and the veil close it; the draft is still there when it opens again                                                |
+| C04-U09 | QuickAdd   | Phone: the sheet with the grabber, the foot with the buttons and Add, pickers open upward, the keyboard height moves the sheet                                    |
+| C04-U10 | QuickAdd   | Reduced motion and the leaving states: the bar fades, 150ms out (210 on phones)                                                                                   |
+| C04-U11 | TaskRow    | The project dot and name in the byline, after the Jira key; brief rows keep it                                                                                    |
+| C04-U12 | TaskDetail | The Project fact: picker with dots, No project, New project…; "Add to a project" when empty                                                                       |
+| C04-U13 | Editor     | Attach a file inserts the chip at the caret with name and size; the chip renders read-only with a link; the cleaner keeps it                                      |
+| C04-U14 | client     | Set project, create a project, and a task made from Quick Add with notes and a project apply at once and queue; the row and panel follow                          |
+| C04-U15 | client     | Uploads: progress, done, failed (toast); an upload while offline is refused before it starts                                                                      |
+| C04-U16 | core       | Project colours: the palette in order, the next free one, wrapping; project names trimmed, 1 to 60 characters                                                     |
+| C04-U17 | core       | The foot's words: "Lands on Today", "Lands on Tomorrow", "Lands on Thu 22 Oct", "Lands in Backlog", with project, due, note and file counts                       |
 
 API (`apps/server`):
 
-| ID      | Case                                                                                                                                   |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| ID      | Case                                                                                                                                           |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | C04-A01 | Projects: create (next colour given when none sent), rename, recolour, delete; a task in a deleted project keeps no project; 403 for strangers |
-| C04-A02 | Set a task's project: last write wins by clock; a project from another space is refused (400); the day's rows carry the project       |
-| C04-A03 | A task created with notes and a project in one batch lands with both; its history says "Created from Quick Add"                       |
-| C04-A04 | Upload: a file lands in the bucket under the space; the answer has id, name, size and type; over 25 MB is refused (413); no file is 400 |
-| C04-A05 | Download: a member streams it back with its name and type; a stranger gets 403; an unknown id 404                                      |
-| C04-A06 | Attachment chips in notes and comments survive the cleaner with their id, name and size, and nothing else                             |
-| C04-A07 | Deleting a task leaves its files readable until restore or a day later; a file nobody references is swept (job)                        |
-| C04-A08 | Every project change publishes a live event to the space's people                                                                      |
+| C04-A02 | Set a task's project: last write wins by clock; a project from another space is refused (400); the day's rows carry the project                |
+| C04-A03 | A task created with notes and a project in one batch lands with both; its history says "Created from Quick Add"                                |
+| C04-A04 | Upload: a file lands in the bucket under the space; the answer has id, name, size and type; over 25 MB is refused (413); no file is 400        |
+| C04-A05 | Download: a member streams it back with its name and type; a stranger gets 403; an unknown id 404                                              |
+| C04-A06 | Attachment chips in notes and comments survive the cleaner with their id, name and size, and nothing else                                      |
+| C04-A07 | Deleting a task leaves its files readable until restore or a day later; a file nobody references is swept (job)                                |
+| C04-A08 | Every project change publishes a live event to the space's people                                                                              |
 
 End-to-end, group `quick-add`:
 
-| ID      | Case                                                                                                                                   |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| C04-E01 | New task opens the bar over the day; write a title, Add task; the row opens its gap on today with the wash; a reload shows it         |
-| C04-E02 | Planned Tomorrow: "Added to Tomorrow" with Show; Show turns the sheet and washes the row                                                |
-| C04-E03 | Planned Backlog: "Added to Backlog"; the day stays empty; the task is in the Backlog state on the server                              |
-| C04-E04 | Due and Project: the foot reads them; the new row's byline says "Due Thu" and the project; the panel shows the Project fact            |
-| C04-E05 | New project from the chip; it is in the picker next time, on the row and in the panel                                                 |
-| C04-E06 | A note becomes the task's notes; a file attached shows as a chip in the notes and opens                                                |
-| C04-E07 | Drop a file on the bar: the outline, the chip, the upload; a 30 MB file is refused with a plain message                                |
-| C04-E08 | Esc keeps the draft; reopening shows it; × and the veil close it too                                                                   |
-| C04-E09 | Enter adds; a failed save (route 500) says the draft is still here; Try again adds it                                                 |
-| C04-E10 | Phone: the round button opens the sheet above the keyboard; add a task; it is on today                                                 |
-| C04-E11 | Two days: a task added to the second sheet's day washes there                                                                          |
-| C04-E12 | Offline: add a task from the bar; it shows at once and reaches the server when back; the attach button says it needs a connection      |
-| C04-E13 | `/quick-add` shows the bar alone; adding from it lands on today in another tab (live)                                                  |
-| C04-E14 | Attach a file from the notes editor in the panel; the chip is there after a reload and opens the file                                  |
-| C04-E15 | Dark mode: E01 and E04 again in dark                                                                                                   |
+| ID      | Case                                                                                                                              |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| C04-E01 | New task opens the bar over the day; write a title, Add task; the row opens its gap on today with the wash; a reload shows it     |
+| C04-E02 | Planned Tomorrow: "Added to Tomorrow" with Show; Show turns the sheet and washes the row                                          |
+| C04-E03 | Planned Backlog: "Added to Backlog"; the day stays empty; the task is in the Backlog state on the server                          |
+| C04-E04 | Due and Project: the foot reads them; the new row's byline says "Due Thu" and the project; the panel shows the Project fact       |
+| C04-E05 | New project from the chip; it is in the picker next time, on the row and in the panel                                             |
+| C04-E06 | A note becomes the task's notes; a file attached shows as a chip in the notes and opens                                           |
+| C04-E07 | Drop a file on the bar: the outline, the chip, the upload; a 30 MB file is refused with a plain message                           |
+| C04-E08 | Esc keeps the draft; reopening shows it; × and the veil close it too                                                              |
+| C04-E09 | Enter adds; a failed save (route 500) says the draft is still here; Try again adds it                                             |
+| C04-E10 | Phone: the round button opens the sheet above the keyboard; add a task; it is on today                                            |
+| C04-E11 | Two days: a task added to the second sheet's day washes there                                                                     |
+| C04-E12 | Offline: add a task from the bar; it shows at once and reaches the server when back; the attach button says it needs a connection |
+| C04-E13 | `/quick-add` shows the bar alone; adding from it lands on today in another tab (live)                                             |
+| C04-E14 | Attach a file from the notes editor in the panel; the chip is there after a reload and opens the file                             |
+| C04-E15 | Dark mode: E01 and E04 again in dark                                                                                              |
 
 Not automated: the bar's arrival and the veil, the chip width easing, the tick on Add; you judge those on staging.
 

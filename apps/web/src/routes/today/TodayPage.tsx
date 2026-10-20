@@ -8,6 +8,7 @@ import {
   dueLabel,
   nightWords,
   type IsoDate,
+  type Project,
   type Task,
   type TaskRefResponse,
 } from '@tudu/core';
@@ -24,7 +25,7 @@ import {
   type TaskItem,
 } from '@tudu/ui';
 import { useEffect, useLayoutEffect, useRef, useState, type TouchEvent } from 'react';
-import { showDay, useDayView, useNewTaskAsk, useShownDay } from '../../app/dayView';
+import { setSecondDay, showDay, useDayView, useFlash, useNewTaskAsk, useShownDay } from '../../app/dayView';
 import { api, meQuery } from '../../app/session';
 import { taskStore, useOnline } from '../../app/tasks';
 import { useViewport, type Viewport } from '../../app/viewport';
@@ -36,12 +37,14 @@ const SWIPE_PX = 60;
 
 const MIN_HEIGHT: Record<Viewport, number> = { desktop: 560, tablet: 640, phone: 520 };
 
-function toItem(t: Task, today: IsoDate): TaskItem {
+function toItem(t: Task, today: IsoDate, projects: Project[]): TaskItem {
+  const project = t.projectId ? projects.find((p) => p.id === t.projectId) : undefined;
   return {
     key: t.id,
     id: t.ref,
     title: t.title,
     done: t.done,
+    project: project ? { name: project.name, color: project.color } : undefined,
     due: t.due && !t.done ? dueLabel(t.due, today) : undefined,
     carried: t.carriedFrom && !t.done ? carriedLabel(t.carriedFrom, today) : undefined,
     comments: t.commentCount || undefined,
@@ -117,6 +120,10 @@ export function TodayPage() {
     setWasTwo(two);
     if (two) setDay2(addDays(day, 1));
   }
+  useEffect(() => {
+    setSecondDay(two ? day2 : null);
+    return () => setSecondDay(null);
+  }, [two, day2]);
 
   const go = (next: IsoDate) => showDay(next, today);
 
@@ -258,6 +265,8 @@ function DaySheet({
 }: DaySheetProps) {
   const compact = vp === 'phone';
   const q = useQuery(taskStore.dayQuery(spaceId, day, today));
+  const projects = useQuery(taskStore.projectsQuery(spaceId)).data ?? [];
+  const flash = useFlash();
   const range = monthAround(day);
   const marks = useQuery(taskStore.marksQuery(spaceId, range.from, range.to)).data;
 
@@ -283,7 +292,7 @@ function DaySheet({
   });
 
   const tasks = q.data?.tasks ?? [];
-  const items = tasks.map((t) => toItem(t, today));
+  const items = tasks.map((t) => toItem(t, today, projects));
   const done = tasks.filter((t) => t.done).length;
   const h = dayHeading(day, today);
   const calendar = { today, selected: day, marks: marks ?? {}, onPick: onDay };
@@ -321,6 +330,7 @@ function DaySheet({
         compact={compact}
         resetKey={day}
         group={group}
+        flashKey={flash && flash.day === day ? flash.id : undefined}
         addLabel="Write the next thing…"
         addKey={writing}
         onAddClose={() => setWriting(null)}
