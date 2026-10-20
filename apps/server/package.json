@@ -7,7 +7,8 @@
     "dev": "tsx watch src/index.ts",
     "start": "node --import tsx src/index.ts",
     "migrate": "node --import tsx src/migrate-cli.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "auth:generate": "pnpm dlx @better-auth/cli@latest generate --config auth.config.ts --output ../../packages/db/src/auth-schema.ts -y"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.7.12",
@@ -17,11 +18,10 @@
     "better-auth": "^1.7.12",
     "hono": "^4.13.13",
     "resend": "^6.34.1",
-    "zod": "^4.6.7",
-    "tsx": "^4.23.15"
+    "tsx": "^4.23.15",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@better-auth/cli": "^1.4.21",
     "@types/node": "^26.6.5"
   }
 }
