@@ -16,3 +16,12 @@ export {
   useMutation,
   useQueryClient,
 } from '@tanstack/react-query';
+export {
+  TaskStore,
+  applyToDay,
+  draftOf,
+  dayKey,
+  marksKey,
+  type DayData,
+  type TaskStoreOptions,
+} from './tasks';

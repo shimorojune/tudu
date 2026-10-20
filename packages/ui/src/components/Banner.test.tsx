@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { nightWords } from '@tudu/core';
 import { Banner } from './Banner';
 
 describe('Banner', () => {
@@ -82,5 +83,38 @@ describe('Banner', () => {
     expect(dismiss).toHaveClass('tp-x');
     await user.click(dismiss);
     expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('C02-U18 the after-midnight banner offers Start Monday (primary) and Stay on Sunday', async () => {
+    const user = userEvent.setup();
+    const start = vi.fn();
+    const stay = vi.fn();
+    const w = nightWords(new Date(2026, 9, 19, 0, 40), '2026-10-18', '2026-10-19');
+    render(
+      <Banner
+        tone="info"
+        title={w.title}
+        actions={[
+          { label: w.start, primary: true, onClick: start },
+          { label: w.stay, onClick: stay },
+        ]}
+        onDismiss={stay}
+      >
+        {w.body}
+      </Banner>,
+    );
+    const banner = screen.getByRole('status');
+    expect(banner).toHaveClass('tp-banner-info');
+    expect(banner).toHaveTextContent(
+      'It’s 00:40 on Monday. You’re still on Sunday’s list. Nothing has moved.',
+    );
+    const primary = screen.getByRole('button', { name: 'Start Monday' });
+    expect(primary).toHaveClass('tp-solid');
+    expect(screen.getByRole('button', { name: 'Stay on Sunday' })).not.toHaveClass('tp-solid');
+    await user.click(primary);
+    expect(start).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Stay on Sunday' }));
+    await user.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(stay).toHaveBeenCalledTimes(2);
   });
 });

@@ -33,6 +33,9 @@ export function refreshMe(): Promise<MeResponse | null> {
 }
 
 export async function signOut(): Promise<void> {
+  // Unsaved changes get a moment to land; whatever is left belongs to this person and goes with them.
+  const { taskStore } = await import('./tasks');
+  await taskStore.clear();
   await authClient.signOut();
   queryClient.setQueryData(meQuery.queryKey, null);
   await queryClient.invalidateQueries();

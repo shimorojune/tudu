@@ -1,7 +1,7 @@
 /**
  * The outbox: every change the person makes is applied locally at once and queued here, then replayed to the
  * server in order. Each mutation carries a client id and its own id, so a retry never doubles a change.
- * Chunk 01 ships the queue and its storage; the mutations themselves arrive with the Today chunk.
+ * The task mutations themselves live in tasks.ts.
  */
 export interface Mutation<T = unknown> {
   id: string;
@@ -9,7 +9,17 @@ export interface Mutation<T = unknown> {
   payload: T;
   /** The client's clock when it was made; the server uses it for last-write-wins per field. */
   at: string;
+  /** Orders mutations made in the same millisecond. */
+  seq?: number;
 }
+
+/** Oldest first: by the clock, then by the order they were made in. */
+export function byClock(a: Mutation, b: Mutation): number {
+  return a.at.localeCompare(b.at) || (a.seq ?? 0) - (b.seq ?? 0);
+}
+
+/** At most this many mutations in one request. */
+export const BATCH_SIZE = 100;
 
 export interface OutboxStore {
   all(): Promise<Mutation[]>;
@@ -104,7 +114,7 @@ export class Outbox {
     this.running = true;
     try {
       for (;;) {
-        const batch = (await this.o.store.all()).sort((a, b) => a.at.localeCompare(b.at));
+        const batch = (await this.o.store.all()).sort(byClock).slice(0, BATCH_SIZE);
         if (!batch.length) break;
         const { done } = await this.o.send(batch);
         for (const id of done) await this.o.store.remove(id);

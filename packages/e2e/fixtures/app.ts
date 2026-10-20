@@ -1,23 +1,30 @@
+import { randomBytes } from 'node:crypto';
 import { test as base, expect, type Page } from '@playwright/test';
 
-export const API_URL = process.env.E2E_API_URL ?? 'http://localhost:3456';
+export const API_URL = process.env.E2E_API_URL ?? `http://localhost:${process.env.E2E_API_PORT ?? '3456'}`;
 let n = 0;
 
-/** A fresh address per test so tests never share a person. */
+/**
+ * A fresh address per test so tests never share a person. Workers run in parallel, so the time and a counter are
+ * not enough on their own: a random part keeps two workers from picking the same address in the same millisecond.
+ */
 export function freshEmail(tag = 'person'): string {
   n += 1;
-  return `${tag}-${Date.now().toString(36)}-${n}@test.tudu`;
+  return `${tag}-${Date.now().toString(36)}-${randomBytes(3).toString('hex')}-${n}@test.tudu`;
 }
 
-/** The latest sign-in code the API mailed to `email`, read from the test outbox. */
-export async function codeFor(page: Page, email: string): Promise<string> {
+/**
+ * The latest sign-in code the API mailed to `email`, read from the test outbox. Pass `newerThan` (an earlier code)
+ * after asking for a new one, so the old one still in the outbox is never mistaken for it.
+ */
+export async function codeFor(page: Page, email: string, newerThan?: string): Promise<string> {
   for (let i = 0; i < 40; i++) {
     const res = await page.request.get(`${API_URL}/__test/outbox/code?to=${encodeURIComponent(email)}`);
     const { code } = (await res.json()) as { code: string | null };
-    if (code) return code;
+    if (code && code !== newerThan) return code;
     await page.waitForTimeout(100);
   }
-  throw new Error(`no code arrived for ${email}`);
+  throw new Error(`no ${newerThan ? 'new ' : ''}code arrived for ${email}`);
 }
 
 /** Type the six digits into the code field. */

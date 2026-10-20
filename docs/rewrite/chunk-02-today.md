@@ -1,6 +1,6 @@
 # Chunk 02 · Today
 
-Status: proposed, awaiting approval.
+Status: built, in review. Tests in [docs/tests/chunk-02.md](../tests/chunk-02.md); deviations in [design-deviations.md](design-deviations.md).
 
 Boards: 01 Today (desktop, dark, tablet, phone, states, phone states, motion), 00 The task row, 00 Components (checkbox and the row), P-IdEnd (the ID at the end of the byline).
 

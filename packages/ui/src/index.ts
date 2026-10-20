@@ -121,3 +121,20 @@ export { Fab, type FabProps } from './components/Fab';
 export { AccountMenu, type AccountMenuProps, type AccountMenuPerson } from './components/AccountMenu';
 export { DayProgress, REWARD_MS, type DayProgressProps } from './components/DayProgress';
 export { DayHeader, type DayHeaderProps } from './components/DayHeader';
+
+// Today (chunk 02)
+export {
+  TaskRow,
+  COPY_FLASH_MS,
+  type TaskRowProps,
+  type TaskDue,
+  type TaskCarried,
+  type TaskProject,
+  type TaskSignal,
+} from './components/TaskRow';
+export { TaskList, FRESH_MS, type TaskListProps, type TaskItem, type TaskMove } from './components/TaskList';
+export { AddTask, type AddTaskProps } from './components/AddTask';
+export { DatePop, DATEPOP_LEAVE_MS, type DatePopProps } from './components/DatePop';
+export { Spread, SpreadPage, SPREAD_MS, type SpreadProps, type SpreadPageProps } from './components/Spread';
+export { useReorder, useDropGroup, moveItem, itemByKey, DRAG_START_PX, TOUCH_HOLD_MS } from './lib/reorder';
+export { openRow, closeRow, dropFlash, settleFrom, easeArrive, bezier } from './lib/motion';
