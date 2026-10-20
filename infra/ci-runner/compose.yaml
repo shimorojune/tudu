@@ -9,27 +9,26 @@ services:
       dockerfile_inline: |
         FROM mcr.microsoft.com/playwright:v1.64.1-noble
         ENV DEBIAN_FRONTEND=noninteractive
-        RUN apt-get update \
-         && apt-get install -y --no-install-recommends ca-certificates curl jq git libicu-dev \
-         && rm -rf /var/lib/apt/lists/* \
-         && npm install -g pnpm@9.15.9 \
+        # The runner is .NET: with invariant globalization it needs no ICU package.
+        ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+        RUN npm install -g pnpm@9.15.9 \
          && useradd -m -s /bin/bash runner \
          && mkdir -p /actions-runner /work \
          && chown -R runner:runner /actions-runner /work /ms-playwright
         USER runner
         WORKDIR /actions-runner
-        RUN set -e; arch=$(uname -m); case "$arch" in aarch64|arm64) ra=arm64;; x86_64) ra=x64;; *) echo "unsupported $arch"; exit 1;; esac; \
-            ver=$(curl -fsSL https://api.github.com/repos/actions/runner/releases/latest | jq -r .tag_name | sed 's/^v//'); \
-            curl -fsSL -o runner.tar.gz "https://github.com/actions/runner/releases/download/v${ver}/actions-runner-linux-${ra}-${ver}.tar.gz"; \
-            tar xzf runner.tar.gz; rm runner.tar.gz; echo "$ver" > .version
+        RUN set -e; arch=$(uname -m); case "$$arch" in aarch64|arm64) ra=arm64;; x86_64) ra=x64;; *) echo "unsupported $$arch"; exit 1;; esac; \
+            ver=$(curl -fsSL https://api.github.com/repos/actions/runner/releases/latest | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).tag_name.replace(/^v/,'')"); \
+            curl -fsSL -o runner.tar.gz "https://github.com/actions/runner/releases/download/v$${ver}/actions-runner-linux-$${ra}-$${ver}.tar.gz"; \
+            tar xzf runner.tar.gz; rm runner.tar.gz; echo "$$ver" > .version
         COPY <<'ENTRY' /entrypoint.sh
         #!/usr/bin/env bash
         set -euo pipefail
         cd /actions-runner
         if [ ! -f .runner ]; then
           ./config.sh --unattended --replace \
-            --url "$REPO_URL" --token "$RUNNER_TOKEN" --name "$RUNNER_NAME" \
-            --labels "$LABELS" --work "$RUNNER_WORKDIR" --disableupdate
+            --url "$$REPO_URL" --token "$$RUNNER_TOKEN" --name "$$RUNNER_NAME" \
+            --labels "$$LABELS" --work "$$RUNNER_WORKDIR" --disableupdate
         fi
         exec ./run.sh
         ENTRY

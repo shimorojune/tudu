@@ -9,3 +9,4 @@ Things we decided to do after the rewrite ships. Each line says where it came fr
 - Upgrade the Dokploy host from t4g.large when test runs and production start to compete. Decided 20 Oct 2026.
 - Database backups from Dokploy to object storage once production has data worth keeping.
 - Object storage runs RustFS because the MinIO vendor pulled its public Docker images. Re-check RustFS maturity, or move to Garage, before production carries real files. Decided 20 Oct 2026.
+- Touch target of the checkbox on phones: the design's box is 19px with no separate hit area (the row is the target). Decide with the Today chunk whether a quiet 44px hit area is wanted. Noted 20 Oct 2026.
