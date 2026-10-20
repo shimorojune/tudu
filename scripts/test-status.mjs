@@ -6,12 +6,14 @@ import { join } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const ID = /\bC(\d\d)-([UAE])(\d\d)\b/g;
-const status = new Map(); // id -> { state, level }
-const ORDER = { pass: 2, skip: 1, fail: 0 };
+const status = new Map(); // id -> state
+// A case runs on several viewports; one failure makes it FAIL, otherwise one pass makes it pass (a viewport that
+// skips it by design does not take that away), and skipped means it ran nowhere.
+const RANK = { fail: 3, pass: 2, skip: 1 };
 
 function note(id, state) {
   const prev = status.get(id);
-  if (!prev || ORDER[state] < ORDER[prev]) status.set(id, state);
+  if (!prev || RANK[state] > RANK[prev]) status.set(id, state);
 }
 
 const vitestPath = join(ROOT, 'reports/vitest.json');

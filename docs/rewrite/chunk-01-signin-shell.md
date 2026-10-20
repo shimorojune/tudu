@@ -1,6 +1,6 @@
 # Chunk 01 · Sign in and the app shell
 
-Status: proposed, awaiting approval.
+Status: approved 20 Oct 2026, built on branch `rewrite/01-signin-shell`.
 
 Boards: 11 Sign in (desktop, tablet, phone, dark, code, states, motion), 00 Layout, 01 Today desktop/tablet/phone (shell only).
 

@@ -34,13 +34,25 @@ export default defineConfig({
     },
     { name: 'phone', use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } } },
   ],
+  // The API on a throwaway database, then the built web app. With E2E_BASE_URL set (staging) nothing is started.
   webServer: process.env.E2E_BASE_URL
     ? undefined
-    : {
-        command: 'pnpm --filter web build && pnpm --filter web preview',
-        cwd: '../..',
-        url: baseURL,
-        reuseExistingServer: !process.env.CI,
-        timeout: 180_000,
-      },
+    : [
+        {
+          command: 'node packages/e2e/scripts/start-api.mjs',
+          cwd: '../..',
+          url: 'http://localhost:3456/health',
+          reuseExistingServer: !process.env.CI,
+          timeout: 120_000,
+          gracefulShutdown: { signal: 'SIGTERM', timeout: 5000 },
+        },
+        {
+          command: 'pnpm --filter web build && pnpm --filter web preview',
+          cwd: '../..',
+          url: baseURL,
+          reuseExistingServer: !process.env.CI,
+          timeout: 180_000,
+          env: { VITE_API_URL: 'http://localhost:3456' },
+        },
+      ],
 });
