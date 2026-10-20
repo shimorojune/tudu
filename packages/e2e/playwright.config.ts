@@ -5,7 +5,10 @@ import { defineConfig, devices } from '@playwright/test';
  * E2E_BASE_URL is set). Chromium only for now. Every test is independent: it makes its own data and never
  * relies on another test having run. Reduced motion is on so no assertion lands mid-animation.
  */
-const baseURL = process.env.E2E_BASE_URL ?? 'http://localhost:5173';
+// Ports can move (E2E_API_PORT, E2E_WEB_PORT) when another copy of the app already runs on the usual ones.
+const apiPort = process.env.E2E_API_PORT ?? '3456';
+const webPort = process.env.E2E_WEB_PORT ?? '5173';
+const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${webPort}`;
 
 export default defineConfig({
   testDir: './tests',
@@ -41,18 +44,18 @@ export default defineConfig({
         {
           command: 'node packages/e2e/scripts/start-api.mjs',
           cwd: '../..',
-          url: 'http://localhost:3456/health',
+          url: `http://localhost:${apiPort}/health`,
           reuseExistingServer: !process.env.CI,
           timeout: 120_000,
           gracefulShutdown: { signal: 'SIGTERM', timeout: 5000 },
         },
         {
-          command: 'pnpm --filter web build && pnpm --filter web preview',
+          command: `pnpm --filter web build && pnpm --filter web exec vite preview --port ${webPort} --strictPort`,
           cwd: '../..',
           url: baseURL,
           reuseExistingServer: !process.env.CI,
           timeout: 180_000,
-          env: { VITE_API_URL: 'http://localhost:3456' },
+          env: { VITE_API_URL: `http://localhost:${apiPort}` },
         },
       ],
 });

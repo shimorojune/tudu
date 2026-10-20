@@ -46,6 +46,9 @@ export function createAuth(deps: AuthDeps) {
       },
     },
     session: { expiresIn: SESSION_SECONDS, updateAge: 60 * 60 * 24 },
+    // Better Auth would delete every expired code whenever anyone signs in, so someone else's sign-in could turn
+    // "That code has expired" into "That code didn't work". Old codes are cleared when a code is sent instead.
+    verification: { disableCleanup: true },
     advanced: { useSecureCookies: deps.baseUrl.startsWith('https://') },
     plugins: [
       emailOTP({

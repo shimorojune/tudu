@@ -36,15 +36,47 @@
 .app-desk[data-viewport='tablet'] .app-scroll {
   padding: 8px 8px 12px 12px;
 }
+/* The page fills the scroll column, so a filled sheet's list scrolls inside the sheet; banners take their room above. */
 .app-page {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  height: 100%;
 }
 .app-page > .tp-sheet {
+  flex: 0 1 auto;
+  min-height: 0;
   max-width: var(--sheet-max-width);
   margin: 0 auto;
   width: 100%;
+}
+.app-page > .tp-spread {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+.app-page > .tp-banner-wrap {
+  width: 100%;
+  max-width: var(--sheet-max-width);
+  margin: 0 auto 12px;
+  animation-name: tp-banner-in, app-banner-gap;
+  animation-duration: 280ms;
+  animation-timing-function: var(--ease-arrive);
+  animation-fill-mode: both;
+}
+.app-desk[data-viewport='desktop'] .app-page:has(.tp-spread-two) > .tp-banner-wrap {
+  max-width: 1320px;
+}
+@keyframes app-banner-gap {
+  from {
+    margin-bottom: 0;
+  }
+  to {
+    margin-bottom: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-page > .tp-banner-wrap {
+    animation: tp-veil-in 120ms linear both;
+  }
 }
 
 .app-phone {

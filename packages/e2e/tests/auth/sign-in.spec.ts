@@ -57,8 +57,7 @@ test.describe('sign in', () => {
     ).toBeVisible();
     await page.getByRole('button', { name: 'Send a new code' }).click();
     await expect(page.getByText(/A new code is on its way/)).toBeVisible();
-    const fresh = await codeFor(page, email);
-    expect(fresh).not.toBe(old);
+    const fresh = await codeFor(page, email, old);
     await enterCode(page, fresh);
     await expect(page.getByText('Nothing planned for today yet.')).toBeVisible();
   });
@@ -79,7 +78,7 @@ test.describe('sign in', () => {
     await expect(page.getByLabel('The 6-digit code')).toBeDisabled();
     await page.getByRole('button', { name: 'Send a new code' }).click();
     await expect(page.getByLabel('The 6-digit code')).toBeEnabled();
-    await enterCode(page, await codeFor(page, email));
+    await enterCode(page, await codeFor(page, email, real));
     await expect(page.getByText('Nothing planned for today yet.')).toBeVisible();
   });
 

@@ -1,10 +1,14 @@
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
-import { addDays, isoToday, weekdayName } from '@tudu/core';
+import { addDays, weekdayName } from '@tudu/core';
 import { Avatar, BottomTabs, Fab, Logo, Sidebar, TopBar, useTheme, type SidebarItem } from '@tudu/ui';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { MeResponse } from '@tudu/client';
+import { askNewTask, setDayView, showDay, useDayView, useShownDay } from './dayView';
 import { initialsOf, signOut } from './session';
+import { taskStore } from './tasks';
 import { useViewport } from './viewport';
+import { useWorkingDay } from './workingDay';
 import './shell.css';
 
 const VIEWS: Array<{
@@ -44,12 +48,31 @@ export function AppShell({ me, children }: { me: MeResponse; children: ReactNode
     }
   }, [collapsed]);
 
-  const active = VIEWS.find((v) => v.path === path)?.value ?? 'today';
-  const today = isoToday();
-  const week = [1, 2, 3, 4, 5].map((n) => {
-    const d = addDays(today, n);
-    return { value: `day:${d}`, date: d.slice(8).replace(/^0/, ''), label: weekdayName(d) };
-  });
+  const { today } = useWorkingDay();
+  const shownParam = useShownDay();
+  const view = useDayView();
+  const space = me.spaces.find((s) => s.kind === 'personal') ?? me.spaces[0];
+  const days = [1, 2, 3, 4, 5].map((n) => addDays(today, n));
+  // The sidebar's week: a dot for each day that has tasks.
+  const marks = useQuery({
+    ...taskStore.marksQuery(space?.id ?? '', days[0]!, days[4]!),
+    enabled: !!space && vp === 'desktop',
+  }).data;
+  const week = days.map((d) => ({
+    value: `day:${d}`,
+    date: d.slice(8).replace(/^0/, ''),
+    label: weekdayName(d),
+    dots: marks?.[d] || undefined,
+  }));
+  const onToday = path === '/';
+  const shownDay = onToday ? (shownParam ?? today) : null;
+  const active = onToday
+    ? shownDay === today
+      ? 'today'
+      : days.includes(shownDay!)
+        ? `day:${shownDay}`
+        : ''
+    : (VIEWS.find((v) => v.path === path)?.value ?? 'today');
   const user = {
     initials: initialsOf(me.user.name, me.user.email),
     name: me.user.name || me.user.email,
@@ -59,8 +82,18 @@ export function AppShell({ me, children }: { me: MeResponse; children: ReactNode
   const spaces = me.spaces.map((s) => ({ name: s.name, color: s.color ?? '#59554c' }));
 
   const onSelect = (value: string) => {
-    const view = VIEWS.find((v) => v.value === value);
-    if (view) void navigate({ to: view.path });
+    if (value.startsWith('day:') || value === 'today') {
+      showDay(value === 'today' ? null : value.slice(4), today);
+      if (!onToday) void navigate({ to: '/' });
+      return;
+    }
+    const v = VIEWS.find((x) => x.value === value);
+    if (v) void navigate({ to: v.path });
+  };
+  // New task opens the day's writing line (Quick Add arrives with chunk 04).
+  const newTask = () => {
+    if (!onToday) void navigate({ to: '/' }).then(askNewTask);
+    else askNewTask();
   };
   const account = {
     theme: choice,
@@ -78,7 +111,7 @@ export function AppShell({ me, children }: { me: MeResponse; children: ReactNode
         </header>
         <div className="tp-scroll app-phone-scroll">{children}</div>
         <div className="app-phone-fab">
-          <Fab label="New task" onClick={() => {}} />
+          <Fab label="New task" onClick={newTask} />
         </div>
         <div className="app-phone-tabs">
           <BottomTabs
@@ -88,7 +121,7 @@ export function AppShell({ me, children }: { me: MeResponse; children: ReactNode
               { value: 'search', label: 'Search', icon: 'search' },
               { value: 'more', label: 'More', icon: 'more' },
             ]}
-            active={active === 'backlog' || active === 'inbox' ? 'more' : active}
+            active={active === 'backlog' || active === 'inbox' ? 'more' : onToday ? 'today' : active}
             onSelect={(v) => {
               if (v === 'today' || v === 'week') onSelect(v);
             }}
@@ -121,7 +154,19 @@ export function AppShell({ me, children }: { me: MeResponse; children: ReactNode
             compact={rail}
             jira={false}
             onSearch={() => {}}
-            onNewTask={() => {}}
+            onNewTask={newTask}
+            views={
+              onToday && vp === 'desktop'
+                ? {
+                    items: [
+                      { value: 'one', label: 'Day' },
+                      { value: 'two', label: '2 days' },
+                    ],
+                    value: view,
+                    onChange: (v) => setDayView(v === 'two' ? 'two' : 'one'),
+                  }
+                : undefined
+            }
             user={user}
             account={account}
           />

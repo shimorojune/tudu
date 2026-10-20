@@ -20,3 +20,21 @@ the coding session, so this file is the record and the canvas gets a copy by han
 - The shell is built as drawn: sidebar that folds to the rail, the rail on tablets, tabs and the round New task button on phones, the avatar menu with the theme switch. Jira stays out of the bar, sidebar and tabs until it is connected.
 - The desktop and tablet avatar menu signs out; phones sign out from Settings, which arrives with chunk 09 (the design puts Settings behind the phone's avatar).
 - Today shows the day header and the empty state only; tasks arrive with chunk 02.
+
+## Chunk 02 · Today · 20 Oct 2026
+
+- Built as drawn: the row and its byline ("→ From Sat · ME-41"), the plain list, the writing line, the "+" between
+  rows, dragging (grip, the lifted slip, rows gliding apart, the settle and wash, press and hold on phones), the page
+  turn, the calendar and the sidebar's week with dots, two days side by side with dragging between them, the carried
+  pill and its picker, the ring and its reward, and every state on the states boards.
+- Until the task detail arrives (chunk 03), clicking a row writes its title in place: a field the size of the title on
+  the accent wash the design gives a subtask being written. Enter or clicking away saves, Esc puts the old words back.
+- The checkbox keeps its 19px look but takes a quiet 44px target on touch screens, since a tap on the row opens it.
+- Not in the design, for the keyboard: Alt with the up or down arrow moves the focused row, and a screen reader hears
+  "Moved to place 2 of 3".
+- Carrying forward: open tasks from earlier days go to the top of today, oldest day first, and the pill keeps the first
+  day a task came from. After midnight the list stays put and the banner asks until 04:00; from 04:00 the app moves to
+  the new day by itself. Undo after moving a carried task puts it back without the "From" pill.
+- The day being shown is not in the address: a reload goes back to today.
+- After a drop only the click that ends the drag is swallowed (the design swallows every click for 60ms).
+- Wording kept from the canvas: "Changes are saved here and sync when you’re back." and "Nothing you wrote is lost."

@@ -9,6 +9,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { ToastHost } from '@tudu/ui';
 import { AppShell } from './app/AppShell';
 import { useLiveEvents } from './app/live';
+import { WorkingDayProvider } from './app/workingDay';
 import { meQuery, queryClient } from './app/session';
 import { KitPage } from './routes/kit/KitPage';
 import { SignInPage } from './routes/sign-in/SignInPage';
@@ -57,9 +58,11 @@ const appRoute = createRoute({
     const { me } = appRoute.useRouteContext();
     useLiveEvents(true);
     return (
-      <AppShell me={me}>
-        <Outlet />
-      </AppShell>
+      <WorkingDayProvider>
+        <AppShell me={me}>
+          <Outlet />
+        </AppShell>
+      </WorkingDayProvider>
     );
   },
 });

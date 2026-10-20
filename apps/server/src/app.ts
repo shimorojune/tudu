@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { randomUUID } from 'node:crypto';
-import { and, count, eq, gt, schema, type Db } from '@tudu/db';
+import { and, count, eq, gt, lt, schema, type Db } from '@tudu/db';
 import type { Auth } from './auth';
 import type { Env } from './env';
 import type { EventHub } from './events';
@@ -10,6 +10,7 @@ import { OutboxMailer, type Mailer } from './email';
 import { sessionMiddleware, type SessionVars } from './middleware/session';
 import { eventRoutes } from './routes/events';
 import { meRoutes } from './routes/me';
+import { taskRoutes } from './routes/tasks';
 import { testRoutes } from './routes/test';
 
 export interface AppDeps {
@@ -26,6 +27,8 @@ export interface AppDeps {
 /** At most this many codes to one address in ten minutes. */
 export const SEND_LIMIT = 5;
 export const SEND_WINDOW_MS = 10 * 60 * 1000;
+/** Expired codes are kept a day, so a late try still hears "That code has expired". */
+export const STALE_CODE_MS = 24 * 60 * 60 * 1000;
 
 export function createApp(deps: AppDeps) {
   const { env, db, auth, hub, mailer } = deps;
@@ -72,6 +75,10 @@ export function createApp(deps: AppDeps) {
       );
     }
     await db.insert(schema.otpSends).values({ id: randomUUID(), email });
+    // Codes that expired more than a day ago can go (see the auth config: Better Auth's own cleanup is off).
+    await db
+      .delete(schema.verification)
+      .where(lt(schema.verification.expiresAt, new Date(Date.now() - STALE_CODE_MS)));
     await next();
   });
 
@@ -79,6 +86,7 @@ export function createApp(deps: AppDeps) {
 
   app.use('/api/*', sessionMiddleware(auth));
   app.route('/api', meRoutes(db));
+  app.route('/api', taskRoutes(db, hub));
   app.route('/api', eventRoutes(hub, auth, { heartbeatMs: deps.heartbeatMs }));
 
   if (env.TEST_ROUTES === '1' && mailer instanceof OutboxMailer) app.route('/__test', testRoutes(mailer, db));

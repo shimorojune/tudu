@@ -128,3 +128,52 @@
     animation-duration: 120ms !important;
   }
 }
+
+/* The task's title written in place (chunk 02, until the task detail arrives): a field of exactly the title's size,
+   on the same soft accent wash with a border-strong edge the design gives a subtask being written. */
+.tp-root .tp-title-edit {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.4;
+  letter-spacing: inherit;
+  color: var(--foreground);
+  caret-color: var(--brand);
+}
+.tp-row.tp-editing {
+  isolation: isolate;
+}
+.tp-row.tp-editing .tp-title {
+  overflow: visible;
+  display: block;
+}
+.tp-row.tp-editing .tp-main {
+  position: relative;
+}
+.tp-row.tp-editing .tp-titlecol::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 9px -10px 8px -8px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  pointer-events: none;
+}
+
+/* Phones and tablets: the 19px box keeps its look but takes a quiet 44px target, since a tap on the row opens it. */
+@media (pointer: coarse) {
+  .tp-row > .tp-cbw .tp-cb::after {
+    content: '';
+    position: absolute;
+    inset: -13px;
+  }
+}
