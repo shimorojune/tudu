@@ -1,34 +1,18 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
-import * as schema from "./schema.js";
+import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
+import pg from 'pg';
+import * as schema from './schema';
 
-export * from "./schema.js";
-export * from "./projects.js";
-export * from "./tasks.js";
-export * from "./moveToSpace.js";
-export * from "./nowCap.js";
-export * from "./activity.js";
-export * from "./rollover.js";
-export * from "./access.js";
-export * from "./orgs.js";
-export * from "./userActivity.js";
-export * from "./coworkers.js";
-export * from "./requests.js";
-export * from "./sync.js";
-export * from "./notifications.js";
-export * from "./jira.js";
-export * from "./mapTask.js";
-export * from "./taskKeys.js";
-export * from "./task-attachments.js";
-export * from "./push-tokens.js";
-export * from "./notificationPreferences.js";
-export * from "./systemUser.js";
-export * from "./jiraNotifications.js";
-export * from "./reminderDelivery.js";
+export type Db = NodePgDatabase<typeof schema>;
+export { schema };
+// One copy of the ORM for every package: operators come from here, never from a second drizzle-orm.
+export { and, asc, count, desc, eq, gt, gte, inArray, isNull, like, lt, lte, ne, or, sql } from 'drizzle-orm';
 
-export function createDb(databaseUrl: string) {
-  const sql = neon(databaseUrl);
-  return drizzle(sql, { schema });
+/** A Drizzle client over a small connection pool. Call `close()` when the process ends. */
+export function createDb(
+  url: string,
+  options: { max?: number } = {},
+): { db: Db; close: () => Promise<void> } {
+  const pool = new pg.Pool({ connectionString: url, max: options.max ?? 8 });
+  const db = drizzle(pool, { schema, casing: 'snake_case' });
+  return { db, close: () => pool.end() };
 }
-
-export type Db = ReturnType<typeof createDb>;

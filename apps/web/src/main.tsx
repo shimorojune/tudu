@@ -1,19 +1,15 @@
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
-import App from "@tudu/ui";
-import { AppProviders } from "@tudu/ui/providers";
-import "@tudu/ui/styles.css";
-import { WebPushHost } from "./WebPushHost.js";
-import { WebUpdateChecker } from "@tudu/ui/providers";
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { RouterProvider } from '@tanstack/react-router';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { router } from './router';
+import { queryClient } from './app/session';
+import './styles.css';
 
-createRoot(document.getElementById("root")!).render(
+createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AppProviders>
-      <WebPushHost>
-        <WebUpdateChecker>
-          <App />
-        </WebUpdateChecker>
-      </WebPushHost>
-    </AppProviders>
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
   </StrictMode>,
 );

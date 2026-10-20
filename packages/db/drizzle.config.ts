@@ -1,16 +1,10 @@
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { config } from "dotenv";
-import { defineConfig } from "drizzle-kit";
-
-const packageDir = dirname(fileURLToPath(import.meta.url));
-config({ path: resolve(packageDir, "../../.env") });
+import { defineConfig } from 'drizzle-kit';
 
 export default defineConfig({
-  schema: "./src/schema.ts",
-  out: "./drizzle",
-  dialect: "postgresql",
-  dbCredentials: {
-    url: process.env.DATABASE_URL!,
-  },
+  dialect: 'postgresql',
+  schema: './src/schema.ts',
+  out: './migrations',
+  dbCredentials: { url: process.env.DATABASE_URL ?? 'postgres://tudu@127.0.0.1:54329/tudu_dev' },
+  strict: true,
+  verbose: true,
 });

@@ -1,0 +1,84 @@
+/* The shell's layout. Looks come from the design system; this only places the parts. */
+.app-desk {
+  height: 100dvh;
+  display: flex;
+  align-items: stretch;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  overflow: hidden;
+}
+.app-side {
+  flex: 0 0 auto;
+  min-width: 0;
+  height: 100%;
+}
+.app-main {
+  flex: 1 1 560px;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.app-top {
+  flex: none;
+  padding: 0 32px 0 8px;
+}
+.app-desk[data-viewport='tablet'] .app-top {
+  padding: 0 20px 0 12px;
+}
+.app-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 20px 20px 8px;
+  box-sizing: border-box;
+}
+.app-desk[data-viewport='tablet'] .app-scroll {
+  padding: 8px 8px 12px 12px;
+}
+.app-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.app-page > .tp-sheet {
+  max-width: var(--sheet-max-width);
+  margin: 0 auto;
+  width: 100%;
+}
+
+.app-phone {
+  position: relative;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  overflow: hidden;
+}
+.app-phone-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 54px;
+  padding: 0 16px;
+  flex: none;
+}
+.app-phone-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 10px 74px;
+  scrollbar-gutter: auto;
+}
+.app-phone-fab {
+  position: absolute;
+  right: 18px;
+  bottom: 82px;
+}
+.app-phone-tabs {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}

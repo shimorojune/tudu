@@ -1,0 +1,64 @@
+# The CI runner: one self-hosted GitHub Actions runner on the Dokploy host, in the dev environment.
+# It runs every test job of .github/workflows/*.yml, next to the dev Postgres and storage on dokploy-network,
+# so nothing needs to be reachable from outside. Deployed from Dokploy as a raw compose (see README.md).
+# Base image: Microsoft's Playwright image (Ubuntu 24.04, Node 22, Chromium and its libraries, arm64 builds).
+services:
+  runner:
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM mcr.microsoft.com/playwright:v1.64.1-noble
+        ENV DEBIAN_FRONTEND=noninteractive
+        # The runner is .NET: with invariant globalization it needs no ICU package.
+        ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+        # The docker CLI talks to the host's daemon over the mounted socket, so deploy jobs build images on the host.
+        RUN npm install -g pnpm@9.15.9 \
+         && mkdir -p /actions-runner /work \
+         && arch=$$(uname -m) && case "$$arch" in aarch64|arm64) da=aarch64;; x86_64) da=x86_64;; esac \
+         && curl -fsSL "https://download.docker.com/linux/static/stable/$${da}/docker-27.5.1.tgz" | tar xz -C /tmp \
+         && mv /tmp/docker/docker /usr/local/bin/docker && rm -rf /tmp/docker
+        ENV RUNNER_ALLOW_RUNASROOT=1
+        WORKDIR /actions-runner
+        RUN set -e; arch=$(uname -m); case "$$arch" in aarch64|arm64) ra=arm64;; x86_64) ra=x64;; *) echo "unsupported $$arch"; exit 1;; esac; \
+            ver=$(curl -fsSL https://api.github.com/repos/actions/runner/releases/latest | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).tag_name.replace(/^v/,'')"); \
+            curl -fsSL -o runner.tar.gz "https://github.com/actions/runner/releases/download/v$${ver}/actions-runner-linux-$${ra}-$${ver}.tar.gz"; \
+            tar xzf runner.tar.gz; rm runner.tar.gz; echo "$$ver" > .version
+        COPY <<'ENTRY' /entrypoint.sh
+        #!/usr/bin/env bash
+        set -euo pipefail
+        cd /actions-runner
+        if [ ! -f .runner ]; then
+          ./config.sh --unattended --replace \
+            --url "$$REPO_URL" --token "$$RUNNER_TOKEN" --name "$$RUNNER_NAME" \
+            --labels "$$LABELS" --work "$$RUNNER_WORKDIR" --disableupdate
+        fi
+        exec ./run.sh
+        ENTRY
+        RUN chmod +x /entrypoint.sh
+        ENTRYPOINT ["/entrypoint.sh"]
+    environment:
+      REPO_URL: https://github.com/eGainDev/tudu
+      RUNNER_NAME: dokploy-1
+      LABELS: self-hosted,dokploy,arm64
+      RUNNER_WORKDIR: /work
+      RUNNER_TOKEN: ${RUNNER_TOKEN}
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+      TUDU_CI_DATABASE_URL: ${TUDU_CI_DATABASE_URL}
+      TUDU_CI_S3_ENDPOINT: ${TUDU_CI_S3_ENDPOINT}
+      TUDU_CI_S3_ACCESS_KEY_ID: ${TUDU_CI_S3_ACCESS_KEY_ID}
+      TUDU_CI_S3_SECRET_ACCESS_KEY: ${TUDU_CI_S3_SECRET_ACCESS_KEY}
+    volumes:
+      - runner-config:/actions-runner
+      - runner-work:/work
+      - pnpm-store:/root/.local/share/pnpm/store
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - dokploy-network
+    restart: unless-stopped
+volumes:
+  runner-config:
+  runner-work:
+  pnpm-store:
+networks:
+  dokploy-network:
+    external: true

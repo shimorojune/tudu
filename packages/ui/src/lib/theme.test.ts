@@ -1,76 +1,205 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, renderHook } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { parseRules, readStylesheet, rulesWhere } from '../test-utils/stylesheet';
 import {
-  THEME_COLOR_DARK,
-  THEME_COLOR_LIGHT,
-  applyTheme,
+  CROSS_FADE_MS,
+  THEME_STORAGE_KEY,
+  readThemeChoice,
+  resetThemeForTests,
   resolveTheme,
-} from "./theme";
+  setThemeChoice,
+  systemTheme,
+  useTheme,
+} from './theme';
 
-describe("resolveTheme", () => {
-  beforeEach(() => {
-    vi.stubGlobal("matchMedia", (query: string) => ({
-      matches: query.includes("dark") ? false : false,
-      media: query,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    }));
-  });
+type Change = (e: MediaQueryListEvent) => void;
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
+// A matchMedia that tests can steer: the OS colour scheme, reduced motion, and a `change` event for the scheme.
+let systemDark = false;
+let reduceMotion = false;
+const schemeListeners = new Set<Change>();
+const realMatchMedia = window.matchMedia;
 
-  it("returns light or dark for explicit preferences", () => {
-    expect(resolveTheme("light")).toBe("light");
-    expect(resolveTheme("dark")).toBe("dark");
-  });
+function fakeMatchMedia(query: string): MediaQueryList {
+  const scheme = query.includes('prefers-color-scheme: dark');
+  const motion = query.includes('prefers-reduced-motion: reduce');
+  return {
+    media: query,
+    onchange: null,
+    get matches() {
+      return scheme ? systemDark : motion ? reduceMotion : false;
+    },
+    addEventListener: (_type: string, cb: Change) => {
+      if (scheme) schemeListeners.add(cb);
+    },
+    removeEventListener: (_type: string, cb: Change) => {
+      schemeListeners.delete(cb);
+    },
+    addListener() {},
+    removeListener() {},
+    dispatchEvent: () => false,
+  } as unknown as MediaQueryList;
+}
 
-  it("follows prefers-color-scheme when preference is system", () => {
-    vi.stubGlobal("matchMedia", (query: string) => ({
-      matches: query.includes("prefers-color-scheme: dark"),
-      media: query,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    }));
-    expect(resolveTheme("system")).toBe("dark");
+function setSystemDark(dark: boolean): void {
+  systemDark = dark;
+  const e = { matches: dark, media: '(prefers-color-scheme: dark)' } as MediaQueryListEvent;
+  schemeListeners.forEach((cb) => cb(e));
+}
 
-    vi.stubGlobal("matchMedia", () => ({
-      matches: false,
-      media: "",
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    }));
-    expect(resolveTheme("system")).toBe("light");
-  });
+const html = document.documentElement;
+
+/** Give the document a startViewTransition for one test (jsdom has none). */
+function mockViewTransition(impl: (cb: () => void) => { finished: Promise<void> }): void {
+  Object.defineProperty(document, 'startViewTransition', { value: impl, configurable: true, writable: true });
+}
+
+beforeEach(() => {
+  resetThemeForTests();
+  localStorage.clear();
+  systemDark = false;
+  reduceMotion = false;
+  schemeListeners.clear();
+  window.matchMedia = fakeMatchMedia;
+  html.className = '';
+  html.style.colorScheme = '';
 });
 
-describe("applyTheme", () => {
-  beforeEach(() => {
-    document.documentElement.classList.remove("dark");
-    document.documentElement.style.colorScheme = "";
-    document.head.innerHTML = "";
+afterEach(() => {
+  window.matchMedia = realMatchMedia;
+  Reflect.deleteProperty(document, 'startViewTransition');
+  resetThemeForTests();
+});
+
+describe('theme', () => {
+  it('C00-U02 light, dark and system resolve to the right theme', () => {
+    expect(resolveTheme('light')).toBe('light');
+    expect(resolveTheme('dark')).toBe('dark');
+    expect(resolveTheme('system')).toBe('light');
+    expect(resolveTheme(undefined)).toBe('light');
+    systemDark = true;
+    expect(systemTheme()).toBe('dark');
+    expect(resolveTheme('system')).toBe('dark');
+    expect(resolveTheme('light')).toBe('light');
   });
 
-  it("toggles html.dark and color-scheme", () => {
-    applyTheme("dark");
-    expect(document.documentElement.classList.contains("dark")).toBe(true);
-    expect(document.documentElement.style.colorScheme).toBe("dark");
+  it('C00-U02 the choice paints the dark class and colour-scheme on <html>', () => {
+    const { result } = renderHook(() => useTheme());
+    expect(result.current.choice).toBe('system'); // nothing stored yet
+    expect(result.current.theme).toBe('light');
+    expect(html).not.toHaveClass('dark');
+    expect(html.style.colorScheme).toBe('light');
 
-    applyTheme("light");
-    expect(document.documentElement.classList.contains("dark")).toBe(false);
-    expect(document.documentElement.style.colorScheme).toBe("light");
+    act(() => result.current.setTheme('dark'));
+    expect(result.current.choice).toBe('dark');
+    expect(result.current.theme).toBe('dark');
+    expect(html).toHaveClass('dark');
+    expect(html.style.colorScheme).toBe('dark');
+
+    act(() => result.current.setTheme('light'));
+    expect(result.current.theme).toBe('light');
+    expect(html).not.toHaveClass('dark');
+    expect(html.style.colorScheme).toBe('light');
+
+    act(() => setSystemDark(true)); // the OS goes dark while the choice is light: nothing is painted yet
+    expect(html).not.toHaveClass('dark');
+    act(() => result.current.setTheme('system'));
+    expect(result.current.choice).toBe('system');
+    expect(result.current.theme).toBe('dark');
+    expect(html).toHaveClass('dark');
+    expect(html.style.colorScheme).toBe('dark');
   });
 
-  it("updates theme-color meta when present", () => {
-    const meta = document.createElement("meta");
-    meta.setAttribute("name", "theme-color");
-    meta.setAttribute("content", THEME_COLOR_LIGHT);
-    document.head.append(meta);
+  it('C00-U02 system follows a media-query change; a fixed choice does not', () => {
+    const { result } = renderHook(() => useTheme());
+    expect(html).not.toHaveClass('dark');
 
-    applyTheme("dark");
-    expect(meta.getAttribute("content")).toBe(THEME_COLOR_DARK);
+    act(() => setSystemDark(true));
+    expect(result.current.theme).toBe('dark');
+    expect(html).toHaveClass('dark');
+    expect(html.style.colorScheme).toBe('dark');
 
-    applyTheme("light");
-    expect(meta.getAttribute("content")).toBe(THEME_COLOR_LIGHT);
+    act(() => setSystemDark(false));
+    expect(result.current.theme).toBe('light');
+    expect(html).not.toHaveClass('dark');
+
+    act(() => result.current.setTheme('light'));
+    act(() => setSystemDark(true));
+    expect(result.current.theme).toBe('light');
+    expect(html).not.toHaveClass('dark');
+    expect(html.style.colorScheme).toBe('light');
+  });
+
+  it('C00-U03 changing the theme cross-fades: the class is on during the view transition and gone when it ends', async () => {
+    let finish!: () => void;
+    const finished = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const start = vi.fn((cb: () => void) => {
+      cb();
+      return { finished };
+    });
+    mockViewTransition(start);
+
+    setThemeChoice('dark');
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(html).toHaveClass('tp-vt-theme');
+    expect(html).toHaveClass('dark'); // painted inside the transition's callback
+    expect(html.style.colorScheme).toBe('dark');
+
+    finish();
+    await finished;
+    expect(html).not.toHaveClass('tp-vt-theme');
+    expect(html).toHaveClass('dark');
+  });
+
+  it('C00-U03 the cross-fade is 280ms, in code and in the stylesheet', () => {
+    // The class is removed when the view transition reports `finished`; the transition itself runs for 280ms.
+    expect(CROSS_FADE_MS).toBe(280);
+    const rules = rulesWhere(parseRules(readStylesheet('components.css')), (s) =>
+      s.startsWith('.tp-vt-theme::view-transition'),
+    );
+    expect(rules.length).toBeGreaterThan(0);
+    for (const r of rules) expect(r.declarations['animation-duration'], r.selector).toBe('280ms');
+  });
+
+  it('C00-U03 without view transitions or with reduced motion the change is instant and leaves no class behind', () => {
+    // jsdom has no startViewTransition
+    setThemeChoice('dark');
+    expect(html).toHaveClass('dark');
+    expect(html).not.toHaveClass('tp-vt-theme');
+
+    const start = vi.fn((cb: () => void) => {
+      cb();
+      return { finished: Promise.resolve() };
+    });
+    mockViewTransition(start);
+    reduceMotion = true;
+    setThemeChoice('light');
+    expect(start).not.toHaveBeenCalled();
+    expect(html).not.toHaveClass('dark');
+    expect(html).not.toHaveClass('tp-vt-theme');
+  });
+
+  it('C00-U03 the choice is stored and survives a reload', () => {
+    setThemeChoice('dark');
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
+    expect(THEME_STORAGE_KEY).toBe('tudu.theme');
+
+    // A reload: module state is gone and the document is fresh, only storage remains.
+    resetThemeForTests();
+    html.className = '';
+    html.style.colorScheme = '';
+    expect(readThemeChoice()).toBe('dark');
+    const { result } = renderHook(() => useTheme());
+    expect(result.current.choice).toBe('dark');
+    expect(result.current.theme).toBe('dark');
+    expect(html).toHaveClass('dark');
+    expect(html.style.colorScheme).toBe('dark');
+
+    // Garbage in storage falls back to system.
+    localStorage.setItem(THEME_STORAGE_KEY, 'sepia');
+    resetThemeForTests();
+    expect(readThemeChoice()).toBe('system');
   });
 });

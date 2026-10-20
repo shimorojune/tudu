@@ -1,37 +1,27 @@
 {
   "name": "@tudu/server",
-  "version": "0.36.0",
+  "version": "0.0.0",
+  "private": true,
   "type": "module",
-  "license": "MIT",
   "scripts": {
-    "dev": "NODE_OPTIONS='--conditions=development' tsx watch src/index.ts",
-    "build": "pnpm --filter @tudu/shared build && pnpm --filter @tudu/db build && tsc",
-    "typecheck": "pnpm --filter @tudu/shared build && pnpm --filter @tudu/db build && tsc --noEmit",
-    "start": "node dist/index.js",
-    "db:seed": "NODE_OPTIONS='--conditions=development' tsx scripts/seed-test-user.ts",
-    "db:seed:orgs-demo": "NODE_OPTIONS='--conditions=development' tsx scripts/seed-orgs-demo.ts"
+    "dev": "tsx watch src/index.ts",
+    "start": "node --import tsx src/index.ts",
+    "migrate": "node --import tsx src/migrate-cli.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "auth:generate": "pnpm dlx @better-auth/cli@latest generate --config auth.config.ts --output ../../packages/db/src/auth-schema.ts -y"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1133.0",
-    "@better-auth/oauth-provider": "1.7.7",
-    "@hono/node-server": "^1.14.4",
-    "@hono/zod-validator": "^0.7.6",
-    "@tudu/db": "workspace:*",
-    "@tudu/shared": "workspace:*",
-    "@typesafe-ai/sdk": "^0.6.0",
-    "better-auth": "^1.7.7",
-    "dotenv": "^17.2.1",
-    "drizzle-orm": "^0.44.5",
-    "extend": "^3.0.2",
-    "firebase-admin": "^14.4.0",
-    "hono": "^4.8.3",
-    "posthog-node": "^5.52.4",
-    "resend": "^6.30.0",
-    "zod": "^4.5.4"
+    "@better-auth/drizzle-adapter": "^1.7.12",
+    "@hono/node-server": "^2.1.5",
+    "@tudu/core": "workspace:^",
+    "@tudu/db": "workspace:^",
+    "better-auth": "^1.7.12",
+    "hono": "^4.13.13",
+    "resend": "^6.34.1",
+    "tsx": "^4.23.15",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/node": "^26.4.0",
-    "tsx": "^4.20.3",
-    "typescript": "^5.8.3"
+    "@types/node": "^26.6.5"
   }
 }

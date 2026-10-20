@@ -1,37 +1,17 @@
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { config } from "dotenv";
-import { serve } from "@hono/node-server";
-import { createApp, resolveServerPort } from "./app.js";
-import { shutdownAnalytics } from "./analytics/posthog.js";
+import { serve } from '@hono/node-server';
+import { readEnv } from './env';
+import { bootstrap } from './bootstrap';
 
-const serverDir = dirname(fileURLToPath(import.meta.url));
-config({
-  path: resolve(serverDir, "../../../.env"),
-  override: false,
+const env = readEnv();
+const server = bootstrap(env);
+const listener = serve({ fetch: server.app.fetch, port: env.PORT }, (info) => {
+  console.log(`tudu api on http://localhost:${info.port} (${env.NODE_ENV}, mail: ${env.EMAIL_TRANSPORT})`);
 });
 
-const { app } = createApp({ startNotificationScheduler: true });
-
-const port = resolveServerPort();
-
-serve(
-  {
-    fetch: app.fetch,
-    port,
-  },
-  (info) => {
-    console.log(`Server listening on http://localhost:${info.port}`);
-  },
-);
-
-function registerShutdown() {
-  const flush = () => {
-    void shutdownAnalytics();
-  };
-  process.on("SIGINT", flush);
-  process.on("SIGTERM", flush);
-  process.on("beforeExit", flush);
+async function shutdown() {
+  listener.close();
+  await server.close();
+  process.exit(0);
 }
-
-registerShutdown();
+process.on('SIGINT', () => void shutdown());
+process.on('SIGTERM', () => void shutdown());

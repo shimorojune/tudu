@@ -1,0 +1,197 @@
+/* The kit page: every primitive in every state, light and dark. Dev tooling, not the app. */
+.kit {
+  font-family: var(--font-sans);
+  color: var(--foreground);
+}
+.kit-top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  background: color-mix(in srgb, var(--background) 86%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 1px 0 var(--hair);
+}
+.kit-top nav {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+.kit-top nav a {
+  font-size: 12.5px;
+  color: var(--foreground-2);
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+}
+.kit-top nav a:hover {
+  background: var(--accent);
+  color: var(--foreground);
+}
+.kit-top .kit-spacer {
+  flex: 1;
+}
+.kit-main {
+  padding: 24px 24px 120px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.kit-h1 {
+  margin: 24px 0 6px;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 44px;
+  line-height: 1.05;
+}
+.kit-lead,
+.kit-intro {
+  margin: 8px 0 0;
+  max-width: 640px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--muted-foreground);
+}
+.kit-section {
+  margin-top: 56px;
+}
+.kit-h2 {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.kit-block {
+  margin-top: 28px;
+}
+.kit-h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.kit-note {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+  max-width: 720px;
+}
+.kit-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.kit-desk {
+  border-radius: var(--radius-xl);
+  box-shadow: 0 0 0 1px var(--hair);
+  min-width: 0;
+}
+.kit-desk-in {
+  padding: 20px;
+  min-width: 0;
+}
+.kit-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.kit-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.kit-swatch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--foreground-2);
+}
+.kit-swatch i {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.kit-type {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.kit-type > div {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+.kit-type .kit-label {
+  width: 90px;
+  flex: none;
+}
+.kit-radii {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.kit-radii div {
+  width: 56px;
+  height: 56px;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  display: grid;
+  place-items: end center;
+  padding-bottom: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.kit-shadows {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.kit-shadows div {
+  width: 120px;
+  height: 72px;
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.kit-tokens {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px 16px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--foreground-2);
+}
+.kit-tokens b {
+  font-weight: 500;
+  color: var(--foreground);
+}
+.kit-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+@media (max-width: 900px) {
+  .kit-pair {
+    grid-template-columns: 1fr;
+  }
+  .kit-main {
+    padding: 16px 16px 100px;
+  }
+}

@@ -1,21 +1,31 @@
 # Tudu
 
-A macOS desktop app and web app built with **React**, **TypeScript**, and **shadcn/ui**, plus a **Hono** TypeScript server. The desktop shell uses **Tauri 2**.
+A calm day planner: one sheet of paper per day, with the tasks as the hero. A web app, a macOS app and an API,
+rebuilt from the "Tudu, Redesign" canvas and the Tudu Paper design system.
 
-Shared UI lives in `packages/ui` and is used by both `apps/desktop` and `apps/web`.
-
-## Documentation
-
-Full setup, development, auth, and deployment docs live in the **[wiki](https://github.com/eGainDev/tudu/wiki)**.
+- [The plan](docs/rewrite/plan.md): stack, architecture, environments, testing, the chunks.
+- [Tests](docs/tests/README.md): what is covered, and the generated [status](docs/tests/STATUS.md).
+- Old code: the `legacy` branch.
 
 ## Quick start
 
 ```bash
 pnpm install
-pnpm dev          # server + desktop
-pnpm dev:all      # server + desktop + web
+pnpm dev            # the web app on http://localhost:5173 (the kit page is at /kit)
+pnpm test           # unit and API tests
+pnpm e2e kit        # one end-to-end group; `pnpm e2e` runs them all
+pnpm verify         # lint, typecheck, tests
 ```
 
-## Install (macOS)
+Node 22 and pnpm 9. Chromium for end-to-end: `pnpm --filter e2e exec playwright install chromium`.
 
-To install a released build, see [INSTALL.md](./INSTALL.md).
+## Layout
+
+| Path            | Holds                                                                   |
+| --------------- | ----------------------------------------------------------------------- |
+| `apps/web`      | The web app and PWA shell                                               |
+| `packages/ui`   | Tudu Paper components in React, with the design system's own stylesheet |
+| `packages/core` | Domain types, date and week logic                                       |
+| `packages/e2e`  | Playwright tests, one folder per group                                  |
+| `infra/`        | The CI runner and deploy files                                          |
+| `docs/`         | The plan, one file per chunk, the test tables                           |

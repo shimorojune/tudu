@@ -1,118 +1,36 @@
-import { randomUUID } from "node:crypto";
-
-export type SendEmailInput = {
+export interface Mail {
   to: string;
   subject: string;
-  html: string;
   text: string;
-};
+  html?: string;
+}
 
-export type SentEmail = SendEmailInput & {
-  id: string;
-  sentAt: string;
-};
+export interface Mailer {
+  send(mail: Mail): Promise<void>;
+}
 
-export type EmailTransport = {
-  send(input: SendEmailInput): Promise<void>;
-  list?(to?: string): SentEmail[];
-  clear?(): void;
-};
+/** Keeps every mail in memory. Tests read it through /__test/outbox. */
+export class OutboxMailer implements Mailer {
+  readonly sent: Array<Mail & { at: string }> = [];
+  async send(mail: Mail): Promise<void> {
+    this.sent.push({ ...mail, at: new Date().toISOString() });
+  }
+  /** The mails sent to one address, newest last. */
+  to(address: string): Array<Mail & { at: string }> {
+    const a = address.toLowerCase();
+    return this.sent.filter((m) => m.to.toLowerCase() === a);
+  }
+  clear(): void {
+    this.sent.length = 0;
+  }
+}
 
-const memoryOutbox: SentEmail[] = [];
-
-export function createMemoryTransport(): EmailTransport {
+/** The sign-in code email. Plain words, the code on its own line. */
+export function signInCodeMail(to: string, code: string): Mail {
   return {
-    async send(input) {
-      memoryOutbox.push({
-        ...input,
-        id: randomUUID(),
-        sentAt: new Date().toISOString(),
-      });
-    },
-    list(to) {
-      if (!to) {
-        return [...memoryOutbox];
-      }
-      return memoryOutbox.filter(
-        (message) => message.to.toLowerCase() === to.toLowerCase(),
-      );
-    },
-    clear() {
-      memoryOutbox.length = 0;
-    },
+    to,
+    subject: `${code} is your Tudu sign-in code`,
+    text: `Your Tudu sign-in code is ${code}. It works for 10 minutes.\n\nIf you didn't ask for it, you can ignore this email.`,
+    html: `<p style="font:15px/1.5 -apple-system,Segoe UI,sans-serif;color:#18181b">Your Tudu sign-in code is</p><p style="font:600 32px/1.2 ui-monospace,SFMono-Regular,monospace;letter-spacing:.12em;color:#18181b;margin:8px 0 16px">${code}</p><p style="font:14px/1.5 -apple-system,Segoe UI,sans-serif;color:#71717a">It works for 10 minutes. If you didn't ask for it, you can ignore this email.</p>`,
   };
-}
-
-export function createDisabledTransport(): EmailTransport {
-  return {
-    async send() {
-      /* no-op */
-    },
-  };
-}
-
-export async function createResendTransport(): Promise<EmailTransport> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM;
-  if (!apiKey || !from) {
-    throw new Error("RESEND_API_KEY and EMAIL_FROM are required for resend transport");
-  }
-  const { Resend } = await import("resend");
-  const resend = new Resend(apiKey);
-  return {
-    async send(input) {
-      const result = await resend.emails.send({
-        from,
-        to: input.to,
-        subject: input.subject,
-        html: input.html,
-        text: input.text,
-      });
-      if (result.error) {
-        throw new Error(result.error.message);
-      }
-    },
-  };
-}
-
-let transport: EmailTransport | null = null;
-
-export async function getEmailTransport(): Promise<EmailTransport> {
-  if (transport) {
-    return transport;
-  }
-  const mode = process.env.EMAIL_TRANSPORT ?? "disabled";
-  if (mode === "memory") {
-    transport = createMemoryTransport();
-  } else if (mode === "resend") {
-    transport = await createResendTransport();
-  } else {
-    transport = createDisabledTransport();
-  }
-  return transport;
-}
-
-export async function sendEmail(
-  input: SendEmailInput,
-): Promise<{ delivered: boolean }> {
-  const mode = process.env.EMAIL_TRANSPORT ?? "disabled";
-  const active = await getEmailTransport();
-  await active.send(input);
-  return { delivered: mode !== "disabled" };
-}
-
-export function readMemoryOutbox(to?: string): SentEmail[] {
-  const active = transport;
-  if (!active?.list) {
-    return [];
-  }
-  return active.list(to);
-}
-
-export function clearMemoryOutbox(): void {
-  transport?.clear?.();
-}
-
-export function resetEmailTransportForTests(): void {
-  transport = null;
 }
