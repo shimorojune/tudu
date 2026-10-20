@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+pnpm-lock.yaml
+packages/ui/src/styles/components.css
+packages/ui/src/styles/paper-theme.css
+packages/ui/tokens.json
+docs/tests/STATUS.md
+reports
+packages/ui/src/styles/tokens-extra.css

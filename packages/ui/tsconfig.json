@@ -1,15 +1,5 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "jsx": "react-jsx",
-    "noEmit": true,
-    "resolveJsonModule": true,
-    "paths": {
-      "@/*": ["./src/*"],
-      "@assets/*": ["./assets/*"]
-    }
-  },
-  "include": ["src", "assets"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
+  "compilerOptions": { "types": ["vitest/globals", "@testing-library/jest-dom"] },
+  "include": ["src", "tokens.json"]
 }

@@ -1,0 +1,494 @@
+/*
+ * Tudu — paper theme (Phase 00 Foundations)
+ * Tailwind v4 + shadcn (new-york, cssVariables). Source of truth: the Tudu design canvas, page "00 Foundations".
+ *
+ * This is the only theme. Import it once, after tailwindcss:
+ *     @import "tailwindcss";
+ *     @custom-variant dark (&:is(.dark *));
+ *     @import "./paper-theme.css";
+ * Load the fonts once in the HTML head:
+ *     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap">
+ *
+ * Rules: primary is ink (never a red button). Red is --brand: today, now, focus ring.
+ * --accent keeps the shadcn meaning (hover surface), not "brand".
+ */
+
+:root {
+  /* shadcn semantic */
+  --background: #eeece6;
+  --foreground: #18181b;
+  --card: #fffdf8;
+  --card-foreground: #18181b;
+  --popover: #fffdf8;
+  --popover-foreground: #18181b;
+  --primary: #18181b;
+
+  /* Tudu additions */
+  --primary-hover: #38383d;
+
+  /* shadcn semantic */
+  --primary-foreground: #fffdf8;
+  --secondary: rgba(24,24,27,.05);
+  --secondary-foreground: #18181b;
+  --muted: #f9f6ee;
+  --muted-foreground: #71717a;
+  --accent: rgba(24,24,27,.05);
+  --accent-foreground: #18181b;
+  --destructive: #b42318;
+  --destructive-foreground: #fffdf8;
+  --border: rgba(24,24,27,.09);
+
+  /* Tudu additions */
+  --border-strong: rgba(24,24,27,.18);
+  --veil: rgba(32,28,20,.16);
+  --scrollbar: rgba(24,24,27,.2);
+  --scrollbar-hover: rgba(24,24,27,.34);
+
+  /* shadcn semantic */
+  --input: rgba(24,24,27,.09);
+  --ring: #e8361b;
+  --chart-1: #e8361b;
+  --chart-2: #2f5fa8;
+  --chart-3: #2d6a45;
+  --chart-4: #dba443;
+  --chart-5: #8f8b83;
+  --sidebar: #eeece6;
+  --sidebar-foreground: #3f3f46;
+  --sidebar-primary: #18181b;
+  --sidebar-primary-foreground: #fffdf8;
+  --sidebar-accent: rgba(24,24,27,.05);
+  --sidebar-accent-foreground: #18181b;
+  --sidebar-border: rgba(24,24,27,.06);
+  --sidebar-ring: #e8361b;
+
+  /* Tudu additions */
+  --foreground-2: #3f3f46;
+  --ghost: #8f8b83;
+  --hair: rgba(24,24,27,.06);
+  --line: rgba(70,105,150,.13);
+  --brand: #e8361b;
+  --brand-foreground: #ffffff;
+  --brand-text: #b3200a;
+  --selection: rgba(232,54,27,.06);
+  --jira: #2f5fa8;
+  --jira-soft: rgba(47,95,168,.12);
+  --space-team: #dbe4f3;
+  --space-team-foreground: #2c4466;
+  --space-project: #eee1c5;
+  --space-project-foreground: #5b4a29;
+  --success: #2d6a45;
+  --success-soft: #dcebe0;
+  --warning: #8a5a00;
+  --warning-soft: #f8efd9;
+  --success-edge: rgba(45,106,69,.35);
+  --warning-edge: rgba(138,90,0,.3);
+  --destructive-edge: rgba(180,35,24,.3);
+  --destructive-soft: #fbeceb;
+  --check: #18181b;
+  --check-border: #b5b2aa;
+  --check-tick: #ffffff;
+  --spark: #eaa21c;
+  --spark-glow: rgba(234,162,28,.45);
+  --toast: #1c1b19;
+  --toast-foreground: #fffdf8;
+  --toast-action: #8fb0e8;
+  --skeleton: rgba(24,24,27,.07);
+  --skeleton-2: rgba(24,24,27,.03);
+
+  /* paper + depth */
+  --shadow-color: rgba(60,50,30,.3);
+  --grain-opacity: .32;
+  --grain-blend: multiply;
+}
+
+.dark {
+  /* shadcn semantic */
+  --background: #111211;
+  --foreground: #f2efe8;
+  --card: #1d1c1a;
+  --card-foreground: #f2efe8;
+  --popover: #1d1c1a;
+  --popover-foreground: #f2efe8;
+  --primary: #f2efe8;
+
+  /* Tudu additions */
+  --primary-hover: #dcd8cf;
+
+  /* shadcn semantic */
+  --primary-foreground: #1d1c1a;
+  --secondary: rgba(255,255,255,.06);
+  --secondary-foreground: #f2efe8;
+  --muted: #181816;
+  --muted-foreground: #a39f96;
+  --accent: rgba(255,255,255,.06);
+  --accent-foreground: #f2efe8;
+  --destructive: #ff8a7a;
+  --destructive-foreground: #1d1c1a;
+  --border: rgba(255,255,255,.1);
+
+  /* Tudu additions */
+  --border-strong: rgba(255,255,255,.18);
+  --veil: rgba(0,0,0,.38);
+  --scrollbar: rgba(255,255,255,.16);
+  --scrollbar-hover: rgba(255,255,255,.28);
+
+  /* shadcn semantic */
+  --input: rgba(255,255,255,.1);
+  --ring: #ff6a4a;
+  --chart-1: #ff6a4a;
+  --chart-2: #8fb0e8;
+  --chart-3: #8fd1a8;
+  --chart-4: #f0c36b;
+  --chart-5: #77736b;
+  --sidebar: #111211;
+  --sidebar-foreground: #d6d2c9;
+  --sidebar-primary: #f2efe8;
+  --sidebar-primary-foreground: #1d1c1a;
+  --sidebar-accent: rgba(255,255,255,.06);
+  --sidebar-accent-foreground: #f2efe8;
+  --sidebar-border: rgba(255,255,255,.06);
+  --sidebar-ring: #ff6a4a;
+
+  /* Tudu additions */
+  --foreground-2: #d6d2c9;
+  --ghost: #77736b;
+  --hair: rgba(255,255,255,.06);
+  --line: rgba(255,255,255,.07);
+  --brand: #ff6a4a;
+  --brand-foreground: #1d1c1a;
+  --brand-text: #ff8a70;
+  --selection: rgba(255,106,74,.09);
+  --jira: #8fb0e8;
+  --jira-soft: rgba(143,176,232,.13);
+  --space-team: rgba(143,176,232,.15);
+  --space-team-foreground: #c3d4f2;
+  --space-project: rgba(214,186,130,.14);
+  --space-project-foreground: #e3d0a8;
+  --success: #8fd1a8;
+  --success-soft: rgba(127,194,154,.2);
+  --warning: #e8bf6a;
+  --warning-soft: rgba(232,191,106,.12);
+  --success-edge: rgba(143,209,168,.35);
+  --warning-edge: rgba(232,191,106,.3);
+  --destructive-edge: rgba(255,138,122,.3);
+  --destructive-soft: rgba(255,138,122,.12);
+  --check: #f2efe8;
+  --check-border: #6f6b64;
+  --check-tick: #1d1c1a;
+  --spark: #ffd27a;
+  --spark-glow: rgba(255,196,96,.6);
+  --toast: #f2efe8;
+  --toast-foreground: #1d1c1a;
+  --toast-action: #2f5fa8;
+  --skeleton: rgba(255,255,255,.08);
+  --skeleton-2: rgba(255,255,255,.03);
+
+  /* paper + depth */
+  --shadow-color: rgba(0,0,0,.75);
+  --grain-opacity: .2;
+  --grain-blend: screen;
+}
+
+:root {
+  /* shape */
+  --radius: 0.75rem;
+
+  /* motion durations (use as duration-(--dur-tick), delay-(--dur-tooltip-delay)) */
+  --dur-tooltip-delay: 380ms;
+  --dur-menu: 160ms;
+  --dur-arrive: 240ms;
+  --dur-tick: 300ms;
+  --dur-fold: 300ms;
+  --dur-row-open: 360ms;
+  --dur-spark: 640ms;
+  --dur-panel-in: 260ms;
+  --dur-day-turn: 280ms;
+  --dur-spread: 240ms;
+  --dur-toast: 4500ms;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-veil: var(--veil);
+  --color-scrollbar: var(--scrollbar);
+  --color-scrollbar-hover: var(--scrollbar-hover);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-foreground-2: var(--foreground-2);
+  --color-ghost: var(--ghost);
+  --color-hair: var(--hair);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-text: var(--brand-text);
+  --color-selection: var(--selection);
+  --color-jira: var(--jira);
+  --color-jira-soft: var(--jira-soft);
+  --color-space-team: var(--space-team);
+  --color-space-team-foreground: var(--space-team-foreground);
+  --color-space-project: var(--space-project);
+  --color-space-project-foreground: var(--space-project-foreground);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-success-edge: var(--success-edge);
+  --color-warning-edge: var(--warning-edge);
+  --color-destructive-edge: var(--destructive-edge);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-check: var(--check);
+  --color-check-border: var(--check-border);
+  --color-check-tick: var(--check-tick);
+  --color-spark: var(--spark);
+  --color-spark-glow: var(--spark-glow);
+  --color-toast: var(--toast);
+  --color-toast-foreground: var(--toast-foreground);
+  --color-toast-action: var(--toast-action);
+  --color-skeleton: var(--skeleton);
+  --color-skeleton-2: var(--skeleton-2);
+
+  /* radius: 6 / 8 / 10 / 12 / 16 / 20 */
+  --radius-xs: calc(var(--radius) - 6px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  /* depth */
+  --shadow-sheet: 0 0 0 1px var(--hair), 0 1px 2px var(--hair), 0 30px 60px -34px var(--shadow-color);
+  --shadow-pop: 0 0 0 1px var(--hair), 0 18px 36px -14px var(--shadow-color);
+  --shadow-toast: 0 18px 40px -16px var(--shadow-color);
+  --shadow-seg: 0 0 0 1px var(--hair), 0 1px 2px var(--hair);
+  --shadow-tip: 0 8px 18px -10px var(--shadow-color);
+
+}
+
+@theme {
+  /* fonts: font-sans, font-mono, font-serif / font-display */
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-serif: "Instrument Serif", Georgia, ui-serif, serif;
+  --font-display: "Instrument Serif", Georgia, ui-serif, serif;
+  --font-heading: "Geist", ui-sans-serif, system-ui, sans-serif;
+
+  /* type scale: text-day, text-task, text-meta ... */
+  --text-day: 4rem;
+  --text-day--line-height: 0.9;
+  --text-day--font-weight: 400;
+  --text-h2: 1.25rem;
+  --text-h2--line-height: 1.3;
+  --text-h2--font-weight: 600;
+  --text-task: 1rem;
+  --text-task--line-height: 1.4;
+  --text-task--font-weight: 400;
+  --text-body: 0.90625rem;
+  --text-body--line-height: 1.55;
+  --text-body--font-weight: 400;
+  --text-subtask: 0.90625rem;
+  --text-subtask--line-height: 1.4;
+  --text-subtask--font-weight: 400;
+  --text-ui: 0.8125rem;
+  --text-ui--line-height: 1.3;
+  --text-ui--font-weight: 600;
+  --text-label: 0.6875rem;
+  --text-label--line-height: 1.3;
+  --text-label--font-weight: 600;
+  --text-meta: 0.6875rem;
+  --text-meta--line-height: 1.3;
+  --text-meta--font-weight: 400;
+  --text-eyebrow: 0.65625rem;
+  --text-eyebrow--line-height: 1.3;
+  --text-eyebrow--font-weight: 400;
+
+  /* easing: ease-arrive, ease-change, ease-leave, ease-settle */
+  --ease-arrive: cubic-bezier(.2,.7,.2,1);
+  --ease-change: cubic-bezier(.4,0,.2,1);
+  --ease-leave: cubic-bezier(.4,0,1,1);
+  --ease-settle: cubic-bezier(.25,.8,.25,1);
+
+  /* animations */
+  --animate-spark: spark var(--dur-spark) var(--ease-arrive) 120ms forwards;
+  --animate-shimmer: shimmer 1.4s linear infinite;
+  --animate-row-arrive: row-arrive 320ms var(--ease-arrive) both;
+  --animate-wash: wash 2s var(--ease-change) both;
+
+  @keyframes spark {
+    0% { opacity: 0; transform: translate(0, 0) scale(.2) rotate(0deg); }
+    35% { opacity: 1; }
+    100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1) rotate(60deg); }
+  }
+  @keyframes shimmer {
+    0% { background-position: -300px 0; }
+    100% { background-position: 300px 0; }
+  }
+  @keyframes row-arrive {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes wash {
+    from { background-color: var(--selection); }
+    to { background-color: transparent; }
+  }
+
+  /* colour ramps (OKLCH). Steps marked in the canvas are the exact semantic values. */
+  --color-paper-50: oklch(0.994 0.007 88.6); /* #fffdf8 */
+  --color-paper-100: oklch(0.973 0.011 89.7); /* #f9f6ee */
+  --color-paper-200: oklch(0.943 0.008 91.5); /* #eeece6 */
+  --color-paper-300: oklch(0.874 0.009 84.6); /* #d8d5cf */
+  --color-paper-400: oklch(0.775 0.014 82.4); /* #bab5ac */
+  --color-paper-500: oklch(0.668 0.016 84.6); /* #99948a */
+  --color-paper-600: oklch(0.564 0.016 84.6); /* #7a756b */
+  --color-paper-700: oklch(0.450 0.015 86.9); /* #59554c */
+  --color-paper-800: oklch(0.335 0.012 78.2); /* #3a3630 */
+  --color-paper-900: oklch(0.227 0.004 84.6); /* #1d1c1a */
+  --color-paper-950: oklch(0.181 0.003 145.5); /* #111211 */
+
+  --color-ember-50: oklch(0.984 0.008 27.2); /* #fff8f7 */
+  --color-ember-100: oklch(0.962 0.019 29.5); /* #ffeeeb */
+  --color-ember-200: oklch(0.922 0.040 31.2); /* #ffdcd5 */
+  --color-ember-300: oklch(0.868 0.071 31.4); /* #ffc3b7 */
+  --color-ember-400: oklch(0.790 0.122 31.6); /* #ff9c89 */
+  --color-ember-500: oklch(0.705 0.188 33.7); /* #ff6a4a */
+  --color-ember-600: oklch(0.609 0.217 31.5); /* #e8361b */
+  --color-ember-700: oklch(0.496 0.184 31.3); /* #b3200a */
+  --color-ember-800: oklch(0.418 0.161 31.4); /* #901200 */
+  --color-ember-900: oklch(0.347 0.134 31.4); /* #6f0b00 */
+  --color-ember-950: oklch(0.269 0.104 31.3); /* #4d0500 */
+
+  --color-jira-50: oklch(0.984 0.007 260.7); /* #f7faff */
+  --color-jira-100: oklch(0.940 0.026 259.0); /* #e1ecfd */
+  --color-jira-200: oklch(0.861 0.049 258.0); /* #bed3f2 */
+  --color-jira-300: oklch(0.754 0.089 260.8); /* #8fb0e8 */
+  --color-jira-400: oklch(0.692 0.109 258.7); /* #729ddf */
+  --color-jira-500: oklch(0.626 0.126 258.6); /* #5788d3 */
+  --color-jira-600: oklch(0.561 0.128 258.7); /* #4374bf */
+  --color-jira-700: oklch(0.491 0.128 258.7); /* #2f5fa8 */
+  --color-jira-800: oklch(0.415 0.099 258.8); /* #284b81 */
+  --color-jira-900: oklch(0.346 0.079 258.5); /* #1e3962 */
+  --color-jira-950: oklch(0.270 0.061 259.2); /* #132644 */
+
+  --color-moss-50: oklch(0.985 0.009 150.7); /* #f6fcf7 */
+  --color-moss-100: oklch(0.950 0.017 153.6); /* #e6f2e9 */
+  --color-moss-200: oklch(0.888 0.034 153.6); /* #cae1d0 */
+  --color-moss-300: oklch(0.805 0.089 156.5); /* #8fd1a8 */
+  --color-moss-400: oklch(0.743 0.074 154.3); /* #87ba97 */
+  --color-moss-500: oklch(0.676 0.085 154.9); /* #6ba780 */
+  --color-moss-600: oklch(0.614 0.087 154.9); /* #57946d */
+  --color-moss-700: oklch(0.545 0.081 154.8); /* #477e5b */
+  --color-moss-800: oklch(0.473 0.088 154.5); /* #2d6a45 */
+  --color-moss-900: oklch(0.373 0.053 154.9); /* #284934 */
+  --color-moss-950: oklch(0.268 0.041 155.0); /* #142c1d */
+
+  --color-amber-50: oklch(0.985 0.012 75.4); /* #fff9f1 */
+  --color-amber-100: oklch(0.953 0.025 78.9); /* #f9eedd */
+  --color-amber-200: oklch(0.897 0.048 78.4); /* #efdaba */
+  --color-amber-300: oklch(0.823 0.114 84.1); /* #e8bf6a */
+  --color-amber-400: oklch(0.753 0.129 78.5); /* #dba443 */
+  --color-amber-500: oklch(0.691 0.126 78.4); /* #c69130 */
+  --color-amber-600: oklch(0.637 0.129 78.6); /* #b5800e */
+  --color-amber-700: oklch(0.572 0.119 78.9); /* #9d6e01 */
+  --color-amber-800: oklch(0.508 0.108 73.3); /* #8a5a00 */
+  --color-amber-900: oklch(0.392 0.080 77.5); /* #5d3f03 */
+  --color-amber-950: oklch(0.269 0.056 77.8); /* #352200 */
+}
+
+/* The window is the desk: painted in --background, never the browser's white. Scrollbars are a thin,
+   rounded thumb on a transparent track, in light and dark. The page scrolls inside the app root
+   (`scroll-page`), which keeps the bar's space on its own desk-coloured background, so nothing shifts
+   sideways when a day grows past the window and no strip shows beside it. */
+html {
+  background-color: var(--background);
+  -webkit-tap-highlight-color: transparent; /* no blue/grey flash on tap; components show their own press state */
+}
+html, html * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+@utility scroll-page {
+  box-sizing: border-box;
+  height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  background-color: var(--background);
+}
+/* WebKit (Safari, the macOS app's webview) ignores scrollbar-color: same look with the pseudo-elements. */
+::-webkit-scrollbar { width: 12px; height: 12px; background: transparent; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar); background-clip: padding-box; border: 3px solid transparent; border-radius: 12px; min-height: 40px; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--scrollbar-hover); }
+
+/* Paper grain: add `paper-grain` to any sheet. Works in light and dark. */
+@utility paper-grain {
+  position: relative;
+  isolation: isolate;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 240px 240px;
+    opacity: var(--grain-opacity);
+    mix-blend-mode: var(--grain-blend);
+  }
+}
+
+/* Strike that fades in instead of jumping: put on the title, toggle data-done. */
+@utility strike-fade {
+  /* No line until it's done: a transparent line-through still paints when the text is selected. */
+  text-decoration-line: none;
+  text-decoration-thickness: 1.5px;
+  text-decoration-color: transparent;
+  transition: color var(--dur-tick) var(--ease-change) 120ms, text-decoration-color var(--dur-tick) var(--ease-change) 120ms;
+  &[data-done="true"] { text-decoration-line: line-through; color: var(--muted-foreground); text-decoration-color: var(--muted-foreground); }
+}
+
+/* Loading bars */
+@utility skeleton-shimmer {
+  background: linear-gradient(90deg, var(--skeleton) 0, var(--skeleton-2) 50%, var(--skeleton) 100%);
+  background-size: 600px 100%;
+  animation: var(--animate-shimmer);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 120ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 120ms !important;
+    transition-delay: 0ms !important;
+  }
+}

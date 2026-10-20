@@ -1,0 +1,104 @@
+/* Sizes and grain strengths from tokens.json that paper-theme.css leaves to the components. */
+:root {
+  --control-height: 38px;
+  --touch-target: 44px;
+  --checkbox: 19px;
+  --row-min-height: 52px;
+  --sheet-max-width: 800px;
+  --sidebar-min: 220px;
+  --sidebar-max: 248px;
+  --jira-panel-min: 400px;
+  --jira-panel-max: 460px;
+  --radius-full: 9999px;
+  --grain-opacity-light: 0.32;
+  --grain-opacity-dark: 0.2;
+}
+
+/* A light desk inside a dark page (the kit page shows both side by side). Generated from paper-theme.css's :root block. */
+.light {
+  /* shadcn semantic */
+  --background: #eeece6;
+  --foreground: #18181b;
+  --card: #fffdf8;
+  --card-foreground: #18181b;
+  --popover: #fffdf8;
+  --popover-foreground: #18181b;
+  --primary: #18181b;
+
+  /* Tudu additions */
+  --primary-hover: #38383d;
+
+  /* shadcn semantic */
+  --primary-foreground: #fffdf8;
+  --secondary: rgba(24,24,27,.05);
+  --secondary-foreground: #18181b;
+  --muted: #f9f6ee;
+  --muted-foreground: #71717a;
+  --accent: rgba(24,24,27,.05);
+  --accent-foreground: #18181b;
+  --destructive: #b42318;
+  --destructive-foreground: #fffdf8;
+  --border: rgba(24,24,27,.09);
+
+  /* Tudu additions */
+  --border-strong: rgba(24,24,27,.18);
+  --veil: rgba(32,28,20,.16);
+  --scrollbar: rgba(24,24,27,.2);
+  --scrollbar-hover: rgba(24,24,27,.34);
+
+  /* shadcn semantic */
+  --input: rgba(24,24,27,.09);
+  --ring: #e8361b;
+  --chart-1: #e8361b;
+  --chart-2: #2f5fa8;
+  --chart-3: #2d6a45;
+  --chart-4: #dba443;
+  --chart-5: #8f8b83;
+  --sidebar: #eeece6;
+  --sidebar-foreground: #3f3f46;
+  --sidebar-primary: #18181b;
+  --sidebar-primary-foreground: #fffdf8;
+  --sidebar-accent: rgba(24,24,27,.05);
+  --sidebar-accent-foreground: #18181b;
+  --sidebar-border: rgba(24,24,27,.06);
+  --sidebar-ring: #e8361b;
+
+  /* Tudu additions */
+  --foreground-2: #3f3f46;
+  --ghost: #8f8b83;
+  --hair: rgba(24,24,27,.06);
+  --line: rgba(70,105,150,.13);
+  --brand: #e8361b;
+  --brand-foreground: #ffffff;
+  --brand-text: #b3200a;
+  --selection: rgba(232,54,27,.06);
+  --jira: #2f5fa8;
+  --jira-soft: rgba(47,95,168,.12);
+  --space-team: #dbe4f3;
+  --space-team-foreground: #2c4466;
+  --space-project: #eee1c5;
+  --space-project-foreground: #5b4a29;
+  --success: #2d6a45;
+  --success-soft: #dcebe0;
+  --warning: #8a5a00;
+  --warning-soft: #f8efd9;
+  --success-edge: rgba(45,106,69,.35);
+  --warning-edge: rgba(138,90,0,.3);
+  --destructive-edge: rgba(180,35,24,.3);
+  --destructive-soft: #fbeceb;
+  --check: #18181b;
+  --check-border: #b5b2aa;
+  --check-tick: #ffffff;
+  --spark: #eaa21c;
+  --spark-glow: rgba(234,162,28,.45);
+  --toast: #1c1b19;
+  --toast-foreground: #fffdf8;
+  --toast-action: #8fb0e8;
+  --skeleton: rgba(24,24,27,.07);
+  --skeleton-2: rgba(24,24,27,.03);
+
+  /* paper + depth */
+  --shadow-color: rgba(60,50,30,.3);
+  --grain-opacity: .32;
+  --grain-blend: multiply;
+}

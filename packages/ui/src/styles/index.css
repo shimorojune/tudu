@@ -1,0 +1,6 @@
+/* Tudu UI styles. The app imports this once, after tailwindcss and its dark variant. */
+@import './fonts.css';
+@import './paper-theme.css';
+@import './tokens-extra.css';
+@import './components.css';
+@import './app.css';

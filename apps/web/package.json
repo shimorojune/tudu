@@ -1,35 +1,25 @@
 {
-  "name": "@tudu/web",
-  "version": "0.36.0",
-  "description": "Tudu web app shell",
+  "name": "web",
+  "version": "0.0.0",
+  "private": true,
   "type": "module",
-  "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "icons": "node scripts/generate-pwa-icons.mjs",
-    "build": "pnpm --filter @tudu/shared build && node scripts/generate-pwa-icons.mjs && node scripts/generate-firebase-messaging-sw.mjs && tsc -b && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc -b --noEmit"
-  },
-  "dependencies": {
-    "@tudu/shared": "workspace:*",
-    "@tudu/store": "workspace:*",
-    "@tudu/ui": "workspace:*",
-    "firebase": "^12.19.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "build": "vite build",
+    "preview": "vite preview --port 5173 --strictPort",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.1.11",
-    "@types/node": "^26.4.0",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.6.0",
-    "sharp": "^0.34.5",
-    "tailwindcss": "^4.1.11",
-    "tw-animate-css": "^1.3.5",
-    "typescript": "^5.8.3",
-    "vite": "^6.3.5",
-    "vite-plugin-pwa": "^1.3.0"
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.1.2",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.4"
+  },
+  "dependencies": {
+    "@tanstack/react-router": "^1.170.45",
+    "@tudu/core": "workspace:^",
+    "@tudu/ui": "workspace:^",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   }
 }

@@ -1,0 +1,7 @@
+@import 'tailwindcss';
+@custom-variant dark (&:is(.dark *));
+@import '@tudu/ui/styles';
+
+#root {
+  min-height: 100dvh;
+}
