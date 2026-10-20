@@ -177,3 +177,45 @@
     inset: -13px;
   }
 }
+
+/* Task detail (chunk 03) */
+/* Tiptap wraps the editable area; the wrapper is invisible so the design's own area rules apply. */
+.tp-rte-host {
+  display: contents;
+}
+/* Checklist items: Tiptap draws a label with a native box; the design's own box (::before) stays, the native
+   one sits over it as the hit area. */
+.tp-prose ul.tp-checks > li > label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 26px;
+  height: 1.6em;
+  margin: 0;
+  cursor: pointer;
+  opacity: 0;
+}
+.tp-prose ul.tp-checks > li > label input {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+.tp-prose ul.tp-checks > li > div {
+  min-width: 0;
+}
+.tp-prose ul.tp-checks > li > div > p {
+  margin: 0;
+}
+/* The ⋯ menus sit on Radix now; the design's own absolutely placed pop is not used for them. */
+.tp-td-top .tp-ib,
+.tp-td-cmt-btn {
+  flex: none;
+}
+/* The panel while its task loads. */
+.tp-td-skl {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-top: 8px;
+}

@@ -1,6 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { DayResponse, MarksResponse, SyncResponse, Task, TasksChangedEvent } from '@tudu/core';
+import type {
+  DayResponse,
+  MarksResponse,
+  SyncResponse,
+  Task,
+  TaskDetail,
+  TasksChangedEvent,
+} from '@tudu/core';
 import { get, post, signIn, startServer, type Jar } from '../test/harness';
 
 let server: ReturnType<typeof startServer>;
@@ -268,7 +275,12 @@ describe('tasks and sync', () => {
     off1();
     off2();
     expect(mine.map((e) => e.type)).toEqual(['tasks.changed', 'tasks.changed']);
-    expect(mine[0]!.data).toEqual({ spaceId: p.spaceId, days: ['2026-10-18'], clientId: 'tab-9' });
+    expect(mine[0]!.data).toEqual({
+      spaceId: p.spaceId,
+      days: ['2026-10-18'],
+      tasks: [id],
+      clientId: 'tab-9',
+    });
     expect(mine[1]!.data.days.sort()).toEqual(['2026-10-18', '2026-10-19']);
     expect(theirs).toEqual([]);
   });
@@ -298,17 +310,23 @@ describe('tasks and sync', () => {
     expect(Object.keys(first).sort()).toEqual(
       [
         'carriedFrom',
+        'commentCount',
         'createdAt',
         'day',
         'done',
         'doneAt',
+        'due',
         'id',
         'number',
         'position',
         'ref',
         'spaceId',
+        'subsDone',
+        'subsTotal',
+        'subtasks',
         'title',
         'updatedAt',
+        'visibility',
       ].sort(),
     );
     const marks = (await (
@@ -350,5 +368,274 @@ describe('tasks and sync', () => {
     expect(res.results[0]!.error).toBe('A task needs a title.');
     const anon = await post(server.app, '/api/sync', { clientId: 'x', mutations: [] });
     expect(anon.status).toBe(401);
+  });
+});
+
+async function detail(p: Person, taskId: string, expectStatus = 200): Promise<TaskDetail> {
+  const res = await get(server.app, `/api/spaces/${p.spaceId}/tasks/${taskId}`, p.jar);
+  expect(res.status).toBe(expectStatus);
+  return (await res.json()) as TaskDetail;
+}
+
+const SUN = '2026-10-18';
+
+describe('task detail (chunk 03)', () => {
+  it('C03-A01 reading a task returns its fields, subtasks, comments and history; someone else’s space is 403', async () => {
+    const p = await person();
+    const id = randomUUID();
+    const s1 = randomUUID();
+    const c1 = randomUUID();
+    await sync(p, [
+      create(p, 'Review Quick Add PR', SUN, 1024, id),
+      m('task.notes', { id, notes: '<p>Staging first.</p>' }),
+      m('subtask.create', { id: s1, taskId: id, title: 'Pull the branch', position: 1024 }),
+      m('subtask.create', { id: randomUUID(), taskId: id, title: 'Run it', position: 2048 }),
+      m('comment.create', { id: c1, taskId: id, html: '<p>Will review tomorrow.</p>' }),
+    ]);
+    const d = await detail(p, id);
+    expect(d).toMatchObject({
+      id,
+      ref: 'ME-1',
+      title: 'Review Quick Add PR',
+      day: SUN,
+      due: null,
+      visibility: 'space',
+      notes: '<p>Staging first.</p>',
+      subsDone: 0,
+      subsTotal: 2,
+      commentCount: 1,
+    });
+    expect(d.subtasks.map((s) => [s.title, s.done])).toEqual([
+      ['Pull the branch', false],
+      ['Run it', false],
+    ]);
+    expect(d.comments).toHaveLength(1);
+    expect(d.comments[0]).toMatchObject({ id: c1, html: '<p>Will review tomorrow.</p>', editedAt: null });
+    expect(d.comments[0]!.author.id).toBe(p.userId);
+    expect(d.history.map((e) => e.kind)).toEqual(['created']);
+    const stranger = await person();
+    const res = await get(server.app, `/api/spaces/${p.spaceId}/tasks/${id}`, stranger.jar);
+    expect(res.status).toBe(403);
+    const wrong = await get(server.app, `/api/spaces/${stranger.spaceId}/tasks/${id}`, stranger.jar);
+    expect(wrong.status).toBe(404);
+  });
+
+  it('C03-A02 due: set and clear, last write wins by clock, each change writes a history event', async () => {
+    const p = await person();
+    const id = randomUUID();
+    await sync(p, [create(p, 'Reply to legal', SUN, 1024, id)]);
+    await sync(p, [m('task.due', { id, due: '2026-10-21' })]);
+    expect((await detail(p, id)).due).toBe('2026-10-21');
+    const later = m('task.due', { id, due: null });
+    const earlier = m('task.due', { id, due: '2026-10-16' }, '2026-10-18T08:00:00.000Z');
+    await sync(p, [later, earlier]);
+    const d = await detail(p, id);
+    expect(d.due).toBeNull();
+    expect(d.history.map((e) => e.kind)).toEqual(['created', 'due.set', 'due.cleared']);
+    expect(d.history[1]).toMatchObject({ due: '2026-10-21' });
+    const d2 = await day(p, SUN);
+    expect(d2.tasks[0]!.due).toBeNull();
+  });
+
+  it('C03-A03 notes are saved cleaned; oversize notes are refused; last write wins', async () => {
+    const p = await person();
+    const id = randomUUID();
+    await sync(p, [create(p, 'Notes', SUN, 1024, id)]);
+    await sync(p, [
+      m('task.notes', { id, notes: '<p>Hi<script>alert(1)</script> <b>there</b></p><img src=x onerror=y>' }),
+    ]);
+    expect((await detail(p, id)).notes).toBe('<p>Hi <b>there</b></p>');
+    const big = await sync(p, [m('task.notes', { id, notes: 'x'.repeat(100_001) })]);
+    expect(big.results[0]).toMatchObject({ status: 'rejected', code: 400 });
+    const old = m('task.notes', { id, notes: '<p>old</p>' }, '2026-10-18T08:00:00.000Z');
+    await sync(p, [old]);
+    expect((await detail(p, id)).notes).toBe('<p>Hi <b>there</b></p>');
+  });
+
+  it('C03-A04 visibility: only me and space are accepted', async () => {
+    const p = await person();
+    const id = randomUUID();
+    await sync(p, [create(p, 'Secret', SUN, 1024, id)]);
+    await sync(p, [m('task.visibility', { id, visibility: 'me' })]);
+    expect((await detail(p, id)).visibility).toBe('me');
+    const bad = await sync(p, [m('task.visibility', { id, visibility: 'everyone' })]);
+    expect(bad.results[0]).toMatchObject({ status: 'rejected', code: 400 });
+    expect((await detail(p, id)).visibility).toBe('me');
+  });
+
+  it('C03-A05 subtasks: create, rename, cross off, reorder, delete; idempotent and last write wins', async () => {
+    const p = await person();
+    const id = randomUUID();
+    const a = randomUUID();
+    const b = randomUUID();
+    await sync(p, [create(p, 'Parent', SUN, 1024, id)]);
+    const ca = m('subtask.create', { id: a, taskId: id, title: 'A', position: 1024 });
+    await sync(p, [ca, m('subtask.create', { id: b, taskId: id, title: 'B', position: null })]);
+    await sync(p, [ca]);
+    let d = await detail(p, id);
+    expect(d.subtasks.map((s) => s.title)).toEqual(['A', 'B']);
+    expect(d.subtasks[1]!.position).toBeGreaterThan(1024);
+    const later = m('subtask.rename', { id: a, taskId: id, title: 'A, later' });
+    const earlier = m(
+      'subtask.rename',
+      { id: a, taskId: id, title: 'A, earlier' },
+      '2026-10-18T08:00:00.000Z',
+    );
+    await sync(p, [
+      later,
+      earlier,
+      m('subtask.cross', { id: b, taskId: id, done: true }),
+      m('subtask.place', { id: b, taskId: id, position: 512 }),
+    ]);
+    d = await detail(p, id);
+    expect(d.subtasks.map((s) => [s.title, s.done])).toEqual([
+      ['B', true],
+      ['A, later', false],
+    ]);
+    expect([d.subsDone, d.subsTotal]).toEqual([1, 2]);
+    await sync(p, [m('subtask.delete', { id: b, taskId: id })]);
+    d = await detail(p, id);
+    expect(d.subtasks.map((s) => s.title)).toEqual(['A, later']);
+    const gone = await sync(p, [m('subtask.rename', { id: b, taskId: id, title: 'Back?' })]);
+    expect(gone.results[0]).toMatchObject({ status: 'rejected', code: 410 });
+    const otherTask = randomUUID();
+    await sync(p, [create(p, 'Other', SUN, 2048, otherTask)]);
+    const mismatch = await sync(p, [m('subtask.cross', { id: a, taskId: otherTask, done: true })]);
+    expect(mismatch.results[0]).toMatchObject({ status: 'rejected', code: 404 });
+    const stranger = await person();
+    const refused = await sync(stranger, [m('subtask.cross', { id: a, taskId: id, done: true })]);
+    expect(refused.results[0]).toMatchObject({ status: 'rejected', code: 403 });
+  });
+
+  it('C03-A06 comments: add, edit and delete by the author only; a deleted one stays out', async () => {
+    const p = await person();
+    const id = randomUUID();
+    const c = randomUUID();
+    await sync(p, [create(p, 'Parent', SUN, 1024, id)]);
+    await sync(p, [m('comment.create', { id: c, taskId: id, html: '<p>First <script>x()</script></p>' })]);
+    let d = await detail(p, id);
+    expect(d.comments[0]).toMatchObject({ id: c, html: '<p>First </p>' });
+    const empty = await sync(p, [m('comment.create', { id: randomUUID(), taskId: id, html: '<p><br></p>' })]);
+    expect(empty.results[0]).toMatchObject({ status: 'rejected', code: 400 });
+    await sync(p, [m('comment.edit', { id: c, taskId: id, html: '<p>Edited</p>' })]);
+    d = await detail(p, id);
+    expect(d.comments[0]!.html).toBe('<p>Edited</p>');
+    expect(d.comments[0]!.editedAt).not.toBeNull();
+    expect(d.commentCount).toBe(1);
+    await sync(p, [m('comment.delete', { id: c, taskId: id })]);
+    d = await detail(p, id);
+    expect(d.comments).toEqual([]);
+    expect(d.commentCount).toBe(0);
+    const again = await sync(p, [m('comment.edit', { id: c, taskId: id, html: '<p>Back</p>' })]);
+    expect(again.results[0]).toMatchObject({ status: 'rejected', code: 410 });
+    // someone else's comment: a stranger is not even in the space; the author check is on the row
+    const stranger = await person();
+    const refused = await sync(stranger, [m('comment.delete', { id: c, taskId: id })]);
+    expect(refused.results[0]).toMatchObject({ status: 'rejected', code: 403 });
+  });
+
+  it('C03-A07 history: moving, carrying, crossing off and uncrossing each write one event in order', async () => {
+    const p = await person();
+    const id = randomUUID();
+    await sync(p, [create(p, 'Moving', null, 1024, id)]);
+    await sync(p, [
+      m('task.place', { id, day: '2026-10-17', position: 1024 }),
+      m('task.cross', { id, done: true }),
+      m('task.cross', { id, done: true }),
+      m('task.cross', { id, done: false }),
+    ]);
+    await day(p, SUN, SUN); // carries it forward
+    const d = await detail(p, id);
+    expect(d.history.map((e) => e.kind)).toEqual(['created', 'moved', 'crossed', 'uncrossed', 'carried']);
+    expect(d.history[1]).toMatchObject({ from: null, to: '2026-10-17' });
+    expect(d.history[4]).toMatchObject({ from: '2026-10-17' });
+    expect(d.day).toBe(SUN);
+  });
+
+  it('C03-A08 restore: a deleted task comes back on its day in its place with its subtasks and comments', async () => {
+    const p = await person();
+    const id = randomUUID();
+    const s = randomUUID();
+    await sync(p, [
+      create(p, 'One', SUN, 1024),
+      create(p, 'Two', SUN, 2048, id),
+      create(p, 'Three', SUN, 3072),
+      m('subtask.create', { id: s, taskId: id, title: 'Sub', position: 1024 }),
+      m('comment.create', { id: randomUUID(), taskId: id, html: '<p>Hi</p>' }),
+    ]);
+    await sync(p, [m('task.delete', { id })]);
+    expect(titles(await day(p, SUN))).toEqual(['One', 'Three']);
+    await detail(p, id, 404);
+    const res = await sync(p, [m('task.restore', { id })]);
+    expect(res.results[0]).toMatchObject({ status: 'ok' });
+    expect(res.tasks.map((t) => t.id)).toEqual([id]);
+    expect(titles(await day(p, SUN))).toEqual(['One', 'Two', 'Three']);
+    const d = await detail(p, id);
+    expect(d.subtasks.map((x) => x.title)).toEqual(['Sub']);
+    expect(d.commentCount).toBe(1);
+    expect(d.history.map((e) => e.kind)).toEqual(['created', 'restored']);
+    // restoring a live task is a no-op; an older restore does not undo a newer delete
+    const noop = await sync(p, [m('task.restore', { id })]);
+    expect(noop.results[0]).toMatchObject({ status: 'ok' });
+    await sync(p, [m('task.delete', { id })]);
+    await sync(p, [m('task.restore', { id }, '2026-10-18T08:00:00.000Z')]);
+    expect(titles(await day(p, SUN))).toEqual(['One', 'Three']);
+  });
+
+  it('C03-A09 a day’s rows carry due, subtasks and comment counts', async () => {
+    const p = await person();
+    const id = randomUUID();
+    await sync(p, [
+      create(p, 'Rich', SUN, 1024, id),
+      m('task.due', { id, due: '2026-10-23' }),
+      m('subtask.create', { id: randomUUID(), taskId: id, title: 'A', position: 1024 }),
+      m('subtask.create', { id: randomUUID(), taskId: id, title: 'B', position: 2048 }),
+      m('comment.create', { id: randomUUID(), taskId: id, html: '<p>Hi</p>' }),
+    ]);
+    const d = await day(p, SUN);
+    const t = d.tasks[0]!;
+    expect([t.due, t.subsDone, t.subsTotal, t.commentCount]).toEqual(['2026-10-23', 0, 2, 1]);
+    expect(t.subtasks.map((s) => s.title)).toEqual(['A', 'B']);
+    expect('notes' in t).toBe(false);
+  });
+
+  it('C03-A10 every change names its task on the live stream, for the space’s people only', async () => {
+    const p = await person();
+    const stranger = await person();
+    const mine: Array<{ type: string; data: TasksChangedEvent }> = [];
+    const theirs: unknown[] = [];
+    const off1 = server.hub.subscribe(p.userId, (e) => mine.push(e as never));
+    const off2 = server.hub.subscribe(stranger.userId, (e) => theirs.push(e));
+    const id = randomUUID();
+    await sync(p, [create(p, 'Announce', SUN, 1024, id)], 'tab-9');
+    await sync(
+      p,
+      [m('subtask.create', { id: randomUUID(), taskId: id, title: 'A', position: 1024 })],
+      'tab-9',
+    );
+    await sync(p, [m('task.notes', { id, notes: '<p>n</p>' })], 'tab-9');
+    await sync(stranger, [m('task.due', { id, due: SUN })]);
+    off1();
+    off2();
+    expect(mine.map((e) => e.data.tasks)).toEqual([[id], [id], [id]]);
+    expect(mine[1]!.data).toMatchObject({ spaceId: p.spaceId, days: [SUN], clientId: 'tab-9' });
+    expect(theirs).toEqual([]);
+  });
+
+  it('C03-A11 /tasks/ref/ME-2 says where a task is for the person who can see it, 404 otherwise', async () => {
+    const p = await person();
+    const id = randomUUID();
+    await sync(p, [create(p, 'One', SUN, 1024), create(p, 'Two', '2026-10-21', 1024, id)]);
+    const res = await get(server.app, '/api/tasks/ref/ME-2', p.jar);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ taskId: id, spaceId: p.spaceId, day: '2026-10-21' });
+    expect((await get(server.app, '/api/tasks/ref/me-2', p.jar)).status).toBe(200);
+    expect((await get(server.app, '/api/tasks/ref/ME-9', p.jar)).status).toBe(404);
+    expect((await get(server.app, '/api/tasks/ref/nonsense', p.jar)).status).toBe(404);
+    const stranger = await person();
+    // the stranger's own ME-2 does not exist yet, and ours is not theirs
+    expect((await get(server.app, '/api/tasks/ref/ME-2', stranger.jar)).status).toBe(404);
+    await sync(p, [m('task.delete', { id })]);
+    expect((await get(server.app, '/api/tasks/ref/ME-2', p.jar)).status).toBe(404);
   });
 });

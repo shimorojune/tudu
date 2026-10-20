@@ -67,7 +67,21 @@ const appRoute = createRoute({
   },
 });
 
-const todayRoute = createRoute({ getParentRoute: () => appRoute, path: '/', component: TodayPage });
+const todayRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/',
+  validateSearch: (s: Record<string, unknown>): { task?: string } =>
+    typeof s.task === 'string' && s.task ? { task: s.task } : {},
+  component: TodayPage,
+});
+/** A link to a task: /t/ME-52 opens it on its day. */
+const taskLinkRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/t/$ref',
+  beforeLoad: ({ params }) => {
+    throw redirect({ to: '/', search: { task: params.ref }, replace: true });
+  },
+});
 const weekRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/week',
@@ -94,7 +108,7 @@ const kitRoute = createRoute({ getParentRoute: () => rootRoute, path: '/kit', co
 export const router = createRouter({
   routeTree: rootRoute.addChildren([
     signInRoute,
-    appRoute.addChildren([todayRoute, weekRoute, backlogRoute, inboxRoute]),
+    appRoute.addChildren([todayRoute, taskLinkRoute, weekRoute, backlogRoute, inboxRoute]),
     kitRoute,
   ]),
   context: { queryClient },

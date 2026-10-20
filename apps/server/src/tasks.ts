@@ -1,13 +1,20 @@
 import {
+  cleanHtml,
+  isEmptyHtml,
   POSITION_STEP,
   syncMutationSchema,
+  taskIdOf,
+  type Comment,
+  type HistoryEvent,
   type IsoDate,
+  type Subtask,
   type SyncMutation,
   type SyncResult,
   type Task,
+  type TaskDetail,
 } from '@tudu/core';
 import { and, asc, count, eq, gte, inArray, isNull, lt, lte, schema, sql, type Db } from '@tudu/db';
-import type { TaskClocks } from '@tudu/db/schema';
+import type { SubtaskClocks, TaskClocks } from '@tudu/db/schema';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type Executor = Db | Tx;
@@ -25,6 +32,7 @@ export class Rejected extends Error {
 const NOT_YOURS = 'You can’t change tasks in that space.';
 const GONE = 'That task isn’t there any more.';
 const DELETED = 'That task was deleted.';
+const NOT_YOUR_COMMENT = 'Only the person who wrote a comment can change it.';
 
 /** The role a person has in a space, or null when they are not in it. */
 export async function roleIn(db: Executor, userId: string, spaceId: string): Promise<string | null> {
@@ -54,6 +62,8 @@ const taskColumns = {
   position: schema.tasks.position,
   doneAt: schema.tasks.doneAt,
   carriedFrom: schema.tasks.carriedFrom,
+  dueDay: schema.tasks.dueDay,
+  visibility: schema.tasks.visibility,
   createdAt: schema.tasks.createdAt,
   updatedAt: schema.tasks.updatedAt,
 };
@@ -68,11 +78,18 @@ type TaskRow = {
   position: number;
   doneAt: Date | null;
   carriedFrom: string | null;
+  dueDay: string | null;
+  visibility: 'space' | 'me';
   createdAt: Date;
   updatedAt: Date;
 };
 
-export function toTask(r: TaskRow): Task {
+interface Counts {
+  subtasks: Subtask[];
+  commentCount: number;
+}
+
+export function toTask(r: TaskRow, c: Counts = { subtasks: [], commentCount: 0 }): Task {
   return {
     id: r.id,
     spaceId: r.spaceId,
@@ -84,9 +101,46 @@ export function toTask(r: TaskRow): Task {
     done: r.doneAt !== null,
     doneAt: r.doneAt?.toISOString() ?? null,
     carriedFrom: r.carriedFrom,
+    due: r.dueDay,
+    visibility: r.visibility,
+    subtasks: c.subtasks,
+    subsDone: c.subtasks.filter((s) => s.done).length,
+    subsTotal: c.subtasks.length,
+    commentCount: c.commentCount,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   };
+}
+
+/** What each row needs beyond its own columns: its subtasks (for the fold) and how many comments. */
+async function countsFor(db: Executor, ids: string[]): Promise<Map<string, Counts>> {
+  const out = new Map<string, Counts>();
+  if (!ids.length) return out;
+  const subs = await db
+    .select()
+    .from(schema.subtasks)
+    .where(and(inArray(schema.subtasks.taskId, ids), isNull(schema.subtasks.deletedAt)))
+    .orderBy(asc(schema.subtasks.position), asc(schema.subtasks.createdAt));
+  const cms = await db
+    .select({ taskId: schema.comments.taskId, n: count() })
+    .from(schema.comments)
+    .where(and(inArray(schema.comments.taskId, ids), isNull(schema.comments.deletedAt)))
+    .groupBy(schema.comments.taskId);
+  const get = (id: string) => out.get(id) ?? { subtasks: [], commentCount: 0 };
+  for (const s of subs) {
+    const c = get(s.taskId);
+    out.set(s.taskId, { ...c, subtasks: [...c.subtasks, toSubtask(s)] });
+  }
+  for (const c of cms) out.set(c.taskId, { ...get(c.taskId), commentCount: c.n });
+  return out;
+}
+
+async function withCounts(db: Executor, rows: TaskRow[]): Promise<Task[]> {
+  const counts = await countsFor(
+    db,
+    rows.map((r) => r.id),
+  );
+  return rows.map((r) => toTask(r, counts.get(r.id)));
 }
 
 /** The tasks of one day in a space, in order. */
@@ -97,7 +151,7 @@ export async function tasksOfDay(db: Executor, spaceId: string, day: IsoDate): P
     .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
     .where(and(eq(schema.tasks.spaceId, spaceId), eq(schema.tasks.day, day), isNull(schema.tasks.deletedAt)))
     .orderBy(asc(schema.tasks.position), asc(schema.tasks.createdAt));
-  return rows.map(toTask);
+  return withCounts(db, rows);
 }
 
 export async function tasksById(db: Executor, ids: string[]): Promise<Task[]> {
@@ -107,7 +161,89 @@ export async function tasksById(db: Executor, ids: string[]): Promise<Task[]> {
     .from(schema.tasks)
     .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
     .where(and(inArray(schema.tasks.id, ids), isNull(schema.tasks.deletedAt)));
-  return rows.map(toTask);
+  return withCounts(db, rows);
+}
+
+function toSubtask(r: typeof schema.subtasks.$inferSelect): Subtask {
+  return {
+    id: r.id,
+    taskId: r.taskId,
+    title: r.title,
+    position: r.position,
+    done: r.doneAt !== null,
+    createdAt: r.createdAt.toISOString(),
+    updatedAt: r.updatedAt.toISOString(),
+  };
+}
+
+/** One task in full: its notes, subtasks in order, comments in order and history. Null when there is no such live task. */
+export async function taskDetail(db: Executor, taskId: string): Promise<TaskDetail | null> {
+  const [row] = await db
+    .select({ ...taskColumns, notes: schema.tasks.notes, deletedAt: schema.tasks.deletedAt })
+    .from(schema.tasks)
+    .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
+    .where(eq(schema.tasks.id, taskId));
+  if (!row || row.deletedAt) return null;
+  const [task] = await withCounts(db, [row]);
+  const cms = await db
+    .select({
+      id: schema.comments.id,
+      taskId: schema.comments.taskId,
+      html: schema.comments.html,
+      createdAt: schema.comments.createdAt,
+      editedAt: schema.comments.editedAt,
+      authorId: schema.user.id,
+      authorName: schema.user.name,
+      authorEmail: schema.user.email,
+    })
+    .from(schema.comments)
+    .innerJoin(schema.user, eq(schema.user.id, schema.comments.authorId))
+    .where(and(eq(schema.comments.taskId, taskId), isNull(schema.comments.deletedAt)))
+    .orderBy(asc(schema.comments.createdAt), asc(schema.comments.id));
+  const events = await db
+    .select()
+    .from(schema.taskEvents)
+    .where(eq(schema.taskEvents.taskId, taskId))
+    .orderBy(asc(schema.taskEvents.id));
+  const comments: Comment[] = cms.map((c) => ({
+    id: c.id,
+    taskId: c.taskId,
+    author: { id: c.authorId, name: c.authorName, email: c.authorEmail },
+    html: c.html,
+    createdAt: c.createdAt.toISOString(),
+    editedAt: c.editedAt?.toISOString() ?? null,
+  }));
+  const history = events.map(
+    (e) => ({ id: e.id, at: e.at.toISOString(), kind: e.kind, ...e.data }) as HistoryEvent,
+  );
+  return { ...task!, notes: row.notes, comments, history };
+}
+
+/** Where "ME-52" points for this person: the first task with that ref in a space they are in. */
+export async function resolveRef(
+  db: Executor,
+  userId: string,
+  ref: string,
+): Promise<{ taskId: string; spaceId: string; day: IsoDate | null } | null> {
+  const m = /^([A-Za-z][A-Za-z0-9]*)-(\d+)$/.exec(ref.trim());
+  if (!m) return null;
+  const [row] = await db
+    .select({ taskId: schema.tasks.id, spaceId: schema.tasks.spaceId, day: schema.tasks.day })
+    .from(schema.tasks)
+    .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
+    .innerJoin(
+      schema.spaceMembers,
+      and(eq(schema.spaceMembers.spaceId, schema.spaces.id), eq(schema.spaceMembers.userId, userId)),
+    )
+    .where(
+      and(
+        eq(schema.spaces.taskPrefix, m[1]!.toUpperCase()),
+        eq(schema.tasks.number, Number(m[2])),
+        isNull(schema.tasks.deletedAt),
+      ),
+    )
+    .orderBy(asc(schema.spaces.kind));
+  return row ?? null;
 }
 
 /** How many tasks each day between `from` and `to` holds. */
@@ -134,20 +270,37 @@ export async function marksOf(
   return marks;
 }
 
+type HistoryKind = (typeof schema.historyKind.enumValues)[number];
+
+async function record(
+  tx: Executor,
+  taskId: string,
+  kind: HistoryKind,
+  data: Record<string, unknown> = {},
+  actorId: string | null = null,
+  at: Date = new Date(),
+): Promise<void> {
+  await tx.insert(schema.taskEvents).values({ taskId, kind, data, actorId, at });
+}
+
 /**
  * Carry unfinished tasks forward: every open task planned before `today` moves to the top of today, keeping its
  * order (oldest day first), and remembers the day it first came from. Runs once per day per space; asking again
  * does nothing.
- * Returns the days that changed.
+ * Returns the days and tasks that changed.
  */
-export async function rollForward(db: Db, spaceId: string, today: IsoDate): Promise<IsoDate[]> {
+export async function rollForward(
+  db: Db,
+  spaceId: string,
+  today: IsoDate,
+): Promise<{ days: IsoDate[]; tasks: string[] }> {
   return db.transaction(async (tx) => {
     const [space] = await tx
       .select({ rolledTo: schema.spaces.rolledTo })
       .from(schema.spaces)
       .where(eq(schema.spaces.id, spaceId))
       .for('update');
-    if (!space || (space.rolledTo && space.rolledTo >= today)) return [];
+    if (!space || (space.rolledTo && space.rolledTo >= today)) return { days: [], tasks: [] };
     const open = await tx
       .select({ id: schema.tasks.id, day: schema.tasks.day, carriedFrom: schema.tasks.carriedFrom })
       .from(schema.tasks)
@@ -162,7 +315,7 @@ export async function rollForward(db: Db, spaceId: string, today: IsoDate): Prom
       .orderBy(asc(schema.tasks.day), asc(schema.tasks.position), asc(schema.tasks.createdAt))
       .for('update');
     await tx.update(schema.spaces).set({ rolledTo: today }).where(eq(schema.spaces.id, spaceId));
-    if (!open.length) return [];
+    if (!open.length) return { days: [], tasks: [] };
     const [top] = await tx
       .select({ min: sql<number | null>`min(${schema.tasks.position})` })
       .from(schema.tasks)
@@ -180,8 +333,9 @@ export async function rollForward(db: Db, spaceId: string, today: IsoDate): Prom
         .update(schema.tasks)
         .set({ day: today, position, carriedFrom: t.carriedFrom ?? t.day, updatedAt: now })
         .where(eq(schema.tasks.id, t.id));
+      await record(tx, t.id, 'carried', { from: t.day }, null, now);
     }
-    return [today, ...new Set(open.map((t) => t.day!))];
+    return { days: [today, ...new Set(open.map((t) => t.day!))], tasks: open.map((t) => t.id) };
   });
 }
 
@@ -211,15 +365,23 @@ export async function applyMutation(db: Db, userId: string, raw: unknown): Promi
       .returning({ id: schema.appliedMutations.id });
     if (!claimed.length) {
       // Already applied: nothing changes, and the client gets the row as it is.
+      const taskId = taskIdOf(m);
       const [t] = await tx
         .select({ spaceId: schema.tasks.spaceId, day: schema.tasks.day })
         .from(schema.tasks)
-        .where(eq(schema.tasks.id, m.payload.id));
-      return t ? { taskId: m.payload.id, spaceId: t.spaceId, days: [] } : null;
+        .where(eq(schema.tasks.id, taskId));
+      return t ? { taskId, spaceId: t.spaceId, days: [] } : null;
     }
-    return m.type === 'task.create' ? create(tx, userId, m) : change(tx, userId, m);
+    if (m.type === 'task.create') return create(tx, userId, m);
+    if (m.type.startsWith('subtask.')) return subtask(tx, userId, m as SubtaskMutation);
+    if (m.type.startsWith('comment.')) return comment(tx, userId, m as CommentMutation);
+    return change(tx, userId, m as TaskChange);
   });
 }
+
+type SubtaskMutation = Extract<SyncMutation, { type: `subtask.${string}` }>;
+type CommentMutation = Extract<SyncMutation, { type: `comment.${string}` }>;
+type TaskChange = Exclude<SyncMutation, { type: 'task.create' } | SubtaskMutation | CommentMutation>;
 
 /** The position after the last task of a day (or of the Backlog). */
 async function endOf(tx: Tx, spaceId: string, day: IsoDate | null): Promise<number> {
@@ -268,35 +430,52 @@ async function create(
     createdBy: userId,
     clocks,
   });
+  await record(tx, p.id, 'created', {}, userId, new Date(m.at));
   return { taskId: p.id, spaceId: p.spaceId, days: [p.day] };
 }
 
-async function change(
-  tx: Tx,
-  userId: string,
-  m: Exclude<SyncMutation, { type: 'task.create' }>,
-): Promise<Applied> {
+/** A live task (or, for restore and delete, a deleted one), locked for the change, with the person's right to it checked. */
+async function lockTask(tx: Tx, userId: string, taskId: string) {
   const [t] = await tx
     .select({
       spaceId: schema.tasks.spaceId,
       day: schema.tasks.day,
+      doneAt: schema.tasks.doneAt,
+      dueDay: schema.tasks.dueDay,
       deletedAt: schema.tasks.deletedAt,
       clocks: schema.tasks.clocks,
     })
     .from(schema.tasks)
-    .where(eq(schema.tasks.id, m.payload.id))
+    .where(eq(schema.tasks.id, taskId))
     .for('update');
   if (!t) throw new Rejected(404, GONE);
   if (!(await roleIn(tx, userId, t.spaceId))) throw new Rejected(403, NOT_YOURS);
+  return t;
+}
+
+async function change(tx: Tx, userId: string, m: TaskChange): Promise<Applied> {
+  const t = await lockTask(tx, userId, m.payload.id);
   const base: Applied = { taskId: m.payload.id, spaceId: t.spaceId, days: [t.day] };
-  if (t.deletedAt) {
-    if (m.type === 'task.delete') return { ...base, days: [], deleted: true };
-    throw new Rejected(410, DELETED);
-  }
   const clocks: TaskClocks = { ...t.clocks };
   const set: Partial<typeof schema.tasks.$inferInsert> = {};
   const days: Array<IsoDate | null> = [t.day];
+  const at = new Date(m.at);
+  if (t.deletedAt) {
+    if (m.type === 'task.restore') {
+      if (!newer(m.at, clocks.deleted)) return { ...base, days: [] };
+      await tx
+        .update(schema.tasks)
+        .set({ deletedAt: null, clocks: { ...clocks, deleted: m.at }, updatedAt: new Date() })
+        .where(eq(schema.tasks.id, m.payload.id));
+      await record(tx, m.payload.id, 'restored', {}, userId, at);
+      return base;
+    }
+    if (m.type === 'task.delete') return { ...base, days: [], deleted: true };
+    throw new Rejected(410, DELETED);
+  }
   switch (m.type) {
+    case 'task.restore':
+      return { ...base, days: [] };
     case 'task.rename':
       if (newer(m.at, clocks.title)) {
         set.title = m.payload.title;
@@ -305,8 +484,10 @@ async function change(
       break;
     case 'task.cross':
       if (newer(m.at, clocks.done)) {
-        set.doneAt = m.payload.done ? new Date(m.at) : null;
+        set.doneAt = m.payload.done ? at : null;
         clocks.done = m.at;
+        if (m.payload.done !== (t.doneAt !== null))
+          await record(tx, m.payload.id, m.payload.done ? 'crossed' : 'uncrossed', {}, userId, at);
       }
       break;
     case 'task.place':
@@ -316,6 +497,7 @@ async function change(
         clocks.place = m.at;
         if (m.payload.day !== t.day) {
           days.push(m.payload.day);
+          await record(tx, m.payload.id, 'moved', { from: t.day, to: m.payload.day }, userId, at);
           // A task moved to another day has found its place: it no longer carries the marker.
           if (newer(m.at, clocks.carried)) {
             set.carriedFrom = null;
@@ -330,9 +512,31 @@ async function change(
         clocks.carried = m.at;
       }
       break;
+    case 'task.due':
+      if (newer(m.at, clocks.due)) {
+        set.dueDay = m.payload.due;
+        clocks.due = m.at;
+        if (m.payload.due !== t.dueDay) {
+          if (m.payload.due) await record(tx, m.payload.id, 'due.set', { due: m.payload.due }, userId, at);
+          else await record(tx, m.payload.id, 'due.cleared', {}, userId, at);
+        }
+      }
+      break;
+    case 'task.notes':
+      if (newer(m.at, clocks.notes)) {
+        set.notes = cleanHtml(m.payload.notes);
+        clocks.notes = m.at;
+      }
+      break;
+    case 'task.visibility':
+      if (newer(m.at, clocks.visibility)) {
+        set.visibility = m.payload.visibility;
+        clocks.visibility = m.at;
+      }
+      break;
     case 'task.delete':
       if (newer(m.at, clocks.deleted)) {
-        set.deletedAt = new Date(m.at);
+        set.deletedAt = at;
         clocks.deleted = m.at;
       }
       break;
@@ -343,6 +547,134 @@ async function change(
     .set({ ...set, clocks, updatedAt: new Date() })
     .where(eq(schema.tasks.id, m.payload.id));
   return { ...base, days, deleted: set.deletedAt ? true : undefined };
+}
+
+async function subEnd(tx: Tx, taskId: string): Promise<number> {
+  const [row] = await tx
+    .select({ max: sql<number | null>`max(${schema.subtasks.position})` })
+    .from(schema.subtasks)
+    .where(and(eq(schema.subtasks.taskId, taskId), isNull(schema.subtasks.deletedAt)));
+  return (row?.max ?? 0) + POSITION_STEP;
+}
+
+async function subtask(tx: Tx, userId: string, m: SubtaskMutation): Promise<Applied> {
+  const t = await lockTask(tx, userId, m.payload.taskId);
+  if (t.deletedAt) throw new Rejected(410, DELETED);
+  const base: Applied = { taskId: m.payload.taskId, spaceId: t.spaceId, days: [t.day] };
+  if (m.type === 'subtask.create') {
+    const [existing] = await tx
+      .select({ id: schema.subtasks.id })
+      .from(schema.subtasks)
+      .where(eq(schema.subtasks.id, m.payload.id));
+    if (existing) return { ...base, days: [] };
+    const clocks: SubtaskClocks = { title: m.at, done: m.at, position: m.at, deleted: m.at };
+    await tx.insert(schema.subtasks).values({
+      id: m.payload.id,
+      taskId: m.payload.taskId,
+      title: m.payload.title,
+      position: m.payload.position ?? (await subEnd(tx, m.payload.taskId)),
+      clocks,
+    });
+    return base;
+  }
+  const [s] = await tx
+    .select({
+      taskId: schema.subtasks.taskId,
+      deletedAt: schema.subtasks.deletedAt,
+      clocks: schema.subtasks.clocks,
+    })
+    .from(schema.subtasks)
+    .where(eq(schema.subtasks.id, m.payload.id))
+    .for('update');
+  if (!s || s.taskId !== m.payload.taskId) throw new Rejected(404, 'That subtask isn’t there any more.');
+  if (s.deletedAt) {
+    if (m.type === 'subtask.delete') return { ...base, days: [] };
+    throw new Rejected(410, 'That subtask was deleted.');
+  }
+  const clocks: SubtaskClocks = { ...s.clocks };
+  const set: Partial<typeof schema.subtasks.$inferInsert> = {};
+  switch (m.type) {
+    case 'subtask.rename':
+      if (newer(m.at, clocks.title)) {
+        set.title = m.payload.title;
+        clocks.title = m.at;
+      }
+      break;
+    case 'subtask.cross':
+      if (newer(m.at, clocks.done)) {
+        set.doneAt = m.payload.done ? new Date(m.at) : null;
+        clocks.done = m.at;
+      }
+      break;
+    case 'subtask.place':
+      if (newer(m.at, clocks.position)) {
+        set.position = m.payload.position;
+        clocks.position = m.at;
+      }
+      break;
+    case 'subtask.delete':
+      if (newer(m.at, clocks.deleted)) {
+        set.deletedAt = new Date(m.at);
+        clocks.deleted = m.at;
+      }
+      break;
+  }
+  if (!Object.keys(set).length) return { ...base, days: [] };
+  await tx
+    .update(schema.subtasks)
+    .set({ ...set, clocks, updatedAt: new Date() })
+    .where(eq(schema.subtasks.id, m.payload.id));
+  return base;
+}
+
+async function comment(tx: Tx, userId: string, m: CommentMutation): Promise<Applied> {
+  const t = await lockTask(tx, userId, m.payload.taskId);
+  if (t.deletedAt) throw new Rejected(410, DELETED);
+  const base: Applied = { taskId: m.payload.taskId, spaceId: t.spaceId, days: [t.day] };
+  if (m.type === 'comment.create') {
+    const html = cleanHtml(m.payload.html);
+    if (isEmptyHtml(html)) throw new Rejected(400, 'A comment needs some words.');
+    await tx
+      .insert(schema.comments)
+      .values({
+        id: m.payload.id,
+        taskId: m.payload.taskId,
+        authorId: userId,
+        html,
+        createdAt: new Date(m.at),
+      })
+      .onConflictDoNothing();
+    return base;
+  }
+  const [c] = await tx
+    .select({
+      taskId: schema.comments.taskId,
+      authorId: schema.comments.authorId,
+      deletedAt: schema.comments.deletedAt,
+    })
+    .from(schema.comments)
+    .where(eq(schema.comments.id, m.payload.id))
+    .for('update');
+  if (!c || c.taskId !== m.payload.taskId) throw new Rejected(404, 'That comment isn’t there any more.');
+  if (c.authorId !== userId) throw new Rejected(403, NOT_YOUR_COMMENT);
+  if (c.deletedAt) {
+    if (m.type === 'comment.delete') return { ...base, days: [] };
+    throw new Rejected(410, 'That comment was deleted.');
+  }
+  if (m.type === 'comment.edit') {
+    const html = cleanHtml(m.payload.html);
+    if (isEmptyHtml(html)) throw new Rejected(400, 'A comment needs some words.');
+    await tx
+      .update(schema.comments)
+      .set({ html, editedAt: new Date(m.at) })
+      .where(eq(schema.comments.id, m.payload.id));
+  } else {
+    await tx
+      .update(schema.comments)
+      .set({ deletedAt: new Date(m.at) })
+      .where(eq(schema.comments.id, m.payload.id));
+  }
+  return base;
 }
 
 /** Apply a batch in order. Each mutation stands alone: a rejected one does not stop the rest. */

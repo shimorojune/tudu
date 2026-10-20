@@ -181,29 +181,76 @@ describe('TaskRow', () => {
     expect(container.querySelector('.tp-title')).toHaveClass('tp-l3');
     expect(container.querySelector('.tp-row')).toHaveClass('tp-compact');
   });
+});
 
-  it('writes the title in place: Enter saves, Esc puts the old words back, an emptied title keeps them', async () => {
+describe('TaskRow subtasks and due (chunk 03)', () => {
+  const SUBS = [
+    { key: 'a', title: 'Pull the branch', done: true },
+    { key: 'b', title: 'Run it on a clean profile', done: false },
+  ];
+
+  it('C03-U15 the byline says "1 of 2 done ›" and opens the fold; the fold lines up under the title; comments and due read in words', async () => {
     const user = userEvent.setup();
-    const onRename = vi.fn();
-    const onEditEnd = vi.fn();
-    const { rerender } = render(
-      <TaskRow title="Call Sam" editing onRename={onRename} onEditEnd={onEditEnd} />,
+    const onAdd = vi.fn();
+    const { container } = render(
+      <TaskRow
+        title="Review Quick Add PR"
+        id="ME-52"
+        subtasks={SUBS}
+        comments={3}
+        due={{ label: 'Fri', tip: 'Due Friday', iso: '2026-10-23' }}
+        onAddSubtask={onAdd}
+      />,
     );
-    const field = screen.getByRole('textbox', { name: 'Task title' });
-    expect(field).toHaveFocus();
-    await user.type(field, ' at 3pm{Enter}');
-    expect(onRename).toHaveBeenCalledWith('Call Sam at 3pm');
-    expect(onEditEnd).toHaveBeenCalledTimes(1);
+    const byline = container.querySelector('.tp-byline')!;
+    expect(byline.textContent).toBe('Due Fri·1 of 2 done·3 comments·ME-52');
+    const fold = screen.getByRole('button', { name: '1 of 2 subtasks done. Show subtasks' });
+    expect(fold).toHaveAttribute('aria-expanded', 'false');
+    const wrap = container.querySelector('.tp-subwrap')!;
+    expect(wrap).not.toHaveClass('tp-open');
+    expect(screen.getByRole('group', { name: 'Subtasks of Review Quick Add PR' })).toHaveClass('tp-subs');
+    expect(screen.getByRole('checkbox', { name: 'Cross off: Pull the branch' })).toHaveAttribute(
+      'tabindex',
+      '-1',
+    );
+    await user.click(fold);
+    expect(fold).toHaveAttribute('aria-expanded', 'true');
+    expect(fold).toHaveClass('tp-open');
+    expect(wrap).toHaveClass('tp-open');
+    expect(container.querySelector('.tp-row')).toHaveClass('tp-hassubs');
+    expect(screen.getByRole('checkbox', { name: 'Cross off: Pull the branch' })).toHaveAttribute(
+      'tabindex',
+      '0',
+    );
+    // the fold is the design's: the guide line and the indent come from the stylesheet
+    const subs = rulesWhere(rules, (s) => s === '.tp-subs')[0]!;
+    expect(subs.declarations['padding']).toBe('0 24px 0 56px');
+    expect(rulesWhere(rules, (s) => s === '.tp-subwrap::before')[0]!.declarations.left).toBe('35px');
+    // "Add subtask" is the last line and writes a subtask
+    await user.click(screen.getByRole('button', { name: 'Add subtask' }));
+    await user.keyboard('Leave review comments{Enter}');
+    expect(onAdd).toHaveBeenCalledWith('Leave review comments');
+    // a crossed-off task keeps its subtasks folded
+    await user.click(fold);
+    expect(wrap).not.toHaveClass('tp-open');
+  });
 
-    rerender(<TaskRow title="Call Sam" editing={false} onRename={onRename} onEditEnd={onEditEnd} />);
-    rerender(<TaskRow title="Call Sam" editing onRename={onRename} onEditEnd={onEditEnd} />);
-    await user.type(screen.getByRole('textbox'), ' tomorrow{Escape}');
-    expect(onRename).toHaveBeenCalledTimes(1);
-
-    rerender(<TaskRow title="Call Sam" editing={false} onRename={onRename} onEditEnd={onEditEnd} />);
-    rerender(<TaskRow title="Call Sam" editing onRename={onRename} onEditEnd={onEditEnd} />);
-    await user.clear(screen.getByRole('textbox'));
-    await user.keyboard('{Enter}');
-    expect(onRename).toHaveBeenCalledTimes(1);
+  it('C03-U16 Due replaces the carried pill; "Overdue since Fri" reads in red', () => {
+    const { container, rerender } = render(
+      <TaskRow
+        title="Reply to legal"
+        id="ME-81"
+        carried={{ label: 'Wed', slipping: true }}
+        due={{ label: 'Fri', tip: 'Was due Friday', overdue: true, iso: '2026-10-16' }}
+      />,
+    );
+    expect(container.querySelector('.tp-sg-carried')).toBeNull();
+    const due = container.querySelector('.tp-sg-due')!;
+    expect(due.textContent).toBe('Overdue since Fri');
+    expect(due).toHaveClass('tp-od');
+    expect(rulesWhere(rules, (s) => s === '.tp-sg.tp-od')[0]!.declarations.color).toBe('var(--destructive)');
+    rerender(<TaskRow title="Reply to legal" id="ME-81" due={{ label: 'Fri', iso: '2026-10-23' }} />);
+    expect(container.querySelector('.tp-sg-due')!.textContent).toBe('Due Fri');
+    expect(container.querySelector('.tp-sg-due')).not.toHaveClass('tp-od');
   });
 });

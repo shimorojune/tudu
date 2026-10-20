@@ -6,6 +6,7 @@ import { closeRow, openRow, scrollerOf, settleFrom } from '../lib/motion';
 import { itemByKey, moveItem, useDropGroup, useReorder } from '../lib/reorder';
 import { AddTask } from './AddTask';
 import type { MiniCalendarProps } from './MiniCalendar';
+import type { SubtaskItem } from './SubtaskList';
 import { TaskRow, type TaskCarried, type TaskDue, type TaskProject, type TaskSignal } from './TaskRow';
 import { showToast } from './Toast';
 
@@ -21,6 +22,7 @@ export interface TaskItem {
   comments?: number;
   jira?: string;
   project?: TaskProject;
+  subtasks?: SubtaskItem[];
 }
 
 export interface TaskMove {
@@ -78,10 +80,13 @@ export interface TaskListProps {
   onKeepTask?: (task: TaskItem) => void;
   onDueChange?: (task: TaskItem, day: IsoDate | null) => void;
   planButton?: boolean;
-  /** The row whose title is being written in place. */
-  editingKey?: string | null;
-  onRename?: (task: TaskItem, title: string) => void;
-  onEditEnd?: () => void;
+  /** Subtasks under a row, folded out from its byline. */
+  onAddSubtask?: (task: TaskItem, title: string) => void;
+  onRenameSubtask?: (task: TaskItem, sub: SubtaskItem, title: string) => void;
+  onToggleSubtask?: (task: TaskItem, sub: SubtaskItem, done: boolean) => void;
+  onReorderSubtask?: (task: TaskItem, sub: SubtaskItem, from: number, to: number) => void;
+  onDeleteSubtask?: (task: TaskItem, sub: SubtaskItem, index: number) => void;
+  onRestoreSubtask?: (task: TaskItem, sub: SubtaskItem, index: number) => void;
 }
 
 /** How long a new or dropped row keeps its wash. */
@@ -333,9 +338,17 @@ export function TaskList(p: TaskListProps) {
                 onOpen={p.onOpenTask ? () => p.onOpenTask!(t) : undefined}
                 onSignal={p.onSignal ? (k) => p.onSignal!(t, k) : undefined}
                 onToggle={(v) => p.onToggleTask?.(t, v)}
-                editing={p.editingKey === t.key}
-                onRename={p.onRename ? (title) => p.onRename!(t, title) : undefined}
-                onEditEnd={p.onEditEnd}
+                subtasks={t.subtasks}
+                onAddSubtask={p.onAddSubtask ? (title) => p.onAddSubtask!(t, title) : undefined}
+                onRenameSubtask={
+                  p.onRenameSubtask ? (s, title) => p.onRenameSubtask!(t, s, title) : undefined
+                }
+                onToggleSubtask={p.onToggleSubtask ? (s, v) => p.onToggleSubtask!(t, s, v) : undefined}
+                onReorderSubtask={
+                  p.onReorderSubtask ? (s, from, to) => p.onReorderSubtask!(t, s, from, to) : undefined
+                }
+                onDeleteSubtask={p.onDeleteSubtask ? (s, i) => p.onDeleteSubtask!(t, s, i) : undefined}
+                onRestoreSubtask={p.onRestoreSubtask ? (s, i) => p.onRestoreSubtask!(t, s, i) : undefined}
               />
             </div>,
           );

@@ -8,6 +8,7 @@ import {
   pgEnum,
   pgTable,
   primaryKey,
+  serial,
   text,
   timestamp,
   uniqueIndex,
@@ -74,7 +75,11 @@ export const otpSends = pgTable(
  * The clock of the last write to each field, from the client that made it (last write wins per field).
  * `place` covers the day and the position together.
  */
-export type TaskClocks = Partial<Record<'title' | 'done' | 'place' | 'carried' | 'deleted', string>>;
+export type TaskClocks = Partial<
+  Record<'title' | 'done' | 'place' | 'carried' | 'deleted' | 'due' | 'notes' | 'visibility', string>
+>;
+
+export const taskVisibility = pgEnum('task_visibility', ['space', 'me']);
 
 export const tasks = pgTable(
   'tasks',
@@ -93,6 +98,12 @@ export const tasks = pgTable(
     doneAt: timestamp('done_at', { withTimezone: true }),
     /** The day it was first carried over from, while it still carries the marker. */
     carriedFrom: date('carried_from', { mode: 'string' }),
+    /** The deadline, separate from the day it is planned for. */
+    dueDay: date('due_day', { mode: 'string' }),
+    /** Rich text, as cleaned HTML. */
+    notes: text('notes').notNull().default(''),
+    /** In a team space: everyone, or only its owner. */
+    visibility: taskVisibility('visibility').notNull().default('space'),
     createdBy: text('created_by').references(() => user.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -103,6 +114,74 @@ export const tasks = pgTable(
     uniqueIndex('tasks_space_number').on(t.spaceId, t.number),
     index('tasks_space_day').on(t.spaceId, t.day, t.position),
   ],
+);
+
+/** The clock of the last write to each field of a subtask. */
+export type SubtaskClocks = Partial<Record<'title' | 'done' | 'position' | 'deleted', string>>;
+
+export const subtasks = pgTable(
+  'subtasks',
+  {
+    id: text('id').primaryKey(),
+    taskId: text('task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    position: doublePrecision('position').notNull(),
+    doneAt: timestamp('done_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    clocks: jsonb('clocks').$type<SubtaskClocks>().notNull().default({}),
+  },
+  (t) => [index('subtasks_task').on(t.taskId, t.position)],
+);
+
+export const comments = pgTable(
+  'comments',
+  {
+    id: text('id').primaryKey(),
+    taskId: text('task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'cascade' }),
+    authorId: text('author_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    /** Cleaned HTML. */
+    html: text('html').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    editedAt: timestamp('edited_at', { withTimezone: true }),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (t) => [index('comments_task').on(t.taskId, t.createdAt)],
+);
+
+export const historyKind = pgEnum('history_kind', [
+  'created',
+  'due.set',
+  'due.cleared',
+  'moved',
+  'carried',
+  'crossed',
+  'uncrossed',
+  'restored',
+]);
+
+/** What happened to a task, written by the server as it applies changes, so every device reads the same history. */
+export const taskEvents = pgTable(
+  'task_events',
+  {
+    id: serial('id').primaryKey(),
+    taskId: text('task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'cascade' }),
+    kind: historyKind('kind').notNull(),
+    /** The event's facts: { due }, { from, to }. */
+    data: jsonb('data').$type<Record<string, unknown>>().notNull().default({}),
+    actorId: text('actor_id').references(() => user.id, { onDelete: 'set null' }),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('task_events_task').on(t.taskId, t.id)],
 );
 
 /** Every mutation the server has applied, by its id, so a retry never applies twice. */

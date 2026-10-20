@@ -15,6 +15,13 @@
       "when": 1792511341987,
       "tag": "0001_flaky_terrax",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792516739908,
+      "tag": "0002_task-detail",
+      "breakpoints": true
     }
   ]
 }

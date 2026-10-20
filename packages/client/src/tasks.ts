@@ -4,14 +4,20 @@ import {
   placeAt,
   POSITION_STEP,
   TASKS_CHANGED,
+  taskIdOf,
+  type Comment,
+  type CommentAuthor,
   type DayResponse,
   type IsoDate,
   type MarksResponse,
+  type Subtask,
   type SyncMutation,
   type SyncResponse,
   type Task,
+  type TaskDetail,
   type TaskMutationBody,
   type TasksChangedEvent,
+  type TaskVisibility,
 } from '@tudu/core';
 import { ApiError, type Api } from './api';
 import type { LiveEvent } from './events';
@@ -26,8 +32,9 @@ export interface DayData {
 export const dayKey = (spaceId: string, day: IsoDate) => ['day', spaceId, day] as const;
 export const marksKey = (spaceId: string, from: IsoDate, to: IsoDate) =>
   ['marks', spaceId, from, to] as const;
+export const taskKey = (spaceId: string, taskId: string) => ['task', spaceId, taskId] as const;
 
-function byPosition(a: Task, b: Task): number {
+function byPosition(a: { position: number; createdAt: string }, b: { position: number; createdAt: string }) {
   return a.position - b.position || a.createdAt.localeCompare(b.createdAt);
 }
 
@@ -45,14 +52,90 @@ export function draftOf(m: Extract<SyncMutation, { type: 'task.create' }>, end =
     done: false,
     doneAt: null,
     carriedFrom: null,
+    due: null,
+    visibility: 'space',
+    subtasks: [],
+    subsDone: 0,
+    subsTotal: 0,
+    commentCount: 0,
     createdAt: m.at,
     updatedAt: m.at,
   };
 }
 
+/** Apply a subtask mutation to a list of subtasks. Pure; anything else leaves the list as it is. */
+export function applySubtasks(subtasks: Subtask[], taskId: string, m: SyncMutation): Subtask[] {
+  if (!m.type.startsWith('subtask.') || taskIdOf(m) !== taskId) return subtasks;
+  const id = m.payload.id;
+  const end = () =>
+    subtasks.length ? Math.max(...subtasks.map((s) => s.position)) + POSITION_STEP : POSITION_STEP;
+  const map = (fn: (s: Subtask) => Subtask | null) =>
+    subtasks.map((s) => (s.id === id ? fn(s) : s)).filter((s): s is Subtask => !!s);
+  switch (m.type) {
+    case 'subtask.create':
+      if (subtasks.some((s) => s.id === id)) return subtasks;
+      return [
+        ...subtasks,
+        {
+          id,
+          taskId,
+          title: m.payload.title,
+          position: m.payload.position ?? end(),
+          done: false,
+          createdAt: m.at,
+          updatedAt: m.at,
+        },
+      ].sort(byPosition);
+    case 'subtask.rename':
+      return map((s) => ({ ...s, title: m.payload.title }));
+    case 'subtask.cross':
+      return map((s) => ({ ...s, done: m.payload.done }));
+    case 'subtask.place':
+      return map((s) => ({ ...s, position: m.payload.position })).sort(byPosition);
+    case 'subtask.delete':
+      return map(() => null);
+    default:
+      return subtasks;
+  }
+}
+
+/** The counts the byline shows, from the list itself. */
+function withCounts<T extends Task>(t: T): T {
+  return { ...t, subsDone: t.subtasks.filter((s) => s.done).length, subsTotal: t.subtasks.length };
+}
+
+/** The fields of a task row one mutation changes (the day and position are handled by the list). */
+function patchTask<T extends Task>(t: T, m: SyncMutation): T {
+  switch (m.type) {
+    case 'task.rename':
+      return { ...t, title: m.payload.title };
+    case 'task.cross':
+      return { ...t, done: m.payload.done, doneAt: m.payload.done ? m.at : null };
+    case 'task.keep':
+      return { ...t, carriedFrom: null };
+    case 'task.due':
+      return { ...t, due: m.payload.due };
+    case 'task.visibility':
+      return { ...t, visibility: m.payload.visibility };
+    case 'subtask.create':
+    case 'subtask.rename':
+    case 'subtask.cross':
+    case 'subtask.place':
+    case 'subtask.delete':
+      return withCounts({ ...t, subtasks: applySubtasks(t.subtasks, t.id, m) });
+    case 'comment.create':
+      return { ...t, commentCount: t.commentCount + 1 };
+    case 'comment.delete':
+      return { ...t, commentCount: Math.max(0, t.commentCount - 1) };
+    default:
+      return t;
+  }
+}
+
 /**
  * Apply one mutation to one day's list. Pure, and safe to apply twice: a create that is already there, or a change
- * the list already shows, leaves it as it is. `lookup` finds a task that is moving in from another day.
+ * the list already shows, leaves it as it is. `lookup` finds a task that is moving in from another day (or coming
+ * back after a delete).
  */
 export function applyToDay(
   tasks: Task[],
@@ -61,36 +144,34 @@ export function applyToDay(
   m: SyncMutation,
   lookup: (id: string) => Task | undefined,
 ): Task[] {
-  const p = m.payload;
-  const has = tasks.some((t) => t.id === p.id);
-  const map = (fn: (t: Task) => Task) => tasks.map((t) => (t.id === p.id ? fn(t) : t));
+  const id = taskIdOf(m);
+  const has = tasks.some((t) => t.id === id);
+  const map = (fn: (t: Task) => Task) => tasks.map((t) => (t.id === id ? fn(t) : t));
   const end = () =>
     tasks.length ? Math.max(...tasks.map((t) => t.position)) + POSITION_STEP : POSITION_STEP;
-  let out = tasks;
+  let out: Task[];
   switch (m.type) {
     case 'task.create': {
       if (has || m.payload.day !== day || m.payload.spaceId !== spaceId) return tasks;
       out = [...tasks, draftOf(m, end())];
       break;
     }
-    case 'task.rename':
-      out = map((t) => ({ ...t, title: m.payload.title }));
-      break;
-    case 'task.cross':
-      out = map((t) => ({ ...t, done: m.payload.done, doneAt: m.payload.done ? m.at : null }));
-      break;
-    case 'task.keep':
-      out = map((t) => ({ ...t, carriedFrom: null }));
-      break;
     case 'task.delete':
-      out = tasks.filter((t) => t.id !== p.id);
+      out = tasks.filter((t) => t.id !== id);
       break;
+    case 'task.restore': {
+      if (has) return tasks;
+      const t = lookup(id);
+      if (!t || t.spaceId !== spaceId || t.day !== day) return tasks;
+      out = [...tasks, t];
+      break;
+    }
     case 'task.place': {
       const to = m.payload.day;
-      if (has && to !== day) out = tasks.filter((t) => t.id !== p.id);
+      if (has && to !== day) out = tasks.filter((t) => t.id !== id);
       else if (has) out = map((t) => ({ ...t, position: m.payload.position ?? t.position }));
       else if (to === day) {
-        const t = lookup(p.id);
+        const t = lookup(id);
         if (!t || t.spaceId !== spaceId) return tasks;
         out = [
           ...tasks,
@@ -104,8 +185,70 @@ export function applyToDay(
       } else return tasks;
       break;
     }
+    default:
+      if (!has) return tasks;
+      out = map((t) => patchTask(t, m));
   }
   return [...out].sort(byPosition);
+}
+
+/** Apply one mutation to a task's full detail. Pure; a mutation for another task leaves it alone. */
+export function applyToDetail(d: TaskDetail, m: SyncMutation, me: CommentAuthor | null): TaskDetail {
+  if (taskIdOf(m) !== d.id) return d;
+  const cms = (fn: (c: Comment) => Comment | null) =>
+    d.comments.map((c) => (c.id === m.payload.id ? fn(c) : c)).filter((c): c is Comment => !!c);
+  let next: TaskDetail;
+  switch (m.type) {
+    case 'task.create':
+    case 'task.delete':
+    case 'task.restore':
+      return d;
+    case 'task.place':
+      next = { ...d, day: m.payload.day, position: m.payload.position ?? d.position };
+      if (m.payload.day !== d.day) next.carriedFrom = null;
+      break;
+    case 'task.notes':
+      next = { ...d, notes: m.payload.notes };
+      break;
+    case 'subtask.create':
+    case 'subtask.rename':
+    case 'subtask.cross':
+    case 'subtask.place':
+    case 'subtask.delete':
+      next = { ...d, subtasks: applySubtasks(d.subtasks, d.id, m) };
+      break;
+    case 'comment.create':
+      if (d.comments.some((c) => c.id === m.payload.id)) return d;
+      next = {
+        ...d,
+        comments: [
+          ...d.comments,
+          {
+            id: m.payload.id,
+            taskId: d.id,
+            author: me ?? { id: '', name: 'You', email: '' },
+            html: m.payload.html,
+            createdAt: m.at,
+            editedAt: null,
+          },
+        ],
+      };
+      break;
+    case 'comment.edit':
+      next = { ...d, comments: cms((c) => ({ ...c, html: m.payload.html, editedAt: m.at })) };
+      break;
+    case 'comment.delete':
+      next = { ...d, comments: cms(() => null) };
+      break;
+    default:
+      next = patchTask(d, m);
+  }
+  return {
+    ...next,
+    subsTotal: next.subtasks.length,
+    subsDone: next.subtasks.filter((s) => s.done).length,
+    commentCount: next.comments.length,
+  };
 }
 
 export interface TaskStoreOptions {
@@ -114,6 +257,8 @@ export interface TaskStoreOptions {
   store: OutboxStore;
   /** One per open tab. */
   clientId: string;
+  /** Who is signed in, for the comments written here before the server answers. */
+  me?: () => CommentAuthor | null;
   /** A change the server will never apply was undone; tell the person why. */
   onRejected?: (message: string) => void;
   /** The connection to the server came and went. */
@@ -129,17 +274,17 @@ interface Pending {
 }
 
 /**
- * The local-first task layer. Every change applies to the cached days at once and goes into the outbox; the outbox
- * replays it to `POST /api/sync`. What the server sends back replaces the cached rows, with the changes still on
- * their way applied on top, so a slow save never makes the list flicker. A change the server refuses is undone by
- * reading the day again, and the person is told why. Live events from other tabs and devices refresh only the days
- * they name.
+ * The local-first task layer. Every change applies to the cached days and tasks at once and goes into the outbox;
+ * the outbox replays it to `POST /api/sync`. What the server sends back replaces the cached rows, with the changes
+ * still on their way applied on top, so a slow save never makes the list flicker. A change the server refuses is
+ * undone by reading again, and the person is told why. Live events from other tabs and devices refresh only the
+ * days and tasks they name.
  */
 export class TaskStore {
   readonly outbox: Outbox;
   readonly clientId: string;
   private readonly pending = new Map<string, Pending>();
-  /** The last known state of every task this tab has seen, for moves into a day. */
+  /** The last known state of every task this tab has seen, for moves into a day and for Undo after a delete. */
   private readonly known = new Map<string, Task>();
   private lastAt = 0;
   private seq = 0;
@@ -187,9 +332,30 @@ export class TaskStore {
     });
   }
 
+  /** One task in full, with the changes still on their way applied on top. */
+  taskQuery(spaceId: string, taskId: string) {
+    return queryOptions({
+      queryKey: taskKey(spaceId, taskId),
+      queryFn: async (): Promise<TaskDetail> => {
+        const res = await this.o.api.get<TaskDetail>(`/api/spaces/${spaceId}/tasks/${taskId}`);
+        this.setReachable(true);
+        return this.overlayDetail(res);
+      },
+    });
+  }
+
   /** The cached list of a day, if this tab has it. */
   cached(spaceId: string, day: IsoDate): Task[] | undefined {
     return this.o.queryClient.getQueryData<DayData>(dayKey(spaceId, day))?.tasks;
+  }
+
+  cachedTask(spaceId: string, taskId: string): TaskDetail | undefined {
+    return this.o.queryClient.getQueryData<TaskDetail>(taskKey(spaceId, taskId));
+  }
+
+  /** What this tab last saw of a task, whether or not its day is open. */
+  lastSeen(id: string): Task | undefined {
+    return this.known.get(id);
   }
 
   // ---- changing ------------------------------------------------------------------------------------------
@@ -221,6 +387,23 @@ export class TaskStore {
     this.mutate({ type: 'task.delete', payload: { id } });
   }
 
+  /** Undo a delete: the task comes back on its day, in its place. */
+  restore(id: string): void {
+    this.mutate({ type: 'task.restore', payload: { id } });
+  }
+
+  due(id: string, due: IsoDate | null): void {
+    this.mutate({ type: 'task.due', payload: { id, due } });
+  }
+
+  notes(id: string, notes: string): void {
+    this.mutate({ type: 'task.notes', payload: { id, notes } });
+  }
+
+  visibility(id: string, visibility: TaskVisibility): void {
+    this.mutate({ type: 'task.visibility', payload: { id, visibility } });
+  }
+
   /**
    * Put a task on `day` at `index` (counted without the task itself; the end when left out). Reordering is a place
    * on the same day; moving is a place on another. When the neighbours are too close the whole day is renumbered.
@@ -249,6 +432,91 @@ export class TaskStore {
     this.mutate({ type: 'task.place', payload: { id, day, position: this.positionFor(t.spaceId, day, id) } });
   }
 
+  // ---- subtasks and comments -----------------------------------------------------------------------------
+
+  /** The subtasks of a task as this tab last saw them: from its open detail, else from its row. */
+  private subtasksOf(spaceId: string, taskId: string): Subtask[] | undefined {
+    return this.cachedTask(spaceId, taskId)?.subtasks ?? this.known.get(taskId)?.subtasks;
+  }
+
+  /** Add a subtask under a task, at the end (or at `index`). Returns its id. */
+  addSubtask(spaceId: string, taskId: string, title: string, index?: number): string {
+    const id = this.o.newId?.() ?? crypto.randomUUID();
+    const subs = this.subtasksOf(spaceId, taskId);
+    const position = subs
+      ? placeAt(
+          subs.map((s) => s.position),
+          index ?? subs.length,
+        ).position
+      : null;
+    this.mutate({ type: 'subtask.create', payload: { id, taskId, title: title.trim(), position } });
+    return id;
+  }
+
+  renameSubtask(taskId: string, id: string, title: string): void {
+    const t = title.trim();
+    if (!t) return;
+    this.mutate({ type: 'subtask.rename', payload: { id, taskId, title: t } });
+  }
+
+  crossSubtask(taskId: string, id: string, done: boolean): void {
+    this.mutate({ type: 'subtask.cross', payload: { id, taskId, done } });
+  }
+
+  /** Put a subtask at `index` among its siblings (counted without itself). */
+  placeSubtask(spaceId: string, taskId: string, id: string, index: number): void {
+    const subs = this.subtasksOf(spaceId, taskId);
+    if (!subs) return;
+    const others = subs.filter((s) => s.id !== id);
+    const placed = placeAt(
+      others.map((s) => s.position),
+      index,
+    );
+    if (placed.renumbered) {
+      const order = [...others];
+      const me = subs.find((s) => s.id === id)!;
+      order.splice(Math.min(index, order.length), 0, me);
+      order.forEach((s, i) =>
+        this.mutate({
+          type: 'subtask.place',
+          payload: { id: s.id, taskId, position: placed.renumbered![i]! },
+        }),
+      );
+      return;
+    }
+    this.mutate({ type: 'subtask.place', payload: { id, taskId, position: placed.position } });
+  }
+
+  removeSubtask(taskId: string, id: string): void {
+    this.mutate({ type: 'subtask.delete', payload: { id, taskId } });
+  }
+
+  /** Restore a deleted subtask (Undo): a fresh create with the same words in the same place. */
+  restoreSubtask(spaceId: string, taskId: string, sub: Subtask, index: number): string {
+    const id = this.addSubtask(spaceId, taskId, sub.title, index);
+    if (sub.done) this.crossSubtask(taskId, id, true);
+    return id;
+  }
+
+  addComment(taskId: string, html: string): string {
+    const id = this.o.newId?.() ?? crypto.randomUUID();
+    this.mutate({ type: 'comment.create', payload: { id, taskId, html } });
+    return id;
+  }
+
+  editComment(taskId: string, id: string, html: string): void {
+    this.mutate({ type: 'comment.edit', payload: { id, taskId, html } });
+  }
+
+  removeComment(taskId: string, id: string): void {
+    this.mutate({ type: 'comment.delete', payload: { id, taskId } });
+  }
+
+  /** Put a deleted comment back (Undo): a fresh comment with the same words. */
+  restoreComment(taskId: string, html: string): string {
+    return this.addComment(taskId, html);
+  }
+
   /** True when nothing is waiting to be saved. Tests wait on this before asserting. */
   async idle(): Promise<boolean> {
     return (await this.outbox.idle()) && this.pending.size === 0;
@@ -256,20 +524,24 @@ export class TaskStore {
 
   // ---- the live stream -----------------------------------------------------------------------------------
 
-  /** Refresh the days another tab or device changed. Our own changes are already on screen. */
+  /** Refresh the days and tasks another tab or device changed. Our own changes are already on screen. */
   onEvent(e: LiveEvent): void {
     if (e.type !== TASKS_CHANGED) return;
     const ev = e.data as TasksChangedEvent;
     if (ev.clientId && ev.clientId === this.clientId) return;
+    const qc = this.o.queryClient;
     for (const d of ev.days) {
-      if (d) void this.o.queryClient.invalidateQueries({ queryKey: dayKey(ev.spaceId, d), exact: true });
+      if (d) void qc.invalidateQueries({ queryKey: dayKey(ev.spaceId, d), exact: true });
     }
-    void this.o.queryClient.invalidateQueries({ queryKey: ['marks', ev.spaceId] });
+    for (const t of ev.tasks ?? [])
+      void qc.invalidateQueries({ queryKey: taskKey(ev.spaceId, t), exact: true });
+    void qc.invalidateQueries({ queryKey: ['marks', ev.spaceId] });
   }
 
-  /** After the stream was down for a while: read every cached day again. */
+  /** After the stream was down for a while: read every cached day and task again. */
   refreshAll(): void {
     void this.o.queryClient.invalidateQueries({ queryKey: ['day'] });
+    void this.o.queryClient.invalidateQueries({ queryKey: ['task'] });
     void this.o.queryClient.invalidateQueries({ queryKey: ['marks'] });
   }
 
@@ -309,13 +581,24 @@ export class TaskStore {
     );
   }
 
-  /** Apply a mutation to every cached day. */
+  /** Apply a mutation to every cached day and task. */
   private applyEverywhere(m: SyncMutation): void {
     const qc = this.o.queryClient;
+    const id = taskIdOf(m);
+    // The task's detail first, so a day row can take its exact counts from it.
+    for (const [key, data] of qc.getQueriesData<TaskDetail>({ queryKey: ['task'] })) {
+      if (!data || data.id !== id) continue;
+      const next = applyToDetail(data, m, this.o.me?.() ?? null);
+      if (next !== data) qc.setQueryData<TaskDetail>(key, next);
+    }
+    const detail = [...qc.getQueriesData<TaskDetail>({ queryKey: ['task'] })].find(
+      ([, d]) => d?.id === id,
+    )?.[1];
     for (const [key, data] of qc.getQueriesData<DayData>({ queryKey: ['day'] })) {
       if (!data) continue;
       const [, spaceId, day] = key as unknown as [string, string, IsoDate];
-      const next = applyToDay(data.tasks, day, spaceId, m, (id) => this.known.get(id));
+      let next = applyToDay(data.tasks, day, spaceId, m, (x) => this.known.get(x));
+      if (detail) next = next.map((t) => (t.id === id ? { ...t, commentCount: detail.commentCount } : t));
       if (next !== data.tasks) {
         this.remember(next);
         qc.setQueryData<DayData>(key, { day, tasks: next });
@@ -333,6 +616,12 @@ export class TaskStore {
       tasks = applyToDay(tasks, day, spaceId, m, (id) => this.known.get(id));
     this.remember(tasks);
     return tasks;
+  }
+
+  private overlayDetail(d: TaskDetail): TaskDetail {
+    let out = d;
+    for (const { m } of this.pending.values()) out = applyToDetail(out, m, this.o.me?.() ?? null);
+    return out;
   }
 
   private remember(tasks: Task[]): void {
@@ -355,10 +644,17 @@ export class TaskStore {
     const rejected = res.results.filter((r) => r.status === 'rejected');
     for (const r of res.results) this.pending.delete(r.id);
     this.merge(res);
+    const touched = new Set<string>();
+    for (const b of batch) touched.add(taskIdOf(b as SyncMutation));
     if (rejected.length) {
       // Undo by reading the days again: the server's rows plus whatever is still on its way.
       void this.o.queryClient.invalidateQueries({ queryKey: ['day'] });
+      void this.o.queryClient.invalidateQueries({ queryKey: ['task'] });
       this.o.onRejected?.(rejected[0]!.error ?? 'That change couldn’t be saved.');
+    } else {
+      // The detail of each task touched reads again, so server-made facts (history, numbers) arrive.
+      for (const [key, d] of this.o.queryClient.getQueriesData<TaskDetail>({ queryKey: ['task'] }))
+        if (d && touched.has(d.id)) void this.o.queryClient.invalidateQueries({ queryKey: key, exact: true });
     }
     void this.o.queryClient.invalidateQueries({ queryKey: ['marks'] });
     return { done: res.results.map((r) => r.id) };
@@ -377,7 +673,7 @@ export class TaskStore {
       let tasks = data.tasks.filter((t) => !rows.has(t.id) && !gone.has(t.id));
       for (const t of rows.values()) if (t.spaceId === spaceId && t.day === day) tasks.push(t);
       for (const { m } of this.pending.values())
-        if (rows.has(m.payload.id)) tasks = applyToDay(tasks, day, spaceId, m, (id) => this.known.get(id));
+        if (rows.has(taskIdOf(m))) tasks = applyToDay(tasks, day, spaceId, m, (id) => this.known.get(id));
       tasks.sort(byPosition);
       if (!sameTasks(tasks, data.tasks)) qc.setQueryData<DayData>(key, { day, tasks });
     }

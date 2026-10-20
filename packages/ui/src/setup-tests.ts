@@ -46,3 +46,13 @@ if (!window.PointerEvent) {
 }
 if (!window.requestAnimationFrame)
   window.requestAnimationFrame = (cb) => window.setTimeout(() => cb(performance.now()), 16);
+
+// ProseMirror (Tiptap) measures ranges and looks under the pointer; jsdom has no layout for either.
+const emptyRect = () =>
+  ({ x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, toJSON() {} }) as DOMRect;
+const noRects = () =>
+  ({ length: 0, item: () => null, [Symbol.iterator]: [][Symbol.iterator] }) as unknown as DOMRectList;
+if (!Range.prototype.getClientRects) Range.prototype.getClientRects = noRects;
+if (!Range.prototype.getBoundingClientRect) Range.prototype.getBoundingClientRect = emptyRect;
+if (!Element.prototype.getClientRects) Element.prototype.getClientRects = noRects;
+if (!document.elementFromPoint) document.elementFromPoint = () => null;
