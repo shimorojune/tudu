@@ -1,6 +1,7 @@
 import { Logo } from '@tudu/ui';
 import { Controls } from './Controls';
 import { Foundations, ThemeBlock } from './Foundations';
+import { Detail } from './Detail';
 import { Overlays } from './Overlays';
 import './kit.css';
 
@@ -14,6 +15,7 @@ const NAV = [
   ['controls', 'Controls'],
   ['feedback', 'Feedback'],
   ['layers', 'Layers'],
+  ['detail', 'Task detail'],
 ];
 
 /** Every primitive in every state, light and dark side by side. The place to judge the motion. */
@@ -30,7 +32,7 @@ export function KitPage() {
           ))}
         </nav>
         <span className="kit-spacer" />
-        <span className="kit-label">Kit · chunk 00</span>
+        <span className="kit-label">Kit · chunks 00 to 03</span>
       </header>
       <main className="kit-main">
         <h1 className="kit-h1">The kit</h1>
@@ -42,6 +44,7 @@ export function KitPage() {
         <Foundations />
         <Controls />
         <Overlays />
+        <Detail />
       </main>
     </div>
   );

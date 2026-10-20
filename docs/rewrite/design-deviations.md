@@ -38,3 +38,24 @@ the coding session, so this file is the record and the canvas gets a copy by han
 - The day being shown is not in the address: a reload goes back to today.
 - After a drop only the click that ends the drag is swallowed (the design swallows every click for 60ms).
 - Wording kept from the canvas: "Changes are saved here and sync when you’re back." and "Nothing you wrote is lost."
+
+## Chunk 03 · Task detail · 20 Oct 2026
+
+- Built as drawn: the paper panel over the page with the veil (460px on tablets, a full page with ‹ Today on
+  phones), the ID and arrows at the top, the title written in place, the facts with their pickers under them,
+  Notes on Tiptap with the rising toolbar, Subtasks in the panel and folded under the row, History folded with its
+  count, Comments as a conversation with the box pinned to the foot, the ⋯ menu with Delete and Undo, and the four
+  states on the states board.
+- The row no longer edits its title in place (chunk 02's stop-gap); a click opens the panel, as the canvas draws.
+- Project and Jira facts are not in the panel until chunks 04 and 10 bring their data; "Visible to" reads "Only
+  you" with a one-item menu until chunk 08. "Attach a file" is not in the toolbar until chunk 04 brings uploads.
+- The Planned picker has "Move to the Backlog" as its clear label (the state exists since chunk 02; its page is
+  chunk 06).
+- The open task is in the address (`/?task=ME-52`), and `/t/ME-52` opens it on its day. The day itself stays out
+  of the address, as chunk 02 decided.
+- Notes save when you leave the field, and when the panel closes or steps to another task with words unsaved.
+  No autosave while typing.
+- The ⋯ menus (the panel's and each comment's) are Radix menus, so they float and never clip, rather than the
+  design's own absolutely placed pop.
+- Posting a comment keeps the caret in the box, ready for the next one.
+- The design's "Send to someone", "Go to its day" and the owner's read-only view wait for chunk 08.

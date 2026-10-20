@@ -5,7 +5,24 @@ import * as schema from './schema';
 export type Db = NodePgDatabase<typeof schema>;
 export { schema };
 // One copy of the ORM for every package: operators come from here, never from a second drizzle-orm.
-export { and, asc, count, desc, eq, gt, gte, inArray, isNull, like, lt, lte, ne, or, sql } from 'drizzle-orm';
+export {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  like,
+  lt,
+  lte,
+  ne,
+  or,
+  sql,
+} from 'drizzle-orm';
 
 /** A Drizzle client over a small connection pool. Call `close()` when the process ends. */
 export function createDb(

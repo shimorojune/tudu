@@ -18,9 +18,9 @@ export async function idle(page: Page): Promise<void> {
   );
 }
 
-/** The list on a day's sheet: "Tasks for Sunday 18 October". */
+/** The list on a day's sheet: "Tasks for Sunday 18 October". Found even under an open panel's veil. */
 export function dayList(page: Page, day: RegExp | string = /^Tasks for /): Locator {
-  return page.getByRole('list', { name: day });
+  return page.getByRole('list', { name: day, includeHidden: true });
 }
 
 /** The rows of a list, task rows only. */

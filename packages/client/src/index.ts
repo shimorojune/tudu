@@ -19,9 +19,12 @@ export {
 export {
   TaskStore,
   applyToDay,
+  applyToDetail,
+  applySubtasks,
   draftOf,
   dayKey,
   marksKey,
+  taskKey,
   type DayData,
   type TaskStoreOptions,
 } from './tasks';

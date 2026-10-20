@@ -1,13 +1,5 @@
 import { addDays, formatDay, isoToday, type IsoDate } from '@tudu/core';
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type MouseEvent,
-  type ReactNode,
-} from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
 import { InkTick, PlainTick } from '../lib/ink';
@@ -15,6 +7,7 @@ import { Sparkle, useSpark } from '../lib/spark';
 import { DatePop } from './DatePop';
 import { JiraMark } from './JiraMark';
 import { MiniCalendar, type MiniCalendarProps } from './MiniCalendar';
+import { SubtaskList, type SubtaskItem } from './SubtaskList';
 import { showToast } from './Toast';
 import { Tooltip } from './Tooltip';
 
@@ -42,7 +35,7 @@ export interface TaskProject {
   color: string;
 }
 
-export type TaskSignal = 'due' | 'carried' | 'comments' | 'jira' | 'project';
+export type TaskSignal = 'due' | 'carried' | 'subtasks' | 'comments' | 'jira' | 'project';
 
 export interface TaskRowProps {
   title: string;
@@ -77,13 +70,16 @@ export interface TaskRowProps {
   onDueChange?: (day: IsoDate | null) => void;
   /** A quiet calendar button at the row's end (the Backlog). */
   planButton?: boolean;
-  /**
-   * Writing the title in place. Until the task detail arrives (chunk 03) the row's own title is a field of the same
-   * size: Enter or clicking away saves, Esc puts the old words back, an emptied title keeps its old words.
-   */
-  editing?: boolean;
-  onRename?: (title: string) => void;
-  onEditEnd?: () => void;
+  /** Subtasks fold out from the byline ("1 of 4 done ›"), lined up under the title. */
+  subtasks?: SubtaskItem[];
+  /** The fold starts open. */
+  defaultSubtasksOpen?: boolean;
+  onAddSubtask?: (title: string) => void;
+  onRenameSubtask?: (sub: SubtaskItem, title: string) => void;
+  onToggleSubtask?: (sub: SubtaskItem, done: boolean) => void;
+  onReorderSubtask?: (sub: SubtaskItem, from: number, to: number) => void;
+  onDeleteSubtask?: (sub: SubtaskItem, index: number) => void;
+  onRestoreSubtask?: (sub: SubtaskItem, index: number) => void;
 }
 
 interface Sig {
@@ -117,6 +113,17 @@ function signals(p: TaskRowProps): Sig[] {
       long: `From ${p.carried.label}`,
       label: p.carried.tip ?? `Carried over from ${p.carried.label}`,
       act: 'Change the date',
+    });
+  }
+  const subs = p.subtasks ?? [];
+  if (subs.length) {
+    const done = subs.filter((x) => x.done).length;
+    out.push({
+      k: 'subtasks',
+      icon: <Icon name="subtasks" size={12} />,
+      long: `${done} of ${subs.length} done`,
+      label: `${done} of ${subs.length} subtasks done`,
+      act: 'Show or hide subtasks',
     });
   }
   if (p.comments) {
@@ -168,62 +175,6 @@ function Grip() {
   );
 }
 
-/** The title written in place: a field of exactly the same size, so nothing moves. */
-function TitleField({
-  title,
-  onSave,
-  onEnd,
-}: {
-  title: string;
-  onSave?: (title: string) => void;
-  onEnd?: () => void;
-}) {
-  const ref = useRef<HTMLTextAreaElement | null>(null);
-  const [value, setValue] = useState(title);
-  const cancel = useRef(false);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = '0px';
-    el.style.height = `${el.scrollHeight}px`;
-  }, [value]);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.focus({ preventScroll: true });
-    el.setSelectionRange(el.value.length, el.value.length);
-  }, []);
-  return (
-    <textarea
-      ref={ref}
-      className="tp-title-edit"
-      value={value}
-      rows={1}
-      aria-label="Task title"
-      spellCheck
-      onChange={(e) => setValue(e.target.value.replace(/\n/g, ' '))}
-      onClick={(e) => e.stopPropagation()}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          e.currentTarget.blur();
-        } else if (e.key === 'Escape') {
-          e.preventDefault();
-          e.stopPropagation();
-          cancel.current = true;
-          e.currentTarget.blur();
-        }
-      }}
-      onBlur={() => {
-        const t = value.trim();
-        if (!cancel.current && t && t !== title) onSave?.(t);
-        cancel.current = false;
-        onEnd?.();
-      }}
-    />
-  );
-}
-
 /** How long the copied ID stays lit. */
 export const COPY_FLASH_MS = 700;
 
@@ -239,6 +190,10 @@ export function TaskRow(p: TaskRowProps) {
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pop, setPop] = useState<{ k: 'carried' | 'due' | 'plan'; el: HTMLElement } | null>(null);
+  const [subsOpen, setSubsOpen] = useState(!!p.defaultSubtasksOpen);
+  const subs = p.subtasks ?? [];
+  const hasSubs = subs.length > 0 && !p.brief;
+  const showSubs = hasSubs && subsOpen && !done;
   useEffect(
     () => () => {
       if (copyTimer.current) clearTimeout(copyTimer.current);
@@ -277,6 +232,7 @@ export function TaskRow(p: TaskRowProps) {
   const sigs = signals(p);
   const byline: ReactNode[] = sigs.map((x) => {
     const isDate = (x.k === 'due' || x.k === 'carried') && canPick;
+    const isSubs = x.k === 'subtasks';
     const hasTip = (x.k === 'due' || x.k === 'carried') && x.label !== x.long;
     const button = (
       <button
@@ -288,9 +244,14 @@ export function TaskRow(p: TaskRowProps) {
           x.od && 'tp-od',
           x.mono && 'tp-mono',
           pop?.k === x.k && 'tp-on',
+          isSubs && showSubs && 'tp-open',
         )}
-        aria-label={`${x.label}. ${x.act}`}
-        aria-expanded={isDate ? (pop?.k === x.k ? 'true' : 'false') : undefined}
+        aria-label={
+          isSubs ? `${x.label}. ${showSubs ? 'Hide subtasks' : 'Show subtasks'}` : `${x.label}. ${x.act}`
+        }
+        aria-expanded={
+          isDate ? (pop?.k === x.k ? 'true' : 'false') : isSubs ? (showSubs ? 'true' : 'false') : undefined
+        }
         aria-haspopup={isDate ? 'dialog' : undefined}
         title={x.k === 'due' || x.k === 'carried' ? undefined : x.long}
         onClick={(e) => {
@@ -299,11 +260,17 @@ export function TaskRow(p: TaskRowProps) {
             pick(x.k as 'carried' | 'due', e.currentTarget);
             return;
           }
+          if (isSubs) setSubsOpen((v) => !v);
           p.onSignal?.(x.k);
         }}
       >
         {x.icon}
         <span>{x.long}</span>
+        {isSubs ? (
+          <span className="tp-sg-caret" aria-hidden="true">
+            <Icon name="caret" size={11} />
+          </span>
+        ) : null}
       </button>
     );
     return hasTip ? (
@@ -430,13 +397,14 @@ export function TaskRow(p: TaskRowProps) {
 
   // The whole row opens the task. Controls inside it keep their own job; a drag swallows the click that follows it.
   function rowClick(e: MouseEvent<HTMLDivElement>) {
-    if (!p.onOpen || p.editing) return;
+    if (!p.onOpen) return;
     if (
       (e.target as HTMLElement).closest(
         'button, a, input, textarea, select, .tp-grip, .tp-cbw, [contenteditable="true"]',
       )
     )
       return;
+    e.currentTarget.querySelector<HTMLElement>('.tp-strike[tabindex]')?.focus({ preventScroll: true });
     p.onOpen();
   }
   function titleKey(e: KeyboardEvent<HTMLSpanElement>) {
@@ -455,7 +423,7 @@ export function TaskRow(p: TaskRowProps) {
           compact && 'tp-compact',
           p.onOpen && 'tp-openable',
           planBtn && 'tp-has-plan',
-          p.editing && 'tp-editing',
+          hasSubs && showSubs && 'tp-hassubs',
         )}
         onClick={p.onOpen ? rowClick : undefined}
       >
@@ -476,19 +444,15 @@ export function TaskRow(p: TaskRowProps) {
         <div className="tp-main">
           <div className="tp-titlecol">
             <span className={cx('tp-title', (p.lines === 3 || compact) && 'tp-l3')}>
-              {p.editing ? (
-                <TitleField title={title} onSave={p.onRename} onEnd={p.onEditEnd} />
-              ) : (
-                <span
-                  className="tp-strike"
-                  role={p.onOpen ? 'button' : undefined}
-                  tabIndex={p.onOpen ? 0 : undefined}
-                  title={title}
-                  onKeyDown={p.onOpen ? titleKey : undefined}
-                >
-                  {title}
-                </span>
-              )}
+              <span
+                className="tp-strike"
+                role={p.onOpen ? 'button' : undefined}
+                tabIndex={p.onOpen ? 0 : undefined}
+                title={title}
+                onKeyDown={p.onOpen ? titleKey : undefined}
+              >
+                {title}
+              </span>
             </span>
             {byline.length ? (
               <div className={cx('tp-byline', compact && 'tp-byline-wrap')}>
@@ -509,6 +473,23 @@ export function TaskRow(p: TaskRowProps) {
         {planBtn}
         {datePop}
       </div>
+      {hasSubs ? (
+        <div className={cx('tp-subwrap', showSubs && 'tp-open')}>
+          <SubtaskList
+            variant="row"
+            subtasks={subs}
+            parentTitle={title}
+            compact={compact}
+            shown={showSubs}
+            onAdd={p.onAddSubtask}
+            onRename={p.onRenameSubtask}
+            onToggle={p.onToggleSubtask}
+            onReorder={p.onReorderSubtask}
+            onDelete={p.onDeleteSubtask}
+            onRestore={p.onRestoreSubtask}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

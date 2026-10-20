@@ -1,12 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import {
   addDays,
   carriedLabel,
   dayHeading,
   daysInMonth,
+  dueLabel,
   nightWords,
   type IsoDate,
   type Task,
+  type TaskRefResponse,
 } from '@tudu/core';
 import {
   Banner,
@@ -20,12 +23,13 @@ import {
   TaskListSkeleton,
   type TaskItem,
 } from '@tudu/ui';
-import { useLayoutEffect, useRef, useState, type TouchEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type TouchEvent } from 'react';
 import { showDay, useDayView, useNewTaskAsk, useShownDay } from '../../app/dayView';
-import { meQuery } from '../../app/session';
+import { api, meQuery } from '../../app/session';
 import { taskStore, useOnline } from '../../app/tasks';
 import { useViewport, type Viewport } from '../../app/viewport';
 import { useWorkingDay } from '../../app/workingDay';
+import { TaskPanel, type OpenTask } from './TaskPanel';
 
 /** A swipe this wide (and wider than it is tall) turns the day on phones. */
 const SWIPE_PX = 60;
@@ -38,7 +42,10 @@ function toItem(t: Task, today: IsoDate): TaskItem {
     id: t.ref,
     title: t.title,
     done: t.done,
+    due: t.due && !t.done ? dueLabel(t.due, today) : undefined,
     carried: t.carriedFrom && !t.done ? carriedLabel(t.carriedFrom, today) : undefined,
+    comments: t.commentCount || undefined,
+    subtasks: t.subtasks.map((s) => ({ key: s.id, title: s.title, done: s.done })),
   };
 }
 
@@ -66,6 +73,43 @@ export function TodayPage() {
   const view = useDayView();
   const two = vp === 'desktop' && view === 'two';
   const ask = useNewTaskAsk();
+
+  // The open task: in the address as its ref ("?task=ME-52"), so a reload and a link reopen it.
+  const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as { task?: string };
+  const [open, setOpen] = useState<OpenTask | null>(null);
+  const resolving = useRef<string | null>(null);
+  // The ref just closed: the address still names it for a moment, and that must not reopen it.
+  const closed = useRef<string | null>(null);
+  const spaceId = space?.id;
+  useEffect(() => {
+    const ref = search.task;
+    if (!ref || !spaceId || open || resolving.current === ref || closed.current === ref) return;
+    // A task named in the address but not open yet (a reload, or a link): ask where it is, then open it there.
+    resolving.current = ref;
+    void api.get<TaskRefResponse>(`/api/tasks/ref/${encodeURIComponent(ref)}`).then(
+      (r) => {
+        if (r.day) showDay(r.day, today);
+        setOpen({ id: r.taskId, dir: 'next' });
+      },
+      () => {
+        resolving.current = null;
+        void navigate({ to: '/', search: {}, replace: true });
+      },
+    );
+  }, [search.task, spaceId, open, today, navigate]);
+  const openTask = (id: string, ref: string | null | undefined, dir: 'next' | 'prev' = 'next') => {
+    setOpen({ id, dir });
+    closed.current = null;
+    if (ref) resolving.current = ref;
+    void navigate({ to: '/', search: ref ? { task: ref } : {}, replace: true });
+  };
+  const closeTask = () => {
+    setOpen(null);
+    closed.current = search.task ?? null;
+    resolving.current = null;
+    if (search.task) void navigate({ to: '/', search: {}, replace: true });
+  };
 
   const [day2, setDay2] = useState(() => addDays(day, 1));
   const [wasTwo, setWasTwo] = useState(two);
@@ -96,7 +140,7 @@ export function TodayPage() {
     if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy) * 1.5) go(addDays(day, dx < 0 ? 1 : -1));
   };
 
-  if (!space) return null;
+  if (!space || !me) return null;
   const nightText = night ? nightWords(night.now, night.from, night.to) : null;
   const sheet = (
     <DaySheet
@@ -108,6 +152,26 @@ export function TodayPage() {
       ask={ask}
       label="The day"
       group={two ? 'days' : undefined}
+      onOpenTask={openTask}
+      openKey={open?.id}
+    />
+  );
+  const panel = (
+    <TaskPanel
+      spaceId={space.id}
+      open={open}
+      today={today}
+      vp={vp}
+      me={{ id: me.user.id, name: me.user.name, email: me.user.email }}
+      onClose={closeTask}
+      onStep={(id, dir) => {
+        const ref = taskStore.lastSeen(id)?.ref;
+        openTask(id, ref, dir);
+      }}
+      onRef={(ref) => {
+        if (search.task !== ref) void navigate({ to: '/', search: { task: ref }, replace: true });
+      }}
+      linkFor={(ref) => `${window.location.origin}/t/${ref}`}
     />
   );
   return (
@@ -148,12 +212,15 @@ export function TodayPage() {
               label="The second day"
               group="days"
               second
+              onOpenTask={openTask}
+              openKey={open?.id}
             />
           </SpreadPage>
         </Spread>
       ) : (
         sheet
       )}
+      {panel}
     </div>
   );
 }
@@ -170,10 +237,25 @@ interface DaySheetProps {
   group?: string;
   /** The second sheet of the two days. */
   second?: boolean;
+  onOpenTask?: (id: string, ref: string | null | undefined) => void;
+  /** The open task's row keeps the selection wash. */
+  openKey?: string;
 }
 
 /** One day on its sheet: the header with its arrows, calendar and ring, and the list or its states. */
-function DaySheet({ spaceId, day, today, onDay, vp, label, ask, group, second }: DaySheetProps) {
+function DaySheet({
+  spaceId,
+  day,
+  today,
+  onDay,
+  vp,
+  label,
+  ask,
+  group,
+  second,
+  onOpenTask,
+  openKey,
+}: DaySheetProps) {
   const compact = vp === 'phone';
   const q = useQuery(taskStore.dayQuery(spaceId, day, today));
   const range = monthAround(day);
@@ -183,12 +265,10 @@ function DaySheet({ spaceId, day, today, onDay, vp, label, ask, group, second }:
   const [shown, setShown] = useState(day);
   const [dir, setDir] = useState<'next' | 'prev'>('next');
   const [writing, setWriting] = useState<number | null>(null);
-  const [editing, setEditing] = useState<string | null>(null);
   if (day !== shown) {
     setShown(day);
     setDir(day > shown ? 'next' : 'prev');
     setWriting(null);
-    setEditing(null);
   }
   const [seenAsk, setSeenAsk] = useState(ask);
   if (ask !== seenAsk) {
@@ -254,10 +334,31 @@ function DaySheet({ spaceId, day, today, onDay, vp, label, ask, group, second }:
         onReceive={(key, at) => taskStore.place(key, day, at)}
         onMoveTask={(t, to, _from, at) => taskStore.place(t.key, to, at)}
         onKeepTask={(t) => taskStore.keep(t.key)}
-        onOpenTask={(t) => setEditing(t.key)}
-        editingKey={editing}
-        onRename={(t, title) => taskStore.rename(t.key, title)}
-        onEditEnd={() => setEditing(null)}
+        onDueChange={(t, due) => taskStore.due(t.key, due)}
+        onOpenTask={onOpenTask ? (t) => onOpenTask(t.key, t.id) : undefined}
+        selectedKey={openKey}
+        onAddSubtask={(t, title) => taskStore.addSubtask(spaceId, t.key, title)}
+        onRenameSubtask={(t, s, title) => taskStore.renameSubtask(t.key, s.key, title)}
+        onToggleSubtask={(t, s, done) => taskStore.crossSubtask(t.key, s.key, done)}
+        onReorderSubtask={(t, s, _from, to) => taskStore.placeSubtask(spaceId, t.key, s.key, to)}
+        onDeleteSubtask={(t, s) => taskStore.removeSubtask(t.key, s.key)}
+        onRestoreSubtask={(t, s, index) => {
+          const was = tasks.find((x) => x.id === t.key)?.subtasks.find((x) => x.id === s.key);
+          taskStore.restoreSubtask(
+            spaceId,
+            t.key,
+            was ?? {
+              id: s.key,
+              taskId: t.key,
+              title: s.title,
+              position: 0,
+              done: s.done,
+              createdAt: '',
+              updatedAt: '',
+            },
+            index,
+          );
+        }}
       />
     );
 

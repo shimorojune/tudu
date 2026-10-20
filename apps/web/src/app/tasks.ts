@@ -1,7 +1,7 @@
 import { IndexedDbOutboxStore, MemoryOutboxStore, TaskStore, type OutboxStore } from '@tudu/client';
 import { showToast } from '@tudu/ui';
 import { useSyncExternalStore } from 'react';
-import { api, queryClient } from './session';
+import { api, meQuery, queryClient } from './session';
 
 /** One id per open tab (kept across a reload of that tab), so a tab can tell its own changes on the live stream. */
 function tabId(): string {
@@ -30,6 +30,10 @@ export const taskStore = new TaskStore({
   queryClient,
   store: outboxStore(),
   clientId: tabId(),
+  me: () => {
+    const me = queryClient.getQueryData(meQuery.queryKey);
+    return me ? { id: me.user.id, name: me.user.name, email: me.user.email } : null;
+  },
   onRejected: (message) => showToast(message),
   onReachable: (on) => {
     reachable = on;

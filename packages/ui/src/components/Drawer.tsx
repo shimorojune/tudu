@@ -106,7 +106,11 @@ export function Drawer({
               if (escapeStepsBack(e.target)) {
                 e.preventDefault();
                 (e.target as HTMLElement).blur?.();
+                return;
               }
+              // A picker open somewhere in the panel closes itself on Esc; the panel stays.
+              if (panel.current?.querySelector('.tp-td-pop:not(.tp-pop-leaving), .tp-rte-pop'))
+                e.preventDefault();
             }}
             onInteractOutside={(e) => {
               if (modeless || leaving) e.preventDefault();

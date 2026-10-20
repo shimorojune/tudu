@@ -1,9 +1,9 @@
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
-import type { DayResponse, SyncResponse, Task } from '@tudu/core';
+import type { DayResponse, SyncResponse, Task, TaskDetail } from '@tudu/core';
 import { createApi } from './api';
 import { MemoryOutboxStore } from './outbox';
-import { TaskStore, applyToDay, dayKey, type DayData } from './tasks';
+import { TaskStore, applyToDay, dayKey, taskKey, type DayData } from './tasks';
 
 const SPACE = 'space-1';
 const SUN = '2026-10-18';
@@ -21,10 +21,20 @@ function task(id: string, title: string, day: string, position: number, extra: P
     done: false,
     doneAt: null,
     carriedFrom: null,
+    due: null,
+    visibility: 'space',
+    subtasks: [],
+    subsDone: 0,
+    subsTotal: 0,
+    commentCount: 0,
     createdAt: '2026-10-18T08:00:00.000Z',
     updatedAt: '2026-10-18T08:00:00.000Z',
     ...extra,
   };
+}
+
+function detailOf(t: Task): TaskDetail {
+  return { ...t, notes: '', comments: [], history: [{ id: 1, at: t.createdAt, kind: 'created' }] };
 }
 
 /** A pretend server: days held in memory, sync answered by a function the test sets. */
@@ -43,6 +53,15 @@ function setup(days: Record<string, Task[]>) {
     if (u.pathname === '/api/sync') {
       return new Response(JSON.stringify(answer(JSON.parse(String(init!.body)))), { status: 200 });
     }
+    const m = /\/tasks\/([^/]+)$/.exec(u.pathname);
+    if (m) {
+      const hit = Object.values(days)
+        .flat()
+        .find((t) => t.id === m[1]);
+      return hit
+        ? new Response(JSON.stringify(detailOf(hit)), { status: 200 })
+        : new Response('{"error":"gone"}', { status: 404 });
+    }
     const day = u.pathname.split('/').pop()!;
     const body: DayResponse = { day, tasks: days[day] ?? [], counts: { total: 0, done: 0 } };
     return new Response(JSON.stringify(body), { status: 200 });
@@ -55,10 +74,17 @@ function setup(days: Record<string, Task[]>) {
     queryClient,
     store: new MemoryOutboxStore(),
     clientId: 'tab-a',
+    me: () => ({ id: 'me', name: 'Rohit Raj', email: 'rohit@test.tudu' }),
     onRejected: (msg) => rejected.push(msg),
     newId: () => `new-${++n}`,
   });
   const read = (day: string) => queryClient.getQueryData<DayData>(dayKey(SPACE, day))?.tasks ?? [];
+  const readTask = (id: string) => queryClient.getQueryData<TaskDetail>(taskKey(SPACE, id));
+  const loadTask = async (id: string) => {
+    const data = await queryClient.fetchQuery(store.taskQuery(SPACE, id));
+    new QueryObserver(queryClient, store.taskQuery(SPACE, id)).subscribe(() => {});
+    return data;
+  };
   // A day on screen: an observer keeps the query active, so invalidating it reads it again.
   const load = async (day: string) => {
     const data = await queryClient.fetchQuery(store.dayQuery(SPACE, day, SUN));
@@ -76,6 +102,8 @@ function setup(days: Record<string, Task[]>) {
     rejected,
     read,
     load,
+    readTask,
+    loadTask,
     settle,
     answer: (fn: typeof answer) => (answer = fn),
   };
@@ -200,5 +228,113 @@ describe('applying a change to a day', () => {
     const once = applyToDay(list, SUN, SPACE, create, () => undefined);
     expect(applyToDay(once, SUN, SPACE, create, () => undefined)).toHaveLength(2);
     expect(applyToDay(list, MON, SPACE, create, () => undefined)).toBe(list);
+  });
+});
+
+describe('C03-U21 detail changes apply at once and queue', () => {
+  it('C03-U21 due, notes, visibility, subtasks and comments show in the task and on its row before the save lands', async () => {
+    const t = setup({ [SUN]: [task('t1', 'One', SUN, 1024), task('t2', 'Two', SUN, 2048)] });
+    await t.load(SUN);
+    await t.loadTask('t1');
+    t.store.due('t1', '2026-10-23');
+    t.store.notes('t1', '<p>Staging first.</p>');
+    t.store.visibility('t1', 'me');
+    const s1 = t.store.addSubtask(SPACE, 't1', ' Pull the branch ');
+    const s2 = t.store.addSubtask(SPACE, 't1', 'Run it');
+    t.store.crossSubtask('t1', s1, true);
+    t.store.renameSubtask('t1', s2, 'Run it on a clean profile');
+    const c1 = t.store.addComment('t1', '<p>Will review tomorrow.</p>');
+    const d = t.readTask('t1')!;
+    expect(d.due).toBe('2026-10-23');
+    expect(d.notes).toBe('<p>Staging first.</p>');
+    expect(d.visibility).toBe('me');
+    expect(d.subtasks.map((s) => [s.title, s.done])).toEqual([
+      ['Pull the branch', true],
+      ['Run it on a clean profile', false],
+    ]);
+    expect(d.subtasks[1]!.position).toBeGreaterThan(d.subtasks[0]!.position);
+    expect(d.comments.map((c) => [c.id, c.author.name, c.html])).toEqual([
+      [c1, 'Rohit Raj', '<p>Will review tomorrow.</p>'],
+    ]);
+    expect([d.subsDone, d.subsTotal, d.commentCount]).toEqual([1, 2, 1]);
+    const row = t.read(SUN)[0]!;
+    expect([row.due, row.subsDone, row.subsTotal, row.commentCount]).toEqual(['2026-10-23', 1, 2, 1]);
+    expect(row.subtasks.map((s) => s.title)).toEqual(['Pull the branch', 'Run it on a clean profile']);
+    // reorder, edit and delete
+    t.store.placeSubtask(SPACE, 't1', s2, 0);
+    t.store.editComment('t1', c1, '<p>Reviewed.</p>');
+    expect(t.readTask('t1')!.subtasks.map((s) => s.title)).toEqual([
+      'Run it on a clean profile',
+      'Pull the branch',
+    ]);
+    expect(t.readTask('t1')!.comments[0]).toMatchObject({ html: '<p>Reviewed.</p>' });
+    expect(t.readTask('t1')!.comments[0]!.editedAt).not.toBeNull();
+    t.store.removeSubtask('t1', s1);
+    t.store.removeComment('t1', c1);
+    expect([t.readTask('t1')!.subsTotal, t.readTask('t1')!.commentCount]).toEqual([1, 0]);
+    expect(t.read(SUN)[0]!.subsTotal).toBe(1);
+    await t.settle();
+    expect(await t.store.idle()).toBe(true);
+    const sent = t.calls.filter((c) => c === 'POST /api/sync');
+    expect(sent.length).toBeGreaterThan(0);
+  });
+
+  it('C03-U21 a refused change rolls the task back and the person is told why', async () => {
+    const t = setup({ [SUN]: [task('t1', 'One', SUN, 1024)] });
+    await t.load(SUN);
+    await t.loadTask('t1');
+    t.answer((body) => ({
+      results: body.mutations.map((m) => ({
+        id: m.id,
+        status: m.type === 'task.due' ? 'rejected' : 'ok',
+        code: 403,
+        error: 'You can’t change tasks in that space.',
+      })),
+      tasks: [],
+      deleted: [],
+    }));
+    t.store.due('t1', '2026-10-23');
+    expect(t.readTask('t1')!.due).toBe('2026-10-23');
+    await t.settle();
+    await vi.waitFor(() => expect(t.readTask('t1')!.due).toBeNull());
+    expect(t.read(SUN)[0]!.due).toBeNull();
+    expect(t.rejected).toEqual(['You can’t change tasks in that space.']);
+  });
+});
+
+describe('C03-U22 delete, restore and live events for a task', () => {
+  it('C03-U22 delete takes the row off its day; restore puts it back in its place', async () => {
+    const t = setup({
+      [SUN]: [task('t1', 'One', SUN, 1024), task('t2', 'Two', SUN, 2048), task('t3', 'Three', SUN, 3072)],
+    });
+    await t.load(SUN);
+    t.store.remove('t2');
+    expect(t.read(SUN).map((x) => x.title)).toEqual(['One', 'Three']);
+    t.store.restore('t2');
+    expect(t.read(SUN).map((x) => x.title)).toEqual(['One', 'Two', 'Three']);
+    await t.settle();
+    expect(await t.store.idle()).toBe(true);
+  });
+
+  it('C03-U22 a live event naming a task reads that task again, and nothing else', async () => {
+    const t = setup({ [SUN]: [task('t1', 'One', SUN, 1024), task('t2', 'Two', SUN, 2048)] });
+    await t.load(SUN);
+    await t.loadTask('t1');
+    await t.loadTask('t2');
+    t.calls.length = 0;
+    t.store.onEvent({
+      id: '1',
+      type: 'tasks.changed',
+      data: { spaceId: SPACE, days: [], tasks: ['t2'], clientId: 'tab-b' },
+    });
+    await vi.waitFor(() => expect(t.calls).toEqual([`GET /api/spaces/${SPACE}/tasks/t2`]));
+    t.calls.length = 0;
+    t.store.onEvent({
+      id: '2',
+      type: 'tasks.changed',
+      data: { spaceId: SPACE, days: [SUN], tasks: ['t1'], clientId: 'tab-a' },
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(t.calls).toEqual([]);
   });
 });

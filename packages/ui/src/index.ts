@@ -138,3 +138,25 @@ export { DatePop, DATEPOP_LEAVE_MS, type DatePopProps } from './components/DateP
 export { Spread, SpreadPage, SPREAD_MS, type SpreadProps, type SpreadPageProps } from './components/Spread';
 export { useReorder, useDropGroup, moveItem, itemByKey, DRAG_START_PX, TOUCH_HOLD_MS } from './lib/reorder';
 export { openRow, closeRow, dropFlash, settleFrom, easeArrive, bezier } from './lib/motion';
+
+// Task detail (chunk 03)
+export {
+  TaskDetail,
+  TaskDetailSkeleton,
+  COMMENT_FRESH_MS,
+  POP_LEAVE_MS,
+  type TaskDetailProps,
+  type TaskDetailTask,
+  type DetailComment,
+  type DetailEvent,
+  type VisibilityOption,
+} from './components/TaskDetail';
+export { SubtaskList, SUB_LEAVE_MS, type SubtaskListProps, type SubtaskItem } from './components/SubtaskList';
+export {
+  RichTextEditor,
+  RichTextContent,
+  toHtml,
+  editorExtensions,
+  type RichTextEditorProps,
+  type RichTextContentProps,
+} from './components/RichTextEditor';
