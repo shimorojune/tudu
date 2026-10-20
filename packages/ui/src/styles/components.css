@@ -62,9 +62,6 @@
 .tp-cbw { position: relative; display: inline-flex; align-items: center; flex: none; }
 .tp-cb { position: relative; width: 19px; height: 19px; border: 1.5px solid var(--check-border); border-radius: var(--radius-xs); background: var(--card); flex: none;
   transition: border-color 120ms, background 160ms; }
-/* The hit area: touch-target (44px) centred on the box, an invisible layer that takes the tap without changing the layout. The subtask box gets its row's 36px, so neighbouring boxes never overlap. */
-.tp-cb::before { content: ""; position: absolute; left: 50%; top: 50%; width: var(--touch-target); height: var(--touch-target); transform: translate(-50%, -50%); }
-.tp-cb.tp-sm::before { width: 36px; height: 36px; }
 .tp-cb:hover { border-color: var(--foreground); }
 .tp-cb svg { position: absolute; inset: 0; margin: auto; width: 15px; height: 15px; display: block; overflow: visible; }
 .tp-cb svg path { stroke: var(--check-tick); stroke-width: 3; stroke-dasharray: 34; stroke-dashoffset: 34; transition: stroke-dashoffset var(--dur-tick) var(--ease-change); }
@@ -498,8 +495,6 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 
 /* Filter chip */
 .tp-chip { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 4px 0 11px; border-radius: var(--radius-full); background: var(--secondary); box-shadow: inset 0 0 0 1px var(--border); font-size: 12.5px; color: var(--foreground-2); }
-/* A changed label eases the width: useWidthEase adds tp-sizing while it moves and clears it on transitionend. */
-.tp-chip.tp-sizing { overflow: hidden; white-space: nowrap; transition: width var(--dur-arrive) var(--ease-settle); }
 .tp-chip .tp-dot { width: 7px; height: 7px; border-radius: 50%; }
 .tp-chip button { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--muted-foreground); }
 .tp-chip button:hover { background: var(--accent); color: var(--foreground); }

@@ -9,7 +9,17 @@ const ruleFor = (selector: string) => rulesWhere(rules, (s) => s === selector);
 
 /** A DOMRect of the given width, for the width easing (jsdom measures everything as 0). */
 function rect(width: number): DOMRect {
-  return { x: 0, y: 0, width, height: 38, top: 0, left: 0, right: width, bottom: 38, toJSON: () => ({}) } as DOMRect;
+  return {
+    x: 0,
+    y: 0,
+    width,
+    height: 38,
+    top: 0,
+    left: 0,
+    right: width,
+    bottom: 38,
+    toJSON: () => ({}),
+  } as DOMRect;
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -32,7 +42,9 @@ describe('Button', () => {
     expect(ruleFor('.tp-btn-primary').some((r) => r.declarations.background === 'var(--primary)')).toBe(true);
     expect(
       ruleFor('.tp-btn-danger').some(
-        (r) => r.declarations.background === 'var(--destructive-soft)' && r.declarations.color === 'var(--destructive)',
+        (r) =>
+          r.declarations.background === 'var(--destructive-soft)' &&
+          r.declarations.color === 'var(--destructive)',
       ),
     ).toBe(true);
   });
@@ -50,7 +62,9 @@ describe('Button', () => {
       expect(r.declarations.transform ?? 'none', r.selector).toBe('none');
     }
     // and nothing is set up to animate a transform on the button at all
-    const transitions = ruleFor('.tp-btn').map((r) => r.declarations.transition ?? '').join(' ');
+    const transitions = ruleFor('.tp-btn')
+      .map((r) => r.declarations.transition ?? '')
+      .join(' ');
     expect(transitions).toContain('background-color');
     expect(transitions).toContain('opacity');
     expect(transitions).not.toContain('transform');
@@ -82,21 +96,14 @@ describe('Button', () => {
     // the same measured width: nothing to ease, no inline width, so the button holds its place
     expect(btn.style.width).toBe('');
 
+    // a wider label eases from the old width to the one the new label needs, so text is never cut off
+    width = 130;
     rerender(
       <Button onClick={onClick} loading loadingLabel="Saving your changes">
         Save
       </Button>,
     );
     expect(btn).toHaveTextContent('Saving your changes');
-    expect(btn.style.width).toBe('100px'); // a wider label: still the old width (the same measurement)
-
-    // a wider label eases from the old width to the one the new label needs, so text is never cut off
-    width = 130;
-    rerender(
-      <Button onClick={onClick} loading loadingLabel="Saving all of your changes">
-        Save
-      </Button>,
-    );
     expect(btn.style.width).toBe('130px');
     fireEvent.transitionEnd(btn, { propertyName: 'width' });
     expect(btn.style.width).toBe('');

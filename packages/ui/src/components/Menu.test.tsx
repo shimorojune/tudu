@@ -70,8 +70,11 @@ describe('Menu', () => {
     expect(screen.queryByRole('menu')).toBeNull();
 
     await user.click(trigger);
-    const menu = screen.getByRole('menu', { name: 'Task actions' });
+    const menu = screen.getByRole('menu');
     expect(menu).toHaveClass('tp-menu');
+    // Radix names the menu by its trigger (aria-labelledby wins); the label still goes on as aria-label.
+    expect(menu).toHaveAttribute('aria-label', 'Task actions');
+    expect(menu).toHaveAccessibleName('More');
     expect(within(menu).getByText('Task')).toHaveClass('tp-mh');
     const items = within(menu).getAllByRole('menuitem');
     expect(items).toHaveLength(2);

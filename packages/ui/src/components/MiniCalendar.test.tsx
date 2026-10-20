@@ -9,7 +9,9 @@ const TODAY: IsoDate = '2026-10-18'; // a Sunday; 1 October 2026 is a Thursday
 function setup(extra: Partial<MiniCalendarProps> = {}) {
   const user = userEvent.setup();
   const onPick = vi.fn();
-  render(<MiniCalendar month="2026-10" today={TODAY} marks={{ '2026-10-19': 3 }} onPick={onPick} {...extra} />);
+  render(
+    <MiniCalendar month="2026-10" today={TODAY} marks={{ '2026-10-19': 3 }} onPick={onPick} {...extra} />,
+  );
   const grid = () => screen.getByRole('grid');
   const days = () => Array.from(grid().querySelectorAll<HTMLButtonElement>('button.tp-cal-d'));
   const day = (d: number) => {
@@ -133,11 +135,19 @@ describe('MiniCalendar', () => {
     const user = userEvent.setup();
     const onClear = vi.fn();
     const onPick = vi.fn();
-    const { rerender } = render(<MiniCalendar month="2026-10" today={TODAY} onPick={onPick} onClear={onClear} />);
+    const { rerender } = render(
+      <MiniCalendar month="2026-10" today={TODAY} onPick={onPick} onClear={onClear} />,
+    );
     expect(screen.queryByText('Remove due date')).toBeNull();
 
     rerender(
-      <MiniCalendar month="2026-10" today={TODAY} onPick={onPick} onClear={onClear} clearLabel="Remove due date" />,
+      <MiniCalendar
+        month="2026-10"
+        today={TODAY}
+        onPick={onPick}
+        onClear={onClear}
+        clearLabel="Remove due date"
+      />,
     );
     const clear = screen.getByRole('button', { name: 'Remove due date' });
     expect(clear).toHaveClass('tp-cal-clear');

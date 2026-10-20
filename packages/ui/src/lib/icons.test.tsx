@@ -5,7 +5,7 @@ import { ICONS, Icon } from './icons';
 describe('Icon', () => {
   it('C00-U31 draws the named Lucide icon at its size and stroke, hidden from screen readers', () => {
     const { container, rerender } = render(<Icon name="x" />);
-    const svg = container.querySelector('svg') as SVGElement;
+    let svg = container.querySelector('svg') as SVGElement;
     expect(svg).toHaveAttribute('width', '16');
     expect(svg).toHaveAttribute('height', '16');
     expect(svg).toHaveAttribute('stroke-width', '2');
@@ -14,6 +14,7 @@ describe('Icon', () => {
     expect(svg.getAttribute('class')).toContain('lucide-x');
 
     rerender(<Icon name="error" size={13} stroke={2.2} className="tp-x" />);
+    svg = container.querySelector('svg') as SVGElement; // another icon is another element
     expect(svg).toHaveAttribute('width', '13');
     expect(svg).toHaveAttribute('height', '13');
     expect(svg).toHaveAttribute('stroke-width', '2.2');
@@ -22,7 +23,20 @@ describe('Icon', () => {
   });
 
   it('C00-U31 the icon names the design system uses are all there', () => {
-    for (const name of ['today', 'week', 'backlog', 'inbox', 'plus', 'x', 'more', 'search', 'error', 'warning', 'success', 'refresh']) {
+    for (const name of [
+      'today',
+      'week',
+      'backlog',
+      'inbox',
+      'plus',
+      'x',
+      'more',
+      'search',
+      'error',
+      'warning',
+      'success',
+      'refresh',
+    ]) {
       expect(ICONS, name).toHaveProperty(name);
     }
     const { container } = render(

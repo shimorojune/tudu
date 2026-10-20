@@ -5,6 +5,13 @@ import { dismissToast, showToast, Toast, ToastHost, TOAST_PLAIN_MS, TOAST_WITH_A
 
 const LEAVE_MS = 200;
 
+// user-event under fake timers: Testing Library ends every action with a setTimeout(0) that the fake clock holds
+// back (it only advances it for Jest). Let that one timer fire so the action settles.
+async function settle<T>(action: Promise<T>): Promise<T> {
+  await vi.advanceTimersByTimeAsync(0);
+  return action;
+}
+
 function setup() {
   const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
   render(<ToastHost />);
@@ -18,7 +25,7 @@ function tick(ms: number) {
   });
 }
 
-describe('Toast', () => {
+describe('ToastHost', () => {
   beforeEach(() => {
     dismissToast();
     vi.useFakeTimers();
@@ -36,7 +43,7 @@ describe('Toast', () => {
     expect(host).toHaveTextContent('Task moved');
     expect(toast()).toHaveClass('tp-toast-in');
 
-    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    await settle(user.click(screen.getByRole('button', { name: 'Undo' })));
     expect(onAction).toHaveBeenCalledTimes(1);
     expect(toast()).toHaveClass('tp-toast-out');
 
@@ -90,9 +97,11 @@ describe('Toast', () => {
     tick(1 + LEAVE_MS);
     expect(host).toBeEmptyDOMElement();
   });
+});
 
+describe('Toast', () => {
   it('C00-U24 the bare Toast renders its text and action', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
     const onAction = vi.fn();
     render(
       <Toast action="Undo" onAction={onAction}>

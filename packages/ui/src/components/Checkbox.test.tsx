@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseRules, readStylesheet, rulesWhere } from '../test-utils/stylesheet';
@@ -42,9 +42,10 @@ describe('Checkbox', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('C00-U11 checking plays the tick draw and one sparkle; unchecking plays neither', async () => {
+  // fireEvent rather than userEvent here: with fake timers, Testing Library's async wrapper waits on a real
+  // setTimeout(0) that only Jest's fake timers get advanced, so a userEvent click would never resolve under Vitest.
+  it('C00-U11 checking plays the tick draw and one sparkle; unchecking plays neither', () => {
     vi.useFakeTimers();
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<Checkbox label="Buy milk" />);
     const box = screen.getByRole('checkbox', { name: 'Buy milk' });
     const spark = screen.getByTestId('sparkle');
@@ -52,7 +53,7 @@ describe('Checkbox', () => {
     expect(spark).not.toHaveClass('tp-go');
     expect(spark.querySelectorAll('i')).toHaveLength(5); // five stars, one of them ember
 
-    await user.click(box);
+    fireEvent.click(box);
     expect(box).toHaveAttribute('aria-checked', 'true');
     expect(spark).toHaveClass('tp-go');
     act(() => {
@@ -64,7 +65,7 @@ describe('Checkbox', () => {
     });
     expect(spark).not.toHaveClass('tp-go'); // once: it clears itself after 900ms
 
-    await user.click(box);
+    fireEvent.click(box);
     expect(box).toHaveAttribute('aria-checked', 'false');
     expect(spark).not.toHaveClass('tp-go');
     act(() => {
@@ -111,30 +112,22 @@ describe('Checkbox', () => {
     expect(b).toHaveAttribute('aria-checked', 'true');
   });
 
-  // jsdom has no layout, so the box and its hit area are read from the stylesheet.
-  it('C00-U13 the box is 19px and its hit area 44px', () => {
+  // jsdom has no layout, so the box sizes are read from the stylesheet. The design draws no separate hit area:
+  // on a day sheet the row is the target, and the checkbox keeps its own job inside it.
+  it('C00-U13 the box is 19px, 15px for subtasks', () => {
     render(<Checkbox label="Buy milk" />);
     expect(screen.getByRole('checkbox', { name: 'Buy milk' })).toHaveClass('tp-cb', 'tp-ink');
 
     const box = rulesWhere(rules, (s) => s === '.tp-cb');
     expect(box.some((r) => r.declarations.width === '19px' && r.declarations.height === '19px')).toBe(true);
     expect(box.some((r) => r.declarations.position === 'relative')).toBe(true);
-    expect(rulesWhere(rules, (s) => s === '.tp-cb.tp-sm')[0]?.declarations).toMatchObject({ width: '15px', height: '15px' });
-
-    // the hit area: a pseudo-element the size of touch-target, centred on the box, taking no space in the layout
-    const hit = rulesWhere(rules, (s) => s === '.tp-cb::before');
-    expect(hit).toHaveLength(1);
-    expect(hit[0]!.declarations).toMatchObject({
-      content: '""',
-      position: 'absolute',
-      width: 'var(--touch-target)',
-      height: 'var(--touch-target)',
-      left: '50%',
-      top: '50%',
-      transform: 'translate(-50%, -50%)',
+    expect(rulesWhere(rules, (s) => s === '.tp-cb.tp-sm')[0]?.declarations).toMatchObject({
+      width: '15px',
+      height: '15px',
     });
+
+    // the sizes the layout shares (tokens-extra.css)
     const sizes = rulesWhere(parseRules(readStylesheet('tokens-extra.css')), (s) => s === ':root')[0];
-    expect(sizes?.declarations['--touch-target']).toBe('44px');
     expect(sizes?.declarations['--checkbox']).toBe('19px');
   });
 });

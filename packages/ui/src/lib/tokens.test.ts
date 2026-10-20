@@ -1,4 +1,6 @@
+/// <reference types="node" />
 import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { readStylesheet } from '../test-utils/stylesheet';
@@ -19,7 +21,8 @@ interface Token {
 type Group = 'color' | 'radius' | 'shadow' | 'easing' | 'duration' | 'size' | 'opacity';
 type Tokens = Record<Group, { tokens: Token[] }>;
 
-const tokens = JSON.parse(readFileSync(fileURLToPath(new URL('../../tokens.json', import.meta.url)), 'utf8')) as Tokens;
+const here = dirname(fileURLToPath(import.meta.url));
+const tokens = JSON.parse(readFileSync(resolve(here, '../../tokens.json'), 'utf8')) as Tokens;
 const theme = readStylesheet('paper-theme.css');
 const extra = readStylesheet('tokens-extra.css');
 
@@ -106,7 +109,8 @@ describe('tokens.json and paper-theme.css', () => {
     expect(all.radius).toBe('0.75rem');
     for (const t of tokens.radius.tokens) expect(`${px(all[t.name]!, 12)}px`, `--${t.name}`).toBe(t.value);
     // Shadows are composed from --hair and --shadow-color, which carry the light and dark values, so the name is the check.
-    for (const t of tokens.shadow.tokens) expect(all[t.name], `--${t.name}`).toMatch(/var\(--shadow-color\)|var\(--hair\)/);
+    for (const t of tokens.shadow.tokens)
+      expect(all[t.name], `--${t.name}`).toMatch(/var\(--shadow-color\)|var\(--hair\)/);
   });
 
   it('C00-U01 the .light desk in tokens-extra.css mirrors :root', () => {

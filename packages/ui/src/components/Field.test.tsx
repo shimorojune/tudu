@@ -54,7 +54,8 @@ describe('Field', () => {
 
   // jsdom has no layout, so the ellipsis is read from the stylesheet: the rules that match the rendered input.
   it('C00-U22 long values end in an ellipsis', () => {
-    const long = 'A very long value that goes on well past the width of the field and must not be cut off hard';
+    const long =
+      'A very long value that goes on well past the width of the field and must not be cut off hard';
     render(<Field label="Title" defaultValue={long} />);
     const input = screen.getByRole('textbox', { name: 'Title' });
     expect(input).toHaveValue(long);

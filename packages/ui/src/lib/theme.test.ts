@@ -48,7 +48,11 @@ function setSystemDark(dark: boolean): void {
 }
 
 const html = document.documentElement;
-type DocWithVT = Document & { startViewTransition?: (cb: () => void) => { finished: Promise<void> } };
+
+/** Give the document a startViewTransition for one test (jsdom has none). */
+function mockViewTransition(impl: (cb: () => void) => { finished: Promise<void> }): void {
+  Object.defineProperty(document, 'startViewTransition', { value: impl, configurable: true, writable: true });
+}
 
 beforeEach(() => {
   resetThemeForTests();
@@ -63,7 +67,7 @@ beforeEach(() => {
 
 afterEach(() => {
   window.matchMedia = realMatchMedia;
-  delete (document as DocWithVT).startViewTransition;
+  Reflect.deleteProperty(document, 'startViewTransition');
   resetThemeForTests();
 });
 
@@ -97,7 +101,8 @@ describe('theme', () => {
     expect(html).not.toHaveClass('dark');
     expect(html.style.colorScheme).toBe('light');
 
-    systemDark = true;
+    act(() => setSystemDark(true)); // the OS goes dark while the choice is light: nothing is painted yet
+    expect(html).not.toHaveClass('dark');
     act(() => result.current.setTheme('system'));
     expect(result.current.choice).toBe('system');
     expect(result.current.theme).toBe('dark');
@@ -134,7 +139,7 @@ describe('theme', () => {
       cb();
       return { finished };
     });
-    (document as DocWithVT).startViewTransition = start;
+    mockViewTransition(start);
 
     setThemeChoice('dark');
     expect(start).toHaveBeenCalledTimes(1);
@@ -151,7 +156,9 @@ describe('theme', () => {
   it('C00-U03 the cross-fade is 280ms, in code and in the stylesheet', () => {
     // The class is removed when the view transition reports `finished`; the transition itself runs for 280ms.
     expect(CROSS_FADE_MS).toBe(280);
-    const rules = rulesWhere(parseRules(readStylesheet('components.css')), (s) => s.startsWith('.tp-vt-theme::view-transition'));
+    const rules = rulesWhere(parseRules(readStylesheet('components.css')), (s) =>
+      s.startsWith('.tp-vt-theme::view-transition'),
+    );
     expect(rules.length).toBeGreaterThan(0);
     for (const r of rules) expect(r.declarations['animation-duration'], r.selector).toBe('280ms');
   });
@@ -166,7 +173,7 @@ describe('theme', () => {
       cb();
       return { finished: Promise.resolve() };
     });
-    (document as DocWithVT).startViewTransition = start;
+    mockViewTransition(start);
     reduceMotion = true;
     setThemeChoice('light');
     expect(start).not.toHaveBeenCalled();

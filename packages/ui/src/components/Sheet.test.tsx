@@ -44,9 +44,17 @@ describe('Sheet', () => {
   // jsdom has no layout: which part scrolls is read from the stylesheet.
   it('C00-U33 the stylesheet lets the body scroll and keeps the header put', () => {
     const fill = rulesWhere(rules, (s) => s === '.tp-sheet-fill')[0];
-    expect(fill?.declarations).toMatchObject({ display: 'flex', 'flex-direction': 'column', 'max-height': '100%' });
+    expect(fill?.declarations).toMatchObject({
+      display: 'flex',
+      'flex-direction': 'column',
+      'max-height': '100%',
+    });
     const bodyRule = rulesWhere(rules, (s) => s === '.tp-sheet-body')[0];
-    expect(bodyRule?.declarations).toMatchObject({ 'overflow-y': 'auto', flex: '1 1 auto', 'min-height': '0' });
+    expect(bodyRule?.declarations).toMatchObject({
+      'overflow-y': 'auto',
+      flex: '1 1 auto',
+      'min-height': '0',
+    });
     // the day header does not shrink or scroll
     expect(rulesWhere(rules, (s) => s === '.tp-sheet-fill .tp-dh')[0]?.declarations.flex).toBe('none');
     // the sheet itself never scrolls

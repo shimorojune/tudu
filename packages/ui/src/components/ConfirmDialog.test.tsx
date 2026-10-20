@@ -3,6 +3,13 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConfirmDialog, type ConfirmDialogProps } from './ConfirmDialog';
 
+// user-event under fake timers: Testing Library ends every action with a setTimeout(0) that the fake clock holds
+// back (it only advances it for Jest). Let that one timer fire so the action settles.
+async function settle<T>(action: Promise<T>): Promise<T> {
+  await vi.advanceTimersByTimeAsync(0);
+  return action;
+}
+
 function setup(extra: Partial<ConfirmDialogProps> = {}) {
   const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
   const onClose = vi.fn();
@@ -41,7 +48,7 @@ describe('ConfirmDialog', () => {
     expect(confirm).not.toHaveClass('tp-btn-danger');
     expect(confirm).toBeEnabled();
 
-    await user.click(cancel);
+    await settle(user.click(cancel));
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onConfirm).not.toHaveBeenCalled();
   });
@@ -49,9 +56,13 @@ describe('ConfirmDialog', () => {
   it('C00-U16 confirming runs the action, shows Done, then calls onDone 420ms later', async () => {
     let finish!: () => void;
     const slow = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
-    const { user, onClose, onDone, confirm } = setup({ onConfirm: slow, busyLabel: 'Leaving', doneLabel: 'Left' });
+    const { user, onClose, onDone, confirm } = setup({
+      onConfirm: slow,
+      busyLabel: 'Leaving',
+      doneLabel: 'Left',
+    });
 
-    await user.click(confirm);
+    await settle(user.click(confirm));
     expect(slow).toHaveBeenCalledTimes(1);
     expect(confirm).toHaveAttribute('data-mode', 'busy');
     expect(confirm).toHaveTextContent('Leaving');
@@ -74,7 +85,7 @@ describe('ConfirmDialog', () => {
 
   it('C00-U16 without onDone, Done falls back to onClose', async () => {
     const { user, onClose, confirm } = setup({ onDone: undefined });
-    await user.click(confirm);
+    await settle(user.click(confirm));
     await act(async () => {});
     expect(confirm).toHaveAttribute('data-mode', 'done');
     act(() => {
@@ -88,30 +99,33 @@ describe('ConfirmDialog', () => {
     const input = screen.getByRole('textbox', { name: 'Type Northwind to confirm' });
     expect(confirm).toBeDisabled();
 
-    await user.type(input, 'Northwin');
+    await settle(user.type(input, 'Northwin'));
     expect(confirm).toBeDisabled();
-    await user.type(input, 'd');
+    await settle(user.type(input, 'd'));
     expect(confirm).toBeEnabled();
 
-    await user.clear(input);
-    await user.type(input, 'northwind');
+    await settle(user.clear(input));
+    await settle(user.type(input, 'northwind'));
     expect(confirm).toBeDisabled();
 
-    await user.clear(input);
-    await user.type(input, '  Northwind ');
+    await settle(user.clear(input));
+    await settle(user.type(input, '  Northwind '));
     expect(confirm).toBeEnabled();
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
   it('C00-U17 a wrong text cannot confirm, even with Enter; the right one can', async () => {
-    const { user, onConfirm, confirm } = setup({ typeToConfirm: 'Northwind' });
+    const pending = vi.fn(() => new Promise<void>(() => {}));
+    const { user, confirm } = setup({ typeToConfirm: 'Northwind', onConfirm: pending });
     const input = screen.getByRole('textbox', { name: 'Type Northwind to confirm' });
 
-    await user.type(input, 'North{Enter}');
-    expect(onConfirm).not.toHaveBeenCalled();
+    await settle(user.type(input, 'North{Enter}'));
+    expect(pending).not.toHaveBeenCalled();
+    expect(confirm).toHaveAttribute('data-mode', 'idle');
 
-    await user.type(input, 'wind{Enter}');
-    expect(onConfirm).toHaveBeenCalledTimes(1);
+    await settle(user.type(input, 'wind{Enter}'));
+    expect(pending).toHaveBeenCalledTimes(1);
     expect(confirm).toHaveAttribute('data-mode', 'busy');
+    expect(confirm).toHaveTextContent('Working');
   });
 });

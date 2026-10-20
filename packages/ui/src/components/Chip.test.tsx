@@ -6,7 +6,17 @@ import { Chip } from './Chip';
 
 /** A DOMRect of the given width, for the width easing (jsdom measures everything as 0). */
 function rect(width: number): DOMRect {
-  return { x: 0, y: 0, width, height: 28, top: 0, left: 0, right: width, bottom: 28, toJSON: () => ({}) } as DOMRect;
+  return {
+    x: 0,
+    y: 0,
+    width,
+    height: 28,
+    top: 0,
+    left: 0,
+    right: width,
+    bottom: 28,
+    toJSON: () => ({}),
+  } as DOMRect;
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -41,7 +51,7 @@ describe('Chip', () => {
     expect(chip).not.toHaveClass('tp-sizing');
 
     // the stylesheet animates the width while tp-sizing is on (jsdom has no layout, so this reads the rule)
-    const sizing = rulesWhere(parseRules(readStylesheet('components.css')), (s) => s === '.tp-chip.tp-sizing')[0];
+    const sizing = rulesWhere(parseRules(readStylesheet('app.css')), (s) => s === '.tp-chip.tp-sizing')[0];
     expect(sizing?.declarations.transition).toContain('width var(--dur-arrive) var(--ease-settle)');
     expect(sizing?.declarations.overflow).toBe('hidden');
   });

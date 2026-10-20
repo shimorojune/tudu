@@ -13,6 +13,13 @@ function placeInTheMiddle(el: Element) {
     ({ ...r, top: r.y, left: r.x, right: r.x + r.width, bottom: r.y + r.height, toJSON: () => r }) as DOMRect;
 }
 
+// user-event under fake timers: Testing Library ends every action with a setTimeout(0) that the fake clock holds
+// back (it only advances it for Jest). Let that one timer fire so the action settles.
+async function settle<T>(action: Promise<T>): Promise<T> {
+  await vi.advanceTimersByTimeAsync(0);
+  return action;
+}
+
 function setup(side?: TooltipSide, opts: Parameters<typeof userEvent.setup>[0] = {}) {
   const user = userEvent.setup(opts);
   render(
@@ -35,7 +42,7 @@ describe('Tooltip', () => {
     const { user, trigger } = setup(undefined, { advanceTimers: vi.advanceTimersByTime });
     expect(TOOLTIP_DELAY_MS).toBe(380);
 
-    await user.hover(trigger);
+    await settle(user.hover(trigger));
     act(() => {
       vi.advanceTimersByTime(TOOLTIP_DELAY_MS - 1);
     });
@@ -46,7 +53,7 @@ describe('Tooltip', () => {
     });
     expect(screen.getByRole('tooltip')).toHaveTextContent('Settings');
 
-    await user.unhover(trigger);
+    await settle(user.unhover(trigger));
     expect(screen.queryByRole('tooltip')).toBeNull();
   });
 

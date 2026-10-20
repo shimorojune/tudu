@@ -1,5 +1,5 @@
 import { Dialog as RadixDialog } from 'radix-ui';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type HTMLAttributes, type ReactNode } from 'react';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
 import { IconButton } from './IconButton';
@@ -40,7 +40,12 @@ export function escapeStepsBack(target: EventTarget | null): boolean {
 }
 
 // React 19 passes `ref` as a prop, so Radix's Slot can compose its ref with ours and reach the panel element.
+// Everything else Radix merges in (id, labels, state, the pointer-events style, focus handlers) goes on the root too.
 function DialogPanel({
+  open: _open,
+  label: _label,
+  inline: _inline,
+  noFocus: _noFocus,
   title,
   sub,
   icon,
@@ -52,7 +57,9 @@ function DialogPanel({
   onClose,
   className,
   ref,
-}: DialogProps & { ref?: React.Ref<HTMLDivElement> }) {
+  ...rest
+}: DialogProps &
+  Omit<HTMLAttributes<HTMLDivElement>, keyof DialogProps> & { ref?: React.Ref<HTMLDivElement> }) {
   const sheet = variant === 'sheet';
   return (
     <div
@@ -60,6 +67,7 @@ function DialogPanel({
       tabIndex={-1}
       role="dialog"
       aria-modal="true"
+      {...rest}
       className={cx('tp-dlg', `tp-dlg-${size}`, sheet && 'tp-dlg-sheet', bare && 'tp-dlg-bare', className)}
     >
       {sheet ? <div className="tp-qa-grabber" aria-hidden="true" /> : null}
@@ -99,6 +107,7 @@ export function Dialog(props: DialogProps) {
   const [mounted, setMounted] = useState(open);
   const [leaving, setLeaving] = useState(false);
   const panel = useRef<HTMLDivElement | null>(null);
+  const opener = useRef<HTMLElement | null>(null);
 
   // Opening mounts at once; closing keeps the panel while it eases out, then unmounts (see the timer below).
   if (open && (!mounted || leaving)) {
@@ -145,7 +154,14 @@ export function Dialog(props: DialogProps) {
             aria-label={label ?? title}
             onOpenAutoFocus={(e) => {
               e.preventDefault();
+              opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
               if (!noFocus) panel.current?.focus({ preventScroll: true });
+            }}
+            onCloseAutoFocus={(e) => {
+              // Radix would refocus its own Trigger, which we do not use: go back to where focus was when it opened.
+              e.preventDefault();
+              const active = document.activeElement;
+              if (!active || active === document.body) opener.current?.focus({ preventScroll: true });
             }}
             onEscapeKeyDown={(e) => {
               if (escapeStepsBack(e.target)) {

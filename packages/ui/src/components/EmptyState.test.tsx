@@ -26,7 +26,15 @@ describe('EmptyState', () => {
   });
 
   it('C00-U31 error, plain, icon and no-mark variants', () => {
-    const { container, rerender } = render(<EmptyState title="Jira is not answering." tone="error" action="Try again" loading loadingLabel="Trying" />);
+    const { container, rerender } = render(
+      <EmptyState
+        title="Jira is not answering."
+        tone="error"
+        action="Try again"
+        loading
+        loadingLabel="Trying"
+      />,
+    );
     const root = container.querySelector('.tp-empty') as HTMLElement;
     expect(root).toHaveClass('tp-empty-error');
     expect(root).toHaveAttribute('data-tone', 'error');

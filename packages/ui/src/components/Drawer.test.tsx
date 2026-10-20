@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { Drawer, type DrawerProps } from './Drawer';
 
@@ -75,6 +76,32 @@ describe('Drawer', () => {
     expect(document.querySelector('.tp-drawer-wrap')).toHaveClass('tp-full');
     expect(document.querySelector('.tp-drawer-wrap')).not.toHaveClass('tp-modeless');
     expect(screen.getByRole('dialog', { name: 'Task' })).toHaveFocus();
+  });
+
+  it('C00-U32 focus moves into the panel when it opens and returns to the opener when it closes', async () => {
+    function Page() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            Open task
+          </button>
+          <Drawer open={open} onClose={() => setOpen(false)} label="Task">
+            <button type="button">Inside</button>
+          </Drawer>
+        </>
+      );
+    }
+    const user = userEvent.setup();
+    render(<Page />);
+    const opener = screen.getByRole('button', { name: 'Open task' });
+
+    await user.click(opener);
+    expect(screen.getByRole('dialog', { name: 'Task' })).toHaveFocus();
+
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(opener).toHaveFocus());
   });
 
   it('C00-U32 width sets the panel width variable; closed renders nothing', () => {

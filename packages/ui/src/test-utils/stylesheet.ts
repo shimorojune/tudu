@@ -1,4 +1,6 @@
+/// <reference types="node" />
 import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -15,11 +17,14 @@ export interface CssRule {
   declarations: Record<string, string>;
 }
 
-export type StylesheetName = 'components.css' | 'paper-theme.css' | 'tokens-extra.css';
+export type StylesheetName = 'components.css' | 'app.css' | 'paper-theme.css' | 'tokens-extra.css';
+
+// Not `new URL(x, import.meta.url)`: Vite rewrites that form into an asset URL.
+const here = dirname(fileURLToPath(import.meta.url));
 
 /** One of the package's stylesheets, as text. */
 export function readStylesheet(name: StylesheetName): string {
-  return readFileSync(fileURLToPath(new URL(`../styles/${name}`, import.meta.url)), 'utf8');
+  return readFileSync(resolve(here, '../styles', name), 'utf8');
 }
 
 /** Split `text` on `sep` outside quotes and parentheses. */

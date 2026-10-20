@@ -5,7 +5,9 @@ import { Banner } from './Banner';
 
 describe('Banner', () => {
   it('C00-U25 puts the tone icon first, the title in bold, and grows into place', () => {
-    const { container } = render(<Banner title="Jira is not connected.">Reconnect to see its issues.</Banner>);
+    const { container } = render(
+      <Banner title="Jira is not connected.">Reconnect to see its issues.</Banner>,
+    );
     const wrap = container.querySelector('.tp-banner-wrap');
     expect(wrap).not.toBeNull();
     const banner = within(wrap as HTMLElement).getByRole('status');

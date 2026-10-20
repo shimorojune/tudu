@@ -39,6 +39,7 @@ export function Drawer({
   const [mounted, setMounted] = useState(open);
   const [leaving, setLeaving] = useState(false);
   const panel = useRef<HTMLElement | null>(null);
+  const opener = useRef<HTMLElement | null>(null);
 
   if (open && (!mounted || leaving)) {
     setMounted(true);
@@ -87,7 +88,15 @@ export function Drawer({
             aria-label={label}
             onOpenAutoFocus={(e) => {
               e.preventDefault();
+              opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
               panel.current?.focus({ preventScroll: true });
+            }}
+            onCloseAutoFocus={(e) => {
+              // Radix would refocus its own Trigger, which we do not use: go back to where focus was when it opened,
+              // unless it has since moved somewhere else (a modeless panel you worked beside).
+              e.preventDefault();
+              const active = document.activeElement;
+              if (!active || active === document.body) opener.current?.focus({ preventScroll: true });
             }}
             onEscapeKeyDown={(e) => {
               if (modeless && panel.current && !panel.current.contains(document.activeElement)) {
