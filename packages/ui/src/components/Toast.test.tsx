@@ -1,4 +1,5 @@
 import { act, render, screen } from '@testing-library/react';
+import { StrictMode } from 'react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dismissToast, showToast, Toast, ToastHost, TOAST_PLAIN_MS, TOAST_WITH_ACTION_MS } from './Toast';
@@ -111,5 +112,36 @@ describe('Toast', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Linked task added to Today');
     await user.click(screen.getByRole('button', { name: 'Undo' }));
     expect(onAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('C05-U15 a toast still leaves under StrictMode, where React runs state updaters twice (the app runs in it)', () => {
+    vi.useFakeTimers();
+    dismissToast();
+    render(
+      <StrictMode>
+        <ToastHost />
+      </StrictMode>,
+    );
+    const host = screen.getByRole('status');
+    act(() => showToast('Moved to Tue 20 Oct'));
+    expect(host).toHaveTextContent('Moved to Tue 20 Oct');
+    tick(TOAST_PLAIN_MS);
+    expect(host.querySelector('.tp-toast')).toHaveClass('tp-toast-out');
+    tick(LEAVE_MS);
+    expect(host).toBeEmptyDOMElement();
+    // and one with an action, dismissed by its action
+    act(() => showToast('Task deleted', { action: 'Undo', onAction: () => {} }));
+    act(() => screen.getByRole('button', { name: 'Undo' }).click());
+    tick(160);
+    expect(host).toBeEmptyDOMElement();
+    // a newer toast shown while the old one leaves keeps its place
+    act(() => showToast('First'));
+    tick(TOAST_PLAIN_MS);
+    act(() => showToast('Second'));
+    tick(LEAVE_MS);
+    expect(host).toHaveTextContent('Second');
+    tick(TOAST_PLAIN_MS + LEAVE_MS);
+    expect(host).toBeEmptyDOMElement();
+    vi.useRealTimers();
   });
 });

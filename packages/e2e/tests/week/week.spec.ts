@@ -257,6 +257,8 @@ test.describe('week', () => {
     await p.getByRole('button', { name: 'Planned', exact: true }).click();
     await p.locator('.tp-td-pop').getByRole('button', { name: 'Move to the Backlog' }).click();
     await expect(page.locator('.tp-toast')).toHaveText(/Moved to the Backlog/);
+    // and the toast goes on its own (the app runs in StrictMode, which once kept it)
+    await expect(page.locator('.tp-toast')).toHaveCount(0, { timeout: 5000 });
     await expect
       .poll(() => titlesOf(tileList(page, SUNDAY_LIST)))
       .toEqual(['Call Sam at 3pm', 'Book car service']);

@@ -103,3 +103,6 @@ the coding session, so this file is the record and the canvas gets a copy by han
   calendar button) can always scroll clear of the round New task button.
 - A drag between tiles starts on a move in any direction (4px), not only a vertical one as a reorder within a
   list does, since the tiles sit side by side.
+- Toasts never left in the running app: the host cleared its record inside a state updater, and React's
+  StrictMode (the app runs in it) runs updaters twice, so the second run kept the toast. The take-down is pure
+  now (C05-U15, and C05-E07 waits for the toast to go).
