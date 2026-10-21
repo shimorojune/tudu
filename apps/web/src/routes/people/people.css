@@ -103,7 +103,13 @@
   margin-left: 0;
 }
 /* Everyone's header holds two switches and no filter: they start where the title starts, as the design draws them,
-   instead of being pushed to the right the way a lone switch beside a filter is. */
+   instead of being pushed to the right the way a lone switch beside a filter is. Where the header is narrow (a
+   phone, the kit at phone width) the switches wrap onto a second line rather than run past the edge. */
+.app-people .tp-dh-tools {
+  flex-wrap: wrap;
+  gap: 8px;
+  row-gap: 10px;
+}
 .app-people .tp-dh-tools .tp-seg {
   margin-left: 0;
 }
