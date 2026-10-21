@@ -2,15 +2,18 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import {
   addedWords,
+  initialsOf,
   mondayOf,
   pagePlannedDay,
   searchWhere,
+  sentToWords,
+  spaceInitials,
   weekDays,
   type IsoDate,
   type SearchHit,
   type SearchResponse,
 } from '@tudu/core';
-import { QuickAdd, showToast, type QuickAddResult, type SimilarItem } from '@tudu/ui';
+import { QuickAdd, showToast, type PickPerson, type QuickAddResult, type SimilarItem } from '@tudu/ui';
 import { useEffect, useRef, useState } from 'react';
 import type { MeResponse } from '@tudu/client';
 import {
@@ -28,7 +31,7 @@ import {
 } from './dayView';
 import { goToTask } from './search';
 import { api } from './session';
-import { useSpace } from './space';
+import { spacePath, useSpace } from './space';
 import { taskStore, useOnline } from './tasks';
 import { useViewport } from './viewport';
 import { useWorkingDay } from './workingDay';
@@ -99,16 +102,46 @@ export function useQuickAddActions(spaceId: string | undefined) {
 }
 
 /** Quick Add over the app: the bar on the desk and tablets, the sheet above the keyboard on phones. */
-export function QuickAddHost(_props: { me: MeResponse }) {
+export function QuickAddHost({ me }: { me: MeResponse }) {
   const vp = useViewport();
   const open = useQuickAddOpen();
   const space = useSpace();
-  const a = useQuickAddActions(space.id);
+  const seed = useQuickAddSeed();
+  // The top line: which space it goes to (this one unless the seed says otherwise), and for whom (you by default).
+  const [sendTo, setSendTo] = useState<{ spaceId: string; toId: string | null }>({
+    spaceId: space.id,
+    toId: null,
+  });
+  const [seenSeed, setSeenSeed] = useState(seed?.nonce ?? 0);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open && !(seed && seed.nonce !== seenSeed)) setSendTo({ spaceId: space.id, toId: null });
+  }
+  if (seed && seed.nonce !== seenSeed) {
+    setSeenSeed(seed.nonce);
+    if (seed.toId !== undefined || seed.spaceId !== undefined)
+      setSendTo({ spaceId: seed.spaceId ?? space.id, toId: seed.toId ?? null });
+  }
+  const target = me.spaces.find((s) => s.id === sendTo.spaceId) ?? space;
+  const members = useQuery({
+    ...taskStore.membersQuery(target.id),
+    enabled: open && target.kind === 'team',
+  }).data;
+  const people: PickPerson[] = (members?.members ?? []).map((m) => ({
+    id: m.id,
+    name: m.name || m.email,
+    email: m.email,
+    initials: initialsOf(m.name, m.email),
+    color: m.color ?? undefined,
+    you: m.id === me.user.id,
+  }));
+  const to = sendTo.toId ? (people.find((p) => p.id === sendTo.toId) ?? null) : null;
+  const a = useQuickAddActions(target.id);
   const keyboard = useKeyboardHeight(vp === 'phone' && open);
   const lastId = useRef<string | null>(null);
   const day2: IsoDate | null = useSecondDay();
   const navigate = useNavigate();
-  const seed = useQuickAddSeed();
   // Tasks that read like the title, from the same search as the panel's, so "Looks like a task you have" can open one.
   const alike = useRef(new Map<string, SearchHit>());
   const similar = async (title: string): Promise<SimilarItem[]> => {
@@ -135,15 +168,67 @@ export function QuickAddHost(_props: { me: MeResponse }) {
       projects={a.projects}
       keyboard={keyboard}
       offline={!a.online}
+      // The top line and Send come with a team space; with Personal alone it is the plain Quick Add.
+      send={
+        !me.spaces.some((s) => s.kind === 'team')
+          ? undefined
+          : {
+              spaces: me.spaces.map((s) => ({
+                id: s.id,
+                name: s.name,
+                color: s.color ?? undefined,
+                personal: s.kind === 'personal',
+                initials: spaceInitials(s.name),
+              })),
+              spaceId: target.id,
+              onSpace: (id) => setSendTo({ spaceId: id, toId: null }),
+              people,
+              to,
+              onTo: (p) => setSendTo((s) => ({ ...s, toId: p?.id ?? null })),
+              me: {
+                name: me.user.name || me.user.email,
+                initials: initialsOf(me.user.name, me.user.email),
+                color: me.user.color ?? undefined,
+              },
+              canSend: target.kind === 'team',
+            }
+      }
       onClose={closeQuickAdd}
       onNewProject={a.newProject}
       onUpload={a.upload}
       onSave={(t) => {
+        if (t.toId) {
+          lastId.current = taskStore.sendRequest(target.id, t.toId, {
+            title: t.title,
+            note: t.note,
+            askedDay: t.planned,
+            due: t.due,
+            projectId: t.projectId,
+            attachments: t.attachments,
+          });
+          return;
+        }
         lastId.current = a.save(t);
       }}
       onAdded={(t) => {
         const id = lastId.current;
         if (!id) return;
+        if (t.toId) {
+          // Sent: it waits in their Inbox, and in your Sent, in that space.
+          const first = (to?.name ?? 'them').trim().split(/\s+/)[0]!;
+          showToast(sentToWords(first, target.id !== space.id ? target.name : undefined), {
+            action: 'Show',
+            onAction: () => void navigate({ href: `${spacePath(target.slug, 'inbox')}?view=sent` }),
+          });
+          return;
+        }
+        if (target.id !== space.id) {
+          showToast(`${addedWords(t.planned, a.today)} in ${target.name}`, {
+            action: 'Show',
+            onAction: () => void navigate({ href: spacePath(target.slug, t.planned ? 'today' : 'backlog') }),
+          });
+          return;
+        }
         if (a.page === 'week') {
           // In view when it landed in the shown week's tiles or the Backlog tile; else the toast turns the week.
           const here = t.planned === null || weekDays(a.monday).includes(t.planned);

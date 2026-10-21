@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { connectEvents } from '@tudu/client';
-import { TASKS_CHANGED } from '@tudu/core';
+import { INBOX_CHANGED, MEMBERS_CHANGED, PROJECTS_CHANGED, TASKS_CHANGED } from '@tudu/core';
 import { API_URL } from './config';
 import { queryClient } from './session';
 import { taskStore } from './tasks';
@@ -17,7 +17,8 @@ export function useLiveEvents(enabled: boolean): void {
       url: `${API_URL}/api/events`,
       onEvent: (e) => {
         if (e.type === 'hello') return;
-        if (e.type === TASKS_CHANGED) taskStore.onEvent(e);
+        if ([TASKS_CHANGED, PROJECTS_CHANGED, MEMBERS_CHANGED, INBOX_CHANGED].includes(e.type))
+          taskStore.onEvent(e);
         else void queryClient.invalidateQueries();
       },
       onStatus: (s) => {

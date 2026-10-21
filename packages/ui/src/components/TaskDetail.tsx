@@ -20,6 +20,7 @@ import { useOutside } from '../lib/hooks';
 import { Icon } from '../lib/icons';
 import { Linger } from '../lib/linger';
 import { Avatar } from './Avatar';
+import { Button } from './Button';
 import { Checkbox } from './Checkbox';
 import { IconButton } from './IconButton';
 import { Menu, MenuList } from './Menu';
@@ -103,6 +104,9 @@ export interface TaskDetailProps {
   readOnly?: boolean;
   owner?: { name: string; initials: string; color?: string | null };
   ownerLine?: string;
+  /** Over the Inbox: "Go to Fri 16 Oct" in the top bar turns the page to the task's day. */
+  onLocate?: () => void;
+  locateLabel?: string;
   onPrev?: () => void;
   onNext?: () => void;
   onClose?: () => void;
@@ -382,6 +386,11 @@ export function TaskDetail(p: TaskDetailProps) {
         </button>
       ) : null}
       <span className="tp-td-sp" />
+      {p.onLocate ? (
+        <Button variant="quiet" size="sm" className="tp-td-locate" onClick={p.onLocate}>
+          {p.locateLabel ?? 'Go to its day'}
+        </Button>
+      ) : null}
       {p.onPrev ? (
         <IconButton label="Previous task" tipSide="bottom" onClick={p.onPrev}>
           <Icon name="left" size={16} />

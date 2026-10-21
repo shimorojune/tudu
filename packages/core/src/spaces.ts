@@ -149,6 +149,8 @@ export interface SpaceSummary {
   prefix: string;
   /** How many people are in it, you included. */
   members: number;
+  /** What waits in its Inbox for you: requests to answer, and updates not read. */
+  inbox: { toAnswer: number; unread: number };
 }
 
 /** One member of a space. */

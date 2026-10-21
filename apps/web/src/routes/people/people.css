@@ -110,3 +110,12 @@
 .app-panes-l .tp-dh-tools .tp-btn {
   margin-left: 0;
 }
+
+/* What you sent them, under their week */
+.app-people-sent {
+  padding: 6px 20px 10px 30px;
+  border-top: 1px solid var(--line);
+}
+.app-people-phone .app-people-sent {
+  padding: 6px 4px 10px;
+}

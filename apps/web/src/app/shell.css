@@ -207,3 +207,44 @@
   min-width: 0;
   flex: 1;
 }
+
+/* The phone header's right side: the Inbox with its count in ink, and you. */
+.app-phone-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.app-phone-inbox {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--foreground-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.app-phone-inbox.tp-on {
+  color: var(--brand);
+}
+.app-phone-pip {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: var(--foreground);
+  color: var(--card);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

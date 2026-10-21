@@ -8,6 +8,7 @@ import { WeekStates } from './WeekStates';
 import { BacklogStates } from './BacklogStates';
 import { SearchStates } from './SearchStates';
 import { SpacesStates } from './SpacesStates';
+import { InboxStates } from './InboxStates';
 import './kit.css';
 
 const NAV = [
@@ -26,6 +27,7 @@ const NAV = [
   ['backlog', 'The Backlog'],
   ['search', 'Search'],
   ['spaces', 'Spaces and People'],
+  ['inbox', 'The Inbox'],
 ];
 
 /** Every primitive in every state, light and dark side by side. The place to judge the motion. */
@@ -60,6 +62,7 @@ export function KitPage() {
         <BacklogStates />
         <SearchStates />
         <SpacesStates />
+        <InboxStates />
       </main>
     </div>
   );

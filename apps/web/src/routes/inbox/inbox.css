@@ -1,0 +1,46 @@
+/* The Inbox: the same two panes as People; the list is 360px wide on the desk. */
+.app-inbox .app-panes-l {
+  --ixl: 380px;
+}
+.app-desk[data-viewport='tablet'] .app-inbox .app-panes-l {
+  --ixl: 320px;
+}
+.app-ix-panes .app-panes-l .tp-dh-tools .tp-ff {
+  flex: 1 1 120px;
+}
+.app-ix-panes .app-panes-l .tp-dh-tools .tp-seg {
+  margin-left: 0;
+  flex: 1 1 100%;
+}
+.app-ix-panes .app-panes-l .tp-dh-tools .tp-seg button {
+  flex: 1;
+}
+.app-ix-r {
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.app-ix-blank {
+  flex: 1;
+}
+.app-inbox .tp-empty {
+  padding: 44px 24px 48px;
+}
+.app-inbox .tp-empty-t {
+  font-size: 24px;
+}
+.app-ix-nomatch {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0;
+  padding: 22px 24px;
+  font-size: 13.5px;
+  color: var(--muted-foreground);
+}
+.app-ix-nomatch p {
+  margin: 0;
+}
+.app-inbox-phone .tp-ixs-head {
+  padding-left: 18px;
+}

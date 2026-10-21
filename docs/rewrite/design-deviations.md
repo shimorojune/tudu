@@ -200,3 +200,34 @@ the coding session, so this file is the record and the canvas gets a copy by han
   in it. An account without a name shows its email where the design shows a name.
 - The join page, signed in with another address than the invite's, says so and offers the way back; it never joins
   with the wrong account.
+
+## Chunk 08 · Sending and the Inbox (the second PR) · 21 Oct 2026
+
+- Built as drawn: Quick Add's top line "In Northwind for Me" with the space and person menus, the chip that reads
+  "Asks for Tue" and the Send button with "Goes to Meera's Inbox"; the Inbox like mail (To answer, Updates with Mark
+  all as read, the picked item in full, Inbox | Answered | Sent turning the list, the search line); Accept with the
+  day picker and the asked day preselected; Decline with the reason the sender sees; Answered; a comment with reply
+  and Open task; Open task over the Inbox with "Go to Fri 16 Oct"; Sent with Waiting, seen, Take it back, Do it
+  myself and Open task; the counts on the sidebar, the rail, the switcher and the phone's header; "Your answers send
+  when you're back." offline; "You sent Meera" and "Send Meera a task" on a person's page.
+- A request is its own row until accepted (migration 0006: `requests`, `inbox_items`); accepting makes the task
+  with a client-made id, so it is on the day at once and never doubles. Send, Accept, Decline and Take it back go
+  through the outbox; creating a space, inviting and joining stay online calls.
+- Take it back's Undo deletes the task it made and sends the request again (a fresh request, so the receiver sees
+  it as new); the design's Undo is not more specific than that.
+- The design's Sent row also offers "See Meera's week" once accepted; it opens her page on People.
+- The switcher's "N new" and the dot by the name count what waits for you in that space (to answer plus unread),
+  the same number the sidebar carries.
+- The Inbox's address may name the view (`?view=sent`), which is how Show on "Sent to Meera" lands there; the
+  picked item is in the address on every size, so a reload keeps it.
+- The reading pane stays blank paper until an item is picked; the design's "the pane keeps what you were reading"
+  holds while the search narrows the list.
+- An update's words are plain ("accepted your task onto Fri 16 Oct", "declined your task: the reason") rather than
+  the design's bolded title line, since the request's title sits on its own line below.
+- Quick Add's top line, the person menu and Send come with a team space; a person with Personal alone gets the
+  plain Quick Add, since there is nobody to send to. The phone's send foot keeps to its buttons, as drawn; "Meera
+  picks the day" is the desktop and tablet line.
+- Personal has no Inbox, so `/me/inbox` goes back to Today, as `/me/people` does; switching from a team space's
+  Inbox to Personal lands on Today.
+- The sidebar's counts (the Inbox, the members) follow the `me` query live rather than the route's context, so a
+  request that arrives shows on the sidebar and the switcher without a navigation.

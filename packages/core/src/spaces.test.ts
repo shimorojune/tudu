@@ -146,3 +146,90 @@ describe('C08-U01 People groups', () => {
     expect(dayGroupTitle('2026-10-17', SUN)).toBe('Yesterday · Sat 17 Oct');
   });
 });
+
+describe('C08-U01 the Inbox’s words', () => {
+  it('C08-U01 counts the header, Answered and Sent lines and narrows items by their words', async () => {
+    const {
+      inboxCountWords,
+      answeredWords,
+      sentWords,
+      inboxBadge,
+      acceptedWords,
+      sentToWords,
+      asksForWords,
+      filterInbox,
+      noMatchWords,
+    } = await import('./inbox');
+    expect(inboxCountWords({ toAnswer: 2, unread: 3 })).toBe('2 to answer · 3 new');
+    expect(inboxCountWords({ toAnswer: 1, unread: 0 })).toBe('1 to answer');
+    expect(inboxCountWords({ toAnswer: 0, unread: 0 })).toBe('All caught up');
+    expect(answeredWords(4)).toBe('4 answered');
+    expect(answeredWords(0)).toBe('Nothing answered yet');
+    expect(sentWords([{ state: 'waiting' }, { state: 'accepted' }, { state: 'declined' }])).toBe(
+      '3 sent · 1 waiting',
+    );
+    expect(sentWords([{ state: 'accepted' }])).toBe('1 sent');
+    expect(sentWords([])).toBe('Nothing sent');
+    expect(inboxBadge({ toAnswer: 2, unread: 3 })).toBe(5);
+    expect(inboxBadge(undefined)).toBe(0);
+    expect(acceptedWords('2026-10-16', SUN)).toBe('Accepted onto Fri 16 Oct. It’s in Answered.');
+    expect(acceptedWords(null, SUN)).toBe('Accepted onto the Backlog. It’s in Answered.');
+    expect(sentToWords('Meera')).toBe('Sent to Meera. It’s in Sent until Meera answers.');
+    expect(sentToWords('Meera', 'Northwind')).toBe(
+      'Sent to Meera in Northwind. It’s in Sent until Meera answers.',
+    );
+    expect(asksForWords('2026-10-20', SUN)).toBe('Asks for Tue 20 Oct');
+    expect(asksForWords(null, SUN)).toBe('No day asked');
+    expect(noMatchWords(' invoice ')).toBe(
+      'Nothing in the Inbox matches “invoice”. Try a name or a task title.',
+    );
+    const who = { id: 'm', name: 'Meera Nair', email: 'meera@x.y', color: null, initials: 'MN' };
+    const items = [
+      {
+        id: 'a',
+        kind: 'request' as const,
+        spaceId: 's',
+        createdAt: '',
+        readAt: null,
+        request: {
+          id: 'r',
+          spaceId: 's',
+          from: who,
+          to: who,
+          title: 'Pay the invoice',
+          note: 'Before Friday',
+          askedDay: null,
+          due: null,
+          projectId: null,
+          attachments: [],
+          state: 'waiting' as const,
+          reason: null,
+          seenAt: null,
+          taskId: null,
+          taskDay: null,
+          createdAt: '',
+          answeredAt: null,
+        },
+      },
+      {
+        id: 'b',
+        kind: 'comment' as const,
+        spaceId: 's',
+        createdAt: '',
+        readAt: null,
+        comment: {
+          id: 'c',
+          html: '<p>Can I take the <b>second</b> half?</p>',
+          author: who,
+          task: { id: 't', ref: 'NW-1', title: 'Write the notes', day: null, done: false },
+        },
+      },
+    ];
+    expect(filterInbox(items, 'invoice').map((i) => i.id)).toEqual(['a']);
+    expect(filterInbox(items, 'friday').map((i) => i.id)).toEqual(['a']);
+    expect(filterInbox(items, 'MEERA').map((i) => i.id)).toEqual(['a', 'b']);
+    expect(filterInbox(items, 'second').map((i) => i.id)).toEqual(['b']);
+    expect(filterInbox(items, '<b>')).toEqual([]);
+    expect(filterInbox(items, '  ')).toHaveLength(2);
+  });
+});

@@ -221,3 +221,19 @@ export { TaskLine, type TaskLineProps, type SharedTask, type TaskLinePerson } fr
 export { PersonRow, type PersonRowProps } from './components/PersonRow';
 export { PersonHeader, type PersonHeaderProps } from './components/PersonHeader';
 export { JoinCard, JoinHead, type JoinCardProps, type JoinInvite } from './components/JoinCard';
+
+// The Inbox and sending (chunk 08, second PR)
+export { PersonPick, PICK_FIND_FROM, type PersonPickProps, type PickPerson } from './components/PersonPick';
+export {
+  InboxItem,
+  InboxSection,
+  type InboxItemProps,
+  type InboxItemMode,
+  type InboxSectionProps,
+  type InboxEntry,
+  type InboxWho,
+  type InboxTaskFacts,
+  type InboxOutcome,
+  type SentStatus,
+} from './components/InboxItem';
+export type { QuickAddSend, QuickAddSpace } from './components/QuickAdd';

@@ -51,6 +51,8 @@ export interface TaskPanelProps {
   linkFor: (ref: string) => string;
   /** The back label for a task on a day (or none): the week page says "Week" and "Backlog". */
   backFor?: (day: IsoDate | null) => string;
+  /** Over the Inbox: "Go to Fri 16 Oct" turns the page to the task's day (or the Backlog). */
+  onLocate?: (day: IsoDate | null) => void;
 }
 
 /** The month around a day, with a week either side, for the Planned picker's dots. */
@@ -202,6 +204,8 @@ export function TaskPanel(p: TaskPanelProps) {
             : undefined
         }
         ownerLine={theirs && owner ? ownerWords(d.day, owner.name || owner.email, today) : undefined}
+        onLocate={p.onLocate ? () => p.onLocate!(d.day) : undefined}
+        locateLabel={`Go to ${d.day ? dayWord(d.day, today) : 'the Backlog'}`}
         calendar={{ marks: marks ?? {} }}
         projects={projects}
         fileBase={API_URL}

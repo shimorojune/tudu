@@ -1,8 +1,10 @@
+import { applyRequest, noteComment } from './requests';
 import {
   addDays,
   cleanHtml,
   fileSize,
   isEmptyHtml,
+  isInboxMutation,
   isProjectMutation,
   LOOKALIKE_MIN,
   lookAlikes,
@@ -659,6 +661,10 @@ export interface Applied {
   deleted?: boolean;
   /** A project change: the space's project list changed, not a task. */
   projects?: boolean;
+  /** A request or Inbox change: `taskId` is the task it made, if any. */
+  requests?: boolean;
+  /** Whose Inboxes changed. */
+  inbox?: string[];
 }
 
 /** An attachment chip as the editor makes it, for notes written by the server. */
@@ -681,7 +687,7 @@ export async function applyMutation(db: Db, userId: string, raw: unknown): Promi
       .returning({ id: schema.appliedMutations.id });
     if (!claimed.length) {
       // Already applied: nothing changes, and the client gets the row as it is.
-      if (isProjectMutation(m)) return null;
+      if (isProjectMutation(m) || isInboxMutation(m)) return null;
       const taskId = taskIdOf(m);
       const [t] = await tx
         .select({ spaceId: schema.tasks.spaceId, day: schema.tasks.day })
@@ -690,6 +696,7 @@ export async function applyMutation(db: Db, userId: string, raw: unknown): Promi
       return t ? { taskId, spaceId: t.spaceId, days: [] } : null;
     }
     if (m.type === 'task.create') return create(tx, userId, m);
+    if (isInboxMutation(m)) return applyRequest(tx, userId, m);
     if (isProjectMutation(m)) return project(tx, userId, m);
     if (m.type.startsWith('subtask.')) return subtask(tx, userId, m as SubtaskMutation);
     if (m.type.startsWith('comment.')) return comment(tx, userId, m as CommentMutation);
@@ -700,9 +707,10 @@ export async function applyMutation(db: Db, userId: string, raw: unknown): Promi
 type SubtaskMutation = Extract<SyncMutation, { type: `subtask.${string}` }>;
 type CommentMutation = Extract<SyncMutation, { type: `comment.${string}` }>;
 type ProjectMutation = Extract<SyncMutation, { type: `project.${string}` }>;
+type InboxMutation = Extract<SyncMutation, { type: `request.${string}` | `inbox.${string}` }>;
 type TaskChange = Exclude<
   SyncMutation,
-  { type: 'task.create' } | SubtaskMutation | CommentMutation | ProjectMutation
+  { type: 'task.create' } | SubtaskMutation | CommentMutation | ProjectMutation | InboxMutation
 >;
 
 /** The position after the last task of a day (or of the Backlog). */
@@ -1010,7 +1018,7 @@ async function comment(tx: Tx, userId: string, m: CommentMutation): Promise<Appl
   if (m.type === 'comment.create') {
     const html = cleanHtml(m.payload.html);
     if (isEmptyHtml(html)) throw new Rejected(400, 'A comment needs some words.');
-    await tx
+    const made = await tx
       .insert(schema.comments)
       .values({
         id: m.payload.id,
@@ -1019,8 +1027,19 @@ async function comment(tx: Tx, userId: string, m: CommentMutation): Promise<Appl
         html,
         createdAt: new Date(m.at),
       })
-      .onConflictDoNothing();
-    return base;
+      .onConflictDoNothing()
+      .returning({ id: schema.comments.id });
+    // A comment on someone else's task lands in their Inbox.
+    const inbox = made.length
+      ? await noteComment(
+          tx,
+          { id: m.payload.taskId, spaceId: t.spaceId, ownerId: t.ownerId },
+          m.payload.id,
+          userId,
+          new Date(m.at),
+        )
+      : [];
+    return { ...base, inbox };
   }
   const [c] = await tx
     .select({

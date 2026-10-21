@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router';
-import type { SpaceSummary } from '@tudu/core';
+import { inboxCountWords, type SpaceSummary } from '@tudu/core';
 import { Icon, Sheet, SheetBody, type IconName } from '@tudu/ui';
 import { spacePath, useSpace, type View } from '../../app/space';
 
@@ -11,12 +11,21 @@ export interface MoreItem {
 }
 
 /** What More keeps on phones: the Backlog, and People in a team space; Inbox, Settings and apps join it with their chunks. */
-export function moreItems(space: Pick<SpaceSummary, 'kind' | 'name'>): MoreItem[] {
+export function moreItems(
+  space: Pick<SpaceSummary, 'kind' | 'name'> & { inbox?: SpaceSummary['inbox'] },
+): MoreItem[] {
   const items: MoreItem[] = [
     { value: 'backlog', label: 'Backlog', icon: 'backlog', hint: 'Tasks without a day' },
   ];
   if (space.kind === 'team')
     items.push({ value: 'people', label: 'People', icon: 'team', hint: `Everyone in ${space.name}` });
+  const n = space.inbox ? space.inbox.toAnswer + space.inbox.unread : 0;
+  items.push({
+    value: 'inbox',
+    label: 'Inbox',
+    icon: 'inbox',
+    hint: n ? inboxCountWords(space.inbox!) : 'All caught up',
+  });
   return items;
 }
 

@@ -60,6 +60,7 @@ describe('sign in with a code', () => {
         slug: 'me',
         prefix: 'ME',
         members: 1,
+        inbox: { toAnswer: 0, unread: 0 },
       },
     ]);
   });

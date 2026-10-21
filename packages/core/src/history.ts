@@ -21,6 +21,10 @@ export function historyWords(e: HistoryEvent, today: IsoDate): string {
       return 'Uncrossed';
     case 'restored':
       return 'Put back after a delete';
+    case 'accepted':
+      return `Sent by ${e.from}, accepted`;
+    case 'withdrawn':
+      return `Sent to ${e.to}, taken back`;
   }
 }
 
