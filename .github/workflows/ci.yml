@@ -69,12 +69,12 @@ jobs:
           if-no-files-found: ignore
 
   e2e:
-    name: End-to-end (${{ matrix.shard }}/3)
+    name: End-to-end (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
     services:
       postgres: *postgres
       rustfs:
@@ -111,7 +111,7 @@ jobs:
             sleep 2
           done
           exit 1
-      - run: pnpm e2e --shard=${{ matrix.shard }}/3
+      - run: pnpm e2e --shard=${{ matrix.shard }}/4
         env:
           CI: 'true'
       - uses: actions/upload-artifact@v4

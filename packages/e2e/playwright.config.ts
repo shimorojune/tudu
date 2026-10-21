@@ -15,8 +15,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,
-  // CI runs on GitHub-hosted 4 vCPU runners, one shard per job (see ci.yml).
-  workers: process.env.CI ? 4 : undefined,
+  // CI splits the suite into shards, one per GitHub-hosted runner (see ci.yml). Two workers each: at four, the API,
+  // the preview server, Postgres and RustFS share the runner's 4 vCPUs with four browsers and timings slip.
+  workers: process.env.CI ? 2 : undefined,
   timeout: 30_000,
   expect: { timeout: 5_000 },
   reporter: [

@@ -39,7 +39,7 @@ export async function signInFresh(page: Page, email = freshEmail()): Promise<str
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible();
   await enterCode(page, await codeFor(page, email));
-  await expect(page.getByText('You’re in.')).toBeVisible();
+  // "You’re in." shows for well under a second; C01-E01 checks it. Here only the landing matters.
   await expect(
     page.getByRole('heading', { name: /^(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)$/ }),
   ).toBeVisible({ timeout: 10_000 });
