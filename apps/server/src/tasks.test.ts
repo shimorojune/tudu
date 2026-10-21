@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type {
   Attachment,
+  BacklogResponse,
   DayResponse,
+  WeekResponse,
   MarksResponse,
   SyncResponse,
   Task,
@@ -905,3 +907,156 @@ async function upload(p: Person, name: string, type: string, size: number): Prom
   expect(res.status).toBe(201);
   return (await res.json()) as Attachment;
 }
+
+describe('the week (chunk 05)', () => {
+  async function week(p: Person, monday: string, today?: string): Promise<WeekResponse> {
+    const q = today ? `?today=${today}` : '';
+    const res = await get(server.app, `/api/spaces/${p.spaceId}/weeks/${monday}${q}`, p.jar);
+    expect(res.status).toBe(200);
+    return (await res.json()) as WeekResponse;
+  }
+
+  it('C05-A01 a week comes back as seven days from its Monday with their tasks, counts and the Backlog', async () => {
+    const p = await person();
+    const done = randomUUID();
+    await sync(p, [
+      create(p, 'Monday first', '2026-10-19', 1024),
+      create(p, 'Monday second', '2026-10-19', 2048),
+      create(p, 'Thursday', '2026-10-22', 1024, done),
+      create(p, 'Sunday', '2026-10-25', 1024),
+      create(p, 'Next Monday', '2026-10-26', 1024),
+      create(p, 'Last Sunday', '2026-10-18', 1024),
+      create(p, 'Waiting', null, 1024),
+      create(p, 'Waiting too', null, 2048),
+      m('task.cross', { id: done, done: true }),
+    ]);
+    const w = await week(p, '2026-10-19');
+    expect(w.monday).toBe('2026-10-19');
+    expect(w.days.map((d) => d.day)).toEqual([
+      '2026-10-19',
+      '2026-10-20',
+      '2026-10-21',
+      '2026-10-22',
+      '2026-10-23',
+      '2026-10-24',
+      '2026-10-25',
+    ]);
+    expect(w.days.map((d) => titles(d))).toEqual([
+      ['Monday first', 'Monday second'],
+      [],
+      [],
+      ['Thursday'],
+      [],
+      [],
+      ['Sunday'],
+    ]);
+    expect(w.days[0]!.counts).toEqual({ total: 2, done: 0 });
+    expect(w.days[3]!.counts).toEqual({ total: 1, done: 1 });
+    expect(w.days[1]!.counts).toEqual({ total: 0, done: 0 });
+    expect(w.backlog.map((t) => t.title)).toEqual(['Waiting', 'Waiting too']);
+    expect(w.days[0]!.tasks[0]!.ref).toBe('ME-1');
+    // a week starts on a Monday
+    const bad = await get(server.app, `/api/spaces/${p.spaceId}/weeks/2026-10-20`, p.jar);
+    expect(bad.status).toBe(400);
+    const worse = await get(server.app, `/api/spaces/${p.spaceId}/weeks/next`, p.jar);
+    expect(worse.status).toBe(400);
+    // a stranger is refused
+    const stranger = await person();
+    const no = await get(server.app, `/api/spaces/${p.spaceId}/weeks/2026-10-19`, stranger.jar);
+    expect(no.status).toBe(403);
+  });
+
+  it('C05-A02 reading the week that holds today carries unfinished tasks forward first, once', async () => {
+    const p = await person();
+    const left = randomUUID();
+    const done = randomUUID();
+    await sync(p, [
+      create(p, 'Left behind', '2026-10-16', 1024, left),
+      create(p, 'Finished', '2026-10-16', 2048, done),
+      m('task.cross', { id: done, done: true }),
+      create(p, 'Already here', '2026-10-18', 1024),
+    ]);
+    // another week does nothing
+    const other = await week(p, '2026-10-19', '2026-10-18');
+    expect(other.days.every((d) => d.tasks.length === 0)).toBe(true);
+    expect(titles(await day(p, '2026-10-16'))).toEqual(['Left behind', 'Finished']);
+    // this week: the open task is on today, at the top, with where it came from
+    const w = await week(p, '2026-10-12', '2026-10-18');
+    expect(titles(w.days[4]!)).toEqual(['Finished']);
+    expect(titles(w.days[6]!)).toEqual(['Left behind', 'Already here']);
+    expect(w.days[6]!.tasks[0]).toMatchObject({ id: left, carriedFrom: '2026-10-16' });
+    // asking again does not move it twice
+    await sync(p, [m('task.place', { id: left, day: '2026-10-17', position: 1024 })]);
+    const again = await week(p, '2026-10-12', '2026-10-18');
+    expect(titles(again.days[5]!)).toEqual(['Left behind']);
+  });
+
+  it('C05-A03 the Backlog comes back in order with crossed-off tasks kept; a stranger is refused', async () => {
+    const p = await person();
+    const a = randomUUID();
+    const b = randomUUID();
+    await sync(p, [
+      create(p, 'Second', null, 2048, b),
+      create(p, 'First', null, 1024, a),
+      create(p, 'On a day', '2026-10-19', 1024),
+      m('task.cross', { id: b, done: true }),
+    ]);
+    const res = await get(server.app, `/api/spaces/${p.spaceId}/backlog`, p.jar);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as BacklogResponse;
+    expect(body.tasks.map((t) => t.title)).toEqual(['First', 'Second']);
+    expect(body.tasks[1]).toMatchObject({ id: b, done: true, day: null });
+    const stranger = await person();
+    expect((await get(server.app, `/api/spaces/${p.spaceId}/backlog`, stranger.jar)).status).toBe(403);
+  });
+
+  it('C05-A04 a move between days keeps the place asked for; in and out of the Backlog the ends are kept', async () => {
+    const p = await person();
+    const a = randomUUID();
+    const b = randomUUID();
+    const c = randomUUID();
+    const w1 = randomUUID();
+    await sync(p, [
+      create(p, 'Mon one', '2026-10-19', 1024, a),
+      create(p, 'Mon two', '2026-10-19', 2048, b),
+      create(p, 'Thu one', '2026-10-22', 1024, c),
+      create(p, 'Waiting', null, 1024, w1),
+    ]);
+    // between two tiles, placed before Thu one
+    await sync(p, [m('task.place', { id: b, day: '2026-10-22', position: 512 })]);
+    let w = await week(p, '2026-10-19');
+    expect(titles(w.days[0]!)).toEqual(['Mon one']);
+    expect(titles(w.days[3]!)).toEqual(['Mon two', 'Thu one']);
+    // out to the Backlog without a position: the end there
+    await sync(p, [m('task.place', { id: a, day: null, position: null })]);
+    w = await week(p, '2026-10-19');
+    expect(titles(w.days[0]!)).toEqual([]);
+    expect(w.backlog.map((t) => t.title)).toEqual(['Waiting', 'Mon one']);
+    expect(w.backlog[1]!.position).toBeGreaterThan(w.backlog[0]!.position);
+    // in from the Backlog at the top of Thursday
+    await sync(p, [m('task.place', { id: w1, day: '2026-10-22', position: 256 })]);
+    w = await week(p, '2026-10-19');
+    expect(titles(w.days[3]!)).toEqual(['Waiting', 'Mon two', 'Thu one']);
+    expect(w.backlog.map((t) => t.title)).toEqual(['Mon one']);
+  });
+
+  it('C05-A05 a move tells the space’s people about both lists, the Backlog as a null day', async () => {
+    const p = await person();
+    const stranger = await person();
+    const mine: Array<{ type: string; data: TasksChangedEvent }> = [];
+    const theirs: unknown[] = [];
+    const id = randomUUID();
+    await sync(p, [create(p, 'Moving', '2026-10-19', 1024, id)]);
+    const off1 = server.hub.subscribe(p.userId, (e) => mine.push(e as never));
+    const off2 = server.hub.subscribe(stranger.userId, (e) => theirs.push(e));
+    await sync(p, [m('task.place', { id, day: null, position: null })], 'tab-5');
+    await sync(p, [m('task.place', { id, day: '2026-10-21', position: 1024 })], 'tab-5');
+    off1();
+    off2();
+    expect(mine).toHaveLength(2);
+    expect(mine[0]!.data.days).toEqual(['2026-10-19', null]);
+    expect(mine[1]!.data.days).toEqual([null, '2026-10-21']);
+    expect(mine[1]!.data).toMatchObject({ spaceId: p.spaceId, tasks: [id], clientId: 'tab-5' });
+    expect(theirs).toEqual([]);
+  });
+});

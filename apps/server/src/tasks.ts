@@ -1,4 +1,5 @@
 import {
+  addDays,
   cleanHtml,
   fileSize,
   isEmptyHtml,
@@ -159,6 +160,44 @@ export async function tasksOfDay(db: Executor, spaceId: string, day: IsoDate): P
     .where(and(eq(schema.tasks.spaceId, spaceId), eq(schema.tasks.day, day), isNull(schema.tasks.deletedAt)))
     .orderBy(asc(schema.tasks.position), asc(schema.tasks.createdAt));
   return withCounts(db, rows);
+}
+
+/** The tasks with no day (the Backlog) in a space, in order. */
+export async function tasksOfBacklog(db: Executor, spaceId: string): Promise<Task[]> {
+  const rows = await db
+    .select(taskColumns)
+    .from(schema.tasks)
+    .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
+    .where(and(eq(schema.tasks.spaceId, spaceId), isNull(schema.tasks.day), isNull(schema.tasks.deletedAt)))
+    .orderBy(asc(schema.tasks.position), asc(schema.tasks.createdAt));
+  return withCounts(db, rows);
+}
+
+/** Seven days from `monday`, each with its tasks in order. */
+export async function tasksOfWeek(
+  db: Executor,
+  spaceId: string,
+  monday: IsoDate,
+): Promise<Map<IsoDate, Task[]>> {
+  const sunday = addDays(monday, 6);
+  const rows = await db
+    .select(taskColumns)
+    .from(schema.tasks)
+    .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
+    .where(
+      and(
+        eq(schema.tasks.spaceId, spaceId),
+        gte(schema.tasks.day, monday),
+        lte(schema.tasks.day, sunday),
+        isNull(schema.tasks.deletedAt),
+      ),
+    )
+    .orderBy(asc(schema.tasks.day), asc(schema.tasks.position), asc(schema.tasks.createdAt));
+  const tasks = await withCounts(db, rows);
+  const out = new Map<IsoDate, Task[]>();
+  for (let i = 0; i < 7; i++) out.set(addDays(monday, i), []);
+  for (const t of tasks) out.get(t.day!)?.push(t);
+  return out;
 }
 
 export async function tasksById(db: Executor, ids: string[]): Promise<Task[]> {

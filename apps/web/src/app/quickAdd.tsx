@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { addedWords, type IsoDate } from '@tudu/core';
+import { addedWords, mondayOf, weekDays, weekPlannedDay, type IsoDate } from '@tudu/core';
 import { QuickAdd, showToast, type QuickAddResult } from '@tudu/ui';
 import { useEffect, useRef, useState } from 'react';
 import type { MeResponse } from '@tudu/client';
@@ -7,10 +7,13 @@ import {
   closeQuickAdd,
   flashTask,
   showDay,
+  showWeek,
   useDayView,
+  usePage,
   useQuickAddOpen,
   useSecondDay,
   useShownDay,
+  useShownWeek,
 } from './dayView';
 import { taskStore, useOnline } from './tasks';
 import { useViewport } from './viewport';
@@ -48,7 +51,11 @@ export function useKeyboardHeight(on: boolean): number {
 /** Write the task through the store and say where it went. Shared by the bar over the app and the floating page. */
 export function useQuickAddActions(spaceId: string | undefined) {
   const { today } = useWorkingDay();
-  const shown = useShownDay() ?? today;
+  const page = usePage();
+  const monday = useShownWeek() ?? mondayOf(today);
+  const shownDay = useShownDay() ?? today;
+  // On the week page a new task lands on the first day of the shown week that is not gone by.
+  const shown = page === 'week' ? weekPlannedDay(monday, today) : shownDay;
   const view = useDayView();
   const projects = useQuery({ ...taskStore.projectsQuery(spaceId ?? ''), enabled: !!spaceId }).data ?? [];
   const online = useOnline();
@@ -66,6 +73,8 @@ export function useQuickAddActions(spaceId: string | undefined) {
     today,
     shown,
     view,
+    page,
+    monday,
     projects,
     online,
     save,
@@ -102,6 +111,22 @@ export function QuickAddHost({ me }: { me: MeResponse }) {
       onAdded={(t) => {
         const id = lastId.current;
         if (!id) return;
+        if (a.page === 'week') {
+          // In view when it landed in the shown week's tiles or the Backlog tile; else the toast turns the week.
+          const here = t.planned === null || weekDays(a.monday).includes(t.planned);
+          if (here) {
+            flashTask(id, t.planned);
+            return;
+          }
+          showToast(addedWords(t.planned, a.today), {
+            action: 'Show',
+            onAction: () => {
+              showWeek(mondayOf(t.planned!), mondayOf(a.today));
+              setTimeout(() => flashTask(id, t.planned), 60);
+            },
+          });
+          return;
+        }
         const here = t.planned === a.shown || (a.view === 'two' && vp === 'desktop' && t.planned === day2);
         if (here) {
           flashTask(id, t.planned);

@@ -117,7 +117,7 @@ test.describe('sign in', () => {
     await page.getByRole('button', { name: 'Continue' }).click();
     await enterCode(page, await codeFor(page, email));
     await expect(page).toHaveURL(/\/week$/);
-    await expect(page.getByText('The week is on its way.')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'The week' })).toBeVisible();
   });
 });
 

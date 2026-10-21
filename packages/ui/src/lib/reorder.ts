@@ -294,7 +294,10 @@ export function useReorder(
             if (Math.abs(dy) > TOUCH_SLOP_PX || Math.abs(dx) > TOUCH_SLOP_PX) s.cancel();
             return;
           }
-          if (Math.abs(dy) < DRAG_START_PX) return;
+          // Rows reorder up and down, so a list on its own starts on a vertical move; lists that trade rows
+          // sit side by side, so there a move in any direction starts the drag.
+          const moved = opts.current.group ? Math.hypot(dx, dy) : Math.abs(dy);
+          if (moved < DRAG_START_PX) return;
           begin(s);
         }
         ev.preventDefault();

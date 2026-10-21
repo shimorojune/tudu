@@ -9,6 +9,7 @@ import {
   TASKS_CHANGED,
   taskIdOf,
   type Attachment,
+  type BacklogResponse,
   type Comment,
   type CommentAuthor,
   type DayResponse,
@@ -24,18 +25,26 @@ import {
   type TaskMutationBody,
   type TasksChangedEvent,
   type TaskVisibility,
+  type WeekResponse,
 } from '@tudu/core';
 import { ApiError, type Api } from './api';
 import type { LiveEvent } from './events';
 import { Outbox, type Mutation, type OutboxStore } from './outbox';
 
-/** A cached day: the tasks on it, in order, with every change not yet saved already applied. */
+/** A cached day (or the Backlog, day null): the tasks on it, in order, with every change not yet saved applied. */
 export interface DayData {
-  day: IsoDate;
+  day: IsoDate | null;
   tasks: Task[];
 }
 
-export const dayKey = (spaceId: string, day: IsoDate) => ['day', spaceId, day] as const;
+/** What a week read keeps for itself: the day caches hold the lists. */
+export interface WeekData {
+  monday: IsoDate;
+  days: IsoDate[];
+}
+
+export const dayKey = (spaceId: string, day: IsoDate | null) => ['day', spaceId, day] as const;
+export const weekKey = (spaceId: string, monday: IsoDate) => ['week', spaceId, monday] as const;
 export const marksKey = (spaceId: string, from: IsoDate, to: IsoDate) =>
   ['marks', spaceId, from, to] as const;
 export const taskKey = (spaceId: string, taskId: string) => ['task', spaceId, taskId] as const;
@@ -186,7 +195,7 @@ function patchTask<T extends Task>(t: T, m: SyncMutation): T {
  */
 export function applyToDay(
   tasks: Task[],
-  day: IsoDate,
+  day: IsoDate | null,
   spaceId: string,
   m: SyncMutation,
   lookup: (id: string) => Task | undefined,
@@ -380,6 +389,50 @@ export class TaskStore {
     });
   }
 
+  /** The Backlog: the tasks with no day, in their order. Cached as the day `null`. */
+  backlogQuery(spaceId: string) {
+    return queryOptions({
+      queryKey: dayKey(spaceId, null),
+      queryFn: async (): Promise<DayData> => {
+        const res = await this.o.api.get<BacklogResponse>(`/api/spaces/${spaceId}/backlog`);
+        this.setReachable(true);
+        return { day: null, tasks: this.overlay(spaceId, null, res.tasks) };
+      },
+    });
+  }
+
+  /** A day of a space, or the Backlog for null. */
+  listQuery(spaceId: string, day: IsoDate | null, today?: IsoDate) {
+    return day === null ? this.backlogQuery(spaceId) : this.dayQuery(spaceId, day, today);
+  }
+
+  /**
+   * A whole week in one read: the seven days from `monday` and the Backlog. Each list lands in its own day cache,
+   * so the tiles, Today and the live stream all share them; asking for the week that holds today carries
+   * unfinished tasks forward first.
+   */
+  weekQuery(spaceId: string, monday: IsoDate, today?: IsoDate) {
+    return queryOptions({
+      queryKey: weekKey(spaceId, monday),
+      queryFn: async (): Promise<WeekData> => {
+        const q = today ? `?today=${today}` : '';
+        const res = await this.o.api.get<WeekResponse>(`/api/spaces/${spaceId}/weeks/${monday}${q}`);
+        this.setReachable(true);
+        const qc = this.o.queryClient;
+        for (const d of res.days)
+          qc.setQueryData<DayData>(dayKey(spaceId, d.day), {
+            day: d.day,
+            tasks: this.overlay(spaceId, d.day, d.tasks),
+          });
+        qc.setQueryData<DayData>(dayKey(spaceId, null), {
+          day: null,
+          tasks: this.overlay(spaceId, null, res.backlog),
+        });
+        return { monday: res.monday, days: res.days.map((d) => d.day) };
+      },
+    });
+  }
+
   marksQuery(spaceId: string, from: IsoDate, to: IsoDate) {
     return queryOptions({
       queryKey: marksKey(spaceId, from, to),
@@ -400,8 +453,8 @@ export class TaskStore {
     });
   }
 
-  /** The cached list of a day, if this tab has it. */
-  cached(spaceId: string, day: IsoDate): Task[] | undefined {
+  /** The cached list of a day (or the Backlog), if this tab has it. */
+  cached(spaceId: string, day: IsoDate | null): Task[] | undefined {
     return this.o.queryClient.getQueryData<DayData>(dayKey(spaceId, day))?.tasks;
   }
 
@@ -562,7 +615,7 @@ export class TaskStore {
   place(id: string, day: IsoDate | null, index?: number): void {
     const t = this.known.get(id);
     if (!t) return;
-    const list = day === null ? undefined : this.cached(t.spaceId, day);
+    const list = this.cached(t.spaceId, day);
     if (list && index !== undefined) {
       const others = list.filter((x) => x.id !== id);
       const placed = placeAt(
@@ -687,9 +740,7 @@ export class TaskStore {
     const ev = e.data as TasksChangedEvent;
     if (ev.clientId && ev.clientId === this.clientId) return;
     const qc = this.o.queryClient;
-    for (const d of ev.days) {
-      if (d) void qc.invalidateQueries({ queryKey: dayKey(ev.spaceId, d), exact: true });
-    }
+    for (const d of ev.days) void qc.invalidateQueries({ queryKey: dayKey(ev.spaceId, d), exact: true });
     for (const t of ev.tasks ?? [])
       void qc.invalidateQueries({ queryKey: taskKey(ev.spaceId, t), exact: true });
     void qc.invalidateQueries({ queryKey: ['marks', ev.spaceId] });
@@ -760,7 +811,7 @@ export class TaskStore {
     )?.[1];
     for (const [key, data] of qc.getQueriesData<DayData>({ queryKey: ['day'] })) {
       if (!data) continue;
-      const [, spaceId, day] = key as unknown as [string, string, IsoDate];
+      const [, spaceId, day] = key as unknown as [string, string, IsoDate | null];
       let next = applyToDay(data.tasks, day, spaceId, m, (x) => this.known.get(x));
       if (detail) next = next.map((t) => (t.id === id ? { ...t, commentCount: detail.commentCount } : t));
       if (next !== data.tasks) {
@@ -773,7 +824,7 @@ export class TaskStore {
   }
 
   /** Server rows with every change still on its way applied on top. */
-  private overlay(spaceId: string, day: IsoDate, rows: Task[]): Task[] {
+  private overlay(spaceId: string, day: IsoDate | null, rows: Task[]): Task[] {
     this.remember(rows);
     let tasks = [...rows].sort(byPosition);
     for (const { m } of this.pending.values())
@@ -793,7 +844,7 @@ export class TaskStore {
   }
 
   private positionFor(spaceId: string, day: IsoDate | null, id: string, index?: number): number | null {
-    const list = day === null ? undefined : this.cached(spaceId, day);
+    const list = this.cached(spaceId, day);
     if (!list) return null;
     const others = list.filter((x) => x.id !== id).map((x) => x.position);
     return placeAt(others, index ?? others.length).position;
@@ -835,7 +886,7 @@ export class TaskStore {
     this.remember(res.tasks);
     for (const [key, data] of qc.getQueriesData<DayData>({ queryKey: ['day'] })) {
       if (!data) continue;
-      const [, spaceId, day] = key as unknown as [string, string, IsoDate];
+      const [, spaceId, day] = key as unknown as [string, string, IsoDate | null];
       let tasks = data.tasks.filter((t) => !rows.has(t.id) && !gone.has(t.id));
       for (const t of rows.values()) if (t.spaceId === spaceId && t.day === day) tasks.push(t);
       for (const { m } of this.pending.values())

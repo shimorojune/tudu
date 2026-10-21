@@ -121,6 +121,12 @@ export function dateLabel(iso: IsoDate): string {
   return `${day} ${MONTHS_LONG[month - 1]}`;
 }
 
+/** "19 Oct" */
+export function dateShort(iso: IsoDate): string {
+  const { month, day } = partsOf(iso);
+  return `${day} ${MONTHS_SHORT[month - 1]}`;
+}
+
 /** "Mon 19 Oct" */
 export function formatDay(iso: IsoDate): string {
   const { month, day } = partsOf(iso);

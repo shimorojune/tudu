@@ -1,6 +1,7 @@
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
-import type { DayResponse, Project, SyncResponse, Task, TaskDetail } from '@tudu/core';
+import { addDays } from '@tudu/core';
+import type { DayResponse, Project, SyncResponse, Task, TaskDetail, WeekResponse } from '@tudu/core';
 import { createApi } from './api';
 import { MemoryOutboxStore } from './outbox';
 import { TaskStore, applyToDay, dayKey, projectsKey, taskKey, type DayData } from './tasks';
@@ -84,6 +85,22 @@ function setup(days: Record<string, Task[]>, projects: Project[] = []) {
         ? new Response(JSON.stringify(detailOf(hit)), { status: 200 })
         : new Response('{"error":"gone"}', { status: 404 });
     }
+    if (u.pathname.endsWith('/backlog')) {
+      return new Response(JSON.stringify({ tasks: days.backlog ?? [] }), { status: 200 });
+    }
+    const wk = /\/weeks\/([^/]+)$/.exec(u.pathname);
+    if (wk) {
+      const monday = wk[1]!;
+      const body: WeekResponse = {
+        monday,
+        days: Array.from({ length: 7 }, (_, i) => {
+          const d = addDays(monday, i);
+          return { day: d, tasks: days[d] ?? [], counts: { total: 0, done: 0 } };
+        }),
+        backlog: days.backlog ?? [],
+      };
+      return new Response(JSON.stringify(body), { status: 200 });
+    }
     const day = u.pathname.split('/').pop()!;
     const body: DayResponse = { day, tasks: days[day] ?? [], counts: { total: 0, done: 0 } };
     return new Response(JSON.stringify(body), { status: 200 });
@@ -119,6 +136,21 @@ function setup(days: Record<string, Task[]>, projects: Project[] = []) {
     new QueryObserver(queryClient, store.dayQuery(SPACE, day, SUN)).subscribe(() => {});
     return data;
   };
+  const loadBacklog = async () => {
+    const data = await queryClient.fetchQuery(store.backlogQuery(SPACE));
+    new QueryObserver(queryClient, store.backlogQuery(SPACE)).subscribe(() => {});
+    return data;
+  };
+  // The week page: the week read, then an observer on each of its eight lists, as the tiles are.
+  const loadWeek = async (monday: string) => {
+    const data = await queryClient.fetchQuery(store.weekQuery(SPACE, monday, SUN));
+    new QueryObserver(queryClient, store.weekQuery(SPACE, monday, SUN)).subscribe(() => {});
+    for (const d of data.days)
+      new QueryObserver(queryClient, store.dayQuery(SPACE, d, SUN)).subscribe(() => {});
+    new QueryObserver(queryClient, store.backlogQuery(SPACE)).subscribe(() => {});
+    return data;
+  };
+  const readBacklog = () => queryClient.getQueryData<DayData>(dayKey(SPACE, null))?.tasks ?? [];
   const settle = async () => {
     for (let i = 0; i < 50 && !(await store.idle()); i++) await new Promise((r) => setTimeout(r, 5));
     await new Promise((r) => setTimeout(r, 0));
@@ -129,6 +161,9 @@ function setup(days: Record<string, Task[]>, projects: Project[] = []) {
     calls,
     rejected,
     read,
+    readBacklog,
+    loadBacklog,
+    loadWeek,
     load,
     readTask,
     loadTask,
@@ -455,5 +490,111 @@ describe('C04-U15 uploads', () => {
       'That file is too big. Files can be up to 25 MB.',
     );
     expect(t.calls.filter((c) => c === `POST /api/spaces/${SPACE}/files`)).toHaveLength(2);
+  });
+});
+
+describe('C05-U10 the week in the store', () => {
+  const MON = '2026-10-19';
+  const TUE = '2026-10-20';
+  const THU = '2026-10-22';
+  const weekOf = () => ({
+    [MON]: [task('m1', 'Mon one', MON, 1024), task('m2', 'Mon two', MON, 2048)],
+    [THU]: [task('h1', 'Thu one', THU, 1024)],
+    backlog: [task('b1', 'Waiting', null as unknown as string, 1024)],
+  });
+
+  it('C05-U10 one week read fills the seven day caches and the Backlog, and the tiles read nothing more', async () => {
+    const t = setup(weekOf());
+    const w = await t.loadWeek(MON);
+    expect(w).toEqual({
+      monday: MON,
+      days: [MON, TUE, '2026-10-21', THU, '2026-10-23', '2026-10-24', '2026-10-25'],
+    });
+    expect(t.read(MON).map((x) => x.title)).toEqual(['Mon one', 'Mon two']);
+    expect(t.read(TUE)).toEqual([]);
+    expect(t.read(THU).map((x) => x.title)).toEqual(['Thu one']);
+    expect(t.readBacklog().map((x) => x.title)).toEqual(['Waiting']);
+    expect(t.store.cached(SPACE, null)?.length).toBe(1);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(t.calls).toEqual([`GET /api/spaces/${SPACE}/weeks/${MON}`]);
+  });
+
+  it('C05-U10 a move between tiles shows in both lists at once and queues one change; into and out of the Backlog too', async () => {
+    const t = setup(weekOf());
+    const sent: Array<{ type: string; payload: Record<string, unknown> }> = [];
+    t.answer((body) => {
+      sent.push(...(body.mutations as never[]));
+      return { results: body.mutations.map((m) => ({ id: m.id, status: 'ok' })), tasks: [], deleted: [] };
+    });
+    await t.loadWeek(MON);
+    t.store.place('m2', THU, 0);
+    expect(t.read(MON).map((x) => x.title)).toEqual(['Mon one']);
+    expect(t.read(THU).map((x) => x.title)).toEqual(['Mon two', 'Thu one']);
+    t.store.place('b1', TUE, 0);
+    expect(t.readBacklog()).toEqual([]);
+    expect(t.read(TUE).map((x) => x.title)).toEqual(['Waiting']);
+    t.store.place('m1', null);
+    expect(t.read(MON)).toEqual([]);
+    expect(t.readBacklog().map((x) => x.title)).toEqual(['Mon one']);
+    await t.settle();
+    expect(sent.map((m) => [m.type, m.payload.id, m.payload.day])).toEqual([
+      ['task.place', 'm2', THU],
+      ['task.place', 'b1', TUE],
+      ['task.place', 'm1', null],
+    ]);
+    expect(sent[0]!.payload.position).toBeLessThan(1024);
+  });
+
+  it('C05-U10 a move the server refuses is undone in both lists and the person is told', async () => {
+    const t = setup(weekOf());
+    t.answer((body) => ({
+      results: body.mutations.map((m) => ({ id: m.id, status: 'rejected', code: 403, error: 'Not yours.' })),
+      tasks: [],
+      deleted: [],
+    }));
+    await t.loadWeek(MON);
+    t.store.place('m2', THU, 0);
+    expect(t.read(THU).map((x) => x.title)).toEqual(['Mon two', 'Thu one']);
+    await t.settle();
+    await vi.waitFor(() => expect(t.read(THU).map((x) => x.title)).toEqual(['Thu one']));
+    expect(t.read(MON).map((x) => x.title)).toEqual(['Mon one', 'Mon two']);
+    expect(t.rejected).toEqual(['Not yours.']);
+  });
+});
+
+describe('C05-U11 live events and the week', () => {
+  const MON = '2026-10-19';
+  it('C05-U11 an event for a day refreshes that tile only; one for the Backlog refreshes the Backlog only', async () => {
+    const t = setup({ [MON]: [task('m1', 'Mon one', MON, 1024)], backlog: [] });
+    await t.loadWeek(MON);
+    await new Promise((r) => setTimeout(r, 20));
+    t.calls.length = 0;
+    t.store.onEvent({
+      id: '1',
+      type: 'tasks.changed',
+      data: { spaceId: SPACE, days: ['2026-10-22'], clientId: 'tab-b' },
+    });
+    await vi.waitFor(() => expect(t.calls).toEqual([`GET /api/spaces/${SPACE}/days/2026-10-22`]));
+    t.calls.length = 0;
+    t.store.onEvent({
+      id: '2',
+      type: 'tasks.changed',
+      data: { spaceId: SPACE, days: [null], clientId: 'tab-b' },
+    });
+    await vi.waitFor(() => expect(t.calls).toEqual([`GET /api/spaces/${SPACE}/backlog`]));
+    t.calls.length = 0;
+    // a move another tab made: both lists, and nothing else
+    t.store.onEvent({
+      id: '3',
+      type: 'tasks.changed',
+      data: { spaceId: SPACE, days: [MON, null], clientId: 'tab-b' },
+    });
+    await vi.waitFor(() =>
+      expect(t.calls.sort()).toEqual([
+        `GET /api/spaces/${SPACE}/backlog`,
+        `GET /api/spaces/${SPACE}/days/${MON}`,
+      ]),
+    );
+    expect(t.calls.some((c) => c.includes('/weeks/'))).toBe(false);
   });
 });

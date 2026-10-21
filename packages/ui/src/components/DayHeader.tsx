@@ -5,6 +5,7 @@ import { Icon } from '../lib/icons';
 import { DayProgress } from './DayProgress';
 import { IconButton } from './IconButton';
 import { MiniCalendar, type MiniCalendarProps } from './MiniCalendar';
+import { WeekPicker, type WeekPickerProps } from './WeekPicker';
 
 export interface DayHeaderProps {
   /** "Today · Week 42", "Tomorrow · Week 43". Brand-text on today only; other days are quiet. */
@@ -35,8 +36,8 @@ export interface DayHeaderProps {
   pickLabel?: string;
   /** The week on the desk: no sheet padding or rule, and the arrows sit on the title's line before the ring. */
   bare?: boolean;
-  /** The title picks a week. Accepted now; the month calendar stands in until the WeekPicker lands. */
-  weeks?: boolean;
+  /** The week: the title opens the WeekPicker instead of the calendar; its `onPick` gets the Monday. */
+  weeks?: WeekPickerProps;
   /** The line under "All crossed off". */
   doneNote?: string;
   className?: string;
@@ -67,6 +68,7 @@ export function DayHeader({
   todayLabel = 'Back to today',
   pickLabel = 'Pick a day',
   bare,
+  weeks,
   doneNote,
   className,
 }: DayHeaderProps) {
@@ -113,7 +115,7 @@ export function DayHeader({
       ) : null}
       <div className="tp-dh-row">
         <div className="tp-dh-day">
-          {calendar ? (
+          {calendar || weeks ? (
             <Popover.Root open={open} onOpenChange={setOpen}>
               <Popover.Trigger asChild>
                 <button
@@ -134,13 +136,23 @@ export function DayHeader({
                   sideOffset={10}
                   collisionPadding={8}
                 >
-                  <MiniCalendar
-                    {...calendar}
-                    onPick={(k) => {
-                      setOpen(false);
-                      calendar.onPick?.(k);
-                    }}
-                  />
+                  {weeks ? (
+                    <WeekPicker
+                      {...weeks}
+                      onPick={(k) => {
+                        setOpen(false);
+                        weeks.onPick?.(k);
+                      }}
+                    />
+                  ) : (
+                    <MiniCalendar
+                      {...calendar}
+                      onPick={(k) => {
+                        setOpen(false);
+                        calendar!.onPick?.(k);
+                      }}
+                    />
+                  )}
                 </Popover.Content>
               </Popover.Portal>
             </Popover.Root>

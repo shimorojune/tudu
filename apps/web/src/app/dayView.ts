@@ -21,6 +21,10 @@ function readView(): DayView {
 let view: DayView = readView();
 let newTask = 0;
 let shown: IsoDate | null = null;
+/** Which page is up, so Quick Add knows where a new task is in view. */
+let page: 'today' | 'week' | null = null;
+/** The Monday of the week the week page shows; null is this week. */
+let shownWeek: IsoDate | null = null;
 let quickAdd = false;
 /** The second sheet's day while two days are open, so Quick Add knows a task landing there is in view. */
 let second: IsoDate | null = null;
@@ -133,6 +137,37 @@ export function useSecondDay(): IsoDate | null {
   return useSyncExternalStore(
     subscribe,
     () => second,
+    () => null,
+  );
+}
+
+/** The page tells the shell which view it is (the week page while it is mounted). */
+export function setPage(p: 'today' | 'week' | null): void {
+  if (p === page) return;
+  page = p;
+  notify();
+}
+
+export function usePage(): 'today' | 'week' | null {
+  return useSyncExternalStore(
+    subscribe,
+    () => page,
+    () => null,
+  );
+}
+
+/** Show a week on the week page by its Monday; null is this week. */
+export function showWeek(monday: IsoDate | null, thisMonday?: IsoDate): void {
+  const next = monday === thisMonday ? null : monday;
+  if (next === shownWeek) return;
+  shownWeek = next;
+  notify();
+}
+
+export function useShownWeek(): IsoDate | null {
+  return useSyncExternalStore(
+    subscribe,
+    () => shownWeek,
     () => null,
   );
 }

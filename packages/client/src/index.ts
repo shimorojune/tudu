@@ -25,8 +25,10 @@ export {
   projectsKey,
   draftOf,
   dayKey,
+  weekKey,
   marksKey,
   taskKey,
   type DayData,
+  type WeekData,
   type TaskStoreOptions,
 } from './tasks';

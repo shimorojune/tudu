@@ -118,6 +118,19 @@ export interface DayResponse {
   counts: { total: number; done: number };
 }
 
+/** A week as the API sends it: seven days, Monday first, and the Backlog, in one answer. */
+export interface WeekResponse {
+  /** The week's Monday. */
+  monday: IsoDate;
+  days: DayResponse[];
+  backlog: Task[];
+}
+
+/** The Backlog: tasks with no day, in their order. */
+export interface BacklogResponse {
+  tasks: Task[];
+}
+
 /** Tasks per day for the calendar dots and the sidebar's week: { "2026-10-19": 3 }. */
 export interface MarksResponse {
   marks: Record<IsoDate, number>;

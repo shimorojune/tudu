@@ -79,3 +79,30 @@ the coding session, so this file is the record and the canvas gets a copy by han
   and shows no toast.
 - The floating bar's page is `/quick-add` on the web; the macOS window and the global summon arrive with chunk 11.
 - "Looks like a task you have" waits for Search (chunk 07).
+
+## Chunk 05 · Week · 21 Oct 2026
+
+- Built as drawn: the plain sheet on the desk with the bare header, the tiles four across (two on a narrow
+  window), the Backlog tile last; on tablets and phones one sheet of days that fold with the one-line preview; the
+  WeekPicker from the title; drag between tiles and in and out of the Backlog; the week ring with "That's the
+  week".
+- One week read (`GET /api/spaces/:id/weeks/:monday`) fills the eight lists; the tiles never ask for a day on
+  their own. The live stream refreshes a tile the way it refreshes a day. The Backlog is cached as the day
+  `null`, so a move in or out of it shows in both lists at once.
+- The shown week stays out of the address, as the day does; the open task is in it (`/week?task=ME-52`).
+- Folded days are remembered per browser (local storage). The first time, today is open in this week and the
+  first day in any other; the Backlog starts shut. A task that lands in a folded day opens it.
+- Past days take no drops and do not tint; the row's date pill and the panel's Planned picker still take any
+  day. Past tiles show only what was crossed off there.
+- A plain row has no date pill, so on phones a task without a due or carried marker moves from the panel's
+  Planned fact or, in the Backlog, from the row's quiet calendar button.
+- New task from the week lands on today in this week and on the Monday of a later week; a task for a day
+  outside the shown week toasts "Added to Tomorrow" and Show turns the week to it.
+- The panel's back label reads "Week" (or "Backlog") on phones when opened from the week.
+- On phones the scroll under the sheet keeps 150px free at the foot, so the last row (the Backlog's, with its
+  calendar button) can always scroll clear of the round New task button.
+- A drag between tiles starts on a move in any direction (4px), not only a vertical one as a reorder within a
+  list does, since the tiles sit side by side.
+- Toasts never left in the running app: the host cleared its record inside a state updater, and React's
+  StrictMode (the app runs in it) runs updaters twice, so the second run kept the toast. The take-down is pure
+  now (C05-U15, and C05-E07 waits for the toast to go).

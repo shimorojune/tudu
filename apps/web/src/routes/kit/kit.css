@@ -206,3 +206,17 @@
   box-shadow: var(--shadow-sheet);
   overflow: hidden;
 }
+
+/* The week's tiles in the kit: at the states board's 300px, in a row that scrolls sideways. */
+.kit .tp-wk-tiles.kit-week-tiles {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  flex-wrap: nowrap;
+  gap: 16px;
+  height: auto;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}

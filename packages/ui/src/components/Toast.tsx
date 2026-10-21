@@ -77,17 +77,22 @@ export function ToastHost() {
   useEffect(() => {
     if (!toast) return;
     const stay = toast.duration ?? (toast.action ? TOAST_WITH_ACTION_MS : TOAST_PLAIN_MS);
-    timer.current = setTimeout(() => leave(200), stay);
+    const id = toast.id;
+    timer.current = setTimeout(() => leave(id, 200), stay);
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast?.id]);
 
-  function leave(ms: number) {
+  /** Ease the toast out, then take it down, unless a newer one has replaced it meanwhile. */
+  function leave(id: number, ms: number) {
     setLeaving(true);
     gone.current = setTimeout(() => {
-      setToast((t) => (t && current && t.id === current.id ? ((current = null), null) : t));
+      // The module's record is cleared here, outside the state updater, which must stay pure: React may run
+      // an updater twice, and one that cleared the record on its first run would keep the toast on its second.
+      if (current?.id === id) current = null;
+      setToast((t) => (t && t.id === id ? null : t));
       setLeaving(false);
     }, ms);
   }
@@ -103,7 +108,7 @@ export function ToastHost() {
             onClick={() => {
               if (timer.current) clearTimeout(timer.current);
               toast.onAction?.();
-              leave(160);
+              leave(toast.id, 160);
             }}
           >
             {toast.action}
