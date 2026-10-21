@@ -8,14 +8,21 @@ export async function fixClock(page: Page, at: Date = SUNDAY): Promise<void> {
   await page.clock.setFixedTime(at);
 }
 
-/** Wait until every change has reached the server (the outbox is empty). */
+/**
+ * Wait until every change has reached the server (the outbox is empty). The page's answer is a promise, which
+ * waitForFunction would take for a truthy value at once, so this polls and awaits it.
+ */
 export async function idle(page: Page): Promise<void> {
-  await page.waitForFunction(
-    async () =>
-      (await (window as unknown as { __tudu?: { idle(): Promise<boolean> } }).__tudu?.idle()) === true,
-    undefined,
-    { polling: 100, timeout: 15_000 },
-  );
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          async () =>
+            (await (window as unknown as { __tudu?: { idle(): Promise<boolean> } }).__tudu?.idle()) === true,
+        ),
+      { timeout: 15_000, intervals: [100] },
+    )
+    .toBe(true);
 }
 
 /** The list on a day's sheet: "Tasks for Sunday 18 October". Found even under an open panel's veil. */

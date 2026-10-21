@@ -28,10 +28,13 @@ export async function createSpace(page: Page, name: string, invites: string[] = 
   await menu.getByRole('menuitem', { name: 'Create a space' }).click();
   const dialog = page.getByRole('dialog', { name: 'Create a space' });
   await expect(dialog).toBeVisible();
+  // The name field takes the focus a moment after the dialog opens; type once it has, so nothing lands elsewhere.
+  await expect(dialog.getByLabel('Space name')).toBeFocused({ timeout: 10_000 });
   await dialog.getByLabel('Space name').fill(name);
   for (const e of invites) {
     await dialog.getByLabel('Invite by email').fill(e);
     await dialog.getByLabel('Invite by email').press('Enter');
+    await expect(dialog.getByText(e, { exact: true })).toBeVisible();
   }
   await dialog.getByRole('button', { name: 'Create space' }).click();
   // The new space's address, never /me (the Create call takes a moment).

@@ -63,9 +63,16 @@ export function CreateSpace(p: CreateSpaceProps) {
       setBusy(0);
     }
   }
+  // The name takes the focus once the dialog has settled, unless the person is already typing somewhere in it.
   useEffect(() => {
     if (!p.open || init.noFocus) return;
-    const t = setTimeout(() => nameEl.current?.focus({ preventScroll: true }), 240);
+    const t = setTimeout(() => {
+      const el = nameEl.current;
+      if (!el) return;
+      const active = document.activeElement;
+      if (active && active !== document.body && el.closest('[role="dialog"]')?.contains(active)) return;
+      el.focus({ preventScroll: true });
+    }, 240);
     return () => clearTimeout(t);
   }, [p.open, init.noFocus]);
 
