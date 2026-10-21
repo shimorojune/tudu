@@ -15,7 +15,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,
-  workers: process.env.CI ? 2 : undefined,
+  // CI runs on GitHub-hosted 4 vCPU runners, one shard per job (see ci.yml).
+  workers: process.env.CI ? 4 : undefined,
   timeout: 30_000,
   expect: { timeout: 5_000 },
   reporter: [
