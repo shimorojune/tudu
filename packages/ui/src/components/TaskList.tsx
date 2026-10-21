@@ -82,6 +82,22 @@ export interface TaskListProps {
   onKeepTask?: (task: TaskItem) => void;
   onDueChange?: (task: TaskItem, day: IsoDate | null) => void;
   planButton?: boolean;
+  /**
+   * The Backlog: a crossed-off row waits a beat (the tick and sparkle play), then folds away with a toast and
+   * Undo. The wait in ms, or `true` for 900. `onLeave` fires once it has gone; `onToggleTask` never does.
+   */
+  leaveDone?: boolean | number;
+  /** The Backlog's Crossed off view: unticking a row sends it away the same way. */
+  leaveUndone?: boolean | number;
+  /** The toast's words: "Crossed off", or "Back in the Backlog". */
+  leaveToast?: string;
+  unleaveToast?: string;
+  /** A row left the list (leaveDone or leaveUndone): commit the tick. */
+  onLeave?: (task: TaskItem, done: boolean) => void;
+  /** Undo on that toast: put it back at the index it had, as it was. */
+  onUnleave?: (task: TaskItem, done: boolean, at: number) => void;
+  /** No dragging, no grip, no Alt-arrows: a list in a fixed order (the Crossed off view). */
+  static?: boolean;
   /** Subtasks under a row, folded out from its byline. */
   onAddSubtask?: (task: TaskItem, title: string) => void;
   onRenameSubtask?: (task: TaskItem, sub: SubtaskItem, title: string) => void;
@@ -93,6 +109,8 @@ export interface TaskListProps {
 
 /** How long a new or dropped row keeps its wash. */
 export const FRESH_MS = 1400;
+/** How long a crossed-off row waits before it folds away from the Backlog, so the tick is seen. */
+export const LEAVE_MS = 900;
 
 /**
  * A list of TaskRows people reorder by dragging (or Alt with the arrow keys). One plain list: the order is the order
@@ -108,6 +126,13 @@ export function TaskList(p: TaskListProps) {
   const opened = useRef<string | null>(null);
   const stopOpen = useRef<(() => void) | null>(null);
   const keyFlip = useRef<{ key: string; top: number; focus?: HTMLElement } | null>(null);
+  // Rows on their way out (leaveDone, leaveUndone): ticked as asked, waiting for their beat before they fold.
+  const [leaving, setLeaving] = useState<Record<string, boolean>>({});
+  const leaveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  useEffect(() => {
+    const timers = leaveTimers.current;
+    return () => timers.forEach((t) => clearTimeout(t));
+  }, []);
 
   // A new day starts fresh; a task added from outside opens its gap.
   const [seenReset, setSeenReset] = useState(p.resetKey);
@@ -244,6 +269,60 @@ export function TaskList(p: TaskListProps) {
   }
   const canInsert = !compact && p.insertable !== false && !filter && !!p.onAdd;
 
+  // Crossing off (or unticking) a row that leaves this list: it waits a beat ticked, then folds away with Undo.
+  const leaves = (done: boolean) => (done ? p.leaveDone : p.leaveUndone);
+  function toggleTask(t: TaskItem, done: boolean) {
+    const leave = leaves(done);
+    const timers = leaveTimers.current;
+    if (!leave) {
+      // Ticked back within the beat: it never left, and nothing is sent.
+      if (timers.has(t.key)) {
+        clearTimeout(timers.get(t.key));
+        timers.delete(t.key);
+        setLeaving((l) => {
+          const { [t.key]: _gone, ...rest } = l;
+          return rest;
+        });
+        return;
+      }
+      p.onToggleTask?.(t, done);
+      return;
+    }
+    setLeaving((l) => ({ ...l, [t.key]: done }));
+    const wait = typeof leave === 'number' ? leave : LEAVE_MS;
+    timers.set(
+      t.key,
+      setTimeout(() => {
+        timers.delete(t.key);
+        const at = tasks.findIndex((x) => x.key === t.key);
+        const el = ref.current ? itemByKey(ref.current, t.key) : null;
+        closeRow(el, () => {
+          setLeaving((l) => {
+            const { [t.key]: _gone, ...rest } = l;
+            return rest;
+          });
+          p.onLeave?.(t, done);
+          requestAnimationFrame(() => {
+            if (el?.isConnected) {
+              el.style.height = '';
+              el.style.opacity = '';
+              el.style.overflow = '';
+              el.style.pointerEvents = '';
+            }
+          });
+          showToast(done ? (p.leaveToast ?? 'Crossed off') : (p.unleaveToast ?? 'Back in the list'), {
+            action: 'Undo',
+            onAction: () => {
+              p.onUnleave?.(t, done, at);
+              opened.current = null;
+              setFresh({ key: t.key });
+            },
+          });
+        });
+      }, wait),
+    );
+  }
+
   // Rescheduling from the row: keep it here (the marker goes), or move it (it folds away, with Undo).
   const cal = p.calendar;
   const calToday = cal ? (cal.today ?? isoToday()) : isoToday();
@@ -282,8 +361,8 @@ export function TaskList(p: TaskListProps) {
       <div
         ref={ref}
         className="tp-list"
-        onPointerDown={down}
-        onKeyDown={onKeyDown}
+        onPointerDown={p.static ? undefined : down}
+        onKeyDown={p.static ? undefined : onKeyDown}
         role="list"
         aria-label={p.label ?? 'Tasks'}
       >
@@ -323,13 +402,13 @@ export function TaskList(p: TaskListProps) {
               <TaskRow
                 title={t.title}
                 id={t.id}
-                done={!!t.done}
+                done={leaving[t.key] ?? !!t.done}
                 due={t.due}
                 carried={t.carried}
                 comments={t.comments}
                 jira={t.jira}
                 project={t.project}
-                reorderable
+                reorderable={!p.static}
                 compact={compact}
                 brief={p.brief}
                 planButton={p.planButton}
@@ -339,7 +418,7 @@ export function TaskList(p: TaskListProps) {
                 onDueChange={cal && p.onDueChange ? (v) => p.onDueChange!(t, v) : undefined}
                 onOpen={p.onOpenTask ? () => p.onOpenTask!(t) : undefined}
                 onSignal={p.onSignal ? (k) => p.onSignal!(t, k) : undefined}
-                onToggle={(v) => p.onToggleTask?.(t, v)}
+                onToggle={(v) => toggleTask(t, v)}
                 subtasks={t.subtasks}
                 onAddSubtask={p.onAddSubtask ? (title) => p.onAddSubtask!(t, title) : undefined}
                 onRenameSubtask={

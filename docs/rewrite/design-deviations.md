@@ -106,3 +106,33 @@ the coding session, so this file is the record and the canvas gets a copy by han
 - Toasts never left in the running app: the host cleared its record inside a state updater, and React's
   StrictMode (the app runs in it) runs updaters twice, so the second run kept the toast. The take-down is pure
   now (C05-U15, and C05-E07 waits for the toast to go).
+
+## Chunk 06 · Backlog · 21 Oct 2026
+
+- Built as drawn: one sheet like Today with "Backlog" and the count, the project filter on the left and To do |
+  Crossed off on the right, the same rows as Today in your own order, the writing line "Add to the Backlog…", the
+  quiet calendar button that gives a task a day (the row folds away, with Undo), crossing off that waits a beat
+  then folds the row into Crossed off (with Undo), unticking there that sends it back, and every state on the
+  states board.
+- No new endpoint: the Backlog read from chunk 05 carries the crossed-off tasks too, and the page splits, filters
+  and counts in the client. Turning the view or the filter never asks the server.
+- Crossed off is newest first and not draggable (no grip). When two tasks were crossed off at the same moment, the
+  one changed last comes first, then the newer task.
+- The filter is remembered per browser and space (local storage); a filter for a project that no longer exists is
+  dropped. The view starts at To do on every visit.
+- The count follows the view: "4 tasks", "2 tasks in Platform", "Nothing waiting"; "3 crossed off", "1 crossed
+  off in Home", "Nothing crossed off". The design's states board shows only the To do counts.
+- "Add a task" in the empty state opens Quick Add (planned for the Backlog), as the design's on-action says; the
+  writing line is there as soon as the list has a row.
+- The phone's More tab is a page of its own at `/more`, drawn in the app's own words (the design has no More
+  board): a short list with Backlog on it now; Inbox, Settings, spaces and apps join it with their chunks. The
+  Backlog keeps More lit in the tab bar.
+- `/t/ME-52` for a task with no day opens the Backlog with the panel, rather than Today.
+- A task given a day from the panel leaves the list at once rather than folding away: the list cannot animate a
+  removal it did not start. The same holds on the week's tiles.
+- Undo after crossing off or giving a day puts the row back at the index it had by queueing the reverse change;
+  the server never sees a special undo.
+- Two fixes in the store found by the tests: `idle()` could say the outbox was empty while the last change was
+  still in flight (tests read the server too early), and a change written to disk between the outbox's last look
+  and its sweep could lose its overlay. Both are closed; chunk 06's tests cover the Backlog, the earlier chunks'
+  tests still pass.

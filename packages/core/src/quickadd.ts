@@ -1,5 +1,9 @@
 import { dayWord } from './carried';
 import { formatDay, type IsoDate } from './dates';
+import { weekPlannedDay } from './week';
+
+/** The pages a new task can be written from. */
+export type AppPage = 'today' | 'week' | 'backlog';
 
 export interface LandsWords {
   /** "Lands on " or "Lands in ". */
@@ -43,3 +47,16 @@ export function fileSize(bytes: number): string {
 
 /** Files may be this big. */
 export const FILE_MAX_BYTES = 25 * 1024 * 1024;
+
+/**
+ * Where Quick Add plans a task by default: the day in view on Today, the first day of the shown week that is not
+ * gone by on the Week, and no day at all on the Backlog, so the task lands there.
+ */
+export function pagePlannedDay(
+  page: AppPage | null,
+  at: { shownDay: IsoDate; monday: IsoDate; today: IsoDate },
+): IsoDate | null {
+  if (page === 'backlog') return null;
+  if (page === 'week') return weekPlannedDay(at.monday, at.today);
+  return at.shownDay;
+}

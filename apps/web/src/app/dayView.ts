@@ -1,4 +1,4 @@
-import type { IsoDate } from '@tudu/core';
+import type { AppPage, IsoDate } from '@tudu/core';
 import { useSyncExternalStore } from 'react';
 
 /**
@@ -22,7 +22,7 @@ let view: DayView = readView();
 let newTask = 0;
 let shown: IsoDate | null = null;
 /** Which page is up, so Quick Add knows where a new task is in view. */
-let page: 'today' | 'week' | null = null;
+let page: AppPage | null = null;
 /** The Monday of the week the week page shows; null is this week. */
 let shownWeek: IsoDate | null = null;
 let quickAdd = false;
@@ -141,14 +141,14 @@ export function useSecondDay(): IsoDate | null {
   );
 }
 
-/** The page tells the shell which view it is (the week page while it is mounted). */
-export function setPage(p: 'today' | 'week' | null): void {
+/** The page tells the shell which view it is (the week and the Backlog while they are mounted). */
+export function setPage(p: AppPage | null): void {
   if (p === page) return;
   page = p;
   notify();
 }
 
-export function usePage(): 'today' | 'week' | null {
+export function usePage(): AppPage | null {
   return useSyncExternalStore(
     subscribe,
     () => page,

@@ -1,6 +1,6 @@
 # Chunk 06 · Backlog
 
-Status: proposed 21 Oct 2026, awaiting approval. Branch `rewrite/06-backlog`. Tests will be in
+Status: approved 21 Oct 2026 (all five choices as proposed), built on branch `rewrite/06-backlog`. Tests in
 [docs/tests/chunk-06.md](../tests/chunk-06.md); deviations in [design-deviations.md](design-deviations.md).
 
 Boards: 06 Backlog (desktop, dark, tablet, phone, states, motion), 00 The task row, 03 Quick Add (New task from the
@@ -76,45 +76,45 @@ Out of scope: Search (07) and "Looks like a task you have", the Inbox, Settings 
 
 Unit (`packages/ui`, `packages/client`, `packages/core`, `apps/web`):
 
-| ID      | Component     | Case                                                                                                                                                         |
-| ------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| C06-U01 | ProjectFilter | The chip reads All projects with the mark, or the project with its dot; the menu lists All projects with the total and each project with its count; picking reports the name or null; the label for screen readers |
-| C06-U02 | TaskList      | `leaveDone`: a ticked row waits 900ms, folds away, reports onLeave; the toast "Crossed off" with Undo puts it back at its index unticked and reports onUnleave; not at all under reduced motion's timing |
-| C06-U03 | TaskList      | `leaveUndone`: in the Crossed off list an unticked row folds away with "Back in the Backlog"; Undo returns it struck through                                 |
-| C06-U04 | TaskList      | `filter`: only the project's rows show, the "+" between rows and dragging between lists are off, the writing line reads "Add to the Backlog…" and adds with no day |
-| C06-U05 | DayHeader     | With `nav` off: Backlog, the count, no arrows and no ring; the filter and the switch sit in its slot; compact on phones; the switch turns the sheet           |
-| C06-U06 | core          | Backlog words: the counts for both views with and without a filter, Nothing waiting; the split into To do (position order) and Crossed off (newest first); per-project counts of the view |
+| ID      | Component     | Case                                                                                                                                                                                                                               |
+| ------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C06-U01 | ProjectFilter | The chip reads All projects with the mark, or the project with its dot; the menu lists All projects with the total and each project with its count; picking reports the name or null; the label for screen readers                 |
+| C06-U02 | TaskList      | `leaveDone`: a ticked row waits 900ms, folds away, reports onLeave; the toast "Crossed off" with Undo puts it back at its index unticked and reports onUnleave; not at all under reduced motion's timing                           |
+| C06-U03 | TaskList      | `leaveUndone`: in the Crossed off list an unticked row folds away with "Back in the Backlog"; Undo returns it struck through                                                                                                       |
+| C06-U04 | TaskList      | `filter`: only the project's rows show, the "+" between rows and dragging between lists are off, the writing line reads "Add to the Backlog…" and adds with no day                                                                 |
+| C06-U05 | DayHeader     | With `nav` off: Backlog, the count, no arrows and no ring; the filter and the switch sit in its slot; compact on phones; the switch turns the sheet                                                                                |
+| C06-U06 | core          | Backlog words: the counts for both views with and without a filter, Nothing waiting; the split into To do (position order) and Crossed off (newest first); per-project counts of the view                                          |
 | C06-U07 | client        | A task made with no day lands at the end of the Backlog cache; crossing off there queues one done change and keeps the task cached; a reorder queues one place change with the day null; Undo queues the reverse at the same index |
-| C06-U08 | core          | Quick Add's Planned for the Backlog page is empty and the foot reads "Lands in the Backlog"; Today and the week are unchanged                                |
-| C06-U09 | web           | The page's filter is remembered per browser and space and dropped when its project is gone; the view starts at To do; the More page lists Backlog            |
+| C06-U08 | core          | Quick Add's Planned for the Backlog page is empty and the foot reads "Lands in the Backlog"; Today and the week are unchanged                                                                                                      |
+| C06-U09 | web           | The page's filter is remembered per browser and space and dropped when its project is gone; the view starts at To do; the More page lists Backlog                                                                                  |
 
 API (`apps/server`):
 
-| ID      | Case                                                                                                                                              |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ID      | Case                                                                                                                                                                |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | C06-A01 | A task created with no day lands at the end of the Backlog with a dense position; reading the Backlog returns it after the rest, crossed-off ones with their doneAt |
-| C06-A02 | Crossing off and unticking a Backlog task keeps its position; the live event names the Backlog (a null day) and reaches the space's people only   |
-| C06-A03 | A place change inside the Backlog (null to null with a position) reorders it and the positions stay dense; a stranger is 403                       |
+| C06-A02 | Crossing off and unticking a Backlog task keeps its position; the live event names the Backlog (a null day) and reaches the space's people only                     |
+| C06-A03 | A place change inside the Backlog (null to null with a position) reorders it and the positions stay dense; a stranger is 403                                        |
 
 End-to-end, group `backlog`:
 
-| ID      | Case                                                                                                                                                    |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C06-E01 | Open the Backlog from the sidebar: "Backlog", "3 tasks", the undated tasks in their order with their bylines, the writing line, More lit on phones       |
-| C06-E02 | Write on "Add to the Backlog…": the row washes in, has no day on the server; the "+" between rows slots one in; both survive a reload in order           |
-| C06-E03 | Give a task a day with its calendar button: Today first, then Tomorrow; the row folds away, "Moved to Tomorrow" with Undo; Undo puts it back in place; done again, Today on tomorrow has it |
-| C06-E04 | Cross one off: the tick, the wait, the row folds away, "Crossed off" with Undo; the count "2 tasks"; Crossed off lists it newest first; untick there sends it back to To do in its place |
+| ID      | Case                                                                                                                                                                                                      |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C06-E01 | Open the Backlog from the sidebar: "Backlog", "3 tasks", the undated tasks in their order with their bylines, the writing line, More lit on phones                                                        |
+| C06-E02 | Write on "Add to the Backlog…": the row washes in, has no day on the server; the "+" between rows slots one in; both survive a reload in order                                                            |
+| C06-E03 | Give a task a day with its calendar button: Today first, then Tomorrow; the row folds away, "Moved to Tomorrow" with Undo; Undo puts it back in place; done again, Today on tomorrow has it               |
+| C06-E04 | Cross one off: the tick, the wait, the row folds away, "Crossed off" with Undo; the count "2 tasks"; Crossed off lists it newest first; untick there sends it back to To do in its place                  |
 | C06-E05 | Filter by project: the chip with the dot, the menu's counts, "2 tasks in Platform", "Nothing here for this project." with Show all projects; the filter survives a reload and a deleted project clears it |
-| C06-E06 | Reorder by drag (desktop) and by press and hold (phone): the order survives a reload and the server agrees                                               |
-| C06-E07 | Open a task: the panel with "Backlog" as its back label on phones, Planned reads Backlog, Next and Previous walk the list in view; a day picked in the panel folds the row out; `/t/ME-52` opens it here |
-| C06-E08 | New task from the top bar: Quick Add says "Lands in the Backlog" and the row washes in; a task with a day picked toasts "Added to Tomorrow" and Show turns to Today |
-| C06-E09 | Phone: the More tab shows its page, Backlog opens the sheet with the compact header, the calendar button is always there, the round button adds to the Backlog (phone) |
-| C06-E10 | Tablet: the rail, the sheet, the filter and the switch, the 460px panel (tablet)                                                                        |
-| C06-E11 | Live: a task crossed off in a second tab leaves this list; one added there with no day appears; one given a day there leaves                            |
-| C06-E12 | Offline: the banner; cross off, reorder and give a day while offline; the server has it all when back                                                   |
-| C06-E13 | Loading and error: a held read shows the header with skeleton rows; an aborted one shows "Couldn't load the Backlog." and Try again recovers            |
-| C06-E14 | Empty: "Nothing waiting." and Add a task opens Quick Add; "Nothing crossed off yet." in the other view                                                  |
-| C06-E15 | Dark mode: E01 and E04 again in dark                                                                                                                    |
+| C06-E06 | Reorder by drag (desktop) and by press and hold (phone): the order survives a reload and the server agrees                                                                                                |
+| C06-E07 | Open a task: the panel with "Backlog" as its back label on phones, Planned reads Backlog, Next and Previous walk the list in view; a day picked in the panel folds the row out; `/t/ME-52` opens it here  |
+| C06-E08 | New task from the top bar: Quick Add says "Lands in the Backlog" and the row washes in; a task with a day picked toasts "Added to Tomorrow" and Show turns to Today                                       |
+| C06-E09 | Phone: the More tab shows its page, Backlog opens the sheet with the compact header, the calendar button is always there, the round button adds to the Backlog (phone)                                    |
+| C06-E10 | Tablet: the rail, the sheet, the filter and the switch, the 460px panel (tablet)                                                                                                                          |
+| C06-E11 | Live: a task crossed off in a second tab leaves this list; one added there with no day appears; one given a day there leaves                                                                              |
+| C06-E12 | Offline: the banner; cross off, reorder and give a day while offline; the server has it all when back                                                                                                     |
+| C06-E13 | Loading and error: a held read shows the header with skeleton rows; an aborted one shows "Couldn't load the Backlog." and Try again recovers                                                              |
+| C06-E14 | Empty: "Nothing waiting." and Add a task opens Quick Add; "Nothing crossed off yet." in the other view                                                                                                    |
+| C06-E15 | Dark mode: E01 and E04 again in dark                                                                                                                                                                      |
 
 Not automated: the calendar button's fade, the fold's easing, the chip easing to its width, the sheet's turn between
 views; you judge those on staging.

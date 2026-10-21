@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addedWords, fileSize, landsWords } from './quickadd';
+import { addedWords, fileSize, landsWords, pagePlannedDay } from './quickadd';
 
 const SUNDAY = '2026-10-18';
 
@@ -27,5 +27,23 @@ describe('C04-U17 the foot of Quick Add', () => {
     expect(fileSize(248_000)).toBe('242 KB');
     expect(fileSize(1_260_000)).toBe('1.2 MB');
     expect(fileSize(10)).toBe('1 KB');
+  });
+});
+
+describe('C06-U08 where Quick Add plans a task by default', () => {
+  const at = { shownDay: '2026-10-20', monday: '2026-10-26', today: '2026-10-18' };
+  it('is empty on the Backlog, so the task lands there, and the foot says so', () => {
+    expect(pagePlannedDay('backlog', at)).toBeNull();
+    expect(landsWords({ planned: null }, at.today)).toEqual({
+      pre: 'Lands in ',
+      where: 'Backlog',
+      extra: '',
+    });
+  });
+  it('keeps Today and the week as they were', () => {
+    expect(pagePlannedDay('today', at)).toBe('2026-10-20');
+    expect(pagePlannedDay(null, at)).toBe('2026-10-20');
+    expect(pagePlannedDay('week', at)).toBe('2026-10-26');
+    expect(pagePlannedDay('week', { ...at, monday: '2026-10-12' })).toBe('2026-10-18');
   });
 });

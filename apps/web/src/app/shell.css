@@ -125,3 +125,65 @@
   right: 0;
   bottom: 0;
 }
+
+/* The phone's More page: a short list of the views with no tab of their own. */
+.app-more-head {
+  padding-bottom: 4px;
+}
+.app-more-list {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0 8px;
+}
+.app-more-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 4px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.app-more-item:hover {
+  background: var(--accent);
+}
+.app-more-item:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1.5px var(--ring);
+}
+.app-more-icon {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: var(--foreground-2);
+}
+.app-more-words {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.app-more-label {
+  font-size: 15px;
+  font-weight: 500;
+}
+.app-more-hint {
+  font-size: 12.5px;
+  color: var(--muted-foreground);
+}
+.app-more-go {
+  flex: none;
+  color: var(--muted-foreground);
+}
