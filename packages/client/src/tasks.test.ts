@@ -25,6 +25,7 @@ function task(id: string, title: string, day: string, position: number, extra: P
     due: null,
     visibility: 'space',
     projectId: null,
+    ownerId: null,
     subtasks: [],
     subsDone: 0,
     subsTotal: 0,
@@ -36,7 +37,13 @@ function task(id: string, title: string, day: string, position: number, extra: P
 }
 
 function detailOf(t: Task): TaskDetail {
-  return { ...t, notes: '', comments: [], history: [{ id: 1, at: t.createdAt, kind: 'created' }] };
+  return {
+    ...t,
+    notes: '',
+    comments: [],
+    history: [{ id: 1, at: t.createdAt, kind: 'created' }],
+    owner: null,
+  };
 }
 
 /** A pretend server: days held in memory, sync answered by a function the test sets. */

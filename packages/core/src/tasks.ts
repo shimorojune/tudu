@@ -24,6 +24,8 @@ export interface Task {
   visibility: TaskVisibility;
   /** The project it belongs to, if any (the coloured dot). */
   projectId: string | null;
+  /** Whose list it is on. In a team space every page shows your own; People shows everyone's. */
+  ownerId: string | null;
   /** Its subtasks in order, for the fold under the row; the counts are what the byline says. */
   subtasks: Subtask[];
   subsDone: number;
@@ -102,12 +104,16 @@ export interface TaskDetail extends Task {
   subtasks: Subtask[];
   comments: Comment[];
   history: HistoryEvent[];
+  /** Whose task it is; null when that person is gone. */
+  owner: { id: string; name: string; email: string; color: string | null } | null;
 }
 
-/** Where a task ref ("ME-52") points: its task and the day it is on. */
+/** Where a task ref ("ME-52") points: its task, its space (and the space's part of the address) and the day it is on. */
 export interface TaskRefResponse {
   taskId: string;
   spaceId: string;
+  /** `me` for Personal, the slug for a team space. */
+  slug: string;
   day: IsoDate | null;
 }
 

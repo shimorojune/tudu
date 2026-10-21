@@ -10,3 +10,5 @@ export * from './quickadd';
 export * from './week';
 export * from './backlog';
 export * from './search';
+export * from './spaces';
+export * from './people';

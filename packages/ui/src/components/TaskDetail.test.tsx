@@ -525,3 +525,75 @@ describe('TaskDetail project (chunk 04)', () => {
     ]);
   });
 });
+
+describe('TaskDetail, someone else’s task (chunk 08)', () => {
+  it('C08-U07 Visible to lists "Everyone in Northwind" and "Only you" in a team space and picking reports', async () => {
+    const user = userEvent.setup();
+    const onVisibility = vi.fn();
+    render(
+      <Panel
+        visibility={[
+          { value: 'space', label: 'Everyone in Northwind' },
+          { value: 'me', label: 'Only you' },
+        ]}
+        onVisibility={onVisibility}
+      />,
+    );
+    const vis = screen.getByRole('button', { name: 'Visible to' });
+    expect(vis).toHaveTextContent('Everyone in Northwind');
+    await user.click(vis);
+    const menu = screen.getByRole('menu', { name: 'Who can see this task' });
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((m) => m.textContent),
+    ).toEqual(['Everyone in Northwind✓', 'Only you']);
+    await user.click(within(menu).getByRole('menuitem', { name: 'Only you' }));
+    expect(onVisibility).toHaveBeenCalledWith('me');
+  });
+
+  it('C08-U07 read-only: the owner line, nothing editable, the comment box there, no Delete under ⋯', async () => {
+    const user = userEvent.setup();
+    const onAddComment = vi.fn(() => 'c9');
+    const onRename = vi.fn();
+    const onCross = vi.fn();
+    render(
+      <Panel
+        readOnly
+        owner={{ name: 'Meera Iyer', initials: 'MI', color: '#3d5a80' }}
+        ownerLine="Mon 19 Oct · Meera’s"
+        visibility={[{ value: 'space', label: 'Everyone in Northwind' }]}
+        onRename={onRename}
+        onCross={onCross}
+        onAddComment={onAddComment}
+        onDelete={() => {}}
+      />,
+    );
+    const panel = document.querySelector('.tp-td')!;
+    expect(panel).toHaveClass('tp-td-readonly');
+    expect(screen.getByText('Mon 19 Oct · Meera’s').closest('.tp-td-owner')).not.toBeNull();
+    // the title is plain words, the box takes no tick
+    expect(screen.getByRole('heading', { name: 'Review Quick Add PR' })).toHaveClass('tp-td-title-ro');
+    expect(screen.queryByRole('textbox', { name: 'Task title' })).toBeNull();
+    const box = screen.getByRole('checkbox', { name: 'Cross off: Review Quick Add PR' });
+    expect(box).toBeDisabled();
+    await user.click(box);
+    expect(onCross).not.toHaveBeenCalled();
+    // the facts read as text: no buttons, no pickers
+    expect(screen.queryByRole('button', { name: 'Planned' })).toBeNull();
+    expect(screen.getByLabelText('Planned')).toHaveClass('tp-td-ro');
+    expect(screen.getByLabelText('Visible to')).toHaveTextContent('Everyone in Northwind');
+    expect(panel.querySelectorAll('.tp-td-pop')).toHaveLength(0);
+    // notes read, not written; subtasks without the add line
+    expect(screen.getByText(/yes or no/)).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Notes' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /Add subtask|New subtask/ })).toBeNull();
+    // ⋯ has no Delete; the comment box is there
+    await user.click(screen.getByRole('button', { name: 'More' }));
+    const menu = await screen.findByRole('menu', { name: 'More' });
+    expect(within(menu).queryByRole('menuitem', { name: 'Delete task' })).toBeNull();
+    expect(within(menu).getByRole('menuitem', { name: 'Copy link to task' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('textbox', { name: 'Write a comment' })).toBeInTheDocument();
+  });
+});

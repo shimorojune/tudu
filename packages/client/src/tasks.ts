@@ -2,6 +2,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { queryOptions } from '@tanstack/react-query';
 import {
   isProjectMutation,
+  MEMBERS_CHANGED,
   nextProjectColor,
   placeAt,
   POSITION_STEP,
@@ -15,6 +16,10 @@ import {
   type DayResponse,
   type IsoDate,
   type MarksResponse,
+  type MembersChangedEvent,
+  type MembersResponse,
+  type PeopleResponse,
+  type PersonResponse,
   type Project,
   type ProjectsChangedEvent,
   type Subtask,
@@ -49,6 +54,11 @@ export const marksKey = (spaceId: string, from: IsoDate, to: IsoDate) =>
   ['marks', spaceId, from, to] as const;
 export const taskKey = (spaceId: string, taskId: string) => ['task', spaceId, taskId] as const;
 export const projectsKey = (spaceId: string) => ['projects', spaceId] as const;
+export const membersKey = (spaceId: string) => ['members', spaceId] as const;
+export const peopleKey = (spaceId: string, from: IsoDate, to: IsoDate) =>
+  ['people', spaceId, from, to] as const;
+export const personKey = (spaceId: string, userId: string, from: IsoDate, to: IsoDate) =>
+  ['people', spaceId, 'one', userId, from, to] as const;
 
 function byPosition(a: { position: number; createdAt: string }, b: { position: number; createdAt: string }) {
   return a.position - b.position || a.createdAt.localeCompare(b.createdAt);
@@ -71,6 +81,7 @@ export function draftOf(m: Extract<SyncMutation, { type: 'task.create' }>, end =
     due: p.due ?? null,
     visibility: 'space',
     projectId: p.projectId ?? null,
+    ownerId: null,
     subtasks: [],
     subsDone: 0,
     subsTotal: 0,
@@ -525,6 +536,48 @@ export class TaskStore {
     });
   }
 
+  // ---- people --------------------------------------------------------------------------------------------
+
+  /** Who is in a space, and who is invited. */
+  membersQuery(spaceId: string) {
+    return queryOptions({
+      queryKey: membersKey(spaceId),
+      queryFn: async (): Promise<MembersResponse> => {
+        const res = await this.o.api.get<MembersResponse>(`/api/spaces/${spaceId}/members`);
+        this.setReachable(true);
+        return res;
+      },
+    });
+  }
+
+  /** Everyone's shared tasks between two days, by member. */
+  peopleQuery(spaceId: string, from: IsoDate, to: IsoDate) {
+    return queryOptions({
+      queryKey: peopleKey(spaceId, from, to),
+      queryFn: async (): Promise<PeopleResponse> => {
+        const res = await this.o.api.get<PeopleResponse>(
+          `/api/spaces/${spaceId}/people?from=${from}&to=${to}`,
+        );
+        this.setReachable(true);
+        return res;
+      },
+    });
+  }
+
+  /** One person's shared tasks between two days. */
+  personQuery(spaceId: string, userId: string, from: IsoDate, to: IsoDate) {
+    return queryOptions({
+      queryKey: personKey(spaceId, userId, from, to),
+      queryFn: async (): Promise<PersonResponse> => {
+        const res = await this.o.api.get<PersonResponse>(
+          `/api/spaces/${spaceId}/people/${userId}?from=${from}&to=${to}`,
+        );
+        this.setReachable(true);
+        return res;
+      },
+    });
+  }
+
   cachedProjects(spaceId: string): Project[] | undefined {
     return this.o.queryClient.getQueryData<Project[]>(projectsKey(spaceId));
   }
@@ -733,6 +786,13 @@ export class TaskStore {
 
   /** Refresh the days and tasks another tab or device changed. Our own changes are already on screen. */
   onEvent(e: LiveEvent): void {
+    if (e.type === MEMBERS_CHANGED) {
+      const me = e.data as MembersChangedEvent;
+      void this.o.queryClient.invalidateQueries({ queryKey: ['me'] });
+      void this.o.queryClient.invalidateQueries({ queryKey: membersKey(me.spaceId), exact: true });
+      void this.o.queryClient.invalidateQueries({ queryKey: ['people', me.spaceId] });
+      return;
+    }
     if (e.type === PROJECTS_CHANGED) {
       const pe = e.data as ProjectsChangedEvent;
       if (pe.clientId && pe.clientId === this.clientId) return;
@@ -747,6 +807,8 @@ export class TaskStore {
     for (const t of ev.tasks ?? [])
       void qc.invalidateQueries({ queryKey: taskKey(ev.spaceId, t), exact: true });
     void qc.invalidateQueries({ queryKey: ['marks', ev.spaceId] });
+    // People shows everyone's tasks: a colleague's change refreshes it.
+    void qc.invalidateQueries({ queryKey: ['people', ev.spaceId] });
   }
 
   /** After the stream was down for a while: read every cached day and task again. */
@@ -755,6 +817,8 @@ export class TaskStore {
     void this.o.queryClient.invalidateQueries({ queryKey: ['task'] });
     void this.o.queryClient.invalidateQueries({ queryKey: ['projects'] });
     void this.o.queryClient.invalidateQueries({ queryKey: ['marks'] });
+    void this.o.queryClient.invalidateQueries({ queryKey: ['people'] });
+    void this.o.queryClient.invalidateQueries({ queryKey: ['members'] });
   }
 
   stop(): void {
@@ -881,6 +945,7 @@ export class TaskStore {
         if (d && touched.has(d.id)) void this.o.queryClient.invalidateQueries({ queryKey: key, exact: true });
     }
     void this.o.queryClient.invalidateQueries({ queryKey: ['marks'] });
+    void this.o.queryClient.invalidateQueries({ queryKey: ['people'] });
     return { done: res.results.map((r) => r.id) };
   }
 

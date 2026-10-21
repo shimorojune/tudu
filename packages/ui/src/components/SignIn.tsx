@@ -6,6 +6,7 @@ import { TICK_PATH } from '../lib/ink';
 import { AuthArt, AuthLayer, type AuthArtProps } from './AuthLayer';
 import { Button } from './Button';
 import { CodeField } from './CodeField';
+import { JoinHead, type JoinInvite } from './JoinCard';
 import { Logo } from './Logo';
 import { showToast } from './Toast';
 
@@ -54,6 +55,11 @@ export interface SignInProps {
   resendSeconds?: number;
   /** The picture of the day beside the form on the desktop: its day, date, week and caption. */
   art?: AuthArtProps;
+  /**
+   * Sign in to join: the card names the space and who asked, the email is the one invited and cannot be changed,
+   * and "You're in" says the space is opening.
+   */
+  invite?: JoinInvite & { email: string };
   /** Emails a code. Rejects with an Error whose message is shown under the field. */
   sendCode: (email: string) => Promise<void>;
   /** Checks the code. Rejects with a SignInError. */
@@ -99,13 +105,14 @@ export function SignIn({
   lead,
   resendSeconds = DEFAULT_RESEND_SECONDS,
   art,
+  invite,
   sendCode,
   verifyCode,
   onDone,
 }: SignInProps) {
   const [step, setStep] = useState<SignInStep>(firstStep);
   const [dir, setDir] = useState<'next' | 'prev'>('next');
-  const [email, setEmail] = useState(initial.email ?? '');
+  const [email, setEmail] = useState(initial.email ?? invite?.email ?? '');
   const [code, setCode] = useState(initial.code ?? '');
   const [busy, setBusy] = useState<0 | 1 | 2>(initial.busy ?? 0);
   const [err, setErr] = useState<string | null>(initial.error ?? null);
@@ -203,13 +210,31 @@ export function SignIn({
     }
   }
 
+  const who = invite?.from?.name ?? 'Someone';
   const page =
     step === 'email' ? (
       <div className="tp-auth-page">
-        <h1>{title ?? 'Sign in to Tudu'}</h1>
-        <p className="tp-auth-lead">
-          {lead ?? 'Your email is all it takes. We’ll send you a code; no password to remember.'}
-        </p>
+        {invite ? (
+          <JoinHead
+            invite={invite}
+            eyebrow="You’re invited"
+            title={`Join ${invite.space.name}`}
+            lead={
+              <>
+                <b>{who}</b> invited you to {invite.space.name}, where{' '}
+                {invite.count <= 1 ? 'it’s just them for now' : `${invite.count} people share their work`} in
+                Tudu. Sign in to join.
+              </>
+            }
+          />
+        ) : (
+          <>
+            <h1>{title ?? 'Sign in to Tudu'}</h1>
+            <p className="tp-auth-lead">
+              {lead ?? 'Your email is all it takes. We’ll send you a code; no password to remember.'}
+            </p>
+          </>
+        )}
         <label className="tp-auth-l" htmlFor={emailId}>
           Email
         </label>
@@ -222,10 +247,11 @@ export function SignIn({
             autoCapitalize="off"
             spellCheck={false}
             value={email}
+            readOnly={!!invite}
+            aria-describedby={invite ? `${emailId}-inv` : err ? emailErrId : undefined}
             placeholder="you@company.com"
             autoFocus={!initial.noFocus}
             aria-invalid={err ? 'true' : undefined}
-            aria-describedby={err ? emailErrId : undefined}
             onChange={(e) => {
               setEmail(e.target.value);
               if (err) setErr(null);
@@ -241,15 +267,24 @@ export function SignIn({
             {err}
           </div>
         ) : null}
+        {invite ? (
+          <p className="tp-auth-fine" id={`${emailId}-inv`}>
+            The invite was sent to this address.
+          </p>
+        ) : null}
         <Button
           className="tp-auth-go"
           loading={busy === 1}
           loadingLabel="Sending a code…"
           onClick={() => void submitEmail()}
         >
-          Continue
+          {invite ? 'Sign in to join' : 'Continue'}
         </Button>
-        <p className="tp-auth-fine">New to Tudu? Same steps; we’ll set you up.</p>
+        <p className="tp-auth-fine">
+          {invite
+            ? `New to Tudu? Same steps; we’ll set you up, then take you to ${invite.space.name}.`
+            : 'New to Tudu? Same steps; we’ll set you up.'}
+        </p>
       </div>
     ) : (
       <div className="tp-auth-page">
@@ -302,7 +337,7 @@ export function SignIn({
                   <path d={TICK_PATH} />
                 </svg>
               </span>
-              You’re in.
+              {invite ? `You’re in. Opening ${invite.space.name}…` : 'You’re in.'}
             </>
           ) : null}
         </div>
@@ -315,23 +350,33 @@ export function SignIn({
           >
             {wait > 0 ? `Send a new code in ${countdown(wait)}` : 'Send a new code'}
           </button>
-          <span className="tp-auth-dot" aria-hidden="true">
-            ·
-          </span>
-          <button
-            type="button"
-            className="tp-auth-link"
-            disabled={busy > 0}
-            onClick={() => go('email', 'prev')}
-          >
-            Use a different email
-          </button>
+          {invite ? null : (
+            <span className="tp-auth-dot" aria-hidden="true">
+              ·
+            </span>
+          )}
+          {invite ? null : (
+            <button
+              type="button"
+              className="tp-auth-link"
+              disabled={busy > 0}
+              onClick={() => go('email', 'prev')}
+            >
+              Use a different email
+            </button>
+          )}
         </div>
       </div>
     );
 
   return (
-    <AuthLayer open={open} inline={inline} phone={phone} side={!inline} label="Sign in">
+    <AuthLayer
+      open={open}
+      inline={inline}
+      phone={phone}
+      side={!inline && !invite}
+      label={invite ? `Join ${invite.space.name}` : 'Sign in'}
+    >
       <div className="tp-auth-main">
         <header className="tp-auth-top">
           <Logo size={24} wordmark />
@@ -351,7 +396,7 @@ export function SignIn({
           .
         </footer>
       </div>
-      {!phone && !inline ? <AuthArt {...art} /> : null}
+      {!phone && !inline && !invite ? <AuthArt {...art} /> : null}
     </AuthLayer>
   );
 }

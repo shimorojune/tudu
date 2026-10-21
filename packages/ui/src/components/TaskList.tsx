@@ -183,9 +183,13 @@ export function TaskList(p: TaskListProps) {
   // still be settling after a turn); only another key or unmounting stops it.
   const seenLocate = useRef<string | null>(null);
   const locateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Unmounting drops a pending glow; the key is forgotten too, so a list that mounts again (StrictMode mounts twice
+  // in development) glows the row after all.
   useEffect(
     () => () => {
       if (locateTimer.current) clearTimeout(locateTimer.current);
+      locateTimer.current = null;
+      seenLocate.current = null;
     },
     [],
   );

@@ -1,0 +1,118 @@
+/* People: two panes like mail on the desk and tablets; the list is a page and a person is pushed in on phones. */
+.app-panes {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+.app-panes-l {
+  flex: 0 0 var(--ixl, 300px);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+  container-type: inline-size;
+}
+.app-desk[data-viewport='tablet'] .app-panes-l {
+  --ixl: 260px;
+}
+.app-panes-l .tp-dh {
+  padding-left: 16px;
+  padding-right: 18px;
+}
+.app-panes-l .tp-dh-tools {
+  flex-wrap: wrap;
+  gap: 8px;
+  row-gap: 10px;
+}
+.app-panes-l .tp-dh-tools .tp-ff {
+  flex: 1 1 100%;
+}
+.app-panes-r {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.app-panes-turn {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.app-panes-turn > .tp-turn {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-panes-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.app-people .tp-sheet-fill > .app-panes {
+  height: 100%;
+}
+/* Everyone's tasks in groups: a mono heading over the lines */
+.app-shared-group {
+  padding: 6px 20px 10px 42px;
+}
+.app-shared-group + .app-shared-group {
+  border-top: 1px solid var(--line);
+}
+.app-people-phone .app-shared-group {
+  padding: 6px 10px 10px 8px;
+}
+.app-shared-title {
+  padding: 12px 12px 4px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.app-shared-list {
+  display: flex;
+  flex-direction: column;
+}
+.app-shared-none {
+  padding: 6px 12px 10px;
+  font-size: 13.5px;
+  color: var(--muted-foreground);
+}
+.app-people .tp-prow {
+  padding-left: 30px;
+  padding-right: 20px;
+}
+.app-people-phone .tp-prow {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+.app-people .tp-empty {
+  padding: 56px 24px 60px;
+}
+.app-people-back {
+  padding: 10px 8px 0;
+}
+.app-people-back .tp-td-back {
+  margin-left: 0;
+}
+/* Everyone's header holds two switches and no filter: they start where the title starts, as the design draws them,
+   instead of being pushed to the right the way a lone switch beside a filter is. Where the header is narrow (a
+   phone, the kit at phone width) the switches wrap onto a second line rather than run past the edge. */
+.app-people .tp-dh-tools {
+  flex-wrap: wrap;
+  gap: 8px;
+  row-gap: 10px;
+}
+.app-people .tp-dh-tools .tp-seg {
+  margin-left: 0;
+}
+.app-panes-l .tp-dh-tools .tp-btn {
+  margin-left: 0;
+}

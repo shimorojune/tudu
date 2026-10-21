@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { createDb, schema, type Db } from '@tudu/db';
+import { personColor } from '@tudu/core';
+import { createDb, eq, schema, type Db } from '@tudu/db';
 import { createAuth, type Auth } from './auth';
 import { EventHub } from './events';
 import { OutboxMailer, signInCodeMail, type Mailer } from './email';
@@ -72,6 +73,11 @@ export function bootstrap(
         .insert(schema.spaces)
         .values({ id: spaceId, kind: 'personal', name: 'Personal', ownerId: user.id });
       await db.insert(schema.spaceMembers).values({ spaceId, userId: user.id, role: 'admin' });
+      // And a colour for their mark, the same on every device.
+      await db
+        .update(schema.user)
+        .set({ color: personColor(user.id) })
+        .where(eq(schema.user.id, user.id));
     },
   });
   const app = createApp({

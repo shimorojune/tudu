@@ -28,6 +28,7 @@ import {
 } from './dayView';
 import { goToTask } from './search';
 import { api } from './session';
+import { useSpace } from './space';
 import { taskStore, useOnline } from './tasks';
 import { useViewport } from './viewport';
 import { useWorkingDay } from './workingDay';
@@ -98,11 +99,11 @@ export function useQuickAddActions(spaceId: string | undefined) {
 }
 
 /** Quick Add over the app: the bar on the desk and tablets, the sheet above the keyboard on phones. */
-export function QuickAddHost({ me }: { me: MeResponse }) {
+export function QuickAddHost(_props: { me: MeResponse }) {
   const vp = useViewport();
   const open = useQuickAddOpen();
-  const space = me.spaces.find((s) => s.kind === 'personal') ?? me.spaces[0];
-  const a = useQuickAddActions(space?.id);
+  const space = useSpace();
+  const a = useQuickAddActions(space.id);
   const keyboard = useKeyboardHeight(vp === 'phone' && open);
   const lastId = useRef<string | null>(null);
   const day2: IsoDate | null = useSecondDay();
@@ -111,7 +112,6 @@ export function QuickAddHost({ me }: { me: MeResponse }) {
   // Tasks that read like the title, from the same search as the panel's, so "Looks like a task you have" can open one.
   const alike = useRef(new Map<string, SearchHit>());
   const similar = async (title: string): Promise<SimilarItem[]> => {
-    if (!space) return [];
     const r = await api.get<SearchResponse>(
       `/api/spaces/${space.id}/search?for=lookalike&q=${encodeURIComponent(title)}`,
     );
@@ -127,7 +127,7 @@ export function QuickAddHost({ me }: { me: MeResponse }) {
         const h = alike.current.get(it.key);
         if (!h) return;
         closeQuickAdd();
-        setTimeout(() => goToTask(h, a.today, (to) => void navigate({ to })), 200);
+        setTimeout(() => goToTask(h, a.today, (to) => void navigate({ href: to }), space.slug), 200);
       }}
       variant={vp === 'phone' ? 'sheet' : 'bar'}
       today={a.today}
@@ -170,7 +170,7 @@ export function QuickAddHost({ me }: { me: MeResponse }) {
             action: 'Show',
             onAction: () => {
               showDay(t.planned, a.today);
-              void navigate({ to: '/' });
+              void navigate({ href: `/${space.slug}` });
               setTimeout(() => flashTask(id, t.planned), 60);
             },
           });
@@ -185,7 +185,7 @@ export function QuickAddHost({ me }: { me: MeResponse }) {
           showToast(addedWords(null, a.today), {
             action: 'Show',
             onAction: () => {
-              void navigate({ to: '/backlog' });
+              void navigate({ href: `/${space.slug}/backlog` });
               setTimeout(() => flashTask(id, null), 60);
             },
           });

@@ -258,3 +258,35 @@
 .tp-qa-file-err .tp-qa-fsize {
   color: var(--destructive);
 }
+
+/* Spaces and People (chunk 08) */
+/* Someone else's task: the facts read as text, the title is plain, nothing invites a click. */
+.tp-root .tp-td-val.tp-td-ro {
+  cursor: default;
+  background: transparent;
+}
+.tp-td-title-ro {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 20px;
+  line-height: 1.3;
+  font-weight: 500;
+  color: var(--foreground);
+  overflow-wrap: anywhere;
+}
+.tp-td-readonly .tp-cbw {
+  cursor: default;
+}
+.tp-td-notes-ro {
+  font-size: 14px;
+}
+/* The members card inside its dialog: the sections breathe like Settings' do. */
+.tp-mc .tp-set-members {
+  display: flex;
+  flex-direction: column;
+}
+.tp-mc .tp-ssec-h .tp-ssec-a {
+  margin-left: 8px;
+}

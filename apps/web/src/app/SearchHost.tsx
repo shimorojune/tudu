@@ -7,6 +7,7 @@ import type { MeResponse } from '@tudu/client';
 import { closeSearch, openQuickAdd, useSearchOpen } from './dayView';
 import { addRecentTask, addSearch, clearSearches, goToTask, useRecentTasks, useSearches } from './search';
 import { api } from './session';
+import { useSpace } from './space';
 import { taskStore } from './tasks';
 import { useViewport } from './viewport';
 import { useWorkingDay } from './workingDay';
@@ -49,8 +50,8 @@ export function SearchHost({ me }: { me: MeResponse }) {
   const open = useSearchOpen();
   const { today } = useWorkingDay();
   const navigate = useNavigate();
-  const space = me.spaces.find((s) => s.kind === 'personal') ?? me.spaces[0];
-  const spaceId = space?.id ?? '';
+  const space = useSpace();
+  const spaceId = space.id;
   const [q, setQ] = useState('');
   const qd = useSettled(q, SEARCH_AFTER_MS);
   const projects = useQuery({ ...taskStore.projectsQuery(spaceId), enabled: !!spaceId && open }).data ?? [];
@@ -92,13 +93,13 @@ export function SearchHost({ me }: { me: MeResponse }) {
     if (!h) return;
     closeSearch();
     addRecentTask(spaceId, h.id);
-    setTimeout(() => goToTask(h, today, (to) => void navigate({ to })), leaveMs + 20);
+    setTimeout(() => goToTask(h, today, (to) => void navigate({ href: to }), space.slug), leaveMs + 20);
   };
   const create = (title: string) => {
     closeSearch();
     setTimeout(() => openQuickAdd({ title }), leaveMs + 20);
   };
-  if (!space) return null;
+  if (!me) return null;
   return (
     <SearchPanel
       open={open}

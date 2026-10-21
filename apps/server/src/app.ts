@@ -11,6 +11,7 @@ import { sessionMiddleware, type SessionVars } from './middleware/session';
 import { eventRoutes } from './routes/events';
 import { fileRoutes } from './routes/files';
 import { meRoutes } from './routes/me';
+import { spaceRoutes } from './routes/spaces';
 import { taskRoutes } from './routes/tasks';
 import { testRoutes } from './routes/test';
 import type { Storage } from './storage';
@@ -90,6 +91,7 @@ export function createApp(deps: AppDeps) {
   app.use('/api/*', sessionMiddleware(auth));
   app.route('/api', meRoutes(db));
   app.route('/api', taskRoutes(db, hub));
+  app.route('/api', spaceRoutes(db, hub, mailer, env.WEB_URL!));
   app.route('/api', fileRoutes(db, storage));
   app.route('/api', eventRoutes(hub, auth, { heartbeatMs: deps.heartbeatMs }));
 

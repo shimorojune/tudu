@@ -345,7 +345,7 @@ test.describe('detail', () => {
     if (copied !== null) expect(copied).toBe(`${origin}/t/ME-1`);
     // a link to a task that is not there goes back to the day
     await page.goto('/t/ME-9');
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/me$/);
     await expect(panel(page)).toHaveCount(0);
   });
 

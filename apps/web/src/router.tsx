@@ -6,15 +6,26 @@ import {
   redirect,
 } from '@tanstack/react-router';
 import type { QueryClient } from '@tanstack/react-query';
-import type { TaskRefResponse } from '@tudu/core';
+import { PERSONAL_SLUG, type TaskRefResponse } from '@tudu/core';
 import { ToastHost } from '@tudu/ui';
 import { AppShell } from './app/AppShell';
 import { useLiveEvents } from './app/live';
 import { WorkingDayProvider } from './app/workingDay';
 import { api, meQuery, queryClient } from './app/session';
+import {
+  homePath,
+  lastSpace,
+  rememberSpace,
+  spaceBySlug,
+  spacePath,
+  SpaceProvider,
+  type View,
+} from './app/space';
 import { KitPage } from './routes/kit/KitPage';
 import { BacklogPage } from './routes/backlog/BacklogPage';
+import { JoinPage } from './routes/join/JoinPage';
 import { MorePage } from './routes/more/MorePage';
+import { PeoplePage } from './routes/people/PeoplePage';
 import { QuickAddPage } from './routes/quick-add/QuickAddPage';
 import { SignInPage } from './routes/sign-in/SignInPage';
 import { SoonPage, TodayPage } from './routes/today/TodayPage';
@@ -40,9 +51,20 @@ const signInRoute = createRoute({
     typeof s.next === 'string' ? { next: s.next } : {},
   beforeLoad: async ({ context, search }) => {
     const me = await context.queryClient.fetchQuery(meQuery);
-    if (me) throw redirect({ to: search.next ?? '/', replace: true });
+    if (me) throw redirect({ href: search.next ?? homePath(me.spaces), replace: true });
   },
   component: SignInPage,
+});
+
+/** An invite's link: Join Northwind, with sign in under it when you are not in yet. */
+const joinRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/join/$token',
+  beforeLoad: async ({ context }) => ({ me: await context.queryClient.fetchQuery(meQuery) }),
+  component: function JoinRoute() {
+    const { me } = joinRoute.useRouteContext();
+    return <JoinPage me={me} />;
+  },
 });
 
 /** Every page of the app: needs a session, else back to sign in with the way back remembered. */
@@ -54,66 +76,133 @@ const appRoute = createRoute({
     if (!me)
       throw redirect({
         to: '/sign-in',
-        search: { next: location.pathname === '/' ? undefined : location.pathname },
+        search: { next: location.pathname === '/' ? undefined : location.pathname + location.searchStr },
         replace: true,
       });
     return { me };
   },
-  component: function AppLayout() {
-    const { me } = appRoute.useRouteContext();
+});
+
+/** `/` opens the last space you were in, Personal the first time. */
+const homeRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/',
+  beforeLoad: ({ context, location }) => {
+    // The search travels along, so /?task=ME-1 still opens the task in the last space.
+    throw redirect({ href: homePath(context.me.spaces) + location.searchStr, replace: true });
+  },
+});
+
+const taskSearch = (s: Record<string, unknown>): { task?: string } =>
+  typeof s.task === 'string' && s.task ? { task: s.task } : {};
+
+/** The old addresses, from before the space was in them: the same view in the last space. */
+function legacy(path: string, view: View) {
+  return createRoute({
+    getParentRoute: () => appRoute,
+    path,
+    validateSearch: taskSearch,
+    beforeLoad: ({ context, search }) => {
+      const slug = lastSpace(context.me.spaces) ?? PERSONAL_SLUG;
+      const q = search.task ? `?task=${encodeURIComponent(search.task)}` : '';
+      throw redirect({ href: spacePath(slug, view) + q, replace: true });
+    },
+  });
+}
+const legacyRoutes = [
+  legacy('/week', 'week'),
+  legacy('/backlog', 'backlog'),
+  legacy('/inbox', 'inbox'),
+  legacy('/people', 'people'),
+  legacy('/more', 'more'),
+];
+
+/** A link to a task: /t/NW-12 opens it on its day in its space, or in that space's Backlog when it has none. */
+const taskLinkRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/t/$ref',
+  beforeLoad: async ({ params, context }) => {
+    const hit = await api
+      .get<TaskRefResponse>(`/api/tasks/ref/${encodeURIComponent(params.ref)}`)
+      .catch(() => null);
+    const slug = hit?.slug ?? lastSpace(context.me.spaces) ?? PERSONAL_SLUG;
+    const view: View = hit && hit.day === null ? 'backlog' : 'today';
+    throw redirect({
+      href: `${spacePath(slug, view)}?task=${encodeURIComponent(params.ref)}`,
+      replace: true,
+    });
+  },
+});
+
+/** A space: every view lives under its part of the address (`me` for Personal). */
+const spaceRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/$space',
+  beforeLoad: ({ context, params }) => {
+    const space = spaceBySlug(context.me.spaces, params.space);
+    if (!space) throw redirect({ href: homePath(context.me.spaces), replace: true });
+    rememberSpace(space.slug);
+    return { space };
+  },
+  component: function SpaceLayout() {
+    const { me, space } = spaceRoute.useRouteContext();
     useLiveEvents(true);
     return (
       <WorkingDayProvider>
-        <AppShell me={me}>
-          <Outlet />
-        </AppShell>
+        <SpaceProvider space={space}>
+          <AppShell me={me} space={space}>
+            <Outlet />
+          </AppShell>
+        </SpaceProvider>
       </WorkingDayProvider>
     );
   },
 });
 
 const todayRoute = createRoute({
-  getParentRoute: () => appRoute,
+  getParentRoute: () => spaceRoute,
   path: '/',
-  validateSearch: (s: Record<string, unknown>): { task?: string } =>
-    typeof s.task === 'string' && s.task ? { task: s.task } : {},
+  validateSearch: taskSearch,
   component: TodayPage,
 });
-/** A link to a task: /t/ME-52 opens it on its day, or in the Backlog when it has none. */
-const taskLinkRoute = createRoute({
-  getParentRoute: () => appRoute,
-  path: '/t/$ref',
-  beforeLoad: async ({ params }) => {
-    let day: string | null | undefined;
-    try {
-      day = (await api.get<TaskRefResponse>(`/api/tasks/ref/${encodeURIComponent(params.ref)}`)).day;
-    } catch {
-      day = undefined;
-    }
-    throw redirect({ to: day === null ? '/backlog' : '/', search: { task: params.ref }, replace: true });
-  },
-});
 const weekRoute = createRoute({
-  getParentRoute: () => appRoute,
+  getParentRoute: () => spaceRoute,
   path: '/week',
-  validateSearch: (s: Record<string, unknown>): { task?: string } =>
-    typeof s.task === 'string' && s.task ? { task: s.task } : {},
+  validateSearch: taskSearch,
   component: WeekPage,
 });
 const backlogRoute = createRoute({
-  getParentRoute: () => appRoute,
+  getParentRoute: () => spaceRoute,
   path: '/backlog',
-  validateSearch: (s: Record<string, unknown>): { task?: string } =>
-    typeof s.task === 'string' && s.task ? { task: s.task } : {},
+  validateSearch: taskSearch,
   component: BacklogPage,
 });
+/** People, team spaces only: Personal sends you to its Today. */
+const peopleRoute = createRoute({
+  getParentRoute: () => spaceRoute,
+  path: '/people',
+  validateSearch: taskSearch,
+  beforeLoad: ({ context }) => {
+    if (context.space.kind !== 'team') throw redirect({ href: spacePath(context.space.slug), replace: true });
+  },
+  component: PeoplePage,
+});
+const personRoute = createRoute({
+  getParentRoute: () => spaceRoute,
+  path: '/people/$userId',
+  validateSearch: taskSearch,
+  beforeLoad: ({ context }) => {
+    if (context.space.kind !== 'team') throw redirect({ href: spacePath(context.space.slug), replace: true });
+  },
+  component: PeoplePage,
+});
 /** The phone's More tab: the views with no tab of their own. */
-const moreRoute = createRoute({ getParentRoute: () => appRoute, path: '/more', component: MorePage });
+const moreRoute = createRoute({ getParentRoute: () => spaceRoute, path: '/more', component: MorePage });
 const inboxRoute = createRoute({
-  getParentRoute: () => appRoute,
+  getParentRoute: () => spaceRoute,
   path: '/inbox',
   component: () => (
-    <SoonPage title="The Inbox is on its way." body="What people send you arrives with chunk 08." />
+    <SoonPage title="The Inbox is on its way." body="What people send you arrives with the next chunk." />
   ),
 });
 const kitRoute = createRoute({ getParentRoute: () => rootRoute, path: '/kit', component: KitPage });
@@ -140,7 +229,21 @@ const quickAddRoute = createRoute({
 export const router = createRouter({
   routeTree: rootRoute.addChildren([
     signInRoute,
-    appRoute.addChildren([todayRoute, taskLinkRoute, weekRoute, backlogRoute, moreRoute, inboxRoute]),
+    joinRoute,
+    appRoute.addChildren([
+      homeRoute,
+      ...legacyRoutes,
+      taskLinkRoute,
+      spaceRoute.addChildren([
+        todayRoute,
+        weekRoute,
+        backlogRoute,
+        peopleRoute,
+        personRoute,
+        moreRoute,
+        inboxRoute,
+      ]),
+    ]),
     kitRoute,
     quickAddRoute,
   ]),

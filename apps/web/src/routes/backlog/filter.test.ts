@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { MORE_ITEMS } from '../more/MorePage';
+import { moreItems } from '../more/MorePage';
 import { getBacklogFilter, resetBacklogFilters, setBacklogFilter } from './filter';
 
 afterEach(resetBacklogFilters);
@@ -21,6 +21,13 @@ describe('C06-U09 the Backlog page remembers its filter', () => {
   });
 
   it('More lists the Backlog', () => {
-    expect(MORE_ITEMS.map((i) => [i.label, i.path])).toEqual([['Backlog', '/backlog']]);
+    expect(moreItems({ kind: 'personal', name: 'Personal' }).map((i) => [i.label, i.value])).toEqual([
+      ['Backlog', 'backlog'],
+    ]);
+    // C08-U11 a team space lists People under the Backlog
+    expect(moreItems({ kind: 'team', name: 'Northwind' }).map((i) => [i.label, i.value, i.hint])).toEqual([
+      ['Backlog', 'backlog', 'Tasks without a day'],
+      ['People', 'people', 'Everyone in Northwind'],
+    ]);
   });
 });

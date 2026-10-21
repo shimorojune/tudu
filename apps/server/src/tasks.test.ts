@@ -325,6 +325,7 @@ describe('tasks and sync', () => {
         'due',
         'id',
         'number',
+        'ownerId',
         'position',
         'projectId',
         'ref',
@@ -636,7 +637,7 @@ describe('task detail (chunk 03)', () => {
     await sync(p, [create(p, 'One', SUN, 1024), create(p, 'Two', '2026-10-21', 1024, id)]);
     const res = await get(server.app, '/api/tasks/ref/ME-2', p.jar);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ taskId: id, spaceId: p.spaceId, day: '2026-10-21' });
+    expect(await res.json()).toEqual({ taskId: id, spaceId: p.spaceId, slug: 'me', day: '2026-10-21' });
     expect((await get(server.app, '/api/tasks/ref/me-2', p.jar)).status).toBe(200);
     expect((await get(server.app, '/api/tasks/ref/ME-9', p.jar)).status).toBe(404);
     expect((await get(server.app, '/api/tasks/ref/nonsense', p.jar)).status).toBe(404);

@@ -5,6 +5,7 @@ import {
   dayWord,
   daysInMonth,
   historyWords,
+  ownerWords,
   relativeDayLabel,
   weekdayName,
   whenWords,
@@ -25,6 +26,7 @@ import { useEffect, useState } from 'react';
 import { API_URL } from '../../app/config';
 import { initialsOf } from '../../app/session';
 import { addRecentTask } from '../../app/search';
+import { useSpace } from '../../app/space';
 import { taskStore } from '../../app/tasks';
 import type { Viewport } from '../../app/viewport';
 
@@ -68,6 +70,7 @@ function monthAround(day: IsoDate): { from: IsoDate; to: IsoDate } {
 export function TaskPanel(p: TaskPanelProps) {
   const { spaceId, open, today, vp } = p;
   const compact = vp === 'phone';
+  const space = useSpace();
   // "Just now", "Thu 10:12": the clock is read when the panel opens or changes task, and once a minute.
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -144,6 +147,9 @@ export function TaskPanel(p: TaskPanelProps) {
   else body = panelFor(detail);
 
   function panelFor(d: TaskDetailData) {
+    // Someone else's task (from People): read and comment, change nothing.
+    const theirs = !!d.ownerId && d.ownerId !== p.me.id;
+    const owner = d.owner ?? (theirs ? { id: d.ownerId!, name: 'Someone', email: '', color: null } : null);
     const task: TaskDetailTask = {
       key: d.id,
       id: d.ref,
@@ -177,7 +183,25 @@ export function TaskPanel(p: TaskPanelProps) {
         task={task}
         today={today}
         me={{ initials: initialsOf(p.me.name, p.me.email), name: p.me.name || p.me.email }}
-        visibility={[{ value: 'space', label: 'Only you' }]}
+        visibility={
+          space.kind === 'team'
+            ? [
+                { value: 'space', label: `Everyone in ${space.name}` },
+                { value: 'me', label: 'Only you' },
+              ]
+            : [{ value: 'space', label: 'Only you' }]
+        }
+        readOnly={theirs}
+        owner={
+          theirs && owner
+            ? {
+                name: owner.name || owner.email,
+                initials: initialsOf(owner.name, owner.email),
+                color: owner.color,
+              }
+            : undefined
+        }
+        ownerLine={theirs && owner ? ownerWords(d.day, owner.name || owner.email, today) : undefined}
         calendar={{ marks: marks ?? {} }}
         projects={projects}
         fileBase={API_URL}
@@ -226,11 +250,15 @@ export function TaskPanel(p: TaskPanelProps) {
         onEditComment={(c, html) => taskStore.editComment(d.id, c.key, html)}
         onDeleteComment={(c: DetailComment) => taskStore.removeComment(d.id, c.key)}
         onRestoreComment={(c) => taskStore.restoreComment(d.id, c.html)}
-        onDelete={() => {
-          p.onClose();
-          taskStore.remove(d.id);
-          showToast('Task deleted', { action: 'Undo', onAction: () => taskStore.restore(d.id) });
-        }}
+        onDelete={
+          theirs
+            ? undefined
+            : () => {
+                p.onClose();
+                taskStore.remove(d.id);
+                showToast('Task deleted', { action: 'Undo', onAction: () => taskStore.restore(d.id) });
+              }
+        }
       />
     );
   }

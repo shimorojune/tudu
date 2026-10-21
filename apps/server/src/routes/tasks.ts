@@ -89,7 +89,7 @@ export function taskRoutes(db: Db, hub: EventHub) {
       const changed = await rollForward(db, spaceId, today);
       await announce(db, hub, spaceId, changed.days, changed.tasks, null);
     }
-    const tasks = await tasksOfDay(db, spaceId, day);
+    const tasks = await tasksOfDay(db, spaceId, userId, day);
     const body: DayResponse = {
       day,
       tasks,
@@ -111,7 +111,7 @@ export function taskRoutes(db: Db, hub: EventHub) {
       const changed = await rollForward(db, spaceId, today);
       await announce(db, hub, spaceId, changed.days, changed.tasks, null);
     }
-    const week = await tasksOfWeek(db, spaceId, monday);
+    const week = await tasksOfWeek(db, spaceId, userId, monday);
     const body: WeekResponse = {
       monday,
       days: Array.from({ length: 7 }, (_, i) => {
@@ -119,7 +119,7 @@ export function taskRoutes(db: Db, hub: EventHub) {
         const tasks = week.get(day) ?? [];
         return { day, tasks, counts: { total: tasks.length, done: tasks.filter((t) => t.done).length } };
       }),
-      backlog: await tasksOfBacklog(db, spaceId),
+      backlog: await tasksOfBacklog(db, spaceId, userId),
     };
     return c.json(body);
   });
@@ -128,7 +128,7 @@ export function taskRoutes(db: Db, hub: EventHub) {
     const userId = c.get('session')!.user.id;
     const { spaceId } = c.req.param();
     if (!(await roleIn(db, userId, spaceId))) return c.json({ error: 'You’re not in that space.' }, 403);
-    const body: BacklogResponse = { tasks: await tasksOfBacklog(db, spaceId) };
+    const body: BacklogResponse = { tasks: await tasksOfBacklog(db, spaceId, userId) };
     return c.json(body);
   });
 
@@ -143,11 +143,12 @@ export function taskRoutes(db: Db, hub: EventHub) {
     const ids = c.req.query('ids');
     const q = (c.req.query('q') ?? '').slice(0, 200);
     let hits;
-    if (ids !== undefined) hits = await hitsById(db, spaceId, ids.split(',').filter(Boolean).slice(0, 20));
-    else if (c.req.query('for') === 'lookalike') hits = await lookAlikeTasks(db, spaceId, q);
+    if (ids !== undefined)
+      hits = await hitsById(db, spaceId, userId, ids.split(',').filter(Boolean).slice(0, 20));
+    else if (c.req.query('for') === 'lookalike') hits = await lookAlikeTasks(db, spaceId, userId, q);
     else {
       const today = c.req.query('today');
-      hits = await searchTasks(db, spaceId, q, isIsoDate(today) ? today : isoToday());
+      hits = await searchTasks(db, spaceId, userId, q, isIsoDate(today) ? today : isoToday());
     }
     const body: SearchResponse = { hits };
     return c.json(body);
@@ -159,6 +160,9 @@ export function taskRoutes(db: Db, hub: EventHub) {
     if (!(await roleIn(db, userId, spaceId))) return c.json({ error: 'You’re not in that space.' }, 403);
     const task = await taskDetail(db, taskId);
     if (!task || task.spaceId !== spaceId) return c.json({ error: 'That task isn’t there any more.' }, 404);
+    // A colleague's task marked Only me is not there for anyone else.
+    if (task.ownerId && task.ownerId !== userId && task.visibility === 'me')
+      return c.json({ error: 'That task isn’t there any more.' }, 404);
     return c.json(task);
   });
 
@@ -186,7 +190,7 @@ export function taskRoutes(db: Db, hub: EventHub) {
     if (!isIsoDate(from) || !isIsoDate(to) || diffDays(from, to) < 0 || diffDays(from, to) > MARKS_SPAN)
       return c.json({ error: 'Ask for a range of up to two months.' }, 400);
     if (!(await roleIn(db, userId, spaceId))) return c.json({ error: 'You’re not in that space.' }, 403);
-    const body: MarksResponse = { marks: await marksOf(db, spaceId, from, to) };
+    const body: MarksResponse = { marks: await marksOf(db, spaceId, userId, from, to) };
     return c.json(body);
   });
 
