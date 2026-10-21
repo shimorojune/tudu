@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseRules, readStylesheet } from '../test-utils/stylesheet';
-import { QA_CLOSE_AFTER_MS, QA_LEAVE_MS, QA_LEAVE_PHONE_MS, QuickAdd, type QuickAddProps } from './QuickAdd';
+import { QA_CLOSE_AFTER_MS, QA_LEAVE_MS, QA_LEAVE_PHONE_MS, QA_SIMILAR_AFTER_MS, QuickAdd, type QuickAddProps } from './QuickAdd';
 import { ToastHost } from './Toast';
 
 const rules = parseRules(readStylesheet('components.css'));
@@ -319,5 +319,91 @@ describe('QuickAdd', () => {
     expect(reduced.some((r) => /tp-veil-in 120ms/.test(r.declarations.animation ?? ''))).toBe(true);
     expect(QA_LEAVE_MS).toBe(160);
     expect(QA_LEAVE_PHONE_MS).toBe(220);
+  });
+
+  it('C07-U07 looks like a task you have: asked after a pause (not under four letters), the closest with where, N more unfolds, × hides, the title opens it, Add never waits', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const similar = vi.fn(async (title: string) => {
+      if (title === 'Run it') return [{ key: 'u', title: 'Run it again' }];
+      if (title === 'Run the backfill') return [{ key: 'v', title: 'Run the backfill script' }];
+      return title.startsWith('Run')
+        ? [
+            { key: 'q', title: 'Run the migration and backfill on staging', where: { label: 'Today' } },
+            { key: 'r', title: 'Run the migration on production', where: { label: 'Tomorrow' } },
+            { key: 's', title: 'Run the backfill', where: { label: 'Backlog' } },
+            { key: 't', title: 'One too many' },
+          ]
+        : [];
+    });
+    const onOpenSimilar = vi.fn();
+    const onSave = vi.fn();
+    render(<Bar similar={similar} onOpenSimilar={onOpenSimilar} onSave={onSave} />);
+    const line = screen.getByRole('textbox', { name: 'Task title' });
+    await waitFor(() => expect(line).toHaveFocus());
+    await user.type(line, 'Run');
+    act(() => vi.advanceTimersByTime(QA_SIMILAR_AFTER_MS + 20));
+    expect(similar).not.toHaveBeenCalled();
+    await user.type(line, ' the migration');
+    expect(similar).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(QA_SIMILAR_AFTER_MS + 20));
+    await waitFor(() => expect(similar).toHaveBeenCalledTimes(1));
+    expect(similar).toHaveBeenCalledWith('Run the migration');
+    const wrap = document.querySelector('.tp-qa-simwrap')!;
+    await waitFor(() => expect(wrap).toHaveClass('tp-on'));
+    expect(wrap.querySelector('.tp-qa-sim-k')!.textContent).toBe('Looks like tasks you have');
+    const links = () => [...wrap.querySelectorAll('.tp-qa-sim-t')].map((b) => b.textContent);
+    expect(links()).toEqual([
+      'Run the migration and backfill on staging',
+      'Run the migration on production',
+      'Run the backfill',
+    ]);
+    expect(wrap.querySelector('.tp-qa-sim-w')!.textContent).toBe('Today');
+    const more = screen.getByRole('button', { name: '2 more' });
+    expect(more).toHaveAttribute('aria-expanded', 'false');
+    expect(wrap.querySelector('.tp-qa-sim-rest')).not.toHaveClass('tp-on');
+    await user.click(more);
+    expect(more).toHaveAttribute('aria-expanded', 'true');
+    expect(wrap.querySelector('.tp-qa-sim-rest')).toHaveClass('tp-on');
+    await user.click(screen.getByRole('button', { name: 'Run the migration on production' }));
+    expect(onOpenSimilar).toHaveBeenCalledWith(expect.objectContaining({ key: 'r' }));
+    // Add never waits for it
+    expect(screen.getByRole('button', { name: 'Add task' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'None of these' }));
+    expect(wrap).not.toHaveClass('tp-on');
+    expect(line).toHaveFocus();
+    // a different title asks again and shows the line again; a short one clears it
+    await user.clear(line);
+    await user.type(line, 'Run it');
+    act(() => vi.advanceTimersByTime(QA_SIMILAR_AFTER_MS + 20));
+    await waitFor(() => expect(similar).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(wrap).toHaveClass('tp-on'));
+    await user.clear(line);
+    await user.type(line, 'Ru');
+    expect(wrap).not.toHaveClass('tp-on');
+    // one look-alike: the singular, no "more"
+    await user.clear(line);
+    await user.type(line, 'Run');
+    await user.type(line, ' the backfill');
+    act(() => vi.advanceTimersByTime(QA_SIMILAR_AFTER_MS + 20));
+    await waitFor(() => expect(similar).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(wrap.querySelector('.tp-qa-sim-k')!.textContent).toBe('Looks like a task you have'));
+    expect(screen.queryByRole('button', { name: /more$/ })).toBeNull();
+  });
+
+  it('C07-U07 words handed in become the title; the kit line opens already shown', () => {
+    const { rerender, unmount } = render(<Bar seed={{ title: 'Gutters', nonce: 1 }} />);
+    expect(screen.getByRole('textbox', { name: 'Task title' })).toHaveValue('Gutters');
+    rerender(<Bar seed={{ title: 'Roof', nonce: 2 }} />);
+    expect(screen.getByRole('textbox', { name: 'Task title' })).toHaveValue('Roof');
+    unmount();
+    render(
+      <Bar
+        initial={{ noFocus: true, title: 'Fix roof', similar: [{ key: 'a', title: 'Fix the roof', where: { label: 'Backlog' } }] }}
+      />,
+    );
+    expect(document.querySelector('.tp-qa-simwrap')).toHaveClass('tp-on');
+    expect(document.querySelector('.tp-qa-sim-k')!.textContent).toBe('Looks like a task you have');
+    expect(document.querySelector('.tp-qa-sim-w')!.textContent).toBe('Backlog');
   });
 });

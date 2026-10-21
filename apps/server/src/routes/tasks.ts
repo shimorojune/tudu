@@ -3,6 +3,7 @@ import {
   addDays,
   diffDays,
   isIsoDate,
+  isoToday,
   mondayOf,
   syncRequestSchema,
   TASKS_CHANGED,
@@ -13,6 +14,7 @@ import {
   type WeekResponse,
   PROJECTS_CHANGED,
   type ProjectsChangedEvent,
+  type SearchResponse,
   type SyncResponse,
   type TaskRefResponse,
   type TasksChangedEvent,
@@ -22,12 +24,15 @@ import type { EventHub } from '../events';
 import { requireSession, type SessionVars } from '../middleware/session';
 import {
   applyBatch,
+  hitsById,
+  lookAlikeTasks,
   marksOf,
   membersOf,
   projectsOf,
   resolveRef,
   roleIn,
   rollForward,
+  searchTasks,
   taskDetail,
   tasksById,
   tasksOfBacklog,
@@ -124,6 +129,27 @@ export function taskRoutes(db: Db, hub: EventHub) {
     const { spaceId } = c.req.param();
     if (!(await roleIn(db, userId, spaceId))) return c.json({ error: 'You’re not in that space.' }, 403);
     const body: BacklogResponse = { tasks: await tasksOfBacklog(db, spaceId) };
+    return c.json(body);
+  });
+
+  /**
+   * Search a space's tasks: `?q=` the words (ranked, at most thirty, `today` for the tie order), `?ids=` the tasks
+   * asked for in that order (Recently opened), `?q=&for=lookalike` open tasks that read like a title.
+   */
+  r.get('/spaces/:spaceId/search', requireSession, async (c) => {
+    const userId = c.get('session')!.user.id;
+    const { spaceId } = c.req.param();
+    if (!(await roleIn(db, userId, spaceId))) return c.json({ error: 'You’re not in that space.' }, 403);
+    const ids = c.req.query('ids');
+    const q = (c.req.query('q') ?? '').slice(0, 200);
+    let hits;
+    if (ids !== undefined) hits = await hitsById(db, spaceId, ids.split(',').filter(Boolean).slice(0, 20));
+    else if (c.req.query('for') === 'lookalike') hits = await lookAlikeTasks(db, spaceId, q);
+    else {
+      const today = c.req.query('today');
+      hits = await searchTasks(db, spaceId, q, isIsoDate(today) ? today : isoToday());
+    }
+    const body: SearchResponse = { hits };
     return c.json(body);
   });
 

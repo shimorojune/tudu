@@ -123,6 +123,8 @@ export const tasks = pgTable(
     dueDay: date('due_day', { mode: 'string' }),
     /** Rich text, as cleaned HTML. */
     notes: text('notes').notNull().default(''),
+    /** The notes' words alone, kept beside the HTML so search reads text, never markup. */
+    notesText: text('notes_text').notNull().default(''),
     /** In a team space: everyone, or only its owner. */
     visibility: taskVisibility('visibility').notNull().default('space'),
     projectId: text('project_id').references(() => projects.id, { onDelete: 'set null' }),

@@ -1,7 +1,7 @@
 # Chunk 07 · Search
 
-Status: proposed 21 Oct 2026. Awaiting your approval. Tests will be in [docs/tests/chunk-07.md](../tests/chunk-07.md);
-deviations in [design-deviations.md](design-deviations.md).
+Status: approved 21 Oct 2026 (all six choices as proposed), built on branch `rewrite/07-search`. Tests in
+[docs/tests/chunk-07.md](../tests/chunk-07.md); deviations in [design-deviations.md](design-deviations.md).
 
 Boards: 07 Search (desktop, dark, tablet, phone, states, motion), 03 Quick Add (Looks like a task you have), 00 The
 task row. The panel is the design system's SearchPanel with SearchHit rows and the Quick Add's close-match line; the

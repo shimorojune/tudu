@@ -138,3 +138,33 @@ the coding session, so this file is the record and the canvas gets a copy by han
   still in flight (tests read the server too early), and a change written to disk between the outbox's last look
   and its sweep could lose its overlay. Both are closed; chunk 06's tests cover the Backlog, the earlier chunks'
   tests still pass.
+
+## Chunk 07 · Search · 21 Oct 2026
+
+- Built as drawn: the panel from the top bar's icon (the Search tab's sheet on phones), recent searches and recently
+  opened before you type, results on every key with the matched words washed in ink, the note line cut around the
+  word, best match first with the canvas's tie order, Create “…” when nothing matches, the pick that turns the page
+  and glows the row, the last search back and selected on reopening, "Looks like a task you have" in Quick Add,
+  and the states on the states board.
+- The search runs on the server: one request a moment after each key (80ms), the previous rows kept while the next
+  answer comes, so nothing flickers. The design's prototype searched a list in the page.
+- A plain-text copy of the notes (`notes_text`, migration 0004, backfilled once) is what the words are matched
+  against, so markup, link addresses and tag names never match.
+- Close matches by meaning are not there (vector search is in later.md): no "Close matches" heading, no "Looking
+  for tasks like this…", and the "Close matches aren’t available" line is not drawn. "Looks like a task you have"
+  matches by shared words meanwhile, the same rule as the design's stand-in: open tasks sharing two or more of the
+  title's words (one for a one- or two-word title), at most three.
+- Jira keys are not searched or shown in the rows until chunk 10 brings them; the hint reads "Search your tasks by
+  title, task ID or note." rather than naming the Jira key.
+- Not drawn: a search that could not run (offline, the server away) shows one quiet line under the box,
+  "Couldn’t search right now.", with Try again; the recents still show with an empty box.
+- Recent searches and recently opened are kept per browser and space (local storage), five each; a task opened from
+  its panel joins recently opened too, not only one picked in Search. The last search lives in the panel for the
+  visit.
+- A pick scrolls the row into the middle and glows it for the list's locate beat; the list's wait now survives the
+  page settling after a turn (it was cancelled by any re-render within 240ms, so a pick on the day already in view
+  never glowed).
+- No keyboard shortcut opens search, per the canvas; inside the panel the arrows, Enter and Esc work as drawn.
+- A fix found on the way (C03-E07's phone flake): the outbox's sweep could drop a change written to disk while the
+  sweep was reading it, so `idle()` said the change had landed before it was sent. The sweep now only lets go of
+  what it saw stored before its read, and IndexedDB writes settle on commit.

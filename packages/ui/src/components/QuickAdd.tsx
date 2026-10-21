@@ -84,9 +84,33 @@ export interface QuickAddProps {
     saving?: boolean;
     dropping?: boolean;
     noFocus?: boolean;
+    /** The look-alike line already open with these tasks. */
+    similar?: SimilarItem[];
+    similarOpen?: boolean;
   };
+  /** Words to start the title with (Create from Search): a new nonce writes them in. */
+  seed?: { title: string; nonce: number } | null;
+  /**
+   * Close matches while you write: tasks that read like the title, asked a moment after a pause. A quiet line under
+   * the title names the closest; it never blocks adding.
+   */
+  similar?: (title: string) => Promise<SimilarItem[]>;
+  /** The title in the look-alike line: go to that task, keeping the draft. */
+  onOpenSimilar?: (item: SimilarItem) => void;
   className?: string;
 }
+
+/** A task that reads like the one being written. */
+export interface SimilarItem {
+  key: string;
+  title: string;
+  where?: { label: string } | null;
+}
+
+/** Quick Add waits this long after a pause in the title before asking for look-alikes. */
+export const QA_SIMILAR_AFTER_MS = 380;
+/** Titles shorter than this are never checked. */
+export const QA_SIMILAR_MIN = 4;
 
 /** The bar confirms "Added" for this long, then leaves. */
 export const QA_CLOSE_AFTER_MS = 650;
@@ -96,7 +120,7 @@ export const QA_LEAVE_PHONE_MS = 220;
 function fresh(p: QuickAddProps): QuickAddDraft {
   const i = p.initial ?? {};
   return {
-    title: i.title ?? '',
+    title: i.title ?? p.seed?.title ?? '',
     planned: i.planned !== undefined ? i.planned : p.planned !== undefined ? p.planned : p.today,
     due: i.due ?? null,
     projectId: i.projectId ?? null,
@@ -221,6 +245,50 @@ export function QuickAdd(p: QuickAddProps) {
     live.current = p;
   });
   const set = (patch: Partial<QuickAddDraft>) => setF((v) => ({ ...v, ...patch }));
+
+  // Words handed in (Create from Search) become the title.
+  const [seenSeed, setSeenSeed] = useState(p.seed?.nonce ?? 0);
+  if (p.seed && p.seed.nonce !== seenSeed) {
+    setSeenSeed(p.seed.nonce);
+    set({ title: p.seed.title });
+  }
+
+  // Close matches while you write: when the title reads like tasks you already have, a quiet box under it says so
+  // and names the closest one (its title opens it); "N more" unfolds the rest (up to three in all). It never blocks
+  // adding; × hides them for those tasks.
+  const [simHits, setSimHits] = useState<SimilarItem[]>(() => p.initial?.similar ?? []);
+  const [simMore, setSimMore] = useState(!!p.initial?.similarOpen);
+  const [simGone, setSimGone] = useState<Record<string, true>>({});
+  const titleWords = f.title.trim();
+  const simAsked = titleWords.length >= QA_SIMILAR_MIN;
+  useEffect(() => {
+    if (!live.current.similar || live.current.initial?.similar || !simAsked) return;
+    let on = true;
+    const t = setTimeout(() => {
+      Promise.resolve()
+        .then(() => live.current.similar!(titleWords))
+        .then(
+          (r) => {
+            if (!on) return;
+            const next = (r ?? []).slice(0, 3);
+            setSimHits((cur) => {
+              const same = cur.length === next.length && cur.every((x, i) => x.key === next[i]!.key);
+              if (!same) setSimMore(false);
+              return same ? cur : next;
+            });
+          },
+          () => {
+            if (on) setSimHits([]);
+          },
+        );
+    }, QA_SIMILAR_AFTER_MS);
+    return () => {
+      on = false;
+      clearTimeout(t);
+    };
+  }, [titleWords, simAsked]);
+  const simShown = simAsked ? simHits.filter((x) => !simGone[x.key]) : [];
+  const simOn = simShown.length > 0 && !added && !saving;
 
   // Opening: the panel arrives, Planned follows the day you are looking at, and the line is ready to write in.
   // Closing keeps the draft for next time.
@@ -527,6 +595,19 @@ export function QuickAdd(p: QuickAddProps) {
       <Ic name="attach" size={15} />
     </button>
   );
+  const simLink = (it: SimilarItem) => (
+    <span key={it.key} className="tp-qa-sim-it">
+      <button
+        type="button"
+        className="tp-qa-sim-t"
+        title={`Open ${it.title}`}
+        onClick={() => p.onOpenSimilar?.(it)}
+      >
+        {it.title}
+      </button>
+      {it.where?.label ? <span className="tp-qa-sim-w">{it.where.label}</span> : null}
+    </span>
+  );
   const addBtn = (
     <Button
       variant="primary"
@@ -616,6 +697,54 @@ export function QuickAdd(p: QuickAddProps) {
           </IconButton>
         )}
       </div>
+      {p.similar || p.initial?.similar ? (
+        <div className={cx('tp-qa-simwrap', simOn && 'tp-on')} aria-live="polite" inert={!simOn}>
+          <div>
+            {simShown.length ? (
+              <div className="tp-qa-sim">
+                <div className="tp-qa-sim-head">
+                  <span className="tp-qa-sim-k">
+                    {simShown.length > 1 ? 'Looks like tasks you have' : 'Looks like a task you have'}
+                  </span>
+                  <span className="tp-qa-sp" />
+                  {simShown.length > 1 ? (
+                    <button
+                      type="button"
+                      className={cx('tp-qa-sim-more', simMore && 'tp-on')}
+                      aria-expanded={simMore}
+                      onClick={() => setSimMore((v) => !v)}
+                    >
+                      {simShown.length - 1} more
+                      <span className="tp-qa-sim-chev" aria-hidden="true">
+                        <Icon name="right" size={12} />
+                      </span>
+                    </button>
+                  ) : null}
+                  <IconButton
+                    label={simShown.length > 1 ? 'None of these' : 'Not the same task'}
+                    tip={false}
+                    className="tp-qa-sim-x"
+                    onClick={() => {
+                      const g: Record<string, true> = {};
+                      for (const x of simShown) g[x.key] = true;
+                      setSimGone((v) => ({ ...v, ...g }));
+                      input.current?.focus();
+                    }}
+                  >
+                    <Icon name="x" size={12} />
+                  </IconButton>
+                </div>
+                {simLink(simShown[0]!)}
+                {simShown.length > 1 ? (
+                  <div className={cx('tp-qa-sim-rest', simMore && 'tp-on')} inert={!simMore}>
+                    <div>{simShown.slice(1).map(simLink)}</div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       {noteOpen ? (
         <textarea
           ref={noteEl}
