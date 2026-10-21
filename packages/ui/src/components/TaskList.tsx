@@ -218,7 +218,10 @@ export function TaskList(p: TaskListProps) {
       const f =
         el.querySelector<HTMLElement>('.tp-strike[tabindex]') ??
         el.querySelector<HTMLElement>('button.tp-cb');
-      f?.focus({ preventScroll: true });
+      // Focus the row unless something over the page (a dialog, the search panel) has the focus by now.
+      const active = document.activeElement;
+      if (!active || active === document.body || !active.closest('[role="dialog"]'))
+        f?.focus({ preventScroll: true });
     }, 240);
   }, [p.locateKey, tasks]);
 
