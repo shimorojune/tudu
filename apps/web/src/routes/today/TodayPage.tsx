@@ -25,7 +25,15 @@ import {
   type TaskItem,
 } from '@tudu/ui';
 import { useEffect, useLayoutEffect, useRef, useState, type TouchEvent } from 'react';
-import { setSecondDay, showDay, useDayView, useFlash, useLocate, useNewTaskAsk, useShownDay } from '../../app/dayView';
+import {
+  setSecondDay,
+  showDay,
+  useDayView,
+  useFlash,
+  useLocate,
+  useNewTaskAsk,
+  useShownDay,
+} from '../../app/dayView';
 import { api, meQuery } from '../../app/session';
 import { taskStore, useOnline } from '../../app/tasks';
 import { useViewport, type Viewport } from '../../app/viewport';

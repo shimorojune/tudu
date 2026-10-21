@@ -1155,14 +1155,28 @@ describe('the week (chunk 05)', () => {
       create(p, 'Renew passport', null, 1024, ids[1]),
       create(p, 'Renew passport', '2026-10-18', 1024, ids[2]),
       create(p, 'Renew the passport', '2026-10-20', 1024, ids[3]),
-      m('task.create', { id: ids[4], spaceId: p.spaceId, title: 'Gutters', day: '2026-10-18', position: 2048, notes: '<p>and <b>renew</b> the passport</p>' }),
+      m('task.create', {
+        id: ids[4],
+        spaceId: p.spaceId,
+        title: 'Gutters',
+        day: '2026-10-18',
+        position: 2048,
+        notes: '<p>and <b>renew</b> the passport</p>',
+      }),
       create(p, 'Renew passport', '2026-10-19', 1024, ids[5]),
       create(p, 'Buy milk', '2026-10-18', 3072, ids[6]),
     ]);
     await sync(p, [m('task.cross', { id: ids[3], done: true })]);
     const r = await search(p, 'q=renew%20passport&today=2026-10-18');
     expect(r.hits.map((h) => h.id)).toEqual([ids[2], ids[5], ids[1], ids[0], ids[3], ids[4]]);
-    expect(r.hits[0]).toMatchObject({ ref: 'ME-3', title: 'Renew passport', day: '2026-10-18', done: false, projectId: null, snippet: null });
+    expect(r.hits[0]).toMatchObject({
+      ref: 'ME-3',
+      title: 'Renew passport',
+      day: '2026-10-18',
+      done: false,
+      projectId: null,
+      snippet: null,
+    });
     expect(r.hits[4]!.done).toBe(true);
     expect(r.hits[5]!.snippet).toBe('and renew the passport');
     // every word must be found
@@ -1185,7 +1199,15 @@ describe('the week (chunk 05)', () => {
     const p = await person();
     const id = randomUUID();
     await sync(p, [
-      m('task.create', { id, spaceId: p.spaceId, title: 'Plan the dinner', day: null, position: 1024, notes: '<p>Ask about <a href="https://example.com/strong">dietary</a> needs</p>', source: 'quick-add' }),
+      m('task.create', {
+        id,
+        spaceId: p.spaceId,
+        title: 'Plan the dinner',
+        day: null,
+        position: 1024,
+        notes: '<p>Ask about <a href="https://example.com/strong">dietary</a> needs</p>',
+        source: 'quick-add',
+      }),
     ]);
     expect((await search(p, 'q=dietary')).hits.map((h) => h.id)).toEqual([id]);
     expect((await search(p, 'q=dietary')).hits[0]!.snippet).toBe('Ask about dietary needs');
@@ -1195,7 +1217,10 @@ describe('the week (chunk 05)', () => {
     await sync(p, [m('task.notes', { id, notes: '<p>Book the <em>venue</em> first</p>' })]);
     expect((await search(p, 'q=dietary')).hits).toEqual([]);
     expect((await search(p, 'q=venue')).hits[0]!.snippet).toBe('Book the venue first');
-    const [row] = await server.db.select({ t: schema.tasks.notesText }).from(schema.tasks).where(eq(schema.tasks.id, id));
+    const [row] = await server.db
+      .select({ t: schema.tasks.notesText })
+      .from(schema.tasks)
+      .where(eq(schema.tasks.id, id));
     expect(row!.t).toBe('Book the venue first');
     // the backfill's own cut of the markup gives the same words for existing rows
     await server.db.execute(sql`UPDATE tasks SET notes_text = '' WHERE id = ${id}`);

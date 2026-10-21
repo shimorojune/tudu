@@ -233,11 +233,18 @@ function numberOf(q: string): number | null {
  * The best matches in a space for the words typed: Postgres finds the rows where any word is in the title, the
  * ID or the notes' text, and the ranking shared with the client puts them in order, every word required.
  */
-export async function searchTasks(db: Executor, spaceId: string, q: string, today: IsoDate): Promise<SearchHit[]> {
+export async function searchTasks(
+  db: Executor,
+  spaceId: string,
+  q: string,
+  today: IsoDate,
+): Promise<SearchHit[]> {
   const toks = searchTokens(q);
   if (!toks.length) return [];
   const n = numberOf(q);
-  const words = toks.map((w) => or(sql`${schema.tasks.title} ILIKE ${like(w)}`, sql`${schema.tasks.notesText} ILIKE ${like(w)}`)!);
+  const words = toks.map((w) =>
+    or(sql`${schema.tasks.title} ILIKE ${like(w)}`, sql`${schema.tasks.notesText} ILIKE ${like(w)}`)!,
+  );
   const rows: SearchRow[] = await db
     .select(searchColumns)
     .from(schema.tasks)
@@ -252,7 +259,14 @@ export async function searchTasks(db: Executor, spaceId: string, q: string, toda
     .orderBy(asc(schema.tasks.day), asc(schema.tasks.position), asc(schema.tasks.createdAt))
     .limit(SEARCH_CANDIDATES);
   const ranked = rankSearch(
-    rows.map((r) => ({ row: r, ref: `${r.prefix}-${r.number}`, title: r.title, day: r.day, done: r.doneAt !== null, notes: r.notesText })),
+    rows.map((r) => ({
+      row: r,
+      ref: `${r.prefix}-${r.number}`,
+      title: r.title,
+      day: r.day,
+      done: r.doneAt !== null,
+      notes: r.notesText,
+    })),
     q,
     today,
     SEARCH_LIMIT,
@@ -291,9 +305,14 @@ export async function hitsById(db: Executor, spaceId: string, ids: string[]): Pr
     .select(searchColumns)
     .from(schema.tasks)
     .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
-    .where(and(eq(schema.tasks.spaceId, spaceId), isNull(schema.tasks.deletedAt), inArray(schema.tasks.id, ids)));
+    .where(
+      and(eq(schema.tasks.spaceId, spaceId), isNull(schema.tasks.deletedAt), inArray(schema.tasks.id, ids)),
+    );
   const byId = new Map(rows.map((r) => [r.id, r]));
-  return ids.map((id) => byId.get(id)).filter((r): r is SearchRow => !!r).map((r) => toHit(r));
+  return ids
+    .map((id) => byId.get(id))
+    .filter((r): r is SearchRow => !!r)
+    .map((r) => toHit(r));
 }
 
 /** Seven days from `monday`, each with its tasks in order. */

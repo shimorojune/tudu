@@ -1,6 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { addedWords, mondayOf, pagePlannedDay, searchWhere, weekDays, type IsoDate, type SearchHit, type SearchResponse } from '@tudu/core';
+import {
+  addedWords,
+  mondayOf,
+  pagePlannedDay,
+  searchWhere,
+  weekDays,
+  type IsoDate,
+  type SearchHit,
+  type SearchResponse,
+} from '@tudu/core';
 import { QuickAdd, showToast, type QuickAddResult, type SimilarItem } from '@tudu/ui';
 import { useEffect, useRef, useState } from 'react';
 import type { MeResponse } from '@tudu/client';

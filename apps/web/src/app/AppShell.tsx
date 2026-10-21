@@ -4,7 +4,15 @@ import { addDays, weekdayName } from '@tudu/core';
 import { Avatar, BottomTabs, Fab, Logo, Sidebar, TopBar, useTheme, type SidebarItem } from '@tudu/ui';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { MeResponse } from '@tudu/client';
-import { openQuickAdd, openSearch, setDayView, showDay, useDayView, useSearchOpen, useShownDay } from './dayView';
+import {
+  openQuickAdd,
+  openSearch,
+  setDayView,
+  showDay,
+  useDayView,
+  useSearchOpen,
+  useShownDay,
+} from './dayView';
 import { SearchHost } from './SearchHost';
 import { QuickAddHost } from './quickAdd';
 import { initialsOf, signOut } from './session';
@@ -39,7 +47,12 @@ function readCollapsed(): boolean {
  * Which of the phone's tabs is lit: Search while its sheet is up, More for the views that live under it, else the
  * page's own tab.
  */
-export function phoneTab(at: { active: string; path: string; onToday: boolean; searchOpen: boolean }): string {
+export function phoneTab(at: {
+  active: string;
+  path: string;
+  onToday: boolean;
+  searchOpen: boolean;
+}): string {
   if (at.searchOpen) return 'search';
   if (at.active === 'backlog' || at.active === 'inbox' || at.path === '/more') return 'more';
   return at.onToday ? 'today' : at.active;
@@ -189,7 +202,7 @@ export function AppShell({ me, children }: { me: MeResponse; children: ReactNode
         <div className="tp-scroll app-scroll">{children}</div>
       </main>
       <QuickAddHost me={me} />
-        <SearchHost me={me} />
+      <SearchHost me={me} />
     </div>
   );
 }

@@ -120,7 +120,12 @@ export interface Ranked<T> {
  * The best matches for the words, best first: by the match, then by where the task sits against today, then the
  * order the tasks came in. At most `limit`.
  */
-export function rankSearch<T extends Searchable>(items: T[], q: string, today: IsoDate, limit = 30): Ranked<T>[] {
+export function rankSearch<T extends Searchable>(
+  items: T[],
+  q: string,
+  today: IsoDate,
+  limit = 30,
+): Ranked<T>[] {
   const out: Array<Ranked<T> & { where: number; i: number }> = [];
   items.forEach((item, i) => {
     const r = matchScore(item, q);
@@ -154,7 +159,22 @@ export function searchWhere(
 }
 
 const STOP = new Set([
-  'the', 'a', 'an', 'and', 'for', 'to', 'of', 'on', 'in', 'my', 'with', 'about', 'after', 'before', 'new', 'old',
+  'the',
+  'a',
+  'an',
+  'and',
+  'for',
+  'to',
+  'of',
+  'on',
+  'in',
+  'my',
+  'with',
+  'about',
+  'after',
+  'before',
+  'new',
+  'old',
 ]);
 
 /** The words of a title that carry meaning: lower case, three letters or more, no small words. */

@@ -21,7 +21,14 @@ import {
   TaskListSkeleton,
 } from '@tudu/ui';
 import { useEffect, useRef, useState } from 'react';
-import { openQuickAdd, setPage, useBacklogViewAsk, useFlash, useLocate, useNewTaskAsk } from '../../app/dayView';
+import {
+  openQuickAdd,
+  setPage,
+  useBacklogViewAsk,
+  useFlash,
+  useLocate,
+  useNewTaskAsk,
+} from '../../app/dayView';
 import { api, meQuery } from '../../app/session';
 import { taskStore, useOnline } from '../../app/tasks';
 import { useViewport, type Viewport } from '../../app/viewport';

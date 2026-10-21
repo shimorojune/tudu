@@ -18,12 +18,19 @@ interface Seeded {
 
 /** The tasks every search test starts with, written straight through sync so the notes and the days are exact. */
 async function seed(page: Page): Promise<Seeded> {
-  const me = (await (await page.request.get(`${API_URL}/api/me`)).json()) as { spaces: Array<{ id: string }> };
+  const me = (await (await page.request.get(`${API_URL}/api/me`)).json()) as {
+    spaces: Array<{ id: string }>;
+  };
   const spaceId = me.spaces[0]!.id;
   const rows: Array<[string, string, string | null, string?]> = [
     ['bill', 'Pay the electricity bill', TODAY],
     ['meera', 'Sync with Meera on onboarding copy', TODAY],
-    ['passport', 'Renew passport', TODAY, '<p>Photos are in the desk drawer. Ask about <b>dietary</b> needs.</p>'],
+    [
+      'passport',
+      'Renew passport',
+      TODAY,
+      '<p>Photos are in the desk drawer. Ask about <b>dietary</b> needs.</p>',
+    ],
     ['old', 'Old passport renewal', PAST],
     ['domain', 'Renew the domain', null],
     ['notes', 'Write the release notes', null],
@@ -52,11 +59,9 @@ async function seed(page: Page): Promise<Seeded> {
   const res = await page.request.post(`${API_URL}/api/sync`, { data: { clientId: 'seed', mutations } });
   expect(res.status()).toBe(200);
   await page.reload();
-  await expect.poll(() => titlesOf(dayList(page))).toEqual([
-    'Pay the electricity bill',
-    'Sync with Meera on onboarding copy',
-    'Renew passport',
-  ]);
+  await expect
+    .poll(() => titlesOf(dayList(page)))
+    .toEqual(['Pay the electricity bill', 'Sync with Meera on onboarding copy', 'Renew passport']);
   return { spaceId, ids };
 }
 
@@ -66,7 +71,8 @@ async function start(page: Page): Promise<Seeded> {
 }
 
 const searchButton = (page: Page) => page.getByRole('button', { name: 'Search tasks' });
-const searchTab = (page: Page) => page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Search' });
+const searchTab = (page: Page) =>
+  page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Search' });
 const heading = (page: Page) => page.getByRole('heading', { level: 1 });
 
 /** The row of a list that is glowing (located by Search). */
@@ -86,7 +92,9 @@ test.describe('search', () => {
     await openSearch(page);
     if (phone()) await expect(searchTab(page)).toHaveAttribute('aria-current', 'page');
     else await expect(searchButton(page)).toHaveClass(/tp-on/);
-    await expect(panel(page).locator('.tp-sp-hint')).toHaveText('Search your tasks by title, task ID or note.');
+    await expect(panel(page).locator('.tp-sp-hint')).toHaveText(
+      'Search your tasks by title, task ID or note.',
+    );
     await expect(options(page)).toHaveCount(0);
     await page.keyboard.press('Escape');
     await expect(panel(page)).toHaveCount(0);
@@ -122,7 +130,9 @@ test.describe('search', () => {
     await search(page, 'passport ren');
     await expect.poll(() => hitTitles(page)).toEqual(['Renew passport', 'Old passport renewal']);
     await search(page, 'renew');
-    await expect.poll(() => hitTitles(page)).toEqual(['Renew passport', 'Renew the domain', 'Old passport renewal']);
+    await expect
+      .poll(() => hitTitles(page))
+      .toEqual(['Renew passport', 'Renew the domain', 'Old passport renewal']);
     // a note match shows a line of it
     await search(page, 'dietary');
     await expect.poll(() => hitTitles(page)).toEqual(['Renew passport']);
@@ -132,12 +142,16 @@ test.describe('search', () => {
     await expect(hit(page, 'Renew passport').locator('.tp-sh-snip mark')).toHaveText('dietary');
     // a better title match outranks a title that merely holds the word; the crossed-off one sits below
     await search(page, 'meera');
-    await expect.poll(() => hitTitles(page)).toEqual(['Meera’s Quick Add demo', 'Sync with Meera on onboarding copy']);
+    await expect
+      .poll(() => hitTitles(page))
+      .toEqual(['Meera’s Quick Add demo', 'Sync with Meera on onboarding copy']);
     await expect(hit(page, 'Meera’s Quick Add demo').locator('.tp-sh-where')).toHaveText('Tomorrow');
     await search(page, 'notes');
     await expect.poll(() => hitTitles(page)).toEqual(['Write the release notes']);
     await expect(hit(page, 'Write the release notes')).toHaveClass(/tp-done/);
-    await expect(hit(page, 'Write the release notes').locator('.tp-sh-where')).toHaveText('Backlog · crossed off');
+    await expect(hit(page, 'Write the release notes').locator('.tp-sh-where')).toHaveText(
+      'Backlog · crossed off',
+    );
     // the ID in full
     await search(page, 'ME-7');
     await expect.poll(() => hitTitles(page)).toEqual(['Meera’s Quick Add demo']);
@@ -183,10 +197,9 @@ test.describe('search', () => {
     await expect(panel(page)).toHaveCount(0);
     await expect(doneList(page)).toBeVisible();
     await expect(glowing(doneList(page))).toContainText('Write the release notes');
-    await expect(page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Crossed off' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    await expect(
+      page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Crossed off' }),
+    ).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('C07-E05 create: no match, Create first, Enter opens Quick Add with the words; Add lands it on today with the wash', async ({
@@ -207,7 +220,9 @@ test.describe('search', () => {
     await expect(bar).toHaveCount(0, { timeout: 5000 });
     await expect(row(dayList(page), 'Clean the gutters')).toHaveClass(/tp-new/);
     await idle(page);
-    const where = (await (await page.request.get(`${API_URL}/api/tasks/ref/ME-10`)).json()) as { day: string };
+    const where = (await (await page.request.get(`${API_URL}/api/tasks/ref/ME-10`)).json()) as {
+      day: string;
+    };
     expect(where.day).toBe(TODAY);
     // the words joined the recent searches
     await openSearch(page);
@@ -230,9 +245,9 @@ test.describe('search', () => {
     await expect(page).toHaveURL(/\/backlog$/);
     await openSearch(page);
     await expect(box(page)).toHaveValue('domain');
-    expect(
-      await box(page).evaluate((el: HTMLInputElement) => [el.selectionStart, el.selectionEnd]),
-    ).toEqual([0, 6]);
+    expect(await box(page).evaluate((el: HTMLInputElement) => [el.selectionStart, el.selectionEnd])).toEqual([
+      0, 6,
+    ]);
     await expect.poll(() => hitTitles(page)).toEqual(['Renew the domain']);
     // typing replaces the selected words
     await page.keyboard.type('bill');
@@ -255,7 +270,14 @@ test.describe('search', () => {
     const del = await page.request.post(`${API_URL}/api/sync`, {
       data: {
         clientId: 'seed',
-        mutations: [{ id: crypto.randomUUID(), type: 'task.delete', payload: { id: ids.domain }, at: '2026-10-18T10:00:00.000Z' }],
+        mutations: [
+          {
+            id: crypto.randomUUID(),
+            type: 'task.delete',
+            payload: { id: ids.domain },
+            at: '2026-10-18T10:00:00.000Z',
+          },
+        ],
       },
     });
     expect(del.status()).toBe(200);
@@ -291,7 +313,9 @@ test.describe('search', () => {
     await expect(more).toHaveAttribute('aria-expanded', 'false');
     await more.click();
     await expect(sim.locator('.tp-qa-sim-rest')).toHaveClass(/tp-on/);
-    await expect(sim.locator('.tp-qa-sim-t').nth(1)).toHaveText('Run the request status enum migration on production');
+    await expect(sim.locator('.tp-qa-sim-t').nth(1)).toHaveText(
+      'Run the request status enum migration on production',
+    );
     await bar.getByRole('button', { name: 'None of these' }).click();
     await expect(sim).not.toHaveClass(/tp-on/);
     await expect(line).toBeFocused();
@@ -325,17 +349,18 @@ test.describe('search', () => {
     await expect(searchTab(page)).not.toHaveAttribute('aria-current', 'page');
     await searchTab(page).click();
     await search(page, 'passport');
-    expect(await hit(page, 'Renew passport').locator('.tp-sh-by').evaluate((el) => getComputedStyle(el).flexWrap)).toBe(
-      'wrap',
-    );
+    expect(
+      await hit(page, 'Renew passport')
+        .locator('.tp-sh-by')
+        .evaluate((el) => getComputedStyle(el).flexWrap),
+    ).toBe('wrap');
     await hit(page, 'Old passport renewal').click();
     await expect(panel(page)).toHaveCount(0);
     await expect(heading(page)).toHaveText('Saturday');
     await expect(glowing(dayList(page))).toContainText('Old passport renewal');
-    await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Today' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
+    await expect(
+      page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Today' }),
+    ).toHaveAttribute('aria-current', 'page');
   });
 
   test('C07-E09 tablet: the icon in the compact bar opens the 620px panel', async ({ page }) => {

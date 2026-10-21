@@ -33,7 +33,13 @@ describe('C07-U04 a search result', () => {
     render(
       <SearchHit
         active
-        item={{ key: 'b', id: 'ME-33', title: 'Draft agenda', done: true, where: { label: 'Yesterday · crossed off' } }}
+        item={{
+          key: 'b',
+          id: 'ME-33',
+          title: 'Draft agenda',
+          done: true,
+          where: { label: 'Yesterday · crossed off' },
+        }}
       />,
     );
     const opt = screen.getByRole('option');

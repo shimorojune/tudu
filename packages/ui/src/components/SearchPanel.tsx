@@ -54,10 +54,7 @@ export interface SearchPanelProps {
 export const SP_LEAVE_MS = 150;
 export const SP_LEAVE_PHONE_MS = 220;
 
-type Opt =
-  | { kind: 'query'; q: string }
-  | { kind: 'create' }
-  | { kind: 'task'; it: SearchItem };
+type Opt = { kind: 'query'; q: string } | { kind: 'create' } | { kind: 'task'; it: SearchItem };
 
 function optKey(o: Opt): string {
   return o.kind === 'create' ? 'create' : o.kind === 'query' ? `q:${o.q}` : o.it.key;

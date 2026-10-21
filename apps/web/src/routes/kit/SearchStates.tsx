@@ -7,21 +7,79 @@ const HM = { name: 'Home', color: '#8a5a00' };
 const TODAY = '2026-10-18';
 
 const ITEMS: SearchItem[] = [
-  { key: 'a', id: 'ME-41', title: 'Sync with Meera on onboarding copy', where: { label: 'Today', tone: 'today' }, project: NW },
+  {
+    key: 'a',
+    id: 'ME-41',
+    title: 'Sync with Meera on onboarding copy',
+    where: { label: 'Today', tone: 'today' },
+    project: NW,
+  },
   { key: 'b', id: 'ME-60', title: 'Meera’s Quick Add demo', where: { label: 'Tomorrow' }, project: NW },
-  { key: 'c', id: 'ME-52', title: 'Review Quick Add PR and leave comments before Meera’s demo on Monday', where: { label: 'Today', tone: 'today' }, project: NW },
-  { key: 'd', id: 'ME-26', title: 'Draft the Q4 hiring plan', where: { label: 'Backlog' }, project: NW, snippet: '…Check the budget first, then share the plan with Meera.' },
-  { key: 'e', id: 'ME-33', title: 'Draft agenda for the Northwind planning session', where: { label: 'Yesterday · crossed off' }, done: true, project: NW },
+  {
+    key: 'c',
+    id: 'ME-52',
+    title: 'Review Quick Add PR and leave comments before Meera’s demo on Monday',
+    where: { label: 'Today', tone: 'today' },
+    project: NW,
+  },
+  {
+    key: 'd',
+    id: 'ME-26',
+    title: 'Draft the Q4 hiring plan',
+    where: { label: 'Backlog' },
+    project: NW,
+    snippet: '…Check the budget first, then share the plan with Meera.',
+  },
+  {
+    key: 'e',
+    id: 'ME-33',
+    title: 'Draft agenda for the Northwind planning session',
+    where: { label: 'Yesterday · crossed off' },
+    done: true,
+    project: NW,
+  },
 ];
 const DIETARY: SearchItem[] = [
-  { key: 'f', id: 'ME-65', title: 'Plan the team offsite agenda', where: { label: 'Wed 21 Oct' }, project: NW, snippet: 'Half a day of planning, half a day out. Ask about dietary needs for the dinner.' },
-  { key: 'g', id: 'ME-74', title: 'Plan the team dinner after the offsite', where: { label: 'Backlog' }, project: NW, snippet: 'Somewhere near the venue, walking distance. Ask about dietary needs first.' },
+  {
+    key: 'f',
+    id: 'ME-65',
+    title: 'Plan the team offsite agenda',
+    where: { label: 'Wed 21 Oct' },
+    project: NW,
+    snippet: 'Half a day of planning, half a day out. Ask about dietary needs for the dinner.',
+  },
+  {
+    key: 'g',
+    id: 'ME-74',
+    title: 'Plan the team dinner after the offsite',
+    where: { label: 'Backlog' },
+    project: NW,
+    snippet: 'Somewhere near the venue, walking distance. Ask about dietary needs first.',
+  },
 ];
 const RECENT: SearchItem[] = [
-  { key: 'c', id: 'ME-52', title: 'Review Quick Add PR and leave comments before Meera’s demo on Monday', where: { label: 'Today', tone: 'today' }, project: NW },
+  {
+    key: 'c',
+    id: 'ME-52',
+    title: 'Review Quick Add PR and leave comments before Meera’s demo on Monday',
+    where: { label: 'Today', tone: 'today' },
+    project: NW,
+  },
   { key: 'd', id: 'ME-26', title: 'Draft the Q4 hiring plan', where: { label: 'Backlog' }, project: NW },
-  { key: 'h', id: 'ME-75', title: 'Read the RFC on offline sync and leave comments', where: { label: 'Backlog' }, project: PF },
-  { key: 'i', id: 'ME-58', title: 'Pay the electricity bill', where: { label: 'Today', tone: 'today' }, project: HM },
+  {
+    key: 'h',
+    id: 'ME-75',
+    title: 'Read the RFC on offline sync and leave comments',
+    where: { label: 'Backlog' },
+    project: PF,
+  },
+  {
+    key: 'i',
+    id: 'ME-58',
+    title: 'Pay the electricity bill',
+    where: { label: 'Today', tone: 'today' },
+    project: HM,
+  },
 ];
 const HISTORY = ['release notes', 'meera'];
 const noop = () => {};
@@ -136,8 +194,16 @@ export function SearchStates() {
               noFocus: true,
               title: 'Run the migration on staging',
               similar: [
-                { key: 'q', title: 'Run the request status enum migration and backfill on staging', where: { label: 'Today' } },
-                { key: 'r', title: 'Run the request status enum migration on production', where: { label: 'Tomorrow' } },
+                {
+                  key: 'q',
+                  title: 'Run the request status enum migration and backfill on staging',
+                  where: { label: 'Today' },
+                },
+                {
+                  key: 'r',
+                  title: 'Run the request status enum migration on production',
+                  where: { label: 'Tomorrow' },
+                },
               ],
               similarOpen: true,
             }}

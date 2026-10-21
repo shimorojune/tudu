@@ -26,7 +26,10 @@ describe('C07-U08 what Search remembers and where a pick goes', () => {
     addSearch('s2', 'pay');
     expect(getSearches('s1')).toEqual(['Release Notes', 'meera']);
     expect(getSearches('s2')).toEqual(['pay']);
-    expect(JSON.parse(localStorage.getItem('tudu.search.history')!)).toEqual({ s1: ['Release Notes', 'meera'], s2: ['pay'] });
+    expect(JSON.parse(localStorage.getItem('tudu.search.history')!)).toEqual({
+      s1: ['Release Notes', 'meera'],
+      s2: ['pay'],
+    });
     for (let i = 0; i < 7; i++) addSearch('s1', `word ${i}`);
     expect(getSearches('s1')).toHaveLength(SEARCH_MEMORY);
     expect(getSearches('s1')[0]).toBe('word 6');
@@ -45,7 +48,13 @@ describe('C07-U08 what Search remembers and where a pick goes', () => {
     expect(getRecentTasks('s1')).toEqual(['a', 'b']);
     for (let i = 0; i < 6; i++) addRecentTask('s1', `t${i}`);
     expect(getRecentTasks('s1')).toEqual(['t5', 't4', 't3', 't2', 't1']);
-    expect(JSON.parse(localStorage.getItem('tudu.search.recent')!).s1).toEqual(['t5', 't4', 't3', 't2', 't1']);
+    expect(JSON.parse(localStorage.getItem('tudu.search.recent')!).s1).toEqual([
+      't5',
+      't4',
+      't3',
+      't2',
+      't1',
+    ]);
     expect(getRecentTasks('s2')).toEqual([]);
   });
 

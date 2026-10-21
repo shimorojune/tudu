@@ -30,7 +30,9 @@ export function options(page: Page): Locator {
 
 /** The row for a task title. */
 export function hit(page: Page, title: string): Locator {
-  return panel(page).getByRole('option', { name: new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')},`) });
+  return panel(page).getByRole('option', {
+    name: new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')},`),
+  });
 }
 
 /** Type words into the box and wait until the rows answer those words (the Create row counts). */

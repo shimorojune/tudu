@@ -105,7 +105,10 @@ export function SearchHost({ me }: { me: MeResponse }) {
       variant={vp === 'phone' ? 'sheet' : 'dialog'}
       results={
         hits.data && !hits.isError && q.trim().toLowerCase()
-          ? { query: hits.data.query.toLowerCase(), hits: hits.data.hits.map((h) => toSearchItem(h, today, projects)) }
+          ? {
+              query: hits.data.query.toLowerCase(),
+              hits: hits.data.hits.map((h) => toSearchItem(h, today, projects)),
+            }
           : null
       }
       loading={!!qd && hits.isPending && !hits.data}

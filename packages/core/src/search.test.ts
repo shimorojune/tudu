@@ -26,7 +26,8 @@ describe('C07-U01 ranking', () => {
   });
 
   it('the tiers: the ID in full, the title starting with the words, every word at a word start, anywhere, the ID, the note', () => {
-    const score = (title: string, q: string, extra = {}) => matchScore(t('ME-52', title, TODAY, extra), q)!.score;
+    const score = (title: string, q: string, extra = {}) =>
+      matchScore(t('ME-52', title, TODAY, extra), q)!.score;
     expect(score('Review the PR', 'me-52')).toBe(100);
     expect(score('Meera’s Quick Add demo', 'meera')).toBe(70);
     expect(score('Sync with Meera on onboarding copy', 'meera on')).toBe(58);
@@ -35,7 +36,10 @@ describe('C07-U01 ranking', () => {
     expect(score('Sync with Meera on onboarding copy', 'eera cop')).toBe(34);
     expect(score('Review the PR', 'me-5')).toBe(40);
     expect(score('Review the PR', 'dietary', { notes: 'Ask about dietary needs' })).toBe(16);
-    expect(matchScore(t('ME-52', 'Review the PR', TODAY, { notes: 'Ask about dietary needs' }), 'dietary')!.inNotes).toBe(true);
+    expect(
+      matchScore(t('ME-52', 'Review the PR', TODAY, { notes: 'Ask about dietary needs' }), 'dietary')!
+        .inNotes,
+    ).toBe(true);
     expect(matchScore(t('ME-52', 'Review the PR', TODAY), 'review')!.inNotes).toBe(false);
   });
 
@@ -89,7 +93,9 @@ describe('C07-U02 the note line and the where words', () => {
   it('cuts the note around the first matched word, with ellipses where it was cut', () => {
     const note =
       'Half a day of planning, half a day out. Ask about dietary needs for the dinner, and book the room by Friday.';
-    expect(snippetOf(note, 'dietary')).toBe('…half a day out. Ask about dietary needs for the dinner, and book the room by Friday.');
+    expect(snippetOf(note, 'dietary')).toBe(
+      '…half a day out. Ask about dietary needs for the dinner, and book the room by Friday.',
+    );
     expect(snippetOf('Ask about dietary needs', 'dietary')).toBe('Ask about dietary needs');
     expect(snippetOf(`${'x'.repeat(120)} end`, 'zzz')).toBe('x'.repeat(90));
     expect(snippetOf('First line\n\nSecond   line', 'second')).toBe('First line Second line');

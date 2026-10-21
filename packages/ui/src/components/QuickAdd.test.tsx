@@ -2,7 +2,14 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseRules, readStylesheet } from '../test-utils/stylesheet';
-import { QA_CLOSE_AFTER_MS, QA_LEAVE_MS, QA_LEAVE_PHONE_MS, QA_SIMILAR_AFTER_MS, QuickAdd, type QuickAddProps } from './QuickAdd';
+import {
+  QA_CLOSE_AFTER_MS,
+  QA_LEAVE_MS,
+  QA_LEAVE_PHONE_MS,
+  QA_SIMILAR_AFTER_MS,
+  QuickAdd,
+  type QuickAddProps,
+} from './QuickAdd';
 import { ToastHost } from './Toast';
 
 const rules = parseRules(readStylesheet('components.css'));
@@ -387,7 +394,9 @@ describe('QuickAdd', () => {
     await user.type(line, ' the backfill');
     act(() => vi.advanceTimersByTime(QA_SIMILAR_AFTER_MS + 20));
     await waitFor(() => expect(similar).toHaveBeenCalledTimes(3));
-    await waitFor(() => expect(wrap.querySelector('.tp-qa-sim-k')!.textContent).toBe('Looks like a task you have'));
+    await waitFor(() =>
+      expect(wrap.querySelector('.tp-qa-sim-k')!.textContent).toBe('Looks like a task you have'),
+    );
     expect(screen.queryByRole('button', { name: /more$/ })).toBeNull();
   });
 
@@ -399,7 +408,11 @@ describe('QuickAdd', () => {
     unmount();
     render(
       <Bar
-        initial={{ noFocus: true, title: 'Fix roof', similar: [{ key: 'a', title: 'Fix the roof', where: { label: 'Backlog' } }] }}
+        initial={{
+          noFocus: true,
+          title: 'Fix roof',
+          similar: [{ key: 'a', title: 'Fix the roof', where: { label: 'Backlog' } }],
+        }}
       />,
     );
     expect(document.querySelector('.tp-qa-simwrap')).toHaveClass('tp-on');

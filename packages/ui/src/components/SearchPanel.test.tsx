@@ -5,7 +5,12 @@ import type { SearchItem } from './SearchHit';
 import { SearchPanel, SP_LEAVE_MS, type SearchPanelProps } from './SearchPanel';
 
 const HITS: SearchItem[] = [
-  { key: 'a', id: 'ME-41', title: 'Sync with Meera on onboarding copy', where: { label: 'Today', tone: 'today' } },
+  {
+    key: 'a',
+    id: 'ME-41',
+    title: 'Sync with Meera on onboarding copy',
+    where: { label: 'Today', tone: 'today' },
+  },
   { key: 'b', id: 'ME-60', title: 'Meera’s Quick Add demo', where: { label: 'Tomorrow' } },
 ];
 const RECENT: SearchItem[] = [
@@ -30,7 +35,12 @@ describe('C07-U05 what the panel shows', () => {
     await waitFor(() => expect(box()).toHaveFocus());
     const heads = [...list().querySelectorAll('.tp-sp-head')].map((h) => h.textContent);
     expect(heads).toEqual(['Recent searchesClear', 'Recently opened']);
-    expect(options()).toEqual(['release notes', 'meera', expect.stringContaining('Review the PR'), expect.stringContaining('Draft the hiring plan')]);
+    expect(options()).toEqual([
+      'release notes',
+      'meera',
+      expect.stringContaining('Review the PR'),
+      expect.stringContaining('Draft the hiring plan'),
+    ]);
     await userEvent.setup().click(screen.getByRole('button', { name: 'Clear' }));
     expect(onClear).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('dialog', { name: 'Search tasks' })).toHaveClass('tp-sp-desk');
@@ -53,7 +63,10 @@ describe('C07-U05 what the panel shows', () => {
     expect(list().querySelector('.tp-sp-load')).not.toBeNull();
     expect(screen.queryAllByRole('option')).toEqual([]);
     rerender(<Panel onQuery={onQuery} recent={RECENT} results={{ query: 'meera', hits: HITS }} />);
-    expect(options()).toEqual([expect.stringContaining('Sync with Meera'), expect.stringContaining('Meera’s Quick Add demo')]);
+    expect(options()).toEqual([
+      expect.stringContaining('Sync with Meera'),
+      expect.stringContaining('Meera’s Quick Add demo'),
+    ]);
     expect(list().querySelectorAll('mark.tp-hl')).toHaveLength(2);
     expect(screen.getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
     // the next word: the old rows stay until the answer for it comes; no "No task matches" meanwhile
@@ -81,7 +94,14 @@ describe('C07-U06 working the panel', () => {
     const user = userEvent.setup();
     const onPick = vi.fn();
     const onSearched = vi.fn();
-    render(<Panel results={{ query: 'meera', hits: HITS }} initial={{ query: 'meera' }} onPick={onPick} onSearched={onSearched} />);
+    render(
+      <Panel
+        results={{ query: 'meera', hits: HITS }}
+        initial={{ query: 'meera' }}
+        onPick={onPick}
+        onSearched={onSearched}
+      />,
+    );
     await waitFor(() => expect(box()).toHaveFocus());
     const opts = screen.getAllByRole('option');
     expect(box()).toHaveAttribute('aria-activedescendant', opts[0]!.id);
@@ -103,7 +123,16 @@ describe('C07-U06 working the panel', () => {
     const onCreate = vi.fn();
     const onQuery = vi.fn();
     const onClose = vi.fn();
-    render(<Panel results={{ query: 'gutter', hits: [] }} initial={{ query: 'gutter' }} history={['meera']} onCreate={onCreate} onQuery={onQuery} onClose={onClose} />);
+    render(
+      <Panel
+        results={{ query: 'gutter', hits: [] }}
+        initial={{ query: 'gutter' }}
+        history={['meera']}
+        onCreate={onCreate}
+        onQuery={onQuery}
+        onClose={onClose}
+      />,
+    );
     await waitFor(() => expect(box()).toHaveFocus());
     await user.keyboard('{Enter}');
     expect(onCreate).toHaveBeenCalledWith('gutter');
@@ -155,14 +184,22 @@ describe('C07-U06 working the panel', () => {
     expect(input.selectionEnd).toBe(5);
     expect(options()).toHaveLength(2);
     // a search that led nowhere is not kept
-    rerender(<Panel open={false} results={{ query: 'meera', hits: HITS }} onPick={onPick} keepLast={false} />);
+    rerender(
+      <Panel open={false} results={{ query: 'meera', hits: HITS }} onPick={onPick} keepLast={false} />,
+    );
     act(() => vi.advanceTimersByTime(SP_LEAVE_MS + 10));
     rerender(<Panel results={{ query: 'meera', hits: HITS }} onPick={onPick} keepLast={false} />);
     expect(box()).toHaveValue('');
   });
 
   it('in the page (the kit) it is a search region with no veil', () => {
-    render(<SearchPanel layer="none" initial={{ query: 'meera', noFocus: true }} results={{ query: 'meera', hits: HITS }} />);
+    render(
+      <SearchPanel
+        layer="none"
+        initial={{ query: 'meera', noFocus: true }}
+        results={{ query: 'meera', hits: HITS }}
+      />,
+    );
     expect(screen.getByRole('search', { name: 'Search tasks' })).toBeInTheDocument();
     expect(document.querySelector('.tp-sp-veil')).toBeNull();
     expect(within(list()).getAllByRole('option')).toHaveLength(2);

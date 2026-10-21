@@ -183,9 +183,12 @@ export function TaskList(p: TaskListProps) {
   // still be settling after a turn); only another key or unmounting stops it.
   const seenLocate = useRef<string | null>(null);
   const locateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => {
-    if (locateTimer.current) clearTimeout(locateTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (locateTimer.current) clearTimeout(locateTimer.current);
+    },
+    [],
+  );
   useEffect(() => {
     const lk = p.locateKey;
     if (!lk || lk === seenLocate.current || !ref.current) return;
