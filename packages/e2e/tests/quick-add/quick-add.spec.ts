@@ -96,7 +96,7 @@ test.describe('quick-add', () => {
     await expect(row(list, 'Meera’s demo')).toHaveClass(/tp-new/);
   });
 
-  test('C04-E03 Planned Backlog: "Added to Backlog"; today stays empty; the server has it without a day', async ({
+  test('C04-E03 Planned Backlog: "Added to Backlog" with Show; today stays empty; the server has it without a day', async ({
     page,
   }) => {
     await signInFresh(page);
@@ -105,10 +105,16 @@ test.describe('quick-add', () => {
       await b.locator('.tp-qa-pop').getByRole('button', { name: 'Backlog' }).click();
       if (test.info().project.name !== 'phone') await expect(foot(b)).toHaveText('Lands in Backlog');
     });
-    await expect(page.locator('.tp-toast')).toHaveText('Added to Backlog');
+    // since chunk 06 the toast offers Show, which opens the Backlog on the row
+    await expect(page.locator('.tp-toast')).toHaveText('Added to BacklogShow');
     await expect(page.getByText('Nothing planned for today yet.')).toBeVisible();
     await idle(page);
     expect((await serverTask(page, 'ME-1')).day).toBeNull();
+    await page.getByRole('button', { name: 'Show', exact: true }).click();
+    await expect(page).toHaveURL(/\/backlog$/);
+    await expect(page.getByRole('list', { name: 'Tasks in the Backlog' })).toContainText(
+      'Renew the domain before it lapses',
+    );
   });
 
   test('C04-E04 Due and Project: the foot reads them; the row says "Due Thu" and the project; the panel shows the Project fact', async ({

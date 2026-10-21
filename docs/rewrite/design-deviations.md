@@ -128,6 +128,8 @@ the coding session, so this file is the record and the canvas gets a copy by han
   board): a short list with Backlog on it now; Inbox, Settings, spaces and apps join it with their chunks. The
   Backlog keeps More lit in the tab bar.
 - `/t/ME-52` for a task with no day opens the Backlog with the panel, rather than Today.
+- From Today, "Added to Backlog" now offers Show, which opens the Backlog on the row (chunk 04's test C04-E03
+  follows). The kit's Backlog sheets shrink with a narrow window so the kit page keeps no sideways scroll.
 - A task given a day from the panel leaves the list at once rather than folding away: the list cannot animate a
   removal it did not start. The same holds on the week's tiles.
 - Undo after crossing off or giving a day puts the row back at the index it had by queueing the reverse change;

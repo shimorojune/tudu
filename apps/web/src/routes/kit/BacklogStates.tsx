@@ -95,7 +95,7 @@ function BacklogSheet({
 }) {
   const [f, setF] = useState<string | null>(filter ?? null);
   return (
-    <Sheet label="Backlog" fill style={{ width: 440, height: 560 }}>
+    <Sheet label="Backlog" fill style={{ width: '100%', maxWidth: 440, height: 560 }}>
       <DayHeader day="Backlog" date={count} nav={false} compact>
         <ProjectFilter projects={PROJECTS} total={4} value={f} onChange={setF} />
         <Segmented items={VIEWS} value={view} onChange={onView} label="View" />
