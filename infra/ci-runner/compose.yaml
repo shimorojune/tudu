@@ -1,10 +1,11 @@
-# The CI runner: one self-hosted GitHub Actions runner on the Dokploy host, in the dev environment.
-# It runs every test job of .github/workflows/*.yml, next to the dev Postgres and storage on dokploy-network,
-# so nothing needs to be reachable from outside. Deployed from Dokploy as a raw compose (see README.md).
+# The CI runners: two self-hosted GitHub Actions runners on the Dokploy host, in the dev environment.
+# `runner` (dokploy-1) runs the test jobs of ci.yml, next to the dev Postgres and storage on dokploy-network,
+# so nothing needs to be reachable from outside. `runner-deploy` (dokploy-2) runs only deploy-staging.yml, so a
+# deploy never waits behind tests. Both share one image. Deployed from Dokploy as a raw compose (see README.md).
 # Base image: Microsoft's Playwright image (Ubuntu 24.04, Node 22, Chromium and its libraries, arm64 builds).
 services:
   runner:
-    build:
+    build: &runner-build
       context: .
       dockerfile_inline: |
         FROM mcr.microsoft.com/playwright:v1.64.1-noble
@@ -55,10 +56,31 @@ services:
     networks:
       - dokploy-network
     restart: unless-stopped
+  runner-deploy:
+    build: *runner-build
+    environment:
+      REPO_URL: https://github.com/eGainDev/tudu
+      RUNNER_NAME: dokploy-2
+      # No `dokploy` label, so ci.yml jobs never land here; deploy-staging.yml asks for `dokploy-deploy`.
+      LABELS: self-hosted,dokploy-deploy,arm64
+      RUNNER_WORKDIR: /work
+      RUNNER_TOKEN: ${RUNNER_DEPLOY_TOKEN}
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+    volumes:
+      - runner-deploy-config:/actions-runner
+      - runner-deploy-work:/work
+      - runner-deploy-pnpm-store:/root/.local/share/pnpm/store
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - dokploy-network
+    restart: unless-stopped
 volumes:
   runner-config:
   runner-work:
   pnpm-store:
+  runner-deploy-config:
+  runner-deploy-work:
+  runner-deploy-pnpm-store:
 networks:
   dokploy-network:
     external: true
