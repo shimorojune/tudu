@@ -11,7 +11,7 @@ import { ToastHost } from '@tudu/ui';
 import { AppShell } from './app/AppShell';
 import { useLiveEvents } from './app/live';
 import { WorkingDayProvider } from './app/workingDay';
-import { api, meQuery, queryClient } from './app/session';
+import { api, loadMe, meQuery, queryClient } from './app/session';
 import {
   homePath,
   lastSpace,
@@ -51,7 +51,7 @@ const signInRoute = createRoute({
   validateSearch: (s: Record<string, unknown>): { next?: string } =>
     typeof s.next === 'string' ? { next: s.next } : {},
   beforeLoad: async ({ context, search }) => {
-    const me = await context.queryClient.fetchQuery(meQuery);
+    const me = await loadMe(context.queryClient);
     if (me) throw redirect({ href: search.next ?? homePath(me.spaces), replace: true });
   },
   component: SignInPage,
@@ -61,7 +61,7 @@ const signInRoute = createRoute({
 const joinRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/join/$token',
-  beforeLoad: async ({ context }) => ({ me: await context.queryClient.fetchQuery(meQuery) }),
+  beforeLoad: async ({ context }) => ({ me: await loadMe(context.queryClient) }),
   component: function JoinRoute() {
     const { me } = joinRoute.useRouteContext();
     return <JoinPage me={me} />;
@@ -73,7 +73,7 @@ const appRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: 'app',
   beforeLoad: async ({ context, location }) => {
-    const me = await context.queryClient.fetchQuery(meQuery);
+    const me = await loadMe(context.queryClient);
     if (!me)
       throw redirect({
         to: '/sign-in',
@@ -235,7 +235,7 @@ const quickAddRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/quick-add',
   beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.fetchQuery(meQuery);
+    const me = await loadMe(context.queryClient);
     if (!me) throw redirect({ to: '/sign-in', search: { next: '/quick-add' }, replace: true });
     return { me };
   },
