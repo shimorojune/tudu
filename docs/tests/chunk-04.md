@@ -3,7 +3,7 @@
 Status column is kept by `pnpm test:status` in [STATUS.md](STATUS.md). Run this chunk's tests with
 `pnpm test -- --project ui --project client --project core --project server` and `pnpm e2e quick-add`.
 End-to-end tests fix the clock at Sunday 18 October 2026, 10:00. Uploads land in the memory storage driver on a
-laptop without Docker and in the RustFS bucket on the Dokploy runner (`TUDU_CI_S3_*`).
+laptop without Docker and in a RustFS service container in CI (`TUDU_CI_S3_*`).
 
 ## Unit (`packages/ui`, `packages/client`, `packages/core`)
 
