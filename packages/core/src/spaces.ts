@@ -39,6 +39,17 @@ export const spaceNameSchema = z
   .max(SPACE_NAME_MAX, 'That name is too long.');
 export const spaceColorSchema = z.string().regex(/^#[0-9a-f]{6}$/i, 'Not a colour.');
 
+export const PERSON_NAME_MAX = 80;
+export const personNameSchema = z
+  .string()
+  .trim()
+  .min(1, 'Your name can’t be empty.')
+  .max(PERSON_NAME_MAX, 'That name is too long.');
+
+/** A photo can be up to this big before it is shrunk on the way up. */
+export const PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+export const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
+
 /** The letters on a space's tile: "Northwind" → N, "Design team" → DT. */
 export function spaceInitials(name: string): string {
   const w = name.trim().split(/\s+/).filter(Boolean);
@@ -151,6 +162,8 @@ export interface SpaceSummary {
   members: number;
   /** What waits in its Inbox for you: requests to answer, and updates not read. */
   inbox: { toAnswer: number; unread: number };
+  /** Slugs it answered to before a rename: an old address still lands here. */
+  oldSlugs?: string[];
 }
 
 /** One member of a space. */
@@ -159,6 +172,8 @@ export interface Member {
   name: string;
   email: string;
   color: string | null;
+  /** Their photo's address, or null for initials. */
+  image?: string | null;
   role: 'admin' | 'member';
   joinedAt: string;
 }
@@ -203,3 +218,139 @@ export interface MembersChangedEvent {
   spaceId: string;
 }
 export const MEMBERS_CHANGED = 'members.changed';
+
+/** The space itself changed (its name, colour or address): read `/api/me` again. */
+export interface SpaceChangedEvent {
+  spaceId: string;
+}
+export const SPACE_CHANGED = 'space.changed';
+
+/** You are no longer in a space: it was deleted, you were removed, or you left it (in another tab). */
+export interface SpaceGoneEvent {
+  spaceId: string;
+  name: string;
+  how: 'deleted' | 'removed' | 'left';
+  /** Who did it, for "Northwind was deleted by Rohit." */
+  by: string | null;
+}
+export const SPACE_GONE = 'space.gone';
+
+/** What happened, for the toast on Personal: "Northwind was deleted by Rohit." */
+export function goneWords(e: Pick<SpaceGoneEvent, 'name' | 'how' | 'by'>): string {
+  if (e.how === 'left') return `You left ${e.name}.`;
+  const by = e.by ? ` by ${e.by}` : '';
+  return e.how === 'deleted' ? `${e.name} was deleted${by}.` : `You were removed from ${e.name}${by}.`;
+}
+
+/** Who may do what in a space, from the asker's role and everyone's. */
+export interface SpaceRules {
+  /** Rename and recolour the space, change roles, remove people, delete the space. */
+  admin: boolean;
+  /** Why Leave can't happen yet, or null when it can. */
+  leaveBlock: 'personal' | 'last-admin' | 'last-person' | null;
+}
+
+export function spaceRules(
+  space: { kind: 'personal' | 'team'; role: 'admin' | 'member' },
+  members: Array<{ id: string; role: 'admin' | 'member' }>,
+  you: string,
+): SpaceRules {
+  const admin = space.kind === 'team' && space.role === 'admin';
+  let leaveBlock: SpaceRules['leaveBlock'] = null;
+  if (space.kind === 'personal') leaveBlock = 'personal';
+  else if (members.filter((m) => m.id !== you).length === 0) leaveBlock = 'last-person';
+  else if (space.role === 'admin' && !members.some((m) => m.id !== you && m.role === 'admin'))
+    leaveBlock = 'last-admin';
+  return { admin, leaveBlock };
+}
+
+/** True when this member's role may change: never your own, never the last admin to member. */
+export function canChangeRole(
+  members: Array<{ id: string; role: 'admin' | 'member' }>,
+  you: string,
+  target: string,
+  to: 'admin' | 'member',
+): boolean {
+  if (target === you) return false;
+  const t = members.find((m) => m.id === target);
+  if (!t || t.role === to) return false;
+  if (to === 'member' && members.filter((m) => m.role === 'admin').length <= 1) return false;
+  return true;
+}
+
+/** The line under a space's name in Settings: "Just you · You’re an admin", "19 people · You’re a member". */
+export function spaceLine(count: number, role: 'admin' | 'member'): string {
+  return `${membersWords(count)} · ${role === 'admin' ? 'You’re an admin' : 'You’re a member'}`;
+}
+
+/** Under Delete: what goes, and for how many. */
+export function deleteWords(count: number): string {
+  return count > 1
+    ? `Removes it, and everything in it, for all ${count} people. This can’t be undone.`
+    : 'Removes it and everything in it. This can’t be undone.';
+}
+
+/** Where a slug leads now: the space it is, or was before a rename. */
+export function spaceForSlug<T extends { kind: 'personal' | 'team'; slug: string; oldSlugs?: string[] }>(
+  spaces: T[],
+  slug: string,
+): { space: T; moved: boolean } | null {
+  if (slug === PERSONAL_SLUG) {
+    const p = spaces.find((s) => s.kind === 'personal');
+    return p ? { space: p, moved: false } : null;
+  }
+  const now = spaces.find((s) => s.kind === 'team' && s.slug === slug);
+  if (now) return { space: now, moved: false };
+  const before = spaces.find((s) => s.kind === 'team' && s.oldSlugs?.includes(slug));
+  return before ? { space: before, moved: true } : null;
+}
+
+/** An email change waiting for its code. */
+export interface EmailChangeResponse {
+  email: string;
+}
+
+/** What a confirm dialog asks: its serif question, the words under it and the ink button. */
+export interface Ask {
+  title: string;
+  body: string;
+  confirm: string;
+}
+
+/** Leave asks once; the last admin is told to make someone else admin first. */
+export function leaveAsk(name: string, block: SpaceRules['leaveBlock']): Ask {
+  if (block === 'last-admin')
+    return {
+      title: 'Make someone admin first',
+      body: `You’re the only admin of ${name}. Make someone else an admin in Members, then you can leave.`,
+      confirm: 'Go to Members',
+    };
+  if (block === 'last-person')
+    return {
+      title: `You’re the only one in ${name}`,
+      body: `Leaving would leave ${name} empty. Delete it instead, from this page.`,
+      confirm: 'OK',
+    };
+  return {
+    title: `Leave ${name}?`,
+    body: `You’ll stop seeing its lists, Inbox and people. What you shared stays with the space for everyone else. To come back, someone has to invite you again.`,
+    confirm: `Leave ${name}`,
+  };
+}
+
+export function removeAsk(person: string, name: string): Ask {
+  return {
+    title: `Remove ${person}?`,
+    body: `${person} stops seeing ${name}. Tasks ${person} shared stay here; anything waiting in ${person}’s Inbox from this space goes back to whoever sent it.`,
+    confirm: `Remove ${person}`,
+  };
+}
+
+export function deleteAsk(name: string, count: number): Ask {
+  const who = count > 1 ? `for all ${count} people` : 'for good';
+  return {
+    title: `Delete ${name}?`,
+    body: `This removes ${name} and everything in it (every list, task, comment and invite) ${who}. It can’t be undone.`,
+    confirm: `Delete ${name}`,
+  };
+}

@@ -19,25 +19,29 @@ export function useOutside(open: boolean, ref: RefObject<HTMLElement | null>, cl
   }, [open, ref, close]);
 }
 
-/** True when the person asked the system for less motion. Updates live. */
+/** True when the person asked for less motion, on the computer or with Settings › Less motion. Updates live. */
 export function useReducedMotion(): boolean {
   const [reduce, setReduce] = useState(() => prefersReducedMotion());
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return;
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const on = () => setReduce(mq.matches);
-    mq.addEventListener?.('change', on);
-    return () => mq.removeEventListener?.('change', on);
+    if (typeof window === 'undefined') return;
+    const on = () => setReduce(prefersReducedMotion());
+    const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    mq?.addEventListener?.('change', on);
+    // The switch in Settings sets data-motion on the page.
+    const watch = new MutationObserver(on);
+    watch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-motion'] });
+    return () => {
+      mq?.removeEventListener?.('change', on);
+      watch.disconnect();
+    };
   }, []);
   return reduce;
 }
 
 export function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    !!window.matchMedia &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  );
+  if (typeof window === 'undefined') return false;
+  if (document.documentElement.dataset.motion === 'less') return true;
+  return !!window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 /**

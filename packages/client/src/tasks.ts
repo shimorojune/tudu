@@ -4,7 +4,12 @@ import {
   INBOX_CHANGED,
   isInboxMutation,
   isProjectMutation,
+  isSettingsMutation,
   MEMBERS_CHANGED,
+  SPACE_CHANGED,
+  SPACE_GONE,
+  type SpaceGoneEvent,
+  type SpaceSummary,
   nextProjectColor,
   placeAt,
   POSITION_STEP,
@@ -39,6 +44,7 @@ import {
   type WeekResponse,
 } from '@tudu/core';
 import { ApiError, type Api } from './api';
+import type { MeResponse } from './auth';
 import type { LiveEvent } from './events';
 import { Outbox, type Mutation, type OutboxStore } from './outbox';
 
@@ -130,7 +136,24 @@ export function applyToProjects(projects: Project[], spaceId: string, m: SyncMut
         .sort((a, b) => a.position - b.position || a.createdAt.localeCompare(b.createdAt));
     case 'project.delete':
       return projects.filter((p) => p.id !== m.payload.id);
+    case 'project.restore':
+      return projects;
   }
+}
+
+/** Apply a change to you or to a space onto the `/api/me` answer. Pure. */
+export function applyToMe(me: MeResponse, m: SyncMutation): MeResponse {
+  if (m.type === 'me.rename') return { ...me, user: { ...me.user, name: m.payload.name } };
+  if (m.type === 'space.update') {
+    const p = m.payload;
+    return {
+      ...me,
+      spaces: me.spaces.map((s): SpaceSummary =>
+        s.id === p.id ? { ...s, name: p.name ?? s.name, color: p.color ?? s.color } : s,
+      ),
+    };
+  }
+  return me;
 }
 
 /** Apply a subtask mutation to a list of subtasks. Pure; anything else leaves the list as it is. */
@@ -224,7 +247,7 @@ export function applyToDay(
     return hit ? tasks.map((t) => patchTask(t, m)) : tasks;
   }
   // A request is not a task until it is accepted; the store writes the accepted task into its day itself.
-  if (isInboxMutation(m)) return tasks;
+  if (isInboxMutation(m) || isSettingsMutation(m)) return tasks;
   const id = taskIdOf(m);
   const has = tasks.some((t) => t.id === id);
   const map = (fn: (t: Task) => Task) => tasks.map((t) => (t.id === id ? fn(t) : t));
@@ -275,7 +298,7 @@ export function applyToDay(
 
 /** Apply one mutation to a task's full detail. Pure; a mutation for another task leaves it alone. */
 export function applyToDetail(d: TaskDetail, m: SyncMutation, me: CommentAuthor | null): TaskDetail {
-  if (isInboxMutation(m)) return d;
+  if (isInboxMutation(m) || isSettingsMutation(m)) return d;
   if (isProjectMutation(m)) {
     if (m.type === 'project.delete' && d.projectId === m.payload.id) return { ...d, projectId: null };
     return d;
@@ -349,6 +372,8 @@ export interface TaskStoreOptions {
   onRejected?: (message: string) => void;
   /** The connection to the server came and went. */
   onReachable?: (reachable: boolean) => void;
+  /** You are no longer in a space (deleted, removed, or left in another tab). */
+  onSpaceGone?: (e: SpaceGoneEvent) => void;
   now?: () => Date;
   newId?: () => string;
 }
@@ -377,6 +402,8 @@ export class TaskStore {
   private reachable = true;
   /** Changes made here the server has not answered yet, whatever the outbox has on disk. */
   private unanswered = 0;
+  /** Projects deleted here, and the tasks they were on, so Undo can put them back at once. */
+  private readonly deletedProjects = new Map<string, { project: Project; tasks: Set<string> }>();
 
   constructor(private readonly o: TaskStoreOptions) {
     this.clientId = o.clientId;
@@ -532,6 +559,16 @@ export class TaskStore {
   }
 
   // ---- projects ------------------------------------------------------------------------------------------
+
+  /** How many open tasks each project of a space has (Settings › Space). */
+  projectCountsQuery(spaceId: string) {
+    return queryOptions({
+      queryKey: [...projectsKey(spaceId), 'open'] as const,
+      queryFn: async (): Promise<Record<string, number>> =>
+        (await this.o.api.get<{ open: Record<string, number> }>(`/api/spaces/${spaceId}/projects?counts=1`))
+          .open,
+    });
+  }
 
   projectsQuery(spaceId: string) {
     return queryOptions({
@@ -795,7 +832,34 @@ export class TaskStore {
   }
 
   deleteProject(spaceId: string, id: string): void {
+    const project = this.cachedProjects(spaceId)?.find((p) => p.id === id);
+    if (project) {
+      const tasks = new Set<string>();
+      for (const [, data] of this.o.queryClient.getQueriesData<DayData>({ queryKey: ['day', spaceId] }))
+        for (const t of data?.tasks ?? []) if (t.projectId === id) tasks.add(t.id);
+      this.deletedProjects.set(id, { project, tasks });
+    }
     this.mutate({ type: 'project.delete', payload: { id, spaceId } });
+  }
+
+  /** Undo a delete: the project is back, on the tasks it was taken off. */
+  restoreProject(spaceId: string, id: string): void {
+    this.mutate({ type: 'project.restore', payload: { id, spaceId } });
+  }
+
+  // ---- you and the space -----------------------------------------------------------------------------------
+
+  /** Your name, as everyone sees it. Saves through the outbox like any change. */
+  renameMe(userId: string, name: string): void {
+    this.mutate({ type: 'me.rename', payload: { id: userId, name: name.trim() } });
+  }
+
+  /** A team space's name or colour (admins). The address follows a new name once the server has it. */
+  updateSpace(spaceId: string, patch: { name?: string; color?: string }): void {
+    this.mutate({
+      type: 'space.update',
+      payload: { id: spaceId, ...patch, ...(patch.name !== undefined ? { name: patch.name.trim() } : {}) },
+    });
   }
 
   // ---- files ---------------------------------------------------------------------------------------------
@@ -979,6 +1043,15 @@ export class TaskStore {
 
   /** Refresh the days and tasks another tab or device changed. Our own changes are already on screen. */
   onEvent(e: LiveEvent): void {
+    if (e.type === SPACE_CHANGED) {
+      void this.o.queryClient.invalidateQueries({ queryKey: ['me'] });
+      return;
+    }
+    if (e.type === SPACE_GONE) {
+      void this.o.queryClient.invalidateQueries({ queryKey: ['me'] });
+      this.o.onSpaceGone?.(e.data as SpaceGoneEvent);
+      return;
+    }
     if (e.type === INBOX_CHANGED) {
       const ie = e.data as InboxChangedEvent;
       void this.o.queryClient.invalidateQueries({ queryKey: ['inbox', ie.spaceId] });
@@ -1062,6 +1135,34 @@ export class TaskStore {
   /** Apply a mutation to every cached day and task. */
   private applyEverywhere(m: SyncMutation): void {
     const qc = this.o.queryClient;
+    if (isSettingsMutation(m)) {
+      const me = qc.getQueryData<MeResponse>(['me']);
+      if (me) qc.setQueryData<MeResponse>(['me'], applyToMe(me, m));
+      return;
+    }
+    if (m.type === 'project.restore') {
+      const kept = this.deletedProjects.get(m.payload.id);
+      if (!kept) return;
+      this.deletedProjects.delete(m.payload.id);
+      const key = projectsKey(m.payload.spaceId);
+      const list = qc.getQueryData<Project[]>(key);
+      if (list && !list.some((p) => p.id === kept.project.id))
+        qc.setQueryData<Project[]>(
+          key,
+          [...list, kept.project].sort(
+            (a, b) => a.position - b.position || a.createdAt.localeCompare(b.createdAt),
+          ),
+        );
+      for (const [k, data] of qc.getQueriesData<DayData>({ queryKey: ['day', m.payload.spaceId] })) {
+        if (!data?.tasks.some((t) => kept.tasks.has(t.id) && t.projectId === null)) continue;
+        const tasks = data.tasks.map((t) =>
+          kept.tasks.has(t.id) && t.projectId === null ? { ...t, projectId: kept.project.id } : t,
+        );
+        this.remember(tasks);
+        qc.setQueryData<DayData>(k, { ...data, tasks });
+      }
+      return;
+    }
     if (isProjectMutation(m)) {
       const key = projectsKey(m.payload.spaceId);
       const list = qc.getQueryData<Project[]>(key);
@@ -1132,7 +1233,8 @@ export class TaskStore {
     this.merge(res);
     const touched = new Set<string>();
     for (const b of batch)
-      if (!isProjectMutation(b as SyncMutation)) touched.add(taskIdOf(b as SyncMutation));
+      if (!isProjectMutation(b as SyncMutation) && !isSettingsMutation(b as SyncMutation))
+        touched.add(taskIdOf(b as SyncMutation));
     if (rejected.length) {
       // Undo by reading the days again: the server's rows plus whatever is still on its way.
       void this.o.queryClient.invalidateQueries({ queryKey: ['day'] });
@@ -1147,6 +1249,15 @@ export class TaskStore {
     void this.o.queryClient.invalidateQueries({ queryKey: ['marks'] });
     void this.o.queryClient.invalidateQueries({ queryKey: ['people'] });
     // Anything about requests or the Inbox: read the Inbox and the counts again, now the server has the truth.
+    // You or a space changed: /api/me (names, addresses), the members and People read again.
+    if (batch.some((b) => isSettingsMutation(b as SyncMutation))) {
+      void this.o.queryClient.invalidateQueries({ queryKey: ['me'] });
+      void this.o.queryClient.invalidateQueries({ queryKey: ['members'] });
+    }
+    if (batch.some((b) => (b as SyncMutation).type === 'project.restore')) {
+      void this.o.queryClient.invalidateQueries({ queryKey: ['projects'] });
+      void this.o.queryClient.invalidateQueries({ queryKey: ['day'] });
+    }
     if (batch.some((b) => isInboxMutation(b as SyncMutation))) {
       void this.o.queryClient.invalidateQueries({ queryKey: ['inbox'] });
       void this.o.queryClient.invalidateQueries({ queryKey: ['me'] });
@@ -1167,7 +1278,7 @@ export class TaskStore {
       let tasks = data.tasks.filter((t) => !rows.has(t.id) && !gone.has(t.id));
       for (const t of rows.values()) if (t.spaceId === spaceId && t.day === day) tasks.push(t);
       for (const { m } of this.pending.values())
-        if (!isProjectMutation(m) && rows.has(taskIdOf(m)))
+        if (!isProjectMutation(m) && !isSettingsMutation(m) && rows.has(taskIdOf(m)))
           tasks = applyToDay(tasks, day, spaceId, m, (id) => this.known.get(id));
       tasks.sort(byPosition);
       if (!sameTasks(tasks, data.tasks)) qc.setQueryData<DayData>(key, { day, tasks });

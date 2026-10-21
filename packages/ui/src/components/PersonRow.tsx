@@ -4,7 +4,7 @@ import { PersonDot, type PersonDotPerson } from './PersonDot';
 import { TaskLine, type SharedTask } from './TaskLine';
 
 export interface PersonRowProps {
-  person: PersonDotPerson & { name: string; email?: string; you?: boolean };
+  person: PersonDotPerson & { name: string; email?: string; you?: boolean; left?: boolean };
   tasks: SharedTask[];
   /** The quiet line: the email, or "You". */
   sub?: string;
@@ -42,6 +42,7 @@ export function PersonRow({
           <span className="tp-prow-name">
             {w.name}
             {w.you ? <span className="tp-prow-you">You</span> : null}
+            {w.left ? <span className="tp-prow-you">Left</span> : null}
           </span>
           <span className="tp-prow-sub">{sub ?? w.email}</span>
         </span>

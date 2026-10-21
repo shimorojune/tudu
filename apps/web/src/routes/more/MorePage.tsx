@@ -10,7 +10,7 @@ export interface MoreItem {
   hint: string;
 }
 
-/** What More keeps on phones: the Backlog, and People in a team space; Inbox, Settings and apps join it with their chunks. */
+/** What More keeps on phones: the Backlog, People in a team space, the Inbox and Settings. */
 export function moreItems(
   space: Pick<SpaceSummary, 'kind' | 'name'> & { inbox?: SpaceSummary['inbox'] },
 ): MoreItem[] {
@@ -25,6 +25,12 @@ export function moreItems(
     label: 'Inbox',
     icon: 'inbox',
     hint: n ? inboxCountWords(space.inbox!) : 'All caught up',
+  });
+  items.push({
+    value: 'settings',
+    label: 'Settings',
+    icon: 'settings',
+    hint: 'You, this space, how Tudu looks',
   });
   return items;
 }

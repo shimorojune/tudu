@@ -3,6 +3,7 @@ import { isIsoDate, type IsoDate } from './dates';
 import { COMMENT_MAX, NOTES_MAX } from './notes';
 import { DECLINE_REASON_MAX, REQUEST_NOTE_MAX } from './inbox';
 import { projectColorSchema, projectNameSchema } from './projects';
+import { personNameSchema, spaceColorSchema, spaceNameSchema } from './spaces';
 
 /** A task as the API sends it. `number` (and so `ref`, "ME-58") is assigned by the server when the task is saved. */
 export interface Task {
@@ -181,6 +182,9 @@ const projectId = id.nullable();
  * | task.visibility | visibility             |
  * | subtask.*     | one subtask's title, done, position or deleted (its own clocks) |
  * | comment.*     | one comment, by its author (no clocks: the author's last word stands) |
+ * | me.rename     | your name (the last word stands)  |
+ * | space.update  | a team space's name or colour, by an admin |
+ * | project.restore | a deleted project, back on the tasks it was taken off (Undo) |
  */
 export const taskMutationSchema = z.discriminatedUnion('type', [
   z.object({
@@ -229,6 +233,14 @@ export const taskMutationSchema = z.discriminatedUnion('type', [
     }),
   }),
   z.object({ type: z.literal('project.delete'), payload: z.object({ id, spaceId: id }) }),
+  z.object({ type: z.literal('project.restore'), payload: z.object({ id, spaceId: id }) }),
+  /** Your name; `id` is your user id. */
+  z.object({ type: z.literal('me.rename'), payload: z.object({ id, name: personNameSchema }) }),
+  /** A team space's name or colour; `id` is the space. */
+  z.object({
+    type: z.literal('space.update'),
+    payload: z.object({ id, name: spaceNameSchema.optional(), color: spaceColorSchema.optional() }),
+  }),
   z.object({
     type: z.literal('subtask.create'),
     payload: z.object({ id, taskId: id, title: subTitle, position: position.nullable() }),
@@ -292,6 +304,13 @@ export function isProjectMutation(
   m: TaskMutationBody,
 ): m is Extract<TaskMutationBody, { type: `project.${string}` }> {
   return m.type.startsWith('project.');
+}
+
+/** A change to you or to a space itself: no task, no list. */
+export function isSettingsMutation(
+  m: TaskMutationBody,
+): m is Extract<TaskMutationBody, { type: `me.${string}` | `space.${string}` }> {
+  return m.type.startsWith('me.') || m.type.startsWith('space.');
 }
 
 export type TaskMutationBody = z.infer<typeof taskMutationSchema>;

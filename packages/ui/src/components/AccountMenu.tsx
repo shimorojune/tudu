@@ -13,6 +13,7 @@ export interface AccountMenuPerson {
   email?: string;
   initials: string;
   color?: string;
+  image?: string;
 }
 
 export interface AccountMenuProps {
@@ -64,7 +65,7 @@ export function AccountMenu({
             aria-expanded={open ? 'true' : 'false'}
             aria-label={`You: ${me.name}`}
           >
-            <Avatar initials={me.initials} name={me.name} color={me.color} />
+            <Avatar initials={me.initials} name={me.name} color={me.color} image={me.image} />
           </button>
         </Popover.Trigger>
         <Popover.Portal>

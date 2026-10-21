@@ -8,6 +8,8 @@ export interface MemberListPerson extends PersonDotPerson {
   name: string;
   email: string;
   you?: boolean;
+  /** No longer in the space: what they shared stays, under their name marked Left. */
+  left?: boolean;
   /** Their shared tasks this week, in quiet mono. */
   count?: number;
 }
@@ -96,17 +98,17 @@ export function MemberList({
           x.id,
           active === x.id,
           <PersonDot person={x} size={30} />,
-          x.you ? (
+          x.you || x.left ? (
             <>
               {x.name}
-              <span className="tp-prow-you">You</span>
+              <span className="tp-prow-you">{x.you ? 'You' : 'Left'}</span>
             </>
           ) : (
             x.name
           ),
           x.email,
           x.count,
-          x.you ? `${x.name}, you` : x.name,
+          x.you ? `${x.name}, you` : x.left ? `${x.name}, left` : x.name,
           () => {
             if (active !== x.id) onPick?.(x);
           },

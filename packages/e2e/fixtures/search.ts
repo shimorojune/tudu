@@ -13,8 +13,11 @@ export function box(page: Page): Locator {
 /** Open search from the top bar's icon, or the Search tab on phones; the box is focused when it resolves. */
 export async function openSearch(page: Page): Promise<void> {
   const tab = page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Search' });
+  const top = page.getByRole('button', { name: 'Search tasks' });
+  // Right after a reload neither is drawn yet: wait for whichever this size has before choosing.
+  await expect(tab.or(top).first()).toBeVisible();
   if (await tab.count()) await tab.click();
-  else await page.getByRole('button', { name: 'Search tasks' }).click();
+  else await top.click();
   await expect(box(page)).toBeFocused();
 }
 

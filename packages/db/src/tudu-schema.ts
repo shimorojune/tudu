@@ -86,6 +86,56 @@ export const spaceInvites = pgTable(
   ],
 );
 
+/** Every slug a space answered to before a rename, so old links still land. */
+export const spaceSlugs = pgTable('space_slugs', {
+  slug: text('slug').primaryKey(),
+  spaceId: text('space_id')
+    .notNull()
+    .references(() => spaces.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const leftHow = pgEnum('left_how', ['left', 'removed']);
+
+/**
+ * Someone who was in a space and is not any more: their shared tasks stay, marked Left on People. `undo` holds
+ * what leaving changed (Only-me tasks deleted, requests declined, the answers that told the senders), so Undo of a
+ * Remove can put it back.
+ */
+export const formerMembers = pgTable(
+  'former_members',
+  {
+    spaceId: text('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    role: memberRole('role').notNull(),
+    joinedAt: timestamp('joined_at', { withTimezone: true }).notNull(),
+    leftAt: timestamp('left_at', { withTimezone: true }).notNull().defaultNow(),
+    how: leftHow('how').notNull(),
+    by: text('by').references(() => user.id, { onDelete: 'set null' }),
+    undo: jsonb('undo')
+      .$type<{ tasks: string[]; requests: string[]; answers: string[] }>()
+      .notNull()
+      .default({ tasks: [], requests: [], answers: [] }),
+  },
+  (t) => [primaryKey({ columns: [t.spaceId, t.userId] })],
+);
+
+/** A change of email waiting for the code sent to the new address. One at a time per person. */
+export const emailChanges = pgTable('email_changes', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  email: text('email').notNull(),
+  codeHash: text('code_hash').notNull(),
+  attempts: integer('attempts').notNull().default(0),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 /** One row per sign-in code sent, so a mailbox cannot be flooded: at most five in ten minutes. */
 export const otpSends = pgTable(
   'otp_sends',
@@ -122,6 +172,8 @@ export const projects = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    /** The tasks a delete took the project off, so Undo can give it back to them. */
+    detached: jsonb('detached').$type<string[]>().notNull().default([]),
   },
   (t) => [index('projects_space').on(t.spaceId, t.position)],
 );

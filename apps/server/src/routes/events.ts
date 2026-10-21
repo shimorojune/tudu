@@ -14,7 +14,10 @@ export function eventRoutes(hub: EventHub, auth: Auth, options: { heartbeatMs?: 
   r.get('/events', requireSession, (c) => {
     const userId = c.get('session')!.user.id;
     const headers = c.req.raw.headers;
-    const after = Number(c.req.header('last-event-id') ?? c.req.query('lastEventId') ?? 0) || 0;
+    // A reconnect names the last event it saw and gets what it missed. A fresh stream starts now: replaying old
+    // events to a page that just loaded would act on news it already read (a space.gone from before an Undo).
+    const given = c.req.header('last-event-id') ?? c.req.query('lastEventId');
+    const after = given === undefined ? Infinity : Number(given) || 0;
     return streamSSE(c, async (stream) => {
       let open = true;
       const send = (e: { id: number; type: string; data: unknown }) =>

@@ -231,3 +231,33 @@ the coding session, so this file is the record and the canvas gets a copy by han
   Inbox to Personal lands on Today.
 - The sidebar's counts (the Inbox, the members) follow the `me` query live rather than the route's context, so a
   request that arrives shows on the sidebar and the switcher without a navigation.
+
+## Chunk 09 · Settings · 21 Oct 2026
+
+- Built as drawn: the large dialog over the page (the section list on the left under You and the space's tile,
+  the section on the right with its serif title and line, ×), nearly full width on tablets; on phones a page with
+  your mark and the list, a section pushing in; Account (photo, name, email, Sign out), Appearance (the three
+  theme cards and Less motion), Personal › Space with Create a space, a team space's Name and colour and Leaving,
+  Members with the role menu and Find someone past eight; the asks (Leave once, Remove once, Delete by typing the
+  name) and their sheets on phones.
+- Notifications and Apps are left out of the list until there is something for them to control (OS notifications
+  are in later.md; Jira's Connect comes with chunk 10).
+- Settings › Space gains a Projects block after Name and colour, not drawn: each project's dot opens the swatches
+  under its row, the name saves when you leave it, its open-task count, Delete with Undo, and New project. Any
+  member may change projects; only admins see Name and colour (members read "Its name and colour are kept by its
+  admins.") and Delete.
+- Email has Change, not drawn beyond the button: the new address, Send code, then the sign-in board's code field;
+  the old address gets a note once it changes.
+- Photo's Change picks an image, shrinks it to a 256px square in the browser and uploads it; Remove (not drawn)
+  shows once there is a photo. A photo fills the round mark wherever people see you.
+- Less motion is a switch in Tudu, so the stylesheets' reduced-motion rules are repeated under
+  `:root[data-motion='less']` (generated into `less-motion.css` by `scripts/less-motion.mjs`; `pnpm lint` fails when
+  it is stale).
+- The last admin's Leave asks "Make someone admin first" with Go to Members; the last person's Leave says to Delete
+  instead. Neither is drawn.
+- A person who left (or was removed) stays on People's list marked Left while they have shared tasks in the range,
+  and their page offers no "Send … a task".
+- The phone's avatar in the header opens Settings (the design puts it there); More lists Settings last.
+- Menus float over dialogs, so the role menu opens above Settings rather than under it.
+- Settings is in the address: `?settings=members` on the desk and tablets, `/northwind/settings/members` on
+  phones; a renamed space's old address lands on the new one, and the task prefix never changes.

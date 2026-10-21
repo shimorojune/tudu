@@ -15,7 +15,9 @@ import {
   type BacklogResponse,
   type WeekResponse,
   PROJECTS_CHANGED,
+  SPACE_CHANGED,
   type ProjectsChangedEvent,
+  type SpaceChangedEvent,
   type SearchResponse,
   type SyncResponse,
   type TaskRefResponse,
@@ -24,12 +26,15 @@ import {
 import type { Db } from '@tudu/db';
 import type { EventHub } from '../events';
 import { requireSession, type SessionVars } from '../middleware/session';
+import { spaceSummaries } from '../spaces';
+import { announceMembers } from './spaces';
 import {
   applyBatch,
   hitsById,
   lookAlikeTasks,
   marksOf,
   membersOf,
+  projectOpenCounts,
   projectsOf,
   resolveRef,
   roleIn,
@@ -62,6 +67,12 @@ export async function announce(
     clientId,
   };
   for (const userId of await membersOf(db, spaceId)) hub.publish(userId, TASKS_CHANGED, event);
+}
+
+/** Tell everyone in a space the space itself changed. */
+export async function announceSpace(db: Db, hub: EventHub, spaceId: string): Promise<void> {
+  const event: SpaceChangedEvent = { spaceId };
+  for (const userId of await membersOf(db, spaceId)) hub.publish(userId, SPACE_CHANGED, event);
 }
 
 /** Tell everyone in a space its projects changed. */
@@ -181,7 +192,11 @@ export function taskRoutes(db: Db, hub: EventHub) {
     const userId = c.get('session')!.user.id;
     const { spaceId } = c.req.param();
     if (!(await roleIn(db, userId, spaceId))) return c.json({ error: 'You’re not in that space.' }, 403);
-    return c.json({ projects: await projectsOf(db, spaceId) });
+    const projects = await projectsOf(db, spaceId);
+    // Settings asks how many open tasks each one has.
+    if (c.req.query('counts') === '1')
+      return c.json({ projects, open: await projectOpenCounts(db, spaceId, userId) });
+    return c.json({ projects });
   });
 
   r.get('/spaces/:spaceId/marks', requireSession, async (c) => {
@@ -203,14 +218,15 @@ export function taskRoutes(db: Db, hub: EventHub) {
     const { clientId, mutations } = parsed.data;
     const { results, applied } = await applyBatch(db, userId, mutations);
 
+    const tasky = applied.filter((a) => !a.space && !a.me);
     const touched = [
-      ...new Set(applied.filter((a) => !a.projects && (!a.requests || a.days.length)).map((a) => a.taskId)),
+      ...new Set(tasky.filter((a) => !a.projects && (!a.requests || a.days.length)).map((a) => a.taskId)),
     ];
     const deleted = [...new Set(applied.filter((a) => a.deleted).map((a) => a.taskId))];
     const body: SyncResponse = { results, tasks: await tasksById(db, touched), deleted };
 
     const bySpace = new Map<string, { days: Array<IsoDate | null>; tasks: string[]; projects: boolean }>();
-    for (const a of applied) {
+    for (const a of tasky) {
       const s = bySpace.get(a.spaceId) ?? { days: [], tasks: [], projects: false };
       s.days.push(...a.days);
       if (!a.projects && (a.days.length || a.deleted)) s.tasks.push(a.taskId);
@@ -231,6 +247,11 @@ export function taskRoutes(db: Db, hub: EventHub) {
         const event: InboxChangedEvent = { spaceId: a.spaceId };
         hub.publish(u, INBOX_CHANGED, event);
       }
+    // A space renamed or recoloured: its people read /api/me again. A new name: every space you are in shows it.
+    for (const spaceId of new Set(applied.filter((a) => a.space).map((a) => a.spaceId)))
+      await announceSpace(db, hub, spaceId);
+    if (applied.some((a) => a.me))
+      for (const s of await spaceSummaries(db, userId)) await announceMembers(db, hub, s.id);
     return c.json(body);
   });
 

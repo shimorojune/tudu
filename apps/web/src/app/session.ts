@@ -60,6 +60,12 @@ export async function signOut(): Promise<void> {
   await queryClient.invalidateQueries();
 }
 
+/** A photo's address for an <img>: the API serves it, so it needs the API's origin. */
+export function photoSrc(image: string | null | undefined): string | undefined {
+  if (!image) return undefined;
+  return image.startsWith('/api/') ? `${API_URL.replace(/\/$/, '')}${image}` : image;
+}
+
 /** Initials for an avatar: "Rohit Raj" gives RR, "rohit@x.y" gives R. */
 export function initialsOf(name: string, email: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
