@@ -62,12 +62,20 @@ export class IndexedDbOutboxStore implements OutboxStore {
     }
     return this.dbp;
   }
+  /** One request in its own transaction, settled when the transaction is through, so a write is on disk. */
   private async tx<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
     const db = await this.open();
     return new Promise((resolve, reject) => {
-      const req = fn(db.transaction(STORE, mode).objectStore(STORE));
-      req.onsuccess = () => resolve(req.result);
+      const t = db.transaction(STORE, mode);
+      const req = fn(t.objectStore(STORE));
+      let result: T;
+      req.onsuccess = () => {
+        result = req.result;
+      };
       req.onerror = () => reject(req.error);
+      t.oncomplete = () => resolve(result);
+      t.onerror = () => reject(t.error);
+      t.onabort = () => reject(t.error ?? new Error('The outbox write was abandoned.'));
     });
   }
   all() {
