@@ -24,6 +24,7 @@ describe('C06-U09 the Backlog page remembers its filter', () => {
     expect(moreItems({ kind: 'personal', name: 'Personal' }).map((i) => [i.label, i.value])).toEqual([
       ['Backlog', 'backlog'],
       ['Inbox', 'inbox'],
+      ['Apps', 'apps'],
       ['Settings', 'settings'],
     ]);
     // C08-U11 a team space lists People under the Backlog, and the Inbox carries its count
@@ -37,6 +38,7 @@ describe('C06-U09 the Backlog page remembers its filter', () => {
       ['Backlog', 'backlog', 'Tasks without a day'],
       ['People', 'people', 'Everyone in Northwind'],
       ['Inbox', 'inbox', '2 to answer · 1 new'],
+      ['Apps', 'apps', 'None yet'],
       ['Settings', 'settings', 'You, this space, how Tudu looks'],
     ]);
     expect(moreItems({ kind: 'personal', name: 'Personal' })[1]!.hint).toBe('All caught up');

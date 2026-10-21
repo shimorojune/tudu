@@ -33,6 +33,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { setPage, showWeek, useFlash, useShownWeek } from '../../app/dayView';
 import { api, meQuery } from '../../app/session';
 import { spacePath, useSpace } from '../../app/space';
+import { openInJira } from '../../app/jira';
 import { taskStore, useOnline } from '../../app/tasks';
 import { useViewport, type Viewport } from '../../app/viewport';
 import { useWorkingDay } from '../../app/workingDay';
@@ -215,6 +216,9 @@ function WeekSheet({ spaceId, monday, today, vp, onWeek, onOpenTask, openKey }: 
     const raw = day === null ? backlog.data?.tasks : lists[days.indexOf(day)]?.data?.tasks;
     return (
       <TaskList
+        onSignal={(t, k) => {
+          if (k === 'jira' && t.jira) openInJira(spaceId, t.jira);
+        }}
         tasks={tasks}
         label={day === null ? 'Tasks in the Backlog' : `Tasks for ${formatLong(day)}`}
         compact

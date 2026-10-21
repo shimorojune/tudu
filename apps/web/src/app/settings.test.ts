@@ -75,6 +75,6 @@ describe('C09-U09 settings in the web app', () => {
 
   it('More lists Settings last, in every space', () => {
     expect(moreItems(PERSONAL).at(-1)).toMatchObject({ value: 'settings', label: 'Settings' });
-    expect(moreItems(NW).map((i) => i.value)).toEqual(['backlog', 'people', 'inbox', 'settings']);
+    expect(moreItems(NW).map((i) => i.value)).toEqual(['backlog', 'people', 'inbox', 'apps', 'settings']);
   });
 });

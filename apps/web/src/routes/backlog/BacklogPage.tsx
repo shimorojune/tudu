@@ -31,6 +31,7 @@ import {
 } from '../../app/dayView';
 import { api, meQuery } from '../../app/session';
 import { spacePath, useSpace } from '../../app/space';
+import { openInJira } from '../../app/jira';
 import { taskStore, useOnline } from '../../app/tasks';
 import { useViewport, type Viewport } from '../../app/viewport';
 import { useWorkingDay } from '../../app/workingDay';
@@ -223,6 +224,9 @@ function BacklogSheet({ spaceId, today, vp, onOpenTask, openKey }: BacklogSheetP
   else if (view === 'done')
     body = (
       <TaskList
+        onSignal={(t, k) => {
+          if (k === 'jira' && t.jira) openInJira(spaceId, t.jira);
+        }}
         tasks={items}
         label="Crossed off in the Backlog"
         compact={compact}
@@ -241,6 +245,9 @@ function BacklogSheet({ spaceId, today, vp, onOpenTask, openKey }: BacklogSheetP
   else
     body = (
       <TaskList
+        onSignal={(t, k) => {
+          if (k === 'jira' && t.jira) openInJira(spaceId, t.jira);
+        }}
         tasks={items}
         label="Tasks in the Backlog"
         compact={compact}

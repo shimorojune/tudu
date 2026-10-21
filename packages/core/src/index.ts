@@ -13,3 +13,4 @@ export * from './search';
 export * from './spaces';
 export * from './people';
 export * from './inbox';
+export * from './jira';

@@ -17,6 +17,8 @@ const schema = z.object({
   EMAIL_FROM: z.string().default('Tudu <sign-in@mail.tudu.ezdev.net>'),
   /** `1` exposes /__test/* (the outbox) for end-to-end tests. Never on in production. */
   TEST_ROUTES: z.string().optional(),
+  /** `1` serves the fake Jira at /demo-jira, so staging can be reviewed without a real Jira. Fixed data only. */
+  DEMO_JIRA: z.string().optional(),
   /** `s3` keeps attachments in the bucket below; `memory` keeps them in the process (tests, local work). */
   STORAGE_DRIVER: z.enum(['s3', 'memory']).default('memory'),
   S3_ENDPOINT: z.string().url().optional(),

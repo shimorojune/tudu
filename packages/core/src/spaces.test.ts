@@ -37,6 +37,7 @@ function task(id: string, day: string | null, position = 1024): Task {
     due: null,
     visibility: 'space',
     projectId: null,
+    jira: null,
     ownerId: null,
     subtasks: [],
     subsDone: 0,

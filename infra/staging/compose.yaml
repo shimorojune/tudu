@@ -20,6 +20,8 @@ services:
       S3_BUCKET: tudu-staging
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      # The fake Jira at https://api.staging.tudu.ezdev.net/demo-jira (tokens good-…), for review without a real one.
+      DEMO_JIRA: '1'
     networks:
       - dokploy-network
     restart: unless-stopped

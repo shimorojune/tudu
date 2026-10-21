@@ -29,7 +29,7 @@ describe('Settings', () => {
     const items = within(nav())
       .getAllByRole('button')
       .map((b) => b.textContent);
-    expect(items).toEqual(['Account', 'Appearance', 'Space', 'Members19']);
+    expect(items).toEqual(['Account', 'Appearance', 'Space', 'Members19', 'Apps']);
     expect(within(nav()).getByRole('button', { name: 'Account' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Account');
     expect(screen.getByText('rohit@x.y', { selector: '.tp-set-h p' })).toBeInTheDocument();
@@ -49,7 +49,7 @@ describe('Settings', () => {
       within(nav())
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['Account', 'Appearance', 'Space']);
+    ).toEqual(['Account', 'Appearance', 'Space', 'Apps']);
     expect(screen.getByText('Yours alone. Nothing here is shared.')).toBeInTheDocument();
 
     // phones: the list is the page, with your mark; rows carry their line; a section has ‹ Settings
@@ -65,6 +65,7 @@ describe('Settings', () => {
       'AppearanceDark',
       'SpaceName, colour, leaving',
       'Members19 people',
+      'AppsNone yet',
     ]);
     expect(list[0]).not.toHaveAttribute('aria-current');
     rerender(

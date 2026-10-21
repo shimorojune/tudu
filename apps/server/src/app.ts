@@ -12,6 +12,9 @@ import { eventRoutes } from './routes/events';
 import { fileRoutes } from './routes/files';
 import { meRoutes } from './routes/me';
 import { inboxRoutes } from './routes/inbox';
+import { jiraRoutes } from './routes/jira';
+import { fakeJira } from './jira/fake';
+import { TokenSeal } from './jira/seal';
 import { spaceRoutes } from './routes/spaces';
 import { taskRoutes } from './routes/tasks';
 import { testRoutes } from './routes/test';
@@ -24,6 +27,8 @@ export interface AppDeps {
   hub: EventHub;
   mailer: Mailer;
   storage: Storage;
+  /** How the server reaches Jira; tests route it to the fake Jira in the same process. */
+  jiraFetch?: typeof fetch;
   /** For the live stream heartbeat in tests. */
   heartbeatMs?: number;
   quiet?: boolean;
@@ -95,9 +100,21 @@ export function createApp(deps: AppDeps) {
   app.route('/api', spaceRoutes(db, hub, mailer, env.WEB_URL!, storage));
   app.route('/api', inboxRoutes(db));
   app.route('/api', fileRoutes(db, storage));
+  app.route(
+    '/api',
+    jiraRoutes(db, hub, {
+      seal: new TokenSeal(env.AUTH_SECRET),
+      http: { production: env.NODE_ENV === 'production', fetch: deps.jiraFetch },
+    }),
+  );
   app.route('/api', eventRoutes(hub, auth, { heartbeatMs: deps.heartbeatMs }));
 
-  if (env.TEST_ROUTES === '1' && mailer instanceof OutboxMailer) app.route('/__test', testRoutes(mailer, db));
+  if (env.TEST_ROUTES === '1' && mailer instanceof OutboxMailer) {
+    app.route('/__test', testRoutes(mailer, db));
+    app.route('/__test/jira', fakeJira());
+  }
+  // Staging: the same fake Jira, reachable as https://api.staging…/demo-jira, for reviewing without a real one.
+  if (env.DEMO_JIRA === '1') app.route('/demo-jira', fakeJira());
 
   app.notFound((c) => c.json({ error: 'Not found.' }, 404));
   app.onError((err, c) => {

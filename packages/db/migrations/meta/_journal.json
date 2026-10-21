@@ -57,6 +57,13 @@
       "when": 1792604395645,
       "tag": "0007_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792616038472,
+      "tag": "0008_jira",
+      "breakpoints": true
     }
   ]
 }

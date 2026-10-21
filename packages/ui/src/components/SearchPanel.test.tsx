@@ -49,7 +49,7 @@ describe('C07-U05 what the panel shows', () => {
 
   it('the first time, with nothing yet, one line says what it searches', () => {
     render(<Panel recent={[]} history={[]} />);
-    expect(list().textContent).toBe('Search your tasks by title, task ID or note.');
+    expect(list().textContent).toBe('Search your tasks by title, task ID, Jira key or note.');
     expect(screen.queryAllByRole('option')).toEqual([]);
   });
 

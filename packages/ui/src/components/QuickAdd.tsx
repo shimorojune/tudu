@@ -211,7 +211,7 @@ function Ic({ name, size = 14 }: { name: keyof typeof I; size?: number }) {
   );
 }
 
-interface ChipProps {
+export interface QAChipProps {
   open: boolean;
   onOpen: (open: boolean) => void;
   up?: boolean;
@@ -224,7 +224,7 @@ interface ChipProps {
 }
 
 /** A quiet chip that opens its picker right under it (above it on phones) and eases its width when its label changes. */
-function Chip(p: ChipProps) {
+export function QAChip(p: QAChipProps) {
   const box = useRef<HTMLDivElement | null>(null);
   const btn = useRef<HTMLButtonElement | null>(null);
   useOutside(p.open, box, () => p.onOpen(false));
@@ -502,7 +502,7 @@ export function QuickAdd(p: QuickAddProps) {
   );
 
   const plannedChip = (
-    <Chip
+    <QAChip
       open={pop === 'planned'}
       onOpen={(v) => setPop(v ? 'planned' : null)}
       up={phone}
@@ -534,7 +534,7 @@ export function QuickAdd(p: QuickAddProps) {
     />
   );
   const dueChip = (
-    <Chip
+    <QAChip
       open={pop === 'due'}
       onOpen={(v) => setPop(v ? 'due' : null)}
       up={phone}
@@ -572,7 +572,7 @@ export function QuickAdd(p: QuickAddProps) {
     />
   );
   const projChip = (
-    <Chip
+    <QAChip
       open={pop === 'project'}
       onOpen={(v) => setPop(v ? 'project' : null)}
       up={phone}
@@ -666,7 +666,7 @@ export function QuickAdd(p: QuickAddProps) {
     </Button>
   );
   const spaceChip = p.send ? (
-    <Chip
+    <QAChip
       open={pop === 'space'}
       onOpen={(v) => setPop(v ? 'space' : null)}
       up={phone}
@@ -721,7 +721,7 @@ export function QuickAdd(p: QuickAddProps) {
   ) : null;
   const forChip =
     p.send && p.send.canSend ? (
-      <Chip
+      <QAChip
         open={pop === 'for'}
         onOpen={(v) => setPop(v ? 'for' : null)}
         up={phone}

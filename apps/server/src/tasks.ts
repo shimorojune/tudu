@@ -82,6 +82,7 @@ const taskColumns = {
   dueDay: schema.tasks.dueDay,
   visibility: schema.tasks.visibility,
   projectId: schema.tasks.projectId,
+  jiraKey: schema.tasks.jiraKey,
   ownerId: schema.tasks.ownerId,
   createdAt: schema.tasks.createdAt,
   updatedAt: schema.tasks.updatedAt,
@@ -100,6 +101,7 @@ type TaskRow = {
   dueDay: string | null;
   visibility: 'space' | 'me';
   projectId: string | null;
+  jiraKey: string | null;
   ownerId: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -125,6 +127,7 @@ export function toTask(r: TaskRow, c: Counts = { subtasks: [], commentCount: 0 }
     due: r.dueDay,
     visibility: r.visibility,
     projectId: r.projectId,
+    jira: r.jiraKey,
     ownerId: r.ownerId,
     subtasks: c.subtasks,
     subsDone: c.subtasks.filter((s) => s.done).length,
@@ -223,6 +226,7 @@ const searchColumns = {
   day: schema.tasks.day,
   doneAt: schema.tasks.doneAt,
   projectId: schema.tasks.projectId,
+  jiraKey: schema.tasks.jiraKey,
   notesText: schema.tasks.notesText,
 };
 type SearchRow = {
@@ -233,6 +237,7 @@ type SearchRow = {
   day: string | null;
   doneAt: Date | null;
   projectId: string | null;
+  jiraKey: string | null;
   notesText: string;
 };
 
@@ -249,6 +254,7 @@ function toHit(r: SearchRow, snippet: string | null = null): SearchHit {
     day: r.day,
     done: r.doneAt !== null,
     projectId: r.projectId,
+    jira: r.jiraKey,
     snippet,
   };
 }
@@ -279,7 +285,11 @@ export async function searchTasks(
   if (!toks.length) return [];
   const n = numberOf(q);
   const words = toks.map((w) =>
-    or(sql`${schema.tasks.title} ILIKE ${like(w)}`, sql`${schema.tasks.notesText} ILIKE ${like(w)}`)!,
+    or(
+      sql`${schema.tasks.title} ILIKE ${like(w)}`,
+      sql`${schema.tasks.notesText} ILIKE ${like(w)}`,
+      sql`${schema.tasks.jiraKey} ILIKE ${like(w)}`,
+    )!,
   );
   const rows: SearchRow[] = await db
     .select(searchColumns)
@@ -303,6 +313,7 @@ export async function searchTasks(
       day: r.day,
       done: r.doneAt !== null,
       notes: r.notesText,
+      jira: r.jiraKey,
     })),
     q,
     today,
@@ -805,6 +816,7 @@ async function create(
   if (p.due !== undefined) clocks.due = m.at;
   if (p.notes !== undefined) clocks.notes = m.at;
   if (p.projectId !== undefined) clocks.project = m.at;
+  if (p.jira !== undefined) clocks.jira = m.at;
   await tx.insert(schema.tasks).values({
     id: p.id,
     spaceId: p.spaceId,
@@ -816,11 +828,14 @@ async function create(
     notes: notes ? cleanHtml(notes) : '',
     notesText: notes ? textOf(cleanHtml(notes)) : '',
     projectId,
+    jiraKey: p.jira ?? null,
     createdBy: userId,
     ownerId: userId,
     clocks,
   });
-  await record(tx, p.id, 'created', p.source ? { source: p.source } : {}, userId, new Date(m.at));
+  const made: Record<string, unknown> = p.source ? { source: p.source } : {};
+  if (p.jira) made.key = p.jira;
+  await record(tx, p.id, 'created', made, userId, new Date(m.at));
   if (p.due) await record(tx, p.id, 'due.set', { due: p.due }, userId, new Date(m.at));
   if (files.length)
     await tx
@@ -847,6 +862,7 @@ async function lockTask(tx: Tx, userId: string, taskId: string, forComment = fal
       day: schema.tasks.day,
       doneAt: schema.tasks.doneAt,
       dueDay: schema.tasks.dueDay,
+      jiraKey: schema.tasks.jiraKey,
       deletedAt: schema.tasks.deletedAt,
       clocks: schema.tasks.clocks,
       ownerId: schema.tasks.ownerId,
@@ -952,6 +968,17 @@ async function change(tx: Tx, userId: string, m: TaskChange): Promise<Applied> {
           throw new Rejected(400, 'That project isn’t in this space.');
         set.projectId = m.payload.projectId;
         clocks.project = m.at;
+      }
+      break;
+    case 'task.jira':
+      if (newer(m.at, clocks.jira)) {
+        set.jiraKey = m.payload.jira;
+        clocks.jira = m.at;
+        if (m.payload.jira !== t.jiraKey) {
+          if (t.jiraKey) await record(tx, m.payload.id, 'jira.unlinked', { key: t.jiraKey }, userId, at);
+          if (m.payload.jira)
+            await record(tx, m.payload.id, 'jira.linked', { key: m.payload.jira }, userId, at);
+        }
       }
       break;
     case 'task.delete':

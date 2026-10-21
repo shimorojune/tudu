@@ -8,6 +8,7 @@ import { CodeField } from './CodeField';
 import { ColorPick } from './ColorPick';
 import { Field } from './Field';
 import { IconButton } from './IconButton';
+import { JiraMark } from './JiraMark';
 import { MembersBody, type MembersBodyInvite, type MembersBodyMember } from './MembersBody';
 import { PersonDot } from './PersonDot';
 import { ProjectSettings, type ProjectSettingsProps } from './ProjectSettings';
@@ -17,7 +18,7 @@ import { SpaceTile } from './SpaceTile';
 import { Switch } from './Switch';
 import { ThemePick } from './ThemePick';
 
-export type SettingsSectionName = 'account' | 'appearance' | 'space' | 'members';
+export type SettingsSectionName = 'account' | 'appearance' | 'space' | 'members' | 'apps';
 
 export interface SettingsMe {
   name: string;
@@ -86,6 +87,12 @@ export interface SettingsProps {
   onResendInvite?: (invite: MembersBodyInvite) => void;
   onRole?: (member: MembersBodyMember, role: 'admin' | 'member') => void;
   onRemove?: (member: MembersBodyMember) => void;
+
+  // Apps
+  /** Your Jira in this space: who you are there and the site ("jira.northwind.io"). */
+  jira?: { connected: boolean; who?: string; site?: string };
+  /** Connect (not connected) or Disconnect (connected). */
+  onJira?: () => void;
 
   /** No connection: names and colours wait in the outbox; the page says so. */
   offline?: boolean;
@@ -270,6 +277,10 @@ const TITLES = (p: SettingsProps): Record<SettingsSectionName, [string, string]>
     `${p.members?.length ?? p.space.members} in ${p.space.name}` +
       (p.invites?.length ? ` · ${p.invites.length} invited` : ''),
   ],
+  apps: [
+    'Apps',
+    `What you’ve connected in ${p.space.name}.${p.space.personal ? '' : ' Each person connects their own.'}`,
+  ],
 });
 
 /**
@@ -325,6 +336,12 @@ export function Settings(p: SettingsProps) {
         : [{ value: 'space', label: 'Space', icon: 'home', sub: 'Just you' }],
     },
   ];
+  groups[1]!.items.push({
+    value: 'apps',
+    label: 'Apps',
+    icon: 'plug',
+    sub: p.jira?.connected ? 'Jira' : 'None yet',
+  });
   const pick = (v: string) => p.onSection?.(v as SettingsSectionName);
 
   let body: ReactNode = null;
@@ -522,6 +539,42 @@ export function Settings(p: SettingsProps) {
         onRemove={admin ? p.onRemove : undefined}
       />
     );
+  else if (sec === 'apps') {
+    const j = p.jira;
+    body = (
+      <>
+        <SettingsSection title="Connected">
+          <SettingRow
+            title={
+              <span className="tp-set-app">
+                <JiraMark size={18} />
+                Jira
+              </span>
+            }
+            sub={
+              j?.connected
+                ? `As ${j.who || p.me.email} on ${j.site || 'your Jira'}. Only you see your issues.`
+                : 'Bring your Jira issues next to your day. Connect with a personal access token.'
+            }
+            control={
+              j?.connected ? (
+                <Button variant="secondary" size="sm" onClick={p.onJira}>
+                  Disconnect
+                </Button>
+              ) : (
+                <Button variant="primary" size="sm" onClick={p.onJira}>
+                  Connect
+                </Button>
+              )
+            }
+          />
+        </SettingsSection>
+        <p className="tp-set-note">
+          More apps are on the way. Everything here is optional; Tudu works fine on its own.
+        </p>
+      </>
+    );
+  }
 
   const [title, line] = TITLES(p)[sec];
   const main = (

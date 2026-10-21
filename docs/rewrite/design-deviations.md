@@ -261,3 +261,24 @@ the coding session, so this file is the record and the canvas gets a copy by han
 - Menus float over dialogs, so the role menu opens above Settings rather than under it.
 - Settings is in the address: `?settings=members` on the desk and tablets, `/northwind/settings/members` on
   phones; a renamed space's old address lands on the new one, and the task prefix never changes.
+
+## Chunk 10 · Jira · 22 Oct 2026
+
+- Built as drawn: Apps (the 480px panel, and a page under More on phones), the Jira panel beside the page (560px,
+  460 on tablets, no veil) with its connect form, the view chip and search, the plain list, the day picker, the
+  linked chip, the preview over the list (a sheet on phones), the banners and every state on the boards; the top
+  bar's button, the sidebar's Jira and the phone's Jira tab with the count; the task panel's Jira fact; Settings ›
+  Apps.
+- Settings › Apps is in Personal too (the board shows it in team spaces only), because a connection belongs to a
+  space and Personal connects its own. Personal's line leaves out "Each person connects their own."
+- Settings › Apps › Connect opens the Jira panel on its form beside the page (the Jira page on phones).
+- A saved view can be removed: open it, then Custom JQL…, and a quiet "Remove view" sits beside Cancel, with Undo on
+  its toast. Not drawn (choice 7).
+- The count leaves out issues that have an open task of yours; a task you cross off counts as not in Tudu again.
+- Esc in the panel's search box or JQL editor leaves the field, as in every Tudu field; Esc from anywhere else in
+  the panel closes the preview first, then the panel.
+- The Apps panel's Jira line is Tudu's own words: "Your Jira issues beside your day. Add one to a day and it
+  becomes a linked task."
+- The phone's Jira tab reads its count as "7 new", as every tab badge does.
+- Search across Jira: a key typed in full asks Jira for that issue; words ask Jira's text search, newest change
+  first.
