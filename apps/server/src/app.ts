@@ -9,9 +9,11 @@ import type { EventHub } from './events';
 import { OutboxMailer, type Mailer } from './email';
 import { sessionMiddleware, type SessionVars } from './middleware/session';
 import { eventRoutes } from './routes/events';
+import { fileRoutes } from './routes/files';
 import { meRoutes } from './routes/me';
 import { taskRoutes } from './routes/tasks';
 import { testRoutes } from './routes/test';
+import type { Storage } from './storage';
 
 export interface AppDeps {
   env: Env;
@@ -19,6 +21,7 @@ export interface AppDeps {
   auth: Auth;
   hub: EventHub;
   mailer: Mailer;
+  storage: Storage;
   /** For the live stream heartbeat in tests. */
   heartbeatMs?: number;
   quiet?: boolean;
@@ -31,7 +34,7 @@ export const SEND_WINDOW_MS = 10 * 60 * 1000;
 export const STALE_CODE_MS = 24 * 60 * 60 * 1000;
 
 export function createApp(deps: AppDeps) {
-  const { env, db, auth, hub, mailer } = deps;
+  const { env, db, auth, hub, mailer, storage } = deps;
   const app = new Hono<{ Variables: SessionVars }>();
   const origins = env.CORS_ORIGINS.split(',')
     .map((s) => s.trim())
@@ -87,6 +90,7 @@ export function createApp(deps: AppDeps) {
   app.use('/api/*', sessionMiddleware(auth));
   app.route('/api', meRoutes(db));
   app.route('/api', taskRoutes(db, hub));
+  app.route('/api', fileRoutes(db, storage));
   app.route('/api', eventRoutes(hub, auth, { heartbeatMs: deps.heartbeatMs }));
 
   if (env.TEST_ROUTES === '1' && mailer instanceof OutboxMailer) app.route('/__test', testRoutes(mailer, db));

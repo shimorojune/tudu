@@ -3,14 +3,9 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseRules, readStylesheet, rulesWhere } from '../test-utils/stylesheet';
+import { POP_LEAVE_MS } from '../lib/linger';
 import { Drawer } from './Drawer';
-import {
-  COMMENT_FRESH_MS,
-  POP_LEAVE_MS,
-  TaskDetail,
-  type TaskDetailProps,
-  type TaskDetailTask,
-} from './TaskDetail';
+import { COMMENT_FRESH_MS, TaskDetail, type TaskDetailProps, type TaskDetailTask } from './TaskDetail';
 import { ToastHost } from './Toast';
 
 const rules = parseRules(readStylesheet('components.css'));
@@ -470,5 +465,63 @@ describe('TaskDetail', () => {
       (r) => r.selector.includes('.tp-drawer') && r.context.some((c) => c.includes('prefers-reduced-motion')),
     );
     expect(reduced.length).toBeGreaterThan(0);
+  });
+});
+
+describe('TaskDetail project (chunk 04)', () => {
+  it('C04-U12 the Project fact: the picker with dots, No project and New project…; "Add to a project" when empty', async () => {
+    const user = userEvent.setup();
+    const onProject = vi.fn();
+    const onNewProject = vi.fn(() => 'new-1');
+    const projects = [
+      { id: 'nw', name: 'Northwind', color: '#3d5a80' },
+      { id: 'pf', name: 'Platform', color: '#5b7553' },
+    ];
+    const { container } = render(
+      <Panel
+        initial={{ ...FULL, projectId: null }}
+        projects={projects}
+        onProject={onProject}
+        onNewProject={onNewProject}
+      />,
+    );
+    const facts = Array.from(container.querySelectorAll('.tp-td-prop dt span')).map((e) => e.textContent);
+    expect(facts).toEqual(['Planned', 'Due', 'Project', 'Visible to']);
+    const fact = screen.getByRole('button', { name: 'Project' });
+    expect(fact).toHaveTextContent('Add to a project');
+    expect(fact).toHaveClass('tp-td-empty');
+    await user.click(fact);
+    const pop = container.querySelector('.tp-td-pop') as HTMLElement;
+    expect(
+      within(pop)
+        .getAllByRole('menuitem')
+        .map((m) => m.textContent),
+    ).toEqual(['Northwind', 'Platform', 'New project…']);
+    await user.click(within(pop).getByRole('menuitem', { name: 'Platform' }));
+    expect(onProject).toHaveBeenCalledWith('pf');
+    const { container: c2 } = render(
+      <Panel
+        initial={{ ...FULL, key: 't2', projectId: 'pf' }}
+        projects={projects}
+        onProject={onProject}
+        onNewProject={onNewProject}
+      />,
+    );
+    const fact2 = within(c2).getByRole('button', { name: 'Project' });
+    expect(fact2).toHaveTextContent('Platform');
+    expect((fact2.querySelector('.tp-dot') as HTMLElement).style.background).toBe('rgb(91, 117, 83)');
+    await user.click(fact2);
+    const pop2 = c2.querySelector('.tp-td-pop') as HTMLElement;
+    await user.click(within(pop2).getByRole('menuitem', { name: 'New project…' }));
+    await user.type(within(pop2).getByRole('textbox', { name: 'Project name' }), 'Home{Enter}');
+    expect(onNewProject).toHaveBeenCalledWith('Home');
+    expect(onProject).toHaveBeenLastCalledWith('new-1');
+    // without a project list the fact stays out
+    const { container: c3 } = render(<Panel initial={{ ...FULL, key: 't3' }} />);
+    expect(Array.from(c3.querySelectorAll('.tp-td-prop dt span')).map((e) => e.textContent)).toEqual([
+      'Planned',
+      'Due',
+      'Visible to',
+    ]);
   });
 });

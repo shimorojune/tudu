@@ -1,15 +1,21 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { queryOptions } from '@tanstack/react-query';
 import {
+  isProjectMutation,
+  nextProjectColor,
   placeAt,
   POSITION_STEP,
+  PROJECTS_CHANGED,
   TASKS_CHANGED,
   taskIdOf,
+  type Attachment,
   type Comment,
   type CommentAuthor,
   type DayResponse,
   type IsoDate,
   type MarksResponse,
+  type Project,
+  type ProjectsChangedEvent,
   type Subtask,
   type SyncMutation,
   type SyncResponse,
@@ -33,6 +39,7 @@ export const dayKey = (spaceId: string, day: IsoDate) => ['day', spaceId, day] a
 export const marksKey = (spaceId: string, from: IsoDate, to: IsoDate) =>
   ['marks', spaceId, from, to] as const;
 export const taskKey = (spaceId: string, taskId: string) => ['task', spaceId, taskId] as const;
+export const projectsKey = (spaceId: string) => ['projects', spaceId] as const;
 
 function byPosition(a: { position: number; createdAt: string }, b: { position: number; createdAt: string }) {
   return a.position - b.position || a.createdAt.localeCompare(b.createdAt);
@@ -52,8 +59,9 @@ export function draftOf(m: Extract<SyncMutation, { type: 'task.create' }>, end =
     done: false,
     doneAt: null,
     carriedFrom: null,
-    due: null,
+    due: p.due ?? null,
     visibility: 'space',
+    projectId: p.projectId ?? null,
     subtasks: [],
     subsDone: 0,
     subsTotal: 0,
@@ -61,6 +69,41 @@ export function draftOf(m: Extract<SyncMutation, { type: 'task.create' }>, end =
     createdAt: m.at,
     updatedAt: m.at,
   };
+}
+
+/** Apply a project mutation to a space's project list. Pure. */
+export function applyToProjects(projects: Project[], spaceId: string, m: SyncMutation): Project[] {
+  if (!isProjectMutation(m) || m.payload.spaceId !== spaceId) return projects;
+  switch (m.type) {
+    case 'project.create':
+      if (projects.some((p) => p.id === m.payload.id)) return projects;
+      return [
+        ...projects,
+        {
+          id: m.payload.id,
+          spaceId,
+          name: m.payload.name,
+          color: m.payload.color ?? nextProjectColor(projects.map((p) => p.color)),
+          position: (projects.at(-1)?.position ?? 0) + POSITION_STEP,
+          createdAt: m.at,
+        },
+      ];
+    case 'project.update':
+      return projects
+        .map((p) =>
+          p.id === m.payload.id
+            ? {
+                ...p,
+                name: m.payload.name ?? p.name,
+                color: m.payload.color ?? p.color,
+                position: m.payload.position ?? p.position,
+              }
+            : p,
+        )
+        .sort((a, b) => a.position - b.position || a.createdAt.localeCompare(b.createdAt));
+    case 'project.delete':
+      return projects.filter((p) => p.id !== m.payload.id);
+  }
 }
 
 /** Apply a subtask mutation to a list of subtasks. Pure; anything else leaves the list as it is. */
@@ -117,6 +160,10 @@ function patchTask<T extends Task>(t: T, m: SyncMutation): T {
       return { ...t, due: m.payload.due };
     case 'task.visibility':
       return { ...t, visibility: m.payload.visibility };
+    case 'task.project':
+      return { ...t, projectId: m.payload.projectId };
+    case 'project.delete':
+      return t.projectId === m.payload.id ? { ...t, projectId: null } : t;
     case 'subtask.create':
     case 'subtask.rename':
     case 'subtask.cross':
@@ -144,6 +191,11 @@ export function applyToDay(
   m: SyncMutation,
   lookup: (id: string) => Task | undefined,
 ): Task[] {
+  if (isProjectMutation(m)) {
+    if (m.type !== 'project.delete' || m.payload.spaceId !== spaceId) return tasks;
+    const hit = tasks.some((t) => t.projectId === m.payload.id);
+    return hit ? tasks.map((t) => patchTask(t, m)) : tasks;
+  }
   const id = taskIdOf(m);
   const has = tasks.some((t) => t.id === id);
   const map = (fn: (t: Task) => Task) => tasks.map((t) => (t.id === id ? fn(t) : t));
@@ -194,6 +246,10 @@ export function applyToDay(
 
 /** Apply one mutation to a task's full detail. Pure; a mutation for another task leaves it alone. */
 export function applyToDetail(d: TaskDetail, m: SyncMutation, me: CommentAuthor | null): TaskDetail {
+  if (isProjectMutation(m)) {
+    if (m.type === 'project.delete' && d.projectId === m.payload.id) return { ...d, projectId: null };
+    return d;
+  }
   if (taskIdOf(m) !== d.id) return d;
   const cms = (fn: (c: Comment) => Comment | null) =>
     d.comments.map((c) => (c.id === m.payload.id ? fn(c) : c)).filter((c): c is Comment => !!c);
@@ -360,12 +416,107 @@ export class TaskStore {
 
   // ---- changing ------------------------------------------------------------------------------------------
 
-  /** Write a new task on a day, at `index` (the end when left out). Returns its id. */
-  create(spaceId: string, day: IsoDate | null, title: string, index?: number): string {
+  /**
+   * Write a new task on a day, at `index` (the end when left out). Quick Add gives it more at birth: a due day, a
+   * project, notes and the files uploaded for it. Returns its id.
+   */
+  create(
+    spaceId: string,
+    day: IsoDate | null,
+    title: string,
+    index?: number,
+    extra: {
+      due?: IsoDate | null;
+      projectId?: string | null;
+      notes?: string;
+      attachments?: string[];
+      source?: 'quick-add';
+    } = {},
+  ): string {
     const id = this.o.newId?.() ?? crypto.randomUUID();
     const position = this.positionFor(spaceId, day, id, index);
-    this.mutate({ type: 'task.create', payload: { id, spaceId, title: title.trim(), day, position } });
+    const payload: Extract<TaskMutationBody, { type: 'task.create' }>['payload'] = {
+      id,
+      spaceId,
+      title: title.trim(),
+      day,
+      position,
+    };
+    if (extra.due !== undefined) payload.due = extra.due;
+    if (extra.projectId !== undefined) payload.projectId = extra.projectId;
+    if (extra.notes) payload.notes = extra.notes;
+    if (extra.attachments?.length) payload.attachments = extra.attachments;
+    if (extra.source) payload.source = extra.source;
+    this.mutate({ type: 'task.create', payload });
     return id;
+  }
+
+  setProject(id: string, projectId: string | null): void {
+    this.mutate({ type: 'task.project', payload: { id, projectId } });
+  }
+
+  // ---- projects ------------------------------------------------------------------------------------------
+
+  projectsQuery(spaceId: string) {
+    return queryOptions({
+      queryKey: projectsKey(spaceId),
+      queryFn: async (): Promise<Project[]> => {
+        const res = await this.o.api.get<{ projects: Project[] }>(`/api/spaces/${spaceId}/projects`);
+        this.setReachable(true);
+        let list = res.projects;
+        for (const { m } of this.pending.values()) list = applyToProjects(list, spaceId, m);
+        return list;
+      },
+    });
+  }
+
+  cachedProjects(spaceId: string): Project[] | undefined {
+    return this.o.queryClient.getQueryData<Project[]>(projectsKey(spaceId));
+  }
+
+  /** Make a project with the next free colour (or the one given). Returns its id. */
+  createProject(spaceId: string, name: string, color?: string): string {
+    const id = this.o.newId?.() ?? crypto.randomUUID();
+    const taken = (this.cachedProjects(spaceId) ?? []).map((p) => p.color);
+    this.mutate({
+      type: 'project.create',
+      payload: { id, spaceId, name: name.trim(), color: color ?? nextProjectColor(taken) },
+    });
+    return id;
+  }
+
+  updateProject(
+    spaceId: string,
+    id: string,
+    patch: { name?: string; color?: string; position?: number },
+  ): void {
+    this.mutate({ type: 'project.update', payload: { id, spaceId, ...patch } });
+  }
+
+  deleteProject(spaceId: string, id: string): void {
+    this.mutate({ type: 'project.delete', payload: { id, spaceId } });
+  }
+
+  // ---- files ---------------------------------------------------------------------------------------------
+
+  /** Upload a file into the space's storage, for a task or for one not written yet. Needs a connection. */
+  async upload(
+    spaceId: string,
+    file: File,
+    taskId: string | null,
+    onProgress?: (ratio: number) => void,
+  ): Promise<Attachment> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    if (taskId) form.append('taskId', taskId);
+    try {
+      const saved = await this.o.api.upload<Attachment>(`/api/spaces/${spaceId}/files`, form, onProgress);
+      this.setReachable(true);
+      return saved;
+    } catch (err) {
+      if (!(err instanceof ApiError)) this.setReachable(false);
+      throw err;
+    }
   }
 
   rename(id: string, title: string): void {
@@ -526,6 +677,12 @@ export class TaskStore {
 
   /** Refresh the days and tasks another tab or device changed. Our own changes are already on screen. */
   onEvent(e: LiveEvent): void {
+    if (e.type === PROJECTS_CHANGED) {
+      const pe = e.data as ProjectsChangedEvent;
+      if (pe.clientId && pe.clientId === this.clientId) return;
+      void this.o.queryClient.invalidateQueries({ queryKey: projectsKey(pe.spaceId), exact: true });
+      return;
+    }
     if (e.type !== TASKS_CHANGED) return;
     const ev = e.data as TasksChangedEvent;
     if (ev.clientId && ev.clientId === this.clientId) return;
@@ -542,6 +699,7 @@ export class TaskStore {
   refreshAll(): void {
     void this.o.queryClient.invalidateQueries({ queryKey: ['day'] });
     void this.o.queryClient.invalidateQueries({ queryKey: ['task'] });
+    void this.o.queryClient.invalidateQueries({ queryKey: ['projects'] });
     void this.o.queryClient.invalidateQueries({ queryKey: ['marks'] });
   }
 
@@ -584,10 +742,16 @@ export class TaskStore {
   /** Apply a mutation to every cached day and task. */
   private applyEverywhere(m: SyncMutation): void {
     const qc = this.o.queryClient;
+    if (isProjectMutation(m)) {
+      const key = projectsKey(m.payload.spaceId);
+      const list = qc.getQueryData<Project[]>(key);
+      if (list) qc.setQueryData<Project[]>(key, applyToProjects(list, m.payload.spaceId, m));
+      if (m.type !== 'project.delete') return;
+    }
     const id = taskIdOf(m);
     // The task's detail first, so a day row can take its exact counts from it.
     for (const [key, data] of qc.getQueriesData<TaskDetail>({ queryKey: ['task'] })) {
-      if (!data || data.id !== id) continue;
+      if (!data || (!isProjectMutation(m) && data.id !== id)) continue;
       const next = applyToDetail(data, m, this.o.me?.() ?? null);
       if (next !== data) qc.setQueryData<TaskDetail>(key, next);
     }
@@ -645,11 +809,13 @@ export class TaskStore {
     for (const r of res.results) this.pending.delete(r.id);
     this.merge(res);
     const touched = new Set<string>();
-    for (const b of batch) touched.add(taskIdOf(b as SyncMutation));
+    for (const b of batch)
+      if (!isProjectMutation(b as SyncMutation)) touched.add(taskIdOf(b as SyncMutation));
     if (rejected.length) {
       // Undo by reading the days again: the server's rows plus whatever is still on its way.
       void this.o.queryClient.invalidateQueries({ queryKey: ['day'] });
       void this.o.queryClient.invalidateQueries({ queryKey: ['task'] });
+      void this.o.queryClient.invalidateQueries({ queryKey: ['projects'] });
       this.o.onRejected?.(rejected[0]!.error ?? 'That change couldn’t be saved.');
     } else {
       // The detail of each task touched reads again, so server-made facts (history, numbers) arrive.
@@ -673,7 +839,8 @@ export class TaskStore {
       let tasks = data.tasks.filter((t) => !rows.has(t.id) && !gone.has(t.id));
       for (const t of rows.values()) if (t.spaceId === spaceId && t.day === day) tasks.push(t);
       for (const { m } of this.pending.values())
-        if (rows.has(taskIdOf(m))) tasks = applyToDay(tasks, day, spaceId, m, (id) => this.known.get(id));
+        if (!isProjectMutation(m) && rows.has(taskIdOf(m)))
+          tasks = applyToDay(tasks, day, spaceId, m, (id) => this.known.get(id));
       tasks.sort(byPosition);
       if (!sameTasks(tasks, data.tasks)) qc.setQueryData<DayData>(key, { day, tasks });
     }

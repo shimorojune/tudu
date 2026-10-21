@@ -21,6 +21,11 @@ function readView(): DayView {
 let view: DayView = readView();
 let newTask = 0;
 let shown: IsoDate | null = null;
+let quickAdd = false;
+/** The second sheet's day while two days are open, so Quick Add knows a task landing there is in view. */
+let second: IsoDate | null = null;
+/** A task just added from Quick Add: its day's list opens its gap with the wash. */
+let flash: { id: string; day: IsoDate | null; nonce: number } | null = null;
 const listeners = new Set<() => void>();
 const subscribe = (l: () => void) => {
   listeners.add(l);
@@ -72,6 +77,62 @@ export function useShownDay(): IsoDate | null {
   return useSyncExternalStore(
     subscribe,
     () => shown,
+    () => null,
+  );
+}
+
+/** Quick Add, over the page. */
+export function openQuickAdd(): void {
+  if (quickAdd) return;
+  quickAdd = true;
+  notify();
+}
+
+export function closeQuickAdd(): void {
+  if (!quickAdd) return;
+  quickAdd = false;
+  notify();
+}
+
+export function useQuickAddOpen(): boolean {
+  return useSyncExternalStore(
+    subscribe,
+    () => quickAdd,
+    () => false,
+  );
+}
+
+/** Wash a task's row on its day (a task added from Quick Add, or Show on its toast). */
+let flashTimer: ReturnType<typeof setTimeout> | null = null;
+export function flashTask(id: string, day: IsoDate | null): void {
+  flash = { id, day, nonce: (flash?.nonce ?? 0) + 1 };
+  notify();
+  // The wash is a moment; a day opened later must not wash it again.
+  if (flashTimer) clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => {
+    flash = null;
+    notify();
+  }, 2500);
+}
+
+export function useFlash(): { id: string; day: IsoDate | null; nonce: number } | null {
+  return useSyncExternalStore(
+    subscribe,
+    () => flash,
+    () => null,
+  );
+}
+
+export function setSecondDay(day: IsoDate | null): void {
+  if (day === second) return;
+  second = day;
+  notify();
+}
+
+export function useSecondDay(): IsoDate | null {
+  return useSyncExternalStore(
+    subscribe,
+    () => second,
     () => null,
   );
 }

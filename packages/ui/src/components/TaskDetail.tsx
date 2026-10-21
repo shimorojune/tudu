@@ -18,11 +18,13 @@ import {
 import { cx } from '../lib/cx';
 import { useOutside } from '../lib/hooks';
 import { Icon } from '../lib/icons';
+import { Linger } from '../lib/linger';
 import { Avatar } from './Avatar';
 import { Checkbox } from './Checkbox';
 import { IconButton } from './IconButton';
 import { Menu, MenuList } from './Menu';
 import { MiniCalendar, type MiniCalendarProps } from './MiniCalendar';
+import { ProjectMenu, type ProjectOption } from './ProjectMenu';
 import { RichTextContent, RichTextEditor, toHtml } from './RichTextEditor';
 import { Skeleton } from './Skeleton';
 import { SubtaskList, type SubtaskItem } from './SubtaskList';
@@ -60,6 +62,8 @@ export interface TaskDetailTask {
   carried?: TaskCarried;
   due: IsoDate | null;
   visibility: TaskVisibility;
+  /** The project it belongs to, if any. */
+  projectId?: string | null;
   notes: string;
   subtasks: SubtaskItem[];
   comments: DetailComment[];
@@ -80,6 +84,10 @@ export interface TaskDetailProps {
   visibility: VisibilityOption[];
   /** The month's dots for the Planned picker. */
   calendar?: Pick<MiniCalendarProps, 'marks' | 'month'>;
+  /** The space's projects for the Project fact. Without the list the fact stays out. */
+  projects?: ProjectOption[];
+  /** Where attachment chips link: the API's origin. */
+  fileBase?: string;
   /** Which way the content slides in when stepping to another task. */
   turnDir?: 'next' | 'prev';
   /** Phones: the back button's words, "Today" or the day's name. */
@@ -95,7 +103,15 @@ export interface TaskDetailProps {
   onMove?: (day: IsoDate | null) => void;
   onDue?: (day: IsoDate | null) => void;
   onVisibility?: (v: TaskVisibility) => void;
+  onProject?: (projectId: string | null) => void;
+  /** "New project…": make one with this name and return its id. */
+  onNewProject?: (name: string) => string | void;
   onNotes?: (html: string) => void;
+  /** "Attach a file" in the notes and comment editors. */
+  onAttach?: (
+    file: File,
+    onProgress?: (ratio: number) => void,
+  ) => Promise<{ id: string; name: string; size: number }>;
   onAddSubtask?: (title: string) => void;
   onRenameSubtask?: (sub: SubtaskItem, title: string) => void;
   onToggleSubtask?: (sub: SubtaskItem, done: boolean) => void;
@@ -113,11 +129,15 @@ export interface TaskDetailProps {
 
 /** How long a new comment keeps its wash. */
 export const COMMENT_FRESH_MS = 1800;
-/** How long a closed fact picker takes to ease out. */
-export const POP_LEAVE_MS = 130;
 const COMMENTS_KEPT = 3;
 
 const FACT_ICONS = {
+  project: (
+    <>
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx={12} cy={10} r={3} />
+    </>
+  ),
   day: (
     <>
       <rect x={3} y={4} width={18} height={18} rx={2} />
@@ -154,26 +174,6 @@ function FactIcon({ name }: { name: keyof typeof FACT_ICONS }) {
       {FACT_ICONS[name]}
     </svg>
   );
-}
-
-/** A pop that eases out instead of vanishing: once closed it keeps its last content for a beat, then unmounts. */
-function Linger({ open, className, children }: { open: boolean; className?: string; children: ReactNode }) {
-  // While open, the latest children are kept in state so they can stay on screen for the beat after it closes.
-  const [kept, setKept] = useState<{ open: boolean; node: ReactNode; gone: boolean }>({
-    open,
-    node: children,
-    gone: !open,
-  });
-  if (open && (kept.node !== children || !kept.open || kept.gone))
-    setKept({ open: true, node: children, gone: false });
-  if (!open && kept.open) setKept({ open: false, node: kept.node, gone: false });
-  useEffect(() => {
-    if (kept.open || kept.gone) return;
-    const t = setTimeout(() => setKept((k) => (k.open ? k : { ...k, gone: true })), POP_LEAVE_MS);
-    return () => clearTimeout(t);
-  }, [kept]);
-  if (kept.gone) return null;
-  return <div className={cx(className, !kept.open && 'tp-pop-leaving')}>{kept.node}</div>;
 }
 
 interface FactProps {
@@ -250,7 +250,7 @@ export function TaskDetail(p: TaskDetailProps) {
   const { task: t, today, compact = false } = p;
   const key = t.key;
   const [title, setTitle] = useState(t.title);
-  const [pop, setPop] = useState<null | 'day' | 'due' | 'vis'>(null);
+  const [pop, setPop] = useState<null | 'day' | 'due' | 'vis' | 'project'>(null);
   const [histOpen, setHistOpen] = useState(false);
   const [allCm, setAllCm] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
@@ -334,6 +334,7 @@ export function TaskDetail(p: TaskDetailProps) {
   const dueRel = due ? dueDistance(due, today) : null;
   const doneCount = t.subtasks.filter((s) => s.done).length;
   const visOpts = p.visibility.length ? p.visibility : [{ value: 'me' as const, label: 'Only you' }];
+  const project = p.projects?.find((x) => x.id === t.projectId) ?? null;
   const vis = visOpts.find((o) => o.value === t.visibility) ?? visOpts[0]!;
   const cal = p.calendar ?? {};
 
@@ -493,6 +494,43 @@ export function TaskDetail(p: TaskDetailProps) {
           <span>Add a due date</span>
         )}
       </Fact>
+      {p.projects ? (
+        <Fact
+          icon="project"
+          label="Project"
+          empty={!project}
+          open={pop === 'project'}
+          onOpen={(v) => setPop(v ? 'project' : null)}
+          pop={
+            <ProjectMenu
+              projects={p.projects}
+              selected={t.projectId ?? null}
+              onPick={(id) => {
+                setPop(null);
+                if (id !== (t.projectId ?? null)) p.onProject?.(id);
+              }}
+              onNew={
+                p.onNewProject
+                  ? (name) => {
+                      const id = p.onNewProject!(name);
+                      setPop(null);
+                      if (id) p.onProject?.(id);
+                    }
+                  : undefined
+              }
+            />
+          }
+        >
+          {project ? (
+            <>
+              <i className="tp-dot" style={{ background: project.color }} />
+              <span>{project.name}</span>
+            </>
+          ) : (
+            <span>Add to a project</span>
+          )}
+        </Fact>
+      ) : null}
       <Fact
         icon="vis"
         label="Visible to"
@@ -528,6 +566,8 @@ export function TaskDetail(p: TaskDetailProps) {
         value={t.notes}
         compact={compact}
         placeholder="Add notes, links, anything that helps…"
+        onAttach={p.onAttach}
+        fileBase={p.fileBase}
         onInput={(html, isEmpty) => {
           notes.current = { html: isEmpty ? '' : html, dirty: true };
         }}
@@ -668,6 +708,8 @@ export function TaskDetail(p: TaskDetailProps) {
                     submitLabel="Save"
                     compact={compact}
                     alwaysOpen
+                    onAttach={p.onAttach}
+                    fileBase={p.fileBase}
                     onSubmit={(html) => {
                       setEditing(null);
                       p.onEditComment?.(c, html);
@@ -675,7 +717,7 @@ export function TaskDetail(p: TaskDetailProps) {
                     onCancel={() => setEditing(null)}
                   />
                 ) : (
-                  <RichTextContent html={c.html} className="tp-td-cmt-text" />
+                  <RichTextContent html={c.html} className="tp-td-cmt-text" fileBase={p.fileBase} />
                 )}
               </div>
             </li>
@@ -744,6 +786,8 @@ export function TaskDetail(p: TaskDetailProps) {
           resetKey={`${key}:new`}
           placeholder="Write a comment…"
           compact={compact}
+          onAttach={p.onAttach}
+          fileBase={p.fileBase}
           onSubmit={(html) => {
             const k = p.onAddComment?.(html);
             if (k) setFresh(k);

@@ -59,3 +59,23 @@ the coding session, so this file is the record and the canvas gets a copy by han
   design's own absolutely placed pop.
 - Posting a comment keeps the caret in the box, ready for the next one.
 - The design's "Send to someone", "Go to its day" and the owner's read-only view wait for chunk 08.
+
+## Chunk 04 · Quick Add · 21 Oct 2026
+
+- Built as drawn: the bar over the desk and tablets with the veil, the sheet above the keyboard on phones, the
+  title line with the logo mark, Planned, Due and Project chips with their pickers (upward on phones), the note
+  line, file chips with drop and paste, the foot ("Lands on Today · Platform · due Thu 22 Oct"), Adding then
+  Added, the wash on the day in view, "Added to Tomorrow" with Show, and the seven states on the states board.
+- "New project…" is the picker's last line and asks for a name on the spot (not drawn); the colour is the next
+  of the design's muted palette. Renaming, recolouring and deleting wait for Settings (chunk 09).
+- Files upload the moment they are added and need a connection; offline, the attach button says so and the rest
+  of the bar keeps working. A failed upload reads "failed" on its chip and can be removed.
+- Files added in the bar join the task as attachment chips at the end of its notes, the same chips the editor's
+  "Attach a file" inserts. There is no separate Files section.
+- A failed save never shows "Couldn’t add the task" in practice: adding is local-first, so the task shows at once
+  and the outbox keeps trying. The message stays for the one case the store refuses outright.
+- The draft is kept in memory for the visit, per browser.
+- Planned defaults to the day you are looking at; in two-day view a task landing on the second sheet washes there
+  and shows no toast.
+- The floating bar's page is `/quick-add` on the web; the macOS window and the global summon arrive with chunk 11.
+- "Looks like a task you have" waits for Search (chunk 07).

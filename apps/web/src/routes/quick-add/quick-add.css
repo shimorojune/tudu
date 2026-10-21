@@ -1,0 +1,32 @@
+/* The floating bar's page: the bar near the top of a soft desk, nothing else. */
+.app-floating {
+  position: relative;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  color: var(--foreground);
+  background:
+    radial-gradient(
+      1200px 700px at 18% 12%,
+      color-mix(in srgb, var(--ember-200, #ffdcd5) 55%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 700px at 85% 90%,
+      color-mix(in srgb, var(--jira-200, #bed3f2) 60%, transparent),
+      transparent 60%
+    ),
+    var(--background);
+}
+.app-floating-bar {
+  padding-top: 14vh;
+}
+.app-floating-note {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 36px;
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}

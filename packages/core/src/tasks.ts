@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isIsoDate, type IsoDate } from './dates';
 import { COMMENT_MAX, NOTES_MAX } from './notes';
+import { projectColorSchema, projectNameSchema } from './projects';
 
 /** A task as the API sends it. `number` (and so `ref`, "ME-58") is assigned by the server when the task is saved. */
 export interface Task {
@@ -21,6 +22,8 @@ export interface Task {
   due: IsoDate | null;
   /** Who sees it in a team space: everyone, or only you. Personal is yours either way. */
   visibility: TaskVisibility;
+  /** The project it belongs to, if any (the coloured dot). */
+  projectId: string | null;
   /** Its subtasks in order, for the fold under the row; the counts are what the byline says. */
   subtasks: Subtask[];
   subsDone: number;
@@ -31,6 +34,27 @@ export interface Task {
 }
 
 export type TaskVisibility = 'space' | 'me';
+
+/** A project: a name and a muted colour, within one space. */
+export interface Project {
+  id: string;
+  spaceId: string;
+  name: string;
+  color: string;
+  position: number;
+  createdAt: string;
+}
+
+/** A file in object storage, as the API answers an upload. */
+export interface Attachment {
+  id: string;
+  spaceId: string;
+  taskId: string | null;
+  name: string;
+  size: number;
+  type: string;
+  createdAt: string;
+}
 
 export interface Subtask {
   id: string;
@@ -61,7 +85,7 @@ export interface Comment {
 
 /** What the server records as a task changes hands and days, for the History fold. */
 export type HistoryEvent =
-  | { id: number; at: string; kind: 'created'; from?: IsoDate | null }
+  | { id: number; at: string; kind: 'created'; source?: 'quick-add' | null }
   | { id: number; at: string; kind: 'due.set'; due: IsoDate }
   | { id: number; at: string; kind: 'due.cleared' }
   | { id: number; at: string; kind: 'moved'; from: IsoDate | null; to: IsoDate | null }
@@ -114,6 +138,7 @@ const commentHtml = z
   .min(1, 'A comment needs some words.')
   .max(COMMENT_MAX, 'That comment is too long.');
 const visibility = z.enum(['space', 'me']);
+const projectId = id.nullable();
 
 /**
  * The changes a client sends. Each one names the fields it writes; the server keeps, per field, the clock of the
@@ -144,6 +169,13 @@ export const taskMutationSchema = z.discriminatedUnion('type', [
       day: isoDay.nullable(),
       /** Null puts it at the end of its day (a day this client has not loaded). */
       position: position.nullable(),
+      /** Quick Add can give a task its due day, project, notes and files at birth. */
+      due: isoDay.nullable().optional(),
+      projectId: projectId.optional(),
+      notes: notes.optional(),
+      /** Ids of files uploaded before the task existed; they become its attachments. */
+      attachments: z.array(id).max(20).optional(),
+      source: z.enum(['quick-add']).optional(),
     }),
   }),
   z.object({ type: z.literal('task.rename'), payload: z.object({ id, title }) }),
@@ -158,6 +190,22 @@ export const taskMutationSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('task.due'), payload: z.object({ id, due: isoDay.nullable() }) }),
   z.object({ type: z.literal('task.notes'), payload: z.object({ id, notes }) }),
   z.object({ type: z.literal('task.visibility'), payload: z.object({ id, visibility }) }),
+  z.object({ type: z.literal('task.project'), payload: z.object({ id, projectId }) }),
+  z.object({
+    type: z.literal('project.create'),
+    payload: z.object({ id, spaceId: id, name: projectNameSchema, color: projectColorSchema.optional() }),
+  }),
+  z.object({
+    type: z.literal('project.update'),
+    payload: z.object({
+      id,
+      spaceId: id,
+      name: projectNameSchema.optional(),
+      color: projectColorSchema.optional(),
+      position: position.optional(),
+    }),
+  }),
+  z.object({ type: z.literal('project.delete'), payload: z.object({ id, spaceId: id }) }),
   z.object({
     type: z.literal('subtask.create'),
     payload: z.object({ id, taskId: id, title: subTitle, position: position.nullable() }),
@@ -171,9 +219,15 @@ export const taskMutationSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('comment.delete'), payload: z.object({ id, taskId: id }) }),
 ]);
 
-/** The task a mutation is about, whatever it names. */
+/** The task a mutation is about, whatever it names; a project change names its project instead. */
 export function taskIdOf(m: TaskMutationBody): string {
   return 'taskId' in m.payload ? m.payload.taskId : m.payload.id;
+}
+
+export function isProjectMutation(
+  m: TaskMutationBody,
+): m is Extract<TaskMutationBody, { type: `project.${string}` }> {
+  return m.type.startsWith('project.');
 }
 
 export type TaskMutationBody = z.infer<typeof taskMutationSchema>;
@@ -218,3 +272,10 @@ export interface TasksChangedEvent {
 }
 
 export const TASKS_CHANGED = 'tasks.changed';
+
+/** A space's projects changed: read them again. */
+export interface ProjectsChangedEvent {
+  spaceId: string;
+  clientId: string | null;
+}
+export const PROJECTS_CHANGED = 'projects.changed';

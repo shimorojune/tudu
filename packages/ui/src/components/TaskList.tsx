@@ -58,7 +58,7 @@ export interface TaskListProps {
   resetKey?: string | number;
   /** A project name: only its tasks show, and the "+" and dragging between lists turn off. */
   filter?: string;
-  /** A task added from outside the list (Quick Add): it opens its gap and gets the wash. */
+  /** A task added from outside the list (Quick Add): it opens its gap and gets the wash, on mount too. */
   flashKey?: string;
   /** Show a task already here: scroll it to the middle, focus it, flash it. Add ":anything" to show it again. */
   locateKey?: string;
@@ -109,7 +109,7 @@ export function TaskList(p: TaskListProps) {
 
   // A new day starts fresh; a task added from outside opens its gap.
   const [seenReset, setSeenReset] = useState(p.resetKey);
-  const [seenFlash, setSeenFlash] = useState(p.flashKey);
+  const [seenFlash, setSeenFlash] = useState<string | undefined>(undefined);
   if (p.resetKey !== seenReset) {
     setSeenReset(p.resetKey);
     setFresh(null);

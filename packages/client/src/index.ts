@@ -21,6 +21,8 @@ export {
   applyToDay,
   applyToDetail,
   applySubtasks,
+  applyToProjects,
+  projectsKey,
   draftOf,
   dayKey,
   marksKey,

@@ -1,12 +1,16 @@
 import {
   cleanHtml,
+  fileSize,
   isEmptyHtml,
+  isProjectMutation,
+  nextProjectColor,
   POSITION_STEP,
   syncMutationSchema,
   taskIdOf,
   type Comment,
   type HistoryEvent,
   type IsoDate,
+  type Project,
   type Subtask,
   type SyncMutation,
   type SyncResult,
@@ -64,6 +68,7 @@ const taskColumns = {
   carriedFrom: schema.tasks.carriedFrom,
   dueDay: schema.tasks.dueDay,
   visibility: schema.tasks.visibility,
+  projectId: schema.tasks.projectId,
   createdAt: schema.tasks.createdAt,
   updatedAt: schema.tasks.updatedAt,
 };
@@ -80,6 +85,7 @@ type TaskRow = {
   carriedFrom: string | null;
   dueDay: string | null;
   visibility: 'space' | 'me';
+  projectId: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -103,6 +109,7 @@ export function toTask(r: TaskRow, c: Counts = { subtasks: [], commentCount: 0 }
     carriedFrom: r.carriedFrom,
     due: r.dueDay,
     visibility: r.visibility,
+    projectId: r.projectId,
     subtasks: c.subtasks,
     subsDone: c.subtasks.filter((s) => s.done).length,
     subsTotal: c.subtasks.length,
@@ -217,6 +224,42 @@ export async function taskDetail(db: Executor, taskId: string): Promise<TaskDeta
     (e) => ({ id: e.id, at: e.at.toISOString(), kind: e.kind, ...e.data }) as HistoryEvent,
   );
   return { ...task!, notes: row.notes, comments, history };
+}
+
+function toProject(r: typeof schema.projects.$inferSelect): Project {
+  return {
+    id: r.id,
+    spaceId: r.spaceId,
+    name: r.name,
+    color: r.color,
+    position: r.position,
+    createdAt: r.createdAt.toISOString(),
+  };
+}
+
+/** A space's projects, in order. */
+export async function projectsOf(db: Executor, spaceId: string): Promise<Project[]> {
+  const rows = await db
+    .select()
+    .from(schema.projects)
+    .where(and(eq(schema.projects.spaceId, spaceId), isNull(schema.projects.deletedAt)))
+    .orderBy(asc(schema.projects.position), asc(schema.projects.createdAt));
+  return rows.map(toProject);
+}
+
+/** A live project of this space, or null. */
+async function projectIn(tx: Executor, spaceId: string, projectId: string): Promise<boolean> {
+  const [p] = await tx
+    .select({ id: schema.projects.id })
+    .from(schema.projects)
+    .where(
+      and(
+        eq(schema.projects.id, projectId),
+        eq(schema.projects.spaceId, spaceId),
+        isNull(schema.projects.deletedAt),
+      ),
+    );
+  return !!p;
 }
 
 /** Where "ME-52" points for this person: the first task with that ref in a space they are in. */
@@ -349,6 +392,14 @@ export interface Applied {
   spaceId: string;
   days: Array<IsoDate | null>;
   deleted?: boolean;
+  /** A project change: the space's project list changed, not a task. */
+  projects?: boolean;
+}
+
+/** An attachment chip as the editor makes it, for notes written by the server. */
+function attachmentChip(f: { id: string; name: string; size: number }): string {
+  const esc = (x: string) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  return `<a class="tp-att" href="/api/files/${f.id}" data-id="${f.id}" data-name="${esc(f.name)}" data-size="${f.size}"><span class="tp-att-i"></span>${esc(f.name)}<span class="tp-att-s">${fileSize(f.size)}</span></a>`;
 }
 
 /** Apply one mutation for `userId`, once. Throws Rejected for a change that will never apply. */
@@ -365,6 +416,7 @@ export async function applyMutation(db: Db, userId: string, raw: unknown): Promi
       .returning({ id: schema.appliedMutations.id });
     if (!claimed.length) {
       // Already applied: nothing changes, and the client gets the row as it is.
+      if (isProjectMutation(m)) return null;
       const taskId = taskIdOf(m);
       const [t] = await tx
         .select({ spaceId: schema.tasks.spaceId, day: schema.tasks.day })
@@ -373,6 +425,7 @@ export async function applyMutation(db: Db, userId: string, raw: unknown): Promi
       return t ? { taskId, spaceId: t.spaceId, days: [] } : null;
     }
     if (m.type === 'task.create') return create(tx, userId, m);
+    if (isProjectMutation(m)) return project(tx, userId, m);
     if (m.type.startsWith('subtask.')) return subtask(tx, userId, m as SubtaskMutation);
     if (m.type.startsWith('comment.')) return comment(tx, userId, m as CommentMutation);
     return change(tx, userId, m as TaskChange);
@@ -381,7 +434,11 @@ export async function applyMutation(db: Db, userId: string, raw: unknown): Promi
 
 type SubtaskMutation = Extract<SyncMutation, { type: `subtask.${string}` }>;
 type CommentMutation = Extract<SyncMutation, { type: `comment.${string}` }>;
-type TaskChange = Exclude<SyncMutation, { type: 'task.create' } | SubtaskMutation | CommentMutation>;
+type ProjectMutation = Extract<SyncMutation, { type: `project.${string}` }>;
+type TaskChange = Exclude<
+  SyncMutation,
+  { type: 'task.create' } | SubtaskMutation | CommentMutation | ProjectMutation
+>;
 
 /** The position after the last task of a day (or of the Backlog). */
 async function endOf(tx: Tx, spaceId: string, day: IsoDate | null): Promise<number> {
@@ -419,7 +476,26 @@ async function create(
     .set({ taskSeq: sql`${schema.spaces.taskSeq} + 1` })
     .where(eq(schema.spaces.id, p.spaceId))
     .returning({ n: schema.spaces.taskSeq });
+  const projectId = p.projectId && (await projectIn(tx, p.spaceId, p.projectId)) ? p.projectId : null;
+  if (p.projectId && !projectId) throw new Rejected(400, 'That project isn’t in this space.');
+  // Files uploaded before the task existed now belong to it, and sit at the end of its notes as chips.
+  const files = p.attachments?.length
+    ? await tx
+        .select({ id: schema.attachments.id, name: schema.attachments.name, size: schema.attachments.size })
+        .from(schema.attachments)
+        .where(
+          and(
+            inArray(schema.attachments.id, p.attachments),
+            eq(schema.attachments.spaceId, p.spaceId),
+            isNull(schema.attachments.taskId),
+          ),
+        )
+    : [];
+  const notes = (p.notes ?? '') + (files.length ? `<p>${files.map(attachmentChip).join(' ')}</p>` : '');
   const clocks: TaskClocks = { title: m.at, done: m.at, place: m.at, carried: m.at, deleted: m.at };
+  if (p.due !== undefined) clocks.due = m.at;
+  if (p.notes !== undefined) clocks.notes = m.at;
+  if (p.projectId !== undefined) clocks.project = m.at;
   await tx.insert(schema.tasks).values({
     id: p.id,
     spaceId: p.spaceId,
@@ -427,10 +503,24 @@ async function create(
     title: p.title,
     day: p.day,
     position: p.position ?? (await endOf(tx, p.spaceId, p.day)),
+    dueDay: p.due ?? null,
+    notes: notes ? cleanHtml(notes) : '',
+    projectId,
     createdBy: userId,
     clocks,
   });
-  await record(tx, p.id, 'created', {}, userId, new Date(m.at));
+  await record(tx, p.id, 'created', p.source ? { source: p.source } : {}, userId, new Date(m.at));
+  if (p.due) await record(tx, p.id, 'due.set', { due: p.due }, userId, new Date(m.at));
+  if (files.length)
+    await tx
+      .update(schema.attachments)
+      .set({ taskId: p.id })
+      .where(
+        inArray(
+          schema.attachments.id,
+          files.map((f) => f.id),
+        ),
+      );
   return { taskId: p.id, spaceId: p.spaceId, days: [p.day] };
 }
 
@@ -532,6 +622,14 @@ async function change(tx: Tx, userId: string, m: TaskChange): Promise<Applied> {
       if (newer(m.at, clocks.visibility)) {
         set.visibility = m.payload.visibility;
         clocks.visibility = m.at;
+      }
+      break;
+    case 'task.project':
+      if (newer(m.at, clocks.project)) {
+        if (m.payload.projectId && !(await projectIn(tx, t.spaceId, m.payload.projectId)))
+          throw new Rejected(400, 'That project isn’t in this space.');
+        set.projectId = m.payload.projectId;
+        clocks.project = m.at;
       }
       break;
     case 'task.delete':
@@ -675,6 +773,60 @@ async function comment(tx: Tx, userId: string, m: CommentMutation): Promise<Appl
       .where(eq(schema.comments.id, m.payload.id));
   }
   return base;
+}
+
+async function project(tx: Tx, userId: string, m: ProjectMutation): Promise<Applied> {
+  const { spaceId } = m.payload;
+  if (!(await roleIn(tx, userId, spaceId))) throw new Rejected(403, NOT_YOURS);
+  const base: Applied = { taskId: m.payload.id, spaceId, days: [], projects: true };
+  if (m.type === 'project.create') {
+    const [existing] = await tx
+      .select({ id: schema.projects.id })
+      .from(schema.projects)
+      .where(eq(schema.projects.id, m.payload.id));
+    if (existing) return { ...base, projects: false };
+    const others = await projectsOf(tx, spaceId);
+    const color = m.payload.color ?? nextProjectColor(others.map((p) => p.color));
+    const position = (others.at(-1)?.position ?? 0) + POSITION_STEP;
+    await tx.insert(schema.projects).values({
+      id: m.payload.id,
+      spaceId,
+      name: m.payload.name,
+      color,
+      position,
+      createdAt: new Date(m.at),
+    });
+    return base;
+  }
+  const [p] = await tx
+    .select({ spaceId: schema.projects.spaceId, deletedAt: schema.projects.deletedAt })
+    .from(schema.projects)
+    .where(eq(schema.projects.id, m.payload.id))
+    .for('update');
+  if (!p || p.spaceId !== spaceId) throw new Rejected(404, 'That project isn’t there any more.');
+  if (p.deletedAt) {
+    if (m.type === 'project.delete') return { ...base, projects: false };
+    throw new Rejected(410, 'That project was deleted.');
+  }
+  if (m.type === 'project.update') {
+    const set: Partial<typeof schema.projects.$inferInsert> = { updatedAt: new Date() };
+    if (m.payload.name !== undefined) set.name = m.payload.name;
+    if (m.payload.color !== undefined) set.color = m.payload.color;
+    if (m.payload.position !== undefined) set.position = m.payload.position;
+    await tx.update(schema.projects).set(set).where(eq(schema.projects.id, m.payload.id));
+    return base;
+  }
+  // Delete: the project goes and its tasks keep no project.
+  await tx
+    .update(schema.projects)
+    .set({ deletedAt: new Date(m.at), updatedAt: new Date() })
+    .where(eq(schema.projects.id, m.payload.id));
+  const moved = await tx
+    .update(schema.tasks)
+    .set({ projectId: null, updatedAt: new Date() })
+    .where(and(eq(schema.tasks.projectId, m.payload.id), isNull(schema.tasks.deletedAt)))
+    .returning({ id: schema.tasks.id, day: schema.tasks.day });
+  return { ...base, days: moved.map((t) => t.day) };
 }
 
 /** Apply a batch in order. Each mutation stands alone: a rejected one does not stop the rest. */

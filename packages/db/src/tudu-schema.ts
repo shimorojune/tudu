@@ -76,8 +76,29 @@ export const otpSends = pgTable(
  * `place` covers the day and the position together.
  */
 export type TaskClocks = Partial<
-  Record<'title' | 'done' | 'place' | 'carried' | 'deleted' | 'due' | 'notes' | 'visibility', string>
+  Record<
+    'title' | 'done' | 'place' | 'carried' | 'deleted' | 'due' | 'notes' | 'visibility' | 'project',
+    string
+  >
 >;
+
+/** A project: a name and a muted colour within one space; the coloured dot on a task. */
+export const projects = pgTable(
+  'projects',
+  {
+    id: text('id').primaryKey(),
+    spaceId: text('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    color: text('color').notNull(),
+    position: doublePrecision('position').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (t) => [index('projects_space').on(t.spaceId, t.position)],
+);
 
 export const taskVisibility = pgEnum('task_visibility', ['space', 'me']);
 
@@ -104,6 +125,7 @@ export const tasks = pgTable(
     notes: text('notes').notNull().default(''),
     /** In a team space: everyone, or only its owner. */
     visibility: taskVisibility('visibility').notNull().default('space'),
+    projectId: text('project_id').references(() => projects.id, { onDelete: 'set null' }),
     createdBy: text('created_by').references(() => user.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -182,6 +204,29 @@ export const taskEvents = pgTable(
     at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('task_events_task').on(t.taskId, t.id)],
+);
+
+/** A file in object storage. Uploaded before or after its task exists; swept when nothing refers to it. */
+export const attachments = pgTable(
+  'attachments',
+  {
+    id: text('id').primaryKey(),
+    spaceId: text('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    taskId: text('task_id').references(() => tasks.id, { onDelete: 'set null' }),
+    /** The object key in the bucket. */
+    key: text('key').notNull(),
+    name: text('name').notNull(),
+    size: integer('size').notNull(),
+    type: text('type').notNull(),
+    uploadedBy: text('uploaded_by').references(() => user.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('attachments_task').on(t.taskId),
+    index('attachments_space_created').on(t.spaceId, t.createdAt),
+  ],
 );
 
 /** Every mutation the server has applied, by its id, so a retry never applies twice. */

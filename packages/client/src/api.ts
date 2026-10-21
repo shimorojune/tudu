@@ -47,8 +47,39 @@ export function createApi(config: ApiConfig) {
     }
     return data as T;
   }
+  /** Send a file as form data, with progress when the browser can report it (XHR), else plain fetch. */
+  async function upload<T>(path: string, form: FormData, onProgress?: (ratio: number) => void): Promise<T> {
+    if (typeof XMLHttpRequest === 'undefined' || config.fetch) {
+      const res = await f(`${base}${path}`, { method: 'POST', credentials: 'include', body: form });
+      const text = await res.text();
+      const data: unknown = text ? safeJson(text) : null;
+      if (!res.ok)
+        throw new ApiError(res.status, (data as { error?: string } | null)?.error ?? res.statusText, data);
+      return data as T;
+    }
+    return new Promise<T>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${base}${path}`);
+      xhr.withCredentials = true;
+      xhr.setRequestHeader('accept', 'application/json');
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
+      };
+      xhr.onerror = () => reject(new TypeError('Network request failed'));
+      xhr.onload = () => {
+        const data: unknown = xhr.responseText ? safeJson(xhr.responseText) : null;
+        if (xhr.status >= 200 && xhr.status < 300) resolve(data as T);
+        else
+          reject(
+            new ApiError(xhr.status, (data as { error?: string } | null)?.error ?? xhr.statusText, data),
+          );
+      };
+      xhr.send(form);
+    });
+  }
   return {
     baseUrl: base,
+    upload,
     get: <T>(path: string, init?: RequestInit) => request<T>('GET', path, undefined, init),
     post: <T>(path: string, body?: unknown, init?: RequestInit) => request<T>('POST', path, body, init),
     patch: <T>(path: string, body?: unknown, init?: RequestInit) => request<T>('PATCH', path, body, init),

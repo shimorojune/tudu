@@ -4,7 +4,8 @@ import { addDays, weekdayName } from '@tudu/core';
 import { Avatar, BottomTabs, Fab, Logo, Sidebar, TopBar, useTheme, type SidebarItem } from '@tudu/ui';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { MeResponse } from '@tudu/client';
-import { askNewTask, setDayView, showDay, useDayView, useShownDay } from './dayView';
+import { openQuickAdd, setDayView, showDay, useDayView, useShownDay } from './dayView';
+import { QuickAddHost } from './quickAdd';
 import { initialsOf, signOut } from './session';
 import { taskStore } from './tasks';
 import { useViewport } from './viewport';
@@ -90,11 +91,8 @@ export function AppShell({ me, children }: { me: MeResponse; children: ReactNode
     const v = VIEWS.find((x) => x.value === value);
     if (v) void navigate({ to: v.path });
   };
-  // New task opens the day's writing line (Quick Add arrives with chunk 04).
-  const newTask = () => {
-    if (!onToday) void navigate({ to: '/' }).then(askNewTask);
-    else askNewTask();
-  };
+  // New task opens Quick Add over whatever you are doing.
+  const newTask = () => openQuickAdd();
   const account = {
     theme: choice,
     onTheme: setTheme,
@@ -113,6 +111,7 @@ export function AppShell({ me, children }: { me: MeResponse; children: ReactNode
         <div className="app-phone-fab">
           <Fab label="New task" onClick={newTask} />
         </div>
+        <QuickAddHost me={me} />
         <div className="app-phone-tabs">
           <BottomTabs
             items={[
@@ -173,6 +172,7 @@ export function AppShell({ me, children }: { me: MeResponse; children: ReactNode
         </div>
         <div className="tp-scroll app-scroll">{children}</div>
       </main>
+      <QuickAddHost me={me} />
     </div>
   );
 }

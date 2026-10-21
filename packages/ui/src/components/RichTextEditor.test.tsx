@@ -104,3 +104,40 @@ describe('RichTextEditor', () => {
     expect(toHtml('<p>kept</p>')).toBe('<p>kept</p>');
   });
 });
+
+describe('attachments (chunk 04)', () => {
+  it('C04-U13 Attach a file inserts the chip at the caret; the chip links to the file; stored HTML keeps the API path', async () => {
+    const user = userEvent.setup();
+    const onAttach = vi.fn(() => Promise.resolve({ id: 'abc-123', name: 'spec.pdf', size: 248_000 }));
+    const onBlur = vi.fn();
+    render(
+      <RichTextEditor
+        variant="notes"
+        label="Notes"
+        onAttach={onAttach}
+        onBlur={onBlur}
+        fileBase="https://api.test"
+      />,
+    );
+    const area = screen.getByRole('textbox', { name: 'Notes' });
+    await user.click(area);
+    await user.keyboard('Spec: ');
+    await user.upload(screen.getByLabelText('Choose a file to attach'), new File(['x'], 'spec.pdf'));
+    await waitFor(() => expect(onAttach).toHaveBeenCalledTimes(1));
+    const chip = await waitFor(() => area.querySelector('a.tp-att')!);
+    expect(chip).toHaveAttribute('href', 'https://api.test/api/files/abc-123');
+    expect(chip).toHaveAttribute('data-id', 'abc-123');
+    expect(chip.textContent).toBe('spec.pdf242 KB');
+    act(() => area.blur());
+    await waitFor(() => expect(onBlur).toHaveBeenCalled());
+    const html = onBlur.mock.calls.at(-1)![0] as string;
+    expect(html).toContain('href="/api/files/abc-123"');
+    expect(html).not.toContain('https://api.test');
+    // read-only, the chip links through the API's origin
+    const { container } = render(<RichTextContent html={html} fileBase="https://api.test" />);
+    expect(container.querySelector('a.tp-att')).toHaveAttribute('href', 'https://api.test/api/files/abc-123');
+    // without onAttach the button stays out
+    render(<RichTextEditor variant="notes" label="Plain" />);
+    expect(screen.queryAllByRole('button', { name: 'Attach a file' })).toHaveLength(1);
+  });
+});
