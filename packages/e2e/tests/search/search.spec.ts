@@ -93,7 +93,7 @@ test.describe('search', () => {
     if (phone()) await expect(searchTab(page)).toHaveAttribute('aria-current', 'page');
     else await expect(searchButton(page)).toHaveClass(/tp-on/);
     await expect(panel(page).locator('.tp-sp-hint')).toHaveText(
-      'Search your tasks by title, task ID or note.',
+      'Search your tasks by title, task ID, Jira key or note.',
     );
     await expect(options(page)).toHaveCount(0);
     await page.keyboard.press('Escape');

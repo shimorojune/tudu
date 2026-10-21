@@ -233,3 +233,14 @@
 .kit .tp-sp-skel .tp-skel {
   max-width: 100%;
 }
+
+/* Jira in the kit: the panel at its desk size (560 by 640), shrinking with a narrow window. */
+.kit-jp {
+  position: relative;
+  width: 560px;
+  max-width: 100%;
+  height: 640px;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sheet);
+  overflow: hidden;
+}

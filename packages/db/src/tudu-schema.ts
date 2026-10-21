@@ -153,7 +153,7 @@ export const otpSends = pgTable(
  */
 export type TaskClocks = Partial<
   Record<
-    'title' | 'done' | 'place' | 'carried' | 'deleted' | 'due' | 'notes' | 'visibility' | 'project',
+    'title' | 'done' | 'place' | 'carried' | 'deleted' | 'due' | 'notes' | 'visibility' | 'project' | 'jira',
     string
   >
 >;
@@ -206,6 +206,8 @@ export const tasks = pgTable(
     /** In a team space: everyone, or only its owner. */
     visibility: taskVisibility('visibility').notNull().default('space'),
     projectId: text('project_id').references(() => projects.id, { onDelete: 'set null' }),
+    /** The Jira issue it is linked to ("TUDU-212"); kept as words when Jira is disconnected. */
+    jiraKey: text('jira_key'),
     createdBy: text('created_by').references(() => user.id, { onDelete: 'set null' }),
     /** Whose list it is on. In a team space every page shows your own tasks; People shows everyone's. */
     ownerId: text('owner_id').references(() => user.id, { onDelete: 'set null' }),
@@ -218,6 +220,9 @@ export const tasks = pgTable(
     uniqueIndex('tasks_space_number').on(t.spaceId, t.number),
     index('tasks_space_day').on(t.spaceId, t.day, t.position),
     index('tasks_owner_day').on(t.ownerId, t.spaceId, t.day),
+    index('tasks_space_jira')
+      .on(t.spaceId, t.jiraKey)
+      .where(sql`jira_key IS NOT NULL`),
   ],
 );
 
@@ -272,6 +277,8 @@ export const historyKind = pgEnum('history_kind', [
   'restored',
   'accepted',
   'withdrawn',
+  'jira.linked',
+  'jira.unlinked',
 ]);
 
 /** What happened to a task, written by the server as it applies changes, so every device reads the same history. */
@@ -376,6 +383,55 @@ export const inboxItems = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('inbox_items_user').on(t.userId, t.spaceId, t.createdAt)],
+);
+
+export const jiraState = pgEnum('jira_state', ['ok', 'expired']);
+
+/**
+ * Your Jira in one space: the site and a personal access token, encrypted (AES-256-GCM, a key derived from
+ * AUTH_SECRET). One per person per space; a colleague connects their own.
+ */
+export const jiraConnections = pgTable(
+  'jira_connections',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    spaceId: text('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    /** The Jira address without a trailing slash, "https://jira.northwind.io". */
+    site: text('site').notNull(),
+    /** The token, sealed: never sent back, never logged. */
+    tokenSealed: text('token_sealed').notNull(),
+    /** Who the token is in Jira (its name and email), from Jira's own answer. */
+    jiraName: text('jira_name').notNull().default(''),
+    jiraEmail: text('jira_email').notNull().default(''),
+    state: jiraState('state').notNull().default('ok'),
+    connectedAt: timestamp('connected_at', { withTimezone: true }).notNull().defaultNow(),
+    /** The last time Jira answered a read. */
+    syncedAt: timestamp('synced_at', { withTimezone: true }),
+    /** The last time Tudu asked Jira anything, answered or not. */
+    checkedAt: timestamp('checked_at', { withTimezone: true }),
+  },
+  (t) => [uniqueIndex('jira_connections_user_space').on(t.userId, t.spaceId)],
+);
+
+/** A saved JQL view in the Views menu. It belongs to its connection and goes with it. */
+export const jiraViews = pgTable(
+  'jira_views',
+  {
+    id: text('id').primaryKey(),
+    connectionId: text('connection_id')
+      .notNull()
+      .references(() => jiraConnections.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    jql: text('jql').notNull(),
+    position: doublePrecision('position').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('jira_views_name').on(t.connectionId, t.name)],
 );
 
 /** Every mutation the server has applied, by its id, so a retry never applies twice. */

@@ -1,5 +1,6 @@
 import {
   addDays,
+  parseJiraKey,
   dueDistance,
   formatDay,
   relativeDayLabel,
@@ -16,6 +17,7 @@ import {
   type RefObject,
 } from 'react';
 import { cx } from '../lib/cx';
+import { JiraMark } from './JiraMark';
 import { useOutside } from '../lib/hooks';
 import { Icon } from '../lib/icons';
 import { Linger } from '../lib/linger';
@@ -66,6 +68,9 @@ export interface TaskDetailTask {
   visibility: TaskVisibility;
   /** The project it belongs to, if any. */
   projectId?: string | null;
+  /** The Jira issue it is linked to, "TUDU-212", and that issue's status while Jira is connected. */
+  jira?: string | null;
+  jiraStatus?: string | null;
   notes: string;
   subtasks: SubtaskItem[];
   comments: DetailComment[];
@@ -116,6 +121,10 @@ export interface TaskDetailProps {
   onDue?: (day: IsoDate | null) => void;
   onVisibility?: (v: TaskVisibility) => void;
   onProject?: (projectId: string | null) => void;
+  /** The Jira fact: link the task to an issue by its key, or unlink it (null). Without it the fact stays out. */
+  onJira?: (key: string | null) => void;
+  /** "Open TUDU-212 in Jira": only while Jira is connected; otherwise the key reads as words. */
+  onOpenJira?: (key: string) => void;
   /** "New project…": make one with this name and return its id. */
   onNewProject?: (name: string) => string | void;
   onNotes?: (html: string) => void;
@@ -162,6 +171,7 @@ const FACT_ICONS = {
       <path d="M12 7v5l3 2" />
     </>
   ),
+  ext: <path d="M7 17 17 7M8 7h9v9" />,
   vis: (
     <>
       <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
@@ -278,7 +288,8 @@ export function TaskDetail(p: TaskDetailProps) {
   const { task: t, today, compact = false, readOnly = false } = p;
   const key = t.key;
   const [title, setTitle] = useState(t.title);
-  const [pop, setPop] = useState<null | 'day' | 'due' | 'vis' | 'project'>(null);
+  const [pop, setPop] = useState<null | 'day' | 'due' | 'vis' | 'project' | 'jira'>(null);
+  const [jiraKey, setJiraKey] = useState('');
   const [histOpen, setHistOpen] = useState(false);
   const [allCm, setAllCm] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
@@ -564,6 +575,80 @@ export function TaskDetail(p: TaskDetailProps) {
             </>
           ) : (
             <span>{readOnly ? 'No project' : 'Add to a project'}</span>
+          )}
+        </Fact>
+      ) : null}
+      {p.onJira || (readOnly && t.jira) ? (
+        <Fact
+          icon="ext"
+          label="Jira"
+          readOnly={readOnly}
+          empty={!t.jira}
+          open={pop === 'jira'}
+          onOpen={(v) => {
+            setPop(v ? 'jira' : null);
+            setJiraKey('');
+          }}
+          pop={
+            t.jira ? (
+              <MenuList
+                label="Jira issue"
+                items={[
+                  p.onOpenJira
+                    ? {
+                        label: `Open ${t.jira} in Jira`,
+                        hint: '↗',
+                        onSelect: () => {
+                          setPop(null);
+                          p.onOpenJira!(t.jira!);
+                        },
+                      }
+                    : null,
+                  {
+                    label: 'Unlink the issue',
+                    onSelect: () => {
+                      setPop(null);
+                      p.onJira?.(null);
+                      showToast(`Unlinked ${t.jira}`);
+                    },
+                  },
+                ]}
+              />
+            ) : (
+              <div className="tp-td-link">
+                <label htmlFor={`${key}-jira`}>Link a Jira issue</label>
+                <input
+                  id={`${key}-jira`}
+                  autoFocus
+                  placeholder="TUDU-123"
+                  value={jiraKey}
+                  aria-label="Jira issue key"
+                  spellCheck={false}
+                  autoComplete="off"
+                  onChange={(e) => setJiraKey(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    const k = parseJiraKey(jiraKey);
+                    if (!k) return;
+                    setPop(null);
+                    setJiraKey('');
+                    p.onJira?.(k);
+                  }}
+                />
+                <p>Paste the issue key and press Enter.</p>
+              </div>
+            )
+          }
+        >
+          {t.jira ? (
+            <>
+              <JiraMark size={13} />
+              <span className="tp-mono">{t.jira}</span>
+              {t.jiraStatus ? <span className="tp-td-status">{t.jiraStatus}</span> : null}
+            </>
+          ) : (
+            <span>Link a Jira issue</span>
           )}
         </Fact>
       ) : null}

@@ -25,6 +25,7 @@ export function toSearchItem(h: SearchHit, today: string, projects: Project[]): 
     done: h.done,
     where: searchWhere(h.day, h.done, today),
     project: project ? { name: project.name, color: project.color } : null,
+    jira: h.jira,
     snippet: h.snippet,
   };
 }

@@ -25,6 +25,9 @@ import {
   type InboxResponse,
   type InboxView,
   type IsoDate,
+  JIRA_CHANGED,
+  type JiraChangedEvent,
+  type JiraLinksResponse,
   type MarksResponse,
   type MembersChangedEvent,
   type MembersResponse,
@@ -46,6 +49,7 @@ import {
 import { ApiError, type Api } from './api';
 import type { MeResponse } from './auth';
 import type { LiveEvent } from './events';
+import { applyToLinks, jiraLinksKey } from './jira';
 import { Outbox, type Mutation, type OutboxStore } from './outbox';
 
 /** A cached day (or the Backlog, day null): the tasks on it, in order, with every change not yet saved applied. */
@@ -94,6 +98,7 @@ export function draftOf(m: Extract<SyncMutation, { type: 'task.create' }>, end =
     due: p.due ?? null,
     visibility: 'space',
     projectId: p.projectId ?? null,
+    jira: p.jira ?? null,
     ownerId: null,
     subtasks: [],
     subsDone: 0,
@@ -212,6 +217,8 @@ function patchTask<T extends Task>(t: T, m: SyncMutation): T {
       return { ...t, visibility: m.payload.visibility };
     case 'task.project':
       return { ...t, projectId: m.payload.projectId };
+    case 'task.jira':
+      return { ...t, jira: m.payload.jira };
     case 'project.delete':
       return t.projectId === m.payload.id ? { ...t, projectId: null } : t;
     case 'subtask.create':
@@ -533,7 +540,9 @@ export class TaskStore {
       projectId?: string | null;
       notes?: string;
       attachments?: string[];
-      source?: 'quick-add';
+      /** A Jira issue's key: the task is made linked to it. */
+      jira?: string;
+      source?: 'quick-add' | 'jira';
     } = {},
   ): string {
     const id = this.o.newId?.() ?? crypto.randomUUID();
@@ -549,6 +558,7 @@ export class TaskStore {
     if (extra.projectId !== undefined) payload.projectId = extra.projectId;
     if (extra.notes) payload.notes = extra.notes;
     if (extra.attachments?.length) payload.attachments = extra.attachments;
+    if (extra.jira) payload.jira = extra.jira;
     if (extra.source) payload.source = extra.source;
     this.mutate({ type: 'task.create', payload });
     return id;
@@ -556,6 +566,11 @@ export class TaskStore {
 
   setProject(id: string, projectId: string | null): void {
     this.mutate({ type: 'task.project', payload: { id, projectId } });
+  }
+
+  /** Link a task to a Jira issue by its key, or unlink it (null). */
+  linkJira(id: string, jira: string | null): void {
+    this.mutate({ type: 'task.jira', payload: { id, jira } });
   }
 
   // ---- projects ------------------------------------------------------------------------------------------
@@ -688,6 +703,7 @@ export class TaskStore {
       due: r.due,
       visibility: 'space',
       projectId: r.projectId,
+      jira: null,
       ownerId: this.o.me?.()?.id ?? null,
       subtasks: [],
       subsDone: 0,
@@ -1065,6 +1081,11 @@ export class TaskStore {
       void this.o.queryClient.invalidateQueries({ queryKey: ['people', me.spaceId] });
       return;
     }
+    if (e.type === JIRA_CHANGED) {
+      const je = e.data as JiraChangedEvent;
+      void this.o.queryClient.invalidateQueries({ queryKey: ['jira', je.spaceId, 'connection'] });
+      return;
+    }
     if (e.type === PROJECTS_CHANGED) {
       const pe = e.data as ProjectsChangedEvent;
       if (pe.clientId && pe.clientId === this.clientId) return;
@@ -1081,6 +1102,7 @@ export class TaskStore {
     void qc.invalidateQueries({ queryKey: ['marks', ev.spaceId] });
     // People shows everyone's tasks: a colleague's change refreshes it.
     void qc.invalidateQueries({ queryKey: ['people', ev.spaceId] });
+    void qc.invalidateQueries({ queryKey: jiraLinksKey(ev.spaceId), exact: true });
   }
 
   /** After the stream was down for a while: read every cached day and task again. */
@@ -1092,6 +1114,10 @@ export class TaskStore {
     void this.o.queryClient.invalidateQueries({ queryKey: ['people'] });
     void this.o.queryClient.invalidateQueries({ queryKey: ['members'] });
     void this.o.queryClient.invalidateQueries({ queryKey: ['inbox'] });
+    void this.o.queryClient.invalidateQueries({
+      queryKey: ['jira'],
+      predicate: (q) => q.queryKey[2] === 'links',
+    });
   }
 
   stop(): void {
@@ -1170,6 +1196,12 @@ export class TaskStore {
       if (m.type !== 'project.delete') return;
     }
     const id = taskIdOf(m);
+    // Which issues have tasks: the panel's chips follow every change of yours at once.
+    for (const [key, data] of qc.getQueriesData<JiraLinksResponse>({ queryKey: ['jira'] })) {
+      if (!data || key[2] !== 'links') continue;
+      const next = applyToLinks(data.links, key[1] as string, m, (x) => this.known.get(x));
+      if (next !== data.links) qc.setQueryData<JiraLinksResponse>(key, { links: next });
+    }
     // The task's detail first, so a day row can take its exact counts from it.
     for (const [key, data] of qc.getQueriesData<TaskDetail>({ queryKey: ['task'] })) {
       if (!data || (!isProjectMutation(m) && data.id !== id)) continue;
@@ -1248,6 +1280,12 @@ export class TaskStore {
     }
     void this.o.queryClient.invalidateQueries({ queryKey: ['marks'] });
     void this.o.queryClient.invalidateQueries({ queryKey: ['people'] });
+    // The server's word on which issues have tasks (and the numbers of new ones).
+    if (batch.some((b) => (b as SyncMutation).type.startsWith('task.')))
+      void this.o.queryClient.invalidateQueries({
+        queryKey: ['jira'],
+        predicate: (q) => q.queryKey[2] === 'links',
+      });
     // Anything about requests or the Inbox: read the Inbox and the counts again, now the server has the truth.
     // You or a space changed: /api/me (names, addresses), the members and People read again.
     if (batch.some((b) => isSettingsMutation(b as SyncMutation))) {

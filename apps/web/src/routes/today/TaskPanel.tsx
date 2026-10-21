@@ -27,6 +27,7 @@ import { API_URL } from '../../app/config';
 import { initialsOf } from '../../app/session';
 import { addRecentTask } from '../../app/search';
 import { useSpace } from '../../app/space';
+import { jiraClient, openInJira, useJira } from '../../app/jira';
 import { taskStore } from '../../app/tasks';
 import type { Viewport } from '../../app/viewport';
 
@@ -107,6 +108,12 @@ export function TaskPanel(p: TaskPanelProps) {
     enabled: !!shown && !!detail,
   }).data?.tasks;
   const projects = useQuery({ ...taskStore.projectsQuery(spaceId), enabled: !!shown }).data ?? [];
+  // A linked task shows its issue's status while Jira is connected (Jira is asked when you look).
+  const { conn } = useJira(spaceId);
+  const issue = useQuery({
+    ...jiraClient.issueQuery(spaceId, detail?.jira ?? ''),
+    enabled: !!shown && !!detail?.jira && conn?.state === 'ok',
+  }).data;
   const at = list?.findIndex((t) => t.id === id) ?? -1;
   const prev = at > 0 ? list![at - 1] : undefined;
   const next = at >= 0 && list && at < list.length - 1 ? list[at + 1] : undefined;
@@ -162,6 +169,8 @@ export function TaskPanel(p: TaskPanelProps) {
       due: d.due,
       visibility: d.visibility,
       projectId: d.projectId,
+      jira: d.jira,
+      jiraStatus: conn && issue?.key === d.jira ? issue.status : null,
       notes: d.notes,
       subtasks: d.subtasks.map((s) => ({ key: s.id, title: s.title, done: s.done })),
       comments: d.comments.map((c) => ({
@@ -225,6 +234,8 @@ export function TaskPanel(p: TaskPanelProps) {
         onDue={(due) => taskStore.due(d.id, due)}
         onVisibility={(v) => taskStore.visibility(d.id, v)}
         onProject={(projectId) => taskStore.setProject(d.id, projectId)}
+        onJira={(key) => taskStore.linkJira(d.id, key)}
+        onOpenJira={conn ? (key) => void openInJira(spaceId, key) : undefined}
         onNewProject={(name) => taskStore.createProject(spaceId, name)}
         onNotes={(html) => taskStore.notes(d.id, html)}
         onAttach={(file, onProgress) => taskStore.upload(spaceId, file, d.id, onProgress)}

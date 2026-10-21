@@ -25,6 +25,7 @@ function task(id: string, title: string, day: string, position: number, extra: P
     due: null,
     visibility: 'space',
     projectId: null,
+    jira: null,
     ownerId: null,
     subtasks: [],
     subsDone: 0,

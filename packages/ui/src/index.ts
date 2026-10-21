@@ -275,3 +275,31 @@ export {
   type SentStatus,
 } from './components/InboxItem';
 export type { QuickAddSend, QuickAddSpace } from './components/QuickAdd';
+
+// Jira (chunk 10)
+export { QAChip, type QAChipProps } from './components/QuickAdd';
+export {
+  JiraPanel,
+  JiraPreview,
+  JPConnect,
+  JPLinked,
+  updatedWords,
+  JP_CONNECTED_MS,
+  JP_FRESH_MS,
+  JP_PREVIEW_LEAVE_MS,
+  JP_SHEET_LEAVE_MS,
+  JP_SEARCH_AFTER_MS,
+  type JiraPanelProps,
+  type JiraPanelIssue,
+  type JiraPanelLink,
+  type JiraPanelState,
+  type JiraPreviewIssue,
+  type JiraPreviewComment,
+  type JiraPreviewProps,
+  type JiraView,
+  type JiraConnectError,
+  type JPConnectProps,
+  type JPLinkedProps,
+  type AddState,
+} from './components/JiraPanel';
+export { AppsPanel, type AppsPanelProps, type AppsPanelApp } from './components/AppsPanel';

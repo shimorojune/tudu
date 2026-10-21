@@ -3,6 +3,7 @@ import { isIsoDate, type IsoDate } from './dates';
 import { COMMENT_MAX, NOTES_MAX } from './notes';
 import { DECLINE_REASON_MAX, REQUEST_NOTE_MAX } from './inbox';
 import { projectColorSchema, projectNameSchema } from './projects';
+import { JIRA_KEY_MAX, JIRA_KEY_PATTERN } from './jira';
 import { personNameSchema, spaceColorSchema, spaceNameSchema } from './spaces';
 
 /** A task as the API sends it. `number` (and so `ref`, "ME-58") is assigned by the server when the task is saved. */
@@ -26,6 +27,8 @@ export interface Task {
   visibility: TaskVisibility;
   /** The project it belongs to, if any (the coloured dot). */
   projectId: string | null;
+  /** The Jira issue it is linked to ("TUDU-212"), if any. */
+  jira: string | null;
   /** Whose list it is on. In a team space every page shows your own; People shows everyone's. */
   ownerId: string | null;
   /** Its subtasks in order, for the fold under the row; the counts are what the byline says. */
@@ -89,7 +92,7 @@ export interface Comment {
 
 /** What the server records as a task changes hands and days, for the History fold. */
 export type HistoryEvent =
-  | { id: number; at: string; kind: 'created'; source?: 'quick-add' | null }
+  | { id: number; at: string; kind: 'created'; source?: 'quick-add' | 'jira' | null; key?: string }
   | { id: number; at: string; kind: 'due.set'; due: IsoDate }
   | { id: number; at: string; kind: 'due.cleared' }
   | { id: number; at: string; kind: 'moved'; from: IsoDate | null; to: IsoDate | null }
@@ -99,7 +102,9 @@ export type HistoryEvent =
   | { id: number; at: string; kind: 'restored' }
   /** The task came as a request: "Sent by Meera, accepted"; or it came back: "Sent to Meera, taken back". */
   | { id: number; at: string; kind: 'accepted'; from: string }
-  | { id: number; at: string; kind: 'withdrawn'; to: string };
+  | { id: number; at: string; kind: 'withdrawn'; to: string }
+  | { id: number; at: string; kind: 'jira.linked'; key: string }
+  | { id: number; at: string; kind: 'jira.unlinked'; key: string };
 
 export type HistoryKind = HistoryEvent['kind'];
 
@@ -163,6 +168,11 @@ const commentHtml = z
   .max(COMMENT_MAX, 'That comment is too long.');
 const visibility = z.enum(['space', 'me']);
 const projectId = id.nullable();
+const jiraKey = z
+  .string()
+  .max(JIRA_KEY_MAX)
+  .transform((k) => k.trim().toUpperCase())
+  .refine((k) => JIRA_KEY_PATTERN.test(k), 'That isn’t a Jira issue key.');
 
 /**
  * The changes a client sends. Each one names the fields it writes; the server keeps, per field, the clock of the
@@ -180,6 +190,7 @@ const projectId = id.nullable();
  * | task.due      | due                      |
  * | task.notes    | notes                    |
  * | task.visibility | visibility             |
+ * | task.jira     | the linked Jira key (link, unlink) |
  * | subtask.*     | one subtask's title, done, position or deleted (its own clocks) |
  * | comment.*     | one comment, by its author (no clocks: the author's last word stands) |
  * | me.rename     | your name (the last word stands)  |
@@ -202,7 +213,9 @@ export const taskMutationSchema = z.discriminatedUnion('type', [
       notes: notes.optional(),
       /** Ids of files uploaded before the task existed; they become its attachments. */
       attachments: z.array(id).max(20).optional(),
-      source: z.enum(['quick-add']).optional(),
+      /** Made from a Jira issue: linked to its key, "Created from KEY" in its history. */
+      jira: jiraKey.optional(),
+      source: z.enum(['quick-add', 'jira']).optional(),
     }),
   }),
   z.object({ type: z.literal('task.rename'), payload: z.object({ id, title }) }),
@@ -218,6 +231,7 @@ export const taskMutationSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('task.notes'), payload: z.object({ id, notes }) }),
   z.object({ type: z.literal('task.visibility'), payload: z.object({ id, visibility }) }),
   z.object({ type: z.literal('task.project'), payload: z.object({ id, projectId }) }),
+  z.object({ type: z.literal('task.jira'), payload: z.object({ id, jira: jiraKey.nullable() }) }),
   z.object({
     type: z.literal('project.create'),
     payload: z.object({ id, spaceId: id, name: projectNameSchema, color: projectColorSchema.optional() }),

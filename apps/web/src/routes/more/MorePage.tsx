@@ -1,6 +1,7 @@
 import { useNavigate } from '@tanstack/react-router';
 import { inboxCountWords, type SpaceSummary } from '@tudu/core';
 import { Icon, Sheet, SheetBody, type IconName } from '@tudu/ui';
+import { useJira } from '../../app/jira';
 import { spacePath, useSpace, type View } from '../../app/space';
 
 export interface MoreItem {
@@ -10,9 +11,10 @@ export interface MoreItem {
   hint: string;
 }
 
-/** What More keeps on phones: the Backlog, People in a team space, the Inbox and Settings. */
+/** What More keeps on phones: the Backlog, People in a team space, the Inbox, Apps and Settings. */
 export function moreItems(
   space: Pick<SpaceSummary, 'kind' | 'name'> & { inbox?: SpaceSummary['inbox'] },
+  jira = false,
 ): MoreItem[] {
   const items: MoreItem[] = [
     { value: 'backlog', label: 'Backlog', icon: 'backlog', hint: 'Tasks without a day' },
@@ -26,6 +28,7 @@ export function moreItems(
     icon: 'inbox',
     hint: n ? inboxCountWords(space.inbox!) : 'All caught up',
   });
+  items.push({ value: 'apps', label: 'Apps', icon: 'plug', hint: jira ? 'Jira' : 'None yet' });
   items.push({
     value: 'settings',
     label: 'Settings',
@@ -39,6 +42,7 @@ export function moreItems(
 export function MorePage() {
   const navigate = useNavigate();
   const space = useSpace();
+  const { conn } = useJira(space.id);
   return (
     <div className="app-page app-more">
       <Sheet label="More" fill minHeight={320}>
@@ -53,7 +57,7 @@ export function MorePage() {
         </div>
         <SheetBody>
           <nav className="app-more-list" aria-label="More">
-            {moreItems(space).map((it) => (
+            {moreItems(space, !!conn).map((it) => (
               <button
                 key={it.value}
                 type="button"

@@ -1,0 +1,12 @@
+/* Jira and Apps on phones: the panel fills the page between the head and the tabs. */
+.app-jira,
+.app-apps {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.app-jira > .tp-jp,
+.app-apps > .tp-apps {
+  flex: 1;
+  min-height: calc(100dvh - 140px);
+}

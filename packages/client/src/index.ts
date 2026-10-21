@@ -36,3 +36,15 @@ export {
   type WeekData,
   type TaskStoreOptions,
 } from './tasks';
+export {
+  JiraClient,
+  applyToLinks,
+  jiraError,
+  listName,
+  jiraConnectionKey,
+  jiraIssuesKey,
+  jiraIssueKey,
+  jiraSearchKey,
+  jiraLinksKey,
+  type JiraListAsk,
+} from './jira';

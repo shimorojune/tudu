@@ -16,9 +16,21 @@ export function startServer(overrides: Partial<NodeJS.ProcessEnv> = {}): Server 
     TEST_ROUTES: '1',
     ...overrides,
   });
-  const server = bootstrap(env, { mailer: outbox, heartbeatMs: 50, quiet: true });
+  // The server reaches "Jira" at http://jira.test, which is the fake Jira this same app serves under /__test/jira.
+  let app: Server['app'] | null = null;
+  const jiraFetch: typeof fetch = (input, init) => {
+    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+    if (url.host !== JIRA_TEST_HOST) return Promise.reject(new TypeError('fetch failed'));
+    return Promise.resolve(app!.request(`/__test/jira${url.pathname}${url.search}`, init));
+  };
+  const server = bootstrap(env, { mailer: outbox, heartbeatMs: 50, quiet: true, jiraFetch });
+  app = server.app;
   return { ...server, outbox };
 }
+
+/** The address of the fake Jira in API tests. */
+export const JIRA_TEST_HOST = 'jira.test';
+export const JIRA_TEST_SITE = `http://${JIRA_TEST_HOST}`;
 
 let n = 0;
 /** A fresh address per test so tests never share a person. */

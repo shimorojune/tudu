@@ -480,6 +480,7 @@ const sharedColumns = {
   dueDay: schema.tasks.dueDay,
   visibility: schema.tasks.visibility,
   projectId: schema.tasks.projectId,
+  jiraKey: schema.tasks.jiraKey,
   ownerId: schema.tasks.ownerId,
   createdAt: schema.tasks.createdAt,
   updatedAt: schema.tasks.updatedAt,

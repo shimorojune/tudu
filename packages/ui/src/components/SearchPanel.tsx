@@ -288,7 +288,7 @@ export function SearchPanel(p: SearchPanelProps) {
     if (!past.length && !recent.length)
       body.push(
         <p key="hint" className="tp-sp-hint">
-          {p.hint ?? 'Search your tasks by title, task ID or note.'}
+          {p.hint ?? 'Search your tasks by title, task ID, Jira key or note.'}
         </p>,
       );
   } else if (showLoading && !hits.length) {

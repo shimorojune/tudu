@@ -37,6 +37,7 @@ import {
 import { openMembers } from '../../app/dayView';
 import { api, meQuery } from '../../app/session';
 import { spacePath, useSpace } from '../../app/space';
+import { openInJira } from '../../app/jira';
 import { taskStore, useOnline } from '../../app/tasks';
 import { useViewport, type Viewport } from '../../app/viewport';
 import { useWorkingDay } from '../../app/workingDay';
@@ -59,6 +60,7 @@ export function toItem(t: Task, today: IsoDate, projects: Project[]): TaskItem {
     due: t.due && !t.done ? dueLabel(t.due, today) : undefined,
     carried: t.carriedFrom && !t.done ? carriedLabel(t.carriedFrom, today) : undefined,
     comments: t.commentCount || undefined,
+    jira: t.jira ?? undefined,
     subtasks: t.subtasks.map((s) => ({ key: s.id, title: s.title, done: s.done })),
   };
 }
@@ -351,6 +353,9 @@ function DaySheet({
   else
     body = (
       <TaskList
+        onSignal={(t, k) => {
+          if (k === 'jira' && t.jira) openInJira(spaceId, t.jira);
+        }}
         tasks={items}
         label={`Tasks for ${h.day} ${h.date}`}
         compact={compact}

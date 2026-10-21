@@ -30,6 +30,7 @@ import { BacklogPage } from './routes/backlog/BacklogPage';
 import { InboxPage } from './routes/inbox/InboxPage';
 import { JoinPage } from './routes/join/JoinPage';
 import { MorePage } from './routes/more/MorePage';
+import { AppsPage, JiraPage } from './routes/jira/JiraPage';
 import { PeoplePage } from './routes/people/PeoplePage';
 import { QuickAddPage } from './routes/quick-add/QuickAddPage';
 import { SignInPage } from './routes/sign-in/SignInPage';
@@ -98,10 +99,14 @@ const homeRoute = createRoute({
   },
 });
 
-/** Every page takes ?task= (the task panel) and ?settings= (Settings over the page on the desk and tablets). */
-const taskSearch = (s: Record<string, unknown>): { task?: string; settings?: string } => ({
+/**
+ * Every page takes ?task= (the task panel), ?settings= (Settings over the page on the desk and tablets) and ?jira
+ * (the Jira panel beside the page; ?jira=KEY with an issue open).
+ */
+const taskSearch = (s: Record<string, unknown>): { task?: string; settings?: string; jira?: string } => ({
   ...(typeof s.task === 'string' && s.task ? { task: s.task } : {}),
   ...(typeof s.settings === 'string' && s.settings ? { settings: s.settings } : {}),
+  ...(typeof s.jira === 'string' ? { jira: s.jira } : {}),
 });
 
 /** The old addresses, from before the space was in them: the same view in the last space. */
@@ -267,6 +272,9 @@ const settingsSectionRoute = createRoute({
     return <SettingsPage me={data ?? me} section={section} />;
   },
 });
+/** Jira on phones (the tab once connected, and the connect form under More › Apps), and Apps under More. */
+const jiraRoute = createRoute({ getParentRoute: () => spaceRoute, path: '/jira', component: JiraPage });
+const appsRoute = createRoute({ getParentRoute: () => spaceRoute, path: '/apps', component: AppsPage });
 /** The phone's More tab: the views with no tab of their own. */
 const moreRoute = createRoute({ getParentRoute: () => spaceRoute, path: '/more', component: MorePage });
 /** The Inbox's address may name the view: /northwind/inbox?view=sent. */
@@ -330,6 +338,8 @@ export const router = createRouter({
         peopleRoute,
         personRoute,
         moreRoute,
+        jiraRoute,
+        appsRoute,
         inboxRoute,
         inboxItemRoute,
         settingsRoute,

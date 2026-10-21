@@ -9,6 +9,8 @@ export interface SearchHit {
   day: IsoDate | null;
   done: boolean;
   projectId: string | null;
+  /** The Jira key it is linked to, shown with the mark in the byline. */
+  jira: string | null;
   /** A line of the note around the matched word, when the match is there and nowhere in the title. */
   snippet: string | null;
 }
@@ -24,6 +26,8 @@ export interface Searchable {
   day: IsoDate | null;
   done: boolean;
   notes?: string | null;
+  /** The linked Jira key: typed in full it is the top hit, and its parts match as words. */
+  jira?: string | null;
 }
 
 /** The words you type, split on spaces. Every word has to be found somewhere in the task. */
@@ -44,12 +48,13 @@ function escapeRe(s: string): string {
 export const SCORE_REF = 100;
 
 /**
- * How well a task matches: the task ID typed in full beats everything, then a title that starts with the words,
- * then titles with every word at the start of a word, then anywhere in the title, then the ID, then the note.
+ * How well a task matches: the task ID or Jira key typed in full beats everything, then a title that starts with
+ * the words, then titles with every word at the start of a word, then anywhere in the title, then the ID or the
+ * Jira key, then the note.
  * Crossed-off tasks sit a step below open ones with the same match. Null when a word is found nowhere.
  */
 export function matchScore(
-  it: Pick<Searchable, 'ref' | 'title' | 'notes' | 'done'>,
+  it: Pick<Searchable, 'ref' | 'title' | 'notes' | 'done' | 'jira'>,
   q: string,
 ): { score: number; inNotes: boolean } | null {
   const ql = q.trim().toLowerCase();
@@ -58,8 +63,9 @@ export function matchScore(
   const t = it.title.toLowerCase();
   const id = it.ref.toLowerCase();
   const nt = (it.notes ?? '').toLowerCase();
-  if (id === ql) return { score: SCORE_REF, inNotes: false };
-  const hay = `${t} ${id} ${nt}`;
+  const jr = (it.jira ?? '').toLowerCase();
+  if (id === ql || (jr && jr === ql)) return { score: SCORE_REF, inNotes: false };
+  const hay = `${t} ${id} ${jr} ${nt}`;
   for (const k of toks) if (!hay.includes(k)) return null;
   const inTitle = toks.every((k) => t.includes(k));
   let s: number;
@@ -69,7 +75,7 @@ export function matchScore(
       const starts = toks.every((k) => new RegExp(`(^|[^a-z0-9])${escapeRe(k)}`).test(t));
       s = (starts ? 50 : 34) + (t.includes(ql) ? 8 : 0);
     }
-  } else if (toks.every((k) => t.includes(k) || id.includes(k))) s = 40;
+  } else if (toks.every((k) => t.includes(k) || id.includes(k) || jr.includes(k))) s = 40;
   else s = 16;
   if (it.done) s -= 6;
   return { score: s, inNotes: !inTitle && s === 16 };

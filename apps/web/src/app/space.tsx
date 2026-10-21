@@ -7,7 +7,7 @@ import { createContext, useContext, type ReactNode } from 'react';
  */
 const KEY = 'tudu.space';
 
-export type View = 'today' | 'week' | 'backlog' | 'people' | 'inbox' | 'more' | 'settings';
+export type View = 'today' | 'week' | 'backlog' | 'people' | 'inbox' | 'more' | 'settings' | 'jira' | 'apps';
 
 export const VIEW_PATHS: Record<View, string> = {
   today: '',
@@ -17,6 +17,8 @@ export const VIEW_PATHS: Record<View, string> = {
   inbox: '/inbox',
   more: '/more',
   settings: '/settings',
+  jira: '/jira',
+  apps: '/apps',
 };
 
 /** The space whose address this is: `me` is Personal, anything else a team space's slug (or one it had). */

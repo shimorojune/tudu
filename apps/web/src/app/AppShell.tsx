@@ -27,6 +27,8 @@ import {
   useShownDay,
 } from './dayView';
 import { SearchHost } from './SearchHost';
+import { AppsHost, JiraHost } from './JiraHost';
+import { jiraParam, openApps, useJira, useJiraFresh, withJira } from './jira';
 import { QuickAddHost } from './quickAdd';
 import { initialsOf, photoSrc, signOut } from './session';
 import { SettingsHost, settingsHref } from './settings';
@@ -65,9 +67,12 @@ function readCollapsed(): boolean {
  * Which of the phone's tabs is lit: Search while its sheet is up, More for the views that live under it, else the
  * page's own tab.
  */
-export function phoneTab(at: { view: View; onToday: boolean; searchOpen: boolean }): string {
+export function phoneTab(at: { view: View; onToday: boolean; searchOpen: boolean; jira?: boolean }): string {
   if (at.searchOpen) return 'search';
+  // Jira's page is its tab once it is connected; before, it is the form under More › Apps.
+  if (at.view === 'jira') return at.jira ? 'jira' : 'more';
   if (
+    at.view === 'apps' ||
     at.view === 'backlog' ||
     at.view === 'inbox' ||
     at.view === 'people' ||
@@ -159,8 +164,18 @@ export function AppShell({
     count: v.value === 'inbox' && inboxCount ? inboxCount : undefined,
   }));
 
+  // Jira, once connected: the sidebar's Apps section, the top bar's button and a phone tab, each with the count.
+  const jira = useJira(space.id);
+  const jiraFresh = useJiraFresh();
+  const jiraOpen = jiraParam(loc.searchStr).open;
+  const toggleJira = () => void navigate({ href: withJira(loc, jiraOpen ? false : null) });
+
   const go = (v: View) => void navigate({ href: spacePath(space.slug, v) });
   const onSelect = (value: string) => {
+    if (value === 'app:Jira') {
+      toggleJira();
+      return;
+    }
     if (value.startsWith('day:') || value === 'today') {
       showDay(value === 'today' ? null : value.slice(4), today);
       if (!onToday) go('today');
@@ -204,6 +219,8 @@ export function AppShell({
       <CreateSpaceHost />
       <MembersHost me={me} space={space} />
       <SettingsHost me={me} space={space} />
+      <JiraHost space={space} />
+      <AppsHost space={space} />
     </>
   );
 
@@ -248,12 +265,24 @@ export function AppShell({
             items={[
               { value: 'today', label: 'Today', icon: 'today' },
               { value: 'week', label: 'Week', icon: 'week' },
+              ...(jira.conn
+                ? [
+                    {
+                      value: 'jira',
+                      label: 'Jira',
+                      icon: 'jira' as const,
+                      badge: jira.count || undefined,
+                      fresh: jiraFresh,
+                    },
+                  ]
+                : []),
               { value: 'search', label: 'Search', icon: 'search' },
               { value: 'more', label: 'More', icon: 'more' },
             ]}
-            active={phoneTab({ view: current, onToday, searchOpen })}
+            active={phoneTab({ view: current, onToday, searchOpen, jira: !!jira.conn })}
             onSelect={(v) => {
               if (v === 'today' || v === 'week') onSelect(v);
+              else if (v === 'jira') go('jira');
               else if (v === 'more') go('more');
               else if (v === 'search') openSearch();
             }}
@@ -271,7 +300,8 @@ export function AppShell({
           items={items}
           week={rail ? [] : week}
           head={switcher('menu', rail || collapsed)}
-          connected={[]}
+          connected={jira.conn ? [{ label: 'Jira', count: jira.count, fresh: jiraFresh }] : []}
+          onAddApp={openApps}
           active={active}
           onSelect={onSelect}
           rail={rail}
@@ -284,7 +314,11 @@ export function AppShell({
         <div className="app-top">
           <TopBar
             compact={rail}
-            jira={false}
+            jira={
+              jira.conn
+                ? { count: jira.count ?? undefined, open: jiraOpen, fresh: jiraFresh, onJira: toggleJira }
+                : false
+            }
             onSearch={openSearch}
             searchOpen={searchOpen}
             onNewTask={newTask}
