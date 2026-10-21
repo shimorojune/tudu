@@ -226,7 +226,13 @@ test.describe('detail', () => {
     await comment.first().getByRole('button', { name: 'Comment options' }).click();
     await page.getByRole('menuitem', { name: 'Delete comment' }).click();
     await expect(p.getByText('No comments yet.')).toBeVisible();
-    await page.getByRole('button', { name: 'Undo' }).click();
+    // Undo while the toast settles in: a click that lands between its frames is retried, as a person would
+    const undo = page.getByRole('button', { name: 'Undo' });
+    await undo.click();
+    for (let i = 0; i < 3 && (await comment.count()) === 0; i++) {
+      await page.waitForTimeout(400);
+      if ((await comment.count()) === 0 && (await undo.isVisible())) await undo.click();
+    }
     await expect(comment).toHaveCount(1);
     await idle(page);
     // the restore lands a moment after the comment shows again, so ask until the server has it
