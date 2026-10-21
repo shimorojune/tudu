@@ -1,11 +1,10 @@
-# The CI runners: two self-hosted GitHub Actions runners on the Dokploy host, in the dev environment.
-# `runner` (dokploy-1) runs the test jobs of ci.yml, next to the dev Postgres and storage on dokploy-network,
-# so nothing needs to be reachable from outside. `runner-deploy` (dokploy-2) runs only deploy-staging.yml, so a
-# deploy never waits behind tests. Both share one image. Deployed from Dokploy as a raw compose (see README.md).
+# The CI runner: one self-hosted GitHub Actions runner on the Dokploy host, in the dev environment.
+# `runner-deploy` (dokploy-2) runs only deploy-staging.yml, building the staging images on the host through the mounted
+# docker socket. Test jobs of ci.yml run on GitHub-hosted runners. Deployed from Dokploy as a raw compose (see README.md).
 # Base image: Microsoft's Playwright image (Ubuntu 24.04, Node 22, Chromium and its libraries, arm64 builds).
 services:
-  runner:
-    build: &runner-build
+  runner-deploy:
+    build:
       context: .
       dockerfile_inline: |
         FROM mcr.microsoft.com/playwright:v1.64.1-noble
@@ -39,27 +38,6 @@ services:
         ENTRYPOINT ["/entrypoint.sh"]
     environment:
       REPO_URL: https://github.com/eGainDev/tudu
-      RUNNER_NAME: dokploy-1
-      LABELS: self-hosted,dokploy,arm64
-      RUNNER_WORKDIR: /work
-      RUNNER_TOKEN: ${RUNNER_TOKEN}
-      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
-      TUDU_CI_DATABASE_URL: ${TUDU_CI_DATABASE_URL}
-      TUDU_CI_S3_ENDPOINT: ${TUDU_CI_S3_ENDPOINT}
-      TUDU_CI_S3_ACCESS_KEY_ID: ${TUDU_CI_S3_ACCESS_KEY_ID}
-      TUDU_CI_S3_SECRET_ACCESS_KEY: ${TUDU_CI_S3_SECRET_ACCESS_KEY}
-    volumes:
-      - runner-config:/actions-runner
-      - runner-work:/work
-      - pnpm-store:/root/.local/share/pnpm/store
-      - /var/run/docker.sock:/var/run/docker.sock
-    networks:
-      - dokploy-network
-    restart: unless-stopped
-  runner-deploy:
-    build: *runner-build
-    environment:
-      REPO_URL: https://github.com/eGainDev/tudu
       RUNNER_NAME: dokploy-2
       # No `dokploy` label, so ci.yml jobs never land here; deploy-staging.yml asks for `dokploy-deploy`.
       LABELS: self-hosted,dokploy-deploy,arm64
@@ -75,9 +53,6 @@ services:
       - dokploy-network
     restart: unless-stopped
 volumes:
-  runner-config:
-  runner-work:
-  pnpm-store:
   runner-deploy-config:
   runner-deploy-work:
   runner-deploy-pnpm-store:
