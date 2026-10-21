@@ -1,4 +1,5 @@
 import { applyRequest, noteComment } from './requests';
+import { moveSlug } from './settings';
 import {
   addDays,
   cleanHtml,
@@ -6,6 +7,7 @@ import {
   isEmptyHtml,
   isInboxMutation,
   isProjectMutation,
+  isSettingsMutation,
   LOOKALIKE_MIN,
   lookAlikes,
   nextProjectColor,
@@ -494,6 +496,29 @@ export async function projectsOf(db: Executor, spaceId: string): Promise<Project
   return rows.map(toProject);
 }
 
+/** How many open tasks each project has, of the ones the person can see (their own, and everyone's shared). */
+export async function projectOpenCounts(
+  db: Executor,
+  spaceId: string,
+  userId: string,
+): Promise<Record<string, number>> {
+  const rows = await db
+    .select({ projectId: schema.tasks.projectId, n: count() })
+    .from(schema.tasks)
+    .where(
+      and(
+        eq(schema.tasks.spaceId, spaceId),
+        isNull(schema.tasks.deletedAt),
+        isNull(schema.tasks.doneAt),
+        or(eq(schema.tasks.visibility, 'space'), eq(schema.tasks.ownerId, userId)),
+      ),
+    )
+    .groupBy(schema.tasks.projectId);
+  const out: Record<string, number> = {};
+  for (const r of rows) if (r.projectId) out[r.projectId] = r.n;
+  return out;
+}
+
 /** A live project of this space, or null. */
 async function projectIn(tx: Executor, spaceId: string, projectId: string): Promise<boolean> {
   const [p] = await tx
@@ -665,6 +690,10 @@ export interface Applied {
   requests?: boolean;
   /** Whose Inboxes changed. */
   inbox?: string[];
+  /** The space itself changed (`spaceId`): its name, colour or address. */
+  space?: boolean;
+  /** The person's own name changed: every space they are in shows it. */
+  me?: boolean;
 }
 
 /** An attachment chip as the editor makes it, for notes written by the server. */
@@ -687,7 +716,7 @@ export async function applyMutation(db: Db, userId: string, raw: unknown): Promi
       .returning({ id: schema.appliedMutations.id });
     if (!claimed.length) {
       // Already applied: nothing changes, and the client gets the row as it is.
-      if (isProjectMutation(m) || isInboxMutation(m)) return null;
+      if (isProjectMutation(m) || isInboxMutation(m) || isSettingsMutation(m)) return null;
       const taskId = taskIdOf(m);
       const [t] = await tx
         .select({ spaceId: schema.tasks.spaceId, day: schema.tasks.day })
@@ -698,6 +727,7 @@ export async function applyMutation(db: Db, userId: string, raw: unknown): Promi
     if (m.type === 'task.create') return create(tx, userId, m);
     if (isInboxMutation(m)) return applyRequest(tx, userId, m);
     if (isProjectMutation(m)) return project(tx, userId, m);
+    if (isSettingsMutation(m)) return settings(tx, userId, m);
     if (m.type.startsWith('subtask.')) return subtask(tx, userId, m as SubtaskMutation);
     if (m.type.startsWith('comment.')) return comment(tx, userId, m as CommentMutation);
     return change(tx, userId, m as TaskChange);
@@ -708,9 +738,15 @@ type SubtaskMutation = Extract<SyncMutation, { type: `subtask.${string}` }>;
 type CommentMutation = Extract<SyncMutation, { type: `comment.${string}` }>;
 type ProjectMutation = Extract<SyncMutation, { type: `project.${string}` }>;
 type InboxMutation = Extract<SyncMutation, { type: `request.${string}` | `inbox.${string}` }>;
+type SettingsMutation = Extract<SyncMutation, { type: `me.${string}` | `space.${string}` }>;
 type TaskChange = Exclude<
   SyncMutation,
-  { type: 'task.create' } | SubtaskMutation | CommentMutation | ProjectMutation | InboxMutation
+  | { type: 'task.create' }
+  | SubtaskMutation
+  | CommentMutation
+  | ProjectMutation
+  | InboxMutation
+  | SettingsMutation
 >;
 
 /** The position after the last task of a day (or of the Backlog). */
@@ -1101,6 +1137,26 @@ async function project(tx: Tx, userId: string, m: ProjectMutation): Promise<Appl
     .where(eq(schema.projects.id, m.payload.id))
     .for('update');
   if (!p || p.spaceId !== spaceId) throw new Rejected(404, 'That project isn’t there any more.');
+  if (m.type === 'project.restore') {
+    if (!p.deletedAt) return { ...base, projects: false };
+    const [row] = await tx
+      .select({ detached: schema.projects.detached })
+      .from(schema.projects)
+      .where(eq(schema.projects.id, m.payload.id));
+    await tx
+      .update(schema.projects)
+      .set({ deletedAt: null, detached: [], updatedAt: new Date() })
+      .where(eq(schema.projects.id, m.payload.id));
+    // Back on the tasks it was taken off, unless someone gave them another project since.
+    const back = row?.detached.length
+      ? await tx
+          .update(schema.tasks)
+          .set({ projectId: m.payload.id, updatedAt: new Date() })
+          .where(and(inArray(schema.tasks.id, row.detached), isNull(schema.tasks.projectId)))
+          .returning({ day: schema.tasks.day })
+      : [];
+    return { ...base, days: back.map((t) => t.day) };
+  }
   if (p.deletedAt) {
     if (m.type === 'project.delete') return { ...base, projects: false };
     throw new Rejected(410, 'That project was deleted.');
@@ -1113,17 +1169,44 @@ async function project(tx: Tx, userId: string, m: ProjectMutation): Promise<Appl
     await tx.update(schema.projects).set(set).where(eq(schema.projects.id, m.payload.id));
     return base;
   }
-  // Delete: the project goes and its tasks keep no project.
-  await tx
-    .update(schema.projects)
-    .set({ deletedAt: new Date(m.at), updatedAt: new Date() })
-    .where(eq(schema.projects.id, m.payload.id));
+  // Delete: the project goes and its tasks keep no project; which tasks it was on is kept for Undo.
   const moved = await tx
     .update(schema.tasks)
     .set({ projectId: null, updatedAt: new Date() })
     .where(and(eq(schema.tasks.projectId, m.payload.id), isNull(schema.tasks.deletedAt)))
     .returning({ id: schema.tasks.id, day: schema.tasks.day });
+  await tx
+    .update(schema.projects)
+    .set({ deletedAt: new Date(m.at), detached: moved.map((t) => t.id), updatedAt: new Date() })
+    .where(eq(schema.projects.id, m.payload.id));
   return { ...base, days: moved.map((t) => t.day) };
+}
+
+/** Your name; a team space's name and colour (admins only; the address follows a new name). */
+async function settings(tx: Tx, userId: string, m: SettingsMutation): Promise<Applied> {
+  if (m.type === 'me.rename') {
+    if (m.payload.id !== userId) throw new Rejected(403, 'You can only change your own name.');
+    await tx
+      .update(schema.user)
+      .set({ name: m.payload.name, updatedAt: new Date() })
+      .where(eq(schema.user.id, userId));
+    return { taskId: userId, spaceId: '', days: [], me: true };
+  }
+  const spaceId = m.payload.id;
+  const role = await roleIn(tx, userId, spaceId);
+  if (!role) throw new Rejected(403, NOT_YOURS);
+  const [s] = await tx
+    .select({ kind: schema.spaces.kind })
+    .from(schema.spaces)
+    .where(eq(schema.spaces.id, spaceId));
+  if (s?.kind !== 'team') throw new Rejected(400, 'Personal is yours alone; it keeps its name.');
+  if (role !== 'admin') throw new Rejected(403, 'Only an admin can change the space’s name and colour.');
+  const set: Partial<typeof schema.spaces.$inferInsert> = { updatedAt: new Date() };
+  if (m.payload.name !== undefined) set.name = m.payload.name;
+  if (m.payload.color !== undefined) set.color = m.payload.color;
+  await tx.update(schema.spaces).set(set).where(eq(schema.spaces.id, spaceId));
+  if (m.payload.name !== undefined) await moveSlug(tx, spaceId, m.payload.name);
+  return { taskId: spaceId, spaceId, days: [], space: true };
 }
 
 /** Apply a batch in order. Each mutation stands alone: a rejected one does not stop the rest. */

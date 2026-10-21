@@ -20,6 +20,7 @@ import {
 import { and, asc, count, eq, gte, inArray, isNull, lte, schema, type Db } from '@tudu/db';
 import type { Mailer } from './email';
 import { inviteMail } from './email';
+import { forgetFormer, oldSlugsOf } from './settings';
 import { roleIn, toTask } from './tasks';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -41,6 +42,7 @@ const userColumns = {
   name: schema.user.name,
   email: schema.user.email,
   color: schema.user.color,
+  image: schema.user.image,
 };
 
 /** The address part of a space: Personal is `me`, a team space its slug. */
@@ -76,6 +78,10 @@ export async function spaceSummaries(db: Executor, userId: string): Promise<Spac
     )
     .groupBy(schema.spaceMembers.spaceId);
   const n = new Map(counts.map((c) => [c.spaceId, c.n]));
+  const old = await oldSlugsOf(
+    db,
+    rows.map((r) => r.id),
+  );
   return rows.map((r) => ({
     id: r.id,
     kind: r.kind,
@@ -86,6 +92,7 @@ export async function spaceSummaries(db: Executor, userId: string): Promise<Spac
     prefix: r.prefix,
     members: n.get(r.id) ?? 1,
     inbox: { toAnswer: 0, unread: 0 },
+    oldSlugs: old.get(r.id) ?? [],
   }));
 }
 
@@ -134,7 +141,11 @@ async function createSpaceOnce(
       .from(schema.spaceMembers)
       .innerJoin(schema.spaces, eq(schema.spaces.id, schema.spaceMembers.spaceId))
       .where(eq(schema.spaceMembers.userId, userId));
-    const slugs = await tx.select({ slug: schema.spaces.slug }).from(schema.spaces);
+    // An address a renamed space used to have still leads there, so it is taken too.
+    const slugs = [
+      ...(await tx.select({ slug: schema.spaces.slug }).from(schema.spaces)),
+      ...(await tx.select({ slug: schema.spaceSlugs.slug }).from(schema.spaceSlugs)),
+    ];
     const id = randomUUID();
     const name = input.name.trim();
     await tx.insert(schema.spaces).values({
@@ -161,6 +172,7 @@ function toMember(r: {
   name: string;
   email: string;
   color: string | null;
+  image: string | null;
   role: 'admin' | 'member';
   joinedAt: Date;
 }): Member {
@@ -169,6 +181,7 @@ function toMember(r: {
     name: r.name,
     email: r.email,
     color: r.color,
+    image: r.image,
     role: r.role,
     joinedAt: r.joinedAt.toISOString(),
   };
@@ -428,11 +441,13 @@ export async function join(
       );
     if (you.email.toLowerCase() !== row.email.toLowerCase())
       throw new SpaceError(403, 'That invite was sent to another address.', { state, email: row.email });
-    if (!already)
+    if (!already) {
       await tx
         .insert(schema.spaceMembers)
         .values({ spaceId: row.spaceId, userId: you.id, role: row.role })
         .onConflictDoNothing();
+      await forgetFormer(tx, row.spaceId, you.id);
+    }
     if (!row.acceptedAt)
       await tx
         .update(schema.spaceInvites)
@@ -503,22 +518,38 @@ export async function peopleOf(
     list.push(r);
     byOwner.set(r.ownerId, list);
   }
+  // People who left: what they shared stays, under their name marked Left, while there is any in the range.
+  const former = await db
+    .select(userColumns)
+    .from(schema.formerMembers)
+    .innerJoin(schema.user, eq(schema.user.id, schema.formerMembers.userId))
+    .where(eq(schema.formerMembers.spaceId, spaceId))
+    .orderBy(asc(schema.user.name));
+  const person = (
+    m: { id: string; name: string; email: string; color: string | null; image: string | null },
+    left = false,
+  ): PersonTasks => {
+    const tasks = (byOwner.get(m.id) ?? []).map((r) => toTask(r));
+    return {
+      id: m.id,
+      name: m.name,
+      email: m.email,
+      color: m.color,
+      image: m.image,
+      initials: initialsOf(m.name, m.email),
+      you: m.id === you,
+      ...(left ? { left: true } : {}),
+      count: tasks.length,
+      tasks,
+    };
+  };
   return {
     from,
     to,
-    members: members.map((m): PersonTasks => {
-      const tasks = (byOwner.get(m.id) ?? []).map((r) => toTask(r));
-      return {
-        id: m.id,
-        name: m.name,
-        email: m.email,
-        color: m.color,
-        initials: initialsOf(m.name, m.email),
-        you: m.id === you,
-        count: tasks.length,
-        tasks,
-      };
-    }),
+    members: [
+      ...members.map((m) => person({ ...m, image: m.image ?? null })),
+      ...former.filter((f) => byOwner.has(f.id)).map((f) => person(f, true)),
+    ],
   };
 }
 

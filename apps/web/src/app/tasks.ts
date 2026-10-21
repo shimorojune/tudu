@@ -1,4 +1,5 @@
 import { IndexedDbOutboxStore, MemoryOutboxStore, TaskStore, type OutboxStore } from '@tudu/client';
+import type { SpaceGoneEvent } from '@tudu/core';
 import { showToast } from '@tudu/ui';
 import { useSyncExternalStore } from 'react';
 import { api, meQuery, queryClient } from './session';
@@ -25,6 +26,12 @@ let reachable = true;
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((l) => l());
 
+// The open space decides what a space.gone means (leave it, or just say so); it sets this while it is mounted.
+let spaceGone: ((e: SpaceGoneEvent) => void) | null = null;
+export function setSpaceGoneHandler(fn: ((e: SpaceGoneEvent) => void) | null): void {
+  spaceGone = fn;
+}
+
 export const taskStore = new TaskStore({
   api,
   queryClient,
@@ -35,6 +42,7 @@ export const taskStore = new TaskStore({
     return me ? { id: me.user.id, name: me.user.name, email: me.user.email } : null;
   },
   onRejected: (message) => showToast(message),
+  onSpaceGone: (e) => spaceGone?.(e),
   onReachable: (on) => {
     reachable = on;
     notify();

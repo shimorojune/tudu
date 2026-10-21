@@ -48,9 +48,10 @@
   }
 }
 
-/* Menu: opens in dur-menu from scale .96 (ease-arrive) and eases out; flips upward near the bottom. */
+/* Menu: opens in dur-menu from scale .96 (ease-arrive) and eases out; flips upward near the bottom. It floats over
+   dialogs (75), so a menu opened inside Settings is never drawn under it. */
 .tp-menu-pop {
-  z-index: 70;
+  z-index: 85;
   transform-origin: var(--radix-dropdown-menu-content-transform-origin);
 }
 .tp-menu-pop[data-state='open'] {
@@ -294,4 +295,144 @@
 /* Personal: "for Me" is a plain chip, nothing to pick. */
 .tp-qa-static-chip {
   cursor: default;
+}
+
+/* Photos (chunk 09): a person's photo fills their round mark in place of the initials. */
+.tp-pdot.tp-photo,
+.tp-avatar.tp-photo {
+  overflow: hidden;
+  background: var(--muted);
+}
+.tp-pdot.tp-photo img,
+.tp-avatar.tp-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Settings › Space › Projects (chunk 09, not drawn): a dot that opens the swatches, a name that saves on leave. */
+.tp-sprj-t {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+.tp-root .tp-sprj-dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow:
+    0 0 0 3px var(--card),
+    0 0 0 3px transparent;
+  transition: box-shadow var(--dur-menu) var(--ease-change);
+}
+.tp-root .tp-sprj-dot:hover,
+.tp-root .tp-sprj-dot.tp-on {
+  box-shadow:
+    0 0 0 3px var(--card),
+    0 0 0 5px var(--border-strong);
+}
+.tp-root .tp-sprj-dot:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px var(--card),
+    0 0 0 5px var(--ring);
+}
+.tp-sprj-pick {
+  padding: 2px 0 2px 24px;
+}
+.tp-root .tp-sprj-name {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  margin-left: -8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--foreground);
+  text-overflow: ellipsis;
+  outline: none;
+  transition:
+    background-color var(--dur-menu) var(--ease-change),
+    box-shadow var(--dur-menu) var(--ease-change);
+}
+.tp-root .tp-sprj-name:hover {
+  background: var(--muted);
+}
+.tp-root .tp-sprj-name:focus,
+.tp-root .tp-sprj-name:focus-visible {
+  background: var(--card);
+  box-shadow:
+    inset 0 0 0 1px var(--border-strong),
+    0 0 0 4px var(--accent);
+  outline: none;
+}
+.tp-root .tp-sprj-name::placeholder {
+  color: var(--ghost);
+  font-weight: 400;
+}
+.tp-sprj-new {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0 0 32px;
+  border-top: 1px solid var(--line);
+}
+.tp-sprj-new .tp-sprj-name {
+  margin-left: -8px;
+}
+
+/* Settings (chunk 09): the email change line, a photo that failed, and ‹ Settings on a phone section. */
+.tp-set-email {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+.tp-set-email > .tp-root:first-child {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.tp-set-email .tp-btn {
+  margin-top: 4px;
+}
+.tp-set-email-code {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.tp-set-bad {
+  color: var(--destructive);
+}
+.tp-root .tp-set-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  margin: 0 0 8px -8px;
+  padding: 0 10px 0 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.tp-root .tp-set-back:hover {
+  background: var(--accent);
+  color: var(--foreground);
+}
+.tp-set-offline {
+  margin: 0 0 6px;
 }

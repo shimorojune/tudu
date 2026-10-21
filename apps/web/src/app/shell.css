@@ -248,3 +248,31 @@
   align-items: center;
   justify-content: center;
 }
+
+/* The phone's avatar opens Settings (chunk 09). */
+.app-phone-me {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  box-shadow: 0 0 0 0 transparent;
+  transition: box-shadow var(--dur-menu) var(--ease-change);
+}
+.app-phone-me:hover,
+.app-phone-me.tp-on {
+  box-shadow: 0 0 0 4px var(--accent);
+}
+.app-phone-me:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Settings as a page on phones: the design's phone layout fills the column. */
+.app-page.app-settings {
+  min-height: 100%;
+}
+.app-page.app-settings > .tp-set {
+  height: auto;
+}

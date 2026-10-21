@@ -6,19 +6,23 @@ import {
   redirect,
 } from '@tanstack/react-router';
 import { useQuery, type QueryClient } from '@tanstack/react-query';
-import { PERSONAL_SLUG, type SpaceSummary, type TaskRefResponse } from '@tudu/core';
+import { useEffect } from 'react';
+import { useNavigate, useRouterState } from '@tanstack/react-router';
+import { PERSONAL_SLUG, spaceForSlug, type SpaceSummary, type TaskRefResponse } from '@tudu/core';
 import { ToastHost } from '@tudu/ui';
 import { AppShell } from './app/AppShell';
 import { useLiveEvents } from './app/live';
+import { onSpaceGone, SettingsPage } from './app/settings';
+import { setSpaceGoneHandler } from './app/tasks';
 import { WorkingDayProvider } from './app/workingDay';
-import { api, loadMe, meQuery, queryClient } from './app/session';
+import { api, loadMe, meQuery, queryClient, refreshMe } from './app/session';
 import {
   homePath,
   lastSpace,
   rememberSpace,
-  spaceBySlug,
   spacePath,
   SpaceProvider,
+  withSlug,
   type View,
 } from './app/space';
 import { KitPage } from './routes/kit/KitPage';
@@ -94,8 +98,11 @@ const homeRoute = createRoute({
   },
 });
 
-const taskSearch = (s: Record<string, unknown>): { task?: string } =>
-  typeof s.task === 'string' && s.task ? { task: s.task } : {};
+/** Every page takes ?task= (the task panel) and ?settings= (Settings over the page on the desk and tablets). */
+const taskSearch = (s: Record<string, unknown>): { task?: string; settings?: string } => ({
+  ...(typeof s.task === 'string' && s.task ? { task: s.task } : {}),
+  ...(typeof s.settings === 'string' && s.settings ? { settings: s.settings } : {}),
+});
 
 /** The old addresses, from before the space was in them: the same view in the last space. */
 function legacy(path: string, view: View) {
@@ -135,27 +142,65 @@ const taskLinkRoute = createRoute({
   },
 });
 
+/**
+ * Renamed (here or by another admin): the address follows, while it still shows this space's old slug. A navigation
+ * to another space passes through here with the new address and is left alone. Its own component, so only it
+ * re-renders as the address changes, never the shell around the page.
+ */
+function SlugFollow({ space, was }: { space: SpaceSummary | undefined; was: string }) {
+  const navigate = useNavigate();
+  const loc = useRouterState({ select: (s) => s.location });
+  const at = loc.pathname.split('/')[1];
+  useEffect(() => {
+    if (space && space.slug !== was && at === was) {
+      rememberSpace(space.slug);
+      void navigate({ href: withSlug(loc.pathname, space.slug) + loc.searchStr, replace: true });
+    }
+  }, [space, at, was, loc.pathname, loc.searchStr, navigate]);
+  return null;
+}
+
 /** A space: every view lives under its part of the address (`me` for Personal). */
 const spaceRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/$space',
-  beforeLoad: ({ context, params }) => {
-    const space = spaceBySlug(context.me.spaces, params.space);
-    if (!space) throw redirect({ href: homePath(context.me.spaces), replace: true });
-    rememberSpace(space.slug);
-    return { space };
+  beforeLoad: async ({ context, params, location }) => {
+    let me = context.me;
+    let hit = spaceForSlug(me.spaces, params.space);
+    // Not in the spaces this tab knows: maybe you joined (or were put back) a moment ago. Ask the server once.
+    if (!hit) {
+      me = (await refreshMe()) ?? me;
+      hit = spaceForSlug(me.spaces, params.space);
+    }
+    if (!hit) throw redirect({ href: homePath(me.spaces), replace: true });
+    // A space renamed since the link was made: its old address lands on the new one.
+    if (hit.moved)
+      throw redirect({
+        href: withSlug(location.pathname, hit.space.slug) + location.searchStr,
+        replace: true,
+      });
+    rememberSpace(hit.space.slug);
+    return { space: hit.space, me };
   },
   component: function SpaceLayout() {
     const ctx = spaceRoute.useRouteContext();
+    const navigate = useNavigate();
     // The route context is read once per navigation; the counts on the sidebar and the switcher (the Inbox, the
     // members) follow the me query instead, so a change that arrives live shows without a navigation.
     const { data: liveMe } = useQuery({ ...meQuery, initialData: ctx.me });
     const me = liveMe ?? ctx.me;
-    const space = spaceBySlug(me.spaces, ctx.space.slug) ?? ctx.space;
+    const live = me.spaces.find((s) => s.id === ctx.space.id);
+    const space = live ?? ctx.space;
     useLiveEvents(true);
+
+    useEffect(() => {
+      setSpaceGoneHandler((e) => onSpaceGone(e, space, (href) => void navigate({ href, replace: true })));
+      return () => setSpaceGoneHandler(null);
+    }, [space, navigate]);
     return (
       <WorkingDayProvider>
         <SpaceProvider space={space}>
+          <SlugFollow space={live} was={ctx.space.slug} />
           <AppShell me={me} space={space}>
             <Outlet />
           </AppShell>
@@ -201,6 +246,26 @@ const personRoute = createRoute({
     if (context.space.kind !== 'team') throw redirect({ href: spacePath(context.space.slug), replace: true });
   },
   component: PeoplePage,
+});
+/** Settings on phones: the list, and a section pushed in. The desk and tablets turn these into ?settings=. */
+const settingsRoute = createRoute({
+  getParentRoute: () => spaceRoute,
+  path: '/settings',
+  component: function SettingsRoute() {
+    const { me } = settingsRoute.useRouteContext();
+    const { data } = useQuery({ ...meQuery, initialData: me });
+    return <SettingsPage me={data ?? me} />;
+  },
+});
+const settingsSectionRoute = createRoute({
+  getParentRoute: () => spaceRoute,
+  path: '/settings/$section',
+  component: function SettingsSectionRoute() {
+    const { me } = settingsSectionRoute.useRouteContext();
+    const { section } = settingsSectionRoute.useParams();
+    const { data } = useQuery({ ...meQuery, initialData: me });
+    return <SettingsPage me={data ?? me} section={section} />;
+  },
 });
 /** The phone's More tab: the views with no tab of their own. */
 const moreRoute = createRoute({ getParentRoute: () => spaceRoute, path: '/more', component: MorePage });
@@ -267,6 +332,8 @@ export const router = createRouter({
         moreRoute,
         inboxRoute,
         inboxItemRoute,
+        settingsRoute,
+        settingsSectionRoute,
       ]),
     ]),
     kitRoute,

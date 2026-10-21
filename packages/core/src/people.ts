@@ -7,12 +7,16 @@ export interface Person {
   name: string;
   email: string;
   color: string | null;
+  /** Their photo's address, or null for initials. */
+  image?: string | null;
   initials: string;
   you?: boolean;
 }
 
 /** Someone's shared tasks for a range, with how many they share this week. */
 export interface PersonTasks extends Person {
+  /** No longer in the space; what they shared stays. */
+  left?: boolean;
   count: number;
   tasks: Task[];
 }

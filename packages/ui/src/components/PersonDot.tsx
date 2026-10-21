@@ -5,6 +5,8 @@ export interface PersonDotPerson {
   initials?: string;
   /** Their colour. Ink by default. */
   color?: string;
+  /** Their photo, shown in place of the initials. */
+  image?: string;
 }
 
 export interface PersonDotProps {
@@ -14,11 +16,11 @@ export interface PersonDotProps {
   className?: string;
 }
 
-/** A person as a small round mark: their initials on their colour. The full name is its tooltip. */
+/** A person as a small round mark: their initials on their colour, or their photo. The full name is its tooltip. */
 export function PersonDot({ person, size = 20, className }: PersonDotProps) {
   return (
     <span
-      className={cx('tp-pdot', className)}
+      className={cx('tp-pdot', person.image && 'tp-photo', className)}
       title={person.name}
       style={{
         width: size,
@@ -27,7 +29,7 @@ export function PersonDot({ person, size = 20, className }: PersonDotProps) {
         fontSize: Math.round(size * 0.42),
       }}
     >
-      {person.initials || '?'}
+      {person.image ? <img src={person.image} alt="" draggable={false} /> : person.initials || '?'}
     </span>
   );
 }

@@ -5,12 +5,16 @@ import {
   isIsoDate,
   diffDays,
   MEMBERS_CHANGED,
+  SPACE_GONE,
   spaceColorSchema,
   spaceNameSchema,
   type MembersChangedEvent,
   type MembersResponse,
+  type SpaceGoneEvent,
+  INBOX_CHANGED,
+  type InboxChangedEvent,
 } from '@tudu/core';
-import type { Db } from '@tudu/db';
+import { eq, schema, type Db } from '@tudu/db';
 import type { Mailer } from '../email';
 import type { EventHub } from '../events';
 import { requireSession, type SessionVars } from '../middleware/session';
@@ -27,6 +31,8 @@ import {
   restoreInvite,
   SpaceError,
 } from '../spaces';
+import { deleteSpace, leaveSpace, nameOf, removeMember, restoreMember, setRole } from '../settings';
+import type { Storage } from '../storage';
 import { membersOf, roleIn } from '../tasks';
 
 /** Tell everyone in a space that who is in it (or invited) changed. */
@@ -46,7 +52,7 @@ const inviteSchema = z.object({ emails: z.array(z.string().trim().toLowerCase())
 const PEOPLE_SPAN = 31;
 
 /** Spaces: making one, inviting and joining, who is in it, and People. */
-export function spaceRoutes(db: Db, hub: EventHub, mailer: Mailer, webUrl: string) {
+export function spaceRoutes(db: Db, hub: EventHub, mailer: Mailer, webUrl: string, storage: Storage) {
   const r = new Hono<{ Variables: SessionVars }>();
   const fail = (c: { json: (b: unknown, s: number) => Response }, err: unknown) => {
     if (err instanceof SpaceError) return c.json({ error: err.message, ...err.body }, err.status);
@@ -111,6 +117,93 @@ export function spaceRoutes(db: Db, hub: EventHub, mailer: Mailer, webUrl: strin
       const spaceId = await restoreInvite(db, userId, c.req.param('id'));
       await announceMembers(db, hub, spaceId);
       return c.json({ invites: await pendingInvites(db, spaceId) });
+    } catch (err) {
+      return fail(c, err);
+    }
+  });
+
+  /** Tell senders their requests came back, and the person who went that the space is gone for them. */
+  const afterDeparture = async (
+    spaceId: string,
+    gone: string,
+    how: 'left' | 'removed',
+    by: string,
+    told: string[],
+  ) => {
+    const [space] = await db
+      .select({ name: schema.spaces.name })
+      .from(schema.spaces)
+      .where(eq(schema.spaces.id, spaceId));
+    const event: SpaceGoneEvent = {
+      spaceId,
+      name: space?.name ?? '',
+      how,
+      by: how === 'removed' ? await nameOf(db, by) : null,
+    };
+    hub.publish(gone, SPACE_GONE, event);
+    for (const u of told) hub.publish(u, INBOX_CHANGED, { spaceId } satisfies InboxChangedEvent);
+    await announceMembers(db, hub, spaceId);
+  };
+
+  r.patch('/spaces/:spaceId/members/:userId', requireSession, async (c) => {
+    const me = c.get('session')!.user.id;
+    const { spaceId, userId } = c.req.param();
+    const body = (await c.req.json().catch(() => null)) as { role?: unknown } | null;
+    if (body?.role !== 'admin' && body?.role !== 'member')
+      return c.json({ error: 'A role is admin or member.' }, 400);
+    try {
+      await setRole(db, me, spaceId, userId, body.role);
+      await announceMembers(db, hub, spaceId);
+      return c.json({ members: await membersDetail(db, spaceId) });
+    } catch (err) {
+      return fail(c, err);
+    }
+  });
+
+  r.delete('/spaces/:spaceId/members/:userId', requireSession, async (c) => {
+    const me = c.get('session')!.user.id;
+    const { spaceId, userId } = c.req.param();
+    try {
+      const out = await removeMember(db, me, spaceId, userId);
+      await afterDeparture(spaceId, userId, 'removed', me, out.told);
+      return c.body(null, 204);
+    } catch (err) {
+      return fail(c, err);
+    }
+  });
+
+  r.post('/spaces/:spaceId/members/:userId/restore', requireSession, async (c) => {
+    const me = c.get('session')!.user.id;
+    const { spaceId, userId } = c.req.param();
+    try {
+      const told = await restoreMember(db, me, spaceId, userId);
+      for (const u of told) hub.publish(u, INBOX_CHANGED, { spaceId } satisfies InboxChangedEvent);
+      await announceMembers(db, hub, spaceId);
+      return c.json({ members: await membersDetail(db, spaceId) });
+    } catch (err) {
+      return fail(c, err);
+    }
+  });
+
+  r.post('/spaces/:spaceId/leave', requireSession, async (c) => {
+    const me = c.get('session')!.user.id;
+    const { spaceId } = c.req.param();
+    try {
+      const out = await leaveSpace(db, me, spaceId);
+      await afterDeparture(spaceId, me, 'left', me, out.told);
+      return c.body(null, 204);
+    } catch (err) {
+      return fail(c, err);
+    }
+  });
+
+  r.delete('/spaces/:spaceId', requireSession, async (c) => {
+    const me = c.get('session')!.user.id;
+    const { spaceId } = c.req.param();
+    try {
+      const out = await deleteSpace(db, storage, me, spaceId);
+      for (const u of out.members) hub.publish(u, SPACE_GONE, out.event);
+      return c.body(null, 204);
     } catch (err) {
       return fail(c, err);
     }

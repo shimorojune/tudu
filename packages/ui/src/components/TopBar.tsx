@@ -13,6 +13,7 @@ export interface TopBarUser {
   initials: string;
   color?: string;
   email?: string;
+  image?: string;
 }
 
 export interface TopBarViews {
@@ -123,7 +124,7 @@ export function TopBar({
       {account && user ? (
         <AccountMenu me={user} {...account} />
       ) : user ? (
-        <Avatar initials={user.initials} name={user.name} color={user.color} />
+        <Avatar initials={user.initials} name={user.name} color={user.color} image={user.image} />
       ) : null}
     </header>
   );

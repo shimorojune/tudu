@@ -123,3 +123,47 @@ export function resetThemeForTests(): void {
 }
 
 export { CROSS_FADE_MS };
+
+/** Settings › Appearance › Less motion, remembered per browser like the theme. */
+export const MOTION_STORAGE_KEY = 'tudu.motion';
+
+export function readLessMotion(): boolean {
+  try {
+    return localStorage.getItem(MOTION_STORAGE_KEY) === 'less';
+  } catch {
+    return false;
+  }
+}
+
+/** Put the switch on the page: `data-motion="less"` turns every motion rule into its reduced form. */
+export function paintMotion(less: boolean): void {
+  const root = document.documentElement;
+  if (less) root.dataset.motion = 'less';
+  else delete root.dataset.motion;
+}
+
+const motionListeners = new Set<(on: boolean) => void>();
+
+export function setLessMotion(on: boolean): void {
+  try {
+    if (on) localStorage.setItem(MOTION_STORAGE_KEY, 'less');
+    else localStorage.removeItem(MOTION_STORAGE_KEY);
+  } catch {
+    /* storage blocked: it lasts for this page */
+  }
+  paintMotion(on);
+  motionListeners.forEach((l) => l(on));
+}
+
+/** The Less motion switch, shared by every caller. */
+export function useLessMotion(): [boolean, (on: boolean) => void] {
+  const [on, setOn] = useState(readLessMotion);
+  useEffect(() => {
+    motionListeners.add(setOn);
+    paintMotion(readLessMotion());
+    return () => {
+      motionListeners.delete(setOn);
+    };
+  }, []);
+  return [on, setLessMotion];
+}

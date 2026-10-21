@@ -1,4 +1,4 @@
-import { PERSONAL_SLUG, type SpaceSummary } from '@tudu/core';
+import { PERSONAL_SLUG, spaceForSlug, type SpaceSummary } from '@tudu/core';
 import { createContext, useContext, type ReactNode } from 'react';
 
 /**
@@ -7,7 +7,7 @@ import { createContext, useContext, type ReactNode } from 'react';
  */
 const KEY = 'tudu.space';
 
-export type View = 'today' | 'week' | 'backlog' | 'people' | 'inbox' | 'more';
+export type View = 'today' | 'week' | 'backlog' | 'people' | 'inbox' | 'more' | 'settings';
 
 export const VIEW_PATHS: Record<View, string> = {
   today: '',
@@ -16,12 +16,17 @@ export const VIEW_PATHS: Record<View, string> = {
   people: '/people',
   inbox: '/inbox',
   more: '/more',
+  settings: '/settings',
 };
 
-/** The space whose address this is: `me` is Personal, anything else a team space's slug. */
+/** The space whose address this is: `me` is Personal, anything else a team space's slug (or one it had). */
 export function spaceBySlug(spaces: SpaceSummary[], slug: string): SpaceSummary | undefined {
-  if (slug === PERSONAL_SLUG) return spaces.find((s) => s.kind === 'personal');
-  return spaces.find((s) => s.kind === 'team' && s.slug === slug);
+  return spaceForSlug(spaces, slug)?.space;
+}
+
+/** The same path with the space's part of the address put right: `/northwind/week` → `/northwind-labs/week`. */
+export function withSlug(pathname: string, slug: string): string {
+  return pathname.replace(/^\/[^/]+/, `/${slug}`);
 }
 
 /** The path of a view in a space: `/northwind`, `/northwind/week`. */

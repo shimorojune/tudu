@@ -11,7 +11,7 @@ import { ApiError, type MeResponse } from '@tudu/client';
 import { CreateSpace, MembersCard, showToast, type CreateSpaceInput } from '@tudu/ui';
 import { useState } from 'react';
 import { closeCreateSpace, closeMembers, useCreateSpaceOpen, useMembersOpen } from './dayView';
-import { api, queryClient, refreshMe } from './session';
+import { api, photoSrc, queryClient, refreshMe } from './session';
 import { rememberSpace, spacePath } from './space';
 import { taskStore } from './tasks';
 import { useViewport } from './viewport';
@@ -119,6 +119,7 @@ export function MembersHost({ me, space }: { me: MeResponse; space: SpaceSummary
         email: m.email,
         initials: initialsFor(m.name, m.email),
         color: m.color ?? undefined,
+        image: photoSrc(m.image),
         role: m.role,
         you: m.id === me.user.id,
       }))}

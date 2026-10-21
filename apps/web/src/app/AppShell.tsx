@@ -28,7 +28,8 @@ import {
 } from './dayView';
 import { SearchHost } from './SearchHost';
 import { QuickAddHost } from './quickAdd';
-import { initialsOf, signOut } from './session';
+import { initialsOf, photoSrc, signOut } from './session';
+import { SettingsHost, settingsHref } from './settings';
 import { spacePath, switchPath, viewOf, type View } from './space';
 import { CreateSpaceHost, MembersHost } from './spaces';
 import { taskStore } from './tasks';
@@ -66,7 +67,13 @@ function readCollapsed(): boolean {
  */
 export function phoneTab(at: { view: View; onToday: boolean; searchOpen: boolean }): string {
   if (at.searchOpen) return 'search';
-  if (at.view === 'backlog' || at.view === 'inbox' || at.view === 'people' || at.view === 'more')
+  if (
+    at.view === 'backlog' ||
+    at.view === 'inbox' ||
+    at.view === 'people' ||
+    at.view === 'more' ||
+    at.view === 'settings'
+  )
     return 'more';
   return at.onToday ? 'today' : at.view;
 }
@@ -99,7 +106,8 @@ export function AppShell({
 }) {
   const vp = useViewport();
   const navigate = useNavigate();
-  const path = useRouterState({ select: (s) => s.location.pathname });
+  const loc = useRouterState({ select: (s) => s.location });
+  const path = loc.pathname;
   const { choice, setTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(readCollapsed);
   useEffect(() => {
@@ -140,6 +148,7 @@ export function AppShell({
     name: me.user.name || me.user.email,
     email: me.user.email,
     color: me.user.color ?? undefined,
+    image: photoSrc(me.user.image),
   };
   const team = space.kind === 'team';
   const inboxCount = inboxBadge(space.inbox);
@@ -166,7 +175,7 @@ export function AppShell({
   const account = {
     theme: choice,
     onTheme: setTheme,
-    onSettings: () => {},
+    onSettings: () => void navigate({ href: settingsHref(loc, space.slug, 'account', vp === 'phone') }),
     onSignOut: () => void signOut().then(() => navigate({ to: '/sign-in', replace: true })),
   };
   const switcher = (variant: 'menu' | 'sheet', rail = false) => (
@@ -194,6 +203,7 @@ export function AppShell({
       <SearchHost me={me} />
       <CreateSpaceHost />
       <MembersHost me={me} space={space} />
+      <SettingsHost me={me} space={space} />
     </>
   );
 
@@ -212,7 +222,20 @@ export function AppShell({
               <Icon name="inbox" size={20} />
               {inboxCount ? <span className="app-phone-pip">{inboxCount}</span> : null}
             </button>
-            <Avatar initials={user.initials} name={user.name} size="sm" />
+            <button
+              type="button"
+              className={cx('app-phone-me', current === 'settings' && 'tp-on')}
+              aria-label="Settings"
+              onClick={() => go('settings')}
+            >
+              <Avatar
+                initials={user.initials}
+                name={user.name}
+                color={user.color}
+                image={user.image}
+                size="sm"
+              />
+            </button>
           </div>
         </header>
         <div className="tp-scroll app-phone-scroll">{page}</div>

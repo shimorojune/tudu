@@ -61,6 +61,7 @@ describe('sign in with a code', () => {
         prefix: 'ME',
         members: 1,
         inbox: { toAnswer: 0, unread: 0 },
+        oldSlugs: [],
       },
     ]);
   });
@@ -160,6 +161,9 @@ describe('sessions', () => {
 
   it('C01-A11 the events stream says hello, keeps a heartbeat, and ends after sign out', async () => {
     const { jar } = await signIn(server);
+    // C09-A06 an event from before a fresh stream is not replayed to it; a reconnect with Last-Event-ID gets it
+    const who = ((await (await get(server.app, '/api/me', jar)).json()) as { user: { id: string } }).user.id;
+    const old = server.hub.publish(who, 'space.gone', { spaceId: 'old' });
     const res = await get(server.app, '/api/events', jar, { accept: 'text/event-stream' });
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/event-stream');
@@ -174,6 +178,15 @@ describe('sessions', () => {
     }
     expect(text).toContain('"type":"hello"');
     expect(text).toContain(': ping');
+    expect(text).not.toContain('space.gone');
+    const again = await get(server.app, `/api/events?lastEventId=${old.id - 1}`, jar, {
+      accept: 'text/event-stream',
+    });
+    const r2 = again.body!.getReader();
+    let t2 = '';
+    while (!t2.includes('"hello"')) t2 += decoder.decode((await r2.read()).value);
+    expect(t2).toContain('space.gone');
+    await r2.cancel();
     // a published event reaches the stream
     const meRes = await get(server.app, '/api/me', jar);
     const userId = ((await meRes.json()) as { user: { id: string } }).user.id;

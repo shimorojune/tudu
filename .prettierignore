@@ -8,3 +8,4 @@ packages/ui/tokens.json
 docs/tests/STATUS.md
 reports
 packages/ui/src/styles/tokens-extra.css
+packages/ui/src/styles/less-motion.css

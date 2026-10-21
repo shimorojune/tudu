@@ -17,6 +17,9 @@
             s === 'dark' || (s === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
           if (dark) document.documentElement.classList.add('dark');
           document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+          // Settings › Less motion, before anything moves.
+          if (localStorage.getItem('tudu.motion') === 'less')
+            document.documentElement.dataset.motion = 'less';
         } catch (e) {}
       })();
     </script>

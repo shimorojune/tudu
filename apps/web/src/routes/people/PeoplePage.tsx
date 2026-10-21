@@ -41,7 +41,7 @@ import { dayWord, firstName } from '@tudu/core';
 import { InboxSection, showToast } from '@tudu/ui';
 import { openMembers, openQuickAdd } from '../../app/dayView';
 import { toSentEntry } from '../inbox/InboxPage';
-import { api, meQuery } from '../../app/session';
+import { api, meQuery, photoSrc } from '../../app/session';
 import { spacePath, useSpace } from '../../app/space';
 import { taskStore, useOnline } from '../../app/tasks';
 import { useViewport, type Viewport } from '../../app/viewport';
@@ -265,7 +265,7 @@ function PeopleList(p: {
     <>
       <DayHeader
         day="People"
-        date={p.pending ? '' : peopleCount(p.members.length, p.space)}
+        date={p.pending ? '' : peopleCount(p.members.filter((m) => !m.left).length, p.space)}
         nav={false}
         compact
       >
@@ -285,7 +285,9 @@ function PeopleList(p: {
               email: m.email,
               initials: m.initials,
               color: m.color ?? undefined,
+              image: photoSrc(m.image),
               you: m.you,
+              left: m.left,
               count: m.count,
             }))}
             active={p.active}
@@ -362,7 +364,9 @@ function EveryonePane(p: {
               email: m.email,
               initials: m.initials,
               color: m.color ?? undefined,
+              image: photoSrc(m.image),
               you: m.you,
+              left: m.left,
             }}
             tasks={tasks}
             onOpen={() => p.onOpenPerson(m)}
@@ -450,11 +454,12 @@ function PersonPane(p: {
           email: w.email,
           initials: w.initials,
           color: w.color ?? undefined,
+          image: photoSrc(w.image),
         }}
-        sub={w.you ? `${w.email} · you` : w.email}
+        sub={w.you ? `${w.email} · you` : w.left ? `${w.email} · left the space` : w.email}
         compact={p.compact}
       >
-        {w.you ? null : (
+        {w.you || w.left ? null : (
           <Button
             variant="secondary"
             size="sm"

@@ -25,6 +25,11 @@ export {
   resetThemeForTests,
   THEME_STORAGE_KEY,
   CROSS_FADE_MS,
+  MOTION_STORAGE_KEY,
+  readLessMotion,
+  setLessMotion,
+  paintMotion,
+  useLessMotion,
   type Theme,
   type ThemeChoice,
 } from './lib/theme';
@@ -209,6 +214,39 @@ export {
   type CreateSpaceInput,
 } from './components/CreateSpace';
 export { MemberRow, ROLE_WORDS, type MemberRowProps, type MemberRowPerson } from './components/MemberRow';
+export {
+  MembersBody,
+  FIND_PAST,
+  type MembersBodyProps,
+  type MembersBodyMember,
+  type MembersBodyInvite,
+} from './components/MembersBody';
+export {
+  SettingsSection,
+  SettingRow,
+  type SettingsSectionProps,
+  type SettingRowProps,
+} from './components/SettingsSection';
+export {
+  SettingsNav,
+  type SettingsNavProps,
+  type SettingsNavGroup,
+  type SettingsNavItem,
+} from './components/SettingsNav';
+export { ThemePick, type ThemePickProps } from './components/ThemePick';
+export {
+  ProjectSettings,
+  openWords,
+  type ProjectSettingsProps,
+  type ProjectSettingsProject,
+} from './components/ProjectSettings';
+export {
+  Settings,
+  type SettingsProps,
+  type SettingsMe,
+  type SettingsSpace,
+  type SettingsSectionName,
+} from './components/Settings';
 export {
   MembersCard,
   MC_DONE_MS,

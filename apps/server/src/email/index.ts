@@ -45,3 +45,25 @@ export function inviteMail(x: { to: string; spaceName: string; fromName: string;
     html: `<p style="font:15px/1.5 -apple-system,Segoe UI,sans-serif;color:#18181b"><b>${esc(x.fromName)}</b> invited you to <b>${esc(x.spaceName)}</b>, a shared space in Tudu.</p><p style="margin:16px 0"><a href="${x.link}" style="display:inline-block;padding:10px 16px;border-radius:10px;background:#18181b;color:#fff;font:600 14px -apple-system,Segoe UI,sans-serif;text-decoration:none">Join ${esc(x.spaceName)}</a></p><p style="font:14px/1.5 -apple-system,Segoe UI,sans-serif;color:#71717a">The link works for 7 days. If you weren't expecting it, you can ignore this email.</p>`,
   };
 }
+
+/** The code that proves a new address is yours, sent to that new address. */
+export function emailChangeCodeMail(to: string, code: string): Mail {
+  return {
+    to,
+    subject: `${code} is your code to change your Tudu email`,
+    // The code comes first: the address may hold digits of its own.
+    text: `${code} is your code to make ${to} your Tudu email. It works for 10 minutes.\n\nIf you didn't ask for it, you can ignore this email.`,
+    html: `<p style="font:15px/1.5 -apple-system,Segoe UI,sans-serif;color:#18181b">Your code to make this your Tudu email is</p><p style="font:600 32px/1.2 ui-monospace,SFMono-Regular,monospace;letter-spacing:.12em;color:#18181b;margin:8px 0 16px">${code}</p><p style="font:14px/1.5 -apple-system,Segoe UI,sans-serif;color:#71717a">It works for 10 minutes. If you didn't ask for it, you can ignore this email.</p>`,
+  };
+}
+
+/** A note to the old address once the change is done. */
+export function emailChangedMail(to: string, next: string): Mail {
+  const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  return {
+    to,
+    subject: 'Your Tudu email changed',
+    text: `Your Tudu email is now ${next}. Sign in with that address from now on.\n\nIf you didn't make this change, reply to this email.`,
+    html: `<p style="font:15px/1.5 -apple-system,Segoe UI,sans-serif;color:#18181b">Your Tudu email is now <b>${esc(next)}</b>. Sign in with that address from now on.</p><p style="font:14px/1.5 -apple-system,Segoe UI,sans-serif;color:#71717a">If you didn't make this change, reply to this email.</p>`,
+  };
+}
