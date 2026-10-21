@@ -394,7 +394,14 @@ export function SearchPanel(p: SearchPanelProps) {
       {phone ? <div className="tp-qa-grabber" aria-hidden="true" /> : null}
       {line}
       <div ref={wrap} className="tp-sp-wrap">
-        <div ref={inner} className="tp-sp-list" id={`${uid}-list`} role="listbox" aria-label="Matching tasks">
+        <div
+          ref={inner}
+          className="tp-sp-list"
+          id={`${uid}-list`}
+          role="listbox"
+          aria-label="Matching tasks"
+          data-answer={ql ? (fresh ? ql : '') : undefined}
+        >
           {body}
         </div>
       </div>

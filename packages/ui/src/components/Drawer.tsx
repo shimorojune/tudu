@@ -113,7 +113,9 @@ export function Drawer({
                 e.preventDefault();
             }}
             onInteractOutside={(e) => {
-              if (modeless || leaving) e.preventDefault();
+              // A toast (Undo on "Comment deleted") sits over the page but belongs to what the panel is doing.
+              const target = e.detail.originalEvent.target as Element | null;
+              if (modeless || leaving || target?.closest?.('.tp-toast-host')) e.preventDefault();
             }}
           >
             <section ref={panel} tabIndex={-1} className="tp-drawer tp-sheet" style={style}>

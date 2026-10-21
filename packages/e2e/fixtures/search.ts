@@ -35,14 +35,11 @@ export function hit(page: Page, title: string): Locator {
   });
 }
 
-/** Type words into the box and wait until the rows answer those words (the Create row counts). */
+/** Type words into the box and wait until the rows answer those very words (the list says which it answers). */
 export async function search(page: Page, words: string): Promise<void> {
   await box(page).fill(words);
-  await expect
-    .poll(async () => {
-      const none = await panel(page).locator('.tp-sp-none').count();
-      const rows = await panel(page).locator('.tp-sh:not(.tp-sh-query)').count();
-      return none + rows;
-    })
-    .toBeGreaterThan(0);
+  await expect(panel(page).getByRole('listbox', { name: 'Matching tasks' })).toHaveAttribute(
+    'data-answer',
+    words.trim().toLowerCase(),
+  );
 }

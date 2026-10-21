@@ -126,9 +126,9 @@ test.describe('search', () => {
     await expect(first.locator('.tp-sh-id')).toHaveText('ME-3');
     await expect(hit(page, 'Old passport renewal').locator('.tp-sh-where')).toHaveText('Sat 10 Oct');
     await expect(first).toHaveAttribute('aria-selected', 'true');
-    // every key: narrower words, fewer rows
+    // every key: the words as a phrase now sit in one title, which takes the lead
     await search(page, 'passport ren');
-    await expect.poll(() => hitTitles(page)).toEqual(['Renew passport', 'Old passport renewal']);
+    await expect.poll(() => hitTitles(page)).toEqual(['Old passport renewal', 'Renew passport']);
     await search(page, 'renew');
     await expect
       .poll(() => hitTitles(page))

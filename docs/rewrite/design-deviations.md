@@ -165,6 +165,9 @@ the coding session, so this file is the record and the canvas gets a copy by han
   page settling after a turn (it was cancelled by any re-render within 240ms, so a pick on the day already in view
   never glowed). The glow's focus yields when a dialog or the search panel is open by the time it lands.
 - No keyboard shortcut opens search, per the canvas; inside the panel the arrows, Enter and Esc work as drawn.
+- A fix found on the way (C03-E06, the comment's Undo): a real click on a toast's Undo while the task panel was open
+  counted as a click outside the panel and closed it a beat after restoring the comment. The panel and the dialog
+  now leave a click on the toast alone.
 - A fix found on the way (C03-E07's phone flake): the outbox's sweep could drop a change written to disk while the
   sweep was reading it, so `idle()` said the change had landed before it was sent. The sweep now only lets go of
   what it saw stored before its read, and IndexedDB writes settle on commit.
