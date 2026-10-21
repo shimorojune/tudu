@@ -163,7 +163,7 @@ the coding session, so this file is the record and the canvas gets a copy by han
   visit.
 - A pick scrolls the row into the middle and glows it for the list's locate beat; the list's wait now survives the
   page settling after a turn (it was cancelled by any re-render within 240ms, so a pick on the day already in view
-  never glowed).
+  never glowed). The glow's focus yields when a dialog or the search panel is open by the time it lands.
 - No keyboard shortcut opens search, per the canvas; inside the panel the arrows, Enter and Esc work as drawn.
 - A fix found on the way (C03-E07's phone flake): the outbox's sweep could drop a change written to disk while the
   sweep was reading it, so `idle()` said the change had landed before it was sent. The sweep now only lets go of
