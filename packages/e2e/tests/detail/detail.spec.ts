@@ -229,9 +229,10 @@ test.describe('detail', () => {
     await page.getByRole('button', { name: 'Undo' }).click();
     await expect(comment).toHaveCount(1);
     await idle(page);
-    expect((await serverTask(page, 'ME-1')).comments.map((c) => c.html)).toEqual([
-      '<p>Will review tomorrow morning. Done.</p>',
-    ]);
+    // the restore lands a moment after the comment shows again, so ask until the server has it
+    await expect
+      .poll(async () => (await serverTask(page, 'ME-1')).comments.map((c) => c.html))
+      .toEqual(['<p>Will review tomorrow morning. Done.</p>']);
   });
 
   test('C03-E07 delete the task; Undo brings it back in place; let the toast go and it is gone for good', async ({

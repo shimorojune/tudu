@@ -598,3 +598,69 @@ describe('C05-U11 live events and the week', () => {
     expect(t.calls.some((c) => c.includes('/weeks/'))).toBe(false);
   });
 });
+
+describe('C06-U07 the Backlog in the store', () => {
+  const two = () => ({
+    backlog: [
+      task('b1', 'Waiting', null as unknown as string, 1024),
+      task('b2', 'Also', null as unknown as string, 2048),
+    ],
+  });
+
+  it('C06-U07 a task written with no day lands at the end of the Backlog cache with the next position', async () => {
+    const t = setup(two());
+    await t.loadBacklog();
+    const id = t.store.create(SPACE, null, 'Renew passport');
+    expect(t.readBacklog().map((x) => [x.id, x.day])).toEqual([
+      ['b1', null],
+      ['b2', null],
+      [id, null],
+    ]);
+    expect(t.readBacklog()[2]!.position).toBeGreaterThan(2048);
+    // slotted in above the second row by the "+"
+    const id2 = t.store.create(SPACE, null, 'Between', 1);
+    expect(t.readBacklog().map((x) => x.id)).toEqual(['b1', id2, 'b2', id]);
+  });
+
+  it('C06-U07 crossing off keeps the task cached in the Backlog and queues one change; Undo queues the reverse', async () => {
+    const t = setup(two());
+    const sent: Array<{ type: string; payload: Record<string, unknown> }> = [];
+    t.answer((body) => {
+      sent.push(...(body.mutations as never[]));
+      return { results: body.mutations.map((m) => ({ id: m.id, status: 'ok' })), tasks: [], deleted: [] };
+    });
+    await t.loadBacklog();
+    t.store.cross('b1', true);
+    expect(t.readBacklog().map((x) => [x.id, x.done, x.position])).toEqual([
+      ['b1', true, 1024],
+      ['b2', false, 2048],
+    ]);
+    expect(t.readBacklog()[0]!.doneAt).not.toBeNull();
+    t.store.cross('b1', false);
+    expect(t.readBacklog().map((x) => [x.id, x.done])).toEqual([
+      ['b1', false],
+      ['b2', false],
+    ]);
+    await t.settle();
+    expect(sent.map((m) => [m.type, m.payload.id, m.payload.done])).toEqual([
+      ['task.cross', 'b1', true],
+      ['task.cross', 'b1', false],
+    ]);
+  });
+
+  it('C06-U07 a reorder in the Backlog queues one place change with the day null', async () => {
+    const t = setup(two());
+    const sent: Array<{ type: string; payload: Record<string, unknown> }> = [];
+    t.answer((body) => {
+      sent.push(...(body.mutations as never[]));
+      return { results: body.mutations.map((m) => ({ id: m.id, status: 'ok' })), tasks: [], deleted: [] };
+    });
+    await t.loadBacklog();
+    t.store.place('b2', null, 0);
+    expect(t.readBacklog().map((x) => x.id)).toEqual(['b2', 'b1']);
+    await t.settle();
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ type: 'task.place', payload: { id: 'b2', day: null } });
+    expect(sent[0]!.payload.position).toBeLessThan(1024);
+  });
+});

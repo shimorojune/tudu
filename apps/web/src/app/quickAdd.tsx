@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { addedWords, mondayOf, weekDays, weekPlannedDay, type IsoDate } from '@tudu/core';
+import { useNavigate } from '@tanstack/react-router';
+import { addedWords, mondayOf, pagePlannedDay, weekDays, type IsoDate } from '@tudu/core';
 import { QuickAdd, showToast, type QuickAddResult } from '@tudu/ui';
 import { useEffect, useRef, useState } from 'react';
 import type { MeResponse } from '@tudu/client';
@@ -54,8 +55,8 @@ export function useQuickAddActions(spaceId: string | undefined) {
   const page = usePage();
   const monday = useShownWeek() ?? mondayOf(today);
   const shownDay = useShownDay() ?? today;
-  // On the week page a new task lands on the first day of the shown week that is not gone by.
-  const shown = page === 'week' ? weekPlannedDay(monday, today) : shownDay;
+  // On the week page a new task lands on the first day of the shown week that is not gone by; in the Backlog, nowhere.
+  const shown = pagePlannedDay(page, { shownDay, monday, today });
   const view = useDayView();
   const projects = useQuery({ ...taskStore.projectsQuery(spaceId ?? ''), enabled: !!spaceId }).data ?? [];
   const online = useOnline();
@@ -93,6 +94,7 @@ export function QuickAddHost({ me }: { me: MeResponse }) {
   const keyboard = useKeyboardHeight(vp === 'phone' && open);
   const lastId = useRef<string | null>(null);
   const day2: IsoDate | null = useSecondDay();
+  const navigate = useNavigate();
   return (
     <QuickAdd
       open={open}
@@ -127,13 +129,35 @@ export function QuickAddHost({ me }: { me: MeResponse }) {
           });
           return;
         }
+        if (a.page === 'backlog') {
+          // In view when it has no day; a task given a day toasts, and Show turns to Today on it.
+          if (t.planned === null) {
+            flashTask(id, null);
+            return;
+          }
+          showToast(addedWords(t.planned, a.today), {
+            action: 'Show',
+            onAction: () => {
+              showDay(t.planned, a.today);
+              void navigate({ to: '/' });
+              setTimeout(() => flashTask(id, t.planned), 60);
+            },
+          });
+          return;
+        }
         const here = t.planned === a.shown || (a.view === 'two' && vp === 'desktop' && t.planned === day2);
         if (here) {
           flashTask(id, t.planned);
           return;
         }
         if (!t.planned) {
-          showToast(addedWords(null, a.today));
+          showToast(addedWords(null, a.today), {
+            action: 'Show',
+            onAction: () => {
+              void navigate({ to: '/backlog' });
+              setTimeout(() => flashTask(id, null), 60);
+            },
+          });
           return;
         }
         showToast(addedWords(t.planned, a.today), {

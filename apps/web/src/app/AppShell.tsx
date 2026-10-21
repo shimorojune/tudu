@@ -120,9 +120,16 @@ export function AppShell({ me, children }: { me: MeResponse; children: ReactNode
               { value: 'search', label: 'Search', icon: 'search' },
               { value: 'more', label: 'More', icon: 'more' },
             ]}
-            active={active === 'backlog' || active === 'inbox' ? 'more' : onToday ? 'today' : active}
+            active={
+              active === 'backlog' || active === 'inbox' || path === '/more'
+                ? 'more'
+                : onToday
+                  ? 'today'
+                  : active
+            }
             onSelect={(v) => {
               if (v === 'today' || v === 'week') onSelect(v);
+              else if (v === 'more') void navigate({ to: '/more' });
             }}
           />
         </div>

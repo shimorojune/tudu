@@ -213,4 +213,35 @@ describe('DayHeader', () => {
     const { container } = setup({ done: 3, total: 3, doneNote: 'That’s the week' });
     expect(container.textContent).toContain('That’s the week');
   });
+
+  it('C06-U05 the Backlog: no arrows, no ring, no eyebrow; the count beside the title; the tools in their row; compact on phones', () => {
+    const { container, rerender, page } = setup({
+      eyebrow: undefined,
+      day: 'Backlog',
+      date: '4 tasks',
+      done: undefined,
+      total: undefined,
+      isToday: undefined,
+      nav: false,
+      calendar: undefined,
+      onToday: undefined,
+      children: (
+        <>
+          <i>Filter</i>
+          <b className="tp-seg">Switch</b>
+        </>
+      ),
+    });
+    expect(screen.getByRole('heading', { name: 'Backlog' })).toBeInTheDocument();
+    expect(container.querySelector('.tp-dh-date')).toHaveTextContent('4 tasks');
+    expect(screen.queryByRole('button', { name: 'Previous day' })).toBeNull();
+    expect(screen.queryByRole('img')).toBeNull();
+    expect(container.querySelector('.tp-dh-top')).toBeNull();
+    const tools = container.querySelector('.tp-dh-tools')!;
+    expect(tools.firstElementChild).toHaveTextContent('Filter');
+    expect(tools.lastElementChild).toHaveClass('tp-seg');
+    expect(container.querySelector('.tp-dh')).not.toHaveClass('tp-compact');
+    rerender(page({ compact: true }));
+    expect(container.querySelector('.tp-dh')).toHaveClass('tp-compact');
+  });
 });

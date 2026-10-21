@@ -8,3 +8,4 @@ export * from './history';
 export * from './projects';
 export * from './quickadd';
 export * from './week';
+export * from './backlog';

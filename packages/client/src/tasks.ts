@@ -354,13 +354,15 @@ export class TaskStore {
   private lastAt = 0;
   private seq = 0;
   private reachable = true;
+  /** Changes made here the server has not answered yet, whatever the outbox has on disk. */
+  private unanswered = 0;
 
   constructor(private readonly o: TaskStoreOptions) {
     this.clientId = o.clientId;
     this.outbox = new Outbox({
       store: o.store,
       send: (batch) => this.send(batch),
-      onIdle: () => this.sweep(),
+      onIdle: () => void this.sweep(),
       onError: (err) => {
         if (!(err instanceof ApiError)) this.setReachable(false);
       },
@@ -723,7 +725,8 @@ export class TaskStore {
 
   /** True when nothing is waiting to be saved. Tests wait on this before asserting. */
   async idle(): Promise<boolean> {
-    return (await this.outbox.idle()) && this.pending.size === 0;
+    if (this.unanswered > 0 || this.pending.size > 0) return false;
+    return (await this.outbox.idle()) && this.unanswered === 0 && this.pending.size === 0;
   }
 
   // ---- the live stream -----------------------------------------------------------------------------------
@@ -764,6 +767,7 @@ export class TaskStore {
     while (Date.now() < until && !(await this.idle())) await new Promise((r) => setTimeout(r, 50));
     for (const m of await this.o.store.all()) await this.o.store.remove(m.id);
     this.pending.clear();
+    this.unanswered = 0;
     this.known.clear();
   }
 
@@ -778,6 +782,7 @@ export class TaskStore {
   private mutate(body: TaskMutationBody): void {
     const m = { id: crypto.randomUUID(), at: this.nextAt(), seq: ++this.seq, ...body } as SyncMutation &
       Mutation;
+    this.unanswered += 1;
     this.pending.set(m.id, { m, stored: false });
     this.applyEverywhere(m);
     void this.o.store.put(m).then(
@@ -857,7 +862,9 @@ export class TaskStore {
     });
     this.setReachable(true);
     const rejected = res.results.filter((r) => r.status === 'rejected');
-    for (const r of res.results) this.pending.delete(r.id);
+    for (const r of res.results) {
+      if (this.pending.delete(r.id)) this.unanswered = Math.max(0, this.unanswered - 1);
+    }
     this.merge(res);
     const touched = new Set<string>();
     for (const b of batch)
@@ -897,9 +904,17 @@ export class TaskStore {
     }
   }
 
-  /** Everything on disk was sent (by this tab or another): forget what we were holding for it. */
-  private sweep(): void {
-    for (const [id, p] of this.pending) if (p.stored) this.pending.delete(id);
+  /**
+   * Everything on disk was sent (by this tab or another): forget what we were holding for it. A change written
+   * to disk after the outbox last looked is still on its way, so only what is no longer on disk goes.
+   */
+  private async sweep(): Promise<void> {
+    const left = new Set((await this.o.store.all()).map((m) => m.id));
+    for (const [id, p] of this.pending)
+      if (p.stored && !left.has(id)) {
+        this.pending.delete(id);
+        this.unanswered = Math.max(0, this.unanswered - 1);
+      }
   }
 
   private setReachable(on: boolean): void {

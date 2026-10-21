@@ -342,4 +342,104 @@ describe('TaskList', () => {
     expect(row).toHaveClass('tp-locate');
     expect(within(row as HTMLElement).getByRole('button', { name: 'Call Sam at 3pm' })).toHaveFocus();
   });
+
+  it('C06-U02 leaveDone: a ticked row waits a beat, folds away with Crossed off and Undo, and Undo puts it back', async () => {
+    vi.useFakeTimers();
+    const onLeave = vi.fn();
+    const onUnleave = vi.fn();
+    const onToggleTask = vi.fn();
+    render(
+      <>
+        <ToastHost />
+        <TaskList
+          tasks={THREE}
+          leaveDone
+          onLeave={onLeave}
+          onUnleave={onUnleave}
+          onToggleTask={onToggleTask}
+        />
+      </>,
+    );
+    const box = screen.getByRole('checkbox', { name: 'Cross off: Call Sam at 3pm' });
+    fireEvent.click(box);
+    // ticked at once, still here, nothing sent yet
+    expect(box).toHaveAttribute('aria-checked', 'true');
+    expect(onLeave).not.toHaveBeenCalled();
+    expect(onToggleTask).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(899);
+    });
+    expect(onLeave).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(1 + 300);
+    });
+    expect(onLeave).toHaveBeenCalledWith(expect.objectContaining({ key: 'b' }), true);
+    expect(screen.getByText('Crossed off')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(onUnleave).toHaveBeenCalledWith(expect.objectContaining({ key: 'b' }), true, 1);
+    expect(screen.getByText('Call Sam at 3pm').closest('.tp-item')).toHaveClass('tp-new');
+  });
+
+  it('C06-U02 ticked back within the beat, the row never leaves and nothing is sent', () => {
+    vi.useFakeTimers();
+    const onLeave = vi.fn();
+    const onToggleTask = vi.fn();
+    render(<TaskList tasks={THREE} leaveDone onLeave={onLeave} onToggleTask={onToggleTask} />);
+    const box = screen.getByRole('checkbox', { name: 'Cross off: Call Sam at 3pm' });
+    fireEvent.click(box);
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    fireEvent.click(box);
+    expect(box).toHaveAttribute('aria-checked', 'false');
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(onLeave).not.toHaveBeenCalled();
+    expect(onToggleTask).not.toHaveBeenCalled();
+  });
+
+  it('C06-U03 leaveUndone: in the Crossed off list an unticked row folds away with Back in the Backlog; a static list has no grip', () => {
+    vi.useFakeTimers();
+    const onLeave = vi.fn();
+    const done = THREE.map((t) => ({ ...t, done: true }));
+    const { container } = render(
+      <>
+        <ToastHost />
+        <TaskList tasks={done} static leaveUndone unleaveToast="Back in the Backlog" onLeave={onLeave} />
+      </>,
+    );
+    expect(container.querySelector('.tp-grip')).toBeNull();
+    const box = screen.getByRole('checkbox', { name: 'Cross off: Book car service' });
+    fireEvent.click(box);
+    expect(box).toHaveAttribute('aria-checked', 'false');
+    act(() => {
+      vi.advanceTimersByTime(1200);
+    });
+    expect(onLeave).toHaveBeenCalledWith(expect.objectContaining({ key: 'c' }), false);
+    expect(screen.getByText('Back in the Backlog')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
+  });
+
+  it('C06-U04 filter: only the project’s rows show, the + is off, and the writing line adds to the Backlog', async () => {
+    const user = userEvent.setup();
+    const onAdd = vi.fn(() => 'n1');
+    const PF = { name: 'Platform', color: '#5b7553' };
+    const tasks: TaskItem[] = [
+      { key: 'a', id: 'ME-1', title: 'Pay the electricity bill', project: PF },
+      { key: 'b', id: 'ME-2', title: 'Call Sam at 3pm' },
+      { key: 'c', id: 'ME-3', title: 'Book car service', project: PF },
+    ];
+    const { container } = render(
+      <TaskList tasks={tasks} filter="Platform" addLabel="Add to the Backlog…" onAdd={onAdd} undated />,
+    );
+    expect(screen.getAllByRole('listitem').map((r) => r.textContent)).toEqual([
+      expect.stringContaining('Pay the electricity bill'),
+      expect.stringContaining('Book car service'),
+    ]);
+    expect(container.querySelector('.tp-ins')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Add to the Backlog…' }));
+    await user.type(screen.getByRole('textbox', { name: 'New task' }), 'Renew passport{Enter}');
+    expect(onAdd).toHaveBeenCalledWith('Renew passport');
+  });
 });

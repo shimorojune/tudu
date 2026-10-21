@@ -46,7 +46,7 @@ laptop without Docker and in the RustFS bucket on the Dokploy runner (`TUDU_CI_S
 | ------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | C04-E01 | Add to today          | New task opens the bar over the day with the veil; Add task puts the row on today with the wash; a reload shows it; history says Quick Add |
 | C04-E02 | Tomorrow              | "Added to Tomorrow" with Show; today stays empty; Show turns the sheet to Monday and washes the row                                        |
-| C04-E03 | Backlog               | "Added to Backlog"; today stays empty; the server has it without a day                                                                     |
+| C04-E03 | Backlog               | "Added to Backlog" with Show (since chunk 06, it opens the Backlog on the row); today stays empty; the server has it without a day         |
 | C04-E04 | Due and Project       | The foot reads them; the row says "Due Thu" and the project; the panel's Project fact shows it; the server has both                        |
 | C04-E05 | A new project         | Made from the chip; after a reload it is in the picker, on the row and in the panel                                                        |
 | C04-E06 | Note and file         | The note becomes the task's notes; a file attached shows as a chip in the notes and opens with its type                                    |

@@ -1059,4 +1059,84 @@ describe('the week (chunk 05)', () => {
     expect(mine[1]!.data).toMatchObject({ spaceId: p.spaceId, tasks: [id], clientId: 'tab-5' });
     expect(theirs).toEqual([]);
   });
+
+  it('C06-A01 a task written with no day lands at the end of the Backlog with a dense position; crossed-off ones keep their doneAt', async () => {
+    const p = await person();
+    const a = randomUUID();
+    const b = randomUUID();
+    const c = randomUUID();
+    await sync(p, [create(p, 'First', null, 1024, a), create(p, 'Second', null, 2048, b)]);
+    await sync(p, [m('task.cross', { id: a, done: true })]);
+    // no position given: the end
+    await sync(p, [
+      m('task.create', { id: c, spaceId: p.spaceId, title: 'Third', day: null, position: null }),
+    ]);
+    const res = await get(server.app, `/api/spaces/${p.spaceId}/backlog`, p.jar);
+    const body = (await res.json()) as BacklogResponse;
+    expect(body.tasks.map((t) => t.title)).toEqual(['First', 'Second', 'Third']);
+    expect(body.tasks[2]!.position).toBeGreaterThan(2048);
+    expect(body.tasks[0]).toMatchObject({ id: a, done: true });
+    expect(body.tasks[0]!.doneAt).toBeTruthy();
+    expect(body.tasks[1]!.doneAt).toBeNull();
+  });
+
+  it('C06-A02 crossing off and unticking a Backlog task keeps its position; the event names the Backlog and reaches the space only', async () => {
+    const p = await person();
+    const stranger = await person();
+    const a = randomUUID();
+    const b = randomUUID();
+    await sync(p, [create(p, 'First', null, 1024, a), create(p, 'Second', null, 2048, b)]);
+    const mine: Array<{ type: string; data: TasksChangedEvent }> = [];
+    const theirs: unknown[] = [];
+    const off1 = server.hub.subscribe(p.userId, (e) => mine.push(e as never));
+    const off2 = server.hub.subscribe(stranger.userId, (e) => theirs.push(e));
+    await sync(p, [m('task.cross', { id: a, done: true })], 'tab-6');
+    await sync(p, [m('task.cross', { id: a, done: false })], 'tab-6');
+    off1();
+    off2();
+    const body = (await (
+      await get(server.app, `/api/spaces/${p.spaceId}/backlog`, p.jar)
+    ).json()) as BacklogResponse;
+    expect(body.tasks.map((t) => [t.title, t.position, t.done])).toEqual([
+      ['First', 1024, false],
+      ['Second', 2048, false],
+    ]);
+    expect(mine).toHaveLength(2);
+    expect(mine[0]!.data).toMatchObject({ spaceId: p.spaceId, days: [null], tasks: [a], clientId: 'tab-6' });
+    expect(theirs).toEqual([]);
+  });
+
+  it('C06-A03 a place change inside the Backlog reorders it with dense positions; a stranger is refused', async () => {
+    const p = await person();
+    const a = randomUUID();
+    const b = randomUUID();
+    const c = randomUUID();
+    await sync(p, [
+      create(p, 'One', null, 1024, a),
+      create(p, 'Two', null, 2048, b),
+      create(p, 'Three', null, 3072, c),
+    ]);
+    await sync(p, [m('task.place', { id: c, day: null, position: 512 })]);
+    let body = (await (
+      await get(server.app, `/api/spaces/${p.spaceId}/backlog`, p.jar)
+    ).json()) as BacklogResponse;
+    expect(body.tasks.map((t) => t.title)).toEqual(['Three', 'One', 'Two']);
+    expect(body.tasks.every((t) => t.day === null)).toBe(true);
+    // the end again, no position
+    await sync(p, [m('task.place', { id: c, day: null, position: null })]);
+    body = (await (
+      await get(server.app, `/api/spaces/${p.spaceId}/backlog`, p.jar)
+    ).json()) as BacklogResponse;
+    expect(body.tasks.map((t) => t.title)).toEqual(['One', 'Two', 'Three']);
+    expect(body.tasks[2]!.position).toBeGreaterThan(body.tasks[1]!.position);
+    const stranger = await person();
+    const res = await post(
+      server.app,
+      '/api/sync',
+      { clientId: 'tab-x', mutations: [m('task.place', { id: a, day: null, position: 1 })] },
+      stranger.jar,
+    );
+    const out = (await res.json()) as SyncResponse;
+    expect(out.results[0]!.status).toBe('rejected');
+  });
 });
