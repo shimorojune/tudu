@@ -173,3 +173,7 @@ export {
   type QuickAddFile,
   type QuickAddResult,
 } from './components/QuickAdd';
+
+// Week (chunk 05)
+export { WeekDay, WeekTiles, type WeekDayProps, type WeekTilesProps } from './components/WeekDay';
+export { WeekPicker, weekRowsOf, weekRowLabel, type WeekPickerProps } from './components/WeekPicker';

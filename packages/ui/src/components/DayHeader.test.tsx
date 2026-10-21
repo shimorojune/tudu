@@ -181,7 +181,8 @@ describe('DayHeader', () => {
     expect(container.querySelector('.tp-dh-top')).toBeNull();
   });
 
-  it('bare puts the arrows on the title line and renames the controls for the week', async () => {
+  it('C05-U07 bare puts the arrows on the title line, renames the controls for the week, and the title opens the WeekPicker', async () => {
+    const onWeek = vi.fn();
     const { user, container, onPrev, onNext } = setup({
       bare: true,
       isToday: false,
@@ -189,7 +190,7 @@ describe('DayHeader', () => {
       nextLabel: 'Next week',
       todayLabel: 'Back to this week',
       pickLabel: 'Pick a week',
-      weeks: true,
+      weeks: { today: TODAY, selected: TODAY, onPick: onWeek },
     });
     expect(container.firstChild).toHaveClass('tp-bare');
     expect(container.querySelector('.tp-dh-top .tp-dh-turn')).toBeNull();
@@ -201,7 +202,15 @@ describe('DayHeader', () => {
     expect(onNext).toHaveBeenCalledTimes(1);
     const title = screen.getByRole('button', { name: 'Pick a week. Showing Monday 19 October' });
     await user.click(title);
-    // until the WeekPicker lands, weeks opens the month calendar
-    expect(screen.getByRole('group', { name: 'Pick a day' })).toBeInTheDocument();
+    const picker = screen.getByRole('group', { name: 'Pick a week' });
+    expect(picker).toBeInTheDocument();
+    await user.click(within(picker).getByRole('button', { name: /^Week 44,/ }));
+    expect(onWeek).toHaveBeenCalledWith('2026-10-26');
+    await waitFor(() => expect(screen.queryByRole('group', { name: 'Pick a week' })).toBeNull());
+  });
+
+  it('C05-U07 the ring says that’s the week when the week is crossed off', () => {
+    const { container } = setup({ done: 3, total: 3, doneNote: 'That’s the week' });
+    expect(container.textContent).toContain('That’s the week');
   });
 });

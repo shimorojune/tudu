@@ -15,6 +15,7 @@ import { KitPage } from './routes/kit/KitPage';
 import { QuickAddPage } from './routes/quick-add/QuickAddPage';
 import { SignInPage } from './routes/sign-in/SignInPage';
 import { SoonPage, TodayPage } from './routes/today/TodayPage';
+import { WeekPage } from './routes/week/WeekPage';
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -86,9 +87,9 @@ const taskLinkRoute = createRoute({
 const weekRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/week',
-  component: () => (
-    <SoonPage title="The week is on its way." body="Seven day tiles and the Backlog arrive with chunk 05." />
-  ),
+  validateSearch: (s: Record<string, unknown>): { task?: string } =>
+    typeof s.task === 'string' && s.task ? { task: s.task } : {},
+  component: WeekPage,
 });
 const backlogRoute = createRoute({
   getParentRoute: () => appRoute,

@@ -7,3 +7,4 @@ export * from './notes';
 export * from './history';
 export * from './projects';
 export * from './quickadd';
+export * from './week';

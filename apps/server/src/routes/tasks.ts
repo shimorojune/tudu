@@ -1,12 +1,16 @@
 import { Hono } from 'hono';
 import {
+  addDays,
   diffDays,
   isIsoDate,
+  mondayOf,
   syncRequestSchema,
   TASKS_CHANGED,
   type DayResponse,
   type IsoDate,
   type MarksResponse,
+  type BacklogResponse,
+  type WeekResponse,
   PROJECTS_CHANGED,
   type ProjectsChangedEvent,
   type SyncResponse,
@@ -26,7 +30,9 @@ import {
   rollForward,
   taskDetail,
   tasksById,
+  tasksOfBacklog,
   tasksOfDay,
+  tasksOfWeek,
 } from '../tasks';
 
 /** At most this many days of dots in one request (a month view and a little either side). */
@@ -84,6 +90,40 @@ export function taskRoutes(db: Db, hub: EventHub) {
       tasks,
       counts: { total: tasks.length, done: tasks.filter((t) => t.done).length },
     };
+    return c.json(body);
+  });
+
+  /** A week in one answer: the seven days from a Monday, each with its tasks and counts, and the Backlog. */
+  r.get('/spaces/:spaceId/weeks/:monday', requireSession, async (c) => {
+    const userId = c.get('session')!.user.id;
+    const { spaceId, monday } = c.req.param();
+    if (!isIsoDate(monday) || mondayOf(monday) !== monday)
+      return c.json({ error: 'A week starts on a Monday.' }, 400);
+    if (!(await roleIn(db, userId, spaceId))) return c.json({ error: 'You’re not in that space.' }, 403);
+    // The week that holds today carries unfinished tasks forward first, as the day read does.
+    const today = c.req.query('today');
+    if (today && isIsoDate(today) && mondayOf(today) === monday) {
+      const changed = await rollForward(db, spaceId, today);
+      await announce(db, hub, spaceId, changed.days, changed.tasks, null);
+    }
+    const week = await tasksOfWeek(db, spaceId, monday);
+    const body: WeekResponse = {
+      monday,
+      days: Array.from({ length: 7 }, (_, i) => {
+        const day = addDays(monday, i);
+        const tasks = week.get(day) ?? [];
+        return { day, tasks, counts: { total: tasks.length, done: tasks.filter((t) => t.done).length } };
+      }),
+      backlog: await tasksOfBacklog(db, spaceId),
+    };
+    return c.json(body);
+  });
+
+  r.get('/spaces/:spaceId/backlog', requireSession, async (c) => {
+    const userId = c.get('session')!.user.id;
+    const { spaceId } = c.req.param();
+    if (!(await roleIn(db, userId, spaceId))) return c.json({ error: 'You’re not in that space.' }, 403);
+    const body: BacklogResponse = { tasks: await tasksOfBacklog(db, spaceId) };
     return c.json(body);
   });
 

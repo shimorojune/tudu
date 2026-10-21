@@ -46,6 +46,8 @@ export interface TaskPanelProps {
   onRef?: (ref: string) => void;
   /** Where "Copy link to task" points. */
   linkFor: (ref: string) => string;
+  /** The back label for a task on a day (or none): the week page says "Week" and "Backlog". */
+  backFor?: (day: IsoDate | null) => string;
 }
 
 /** The month around a day, with a week either side, for the Planned picker's dots. */
@@ -89,9 +91,11 @@ export function TaskPanel(p: TaskPanelProps) {
     ...taskStore.marksQuery(spaceId, range.from, range.to),
     enabled: !!shown,
   }).data;
-  // Neighbours on the task's day, for the arrows.
-  const list = useQuery({ ...taskStore.dayQuery(spaceId, day, today), enabled: !!shown && !!detail?.day })
-    .data?.tasks;
+  // Neighbours on the task's day (or in the Backlog), for the arrows.
+  const list = useQuery({
+    ...taskStore.listQuery(spaceId, detail?.day ?? null, today),
+    enabled: !!shown && !!detail,
+  }).data?.tasks;
   const projects = useQuery({ ...taskStore.projectsQuery(spaceId), enabled: !!shown }).data ?? [];
   const at = list?.findIndex((t) => t.id === id) ?? -1;
   const prev = at > 0 ? list![at - 1] : undefined;
@@ -102,11 +106,14 @@ export function TaskPanel(p: TaskPanelProps) {
     if (open && detail?.ref && detail.id === open.id) onRef?.(detail.ref);
   }, [open, detail?.ref, detail?.id, onRef]);
 
-  const backLabel = detail?.day
-    ? relativeDayLabel(detail.day, today) === 'Today'
-      ? 'Today'
-      : weekdayName(detail.day)
-    : 'Backlog';
+  const backLabel =
+    detail && p.backFor
+      ? p.backFor(detail.day)
+      : detail?.day
+        ? relativeDayLabel(detail.day, today) === 'Today'
+          ? 'Today'
+          : weekdayName(detail.day)
+        : 'Backlog';
 
   let body;
   if (!shown) body = null;

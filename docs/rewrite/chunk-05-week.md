@@ -76,52 +76,52 @@ its days still open Today on that day), For someone and Send (08).
 
 Unit (`packages/ui`, `packages/client`, `packages/core`):
 
-| ID      | Component   | Case                                                                                                                                                                     |
-| ------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| C05-U01 | WeekDay     | Tile: eyebrow (brand on today, quiet elsewhere), day, date, count; past and quiet tones; "Nothing planned" when empty and the list still renders as a drop target         |
-| C05-U02 | WeekDay     | Section: the header is a button with aria-expanded; tapping toggles, turns the chevron and reports onToggle; the preview shows when shut and is hidden when open          |
-| C05-U03 | WeekDay     | Section: the folded body is inert when shut; "Nothing planned" and a custom empty text ("Nothing waiting"); reduced motion folds without the height animation            |
-| C05-U04 | WeekTiles   | Seven tiles and the Backlog in a grid of four columns; `columns` sets two; tiles keep their height and lists scroll inside                                                |
-| C05-U05 | WeekPicker  | A month of week rows with numbers, days, dots on marked days, this week marked; previous and next month; hover or focus names the week in the hint; "This week" at the foot |
-| C05-U06 | WeekPicker  | Picking a row reports its Monday; aria-pressed on the chosen week; weeks that cross a month read "28 Sep – 4 Oct"                                                         |
-| C05-U07 | DayHeader   | With `weeks`, the title opens the WeekPicker instead of the calendar; "Back to this week", "Previous week" and "Next week" labels; the ring's "That's the week"           |
-| C05-U08 | TaskList    | Brief compact rows in a `week` group trade rows between eight lists; onMoveTask reports from, to and the index; a tile marked past refuses the drop                        |
-| C05-U09 | TaskList    | The Backlog's rows show the quiet calendar button; picking a day there reports a move out of the Backlog                                                                   |
-| C05-U10 | client      | The week query fills the seven day caches and the Backlog; a move between days updates both lists at once and queues one place change; a rejected move rolls both back   |
-| C05-U11 | client      | A live event for a day or the Backlog refreshes that list only; a week in view refetches once, not eight times                                                           |
-| C05-U12 | core        | Week words: This week, Next week, Last week, In 2 weeks, 3 weeks ago; the heading "12 – 18" + "October" and "28 Sep – 4 Oct"; the eyebrow "Next week · Week 43"           |
-| C05-U13 | core        | Tile words: the eyebrow (Today, Tomorrow, Yesterday, In 3 days, 2 days ago), counts ("1 task", "3 tasks", "2 of 7", empty), the preview line and "All crossed off"       |
-| C05-U14 | core        | Quick Add's Planned for a week: today for this week, the Monday for a later week, nothing in the past                                                                     |
+| ID      | Component  | Case                                                                                                                                                                        |
+| ------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C05-U01 | WeekDay    | Tile: eyebrow (brand on today, quiet elsewhere), day, date, count; past and quiet tones; "Nothing planned" when empty and the list still renders as a drop target           |
+| C05-U02 | WeekDay    | Section: the header is a button with aria-expanded; tapping toggles, turns the chevron and reports onToggle; the preview shows when shut and is hidden when open            |
+| C05-U03 | WeekDay    | Section: the folded body is inert when shut; "Nothing planned" and a custom empty text ("Nothing waiting"); reduced motion folds without the height animation               |
+| C05-U04 | WeekTiles  | Seven tiles and the Backlog in a grid of four columns; `columns` sets two; tiles keep their height and lists scroll inside                                                  |
+| C05-U05 | WeekPicker | A month of week rows with numbers, days, dots on marked days, this week marked; previous and next month; hover or focus names the week in the hint; "This week" at the foot |
+| C05-U06 | WeekPicker | Picking a row reports its Monday; aria-pressed on the chosen week; weeks that cross a month read "28 Sep – 4 Oct"                                                           |
+| C05-U07 | DayHeader  | With `weeks`, the title opens the WeekPicker instead of the calendar; "Back to this week", "Previous week" and "Next week" labels; the ring's "That's the week"             |
+| C05-U08 | TaskList   | Brief compact rows in a `week` group trade rows between eight lists; onMoveTask reports from, to and the index; a tile marked past refuses the drop                         |
+| C05-U09 | TaskList   | The Backlog's rows show the quiet calendar button; picking a day there reports a move out of the Backlog                                                                    |
+| C05-U10 | client     | The week query fills the seven day caches and the Backlog; a move between days updates both lists at once and queues one place change; a rejected move rolls both back      |
+| C05-U11 | client     | A live event for a day or the Backlog refreshes that list only; a week in view refetches once, not eight times                                                              |
+| C05-U12 | core       | Week words: This week, Next week, Last week, In 2 weeks, 3 weeks ago; the heading "12 – 18" + "October" and "28 Sep – 4 Oct"; the eyebrow "Next week · Week 43"             |
+| C05-U13 | core       | Tile words: the eyebrow (Today, Tomorrow, Yesterday, In 3 days, 2 days ago), counts ("1 task", "3 tasks", "2 of 7", empty), the preview line and "All crossed off"          |
+| C05-U14 | core       | Quick Add's Planned for a week: today for this week, the Monday for a later week, nothing in the past                                                                       |
 
 API (`apps/server`):
 
-| ID      | Case                                                                                                                                               |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C05-A01 | Reading a week: seven days Monday to Sunday with their tasks in order and counts, plus the Backlog; a date that is not a Monday is refused (400)    |
-| C05-A02 | Reading the week that holds today rolls unfinished tasks forward first, once, and the days come back already moved                                  |
-| C05-A03 | Reading the Backlog: undated tasks in position order, crossed-off ones included; a stranger gets 403                                                 |
-| C05-A04 | A place change between two days keeps the index asked for; between a day and the Backlog the positions on both sides stay dense                     |
-| C05-A05 | The live event for a move names both lists (the old day, the new day or the Backlog) and reaches the space's people only                             |
+| ID      | Case                                                                                                                                             |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| C05-A01 | Reading a week: seven days Monday to Sunday with their tasks in order and counts, plus the Backlog; a date that is not a Monday is refused (400) |
+| C05-A02 | Reading the week that holds today rolls unfinished tasks forward first, once, and the days come back already moved                               |
+| C05-A03 | Reading the Backlog: undated tasks in position order, crossed-off ones included; a stranger gets 403                                             |
+| C05-A04 | A place change between two days keeps the index asked for; between a day and the Backlog the positions on both sides stay dense                  |
+| C05-A05 | The live event for a move names both lists (the old day, the new day or the Backlog) and reaches the space's people only                         |
 
 End-to-end, group `week`:
 
-| ID      | Case                                                                                                                                          |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| C05-E01 | Open Week: seven tiles and the Backlog, today's eyebrow, the heading "This week · Week 42", the tasks made on Today in today's tile            |
-| C05-E02 | Drag a task from today to Thursday: it is in Thursday's tile, both counts follow, and Thursday has it after a reload and on Today's sheet       |
-| C05-E03 | Drag a task from the Backlog onto a day, and one from a day into the Backlog; both survive a reload                                             |
-| C05-E04 | Cross off in a tile: the strike, the tile's count "1 of 3", the week ring; uncross it                                                          |
-| C05-E05 | Turn the week with the arrows: next week's dates, "Back to this week" appears and works                                                        |
-| C05-E06 | Pick a week from the picker: the dots on marked days, the chosen week's tiles; "This week" in the picker returns                                |
-| C05-E07 | Open a task from a tile: the panel with "Week" as its back label, prev and next walk the tile; change its day in the panel, it changes tile     |
-| C05-E08 | New task from the top bar on next week: Quick Add says "Lands on Mon 19 Oct"; the row washes in Monday's tile                                  |
-| C05-E09 | Tablet: days fold; Today is open, Monday closed with its preview; open Monday, reload, it is still open; the Backlog folds                       |
-| C05-E10 | Phone: the compact header, "This week"; open a day; move a task with its date pill; the round button adds to today                             |
-| C05-E11 | Live: a move made in a second tab shows in the first week without a reload, in both tiles                                                      |
-| C05-E12 | Offline: cut the network, drag a task to another day and cross one off, reconnect, the server has both                                         |
-| C05-E13 | Loading and error: a slow week shows the tiles with skeleton rows; a failed week shows "Couldn't load this week." and Try again recovers        |
-| C05-E14 | A past day refuses a drop and keeps its crossed-off tasks; a very full day scrolls inside its tile                                              |
-| C05-E15 | Dark mode: E01 and E02 again in dark                                                                                                           |
+| ID      | Case                                                                                                                                        |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| C05-E01 | Open Week: seven tiles and the Backlog, today's eyebrow, the heading "This week · Week 42", the tasks made on Today in today's tile         |
+| C05-E02 | Drag a task from today to Thursday: it is in Thursday's tile, both counts follow, and Thursday has it after a reload and on Today's sheet   |
+| C05-E03 | Drag a task from the Backlog onto a day, and one from a day into the Backlog; both survive a reload                                         |
+| C05-E04 | Cross off in a tile: the strike, the tile's count "1 of 3", the week ring; uncross it                                                       |
+| C05-E05 | Turn the week with the arrows: next week's dates, "Back to this week" appears and works                                                     |
+| C05-E06 | Pick a week from the picker: the dots on marked days, the chosen week's tiles; "This week" in the picker returns                            |
+| C05-E07 | Open a task from a tile: the panel with "Week" as its back label, prev and next walk the tile; change its day in the panel, it changes tile |
+| C05-E08 | New task from the top bar on next week: Quick Add says "Lands on Mon 19 Oct"; the row washes in Monday's tile                               |
+| C05-E09 | Tablet: days fold; Today is open, Monday closed with its preview; open Monday, reload, it is still open; the Backlog folds                  |
+| C05-E10 | Phone: the compact header, "This week"; open a day; move a task with its date pill; the round button adds to today                          |
+| C05-E11 | Live: a move made in a second tab shows in the first week without a reload, in both tiles                                                   |
+| C05-E12 | Offline: cut the network, drag a task to another day and cross one off, reconnect, the server has both                                      |
+| C05-E13 | Loading and error: a slow week shows the tiles with skeleton rows; a failed week shows "Couldn't load this week." and Try again recovers    |
+| C05-E14 | A past day refuses a drop and keeps its crossed-off tasks; a very full day scrolls inside its tile                                          |
+| C05-E15 | Dark mode: E01 and E02 again in dark                                                                                                        |
 
 Not automated: the tint under a dragged task, the fold's easing, the week turning; you judge those on staging.
 

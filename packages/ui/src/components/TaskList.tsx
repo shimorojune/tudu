@@ -70,6 +70,8 @@ export interface TaskListProps {
   group?: string;
   /** A row dragged in from another list of the group, and where it landed. */
   onReceive?: (key: string, at: number) => void;
+  /** Takes no drops from the group (a day gone by): rows can still be dragged out of it. */
+  locked?: boolean;
   /** The day header's calendar; `selected` is the list's day. With it the date pills open a picker. */
   calendar?: MiniCalendarProps;
   /** The Backlog: the list's own day is none. */
@@ -204,7 +206,7 @@ export function TaskList(p: TaskListProps) {
     p.onReorder?.(next, { key, from: fromFull, to: toFull });
   }
   const down = useReorder(ref, reorder, { group: filter ? null : p.group });
-  useDropGroup(filter ? null : p.group, ref, (key, at) => {
+  useDropGroup(filter || p.locked ? null : p.group, ref, (key, at) => {
     p.onReceive?.(key, at);
     setFresh({ key });
     opened.current = null;

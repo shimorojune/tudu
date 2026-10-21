@@ -37,7 +37,8 @@ const SWIPE_PX = 60;
 
 const MIN_HEIGHT: Record<Viewport, number> = { desktop: 560, tablet: 640, phone: 520 };
 
-function toItem(t: Task, today: IsoDate, projects: Project[]): TaskItem {
+/** A task as a row: the words of its byline for the day shown. */
+export function toItem(t: Task, today: IsoDate, projects: Project[]): TaskItem {
   const project = t.projectId ? projects.find((p) => p.id === t.projectId) : undefined;
   return {
     key: t.id,
@@ -53,7 +54,7 @@ function toItem(t: Task, today: IsoDate, projects: Project[]): TaskItem {
 }
 
 /** The month around a day, with a week either side, for the calendar's dots. */
-function monthAround(day: IsoDate): { from: IsoDate; to: IsoDate } {
+export function monthAround(day: IsoDate): { from: IsoDate; to: IsoDate } {
   const y = Number(day.slice(0, 4));
   const m = Number(day.slice(5, 7));
   const first = `${day.slice(0, 7)}-01`;

@@ -1,9 +1,10 @@
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseRules, readStylesheet, rulesWhere } from '../test-utils/stylesheet';
 import { TaskList, type TaskItem, type TaskListProps } from './TaskList';
+import { ToastHost } from './Toast';
 
 const rules = parseRules(readStylesheet('components.css'));
 const ROW = 52;
@@ -245,6 +246,74 @@ describe('TaskList', () => {
     expect(onReceive).toHaveBeenCalledWith('b', 1);
     expect(monday).not.toHaveClass('tp-drop-on');
     expect(document.querySelector('.tp-drag-ghost')).toBeNull();
+  });
+
+  it('C05-U08 brief compact rows in a week group trade between lists; a locked list refuses the drop but gives its rows', () => {
+    const onReceive = vi.fn();
+    const onMoveTask = vi.fn();
+    render(
+      <>
+        <TaskList tasks={THREE} group="week" brief compact label="Sunday" locked onMoveTask={onMoveTask} />
+        <TaskList
+          tasks={[{ key: 'd', title: 'Dentist at 4pm' }]}
+          group="week"
+          brief
+          compact
+          label="Monday"
+          onReceive={onReceive}
+        />
+      </>,
+    );
+    layout();
+    const sunday = screen.getByRole('list', { name: 'Sunday' });
+    const monday = screen.getByRole('list', { name: 'Monday' });
+    // brief: no ID in the byline
+    expect(sunday.querySelector('.tp-sg-id')).toBeNull();
+    // out of the locked list, into Monday at the end
+    pointer(screen.getByText('Call Sam at 3pm'), 'pointerdown', 50, 175);
+    pointer(window, 'pointermove', 60, 185);
+    pointer(window, 'pointermove', 760, 100 + ROW + 10);
+    expect(monday).toHaveClass('tp-drop-on');
+    pointer(window, 'pointerup', 760, 100 + ROW + 10);
+    expect(onReceive).toHaveBeenCalledWith('b', 1);
+    // into the locked list: it never tints and nothing lands
+    pointer(screen.getByText('Dentist at 4pm'), 'pointerdown', 750, 125);
+    pointer(window, 'pointermove', 760, 135);
+    pointer(window, 'pointermove', 60, 100 + ROW * 3 + 10);
+    expect(sunday).not.toHaveClass('tp-drop-on');
+    expect(sunday.querySelector('.tp-drop-line')).toBeNull();
+    pointer(window, 'pointerup', 60, 100 + ROW * 3 + 10);
+    expect(onReceive).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('.tp-drag-ghost')).toBeNull();
+    // the click that ends a drag is swallowed; spend it so the next test's first click is not
+    fireEvent.click(document.body);
+  });
+
+  it('C05-U09 the Backlog’s rows carry the quiet calendar button; picking a day there moves the task out', async () => {
+    const user = userEvent.setup();
+    const onMoveTask = vi.fn();
+    render(
+      <>
+        <ToastHost />
+        <TaskList
+          tasks={[{ key: 'b1', title: 'Renew passport' }]}
+          group="week"
+          brief
+          compact
+          undated
+          planButton
+          label="Backlog"
+          calendar={{ today: '2026-10-18', marks: {} }}
+          onMoveTask={onMoveTask}
+        />
+      </>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Plan it for a day: Renew passport' }));
+    await user.click(screen.getByRole('button', { name: 'Tomorrow' }));
+    await waitFor(() =>
+      expect(onMoveTask).toHaveBeenCalledWith(expect.objectContaining({ key: 'b1' }), '2026-10-19', null),
+    );
+    expect(screen.getByText('Moved to Tomorrow')).toBeInTheDocument();
   });
 
   it('C02-U13 flashKey opens the gap of a row added from outside; locateKey scrolls to it and flashes it', () => {
