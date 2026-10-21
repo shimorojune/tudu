@@ -130,7 +130,7 @@ export function Dialog(props: DialogProps) {
   if (inline) {
     return (
       <div className={cx('tp-root tp-dlg-inline', sheet && 'tp-dlg-inline-sheet')}>
-        <DialogPanel {...props} />
+        <DialogPanel {...props} aria-label={label ?? title} />
       </div>
     );
   }

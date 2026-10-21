@@ -34,7 +34,9 @@ import {
   useNewTaskAsk,
   useShownDay,
 } from '../../app/dayView';
+import { openMembers } from '../../app/dayView';
 import { api, meQuery } from '../../app/session';
+import { spacePath, useSpace } from '../../app/space';
 import { taskStore, useOnline } from '../../app/tasks';
 import { useViewport, type Viewport } from '../../app/viewport';
 import { useWorkingDay } from '../../app/workingDay';
@@ -78,7 +80,7 @@ export function monthAround(day: IsoDate): { from: IsoDate; to: IsoDate } {
 export function TodayPage() {
   const vp = useViewport();
   const me = useQuery(meQuery).data;
-  const space = me?.spaces.find((s) => s.kind === 'personal') ?? me?.spaces[0];
+  const space = useSpace();
   const { today, night, start, stay } = useWorkingDay();
   const online = useOnline();
   const day = useShownDay() ?? today;
@@ -93,7 +95,8 @@ export function TodayPage() {
   const resolving = useRef<string | null>(null);
   // The ref just closed: the address still names it for a moment, and that must not reopen it.
   const closed = useRef<string | null>(null);
-  const spaceId = space?.id;
+  const spaceId = space.id;
+  const here = spacePath(space.slug);
   useEffect(() => {
     const ref = search.task;
     if (!ref || !spaceId || open || resolving.current === ref || closed.current === ref) return;
@@ -106,21 +109,21 @@ export function TodayPage() {
       },
       () => {
         resolving.current = null;
-        void navigate({ to: '/', search: {}, replace: true });
+        void navigate({ href: here, replace: true });
       },
     );
-  }, [search.task, spaceId, open, today, navigate]);
+  }, [search.task, spaceId, open, today, navigate, here]);
   const openTask = (id: string, ref: string | null | undefined, dir: 'next' | 'prev' = 'next') => {
     setOpen({ id, dir });
     closed.current = null;
     if (ref) resolving.current = ref;
-    void navigate({ to: '/', search: ref ? { task: ref } : {}, replace: true });
+    void navigate({ href: ref ? `${here}?task=${encodeURIComponent(ref)}` : here, replace: true });
   };
   const closeTask = () => {
     setOpen(null);
     closed.current = search.task ?? null;
     resolving.current = null;
-    if (search.task) void navigate({ to: '/', search: {}, replace: true });
+    if (search.task) void navigate({ href: here, replace: true });
   };
 
   const [day2, setDay2] = useState(() => addDays(day, 1));
@@ -156,8 +159,10 @@ export function TodayPage() {
     if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy) * 1.5) go(addDays(day, dx < 0 ? 1 : -1));
   };
 
-  if (!space || !me) return null;
+  if (!me) return null;
   const nightText = night ? nightWords(night.now, night.from, night.to) : null;
+  // A new team space, just you in it: Today welcomes you and offers Invite people.
+  const welcome = space.kind === 'team' && space.members <= 1 ? space.name : undefined;
   const sheet = (
     <DaySheet
       spaceId={space.id}
@@ -170,6 +175,7 @@ export function TodayPage() {
       group={two ? 'days' : undefined}
       onOpenTask={openTask}
       openKey={open?.id}
+      welcome={welcome}
     />
   );
   const panel = (
@@ -185,7 +191,8 @@ export function TodayPage() {
         openTask(id, ref, dir);
       }}
       onRef={(ref) => {
-        if (search.task !== ref) void navigate({ to: '/', search: { task: ref }, replace: true });
+        if (search.task !== ref)
+          void navigate({ href: `${here}?task=${encodeURIComponent(ref)}`, replace: true });
       }}
       linkFor={(ref) => `${window.location.origin}/t/${ref}`}
     />
@@ -256,6 +263,8 @@ interface DaySheetProps {
   onOpenTask?: (id: string, ref: string | null | undefined) => void;
   /** The open task's row keeps the selection wash. */
   openKey?: string;
+  /** A new team space with only you in it: the empty day says welcome and offers Invite people. */
+  welcome?: string;
 }
 
 /** One day on its sheet: the header with its arrows, calendar and ring, and the list or its states. */
@@ -271,6 +280,7 @@ function DaySheet({
   second,
   onOpenTask,
   openKey,
+  welcome,
 }: DaySheetProps) {
   const compact = vp === 'phone';
   const q = useQuery(taskStore.dayQuery(spaceId, day, today));
@@ -320,6 +330,12 @@ function DaySheet({
         onAction={() => void q.refetch()}
       >
         Check your connection. Nothing you wrote is lost.
+      </EmptyState>
+    );
+  else if (!tasks.length && writing === null && !group && welcome && h.isToday)
+    body = (
+      <EmptyState title={`Welcome to ${welcome}.`} action="Invite people" onAction={openMembers}>
+        It’s just you for now. Invite the people you work with, or write the first thing for the team.
       </EmptyState>
     );
   else if (!tasks.length && writing === null && !group)

@@ -24,6 +24,7 @@ import { Checkbox } from './Checkbox';
 import { IconButton } from './IconButton';
 import { Menu, MenuList } from './Menu';
 import { MiniCalendar, type MiniCalendarProps } from './MiniCalendar';
+import { PersonDot } from './PersonDot';
 import { ProjectMenu, type ProjectOption } from './ProjectMenu';
 import { RichTextContent, RichTextEditor, toHtml } from './RichTextEditor';
 import { Skeleton } from './Skeleton';
@@ -95,6 +96,13 @@ export interface TaskDetailProps {
   compact?: boolean;
   /** What "Copy link to task" copies. */
   link?: string;
+  /**
+   * Someone else's task: nothing to edit, the comment box there, no Delete. `owner` is the person and `ownerLine`
+   * says where it sits, "Mon 19 Oct · Meera’s".
+   */
+  readOnly?: boolean;
+  owner?: { name: string; initials: string; color?: string | null };
+  ownerLine?: string;
   onPrev?: () => void;
   onNext?: () => void;
   onClose?: () => void;
@@ -184,10 +192,12 @@ interface FactProps {
   onOpen: (open: boolean) => void;
   pop: ReactNode;
   children: ReactNode;
+  /** Someone else's task: the value reads as text and opens nothing. */
+  readOnly?: boolean;
 }
 
 /** One fact: a label on the left, a quiet button on the right that opens its picker right under it. */
-function Fact({ icon, label, empty, open, onOpen, pop, children }: FactProps) {
+function Fact({ icon, label, empty, open, onOpen, pop, children, readOnly }: FactProps) {
   const box = useRef<HTMLDivElement | null>(null);
   const btn = useRef<HTMLButtonElement | null>(null);
   useOutside(open, box, () => onOpen(false));
@@ -197,6 +207,20 @@ function Fact({ icon, label, empty, open, onOpen, pop, children }: FactProps) {
     onOpen(false);
     btn.current?.focus({ preventScroll: true });
   }
+  if (readOnly)
+    return (
+      <div className="tp-td-prop">
+        <dt>
+          <FactIcon name={icon} />
+          <span>{label}</span>
+        </dt>
+        <dd>
+          <span className={cx('tp-td-val tp-td-ro', empty && 'tp-td-empty')} aria-label={label}>
+            {children}
+          </span>
+        </dd>
+      </div>
+    );
   return (
     <div className="tp-td-prop" ref={box} onKeyDown={onKey}>
       <dt>
@@ -247,7 +271,7 @@ function dayLabel(day: IsoDate | null, today: IsoDate): string {
  * lives under ⋯. Written in place, no Save button.
  */
 export function TaskDetail(p: TaskDetailProps) {
-  const { task: t, today, compact = false } = p;
+  const { task: t, today, compact = false, readOnly = false } = p;
   const key = t.key;
   const [title, setTitle] = useState(t.title);
   const [pop, setPop] = useState<null | 'day' | 'due' | 'vis' | 'project'>(null);
@@ -376,7 +400,7 @@ export function TaskDetail(p: TaskDetailProps) {
             t.id
               ? { label: 'Copy task ID', hint: t.id, onSelect: () => copy(t.id!, `Copied ${t.id}`) }
               : null,
-            p.onDelete ? { label: 'Delete task', danger: true, onSelect: p.onDelete } : null,
+            p.onDelete && !readOnly ? { label: 'Delete task', danger: true, onSelect: p.onDelete } : null,
           ]}
         >
           <IconButton label="More" tipSide="bottom">
@@ -397,6 +421,7 @@ export function TaskDetail(p: TaskDetailProps) {
       <Fact
         icon="day"
         label="Planned"
+        readOnly={readOnly}
         open={pop === 'day'}
         onOpen={(v) => setPop(v ? 'day' : null)}
         pop={
@@ -447,6 +472,7 @@ export function TaskDetail(p: TaskDetailProps) {
       <Fact
         icon="due"
         label="Due"
+        readOnly={readOnly}
         empty={!due}
         open={pop === 'due'}
         onOpen={(v) => setPop(v ? 'due' : null)}
@@ -491,13 +517,14 @@ export function TaskDetail(p: TaskDetailProps) {
             </span>
           </>
         ) : (
-          <span>Add a due date</span>
+          <span>{readOnly ? 'No due date' : 'Add a due date'}</span>
         )}
       </Fact>
       {p.projects ? (
         <Fact
           icon="project"
           label="Project"
+          readOnly={readOnly}
           empty={!project}
           open={pop === 'project'}
           onOpen={(v) => setPop(v ? 'project' : null)}
@@ -527,13 +554,14 @@ export function TaskDetail(p: TaskDetailProps) {
               <span>{project.name}</span>
             </>
           ) : (
-            <span>Add to a project</span>
+            <span>{readOnly ? 'No project' : 'Add to a project'}</span>
           )}
         </Fact>
       ) : null}
       <Fact
         icon="vis"
         label="Visible to"
+        readOnly={readOnly}
         open={pop === 'vis'}
         onOpen={(v) => setPop(v ? 'vis' : null)}
         pop={
@@ -556,7 +584,16 @@ export function TaskDetail(p: TaskDetailProps) {
     </dl>
   );
 
-  const notesSec = (
+  const notesSec = readOnly ? (
+    <section className="tp-td-sec">
+      <h3 className="tp-td-h">Notes</h3>
+      {t.notes && t.notes !== '<p></p>' ? (
+        <RichTextContent html={t.notes} compact={compact} fileBase={p.fileBase} className="tp-td-notes-ro" />
+      ) : (
+        <p className="tp-td-nocm">No notes.</p>
+      )}
+    </section>
+  ) : (
     <section className="tp-td-sec">
       <h3 className="tp-td-h">Notes</h3>
       <RichTextEditor
@@ -591,12 +628,12 @@ export function TaskDetail(p: TaskDetailProps) {
         subtasks={t.subtasks}
         parentTitle={t.title}
         compact={compact}
-        onAdd={p.onAddSubtask}
-        onRename={p.onRenameSubtask}
-        onToggle={p.onToggleSubtask}
-        onReorder={p.onReorderSubtask}
-        onDelete={p.onDeleteSubtask}
-        onRestore={p.onRestoreSubtask}
+        onAdd={readOnly ? undefined : p.onAddSubtask}
+        onRename={readOnly ? undefined : p.onRenameSubtask}
+        onToggle={readOnly ? undefined : p.onToggleSubtask}
+        onReorder={readOnly ? undefined : p.onReorderSubtask}
+        onDelete={readOnly ? undefined : p.onDeleteSubtask}
+        onRestore={readOnly ? undefined : p.onRestoreSubtask}
       />
     </section>
   );
@@ -730,47 +767,71 @@ export function TaskDetail(p: TaskDetailProps) {
   );
 
   return (
-    <div className={cx('tp-root tp-td', compact && 'tp-compact', t.done && 'tp-done', p.className)}>
+    <div
+      className={cx(
+        'tp-root tp-td',
+        compact && 'tp-compact',
+        t.done && 'tp-done',
+        readOnly && 'tp-td-readonly',
+        p.className,
+      )}
+    >
       {top}
       <div className="tp-td-scroll" ref={scrollEl}>
-        <div key={key} className={cx('tp-td-body', `tp-td-in-${turn}`)}>
+        <div key={key} className={cx('tp-td-body', `tp-td-in-${turn}`, readOnly && 'tp-td-ro-body')}>
           <div className="tp-td-head">
             <Checkbox
               label={t.done ? `Not done: ${title}` : `Cross off: ${title}`}
               checked={t.done}
-              onChange={(v) => p.onCross?.(v)}
-            />
-            <textarea
-              ref={titleRef}
-              rows={1}
-              className="tp-td-title"
-              value={title}
-              aria-label="Task title"
-              spellCheck
-              onFocus={() => setWritingTitle(true)}
-              onChange={(e) => setTitle(e.target.value.replace(/\n/g, ' '))}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  e.currentTarget.blur();
-                } else if (e.key === 'Escape') {
-                  cancelTitle.current = true;
-                  e.currentTarget.blur();
-                }
-              }}
-              onBlur={() => {
-                setWritingTitle(false);
-                const v = title.trim();
-                if (cancelTitle.current || !v) {
-                  cancelTitle.current = false;
-                  setTitle(t.title);
-                  return;
-                }
-                if (v !== t.title) p.onRename?.(v);
-                else setTitle(t.title);
+              disabled={readOnly}
+              onChange={(v) => {
+                if (!readOnly) p.onCross?.(v);
               }}
             />
+            {readOnly ? (
+              <h2 className="tp-td-title tp-td-title-ro">{t.title}</h2>
+            ) : (
+              <textarea
+                ref={titleRef}
+                rows={1}
+                className="tp-td-title"
+                value={title}
+                aria-label="Task title"
+                spellCheck
+                onFocus={() => setWritingTitle(true)}
+                onChange={(e) => setTitle(e.target.value.replace(/\n/g, ' '))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                  } else if (e.key === 'Escape') {
+                    cancelTitle.current = true;
+                    e.currentTarget.blur();
+                  }
+                }}
+                onBlur={() => {
+                  setWritingTitle(false);
+                  const v = title.trim();
+                  if (cancelTitle.current || !v) {
+                    cancelTitle.current = false;
+                    setTitle(t.title);
+                    return;
+                  }
+                  if (v !== t.title) p.onRename?.(v);
+                  else setTitle(t.title);
+                }}
+              />
+            )}
           </div>
+          {readOnly && p.owner ? (
+            <div className="tp-td-owner">
+              <PersonDot
+                person={{ name: p.owner.name, initials: p.owner.initials, color: p.owner.color ?? undefined }}
+                size={16}
+              />
+              <span>{p.ownerLine ?? `${p.owner.name}’s`}</span>
+            </div>
+          ) : null}
           {facts}
           {notesSec}
           {subsSec}

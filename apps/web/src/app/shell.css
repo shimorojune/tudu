@@ -187,3 +187,23 @@
   flex: none;
   color: var(--muted-foreground);
 }
+
+/* Spaces (chunk 08): switching fades the new page in; the shell around it never moves. */
+.app-page-in {
+  display: contents;
+}
+.app-scroll > .app-page-in > .app-page,
+.app-phone-scroll > .app-page-in > .app-page {
+  animation: tp-pg-a 280ms var(--ease-arrive) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-scroll > .app-page-in > .app-page,
+  .app-phone-scroll > .app-page-in > .app-page {
+    animation: tp-veil-in 120ms linear both;
+  }
+}
+/* The phone header: the space's name on the left opens the switcher sheet. */
+.app-phone-head .tp-ssw {
+  min-width: 0;
+  flex: 1;
+}

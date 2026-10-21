@@ -12,7 +12,7 @@ test.describe('sign in', () => {
     await expect(page.getByText(email)).toBeVisible();
     await enterCode(page, await codeFor(page, email));
     await expect(page.getByText('You’re in.')).toBeVisible();
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/me$/);
     await expect(page.getByText('Nothing planned for today yet.')).toBeVisible();
     await expect(page.getByText(/Today · Week \d+/)).toBeVisible();
   });

@@ -171,3 +171,32 @@ the coding session, so this file is the record and the canvas gets a copy by han
 - A fix found on the way (C03-E07's phone flake): the outbox's sweep could drop a change written to disk while the
   sweep was reading it, so `idle()` said the change had landed before it was sent. The sweep now only lets go of
   what it saw stored before its read, and IndexedDB writes settle on commit.
+
+## Chunk 08 · Spaces and People (the first PR) · 21 Oct 2026
+
+- Built as drawn: the space's tile and name at the top of the sidebar (the tile alone on the rail, the name in the
+  phone's header) opening the list of spaces with "Just you" or "N people" under each, the tick and Create a space;
+  Create a space as one dialog (a sheet on phones) with the tile that follows the name and the colour, the eight
+  swatches and people to invite; the welcome on a new space's Today with Invite people; the Members card; Join
+  Northwind as drawn, with Sign in to join under the card and the invited address locked; People as one page like
+  mail with Find someone, Everyone (Today | This week, By day | By person) and one person's week; a colleague's
+  task in the panel to read and comment, with "Mon 19 Oct · Meera's" at the top; Visible to with "Everyone in
+  Northwind" and "Only you".
+- The space is in the address, against the canvas's note that the day and the week are not: `/me/today` is Personal,
+  `/northwind/week` a team space's week. A reload and a shared link keep the space; `/` opens the last space you
+  were in (remembered per browser); the old `/week`, `/backlog` and `/inbox` go to the same view in the last space.
+  Decided 21 Oct 2026 for shareable links.
+- "N new" on another space and the dot by the name wait for the Inbox (the second PR), as does Quick Add's top line
+  ("In Northwind for Me") and "Send Meera a task" on a person's page.
+- Roles show as a quiet word on the Members card; changing them, Remove, Leave and Delete wait for Settings (09).
+  Resend sits beside Cancel on a pending invite (the design's MemberRow has it), and a cancelled invite's Undo
+  restores the same link rather than sending a new mail.
+- The Members card says "Invited 18:02" (or "Just now", "Thu 10:12") with the same words the history uses, rather
+  than "Invited 2 days ago".
+- A task prefix is the first letter and the letter past the middle of a one-word name (Northwind → NW, Platform →
+  PF, Home → HM, the design's own examples), the initials of two words; a clash within your spaces grows a letter
+  from the name, then a number. The address is the name's slug; a clash gets -2.
+- People's week is the week that holds today (Monday to Sunday); the count beside each person is their shared tasks
+  in it. An account without a name shows its email where the design shows a name.
+- The join page, signed in with another address than the invite's, says so and offers the way back; it never joins
+  with the wrong account.

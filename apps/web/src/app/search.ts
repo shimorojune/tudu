@@ -116,17 +116,18 @@ export type GoTo = { page: 'today'; day: IsoDate } | { page: 'backlog'; view: 'o
 export function goToTask(
   task: { id: string; day: IsoDate | null; done: boolean },
   today: IsoDate,
-  navigate: (path: '/' | '/backlog') => void,
+  navigate: (path: string) => void,
+  slug = 'me',
 ): GoTo {
   if (task.day === null) {
     const view = task.done ? 'done' : 'open';
     askBacklogView(view);
-    navigate('/backlog');
+    navigate(`/${slug}/backlog`);
     locateTask(task.id, null);
     return { page: 'backlog', view };
   }
   showDay(task.day, today);
-  navigate('/');
+  navigate(`/${slug}`);
   locateTask(task.id, task.day);
   return { page: 'today', day: task.day };
 }

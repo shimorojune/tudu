@@ -27,6 +27,8 @@ export const spaces = pgTable(
     name: text('name').notNull(),
     /** A muted swatch for team spaces; personal has none. */
     color: text('color'),
+    /** The part of the address a team space answers to ("northwind"); Personal has none and answers to "me". */
+    slug: text('slug'),
     /** The person a personal space belongs to; null for team spaces. */
     ownerId: text('owner_id').references(() => user.id, { onDelete: 'cascade' }),
     /** Task IDs read prefix and number: Personal is ME, so a task reads ME-58. */
@@ -42,6 +44,7 @@ export const spaces = pgTable(
     uniqueIndex('spaces_personal_owner')
       .on(t.ownerId)
       .where(sql`kind = 'personal'`),
+    uniqueIndex('spaces_slug').on(t.slug),
   ],
 );
 
@@ -58,6 +61,29 @@ export const spaceMembers = pgTable(
     joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.spaceId, t.userId] }), index('space_members_user').on(t.userId)],
+);
+
+/** An invitation to a team space, sent by email with a join link; the token is the link. */
+export const spaceInvites = pgTable(
+  'space_invites',
+  {
+    id: text('id').primaryKey(),
+    spaceId: text('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    role: memberRole('role').notNull().default('member'),
+    token: text('token').notNull(),
+    invitedBy: text('invited_by').references(() => user.id, { onDelete: 'set null' }),
+    sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+    acceptedBy: text('accepted_by').references(() => user.id, { onDelete: 'set null' }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('space_invites_token').on(t.token),
+    index('space_invites_space').on(t.spaceId, t.email),
+  ],
 );
 
 /** One row per sign-in code sent, so a mailbox cannot be flooded: at most five in ten minutes. */
@@ -129,6 +155,8 @@ export const tasks = pgTable(
     visibility: taskVisibility('visibility').notNull().default('space'),
     projectId: text('project_id').references(() => projects.id, { onDelete: 'set null' }),
     createdBy: text('created_by').references(() => user.id, { onDelete: 'set null' }),
+    /** Whose list it is on. In a team space every page shows your own tasks; People shows everyone's. */
+    ownerId: text('owner_id').references(() => user.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
@@ -137,6 +165,7 @@ export const tasks = pgTable(
   (t) => [
     uniqueIndex('tasks_space_number').on(t.spaceId, t.number),
     index('tasks_space_day').on(t.spaceId, t.day, t.position),
+    index('tasks_owner_day').on(t.ownerId, t.spaceId, t.day),
   ],
 );
 

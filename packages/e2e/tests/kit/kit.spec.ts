@@ -72,7 +72,8 @@ test.describe('kit page', () => {
       box!.y + box!.height - viewport.height + 40,
     );
     await trigger.click();
-    const menu = page.getByRole('menu');
+    // The kit's space switchers are open menus too: this is the floating one.
+    const menu = page.locator('.tp-menu-pop[role="menu"]');
     await expect(menu).toBeVisible();
     await expect(menu).toHaveAttribute('data-side', 'top');
     await page.keyboard.press('Escape');

@@ -38,6 +38,9 @@ let search = false;
 let quickAddSeed: { title: string; nonce: number } | null = null;
 /** The view the Backlog should open on next (a crossed-off task picked in Search). */
 let backlogView: { view: 'open' | 'done'; nonce: number } | null = null;
+/** The Create a space dialog, and the Members card, over the page. */
+let createSpace = false;
+let members = false;
 const listeners = new Set<() => void>();
 const subscribe = (l: () => void) => {
   listeners.add(l);
@@ -170,9 +173,47 @@ export function useBacklogViewAsk(): { view: 'open' | 'done'; nonce: number } | 
   );
 }
 
+export function openCreateSpace(): void {
+  if (createSpace) return;
+  createSpace = true;
+  notify();
+}
+export function closeCreateSpace(): void {
+  if (!createSpace) return;
+  createSpace = false;
+  notify();
+}
+export function useCreateSpaceOpen(): boolean {
+  return useSyncExternalStore(
+    subscribe,
+    () => createSpace,
+    () => false,
+  );
+}
+
+export function openMembers(): void {
+  if (members) return;
+  members = true;
+  notify();
+}
+export function closeMembers(): void {
+  if (!members) return;
+  members = false;
+  notify();
+}
+export function useMembersOpen(): boolean {
+  return useSyncExternalStore(
+    subscribe,
+    () => members,
+    () => false,
+  );
+}
+
 /** For tests: everything back to the start. */
 export function resetDayViewForTests(): void {
   shown = null;
+  createSpace = false;
+  members = false;
   page = null;
   shownWeek = null;
   quickAdd = false;

@@ -1,6 +1,7 @@
 # Chunk 08 · Spaces, People and the Inbox
 
-Status: proposed 21 Oct 2026. Awaiting your approval of the scope, the choices and the test plan.
+Status: approved 21 Oct 2026, as proposed except for choice 2: the space goes in the address. Built as two PRs
+(`rewrite/08-spaces`, then `rewrite/08-inbox`).
 
 Boards: 09 Team space (Northwind, Switching, Phone, the phone sheet, People, People › Meera, People on the phone,
 New task for Meera, New task for Me, Inbox › Sent), 08 Inbox (desktop panes, dark, tablet, phone, states, motion),
@@ -17,8 +18,9 @@ are already in the vendored stylesheet.
 - **Switching.** The space's name at the top of the sidebar (the rail's tile on tablets, the name in the phone's
   header) opens the list of spaces: a tile and name each, "5 new" when that space's Inbox has something for you,
   a tick on the one you are in, and Create a space at the foot. A small dot by the name means something is new
-  elsewhere. Switching keeps you on the same view and fades the page in; the last space is remembered per
-  browser, so a reload comes back to it. On phones the list rises as a sheet. The space is not in the address.
+  elsewhere. Switching keeps you on the same view and fades the page in. The space is in the address
+  (`/northwind/today`, `/me/today` for Personal), so a reload and a shared link keep it; `/` opens the last space
+  you were in (remembered per browser). On phones the list rises as a sheet.
 - **Create a space.** One dialog (a sheet on phones): the name, a colour (the tile follows as you type and pick),
   people to invite by email (optional), Create space with Creating… and Created. You land on the new space's
   Today with the welcome ("Welcome to Northwind. It's just you for now. Invite the people you work with, or write
@@ -78,11 +80,11 @@ are already in the vendored stylesheet.
   answered"), nothing answered yet, nothing sent, loading (skeleton rows on the left, the pane empty), offline
   ("Your answers send when you're back."), the welcome on a new space, People with nobody found, a person with
   nothing shared.
-- **Data.** Migration 0005: `owner_id` on tasks (filled from `created_by`); `space_invites` (space, email, role,
+- **Data.** Migration 0005 (the first PR): `slug` on spaces, `owner_id` on tasks (filled from `created_by`), a colour per
+  person (given at first sign-in), `space_invites` (space, email, role,
   token, who invited, sent, accepted, cancelled); `requests` (space, from, to, title, note, asked day, due,
   project, files, state waiting | accepted | declined | withdrawn, the reason, seen at, the task it became);
-  `inbox_items` (person, space, kind request | comment | answer, what it points at, read at, answered at); a
-  colour per person, given at first sign-in. New sync mutations: request.send, request.accept, request.decline,
+  `inbox_items` (person, space, kind request | comment | answer, what it points at, read at, answered at). New sync mutations: request.send, request.accept, request.decline,
   request.withdraw (with an optional day), inbox.read, inbox.readAll. New reads: `GET /api/spaces/:id/people`
   (shared tasks for a range, by member), `GET /api/spaces/:id/people/:userId`, `GET /api/spaces/:id/inbox?view=&q=`,
   `GET /api/spaces/:id/members`; `POST /api/spaces`, `POST /api/spaces/:id/invites`, `DELETE
@@ -101,10 +103,12 @@ join (12); push or email for Inbox items (never, by the decisions log); Only-me 
    and joining, People, Visible to and reading others' tasks. The second (`rewrite/08-inbox`) brings sending, the
    Inbox, answering, Sent and the counts. Each is reviewed on staging on its own, since together they are the
    size of two earlier chunks. The alternative is one PR with everything, reviewed once.
-2. **The space is remembered, not in the address.** Like the day and the week, the space you are in is kept per
-   browser and a reload returns to it; `/t/NW-12` finds the task across your spaces by its prefix and switches.
-   The alternative puts the space in the address (`/northwind/today`), which gives shareable links to a space's
-   pages at the cost of every route moving.
+2. **The space is in the address.** Every page of a space lives under its slug: `/northwind/today`, `/northwind/week`,
+   `/northwind/people`; Personal is `/me/...`. A reload and a shared link keep the space, and `/` opens the last space
+   you were in (remembered per browser), Personal the first time. The slug comes from the name (`northwind`, a clash
+   gets `-2`); `/t/NW-12` finds the task across your spaces by its prefix and opens it in its space. The old paths
+   (`/week`, `/backlog`, `/inbox`) go to the same view in the last space. Decided 21 Oct 2026 over keeping the space
+   out of the address like the day and the week: shareable links to a space's pages were worth every route moving.
 3. **Invites live in the Members card now, inside Settings later.** The card (people, roles shown, the email line,
    pending invites with Cancel) opens from the welcome, from People and from the switcher's Create a space, so a
    team can be assembled before Settings exists. Chunk 09 hosts the same card and adds roles, Remove, Leave and
@@ -138,13 +142,13 @@ Unit (`packages/ui`, `packages/core`, `apps/web`):
 | C08-U08 | QuickAdd    | The top line "In Northwind for Me"; the space menu lists your spaces and the person menu the members with Find; with a person the chip reads "Asks for Tue" and the button Send; the result carries space and person; no person menu in Personal                                                                                                                           |
 | C08-U09 | Inbox       | To answer then Updates, newest first, dots, Mark all as read; the header count; the picked item in the pane; Inbox, Answered, Sent turn with the direction; the search line narrows and clears, the no-match line with Clear search; the empty, loading and offline states                                                                                                 |
 | C08-U10 | InboxItem   | A request: sender, note, the asked day, project; Accept opens the picker with the asked day preselected and reports the day or the Backlog; Decline opens the reason, Send off until there is one, reports; a comment: the whole comment, the reply reports, Open task; an answer update; a sent row with Waiting, Seen, Accepted, Declined, Take it back and Do it myself |
-| C08-U11 | web         | The space remembered per browser and dropped when it is gone; `/t/NW-12` picks the space; the phone's header icon and count; where the Inbox goes back to; More lists People in a team space only                                                                                                                                                                          |
+| C08-U11 | web         | The space from the address (`me` is Personal, an unknown slug goes home); the last space remembered per browser and dropped when it is gone; `/t/NW-12` picks the space; the phone's header icon and count; where the Inbox goes back to; More lists People in a team space only                                                                                           |
 
 API (`apps/server`):
 
 | ID      | Case                                                                                                                                                                                                                                                                                                            |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C08-A01 | Create a space: the maker is its admin, the prefix comes from the name, `/api/me` lists it with the role; a blank name is 400; invites in the same call send one mail each with a join link                                                                                                                     |
+| C08-A01 | Create a space: the maker is its admin, the prefix and the slug come from the name (a clash gets a letter or a number), `/api/me` lists it with the role; a blank name is 400; invites in the same call send one mail each with a join link                                                                     |
 | C08-A02 | Invites: an admin or member may invite; a pending list; cancel; an address already in the space is told so; `GET /join/:token` names the space and the inviter; `POST /join/:token` adds the member and spends the token; a cancelled or spent token is 410; joining with another email than invited is refused |
 | C08-A03 | Ownership: a task written in a team space is owned by its writer; the day, week, Backlog, marks and search answer with the caller's own tasks; the migration fills `owner_id` from `created_by`                                                                                                                 |
 | C08-A04 | Reading others' tasks: a member reads a shared task of another member with its comments; an Only-me task of another member is 404; every edit mutation on another member's task is refused and nothing changes; a comment is accepted and reaches the owner's Inbox                                             |
@@ -157,28 +161,28 @@ API (`apps/server`):
 
 End-to-end, groups `spaces` (E01 to E09) and `inbox` (E10 to E20):
 
-| ID      | Case                                                                                                                                                                                                                                        |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C08-E01 | Create a space from the switcher: name, colour, Create; Today with the welcome; the switcher lists both with the tick; the toast                                                                                                            |
-| C08-E02 | Switch: a task written in Northwind is not on Personal's Today and the other way round; switching keeps the view (Week stays Week); a reload comes back to the last space; the prefix on the byline                                         |
-| C08-E03 | Invite and join: Invite people, an email, Invite, the pending row; the join link from the test outbox in a second browser; Sign in to join; the newcomer lands on Northwind's Today; the member list                                        |
-| C08-E04 | A cancelled invite's link says so; a second invite to the same address is told it is already in the space (after joining)                                                                                                                   |
-| C08-E05 | People: two members write tasks; Everyone shows both by day and by person with counts, This week; a person's page shows their days and the week count; Find someone narrows and empties                                                     |
-| C08-E06 | Read-only: open a colleague's task from People, nothing editable, post a comment; they see it on the task; an Only-me task is absent from People                                                                                            |
-| C08-E07 | Visible to: Only me on a task in Northwind hides it from the colleague's People; back to Everyone shows it                                                                                                                                  |
-| C08-E08 | Phone: the name in the header opens the sheet, switch; More › People, a person pushes in and ‹ People back (phone)                                                                                                                          |
-| C08-E09 | Tablet: the rail's tile opens the switcher; People from the rail (tablet)                                                                                                                                                                   |
-| C08-E10 | Send: New task, pick Meera, the chip reads "Asks for …", Send; the toast with Show lands on Sent with Waiting; Meera's Inbox has it in To answer with the count on the sidebar                                                              |
-| C08-E11 | Accept: Meera reads the request (the sender's Sent shows Seen), Accept with the asked day preselected, picks Tomorrow; the task is on her Tomorrow with the note; the request in Answered; the sender's Updates says accepted onto that day |
-| C08-E12 | Decline: Send off until a reason, Send; Answered with the reason; the sender's Updates carries it; Take it back puts it on the sender's Backlog with Undo                                                                                   |
-| C08-E13 | Do it myself from a waiting request: the picker, Today; the task on the sender's Today; the receiver's item is gone                                                                                                                         |
-| C08-E14 | A comment update: a colleague comments on your task; the Inbox shows it with the dot and the count; the pane shows the comment; a reply lands on the task; Open task, then "Go to …" turns the page with the glow                           |
-| C08-E15 | Mark all as read clears the dots and the count; a read item keeps its place; a request stays counted until answered                                                                                                                         |
-| C08-E16 | Search in the Inbox narrows by the sender's name and by a word in the note; nothing matches with Clear search; the switch to Answered still works                                                                                           |
-| C08-E17 | Send into another space from Personal: the top line picks Northwind and Meera; the toast names the space; it is in Northwind's Sent and Meera's Inbox; Personal's Today has nothing new                                                     |
-| C08-E18 | Live: with two tabs open, a request sent in one shows in the other's Inbox and its count without a reload; the switcher's "1 new" on the other space                                                                                        |
-| C08-E19 | Phone: the header's inbox icon with the count opens the Inbox with ‹ Today; an item is its own page with ‹ Inbox; Accept there (phone)                                                                                                      |
-| C08-E20 | Offline: Accept while offline queues, the item folds away, "Your answers send when you're back."; back online it lands on the day and the sender hears; dark mode: E10 and E14 again in dark                                                |
+| ID      | Case                                                                                                                                                                                                                                                 |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C08-E01 | Create a space from the switcher: name, colour, Create; Today with the welcome; the switcher lists both with the tick; the toast                                                                                                                     |
+| C08-E02 | Switch: a task written in Northwind is not on Personal's Today and the other way round; switching keeps the view (Week stays Week) and the address names the space; a reload keeps it and `/` comes back to the last space; the prefix on the byline |
+| C08-E03 | Invite and join: Invite people, an email, Invite, the pending row; the join link from the test outbox in a second browser; Sign in to join; the newcomer lands on Northwind's Today; the member list                                                 |
+| C08-E04 | A cancelled invite's link says so; a second invite to the same address is told it is already in the space (after joining)                                                                                                                            |
+| C08-E05 | People: two members write tasks; Everyone shows both by day and by person with counts, This week; a person's page shows their days and the week count; Find someone narrows and empties                                                              |
+| C08-E06 | Read-only: open a colleague's task from People, nothing editable, post a comment; they see it on the task; an Only-me task is absent from People                                                                                                     |
+| C08-E07 | Visible to: Only me on a task in Northwind hides it from the colleague's People; back to Everyone shows it                                                                                                                                           |
+| C08-E08 | Phone: the name in the header opens the sheet, switch; More › People, a person pushes in and ‹ People back (phone)                                                                                                                                   |
+| C08-E09 | Tablet: the rail's tile opens the switcher; People from the rail (tablet)                                                                                                                                                                            |
+| C08-E10 | Send: New task, pick Meera, the chip reads "Asks for …", Send; the toast with Show lands on Sent with Waiting; Meera's Inbox has it in To answer with the count on the sidebar                                                                       |
+| C08-E11 | Accept: Meera reads the request (the sender's Sent shows Seen), Accept with the asked day preselected, picks Tomorrow; the task is on her Tomorrow with the note; the request in Answered; the sender's Updates says accepted onto that day          |
+| C08-E12 | Decline: Send off until a reason, Send; Answered with the reason; the sender's Updates carries it; Take it back puts it on the sender's Backlog with Undo                                                                                            |
+| C08-E13 | Do it myself from a waiting request: the picker, Today; the task on the sender's Today; the receiver's item is gone                                                                                                                                  |
+| C08-E14 | A comment update: a colleague comments on your task; the Inbox shows it with the dot and the count; the pane shows the comment; a reply lands on the task; Open task, then "Go to …" turns the page with the glow                                    |
+| C08-E15 | Mark all as read clears the dots and the count; a read item keeps its place; a request stays counted until answered                                                                                                                                  |
+| C08-E16 | Search in the Inbox narrows by the sender's name and by a word in the note; nothing matches with Clear search; the switch to Answered still works                                                                                                    |
+| C08-E17 | Send into another space from Personal: the top line picks Northwind and Meera; the toast names the space; it is in Northwind's Sent and Meera's Inbox; Personal's Today has nothing new                                                              |
+| C08-E18 | Live: with two tabs open, a request sent in one shows in the other's Inbox and its count without a reload; the switcher's "1 new" on the other space                                                                                                 |
+| C08-E19 | Phone: the header's inbox icon with the count opens the Inbox with ‹ Today; an item is its own page with ‹ Inbox; Accept there (phone)                                                                                                               |
+| C08-E20 | Offline: Accept while offline queues, the item folds away, "Your answers send when you're back."; back online it lands on the day and the sender hears; dark mode: E10 and E14 again in dark                                                         |
 
 Not automated: the page fade on switching, the list turning between Inbox and Answered, the fold on answering,
 the pane's lift; you judge those on staging.

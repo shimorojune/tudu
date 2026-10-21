@@ -51,7 +51,16 @@ describe('sign in with a code', () => {
     };
     expect(data.user.email).toBe(email);
     expect(data.spaces).toEqual([
-      { id: expect.any(String), kind: 'personal', name: 'Personal', color: null, role: 'admin' },
+      {
+        id: expect.any(String),
+        kind: 'personal',
+        name: 'Personal',
+        color: null,
+        role: 'admin',
+        slug: 'me',
+        prefix: 'ME',
+        members: 1,
+      },
     ]);
   });
 

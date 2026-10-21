@@ -328,7 +328,7 @@ test.describe('backlog', () => {
     await expect(page.locator('.tp-toast')).toHaveText('Added to TomorrowShow');
     await expect.poll(() => titlesOf(todoList(page))).toEqual(['Renew passport']);
     await page.getByRole('button', { name: 'Show', exact: true }).click();
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/me$/);
     await expect
       .poll(() => titlesOf(dayList(page, 'Tasks for Monday 19 October')))
       .toEqual(['Call Sam at 3pm']);

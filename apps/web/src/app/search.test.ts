@@ -68,7 +68,7 @@ describe('C07-U08 what Search remembers and where a pick goes', () => {
       went = goToTask({ id: 'x', day: '2026-10-10', done: false }, '2026-10-18', navigate);
     });
     expect(went).toEqual({ page: 'today', day: '2026-10-10' });
-    expect(navigate).toHaveBeenLastCalledWith('/');
+    expect(navigate).toHaveBeenLastCalledWith('/me');
     expect(shown.result.current).toBe('2026-10-10');
     expect(locate.result.current).toMatchObject({ id: 'x', day: '2026-10-10' });
     // today itself: shown goes back to null (today follows the working day)
@@ -82,7 +82,7 @@ describe('C07-U08 what Search remembers and where a pick goes', () => {
       went = goToTask({ id: 'z', day: null, done: true }, '2026-10-18', navigate);
     });
     expect(went).toEqual({ page: 'backlog', view: 'done' });
-    expect(navigate).toHaveBeenLastCalledWith('/backlog');
+    expect(navigate).toHaveBeenLastCalledWith('/me/backlog');
     expect(ask.result.current).toMatchObject({ view: 'done' });
     expect(locate.result.current).toMatchObject({ id: 'z', day: null });
     act(() => {
@@ -94,10 +94,11 @@ describe('C07-U08 what Search remembers and where a pick goes', () => {
 
 describe('C07-U09 which tab is lit on phones', () => {
   it('Search while its sheet is up, More for the Backlog and the More page, else the page', () => {
-    expect(phoneTab({ active: 'today', path: '/', onToday: true, searchOpen: true })).toBe('search');
-    expect(phoneTab({ active: 'backlog', path: '/backlog', onToday: false, searchOpen: false })).toBe('more');
-    expect(phoneTab({ active: 'today', path: '/more', onToday: false, searchOpen: false })).toBe('more');
-    expect(phoneTab({ active: 'day:2026-10-20', path: '/', onToday: true, searchOpen: false })).toBe('today');
-    expect(phoneTab({ active: 'week', path: '/week', onToday: false, searchOpen: false })).toBe('week');
+    expect(phoneTab({ view: 'today', onToday: true, searchOpen: true })).toBe('search');
+    expect(phoneTab({ view: 'backlog', onToday: false, searchOpen: false })).toBe('more');
+    expect(phoneTab({ view: 'more', onToday: false, searchOpen: false })).toBe('more');
+    expect(phoneTab({ view: 'people', onToday: false, searchOpen: false })).toBe('more');
+    expect(phoneTab({ view: 'today', onToday: true, searchOpen: false })).toBe('today');
+    expect(phoneTab({ view: 'week', onToday: false, searchOpen: false })).toBe('week');
   });
 });

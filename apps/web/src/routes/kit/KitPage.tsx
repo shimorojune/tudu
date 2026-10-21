@@ -7,6 +7,7 @@ import { QuickAddStates } from './QuickAddStates';
 import { WeekStates } from './WeekStates';
 import { BacklogStates } from './BacklogStates';
 import { SearchStates } from './SearchStates';
+import { SpacesStates } from './SpacesStates';
 import './kit.css';
 
 const NAV = [
@@ -24,6 +25,7 @@ const NAV = [
   ['week', 'The week'],
   ['backlog', 'The Backlog'],
   ['search', 'Search'],
+  ['spaces', 'Spaces and People'],
 ];
 
 /** Every primitive in every state, light and dark side by side. The place to judge the motion. */
@@ -40,7 +42,7 @@ export function KitPage() {
           ))}
         </nav>
         <span className="kit-spacer" />
-        <span className="kit-label">Kit · chunks 00 to 07</span>
+        <span className="kit-label">Kit · chunks 00 to 08</span>
       </header>
       <main className="kit-main">
         <h1 className="kit-h1">The kit</h1>
@@ -57,6 +59,7 @@ export function KitPage() {
         <WeekStates />
         <BacklogStates />
         <SearchStates />
+        <SpacesStates />
       </main>
     </div>
   );

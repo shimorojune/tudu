@@ -1,5 +1,6 @@
 import { createAuthClient } from 'better-auth/react';
 import { emailOTPClient } from 'better-auth/client/plugins';
+import type { SpaceSummary } from '@tudu/core';
 
 /** The sign-in client: send a code to an email, then sign in with it. Cookies carry the session. */
 export function createAuthClientFor(baseUrl: string) {
@@ -18,15 +19,11 @@ export interface Me {
   email: string;
   name: string;
   image: string | null;
+  /** The colour of your mark. */
+  color: string | null;
 }
 
-export interface SpaceSummary {
-  id: string;
-  kind: 'personal' | 'team';
-  name: string;
-  color: string | null;
-  role: 'admin' | 'member';
-}
+export type { SpaceSummary };
 
 export interface MeResponse {
   user: Me;

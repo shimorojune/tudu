@@ -7,6 +7,8 @@ export const user = pgTable('user', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').default(false).notNull(),
   image: text('image'),
+  /** Tudu's own: the colour of this person's mark, given at first sign-in. Better Auth leaves it alone. */
+  color: text('color'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at')
     .defaultNow()

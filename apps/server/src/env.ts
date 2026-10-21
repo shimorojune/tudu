@@ -9,6 +9,8 @@ const schema = z.object({
   AUTH_SECRET: z.string().min(16),
   /** Comma-separated origins allowed to call the API with cookies. */
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
+  /** Where the web app lives, for links in emails (a join link). The first CORS origin when left out. */
+  WEB_URL: z.string().url().optional(),
   /** `resend` sends real mail; `outbox` keeps it in memory for tests and local work. */
   EMAIL_TRANSPORT: z.enum(['resend', 'outbox']).default('outbox'),
   RESEND_API_KEY: z.string().optional(),
@@ -33,6 +35,7 @@ export function readEnv(source: NodeJS.ProcessEnv = process.env): Env {
     throw new Error(`Bad environment:\n${lines.join('\n')}`);
   }
   const env = parsed.data;
+  if (!env.WEB_URL) env.WEB_URL = env.CORS_ORIGINS.split(',')[0]!.trim() || 'http://localhost:5173';
   if (env.NODE_ENV === 'production' && env.TEST_ROUTES === '1')
     throw new Error('TEST_ROUTES must not be on in production');
   if (env.EMAIL_TRANSPORT === 'resend' && !env.RESEND_API_KEY)

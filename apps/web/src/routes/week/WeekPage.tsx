@@ -32,6 +32,7 @@ import {
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { setPage, showWeek, useFlash, useShownWeek } from '../../app/dayView';
 import { api, meQuery } from '../../app/session';
+import { spacePath, useSpace } from '../../app/space';
 import { taskStore, useOnline } from '../../app/tasks';
 import { useViewport, type Viewport } from '../../app/viewport';
 import { useWorkingDay } from '../../app/workingDay';
@@ -62,7 +63,7 @@ function useNarrow(): boolean {
 export function WeekPage() {
   const vp = useViewport();
   const me = useQuery(meQuery).data;
-  const space = me?.spaces.find((s) => s.kind === 'personal') ?? me?.spaces[0];
+  const space = useSpace();
   const { today } = useWorkingDay();
   const online = useOnline();
   const thisMonday = mondayOf(today);
@@ -78,7 +79,8 @@ export function WeekPage() {
   const [open, setOpen] = useState<OpenTask | null>(null);
   const resolving = useRef<string | null>(null);
   const closed = useRef<string | null>(null);
-  const spaceId = space?.id;
+  const spaceId = space.id;
+  const here = spacePath(space.slug, 'week');
   useEffect(() => {
     const ref = search.task;
     if (!ref || !spaceId || open || resolving.current === ref || closed.current === ref) return;
@@ -90,24 +92,24 @@ export function WeekPage() {
       },
       () => {
         resolving.current = null;
-        void navigate({ to: '/week', search: {}, replace: true });
+        void navigate({ href: here, replace: true });
       },
     );
-  }, [search.task, spaceId, open, thisMonday, navigate]);
+  }, [search.task, spaceId, open, thisMonday, navigate, here]);
   const openTask = (id: string, ref: string | null | undefined, dir: 'next' | 'prev' = 'next') => {
     setOpen({ id, dir });
     closed.current = null;
     if (ref) resolving.current = ref;
-    void navigate({ to: '/week', search: ref ? { task: ref } : {}, replace: true });
+    void navigate({ href: ref ? `${here}?task=${encodeURIComponent(ref)}` : here, replace: true });
   };
   const closeTask = () => {
     setOpen(null);
     closed.current = search.task ?? null;
     resolving.current = null;
-    if (search.task) void navigate({ to: '/week', search: {}, replace: true });
+    if (search.task) void navigate({ href: here, replace: true });
   };
 
-  if (!space || !me) return null;
+  if (!me) return null;
   return (
     <div className="app-page app-week">
       {!online ? (
@@ -133,7 +135,8 @@ export function WeekPage() {
         onClose={closeTask}
         onStep={(id, dir) => openTask(id, taskStore.lastSeen(id)?.ref, dir)}
         onRef={(ref) => {
-          if (search.task !== ref) void navigate({ to: '/week', search: { task: ref }, replace: true });
+          if (search.task !== ref)
+            void navigate({ href: `${here}?task=${encodeURIComponent(ref)}`, replace: true });
         }}
         linkFor={(ref) => `${window.location.origin}/t/${ref}`}
         backFor={(day) => (day ? 'Week' : 'Backlog')}

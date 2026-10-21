@@ -2,6 +2,7 @@ import { addedWords } from '@tudu/core';
 import { Desk, QuickAdd, showToast, useTheme } from '@tudu/ui';
 import type { MeResponse } from '@tudu/client';
 import { useQuickAddActions } from '../../app/quickAdd';
+import { lastSpace, spaceBySlug } from '../../app/space';
 import './quick-add.css';
 
 /**
@@ -10,7 +11,10 @@ import './quick-add.css';
  */
 export function QuickAddPage({ me }: { me: MeResponse }) {
   const { theme } = useTheme();
-  const space = me.spaces.find((s) => s.kind === 'personal') ?? me.spaces[0];
+  // The floating bar writes into the space you were last in.
+  const last = lastSpace(me.spaces);
+  const space =
+    (last ? spaceBySlug(me.spaces, last) : undefined) ?? me.spaces.find((s) => s.kind === 'personal');
   const a = useQuickAddActions(space?.id);
   return (
     <Desk theme={theme} className="app-floating">

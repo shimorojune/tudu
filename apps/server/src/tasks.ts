@@ -42,6 +42,7 @@ export class Rejected extends Error {
 }
 
 const NOT_YOURS = 'You can’t change tasks in that space.';
+const NOT_YOUR_TASK = 'You can only change your own tasks.';
 const GONE = 'That task isn’t there any more.';
 const DELETED = 'That task was deleted.';
 const NOT_YOUR_COMMENT = 'Only the person who wrote a comment can change it.';
@@ -77,6 +78,7 @@ const taskColumns = {
   dueDay: schema.tasks.dueDay,
   visibility: schema.tasks.visibility,
   projectId: schema.tasks.projectId,
+  ownerId: schema.tasks.ownerId,
   createdAt: schema.tasks.createdAt,
   updatedAt: schema.tasks.updatedAt,
 };
@@ -94,6 +96,7 @@ type TaskRow = {
   dueDay: string | null;
   visibility: 'space' | 'me';
   projectId: string | null;
+  ownerId: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -118,6 +121,7 @@ export function toTask(r: TaskRow, c: Counts = { subtasks: [], commentCount: 0 }
     due: r.dueDay,
     visibility: r.visibility,
     projectId: r.projectId,
+    ownerId: r.ownerId,
     subtasks: c.subtasks,
     subsDone: c.subtasks.filter((s) => s.done).length,
     subsTotal: c.subtasks.length,
@@ -158,24 +162,51 @@ async function withCounts(db: Executor, rows: TaskRow[]): Promise<Task[]> {
   return rows.map((r) => toTask(r, counts.get(r.id)));
 }
 
-/** The tasks of one day in a space, in order. */
-export async function tasksOfDay(db: Executor, spaceId: string, day: IsoDate): Promise<Task[]> {
+/**
+ * Whose tasks a page shows: in a team space every page shows your own (People shows everyone's); a task whose owner is
+ * gone belongs to everyone in the space.
+ */
+function ownedBy(userId: string) {
+  return or(eq(schema.tasks.ownerId, userId), isNull(schema.tasks.ownerId))!;
+}
+
+/** The tasks of one day in a space, in order: the asking person's own. */
+export async function tasksOfDay(
+  db: Executor,
+  spaceId: string,
+  userId: string,
+  day: IsoDate,
+): Promise<Task[]> {
   const rows = await db
     .select(taskColumns)
     .from(schema.tasks)
     .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
-    .where(and(eq(schema.tasks.spaceId, spaceId), eq(schema.tasks.day, day), isNull(schema.tasks.deletedAt)))
+    .where(
+      and(
+        eq(schema.tasks.spaceId, spaceId),
+        ownedBy(userId),
+        eq(schema.tasks.day, day),
+        isNull(schema.tasks.deletedAt),
+      ),
+    )
     .orderBy(asc(schema.tasks.position), asc(schema.tasks.createdAt));
   return withCounts(db, rows);
 }
 
-/** The tasks with no day (the Backlog) in a space, in order. */
-export async function tasksOfBacklog(db: Executor, spaceId: string): Promise<Task[]> {
+/** The tasks with no day (the Backlog) in a space, in order: the asking person's own. */
+export async function tasksOfBacklog(db: Executor, spaceId: string, userId: string): Promise<Task[]> {
   const rows = await db
     .select(taskColumns)
     .from(schema.tasks)
     .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
-    .where(and(eq(schema.tasks.spaceId, spaceId), isNull(schema.tasks.day), isNull(schema.tasks.deletedAt)))
+    .where(
+      and(
+        eq(schema.tasks.spaceId, spaceId),
+        ownedBy(userId),
+        isNull(schema.tasks.day),
+        isNull(schema.tasks.deletedAt),
+      ),
+    )
     .orderBy(asc(schema.tasks.position), asc(schema.tasks.createdAt));
   return withCounts(db, rows);
 }
@@ -236,6 +267,7 @@ function numberOf(q: string): number | null {
 export async function searchTasks(
   db: Executor,
   spaceId: string,
+  userId: string,
   q: string,
   today: IsoDate,
 ): Promise<SearchHit[]> {
@@ -252,6 +284,7 @@ export async function searchTasks(
     .where(
       and(
         eq(schema.tasks.spaceId, spaceId),
+        ownedBy(userId),
         isNull(schema.tasks.deletedAt),
         or(...words, ...(n === null ? [] : [eq(schema.tasks.number, n)])),
       ),
@@ -275,7 +308,12 @@ export async function searchTasks(
 }
 
 /** Open tasks in a space that read like the title (Quick Add's "Looks like a task you have"), the closest first. */
-export async function lookAlikeTasks(db: Executor, spaceId: string, title: string): Promise<SearchHit[]> {
+export async function lookAlikeTasks(
+  db: Executor,
+  spaceId: string,
+  userId: string,
+  title: string,
+): Promise<SearchHit[]> {
   const ws = wordsOf(title);
   if (!ws.length || title.trim().length < LOOKALIKE_MIN) return [];
   const rows: SearchRow[] = await db
@@ -285,6 +323,7 @@ export async function lookAlikeTasks(db: Executor, spaceId: string, title: strin
     .where(
       and(
         eq(schema.tasks.spaceId, spaceId),
+        ownedBy(userId),
         isNull(schema.tasks.deletedAt),
         isNull(schema.tasks.doneAt),
         or(...ws.map((w) => sql`${schema.tasks.title} ILIKE ${like(w.slice(0, 5))}`)),
@@ -299,14 +338,25 @@ export async function lookAlikeTasks(db: Executor, spaceId: string, title: strin
 }
 
 /** The tasks asked for by id, as hits, in the order asked; a deleted or unknown one is left out. */
-export async function hitsById(db: Executor, spaceId: string, ids: string[]): Promise<SearchHit[]> {
+export async function hitsById(
+  db: Executor,
+  spaceId: string,
+  userId: string,
+  ids: string[],
+): Promise<SearchHit[]> {
   if (!ids.length) return [];
   const rows: SearchRow[] = await db
     .select(searchColumns)
     .from(schema.tasks)
     .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
     .where(
-      and(eq(schema.tasks.spaceId, spaceId), isNull(schema.tasks.deletedAt), inArray(schema.tasks.id, ids)),
+      and(
+        eq(schema.tasks.spaceId, spaceId),
+        isNull(schema.tasks.deletedAt),
+        inArray(schema.tasks.id, ids),
+        // A colleague's task you opened from People is still found here.
+        or(ownedBy(userId), eq(schema.tasks.visibility, 'space')),
+      ),
     );
   const byId = new Map(rows.map((r) => [r.id, r]));
   return ids
@@ -319,6 +369,7 @@ export async function hitsById(db: Executor, spaceId: string, ids: string[]): Pr
 export async function tasksOfWeek(
   db: Executor,
   spaceId: string,
+  userId: string,
   monday: IsoDate,
 ): Promise<Map<IsoDate, Task[]>> {
   const sunday = addDays(monday, 6);
@@ -329,6 +380,7 @@ export async function tasksOfWeek(
     .where(
       and(
         eq(schema.tasks.spaceId, spaceId),
+        ownedBy(userId),
         gte(schema.tasks.day, monday),
         lte(schema.tasks.day, sunday),
         isNull(schema.tasks.deletedAt),
@@ -367,12 +419,24 @@ function toSubtask(r: typeof schema.subtasks.$inferSelect): Subtask {
 /** One task in full: its notes, subtasks in order, comments in order and history. Null when there is no such live task. */
 export async function taskDetail(db: Executor, taskId: string): Promise<TaskDetail | null> {
   const [row] = await db
-    .select({ ...taskColumns, notes: schema.tasks.notes, deletedAt: schema.tasks.deletedAt })
+    .select({
+      ...taskColumns,
+      notes: schema.tasks.notes,
+      deletedAt: schema.tasks.deletedAt,
+      ownerName: schema.user.name,
+      ownerEmail: schema.user.email,
+      ownerColor: schema.user.color,
+    })
     .from(schema.tasks)
     .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
+    .leftJoin(schema.user, eq(schema.user.id, schema.tasks.ownerId))
     .where(eq(schema.tasks.id, taskId));
   if (!row || row.deletedAt) return null;
   const [task] = await withCounts(db, [row]);
+  const owner =
+    row.ownerId && row.ownerName !== null
+      ? { id: row.ownerId, name: row.ownerName, email: row.ownerEmail ?? '', color: row.ownerColor ?? null }
+      : null;
   const cms = await db
     .select({
       id: schema.comments.id,
@@ -404,7 +468,7 @@ export async function taskDetail(db: Executor, taskId: string): Promise<TaskDeta
   const history = events.map(
     (e) => ({ id: e.id, at: e.at.toISOString(), kind: e.kind, ...e.data }) as HistoryEvent,
   );
-  return { ...task!, notes: row.notes, comments, history };
+  return { ...task!, notes: row.notes, comments, history, owner };
 }
 
 function toProject(r: typeof schema.projects.$inferSelect): Project {
@@ -448,11 +512,17 @@ export async function resolveRef(
   db: Executor,
   userId: string,
   ref: string,
-): Promise<{ taskId: string; spaceId: string; day: IsoDate | null } | null> {
+): Promise<{ taskId: string; spaceId: string; slug: string; day: IsoDate | null } | null> {
   const m = /^([A-Za-z][A-Za-z0-9]*)-(\d+)$/.exec(ref.trim());
   if (!m) return null;
   const [row] = await db
-    .select({ taskId: schema.tasks.id, spaceId: schema.tasks.spaceId, day: schema.tasks.day })
+    .select({
+      taskId: schema.tasks.id,
+      spaceId: schema.tasks.spaceId,
+      day: schema.tasks.day,
+      kind: schema.spaces.kind,
+      slug: schema.spaces.slug,
+    })
     .from(schema.tasks)
     .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
     .innerJoin(
@@ -464,16 +534,29 @@ export async function resolveRef(
         eq(schema.spaces.taskPrefix, m[1]!.toUpperCase()),
         eq(schema.tasks.number, Number(m[2])),
         isNull(schema.tasks.deletedAt),
+        // Your own, or one a colleague shares with the space.
+        or(
+          eq(schema.tasks.ownerId, userId),
+          isNull(schema.tasks.ownerId),
+          eq(schema.tasks.visibility, 'space'),
+        ),
       ),
     )
     .orderBy(asc(schema.spaces.kind));
-  return row ?? null;
+  if (!row) return null;
+  return {
+    taskId: row.taskId,
+    spaceId: row.spaceId,
+    slug: row.kind === 'personal' ? 'me' : (row.slug ?? row.spaceId),
+    day: row.day,
+  };
 }
 
 /** How many tasks each day between `from` and `to` holds. */
 export async function marksOf(
   db: Executor,
   spaceId: string,
+  userId: string,
   from: IsoDate,
   to: IsoDate,
 ): Promise<Record<string, number>> {
@@ -483,6 +566,7 @@ export async function marksOf(
     .where(
       and(
         eq(schema.tasks.spaceId, spaceId),
+        ownedBy(userId),
         gte(schema.tasks.day, from),
         lte(schema.tasks.day, to),
         isNull(schema.tasks.deletedAt),
@@ -689,6 +773,7 @@ async function create(
     notesText: notes ? textOf(cleanHtml(notes)) : '',
     projectId,
     createdBy: userId,
+    ownerId: userId,
     clocks,
   });
   await record(tx, p.id, 'created', p.source ? { source: p.source } : {}, userId, new Date(m.at));
@@ -706,8 +791,12 @@ async function create(
   return { taskId: p.id, spaceId: p.spaceId, days: [p.day] };
 }
 
-/** A live task (or, for restore and delete, a deleted one), locked for the change, with the person's right to it checked. */
-async function lockTask(tx: Tx, userId: string, taskId: string) {
+/**
+ * A live task (or, for restore and delete, a deleted one), locked for the change, with the person's right to it
+ * checked: a member may change their own tasks; another member's task takes a comment and nothing else, and one
+ * marked Only me is not there for them at all.
+ */
+async function lockTask(tx: Tx, userId: string, taskId: string, forComment = false) {
   const [t] = await tx
     .select({
       spaceId: schema.tasks.spaceId,
@@ -716,12 +805,18 @@ async function lockTask(tx: Tx, userId: string, taskId: string) {
       dueDay: schema.tasks.dueDay,
       deletedAt: schema.tasks.deletedAt,
       clocks: schema.tasks.clocks,
+      ownerId: schema.tasks.ownerId,
+      visibility: schema.tasks.visibility,
     })
     .from(schema.tasks)
     .where(eq(schema.tasks.id, taskId))
     .for('update');
   if (!t) throw new Rejected(404, GONE);
   if (!(await roleIn(tx, userId, t.spaceId))) throw new Rejected(403, NOT_YOURS);
+  if (t.ownerId && t.ownerId !== userId) {
+    if (t.visibility === 'me') throw new Rejected(404, GONE);
+    if (!forComment) throw new Rejected(403, NOT_YOUR_TASK);
+  }
   return t;
 }
 
@@ -909,7 +1004,7 @@ async function subtask(tx: Tx, userId: string, m: SubtaskMutation): Promise<Appl
 }
 
 async function comment(tx: Tx, userId: string, m: CommentMutation): Promise<Applied> {
-  const t = await lockTask(tx, userId, m.payload.taskId);
+  const t = await lockTask(tx, userId, m.payload.taskId, true);
   if (t.deletedAt) throw new Rejected(410, DELETED);
   const base: Applied = { taskId: m.payload.taskId, spaceId: t.spaceId, days: [t.day] };
   if (m.type === 'comment.create') {

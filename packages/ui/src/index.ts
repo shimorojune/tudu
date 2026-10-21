@@ -191,3 +191,33 @@ export {
   type SearchPanelProps,
   type SearchResults,
 } from './components/SearchPanel';
+
+// Spaces and People (chunk 08)
+export {
+  SpaceSwitch,
+  SSW_SHEET_LEAVE_MS,
+  type SpaceSwitchProps,
+  type SwitchSpace,
+} from './components/SpaceSwitch';
+export { ColorPick, type ColorPickProps } from './components/ColorPick';
+export { InviteField, type InviteFieldProps } from './components/InviteField';
+export { FilterField, type FilterFieldProps } from './components/FilterField';
+export {
+  CreateSpace,
+  CS_DONE_MS,
+  type CreateSpaceProps,
+  type CreateSpaceInput,
+} from './components/CreateSpace';
+export { MemberRow, ROLE_WORDS, type MemberRowProps, type MemberRowPerson } from './components/MemberRow';
+export {
+  MembersCard,
+  MC_DONE_MS,
+  type MembersCardProps,
+  type MembersCardMember,
+  type MembersCardInvite,
+} from './components/MembersCard';
+export { MemberList, type MemberListProps, type MemberListPerson } from './components/MemberList';
+export { TaskLine, type TaskLineProps, type SharedTask, type TaskLinePerson } from './components/TaskLine';
+export { PersonRow, type PersonRowProps } from './components/PersonRow';
+export { PersonHeader, type PersonHeaderProps } from './components/PersonHeader';
+export { JoinCard, JoinHead, type JoinCardProps, type JoinInvite } from './components/JoinCard';
