@@ -46,15 +46,33 @@ test.describe('kit page', () => {
     await expect(page.getByRole('heading', { name: 'The kit' })).toBeVisible();
     const overflow = await page.evaluate(() => {
       const root = document.querySelector('.scroll-page') as HTMLElement;
+      // What reaches past the right edge (outside any scroller of its own), so a failure names the culprit.
+      const inScroller = (el: Element) => {
+        for (let p = el.parentElement; p && p !== root; p = p.parentElement) {
+          const o = getComputedStyle(p).overflowX;
+          if (o === 'auto' || o === 'scroll' || o === 'hidden' || o === 'clip') return true;
+        }
+        return false;
+      };
+      const past: string[] = [];
+      for (const el of root.querySelectorAll('*')) {
+        const r = el.getBoundingClientRect();
+        if (r.width && r.right > root.clientWidth && !inScroller(el))
+          past.push(
+            `${el.tagName.toLowerCase()}.${(el.getAttribute('class') ?? '').split(' ').slice(0, 3).join('.')} ` +
+              `right ${Math.round(r.right)} width ${Math.round(r.width)} in #${el.closest('section[id]')?.id ?? '?'}`,
+          );
+      }
       return {
         scroll: root.scrollWidth,
         client: root.clientWidth,
         doc: document.documentElement.scrollWidth,
         win: window.innerWidth,
+        past: past.slice(0, 12),
       };
     });
-    expect(overflow.scroll).toBeLessThanOrEqual(overflow.client);
-    expect(overflow.doc).toBeLessThanOrEqual(overflow.win);
+    expect(overflow.scroll, overflow.past.join('\n')).toBeLessThanOrEqual(overflow.client);
+    expect(overflow.doc, overflow.past.join('\n')).toBeLessThanOrEqual(overflow.win);
   });
 
   test('C00-E04 a menu near the bottom of the window opens upward', async ({ page }) => {
