@@ -102,3 +102,11 @@
 .app-people-back .tp-td-back {
   margin-left: 0;
 }
+/* Everyone's header holds two switches and no filter: they start where the title starts, as the design draws them,
+   instead of being pushed to the right the way a lone switch beside a filter is. */
+.app-people .tp-dh-tools .tp-seg {
+  margin-left: 0;
+}
+.app-panes-l .tp-dh-tools .tp-btn {
+  margin-left: 0;
+}

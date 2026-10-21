@@ -1,17 +1,20 @@
 import {
   CreateSpace,
+  DayHeader,
   FilterField,
   JoinCard,
   MemberList,
   MembersCard,
   PersonHeader,
   PersonRow,
+  Segmented,
   SpaceSwitch,
   TaskLine,
   type JoinInvite,
   type SwitchSpace,
 } from '@tudu/ui';
 import { Pair, Section } from './Pair';
+import '../people/people.css';
 
 const SPACES: SwitchSpace[] = [
   { id: 'me', name: 'Personal', personal: true, sub: 'Just you' },
@@ -164,6 +167,32 @@ export function SpacesStates() {
               onOpen={noop}
               onOpenTask={noop}
             />
+          </div>
+        )}
+      />
+      <Pair
+        title="People: Everyone’s header"
+        note="Two switches, no filter: they start where the title starts."
+        render={() => (
+          <div className="app-people" style={{ width: 'min(560px, 100%)' }}>
+            <DayHeader day="Everyone" date="23 shared this week" nav={false}>
+              <Segmented
+                items={[
+                  { value: 'today', label: 'Today' },
+                  { value: 'week', label: 'This week' },
+                ]}
+                defaultValue="week"
+                label="Range"
+              />
+              <Segmented
+                items={[
+                  { value: 'day', label: 'By day' },
+                  { value: 'person', label: 'By person' },
+                ]}
+                defaultValue="day"
+                label="Group by"
+              />
+            </DayHeader>
           </div>
         )}
       />
