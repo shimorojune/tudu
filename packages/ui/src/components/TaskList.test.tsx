@@ -276,6 +276,13 @@ describe('TaskList', () => {
     expect(monday).toHaveClass('tp-drop-on');
     pointer(window, 'pointerup', 760, 100 + ROW + 10);
     expect(onReceive).toHaveBeenCalledWith('b', 1);
+    // a straight sideways drag starts too, since the tiles sit side by side
+    pointer(screen.getByText('Book car service'), 'pointerdown', 50, 230);
+    pointer(window, 'pointermove', 56, 230);
+    expect(document.querySelector('.tp-drag-ghost')).not.toBeNull();
+    pointer(window, 'pointermove', 760, 100 + ROW * 2 + 10);
+    pointer(window, 'pointerup', 760, 100 + ROW * 2 + 10);
+    expect(onReceive).toHaveBeenLastCalledWith('c', 1);
     // into the locked list: it never tints and nothing lands
     pointer(screen.getByText('Dentist at 4pm'), 'pointerdown', 750, 125);
     pointer(window, 'pointermove', 760, 135);
@@ -283,7 +290,7 @@ describe('TaskList', () => {
     expect(sunday).not.toHaveClass('tp-drop-on');
     expect(sunday.querySelector('.tp-drop-line')).toBeNull();
     pointer(window, 'pointerup', 60, 100 + ROW * 3 + 10);
-    expect(onReceive).toHaveBeenCalledTimes(1);
+    expect(onReceive).toHaveBeenCalledTimes(2);
     expect(document.querySelector('.tp-drag-ghost')).toBeNull();
     // the click that ends a drag is swallowed; spend it so the next test's first click is not
     fireEvent.click(document.body);

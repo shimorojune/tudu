@@ -52,3 +52,15 @@ export async function dropPoint(page: Page, name: string | RegExp): Promise<{ x:
   const box = (await list.boundingBox())!;
   return { x: box.x + Math.min(120, box.width / 2), y: box.y + Math.max(8, box.height - 8) };
 }
+
+/** Drag a row straight sideways into another tile, with no vertical move first, as a person does on the week. */
+export async function dragAcross(page: Page, from: Locator, to: { x: number; y: number }): Promise<void> {
+  const box = (await from.boundingBox())!;
+  const x = box.x + Math.min(120, box.width / 2);
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 6, y, { steps: 2 });
+  await page.mouse.move(to.x, to.y, { steps: 12 });
+  await page.mouse.up();
+}

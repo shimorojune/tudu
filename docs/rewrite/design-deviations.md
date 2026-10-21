@@ -101,3 +101,5 @@ the coding session, so this file is the record and the canvas gets a copy by han
 - The panel's back label reads "Week" (or "Backlog") on phones when opened from the week.
 - On phones the scroll under the sheet keeps 150px free at the foot, so the last row (the Backlog's, with its
   calendar button) can always scroll clear of the round New task button.
+- A drag between tiles starts on a move in any direction (4px), not only a vertical one as a reorder within a
+  list does, since the tiles sit side by side.

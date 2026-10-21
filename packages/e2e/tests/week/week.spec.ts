@@ -4,6 +4,7 @@ import { dayList, drag, fixClock, idle, ring, row, rowsOf, titlesOf, writeTasks 
 import {
   WEDNESDAY,
   backlogList,
+  dragAcross,
   dropPoint,
   goWeek,
   openDay,
@@ -107,7 +108,8 @@ test.describe('week', () => {
     await goWeek(page);
     const wed = 'Today, Wednesday 14 October';
     await expect(tileCount(page, wed)).toHaveText('3 tasks');
-    await drag(
+    // straight sideways, no vertical move first
+    await dragAcross(
       page,
       row(tileList(page, 'Wednesday 14 October'), 'Call Sam at 3pm'),
       await dropPoint(page, 'Thursday 15 October'),
