@@ -15,7 +15,7 @@ permissions:
 jobs:
   build-and-deploy:
     name: Build images on the host and deploy
-    runs-on: [self-hosted, dokploy]
+    runs-on: [self-hosted, dokploy-deploy]
     steps:
       - uses: actions/checkout@v4
       - name: Build the API image
@@ -39,7 +39,7 @@ jobs:
   smoke:
     name: Smoke test staging
     needs: build-and-deploy
-    runs-on: [self-hosted, dokploy]
+    runs-on: [self-hosted, dokploy-deploy]
     steps:
       - uses: actions/checkout@v4
       - run: pnpm install --frozen-lockfile

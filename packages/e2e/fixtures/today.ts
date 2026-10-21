@@ -9,8 +9,8 @@ export async function fixClock(page: Page, at: Date = SUNDAY): Promise<void> {
 }
 
 /**
- * Wait until every change has reached the server (the outbox is empty). The page's answer is a promise, which
- * waitForFunction would take for a truthy value at once, so this polls and awaits it.
+ * Wait until every change has reached the server (the outbox is empty). Polled through `evaluate`, which awaits
+ * the answer: `waitForFunction` takes an async predicate's Promise itself as truthy and returns at once.
  */
 export async function idle(page: Page): Promise<void> {
   await expect
@@ -20,7 +20,7 @@ export async function idle(page: Page): Promise<void> {
           async () =>
             (await (window as unknown as { __tudu?: { idle(): Promise<boolean> } }).__tudu?.idle()) === true,
         ),
-      { timeout: 15_000, intervals: [100] },
+      { intervals: [100], timeout: 15_000 },
     )
     .toBe(true);
 }
