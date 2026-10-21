@@ -33,11 +33,32 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
 
+  # Unit and e2e run on GitHub-hosted runners, each with its own throwaway Postgres and RustFS service containers,
+  # so test load stays off the Dokploy host. Tests create and drop their own databases on the server they are given.
   unit:
     name: Unit tests
-    runs-on: [self-hosted, dokploy]
+    runs-on: ubuntu-latest
+    services:
+      postgres: &postgres
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: tudu
+          POSTGRES_PASSWORD: tudu
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U tudu" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TUDU_CI_DATABASE_URL: postgres://tudu:tudu@127.0.0.1:5432/postgres
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test -- --reporter=default --reporter=json --outputFile=reports/vitest.json
       - uses: actions/upload-artifact@v4
@@ -49,10 +70,43 @@ jobs:
 
   e2e:
     name: End-to-end
-    runs-on: [self-hosted, dokploy]
+    runs-on: ubuntu-latest
+    services:
+      postgres: *postgres
+      rustfs:
+        image: rustfs/rustfs:latest
+        env:
+          RUSTFS_ACCESS_KEY: tudu-ci
+          RUSTFS_SECRET_KEY: tudu-ci-secret
+        ports: ['9000:9000']
+    env:
+      TUDU_CI_DATABASE_URL: postgres://tudu:tudu@127.0.0.1:5432/postgres
+      TUDU_CI_S3_ENDPOINT: http://127.0.0.1:9000
+      TUDU_CI_S3_BUCKET: tudu-ci
+      TUDU_CI_S3_ACCESS_KEY_ID: tudu-ci
+      TUDU_CI_S3_SECRET_ACCESS_KEY: tudu-ci-secret
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter e2e exec playwright install --with-deps chromium
+      - name: Create the storage bucket
+        env:
+          AWS_ACCESS_KEY_ID: tudu-ci
+          AWS_SECRET_ACCESS_KEY: tudu-ci-secret
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          for i in $(seq 1 30); do
+            aws --endpoint-url "$TUDU_CI_S3_ENDPOINT" s3 mb "s3://$TUDU_CI_S3_BUCKET" && exit 0
+            sleep 2
+          done
+          exit 1
       - run: pnpm e2e
         env:
           CI: 'true'
