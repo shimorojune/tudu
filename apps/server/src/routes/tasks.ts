@@ -7,6 +7,8 @@ import {
   mondayOf,
   syncRequestSchema,
   TASKS_CHANGED,
+  INBOX_CHANGED,
+  type InboxChangedEvent,
   type DayResponse,
   type IsoDate,
   type MarksResponse,
@@ -201,7 +203,9 @@ export function taskRoutes(db: Db, hub: EventHub) {
     const { clientId, mutations } = parsed.data;
     const { results, applied } = await applyBatch(db, userId, mutations);
 
-    const touched = [...new Set(applied.filter((a) => !a.projects).map((a) => a.taskId))];
+    const touched = [
+      ...new Set(applied.filter((a) => !a.projects && (!a.requests || a.days.length)).map((a) => a.taskId)),
+    ];
     const deleted = [...new Set(applied.filter((a) => a.deleted).map((a) => a.taskId))];
     const body: SyncResponse = { results, tasks: await tasksById(db, touched), deleted };
 
@@ -217,6 +221,16 @@ export function taskRoutes(db: Db, hub: EventHub) {
       await announce(db, hub, spaceId, s.days, s.tasks, clientId);
       if (s.projects) await announceProjects(db, hub, spaceId, clientId);
     }
+    // Inboxes: each person concerned hears, and only them.
+    const told = new Set<string>();
+    for (const a of applied)
+      for (const u of a.inbox ?? []) {
+        const key = `${u}:${a.spaceId}`;
+        if (told.has(key)) continue;
+        told.add(key);
+        const event: InboxChangedEvent = { spaceId: a.spaceId };
+        hub.publish(u, INBOX_CHANGED, event);
+      }
     return c.json(body);
   });
 

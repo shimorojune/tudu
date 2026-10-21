@@ -16,7 +16,10 @@ import { Button } from './Button';
 import { IconButton } from './IconButton';
 import { Logo } from './Logo';
 import { MiniCalendar, type MiniCalendarProps } from './MiniCalendar';
+import { PersonDot, type PersonDotPerson } from './PersonDot';
+import { PersonPick, type PickPerson } from './PersonPick';
 import { ProjectMenu, type ProjectOption } from './ProjectMenu';
+import { SpaceTile, type SpaceTileSpace } from './SpaceTile';
 import { showToast } from './Toast';
 
 export interface QuickAddFile {
@@ -49,6 +52,34 @@ export interface QuickAddResult {
   projectId: string | null;
   note: string;
   attachments: string[];
+  /** The space it goes to (the top line's "In …"), when there is a choice. */
+  spaceId?: string;
+  /** Who it goes to; null is you. */
+  toId?: string | null;
+}
+
+export interface QuickAddSpace extends SpaceTileSpace {
+  id: string;
+  name: string;
+}
+
+/**
+ * The top line "In Northwind for Me": the spaces you are in and the people in the chosen one. Pick a person and the
+ * task goes to their Inbox as a request.
+ */
+export interface QuickAddSend {
+  spaces: QuickAddSpace[];
+  /** The chosen space's id. */
+  spaceId: string;
+  onSpace: (spaceId: string) => void;
+  /** The people in the chosen space (you included or not; you are left out of the list). */
+  people: PickPerson[];
+  /** Who it is for; null is you. */
+  to: PickPerson | null;
+  onTo: (person: PickPerson | null) => void;
+  me: PersonDotPerson;
+  /** Personal: no person menu. */
+  canSend: boolean;
 }
 
 export interface QuickAddProps {
@@ -89,7 +120,7 @@ export interface QuickAddProps {
     similarOpen?: boolean;
   };
   /** Words to start the title with (Create from Search): a new nonce writes them in. */
-  seed?: { title: string; nonce: number } | null;
+  seed?: { title?: string; nonce: number } | null;
   /**
    * Close matches while you write: tasks that read like the title, asked a moment after a pause. A quiet line under
    * the title names the closest; it never blocks adding.
@@ -97,6 +128,8 @@ export interface QuickAddProps {
   similar?: (title: string) => Promise<SimilarItem[]>;
   /** The title in the look-alike line: go to that task, keeping the draft. */
   onOpenSimilar?: (item: SimilarItem) => void;
+  /** The top line: which space, and for whom. */
+  send?: QuickAddSend;
   className?: string;
 }
 
@@ -228,7 +261,7 @@ export function QuickAdd(p: QuickAddProps) {
   const overlay = p.layer !== 'none';
   const open = overlay ? p.open : true;
   const [f, setF] = useState<QuickAddDraft>(() => fresh(p));
-  const [pop, setPop] = useState<null | 'planned' | 'due' | 'project'>(null);
+  const [pop, setPop] = useState<null | 'planned' | 'due' | 'project' | 'space' | 'for'>(null);
   const [added, setAdded] = useState(!!p.initial?.added);
   const [saving, setSaving] = useState(!!p.initial?.saving);
   const [drop, setDrop] = useState(p.initial?.dropping ? 1 : 0);
@@ -250,7 +283,7 @@ export function QuickAdd(p: QuickAddProps) {
   const [seenSeed, setSeenSeed] = useState(p.seed?.nonce ?? 0);
   if (p.seed && p.seed.nonce !== seenSeed) {
     setSeenSeed(p.seed.nonce);
-    set({ title: p.seed.title });
+    if (p.seed.title !== undefined) set({ title: p.seed.title });
   }
 
   // Close matches while you write: when the title reads like tasks you already have, a quiet box under it says so
@@ -373,6 +406,8 @@ export function QuickAdd(p: QuickAddProps) {
         projectId: f.projectId,
         note: f.note.trim(),
         attachments: files.filter((x) => x.id).map((x) => x.id!),
+        spaceId: p.send?.spaceId,
+        toId: p.send ? (p.send.to?.id ?? null) : undefined,
       };
       await p.onSave?.(task);
       setSaving(false);
@@ -446,13 +481,20 @@ export function QuickAdd(p: QuickAddProps) {
 
   const proj = p.projects.find((x) => x.id === f.projectId) ?? null;
   const tomorrow = addDays(today, 1);
-  const plannedLabel = !f.planned
+  const plannedWord = !f.planned
     ? 'Backlog'
     : f.planned === today
       ? 'Today'
       : f.planned === tomorrow
         ? 'Tomorrow'
         : formatDay(f.planned);
+  // For someone: the task goes to their Inbox. Planned becomes the day you would like ("Asks for Tue"); they pick the day.
+  const to = p.send?.to ?? null;
+  const toName = to ? to.name.trim().split(/\s+/)[0]! : '';
+  const space = p.send
+    ? (p.send.spaces.find((s) => s.id === p.send!.spaceId) ?? p.send.spaces[0])
+    : undefined;
+  const plannedLabel = to ? (f.planned ? `Asks for ${plannedWord}` : 'No day asked') : plannedWord;
   const dueRel = f.due ? dueDistance(f.due, today) : null;
   const lands = landsWords(
     { planned: f.planned, due: f.due, projectName: proj?.name, note: f.note, files: f.files.length },
@@ -464,10 +506,10 @@ export function QuickAdd(p: QuickAddProps) {
       open={pop === 'planned'}
       onOpen={(v) => setPop(v ? 'planned' : null)}
       up={phone}
-      aria={`Planned for: ${plannedLabel}`}
+      aria={`${to ? 'Asks for' : 'Planned for'}: ${plannedWord}`}
       icon={f.planned ? <Ic name="day" /> : <Ic name="backlog" />}
       label={plannedLabel}
-      tone={f.planned === today ? 'today' : null}
+      tone={f.planned === today && !to ? 'today' : null}
       pop={
         <MiniCalendar
           {...(p.calendar ?? {})}
@@ -613,27 +655,116 @@ export function QuickAdd(p: QuickAddProps) {
       variant="primary"
       className="tp-qa-add"
       disabled={!title && !added && !saving}
+      icon={to ? <Icon name="send" size={14} /> : undefined}
       loading={saving}
-      loadingLabel={uploading ? 'Uploading…' : 'Adding…'}
+      loadingLabel={uploading ? 'Uploading…' : to ? 'Sending…' : 'Adding…'}
       success={added}
-      successLabel="Added"
+      successLabel={to ? 'Sent' : 'Added'}
       onClick={() => void add()}
     >
-      {phone ? 'Add' : 'Add task'}
+      {to ? 'Send' : phone ? 'Add' : 'Add task'}
     </Button>
   );
+  const spaceChip = p.send ? (
+    <Chip
+      open={pop === 'space'}
+      onOpen={(v) => setPop(v ? 'space' : null)}
+      up={phone}
+      aria={`Space: ${space?.name ?? ''}`}
+      icon={space ? <SpaceTile space={space} size={18} /> : <Ic name="project" />}
+      label={space?.name ?? ''}
+      pop={
+        <div className="tp-ppick-pop">
+          <div className="tp-sswl" role="menu" aria-label="Which space">
+            <div className="tp-mh">Which space</div>
+            {p.send.spaces.map((s) => {
+              const on = s.id === space?.id;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={on ? 'true' : 'false'}
+                  className={cx('tp-sswl-it', on && 'tp-on')}
+                  onClick={() => {
+                    setPop(null);
+                    if (!on) p.send!.onSpace(s.id);
+                  }}
+                >
+                  <SpaceTile space={s} size={24} />
+                  <span className="tp-sswl-n">
+                    <span>{s.name}</span>
+                  </span>
+                  {on ? (
+                    <span className="tp-sswl-ok" aria-hidden="true">
+                      <svg
+                        width={14}
+                        height={14}
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2.6}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M5 12.4 9.8 17.2 19.2 6.8" />
+                      </svg>
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      }
+    />
+  ) : null;
+  const forChip =
+    p.send && p.send.canSend ? (
+      <Chip
+        open={pop === 'for'}
+        onOpen={(v) => setPop(v ? 'for' : null)}
+        up={phone}
+        empty={!to}
+        aria={to ? `For ${to.name}` : 'Who it’s for'}
+        icon={<PersonDot person={to ?? p.send.me} size={18} />}
+        label={to ? to.name : 'Me'}
+        pop={
+          <div className="tp-ppick-pop">
+            <PersonPick
+              people={p.send.people}
+              me={p.send.me}
+              meSub={space ? `On your list in ${space.name}` : undefined}
+              selected={to}
+              heading="Who it’s for"
+              onPick={(x) => {
+                setPop(null);
+                p.send!.onTo(x);
+              }}
+            />
+          </div>
+        }
+      />
+    ) : p.send ? (
+      <span className="tp-qa-chip tp-qa-static-chip" aria-label="For you">
+        <PersonDot person={p.send.me} size={18} />
+        <span>Me</span>
+      </span>
+    ) : null;
 
   const panel = (
     <section
       className={cx(
         'tp-qa tp-sheet',
         phone ? 'tp-qa-phone' : 'tp-qa-desk',
+        p.send && 'tp-qa-send',
+        to && 'tp-qa-for',
         drop > 0 && 'tp-qa-dropping',
         added && 'tp-qa-added',
         saving && 'tp-qa-saving',
       )}
       role="dialog"
-      aria-label="Quick Add"
+      aria-label={p.send ? 'New task' : 'Quick Add'}
       aria-busy={saving ? 'true' : undefined}
       onPaste={onPaste}
       onDragEnter={(e) => {
@@ -668,6 +799,20 @@ export function QuickAdd(p: QuickAddProps) {
         }}
       />
       {phone ? <div className="tp-qa-grabber" aria-hidden="true" /> : null}
+      {p.send ? (
+        <div className="tp-qa-toline">
+          <span className="tp-qa-tol">In</span>
+          {spaceChip}
+          <span className="tp-qa-tol">for</span>
+          {forChip}
+          <span className="tp-qa-sp" />
+          {!phone && p.onClose ? (
+            <IconButton label="Close" className="tp-qa-x" tip={false} onClick={p.onClose}>
+              <Icon name="x" size={16} />
+            </IconButton>
+          ) : null}
+        </div>
+      ) : null}
       <div className="tp-qa-line">
         {phone ? null : (
           <span className="tp-qa-mark">
@@ -691,7 +836,7 @@ export function QuickAdd(p: QuickAddProps) {
             }
           }}
         />
-        {phone || !p.onClose ? null : (
+        {phone || !p.onClose || p.send ? null : (
           <IconButton label="Close" className="tp-qa-x" tip={false} onClick={p.onClose}>
             <Icon name="x" size={16} />
           </IconButton>
@@ -801,7 +946,23 @@ export function QuickAdd(p: QuickAddProps) {
       ) : (
         <div className="tp-qa-foot">
           <span className="tp-qa-lands" aria-live="polite">
-            {added ? (
+            {to ? (
+              added ? (
+                <span className="tp-qa-done">
+                  Sent to <b>{toName}</b>
+                </span>
+              ) : saving ? (
+                <span className="tp-qa-busy">
+                  Sending to <b>{toName}</b>…
+                </span>
+              ) : (
+                <>
+                  Goes to <b>{toName}’s Inbox</b>
+                  {space && p.send!.spaces.length > 1 ? ` in ${space.name}` : ''}. {toName} picks the day
+                  {lands.extra ? ` · ${lands.extra}` : ''}
+                </>
+              )
+            ) : added ? (
               <span className="tp-qa-done">
                 Added to <b>{lands.where}</b>
               </span>

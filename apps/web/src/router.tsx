@@ -5,13 +5,13 @@ import {
   Outlet,
   redirect,
 } from '@tanstack/react-router';
-import type { QueryClient } from '@tanstack/react-query';
-import { PERSONAL_SLUG, type TaskRefResponse } from '@tudu/core';
+import { useQuery, type QueryClient } from '@tanstack/react-query';
+import { PERSONAL_SLUG, type SpaceSummary, type TaskRefResponse } from '@tudu/core';
 import { ToastHost } from '@tudu/ui';
 import { AppShell } from './app/AppShell';
 import { useLiveEvents } from './app/live';
 import { WorkingDayProvider } from './app/workingDay';
-import { api, meQuery, queryClient } from './app/session';
+import { api, loadMe, meQuery, queryClient } from './app/session';
 import {
   homePath,
   lastSpace,
@@ -23,12 +23,13 @@ import {
 } from './app/space';
 import { KitPage } from './routes/kit/KitPage';
 import { BacklogPage } from './routes/backlog/BacklogPage';
+import { InboxPage } from './routes/inbox/InboxPage';
 import { JoinPage } from './routes/join/JoinPage';
 import { MorePage } from './routes/more/MorePage';
 import { PeoplePage } from './routes/people/PeoplePage';
 import { QuickAddPage } from './routes/quick-add/QuickAddPage';
 import { SignInPage } from './routes/sign-in/SignInPage';
-import { SoonPage, TodayPage } from './routes/today/TodayPage';
+import { TodayPage } from './routes/today/TodayPage';
 import { WeekPage } from './routes/week/WeekPage';
 
 interface RouterContext {
@@ -50,7 +51,7 @@ const signInRoute = createRoute({
   validateSearch: (s: Record<string, unknown>): { next?: string } =>
     typeof s.next === 'string' ? { next: s.next } : {},
   beforeLoad: async ({ context, search }) => {
-    const me = await context.queryClient.fetchQuery(meQuery);
+    const me = await loadMe(context.queryClient);
     if (me) throw redirect({ href: search.next ?? homePath(me.spaces), replace: true });
   },
   component: SignInPage,
@@ -60,7 +61,7 @@ const signInRoute = createRoute({
 const joinRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/join/$token',
-  beforeLoad: async ({ context }) => ({ me: await context.queryClient.fetchQuery(meQuery) }),
+  beforeLoad: async ({ context }) => ({ me: await loadMe(context.queryClient) }),
   component: function JoinRoute() {
     const { me } = joinRoute.useRouteContext();
     return <JoinPage me={me} />;
@@ -72,7 +73,7 @@ const appRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: 'app',
   beforeLoad: async ({ context, location }) => {
-    const me = await context.queryClient.fetchQuery(meQuery);
+    const me = await loadMe(context.queryClient);
     if (!me)
       throw redirect({
         to: '/sign-in',
@@ -145,7 +146,12 @@ const spaceRoute = createRoute({
     return { space };
   },
   component: function SpaceLayout() {
-    const { me, space } = spaceRoute.useRouteContext();
+    const ctx = spaceRoute.useRouteContext();
+    // The route context is read once per navigation; the counts on the sidebar and the switcher (the Inbox, the
+    // members) follow the me query instead, so a change that arrives live shows without a navigation.
+    const { data: liveMe } = useQuery({ ...meQuery, initialData: ctx.me });
+    const me = liveMe ?? ctx.me;
+    const space = spaceBySlug(me.spaces, ctx.space.slug) ?? ctx.space;
     useLiveEvents(true);
     return (
       <WorkingDayProvider>
@@ -198,12 +204,30 @@ const personRoute = createRoute({
 });
 /** The phone's More tab: the views with no tab of their own. */
 const moreRoute = createRoute({ getParentRoute: () => spaceRoute, path: '/more', component: MorePage });
+/** The Inbox's address may name the view: /northwind/inbox?view=sent. */
+const inboxSearch = (
+  s: Record<string, unknown>,
+): { task?: string; view?: 'inbox' | 'answered' | 'sent' } => ({
+  ...taskSearch(s),
+  ...(s.view === 'answered' || s.view === 'sent' || s.view === 'inbox' ? { view: s.view } : {}),
+});
+/** Personal has no Inbox (nobody sends you tasks there): its address goes back to Today, like People. */
+const teamOnly = ({ context }: { context: { space: SpaceSummary } }) => {
+  if (context.space.kind !== 'team') throw redirect({ href: spacePath(context.space.slug), replace: true });
+};
 const inboxRoute = createRoute({
   getParentRoute: () => spaceRoute,
   path: '/inbox',
-  component: () => (
-    <SoonPage title="The Inbox is on its way." body="What people send you arrives with the next chunk." />
-  ),
+  validateSearch: inboxSearch,
+  beforeLoad: teamOnly,
+  component: InboxPage,
+});
+const inboxItemRoute = createRoute({
+  getParentRoute: () => spaceRoute,
+  path: '/inbox/$itemId',
+  validateSearch: inboxSearch,
+  beforeLoad: teamOnly,
+  component: InboxPage,
 });
 const kitRoute = createRoute({ getParentRoute: () => rootRoute, path: '/kit', component: KitPage });
 /** The floating bar alone: the page the macOS window opens on the global summon (chunk 11). */
@@ -211,7 +235,7 @@ const quickAddRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/quick-add',
   beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.fetchQuery(meQuery);
+    const me = await loadMe(context.queryClient);
     if (!me) throw redirect({ to: '/sign-in', search: { next: '/quick-add' }, replace: true });
     return { me };
   },
@@ -242,6 +266,7 @@ export const router = createRouter({
         personRoute,
         moreRoute,
         inboxRoute,
+        inboxItemRoute,
       ]),
     ]),
     kitRoute,

@@ -34,8 +34,8 @@ let flash: { id: string; day: IsoDate | null; nonce: number } | null = null;
 let locate: { id: string; day: IsoDate | null; nonce: number } | null = null;
 /** The search panel, over the page. */
 let search = false;
-/** Words to start Quick Add's title with (Create from Search). */
-let quickAddSeed: { title: string; nonce: number } | null = null;
+/** Words to start Quick Add's title with (Create from Search), or who it is for ("Send Meera a task"). */
+let quickAddSeed: { title?: string; toId?: string; spaceId?: string; nonce: number } | null = null;
 /** The view the Backlog should open on next (a crossed-off task picked in Search). */
 let backlogView: { view: 'open' | 'done'; nonce: number } | null = null;
 /** The Create a space dialog, and the Members card, over the page. */
@@ -96,20 +96,23 @@ export function useShownDay(): IsoDate | null {
   );
 }
 
-/** Quick Add, over the page; with words, they become the title. */
-export function openQuickAdd(seed?: { title: string }): void {
-  // A click handler may pass its event: only real words count.
-  const words = seed && typeof seed.title === 'string' ? seed.title : null;
-  if (words !== null) quickAddSeed = { title: words, nonce: (quickAddSeed?.nonce ?? 0) + 1 };
+/** Quick Add, over the page; with words, they become the title; with a person, it is for them. */
+export function openQuickAdd(seed?: { title?: string; toId?: string; spaceId?: string }): void {
+  // A click handler may pass its event: only real words or a real person count.
+  const words = seed && typeof seed.title === 'string' ? seed.title : undefined;
+  const toId = seed && typeof seed.toId === 'string' ? seed.toId : undefined;
+  const spaceId = seed && typeof seed.spaceId === 'string' ? seed.spaceId : undefined;
+  if (words !== undefined || toId !== undefined)
+    quickAddSeed = { title: words, toId, spaceId, nonce: (quickAddSeed?.nonce ?? 0) + 1 };
   if (quickAdd) {
-    if (words !== null) notify();
+    if (words !== undefined || toId !== undefined) notify();
     return;
   }
   quickAdd = true;
   notify();
 }
 
-export function useQuickAddSeed(): { title: string; nonce: number } | null {
+export function useQuickAddSeed(): { title?: string; toId?: string; spaceId?: string; nonce: number } | null {
   return useSyncExternalStore(
     subscribe,
     () => quickAddSeed,

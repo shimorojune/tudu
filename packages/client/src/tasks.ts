@@ -1,6 +1,8 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { queryOptions } from '@tanstack/react-query';
 import {
+  INBOX_CHANGED,
+  isInboxMutation,
   isProjectMutation,
   MEMBERS_CHANGED,
   nextProjectColor,
@@ -14,6 +16,9 @@ import {
   type Comment,
   type CommentAuthor,
   type DayResponse,
+  type InboxChangedEvent,
+  type InboxResponse,
+  type InboxView,
   type IsoDate,
   type MarksResponse,
   type MembersChangedEvent,
@@ -28,6 +33,7 @@ import {
   type Task,
   type TaskDetail,
   type TaskMutationBody,
+  type TaskRequest,
   type TasksChangedEvent,
   type TaskVisibility,
   type WeekResponse,
@@ -59,6 +65,7 @@ export const peopleKey = (spaceId: string, from: IsoDate, to: IsoDate) =>
   ['people', spaceId, from, to] as const;
 export const personKey = (spaceId: string, userId: string, from: IsoDate, to: IsoDate) =>
   ['people', spaceId, 'one', userId, from, to] as const;
+export const inboxKey = (spaceId: string, view: InboxView, q = '') => ['inbox', spaceId, view, q] as const;
 
 function byPosition(a: { position: number; createdAt: string }, b: { position: number; createdAt: string }) {
   return a.position - b.position || a.createdAt.localeCompare(b.createdAt);
@@ -216,6 +223,8 @@ export function applyToDay(
     const hit = tasks.some((t) => t.projectId === m.payload.id);
     return hit ? tasks.map((t) => patchTask(t, m)) : tasks;
   }
+  // A request is not a task until it is accepted; the store writes the accepted task into its day itself.
+  if (isInboxMutation(m)) return tasks;
   const id = taskIdOf(m);
   const has = tasks.some((t) => t.id === id);
   const map = (fn: (t: Task) => Task) => tasks.map((t) => (t.id === id ? fn(t) : t));
@@ -266,6 +275,7 @@ export function applyToDay(
 
 /** Apply one mutation to a task's full detail. Pure; a mutation for another task leaves it alone. */
 export function applyToDetail(d: TaskDetail, m: SyncMutation, me: CommentAuthor | null): TaskDetail {
+  if (isInboxMutation(m)) return d;
   if (isProjectMutation(m)) {
     if (m.type === 'project.delete' && d.projectId === m.payload.id) return { ...d, projectId: null };
     return d;
@@ -578,6 +588,189 @@ export class TaskStore {
     });
   }
 
+  // ---- the Inbox ------------------------------------------------------------------------------------------
+
+  /** One view of a space's Inbox, narrowed by words. Reads live, like every list. */
+  inboxQuery(spaceId: string, view: InboxView, q = '') {
+    return queryOptions({
+      queryKey: inboxKey(spaceId, view, q),
+      queryFn: async (): Promise<InboxResponse> => {
+        const res = await this.o.api.get<InboxResponse>(
+          `/api/spaces/${spaceId}/inbox?view=${view}&q=${encodeURIComponent(q)}`,
+        );
+        this.setReachable(true);
+        return res;
+      },
+    });
+  }
+
+  /** Send someone a task: a request in their Inbox in that space. Returns the request's id. */
+  sendRequest(
+    spaceId: string,
+    toId: string,
+    task: {
+      title: string;
+      note?: string;
+      askedDay: IsoDate | null;
+      due?: IsoDate | null;
+      projectId?: string | null;
+      attachments?: string[];
+    },
+  ): string {
+    const id = this.o.newId?.() ?? crypto.randomUUID();
+    const payload: Extract<TaskMutationBody, { type: 'request.send' }>['payload'] = {
+      id,
+      spaceId,
+      toId,
+      title: task.title.trim(),
+      askedDay: task.askedDay,
+    };
+    if (task.note?.trim()) payload.note = task.note.trim();
+    if (task.due !== undefined) payload.due = task.due;
+    if (task.projectId !== undefined) payload.projectId = task.projectId;
+    if (task.attachments?.length) payload.attachments = task.attachments;
+    this.mutate({ type: 'request.send', payload });
+    return id;
+  }
+
+  /** The task a request becomes on this side, before the server has numbered it. */
+  private draftFromRequest(r: TaskRequest, taskId: string, day: IsoDate | null, at: string): Task {
+    const list = this.cached(r.spaceId, day);
+    const end = list?.length ? Math.max(...list.map((t) => t.position)) + POSITION_STEP : POSITION_STEP;
+    return {
+      id: taskId,
+      spaceId: r.spaceId,
+      number: null,
+      ref: null,
+      title: r.title,
+      day,
+      position: end,
+      done: false,
+      doneAt: null,
+      carriedFrom: null,
+      due: r.due,
+      visibility: 'space',
+      projectId: r.projectId,
+      ownerId: this.o.me?.()?.id ?? null,
+      subtasks: [],
+      subsDone: 0,
+      subsTotal: 0,
+      commentCount: 0,
+      createdAt: at,
+      updatedAt: at,
+    };
+  }
+
+  /** Put a task the store made itself (an accepted or taken-back request) into its day, if that day is cached. */
+  private placeDraft(t: Task): void {
+    const qc = this.o.queryClient;
+    const key = dayKey(t.spaceId, t.day);
+    const data = qc.getQueryData<DayData>(key);
+    this.known.set(t.id, t);
+    if (data && !data.tasks.some((x) => x.id === t.id))
+      qc.setQueryData<DayData>(key, { day: t.day, tasks: [...data.tasks, t].sort(byPosition) });
+  }
+
+  /** Mark a request answered (or gone) in every cached Inbox view, so it folds out at once. */
+  private settleRequest(
+    spaceId: string,
+    requestId: string,
+    patch: Partial<TaskRequest>,
+    remove = false,
+  ): void {
+    const qc = this.o.queryClient;
+    for (const [key, data] of qc.getQueriesData<InboxResponse>({ queryKey: ['inbox', spaceId] })) {
+      if (!data) continue;
+      const fix = (list: typeof data.toAnswer) =>
+        list
+          .filter((i) => !(remove && i.request?.id === requestId))
+          .map((i) => (i.request?.id === requestId ? { ...i, request: { ...i.request, ...patch } } : i));
+      const toAnswer = fix(data.toAnswer).filter((i) => i.request?.state === 'waiting');
+      qc.setQueryData<InboxResponse>(key, {
+        ...data,
+        toAnswer,
+        updates: fix(data.updates),
+        answered: fix(data.answered),
+        sent: data.sent
+          .filter((r) => !(remove && r.id === requestId))
+          .map((r) => (r.id === requestId ? { ...r, ...patch } : r)),
+        counts: { ...data.counts, toAnswer: toAnswer.length },
+      });
+    }
+  }
+
+  /** Accept a request onto a day (the Backlog for null): the task is yours at once. Returns its id. */
+  acceptRequest(r: TaskRequest, day: IsoDate | null): string {
+    const taskId = this.o.newId?.() ?? crypto.randomUUID();
+    const at = this.nextAt();
+    this.mutate({ type: 'request.accept', payload: { id: r.id, taskId, day } });
+    this.placeDraft(this.draftFromRequest(r, taskId, day, at));
+    this.settleRequest(r.spaceId, r.id, { state: 'accepted', taskId, taskDay: day, answeredAt: at });
+    return taskId;
+  }
+
+  declineRequest(r: TaskRequest, reason: string): void {
+    this.mutate({ type: 'request.decline', payload: { id: r.id, reason: reason.trim() } });
+    this.settleRequest(r.spaceId, r.id, {
+      state: 'declined',
+      reason: reason.trim(),
+      answeredAt: this.nextAt(),
+    });
+  }
+
+  /** Take a request back (or Do it myself): a task of your own on the day, the Backlog for null. Returns its id. */
+  withdrawRequest(r: TaskRequest, day: IsoDate | null): string {
+    const taskId = this.o.newId?.() ?? crypto.randomUUID();
+    const at = this.nextAt();
+    this.mutate({ type: 'request.withdraw', payload: { id: r.id, taskId, day } });
+    this.placeDraft(this.draftFromRequest(r, taskId, day, at));
+    this.settleRequest(r.spaceId, r.id, { state: 'withdrawn', taskId, taskDay: day }, true);
+    return taskId;
+  }
+
+  /** Reading an item clears its dot (and tells a request's sender it was seen). */
+  readItem(spaceId: string, itemId: string): void {
+    const qc = this.o.queryClient;
+    const at = this.nextAt();
+    let unread = false;
+    for (const [key, data] of qc.getQueriesData<InboxResponse>({ queryKey: ['inbox', spaceId] })) {
+      if (!data) continue;
+      const mark = (list: typeof data.toAnswer) =>
+        list.map((i) => {
+          if (i.id !== itemId || i.readAt) return i;
+          if (i.kind !== 'request') unread = true;
+          return { ...i, readAt: at };
+        });
+      const updates = mark(data.updates);
+      qc.setQueryData<InboxResponse>(key, {
+        ...data,
+        toAnswer: mark(data.toAnswer),
+        updates,
+        answered: mark(data.answered),
+        counts: { ...data.counts, unread: updates.filter((i) => !i.readAt).length },
+      });
+    }
+    void unread;
+    this.mutate({ type: 'inbox.read', payload: { id: itemId } });
+  }
+
+  readAll(spaceId: string): void {
+    const qc = this.o.queryClient;
+    const at = this.nextAt();
+    for (const [key, data] of qc.getQueriesData<InboxResponse>({ queryKey: ['inbox', spaceId] })) {
+      if (!data) continue;
+      const mark = (list: typeof data.toAnswer) => list.map((i) => (i.readAt ? i : { ...i, readAt: at }));
+      qc.setQueryData<InboxResponse>(key, {
+        ...data,
+        toAnswer: mark(data.toAnswer),
+        updates: mark(data.updates),
+        answered: mark(data.answered),
+        counts: { ...data.counts, unread: 0 },
+      });
+    }
+    this.mutate({ type: 'inbox.readAll', payload: { id: this.o.newId?.() ?? crypto.randomUUID(), spaceId } });
+  }
+
   cachedProjects(spaceId: string): Project[] | undefined {
     return this.o.queryClient.getQueryData<Project[]>(projectsKey(spaceId));
   }
@@ -786,6 +979,12 @@ export class TaskStore {
 
   /** Refresh the days and tasks another tab or device changed. Our own changes are already on screen. */
   onEvent(e: LiveEvent): void {
+    if (e.type === INBOX_CHANGED) {
+      const ie = e.data as InboxChangedEvent;
+      void this.o.queryClient.invalidateQueries({ queryKey: ['inbox', ie.spaceId] });
+      void this.o.queryClient.invalidateQueries({ queryKey: ['me'] });
+      return;
+    }
     if (e.type === MEMBERS_CHANGED) {
       const me = e.data as MembersChangedEvent;
       void this.o.queryClient.invalidateQueries({ queryKey: ['me'] });
@@ -819,6 +1018,7 @@ export class TaskStore {
     void this.o.queryClient.invalidateQueries({ queryKey: ['marks'] });
     void this.o.queryClient.invalidateQueries({ queryKey: ['people'] });
     void this.o.queryClient.invalidateQueries({ queryKey: ['members'] });
+    void this.o.queryClient.invalidateQueries({ queryKey: ['inbox'] });
   }
 
   stop(): void {
@@ -946,6 +1146,11 @@ export class TaskStore {
     }
     void this.o.queryClient.invalidateQueries({ queryKey: ['marks'] });
     void this.o.queryClient.invalidateQueries({ queryKey: ['people'] });
+    // Anything about requests or the Inbox: read the Inbox and the counts again, now the server has the truth.
+    if (batch.some((b) => isInboxMutation(b as SyncMutation))) {
+      void this.o.queryClient.invalidateQueries({ queryKey: ['inbox'] });
+      void this.o.queryClient.invalidateQueries({ queryKey: ['me'] });
+    }
     return { done: res.results.map((r) => r.id) };
   }
 

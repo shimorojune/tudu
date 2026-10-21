@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isIsoDate, type IsoDate } from './dates';
 import { COMMENT_MAX, NOTES_MAX } from './notes';
+import { DECLINE_REASON_MAX, REQUEST_NOTE_MAX } from './inbox';
 import { projectColorSchema, projectNameSchema } from './projects';
 
 /** A task as the API sends it. `number` (and so `ref`, "ME-58") is assigned by the server when the task is saved. */
@@ -94,7 +95,10 @@ export type HistoryEvent =
   | { id: number; at: string; kind: 'carried'; from: IsoDate }
   | { id: number; at: string; kind: 'crossed' }
   | { id: number; at: string; kind: 'uncrossed' }
-  | { id: number; at: string; kind: 'restored' };
+  | { id: number; at: string; kind: 'restored' }
+  /** The task came as a request: "Sent by Meera, accepted"; or it came back: "Sent to Meera, taken back". */
+  | { id: number; at: string; kind: 'accepted'; from: string }
+  | { id: number; at: string; kind: 'withdrawn'; to: string };
 
 export type HistoryKind = HistoryEvent['kind'];
 
@@ -236,11 +240,52 @@ export const taskMutationSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('comment.create'), payload: z.object({ id, taskId: id, html: commentHtml }) }),
   z.object({ type: z.literal('comment.edit'), payload: z.object({ id, taskId: id, html: commentHtml }) }),
   z.object({ type: z.literal('comment.delete'), payload: z.object({ id, taskId: id }) }),
+  /** Send someone a task: a request in their Inbox, not a task until they accept it. */
+  z.object({
+    type: z.literal('request.send'),
+    payload: z.object({
+      id,
+      spaceId: id,
+      toId: id,
+      title,
+      note: z.string().max(REQUEST_NOTE_MAX, 'That note is too long.').optional(),
+      askedDay: isoDay.nullable(),
+      due: isoDay.nullable().optional(),
+      projectId: projectId.optional(),
+      attachments: z.array(id).max(20).optional(),
+    }),
+  }),
+  /** Accept a request onto a day (null is the Backlog): the task is made with the id the client chose. */
+  z.object({
+    type: z.literal('request.accept'),
+    payload: z.object({ id, taskId: id, day: isoDay.nullable() }),
+  }),
+  z.object({
+    type: z.literal('request.decline'),
+    payload: z.object({
+      id,
+      reason: z.string().trim().min(1, 'Say why.').max(DECLINE_REASON_MAX, 'That reason is too long.'),
+    }),
+  }),
+  /** Take a request back (or Do it myself): a task of your own on the day, the Backlog for null. */
+  z.object({
+    type: z.literal('request.withdraw'),
+    payload: z.object({ id, taskId: id, day: isoDay.nullable() }),
+  }),
+  z.object({ type: z.literal('inbox.read'), payload: z.object({ id }) }),
+  z.object({ type: z.literal('inbox.readAll'), payload: z.object({ id, spaceId: id }) }),
 ]);
 
 /** The task a mutation is about, whatever it names; a project change names its project instead. */
 export function taskIdOf(m: TaskMutationBody): string {
   return 'taskId' in m.payload ? m.payload.taskId : m.payload.id;
+}
+
+/** A request or Inbox change: not about a task of yours (until an accept makes one). */
+export function isInboxMutation(
+  m: TaskMutationBody,
+): m is Extract<TaskMutationBody, { type: `request.${string}` | `inbox.${string}` }> {
+  return m.type.startsWith('request.') || m.type.startsWith('inbox.');
 }
 
 export function isProjectMutation(

@@ -290,3 +290,8 @@
 .tp-mc .tp-ssec-h .tp-ssec-a {
   margin-left: 8px;
 }
+
+/* Personal: "for Me" is a plain chip, nothing to pick. */
+.tp-qa-static-chip {
+  cursor: default;
+}

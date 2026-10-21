@@ -37,7 +37,10 @@ import {
   type SharedTask,
 } from '@tudu/ui';
 import { useEffect, useRef, useState } from 'react';
-import { openMembers } from '../../app/dayView';
+import { dayWord, firstName } from '@tudu/core';
+import { InboxSection, showToast } from '@tudu/ui';
+import { openMembers, openQuickAdd } from '../../app/dayView';
+import { toSentEntry } from '../inbox/InboxPage';
 import { api, meQuery } from '../../app/session';
 import { spacePath, useSpace } from '../../app/space';
 import { taskStore, useOnline } from '../../app/tasks';
@@ -158,6 +161,11 @@ export function PeoplePage() {
       onOpenTask={openTask}
       compact={compact}
       onBack={compact ? () => pick(null) : undefined}
+      spaceId={space.id}
+      onOpenTaskId={(id) => {
+        setOpen({ id, dir: 'next' });
+        closed.current = null;
+      }}
     />
   ) : (
     <EveryonePane
@@ -414,9 +422,18 @@ function PersonPane(p: {
   onOpenTask: (t: Task) => void;
   compact: boolean;
   onBack?: () => void;
+  spaceId: string;
+  onOpenTaskId: (id: string) => void;
 }) {
   const w = p.person;
   const days = personDays(w.tasks, p.monday, p.sunday, p.today);
+  const first = firstName(w.name, w.email);
+  // What you sent them: the requests from you to them in this space, with where each stands.
+  const sent = useQuery({ ...taskStore.inboxQuery(p.spaceId, 'sent'), enabled: !w.you });
+  const toThem = (sent.data?.sent ?? []).filter((r) => r.to.id === w.id);
+  const [now] = useState(() => new Date());
+  const [openSent, setOpenSent] = useState<string | null>(null);
+  const requestOf = (id: string) => toThem.find((r) => r.id === id);
   return (
     <>
       {p.onBack ? (
@@ -436,7 +453,18 @@ function PersonPane(p: {
         }}
         sub={w.you ? `${w.email} · you` : w.email}
         compact={p.compact}
-      />
+      >
+        {w.you ? null : (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Icon name="send" size={14} />}
+            onClick={() => openQuickAdd({ toId: w.id, spaceId: p.spaceId })}
+          >
+            Send {first} a task
+          </Button>
+        )}
+      </PersonHeader>
       <SheetBody className="app-panes-scroll">
         {days.map((d) => (
           <section key={d.day} className="app-shared-group" aria-label={d.title}>
@@ -452,6 +480,41 @@ function PersonPane(p: {
             )}
           </section>
         ))}
+        {w.you ? null : toThem.length ? (
+          <div className="app-people-sent">
+            <InboxSection
+              title={`You sent ${first}`}
+              count={toThem.length}
+              items={toThem.map((r) => toSentEntry(r, p.today, now, p.projects))}
+              mode="fold"
+              hideTo
+              openKey={openSent}
+              calendar={{ today: p.today, marks: {} }}
+              onToggle={(e, on) => setOpenSent(on ? e.id : null)}
+              onWithdraw={(e) => {
+                const r = requestOf(e.id);
+                if (!r) return;
+                taskStore.withdrawRequest(r, null);
+                showToast('Taken back. It’s on your Backlog.');
+              }}
+              onTakeBack={(e, day) => {
+                const r = requestOf(e.id);
+                if (!r) return;
+                taskStore.withdrawRequest(r, day);
+                showToast(`On ${dayWord(day, p.today)} now. You’ve got it.`);
+              }}
+              onOpen={(e) => {
+                const r = requestOf(e.id);
+                if (r?.taskId) p.onOpenTaskId(r.taskId);
+              }}
+            />
+          </div>
+        ) : (
+          <section className="app-shared-group" aria-label={`You sent ${first}`}>
+            <div className="app-shared-title tp-turnable">You sent {first}</div>
+            <div className="app-shared-none tp-turnable">Nothing sent to {first} yet.</div>
+          </section>
+        )}
       </SheetBody>
     </>
   );

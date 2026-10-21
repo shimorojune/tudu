@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { eq, schema, type Db } from '@tudu/db';
 import { requireSession, type SessionVars } from '../middleware/session';
+import { inboxCounts } from '../requests';
 import { colourOf, spaceSummaries } from '../spaces';
 
 /** Who you are and the spaces you are in. */
@@ -22,7 +23,13 @@ export function meRoutes(db: Db) {
         image: session.user.image ?? null,
         color,
       },
-      spaces: await spaceSummaries(db, session.user.id),
+      spaces: await (async () => {
+        const counts = await inboxCounts(db, session.user.id);
+        return (await spaceSummaries(db, session.user.id)).map((s) => ({
+          ...s,
+          inbox: counts.get(s.id) ?? { toAnswer: 0, unread: 0 },
+        }));
+      })(),
     });
   });
   return r;

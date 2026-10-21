@@ -218,6 +218,8 @@ export const historyKind = pgEnum('history_kind', [
   'crossed',
   'uncrossed',
   'restored',
+  'accepted',
+  'withdrawn',
 ]);
 
 /** What happened to a task, written by the server as it applies changes, so every device reads the same history. */
@@ -258,6 +260,70 @@ export const attachments = pgTable(
     index('attachments_task').on(t.taskId),
     index('attachments_space_created').on(t.spaceId, t.createdAt),
   ],
+);
+
+export const requestState = pgEnum('request_state', ['waiting', 'accepted', 'declined', 'withdrawn']);
+
+/** A task someone sent: its own row while it waits; accepting makes the task, declining makes none. */
+export const requests = pgTable(
+  'requests',
+  {
+    /** Made by the client, so Send works offline and never doubles. */
+    id: text('id').primaryKey(),
+    spaceId: text('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    fromId: text('from_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    toId: text('to_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    /** The sender's note, plain words. */
+    note: text('note').notNull().default(''),
+    /** The day the sender asked for; null for none. */
+    askedDay: date('asked_day', { mode: 'string' }),
+    dueDay: date('due_day', { mode: 'string' }),
+    projectId: text('project_id').references(() => projects.id, { onDelete: 'set null' }),
+    /** Files sent along; they join the task on accept. */
+    attachments: jsonb('attachments').$type<string[]>().notNull().default([]),
+    state: requestState('state').notNull().default('waiting'),
+    reason: text('reason'),
+    seenAt: timestamp('seen_at', { withTimezone: true }),
+    /** The task it became (accepted), or the one Take it back made. */
+    taskId: text('task_id').references(() => tasks.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    answeredAt: timestamp('answered_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('requests_to').on(t.toId, t.spaceId, t.state),
+    index('requests_from').on(t.fromId, t.spaceId),
+  ],
+);
+
+export const inboxKind = pgEnum('inbox_kind', ['request', 'comment', 'answer']);
+
+/** One thing in someone's Inbox: a request to answer, a comment on their task, an answer to a request they sent. */
+export const inboxItems = pgTable(
+  'inbox_items',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    spaceId: text('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    kind: inboxKind('kind').notNull(),
+    requestId: text('request_id').references(() => requests.id, { onDelete: 'cascade' }),
+    taskId: text('task_id').references(() => tasks.id, { onDelete: 'cascade' }),
+    commentId: text('comment_id').references(() => comments.id, { onDelete: 'cascade' }),
+    readAt: timestamp('read_at', { withTimezone: true }),
+    answeredAt: timestamp('answered_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('inbox_items_user').on(t.userId, t.spaceId, t.createdAt)],
 );
 
 /** Every mutation the server has applied, by its id, so a retry never applies twice. */

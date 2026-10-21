@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
-import { addDays, membersWords, spaceInitials, weekdayName, type SpaceSummary } from '@tudu/core';
+import { addDays, inboxBadge, membersWords, spaceInitials, weekdayName, type SpaceSummary } from '@tudu/core';
 import {
   Avatar,
   BottomTabs,
   Fab,
+  Icon,
   Sidebar,
   SpaceSwitch,
   TopBar,
@@ -14,6 +15,7 @@ import {
 } from '@tudu/ui';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { MeResponse } from '@tudu/client';
+import { cx } from '@tudu/ui';
 import {
   openCreateSpace,
   openQuickAdd,
@@ -78,6 +80,7 @@ export function switchSpaces(spaces: SpaceSummary[]): SwitchSpace[] {
     personal: s.kind === 'personal',
     initials: spaceInitials(s.name),
     sub: membersWords(s.members),
+    count: inboxBadge(s.inbox) || undefined,
   }));
 }
 
@@ -139,10 +142,12 @@ export function AppShell({
     color: me.user.color ?? undefined,
   };
   const team = space.kind === 'team';
+  const inboxCount = inboxBadge(space.inbox);
   const items: SidebarItem[] = VIEWS.filter((v) => team || !v.team).map((v) => ({
     value: v.value,
     label: v.label,
     icon: v.icon,
+    count: v.value === 'inbox' && inboxCount ? inboxCount : undefined,
   }));
 
   const go = (v: View) => void navigate({ href: spacePath(space.slug, v) });
@@ -197,7 +202,18 @@ export function AppShell({
       <div className="tp-root app-phone" data-viewport="phone">
         <header className="app-phone-head">
           {switcher('sheet')}
-          <Avatar initials={user.initials} name={user.name} size="sm" />
+          <div className="app-phone-tools">
+            <button
+              type="button"
+              className={cx('app-phone-inbox', current === 'inbox' && 'tp-on')}
+              aria-label={inboxCount ? `Inbox, ${inboxCount} new` : 'Inbox'}
+              onClick={() => go('inbox')}
+            >
+              <Icon name="inbox" size={20} />
+              {inboxCount ? <span className="app-phone-pip">{inboxCount}</span> : null}
+            </button>
+            <Avatar initials={user.initials} name={user.name} size="sm" />
+          </div>
         </header>
         <div className="tp-scroll app-phone-scroll">{page}</div>
         <div className="app-phone-fab">

@@ -1,5 +1,5 @@
 import { createApi, createAuthClientFor, ApiError, type MeResponse } from '@tudu/client';
-import { QueryClient, queryOptions } from '@tanstack/react-query';
+import { CancelledError, QueryClient, queryOptions } from '@tanstack/react-query';
 import { API_URL } from './config';
 
 export const api = createApi({ baseUrl: API_URL });
@@ -27,9 +27,28 @@ export const meQuery = queryOptions({
   },
 });
 
-/** Ask the server again who is signed in (after sign in). */
-export function refreshMe(): Promise<MeResponse | null> {
-  return queryClient.fetchQuery({ ...meQuery, staleTime: 0 });
+/**
+ * Who is signed in, for the router: the cached answer when there is one (the shell's live query keeps it fresh),
+ * the server's otherwise. A refresh of the same query landing mid-fetch cancels that fetch; the read is asked once
+ * more then, instead of the navigation failing.
+ */
+export async function loadMe(qc: QueryClient = queryClient): Promise<MeResponse | null> {
+  try {
+    return await qc.ensureQueryData(meQuery);
+  } catch (err) {
+    if (err instanceof CancelledError) return qc.ensureQueryData(meQuery);
+    throw err;
+  }
+}
+
+/** Ask the server again who is signed in (after sign in, joining or creating a space). */
+export async function refreshMe(): Promise<MeResponse | null> {
+  try {
+    return await queryClient.fetchQuery({ ...meQuery, staleTime: 0 });
+  } catch (err) {
+    if (err instanceof CancelledError) return queryClient.fetchQuery({ ...meQuery, staleTime: 0 });
+    throw err;
+  }
 }
 
 export async function signOut(): Promise<void> {

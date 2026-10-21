@@ -85,6 +85,7 @@ export async function spaceSummaries(db: Executor, userId: string): Promise<Spac
     slug: slugOf(r),
     prefix: r.prefix,
     members: n.get(r.id) ?? 1,
+    inbox: { toAnswer: 0, unread: 0 },
   }));
 }
 

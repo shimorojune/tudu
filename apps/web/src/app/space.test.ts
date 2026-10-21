@@ -21,6 +21,7 @@ const SPACES: SpaceSummary[] = [
     slug: 'me',
     prefix: 'ME',
     members: 1,
+    inbox: { toAnswer: 0, unread: 0 },
   },
   {
     id: 'n',
@@ -31,6 +32,7 @@ const SPACES: SpaceSummary[] = [
     slug: 'northwind',
     prefix: 'NW',
     members: 3,
+    inbox: { toAnswer: 0, unread: 0 },
   },
 ];
 
