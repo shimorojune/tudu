@@ -95,9 +95,11 @@ export function useShownDay(): IsoDate | null {
 
 /** Quick Add, over the page; with words, they become the title. */
 export function openQuickAdd(seed?: { title: string }): void {
-  if (seed) quickAddSeed = { title: seed.title, nonce: (quickAddSeed?.nonce ?? 0) + 1 };
+  // A click handler may pass its event: only real words count.
+  const words = seed && typeof seed.title === 'string' ? seed.title : null;
+  if (words !== null) quickAddSeed = { title: words, nonce: (quickAddSeed?.nonce ?? 0) + 1 };
   if (quickAdd) {
-    if (seed) notify();
+    if (words !== null) notify();
     return;
   }
   quickAdd = true;

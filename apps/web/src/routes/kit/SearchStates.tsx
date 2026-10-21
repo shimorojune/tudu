@@ -93,7 +93,7 @@ export function SearchStates() {
         title="Phone"
         note="The Search tab opens a full-height sheet; Cancel puts it away. The byline wraps rather than cutting."
         render={() => (
-          <div style={{ width: 390, height: 560, display: 'flex' }}>
+          <div style={{ width: 'min(390px, 100%)', height: 560, display: 'flex' }}>
             <SearchPanel
               layer="none"
               variant="sheet"
@@ -108,36 +108,40 @@ export function SearchStates() {
       />
       <Pair
         title="Quick Add: looks like a task you have"
-        note="As you write, the same search checks the title. Its title opens that task (the draft stays); “N more” unfolds the rest; × hides them."
+        note="As you write, the same search checks the title. Its title opens that task (the draft stays); × hides it."
         render={() => (
-          <div style={{ display: 'grid', gap: 16, width: 'min(640px, 100%)' }}>
-            <QuickAdd
-              layer="none"
-              open
-              today={TODAY}
-              projects={[]}
-              initial={{
-                noFocus: true,
-                title: 'Renew my passport',
-                similar: [{ key: 'p', title: 'Renew passport', where: { label: 'Backlog' } }],
-              }}
-            />
-            <QuickAdd
-              layer="none"
-              open
-              today={TODAY}
-              projects={[]}
-              initial={{
-                noFocus: true,
-                title: 'Run the migration on staging',
-                similar: [
-                  { key: 'q', title: 'Run the request status enum migration and backfill on staging', where: { label: 'Today' } },
-                  { key: 'r', title: 'Run the request status enum migration on production', where: { label: 'Tomorrow' } },
-                ],
-                similarOpen: true,
-              }}
-            />
-          </div>
+          <QuickAdd
+            layer="none"
+            open
+            today={TODAY}
+            projects={[]}
+            initial={{
+              noFocus: true,
+              title: 'Renew my passport',
+              similar: [{ key: 'p', title: 'Renew passport', where: { label: 'Backlog' } }],
+            }}
+          />
+        )}
+      />
+      <Pair
+        title="Quick Add: several alike"
+        note="The closest shows; “N more” unfolds the rest (up to three)."
+        render={() => (
+          <QuickAdd
+            layer="none"
+            open
+            today={TODAY}
+            projects={[]}
+            initial={{
+              noFocus: true,
+              title: 'Run the migration on staging',
+              similar: [
+                { key: 'q', title: 'Run the request status enum migration and backfill on staging', where: { label: 'Today' } },
+                { key: 'r', title: 'Run the request status enum migration on production', where: { label: 'Tomorrow' } },
+              ],
+              similarOpen: true,
+            }}
+          />
         )}
       />
     </Section>

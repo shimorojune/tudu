@@ -206,7 +206,7 @@ function BacklogSheet({ spaceId, today, vp, onOpenTask, openKey }: BacklogSheetP
     );
   else if (view === 'open' && !open.length && writing === null)
     body = (
-      <EmptyState title="Nothing waiting." action="Add a task" onAction={openQuickAdd}>
+      <EmptyState title="Nothing waiting." action="Add a task" onAction={() => openQuickAdd()}>
         Tasks without a day land here. Give one a day with its calendar button when you’re ready.
       </EmptyState>
     );
