@@ -4,21 +4,28 @@ import {
   fileSize,
   isEmptyHtml,
   isProjectMutation,
+  LOOKALIKE_MIN,
+  lookAlikes,
   nextProjectColor,
   POSITION_STEP,
+  rankSearch,
+  searchTokens,
   syncMutationSchema,
   taskIdOf,
+  textOf,
+  wordsOf,
   type Comment,
   type HistoryEvent,
   type IsoDate,
   type Project,
+  type SearchHit,
   type Subtask,
   type SyncMutation,
   type SyncResult,
   type Task,
   type TaskDetail,
 } from '@tudu/core';
-import { and, asc, count, eq, gte, inArray, isNull, lt, lte, schema, sql, type Db } from '@tudu/db';
+import { and, asc, count, eq, gte, inArray, isNull, lt, lte, or, schema, sql, type Db } from '@tudu/db';
 import type { SubtaskClocks, TaskClocks } from '@tudu/db/schema';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -171,6 +178,141 @@ export async function tasksOfBacklog(db: Executor, spaceId: string): Promise<Tas
     .where(and(eq(schema.tasks.spaceId, spaceId), isNull(schema.tasks.day), isNull(schema.tasks.deletedAt)))
     .orderBy(asc(schema.tasks.position), asc(schema.tasks.createdAt));
   return withCounts(db, rows);
+}
+
+const searchColumns = {
+  id: schema.tasks.id,
+  number: schema.tasks.number,
+  prefix: schema.spaces.taskPrefix,
+  title: schema.tasks.title,
+  day: schema.tasks.day,
+  doneAt: schema.tasks.doneAt,
+  projectId: schema.tasks.projectId,
+  notesText: schema.tasks.notesText,
+};
+type SearchRow = {
+  id: string;
+  number: number;
+  prefix: string;
+  title: string;
+  day: string | null;
+  doneAt: Date | null;
+  projectId: string | null;
+  notesText: string;
+};
+
+/** At most this many rows are read for one search before the ranking picks the best. */
+const SEARCH_CANDIDATES = 400;
+/** At most this many hits go back. */
+export const SEARCH_LIMIT = 30;
+
+function toHit(r: SearchRow, snippet: string | null = null): SearchHit {
+  return {
+    id: r.id,
+    ref: `${r.prefix}-${r.number}`,
+    title: r.title,
+    day: r.day,
+    done: r.doneAt !== null,
+    projectId: r.projectId,
+    snippet,
+  };
+}
+
+/** A word as a pattern for ILIKE: its own wildcards escaped. */
+function like(word: string): string {
+  return `%${word.replace(/[\\%_]/g, '\\$&')}%`;
+}
+
+/** The task's number when the words are a task ID typed in full ("ME-52"), else null. */
+function numberOf(q: string): number | null {
+  const m = /^[a-z][a-z0-9]*-(\d+)$/i.exec(q.trim());
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * The best matches in a space for the words typed: Postgres finds the rows where any word is in the title, the
+ * ID or the notes' text, and the ranking shared with the client puts them in order, every word required.
+ */
+export async function searchTasks(
+  db: Executor,
+  spaceId: string,
+  q: string,
+  today: IsoDate,
+): Promise<SearchHit[]> {
+  const toks = searchTokens(q);
+  if (!toks.length) return [];
+  const n = numberOf(q);
+  const words = toks.map((w) =>
+    or(sql`${schema.tasks.title} ILIKE ${like(w)}`, sql`${schema.tasks.notesText} ILIKE ${like(w)}`)!,
+  );
+  const rows: SearchRow[] = await db
+    .select(searchColumns)
+    .from(schema.tasks)
+    .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
+    .where(
+      and(
+        eq(schema.tasks.spaceId, spaceId),
+        isNull(schema.tasks.deletedAt),
+        or(...words, ...(n === null ? [] : [eq(schema.tasks.number, n)])),
+      ),
+    )
+    .orderBy(asc(schema.tasks.day), asc(schema.tasks.position), asc(schema.tasks.createdAt))
+    .limit(SEARCH_CANDIDATES);
+  const ranked = rankSearch(
+    rows.map((r) => ({
+      row: r,
+      ref: `${r.prefix}-${r.number}`,
+      title: r.title,
+      day: r.day,
+      done: r.doneAt !== null,
+      notes: r.notesText,
+    })),
+    q,
+    today,
+    SEARCH_LIMIT,
+  );
+  return ranked.map((h) => toHit(h.item.row, h.snippet));
+}
+
+/** Open tasks in a space that read like the title (Quick Add's "Looks like a task you have"), the closest first. */
+export async function lookAlikeTasks(db: Executor, spaceId: string, title: string): Promise<SearchHit[]> {
+  const ws = wordsOf(title);
+  if (!ws.length || title.trim().length < LOOKALIKE_MIN) return [];
+  const rows: SearchRow[] = await db
+    .select(searchColumns)
+    .from(schema.tasks)
+    .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
+    .where(
+      and(
+        eq(schema.tasks.spaceId, spaceId),
+        isNull(schema.tasks.deletedAt),
+        isNull(schema.tasks.doneAt),
+        or(...ws.map((w) => sql`${schema.tasks.title} ILIKE ${like(w.slice(0, 5))}`)),
+      ),
+    )
+    .orderBy(asc(schema.tasks.day), asc(schema.tasks.position), asc(schema.tasks.createdAt))
+    .limit(SEARCH_CANDIDATES);
+  return lookAlikes(
+    rows.map((r) => ({ row: r, title: r.title, done: false })),
+    title,
+  ).map((x) => toHit(x.row));
+}
+
+/** The tasks asked for by id, as hits, in the order asked; a deleted or unknown one is left out. */
+export async function hitsById(db: Executor, spaceId: string, ids: string[]): Promise<SearchHit[]> {
+  if (!ids.length) return [];
+  const rows: SearchRow[] = await db
+    .select(searchColumns)
+    .from(schema.tasks)
+    .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
+    .where(
+      and(eq(schema.tasks.spaceId, spaceId), isNull(schema.tasks.deletedAt), inArray(schema.tasks.id, ids)),
+    );
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return ids
+    .map((id) => byId.get(id))
+    .filter((r): r is SearchRow => !!r)
+    .map((r) => toHit(r));
 }
 
 /** Seven days from `monday`, each with its tasks in order. */
@@ -544,6 +686,7 @@ async function create(
     position: p.position ?? (await endOf(tx, p.spaceId, p.day)),
     dueDay: p.due ?? null,
     notes: notes ? cleanHtml(notes) : '',
+    notesText: notes ? textOf(cleanHtml(notes)) : '',
     projectId,
     createdBy: userId,
     clocks,
@@ -654,6 +797,7 @@ async function change(tx: Tx, userId: string, m: TaskChange): Promise<Applied> {
     case 'task.notes':
       if (newer(m.at, clocks.notes)) {
         set.notes = cleanHtml(m.payload.notes);
+        set.notesText = textOf(set.notes);
         clocks.notes = m.at;
       }
       break;

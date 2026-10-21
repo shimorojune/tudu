@@ -24,6 +24,7 @@ import {
 import { useEffect, useState } from 'react';
 import { API_URL } from '../../app/config';
 import { initialsOf } from '../../app/session';
+import { addRecentTask } from '../../app/search';
 import { taskStore } from '../../app/tasks';
 import type { Viewport } from '../../app/viewport';
 
@@ -78,6 +79,10 @@ export function TaskPanel(p: TaskPanelProps) {
     setSeenOpen(open);
     setNow(new Date());
   }
+  // A task you open joins Search's "Recently opened".
+  useEffect(() => {
+    if (open) addRecentTask(spaceId, open.id);
+  }, [open, spaceId]);
   // The last task keeps rendering while the drawer eases out.
   const [last, setLast] = useState<OpenTask | null>(open);
   if (open && open !== last) setLast(open);

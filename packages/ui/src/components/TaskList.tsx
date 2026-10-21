@@ -179,8 +179,16 @@ export function TaskList(p: TaskListProps) {
     if (f.focus?.isConnected && document.activeElement !== f.focus) f.focus.focus({ preventScroll: true });
   });
 
-  // locateKey: scroll a task into the middle, focus it, flash it.
+  // locateKey: scroll a task into the middle, focus it, flash it. The wait survives re-renders (the page may
+  // still be settling after a turn); only another key or unmounting stops it.
   const seenLocate = useRef<string | null>(null);
+  const locateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (locateTimer.current) clearTimeout(locateTimer.current);
+    },
+    [],
+  );
   useEffect(() => {
     const lk = p.locateKey;
     if (!lk || lk === seenLocate.current || !ref.current) return;
@@ -188,7 +196,8 @@ export function TaskList(p: TaskListProps) {
     if (!tasks.some((t) => t.key === key || t.id === key)) return;
     seenLocate.current = lk;
     const hit = tasks.find((t) => t.key === key || t.id === key)!;
-    const timer = setTimeout(() => {
+    if (locateTimer.current) clearTimeout(locateTimer.current);
+    locateTimer.current = setTimeout(() => {
       const el = ref.current ? itemByKey(ref.current, hit.key) : null;
       if (!el) return;
       const sc = scrollerOf(el);
@@ -209,9 +218,11 @@ export function TaskList(p: TaskListProps) {
       const f =
         el.querySelector<HTMLElement>('.tp-strike[tabindex]') ??
         el.querySelector<HTMLElement>('button.tp-cb');
-      f?.focus({ preventScroll: true });
+      // Focus the row unless something over the page (a dialog, the search panel) has the focus by now.
+      const active = document.activeElement;
+      if (!active || active === document.body || !active.closest('[role="dialog"]'))
+        f?.focus({ preventScroll: true });
     }, 240);
-    return () => clearTimeout(timer);
   }, [p.locateKey, tasks]);
 
   // Reordering inside this list (drag, or Alt with an arrow key) and rows handed over from another list.

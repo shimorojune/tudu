@@ -170,7 +170,8 @@ export function Dialog(props: DialogProps) {
               }
             }}
             onInteractOutside={(e) => {
-              if (leaving) e.preventDefault();
+              const target = e.detail.originalEvent.target as Element | null;
+              if (leaving || target?.closest?.('.tp-toast-host')) e.preventDefault();
             }}
           >
             <DialogPanel {...props} ref={panel} />

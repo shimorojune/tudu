@@ -25,7 +25,15 @@ import {
   type TaskItem,
 } from '@tudu/ui';
 import { useEffect, useLayoutEffect, useRef, useState, type TouchEvent } from 'react';
-import { setSecondDay, showDay, useDayView, useFlash, useNewTaskAsk, useShownDay } from '../../app/dayView';
+import {
+  setSecondDay,
+  showDay,
+  useDayView,
+  useFlash,
+  useLocate,
+  useNewTaskAsk,
+  useShownDay,
+} from '../../app/dayView';
 import { api, meQuery } from '../../app/session';
 import { taskStore, useOnline } from '../../app/tasks';
 import { useViewport, type Viewport } from '../../app/viewport';
@@ -268,6 +276,7 @@ function DaySheet({
   const q = useQuery(taskStore.dayQuery(spaceId, day, today));
   const projects = useQuery(taskStore.projectsQuery(spaceId)).data ?? [];
   const flash = useFlash();
+  const locate = useLocate();
   const range = monthAround(day);
   const marks = useQuery(taskStore.marksQuery(spaceId, range.from, range.to)).data;
 
@@ -332,6 +341,7 @@ function DaySheet({
         resetKey={day}
         group={group}
         flashKey={flash && flash.day === day ? flash.id : undefined}
+        locateKey={locate && locate.day === day ? `${locate.id}:${locate.nonce}` : undefined}
         addLabel="Write the next thing…"
         addKey={writing}
         onAddClose={() => setWriting(null)}

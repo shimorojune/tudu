@@ -220,3 +220,16 @@
   overflow-x: auto;
   padding-bottom: 8px;
 }
+
+/* Search in the kit: the panel keeps its 620px on the desk and shrinks with a narrow window. */
+.kit .tp-sp-static .tp-sp-desk {
+  max-width: 100%;
+}
+.kit .tp-sp-static-phone,
+.kit .tp-sp-static-phone .tp-sp-phone {
+  max-width: 100%;
+  min-width: 0;
+}
+.kit .tp-sp-skel .tp-skel {
+  max-width: 100%;
+}

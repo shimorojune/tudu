@@ -21,7 +21,14 @@ import {
   TaskListSkeleton,
 } from '@tudu/ui';
 import { useEffect, useRef, useState } from 'react';
-import { openQuickAdd, setPage, useFlash, useNewTaskAsk } from '../../app/dayView';
+import {
+  openQuickAdd,
+  setPage,
+  useBacklogViewAsk,
+  useFlash,
+  useLocate,
+  useNewTaskAsk,
+} from '../../app/dayView';
 import { api, meQuery } from '../../app/session';
 import { taskStore, useOnline } from '../../app/tasks';
 import { useViewport, type Viewport } from '../../app/viewport';
@@ -128,11 +135,22 @@ function BacklogSheet({ spaceId, today, vp, onOpenTask, openKey }: BacklogSheetP
   const range = monthAround(today);
   const marks = useQuery(taskStore.marksQuery(spaceId, addDays(range.from, -7), range.to)).data ?? {};
   const flash = useFlash();
+  const locate = useLocate();
   const ask = useNewTaskAsk();
 
   // The view starts at To do each visit; the filter is remembered. A filter for a project that is gone is dropped.
-  const [view, setView] = useState<BacklogView>('open');
+  // A task picked in Search asks for its view (Crossed off for a crossed-off one).
+  const viewAsk = useBacklogViewAsk();
+  const [view, setView] = useState<BacklogView>(viewAsk?.view ?? 'open');
   const [dir, setDir] = useState<'next' | 'prev'>('next');
+  const [seenViewAsk, setSeenViewAsk] = useState(viewAsk?.nonce ?? 0);
+  if (viewAsk && viewAsk.nonce !== seenViewAsk) {
+    setSeenViewAsk(viewAsk.nonce);
+    if (viewAsk.view !== view) {
+      setDir(viewAsk.view === 'done' ? 'next' : 'prev');
+      setView(viewAsk.view);
+    }
+  }
   const kept = useBacklogFilter(spaceId);
   const filterProject = kept ? projects.find((p) => p.id === kept) : undefined;
   const projectsReady = useQuery(taskStore.projectsQuery(spaceId)).isSuccess;
@@ -195,7 +213,7 @@ function BacklogSheet({ spaceId, today, vp, onOpenTask, openKey }: BacklogSheetP
     );
   else if (view === 'open' && !open.length && writing === null)
     body = (
-      <EmptyState title="Nothing waiting." action="Add a task" onAction={openQuickAdd}>
+      <EmptyState title="Nothing waiting." action="Add a task" onAction={() => openQuickAdd()}>
         Tasks without a day land here. Give one a day with its calendar button when you’re ready.
       </EmptyState>
     );
@@ -214,6 +232,7 @@ function BacklogSheet({ spaceId, today, vp, onOpenTask, openKey }: BacklogSheetP
         onUnleave={(t) => taskStore.cross(t.key, true)}
         onOpenTask={(t) => onOpenTask(t.key, t.id)}
         selectedKey={openKey}
+        locateKey={locate && locate.day === null ? `${locate.id}:${locate.nonce}` : undefined}
       />
     );
   else
@@ -243,6 +262,7 @@ function BacklogSheet({ spaceId, today, vp, onOpenTask, openKey }: BacklogSheetP
         onDueChange={(t, due) => taskStore.due(t.key, due)}
         onOpenTask={(t) => onOpenTask(t.key, t.id)}
         selectedKey={openKey}
+        locateKey={locate && locate.day === null ? `${locate.id}:${locate.nonce}` : undefined}
         onAddSubtask={(t, title) => taskStore.addSubtask(spaceId, t.key, title)}
         onRenameSubtask={(t, s, title) => taskStore.renameSubtask(t.key, s.key, title)}
         onToggleSubtask={(t, s, v) => taskStore.crossSubtask(t.key, s.key, v)}

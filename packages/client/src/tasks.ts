@@ -909,9 +909,12 @@ export class TaskStore {
    * to disk after the outbox last looked is still on its way, so only what is no longer on disk goes.
    */
   private async sweep(): Promise<void> {
+    // Only what was on disk before this look can be gone from it: a change that lands while the read is in flight
+    // may be missing from the answer yet still on its way, so it is left for the next sweep.
+    const candidates = [...this.pending].filter(([, p]) => p.stored).map(([id]) => id);
     const left = new Set((await this.o.store.all()).map((m) => m.id));
-    for (const [id, p] of this.pending)
-      if (p.stored && !left.has(id)) {
+    for (const id of candidates)
+      if (this.pending.has(id) && !left.has(id)) {
         this.pending.delete(id);
         this.unanswered = Math.max(0, this.unanswered - 1);
       }

@@ -6,12 +6,13 @@ import type {
   DayResponse,
   WeekResponse,
   MarksResponse,
+  SearchResponse,
   SyncResponse,
   Task,
   TaskDetail,
   TasksChangedEvent,
 } from '@tudu/core';
-import { eq, schema } from '@tudu/db';
+import { eq, schema, sql } from '@tudu/db';
 import { sweepAttachments } from './files';
 import type { MemoryStorage } from './storage';
 import { get, post, signIn, startServer, type Jar } from '../test/harness';
@@ -1138,5 +1139,119 @@ describe('the week (chunk 05)', () => {
     );
     const out = (await res.json()) as SyncResponse;
     expect(out.results[0]!.status).toBe('rejected');
+  });
+
+  async function search(p: Person, query: string): Promise<SearchResponse> {
+    const res = await get(server.app, `/api/spaces/${p.spaceId}/search?${query}`, p.jar);
+    expect(res.status).toBe(200);
+    return (await res.json()) as SearchResponse;
+  }
+
+  it('C07-A01 search ranks across the title, the ID and the notes; every word must match; crossed off below; ties by where against today; at most thirty', async () => {
+    const p = await person();
+    const ids = Array.from({ length: 8 }, () => randomUUID());
+    await sync(p, [
+      create(p, 'Old passport renewal', '2026-10-10', 1024, ids[0]),
+      create(p, 'Renew passport', null, 1024, ids[1]),
+      create(p, 'Renew passport', '2026-10-18', 1024, ids[2]),
+      create(p, 'Renew the passport', '2026-10-20', 1024, ids[3]),
+      m('task.create', {
+        id: ids[4],
+        spaceId: p.spaceId,
+        title: 'Gutters',
+        day: '2026-10-18',
+        position: 2048,
+        notes: '<p>and <b>renew</b> the passport</p>',
+      }),
+      create(p, 'Renew passport', '2026-10-19', 1024, ids[5]),
+      create(p, 'Buy milk', '2026-10-18', 3072, ids[6]),
+    ]);
+    await sync(p, [m('task.cross', { id: ids[3], done: true })]);
+    const r = await search(p, 'q=renew%20passport&today=2026-10-18');
+    expect(r.hits.map((h) => h.id)).toEqual([ids[2], ids[5], ids[1], ids[0], ids[3], ids[4]]);
+    expect(r.hits[0]).toMatchObject({
+      ref: 'ME-3',
+      title: 'Renew passport',
+      day: '2026-10-18',
+      done: false,
+      projectId: null,
+      snippet: null,
+    });
+    expect(r.hits[4]!.done).toBe(true);
+    expect(r.hits[5]!.snippet).toBe('and renew the passport');
+    // every word must be found
+    expect((await search(p, 'q=renew%20milk&today=2026-10-18')).hits).toEqual([]);
+    // the ID in full comes first and alone matches by the ID
+    const byId = await search(p, 'q=me-5&today=2026-10-18');
+    expect(byId.hits[0]!.ref).toBe('ME-5');
+    expect(byId.hits).toHaveLength(1);
+    // no words, no hits
+    expect((await search(p, 'q=%20')).hits).toEqual([]);
+    // at most thirty of many
+    await sync(
+      p,
+      Array.from({ length: 35 }, (_, i) => create(p, `Water the plants ${i}`, null, 1024 + i)),
+    );
+    expect((await search(p, 'q=water&today=2026-10-18')).hits).toHaveLength(30);
+  });
+
+  it('C07-A02 notes are searched as words: markup never matches, the text copy follows every notes change, Quick Add notes are found at once', async () => {
+    const p = await person();
+    const id = randomUUID();
+    await sync(p, [
+      m('task.create', {
+        id,
+        spaceId: p.spaceId,
+        title: 'Plan the dinner',
+        day: null,
+        position: 1024,
+        notes: '<p>Ask about <a href="https://example.com/strong">dietary</a> needs</p>',
+        source: 'quick-add',
+      }),
+    ]);
+    expect((await search(p, 'q=dietary')).hits.map((h) => h.id)).toEqual([id]);
+    expect((await search(p, 'q=dietary')).hits[0]!.snippet).toBe('Ask about dietary needs');
+    // "strong" and "href" live in the markup only
+    expect((await search(p, 'q=strong')).hits).toEqual([]);
+    expect((await search(p, 'q=href')).hits).toEqual([]);
+    await sync(p, [m('task.notes', { id, notes: '<p>Book the <em>venue</em> first</p>' })]);
+    expect((await search(p, 'q=dietary')).hits).toEqual([]);
+    expect((await search(p, 'q=venue')).hits[0]!.snippet).toBe('Book the venue first');
+    const [row] = await server.db
+      .select({ t: schema.tasks.notesText })
+      .from(schema.tasks)
+      .where(eq(schema.tasks.id, id));
+    expect(row!.t).toBe('Book the venue first');
+    // the backfill's own cut of the markup gives the same words for existing rows
+    await server.db.execute(sql`UPDATE tasks SET notes_text = '' WHERE id = ${id}`);
+    await server.db.execute(
+      sql`UPDATE tasks SET notes_text = btrim(regexp_replace(regexp_replace(notes, '<[^>]+>', ' ', 'g'), '\s+', ' ', 'g')) WHERE notes <> ''`,
+    );
+    expect((await search(p, 'q=venue')).hits.map((h) => h.id)).toEqual([id]);
+  });
+
+  it('C07-A03 ids come back in the order asked without deleted ones; look-alikes are open tasks sharing words; a stranger is refused', async () => {
+    const p = await person();
+    const a = randomUUID();
+    const b = randomUUID();
+    const c = randomUUID();
+    const d = randomUUID();
+    await sync(p, [
+      create(p, 'Renew passport', null, 1024, a),
+      create(p, 'Renew the domain', '2026-10-18', 1024, b),
+      create(p, 'Passport photos', '2026-10-19', 1024, c),
+      create(p, 'Write the release notes', null, 2048, d),
+    ]);
+    await sync(p, [m('task.cross', { id: c, done: true }), m('task.delete', { id: d })]);
+    const byIds = await search(p, `ids=${d},${b},${randomUUID()},${a}`);
+    expect(byIds.hits.map((h) => h.id)).toEqual([b, a]);
+    expect(byIds.hits[0]).toMatchObject({ ref: 'ME-2', day: '2026-10-18', done: false });
+    const alike = await search(p, 'for=lookalike&q=Renew%20my%20passport');
+    expect(alike.hits.map((h) => h.id)).toEqual([a, b]);
+    expect((await search(p, 'for=lookalike&q=Passport%20photos')).hits.map((h) => h.id)).toEqual([a]);
+    expect((await search(p, 'for=lookalike&q=Run')).hits).toEqual([]);
+    const stranger = await person();
+    const res = await get(server.app, `/api/spaces/${p.spaceId}/search?q=renew`, stranger.jar);
+    expect(res.status).toBe(403);
   });
 });

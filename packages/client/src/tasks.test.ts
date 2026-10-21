@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { addDays } from '@tudu/core';
 import type { DayResponse, Project, SyncResponse, Task, TaskDetail, WeekResponse } from '@tudu/core';
 import { createApi } from './api';
-import { MemoryOutboxStore } from './outbox';
+import { MemoryOutboxStore, type OutboxStore } from './outbox';
 import { TaskStore, applyToDay, dayKey, projectsKey, taskKey, type DayData } from './tasks';
 
 const SPACE = 'space-1';
@@ -40,7 +40,7 @@ function detailOf(t: Task): TaskDetail {
 }
 
 /** A pretend server: days held in memory, sync answered by a function the test sets. */
-function setup(days: Record<string, Task[]>, projects: Project[] = []) {
+function setup(days: Record<string, Task[]>, projects: Project[] = [], outbox?: OutboxStore) {
   const calls: string[] = [];
   let answer: (body: {
     mutations: Array<{ id: string; type: string; payload: { id: string } }>;
@@ -111,7 +111,7 @@ function setup(days: Record<string, Task[]>, projects: Project[] = []) {
   const store = new TaskStore({
     api: createApi({ baseUrl: 'http://api.test', fetch: fetch as unknown as typeof globalThis.fetch }),
     queryClient,
-    store: new MemoryOutboxStore(),
+    store: outbox ?? new MemoryOutboxStore(),
     clientId: 'tab-a',
     me: () => ({ id: 'me', name: 'Rohit Raj', email: 'rohit@test.tudu' }),
     onRejected: (msg) => rejected.push(msg),
@@ -368,6 +368,38 @@ describe('C03-U21 detail changes apply at once and queue', () => {
 });
 
 describe('C03-U22 delete, restore and live events for a task', () => {
+  it('C03-U22 a change written while the outbox was sweeping the disk is still sent', async () => {
+    // The sweep reads the disk; a write that lands during that read must not be mistaken for one already sent.
+    const inner = new MemoryOutboxStore();
+    let hold: Promise<void> | null = null;
+    let reads = 0;
+    let heldRead = -1;
+    const gated: OutboxStore = {
+      all: async () => {
+        const snap = await inner.all();
+        if (++reads === heldRead && hold) await hold;
+        return snap;
+      },
+      put: (m) => inner.put(m),
+      remove: (id) => inner.remove(id),
+    };
+    const t = setup({ [SUN]: [task('t1', 'One', SUN, 1024), task('t2', 'Two', SUN, 2048)] }, [], gated);
+    await t.load(SUN);
+    // A flush with nothing to send ends in a sweep; its read of the disk is held open.
+    let release!: () => void;
+    hold = new Promise((r) => (release = r));
+    heldRead = reads + 2; // the flush's own read, then the sweep's
+    await t.store.outbox.flush();
+    await new Promise((r) => setTimeout(r, 0));
+    t.store.remove('t2');
+    await new Promise((r) => setTimeout(r, 0));
+    release();
+    await t.settle();
+    expect(t.calls.filter((c) => c === 'POST /api/sync')).toHaveLength(1);
+    expect(await t.store.idle()).toBe(true);
+    expect(t.read(SUN).map((x) => x.title)).toEqual(['One']);
+  });
+
   it('C03-U22 delete takes the row off its day; restore puts it back in its place', async () => {
     const t = setup({
       [SUN]: [task('t1', 'One', SUN, 1024), task('t2', 'Two', SUN, 2048), task('t3', 'Three', SUN, 3072)],

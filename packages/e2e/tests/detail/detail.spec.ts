@@ -228,6 +228,8 @@ test.describe('detail', () => {
     await expect(p.getByText('No comments yet.')).toBeVisible();
     await page.getByRole('button', { name: 'Undo' }).click();
     await expect(comment).toHaveCount(1);
+    // the panel stays: a click on the toast is not a click outside it
+    await expect(p).toBeVisible();
     await idle(page);
     // the restore lands a moment after the comment shows again, so ask until the server has it
     await expect

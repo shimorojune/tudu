@@ -30,6 +30,14 @@ let quickAdd = false;
 let second: IsoDate | null = null;
 /** A task just added from Quick Add: its day's list opens its gap with the wash. */
 let flash: { id: string; day: IsoDate | null; nonce: number } | null = null;
+/** A task picked in Search: its list scrolls it into the middle and it glows. */
+let locate: { id: string; day: IsoDate | null; nonce: number } | null = null;
+/** The search panel, over the page. */
+let search = false;
+/** Words to start Quick Add's title with (Create from Search). */
+let quickAddSeed: { title: string; nonce: number } | null = null;
+/** The view the Backlog should open on next (a crossed-off task picked in Search). */
+let backlogView: { view: 'open' | 'done'; nonce: number } | null = null;
 const listeners = new Set<() => void>();
 const subscribe = (l: () => void) => {
   listeners.add(l);
@@ -85,10 +93,95 @@ export function useShownDay(): IsoDate | null {
   );
 }
 
-/** Quick Add, over the page. */
-export function openQuickAdd(): void {
-  if (quickAdd) return;
+/** Quick Add, over the page; with words, they become the title. */
+export function openQuickAdd(seed?: { title: string }): void {
+  // A click handler may pass its event: only real words count.
+  const words = seed && typeof seed.title === 'string' ? seed.title : null;
+  if (words !== null) quickAddSeed = { title: words, nonce: (quickAddSeed?.nonce ?? 0) + 1 };
+  if (quickAdd) {
+    if (words !== null) notify();
+    return;
+  }
   quickAdd = true;
+  notify();
+}
+
+export function useQuickAddSeed(): { title: string; nonce: number } | null {
+  return useSyncExternalStore(
+    subscribe,
+    () => quickAddSeed,
+    () => null,
+  );
+}
+
+/** The search panel, over the page. */
+export function openSearch(): void {
+  if (search) return;
+  search = true;
+  notify();
+}
+
+export function closeSearch(): void {
+  if (!search) return;
+  search = false;
+  notify();
+}
+
+export function useSearchOpen(): boolean {
+  return useSyncExternalStore(
+    subscribe,
+    () => search,
+    () => false,
+  );
+}
+
+/** Show a task where it sits: its list scrolls it into the middle and it glows. Kept a few seconds for a list still loading. */
+let locateTimer: ReturnType<typeof setTimeout> | null = null;
+let locateSeq = 0;
+export function locateTask(id: string, day: IsoDate | null): void {
+  locate = { id, day, nonce: ++locateSeq };
+  notify();
+  if (locateTimer) clearTimeout(locateTimer);
+  locateTimer = setTimeout(() => {
+    locate = null;
+    notify();
+  }, 6000);
+}
+
+export function useLocate(): { id: string; day: IsoDate | null; nonce: number } | null {
+  return useSyncExternalStore(
+    subscribe,
+    () => locate,
+    () => null,
+  );
+}
+
+/** Ask the Backlog to open on a view (To do or Crossed off) the next time it looks. */
+export function askBacklogView(view: 'open' | 'done'): void {
+  backlogView = { view, nonce: (backlogView?.nonce ?? 0) + 1 };
+  notify();
+}
+
+export function useBacklogViewAsk(): { view: 'open' | 'done'; nonce: number } | null {
+  return useSyncExternalStore(
+    subscribe,
+    () => backlogView,
+    () => null,
+  );
+}
+
+/** For tests: everything back to the start. */
+export function resetDayViewForTests(): void {
+  shown = null;
+  page = null;
+  shownWeek = null;
+  quickAdd = false;
+  second = null;
+  flash = null;
+  locate = null;
+  search = false;
+  quickAddSeed = null;
+  backlogView = null;
   notify();
 }
 

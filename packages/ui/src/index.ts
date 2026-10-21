@@ -169,7 +169,10 @@ export {
   QA_CLOSE_AFTER_MS,
   QA_LEAVE_MS,
   QA_LEAVE_PHONE_MS,
+  QA_SIMILAR_AFTER_MS,
+  QA_SIMILAR_MIN,
   type QuickAddProps,
+  type SimilarItem,
   type QuickAddDraft,
   type QuickAddFile,
   type QuickAddResult,
@@ -178,3 +181,13 @@ export {
 // Week (chunk 05)
 export { WeekDay, WeekTiles, type WeekDayProps, type WeekTilesProps } from './components/WeekDay';
 export { WeekPicker, weekRowsOf, weekRowLabel, type WeekPickerProps } from './components/WeekPicker';
+
+// Search (chunk 07)
+export { SearchHit, markWords, type SearchHitProps, type SearchItem } from './components/SearchHit';
+export {
+  SearchPanel,
+  SP_LEAVE_MS,
+  SP_LEAVE_PHONE_MS,
+  type SearchPanelProps,
+  type SearchResults,
+} from './components/SearchPanel';

@@ -167,6 +167,11 @@ test.describe('today', () => {
     await signInFresh(page);
     await writeTasks(page, ['Sync with Meera', 'Water the plants', 'Done on Saturday']);
     await page.getByRole('checkbox', { name: 'Cross off: Done on Saturday' }).click();
+    // the row was written a moment ago: wait for the tick before asking the outbox, else there is nothing to wait for
+    await expect(page.getByRole('checkbox', { name: 'Cross off: Done on Saturday' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
     await idle(page);
     await fixClock(page, SUNDAY);
     await page.reload();

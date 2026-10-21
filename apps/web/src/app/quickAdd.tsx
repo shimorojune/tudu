@@ -1,7 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { addedWords, mondayOf, pagePlannedDay, weekDays, type IsoDate } from '@tudu/core';
-import { QuickAdd, showToast, type QuickAddResult } from '@tudu/ui';
+import {
+  addedWords,
+  mondayOf,
+  pagePlannedDay,
+  searchWhere,
+  weekDays,
+  type IsoDate,
+  type SearchHit,
+  type SearchResponse,
+} from '@tudu/core';
+import { QuickAdd, showToast, type QuickAddResult, type SimilarItem } from '@tudu/ui';
 import { useEffect, useRef, useState } from 'react';
 import type { MeResponse } from '@tudu/client';
 import {
@@ -12,10 +21,13 @@ import {
   useDayView,
   usePage,
   useQuickAddOpen,
+  useQuickAddSeed,
   useSecondDay,
   useShownDay,
   useShownWeek,
 } from './dayView';
+import { goToTask } from './search';
+import { api } from './session';
 import { taskStore, useOnline } from './tasks';
 import { useViewport } from './viewport';
 import { useWorkingDay } from './workingDay';
@@ -95,9 +107,28 @@ export function QuickAddHost({ me }: { me: MeResponse }) {
   const lastId = useRef<string | null>(null);
   const day2: IsoDate | null = useSecondDay();
   const navigate = useNavigate();
+  const seed = useQuickAddSeed();
+  // Tasks that read like the title, from the same search as the panel's, so "Looks like a task you have" can open one.
+  const alike = useRef(new Map<string, SearchHit>());
+  const similar = async (title: string): Promise<SimilarItem[]> => {
+    if (!space) return [];
+    const r = await api.get<SearchResponse>(
+      `/api/spaces/${space.id}/search?for=lookalike&q=${encodeURIComponent(title)}`,
+    );
+    for (const h of r.hits) alike.current.set(h.id, h);
+    return r.hits.map((h) => ({ key: h.id, title: h.title, where: searchWhere(h.day, h.done, a.today) }));
+  };
   return (
     <QuickAdd
       open={open}
+      seed={seed}
+      similar={similar}
+      onOpenSimilar={(it) => {
+        const h = alike.current.get(it.key);
+        if (!h) return;
+        closeQuickAdd();
+        setTimeout(() => goToTask(h, a.today, (to) => void navigate({ to })), 200);
+      }}
       variant={vp === 'phone' ? 'sheet' : 'bar'}
       today={a.today}
       planned={a.shown}
