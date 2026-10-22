@@ -16,6 +16,7 @@ export {
 export {
   useTheme,
   setThemeChoice,
+  syncThemeChoice,
   readThemeChoice,
   resolveTheme,
   systemTheme,

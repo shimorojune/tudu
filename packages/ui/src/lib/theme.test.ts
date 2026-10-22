@@ -8,6 +8,7 @@ import {
   resetThemeForTests,
   resolveTheme,
   setThemeChoice,
+  syncThemeChoice,
   systemTheme,
   useTheme,
 } from './theme';
@@ -201,5 +202,51 @@ describe('theme', () => {
     localStorage.setItem(THEME_STORAGE_KEY, 'sepia');
     resetThemeForTests();
     expect(readThemeChoice()).toBe('system');
+  });
+
+  it('C11-U09 a pick in another window (a storage event) repaints this one and tells every useTheme', () => {
+    setThemeChoice('light');
+    const { result } = renderHook(() => useTheme());
+    expect(result.current.choice).toBe('light');
+
+    localStorage.setItem(THEME_STORAGE_KEY, 'dark');
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: THEME_STORAGE_KEY, newValue: 'dark' }));
+    });
+    expect(result.current.choice).toBe('dark');
+    expect(result.current.theme).toBe('dark');
+    expect(html).toHaveClass('dark');
+    expect(html.style.colorScheme).toBe('dark');
+
+    // Another key is not the theme.
+    localStorage.setItem(THEME_STORAGE_KEY, 'light');
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: 'tudu.motion', newValue: 'less' }));
+    });
+    expect(result.current.choice).toBe('dark');
+
+    // Storage cleared elsewhere: back to System.
+    localStorage.clear();
+    systemDark = false;
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: null }));
+    });
+    expect(result.current.choice).toBe('system');
+    expect(html).not.toHaveClass('dark');
+  });
+
+  it('C11-U09 a page that read the choice earlier takes up the stored one on mount and on a sync', () => {
+    setThemeChoice('light'); // read once, long ago
+    localStorage.setItem(THEME_STORAGE_KEY, 'dark'); // picked in another window, no event heard
+    const { result } = renderHook(() => useTheme());
+    expect(result.current.choice).toBe('dark');
+    expect(html).toHaveClass('dark');
+
+    localStorage.setItem(THEME_STORAGE_KEY, 'system');
+    systemDark = false;
+    act(() => syncThemeChoice());
+    expect(result.current.choice).toBe('system');
+    expect(result.current.theme).toBe('light');
+    expect(html).not.toHaveClass('dark');
   });
 });

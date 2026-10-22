@@ -269,4 +269,34 @@ test.describe('desktop', () => {
     const f = await floatingAdd(page, 'Water the plants');
     await expect(f.locator('.tp-desk')).toHaveAttribute('data-theme', 'dark');
   });
+
+  test('C11-E09 the floating page follows the theme picked on the desk: open, and put away until the summon', async ({
+    page,
+  }) => {
+    await fixClock(page);
+    await installFake(page);
+    await signInFresh(page);
+    const f = await floating(page);
+    const desk = f.locator('.tp-desk');
+    await expect(desk).toHaveAttribute('data-theme', 'light');
+
+    const pick = async (name: 'Light' | 'Dark' | 'System') => {
+      await page.getByRole('button', { name: /^You: / }).click();
+      await page.getByRole('group', { name: 'Theme' }).getByRole('button', { name }).click();
+      await page.keyboard.press('Escape');
+    };
+    // Dark on the desk with the bar open.
+    await pick('Dark');
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await expect(desk).toHaveAttribute('data-theme', 'dark');
+    await expect(f.locator('html')).toHaveClass(/dark/);
+
+    // Put away, Light on the desk, then the summon.
+    await f.keyboard.press('Escape');
+    await expect.poll(async () => (await calls(f, 'hideFloating')).length).toBe(1);
+    await pick('Light');
+    await emit(f, 'floating:shown');
+    await expect(desk).toHaveAttribute('data-theme', 'light');
+    await expect(f.locator('html')).not.toHaveClass(/dark/);
+  });
 });
