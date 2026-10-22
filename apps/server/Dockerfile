@@ -13,10 +13,10 @@ RUN pnpm install --frozen-lockfile --prod --filter @tudu/server... && pnpm store
 COPY apps/server apps/server
 COPY packages/db packages/db
 COPY packages/core packages/core
+WORKDIR /app/apps/server
 # The close-matches model, fetched once here so the API starts with no network to its host (EMBEDDINGS_OFFLINE).
 ENV EMBEDDINGS_MODEL_DIR=/app/models EMBEDDINGS_OFFLINE=1
-RUN node --import tsx apps/server/src/embeddings/fetch-model.ts
-WORKDIR /app/apps/server
+RUN node --import tsx src/embeddings/fetch-model.ts
 EXPOSE 3456
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s CMD node -e "fetch('http://127.0.0.1:3456/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
 CMD ["sh", "-c", "pnpm migrate && pnpm start"]

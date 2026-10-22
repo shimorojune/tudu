@@ -65,7 +65,7 @@ jobs:
         with:
           path: .local/models
           key: embeddings-all-MiniLM-L6-v2-q8
-      - run: EMBEDDINGS_MODEL_DIR=$PWD/.local/models node --import tsx apps/server/src/embeddings/fetch-model.ts
+      - run: EMBEDDINGS_MODEL_DIR=$PWD/.local/models pnpm --filter @tudu/server exec node --import tsx src/embeddings/fetch-model.ts
       - run: pnpm test -- --reporter=default --reporter=json --outputFile=reports/vitest.json
       - uses: actions/upload-artifact@v4
         if: always()
@@ -110,7 +110,7 @@ jobs:
         with:
           path: .local/models
           key: embeddings-all-MiniLM-L6-v2-q8
-      - run: EMBEDDINGS_MODEL_DIR=$PWD/.local/models node --import tsx apps/server/src/embeddings/fetch-model.ts
+      - run: EMBEDDINGS_MODEL_DIR=$PWD/.local/models pnpm --filter @tudu/server exec node --import tsx src/embeddings/fetch-model.ts
       - run: pnpm --filter e2e exec playwright install --with-deps chromium
       - name: Create the storage bucket
         env:
@@ -145,7 +145,7 @@ jobs:
       - run: docker build -f apps/server/Dockerfile -t tudu-api:ci .
       - name: The model is inside (no network) and the API answers
         run: |
-          docker run --rm --network none -w /app tudu-api:ci node --import tsx apps/server/src/embeddings/fetch-model.ts
+          docker run --rm --network none tudu-api:ci node --import tsx src/embeddings/fetch-model.ts
           docker run -d --name api -p 3456:3456 -e NODE_ENV=development \
             -e DATABASE_URL=postgres://nobody@127.0.0.1:1/none -e AUTH_SECRET=ci-secret-ci-secret-ci-secret \
             --entrypoint sh tudu-api:ci -c "pnpm start"
@@ -191,7 +191,7 @@ jobs:
         with:
           path: .local/models
           key: embeddings-all-MiniLM-L6-v2-q8
-      - run: EMBEDDINGS_MODEL_DIR=$PWD/.local/models node --import tsx apps/server/src/embeddings/fetch-model.ts
+      - run: EMBEDDINGS_MODEL_DIR=$PWD/.local/models pnpm --filter @tudu/server exec node --import tsx src/embeddings/fetch-model.ts
 
       - name: Rust unit tests
         run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --features control
