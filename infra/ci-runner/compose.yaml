@@ -37,7 +37,7 @@ services:
         RUN chmod +x /entrypoint.sh
         ENTRYPOINT ["/entrypoint.sh"]
     environment:
-      REPO_URL: https://github.com/eGainDev/tudu
+      REPO_URL: https://github.com/shimorojune/tudu
       RUNNER_NAME: dokploy-2
       # No `dokploy` label, so ci.yml jobs never land here; deploy-staging.yml asks for `dokploy-deploy`.
       LABELS: self-hosted,dokploy-deploy,arm64

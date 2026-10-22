@@ -7,7 +7,7 @@ project Tudu, environment `dev`, service `tudu-ci-runner`:
 - The test jobs of `ci.yml` run on GitHub-hosted runners with their own Postgres and RustFS service containers, so
   test load stays off the host.
 
-- Register: mint a token with `gh api -X POST repos/eGainDev/tudu/actions/runners/registration-token --jq .token`
+- Register: mint a token with `gh api -X POST repos/shimorojune/tudu/actions/runners/registration-token --jq .token`
   and set it as `RUNNER_DEPLOY_TOKEN` in the service's environment before the runner's first deploy. The registration
   is kept on its config volume, so later deploys and restarts do not need a new token.
 - Labels: `self-hosted`, `dokploy-deploy`, `arm64` (`runs-on: [self-hosted, dokploy-deploy]`).
