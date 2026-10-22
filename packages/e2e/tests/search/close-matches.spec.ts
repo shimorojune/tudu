@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
-import { box, hit, hitTitles, openSearch, options, panel, search } from '../../fixtures/search';
+import { box, closeTitles, hit, hitTitles, openSearch, options, panel, search } from '../../fixtures/search';
 import { joinLink, me, secondPerson, seedTasks, switcher } from '../../fixtures/spaces';
 import { dayList, fixClock, idle } from '../../fixtures/today';
 
@@ -12,10 +12,6 @@ const TOMORROW = '2026-10-19';
 const heading = (page: Page) => page.getByRole('heading', { level: 1 });
 const glowing = (list: Locator) => list.locator('.tp-item.tp-locate');
 const list = (page: Page) => panel(page).getByRole('listbox', { name: 'Matching tasks' });
-/** The rows under the Close matches heading, by title. */
-const closeTitles = (page: Page) =>
-  panel(page).locator('.tp-sp-head-sim ~ .tp-sp-opt .tp-sh-title').allTextContents();
-
 /** Embed everything pending now, as the batch after a sync would. */
 async function embedded(page: Page): Promise<void> {
   const res = await page.request.post(`${API_URL}/__test/embeddings/drain`);
