@@ -143,15 +143,16 @@ test.describe('close matches', () => {
   }) => {
     await start(page);
     await openSearch(page);
-    await searchClose(page, 'travel documents');
-    await expect(panel(page).locator('.tp-sp-none')).toHaveText('No task matches “travel documents”.');
+    // no word in common with any task, and plainly the dentist by meaning (0.8 to its title, well over the floor)
+    await searchClose(page, 'tooth doctor visit');
+    await expect(panel(page).locator('.tp-sp-none')).toHaveText('No task matches “tooth doctor visit”.');
     await expect(options(page).first()).toHaveClass(/tp-sh-create/);
     await expect(panel(page).locator('.tp-sp-head-sim')).toHaveText('Close matches');
-    expect(await closeTitles(page)).toContain('Renew passport');
+    expect(await closeTitles(page)).toContain('Dentist appointment');
     await page.keyboard.press('Enter');
     await expect(panel(page)).toHaveCount(0);
     const bar = page.getByRole('dialog', { name: 'Quick Add' });
-    await expect(bar.getByRole('textbox', { name: 'Task title' })).toHaveValue('travel documents');
+    await expect(bar.getByRole('textbox', { name: 'Task title' })).toHaveValue('tooth doctor visit');
   });
 
   test('C13-E05 a task ID typed in full comes first with no close matches; a Jira key typed in full skips them too', async ({
