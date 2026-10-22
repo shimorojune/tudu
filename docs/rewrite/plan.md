@@ -121,20 +121,23 @@ The loop per chunk:
 
 ## Chunks
 
-| #   | Chunk                      | Needs   | When it ships you can                                                                           |
-| --- | -------------------------- | ------- | ----------------------------------------------------------------------------------------------- |
-| 00  | Foundations                | nothing | Open the kit page and see every primitive, light and dark, with its motion                      |
-| 01  | Sign in and app shell      | 00      | Sign in with a code, see the empty Today with the sidebar, rail or tabs, switch theme, sign out |
-| 02  | Today                      | 01      | Write tasks on the sheet, tick them off, reorder, turn the day, two days, carry-over            |
-| 03  | Task detail                | 02      | Open a task, edit everything in place, subtasks, notes, comments, history, delete with undo     |
-| 04  | Quick Add                  | 02      | Add from the top bar, on the desktop the floating bar and the global summon                     |
-| 05  | Week                       | 02      | Seven tiles and the Backlog tile, drag between days, the week picker                            |
-| 06  | Backlog                    | 02      | The backlog list, give a task a day, project filter, crossed off                                |
-| 07  | Search                     | 02      | Word search, recent, create from search                                                         |
-| 08  | Spaces, People, Inbox      | 03      | Create a space, invite, switch spaces, send a task, accept or decline, People                   |
-| 09  | Settings                   | 08      | Account, Appearance, Notifications, Space, Members, Apps, leave and delete                      |
-| 10  | Jira                       | 03, 09  | Connect with a token, the panel, add an issue to a day, linked tasks                            |
-| 11  | Desktop and release tracks | 04      | Install Tudu and Tudu Staging, get updates, restart to update from the Inbox                    |
-| 12  | First run                  | 09      | Getting started card that ticks itself off                                                      |
+| #   | Chunk                      | Needs   | When it ships you can                                                                              |
+| --- | -------------------------- | ------- | -------------------------------------------------------------------------------------------------- |
+| 00  | Foundations                | nothing | Open the kit page and see every primitive, light and dark, with its motion                         |
+| 01  | Sign in and app shell      | 00      | Sign in with a code, see the empty Today with the sidebar, rail or tabs, switch theme, sign out    |
+| 02  | Today                      | 01      | Write tasks on the sheet, tick them off, reorder, turn the day, two days, carry-over               |
+| 03  | Task detail                | 02      | Open a task, edit everything in place, subtasks, notes, comments, history, delete with undo        |
+| 04  | Quick Add                  | 02      | Add from the top bar, on the desktop the floating bar and the global summon                        |
+| 05  | Week                       | 02      | Seven tiles and the Backlog tile, drag between days, the week picker                               |
+| 06  | Backlog                    | 02      | The backlog list, give a task a day, project filter, crossed off                                   |
+| 07  | Search                     | 02      | Word search, recent, create from search                                                            |
+| 08  | Spaces, People, Inbox      | 03      | Create a space, invite, switch spaces, send a task, accept or decline, People                      |
+| 09  | Settings                   | 08      | Account, Appearance, Notifications, Space, Members, Apps, leave and delete                         |
+| 10  | Jira                       | 03, 09  | Connect with a token, the panel, add an issue to a day, linked tasks                               |
+| 11  | Desktop and release tracks | 04      | Install Tudu and Tudu Staging, get updates, restart to update from the Inbox                       |
+| 12  | First run                  | 09      | Getting started card that ticks itself off                                                         |
+| 13  | Close matches              | 07      | Find a task by what it means in Search and Quick Add                                               |
+| 14  | Notifications              | 08, 11  | Your Mac or browser tells you of a task sent, an answer, a comment, a Jira issue, a new version    |
+| 15  | Backups (parked)           | nothing | Daily copies of the database and files off the host, a check that emails you, a restore you can do |
 
 Projects (the coloured dot) arrive with chunk 02 as data and get their picker in chunk 04.
