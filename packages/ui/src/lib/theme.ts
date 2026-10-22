@@ -70,6 +70,8 @@ export function fadeTheme(apply: () => void): void {
 
 type Listener = (choice: ThemeChoice) => void;
 const listeners = new Set<Listener>();
+/** Picks made in this page only; a choice taken up from another window is not a pick here. */
+const pickListeners = new Set<Listener>();
 let current: ThemeChoice | null = null;
 
 function choice(): ThemeChoice {
@@ -83,6 +85,7 @@ export function setThemeChoice(next: ThemeChoice): void {
   storeThemeChoice(next);
   fadeTheme(() => paintTheme(resolveTheme(next)));
   listeners.forEach((l) => l(next));
+  pickListeners.forEach((l) => l(next));
 }
 
 /**
@@ -100,6 +103,12 @@ export function syncThemeChoice(): void {
 function onStorage(e: StorageEvent): void {
   // A null key is storage cleared.
   if (e.key === THEME_STORAGE_KEY || e.key === null) syncThemeChoice();
+}
+
+/** Hear every theme pick (Light, Dark or System), wherever it was made. Returns the way to stop listening. */
+export function onThemeChoice(l: (choice: ThemeChoice) => void): () => void {
+  pickListeners.add(l);
+  return () => pickListeners.delete(l);
 }
 
 /** Keep the painted theme in step with the system while the choice is `system`. */
@@ -141,6 +150,7 @@ export function useTheme(): { choice: ThemeChoice; theme: Theme; setTheme: (c: T
 export function resetThemeForTests(): void {
   current = null;
   listeners.clear();
+  pickListeners.clear();
 }
 
 export { CROSS_FADE_MS };

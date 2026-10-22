@@ -15,6 +15,8 @@ export interface AuthDeps {
   sendCode: (to: string, code: string) => Promise<void> | void;
   /** Runs once when a new person signs in for the first time (their Personal space is made here). */
   onUserCreated?: (user: { id: string; email: string; name: string }) => Promise<void>;
+  /** Runs after every sign-in's session is made (the first one tells a new account from a returning one). */
+  onSessionCreated?: (session: { id: string; userId: string }) => Promise<void>;
 }
 
 /** Codes work for ten minutes. */
@@ -41,6 +43,13 @@ export function createAuth(deps: AuthDeps) {
         create: {
           after: async (user) => {
             await deps.onUserCreated?.({ id: user.id, email: user.email, name: user.name });
+          },
+        },
+      },
+      session: {
+        create: {
+          after: async (session) => {
+            await deps.onSessionCreated?.({ id: session.id, userId: session.userId });
           },
         },
       },

@@ -4,6 +4,7 @@ import { parseRules, readStylesheet, rulesWhere } from '../test-utils/stylesheet
 import {
   CROSS_FADE_MS,
   THEME_STORAGE_KEY,
+  onThemeChoice,
   readThemeChoice,
   resetThemeForTests,
   resolveTheme,
@@ -208,6 +209,8 @@ describe('theme', () => {
     setThemeChoice('light');
     const { result } = renderHook(() => useTheme());
     expect(result.current.choice).toBe('light');
+    const picks = vi.fn();
+    onThemeChoice(picks);
 
     localStorage.setItem(THEME_STORAGE_KEY, 'dark');
     act(() => {
@@ -217,6 +220,8 @@ describe('theme', () => {
     expect(result.current.theme).toBe('dark');
     expect(html).toHaveClass('dark');
     expect(html.style.colorScheme).toBe('dark');
+    // Picked in the other window, not here: Getting started's tick is that window's.
+    expect(picks).not.toHaveBeenCalled();
 
     // Another key is not the theme.
     localStorage.setItem(THEME_STORAGE_KEY, 'light');

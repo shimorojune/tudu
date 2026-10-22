@@ -4,6 +4,7 @@ import { PHOTO_MAX_BYTES } from '@tudu/core';
 import { eq, schema, type Db } from '@tudu/db';
 import { clearPhoto, confirmEmailChange, readPhoto, setPhoto, startEmailChange } from '../account';
 import type { Mailer } from '../email';
+import { gettingStarted, isFirstSession, parseRecord, recordFirstRun } from '../firstRun';
 import type { EventHub } from '../events';
 import { requireSession, type SessionVars } from '../middleware/session';
 import { inboxCounts } from '../requests';
@@ -26,7 +27,7 @@ export function meRoutes(db: Db, hub: EventHub, mailer: Mailer, storage: Storage
   r.get('/me', requireSession, async (c) => {
     const session = c.get('session')!;
     const [row] = await db
-      .select({ color: schema.user.color, image: schema.user.image })
+      .select({ color: schema.user.color, image: schema.user.image, createdAt: schema.user.createdAt })
       .from(schema.user)
       .where(eq(schema.user.id, session.user.id));
     // Someone from before colours were given gets theirs the first time they ask.
@@ -38,7 +39,11 @@ export function meRoutes(db: Db, hub: EventHub, mailer: Mailer, storage: Storage
         name: session.user.name,
         image: row?.image ?? null,
         color,
+        createdAt: (row?.createdAt ?? new Date(session.user.createdAt)).toISOString(),
       },
+      /** This session is the sign-in that made the account: a new person, not a returning one. */
+      firstSignIn: await isFirstSession(db, session.user.id, session.session.id),
+      gettingStarted: await gettingStarted(db, session.user.id),
       spaces: await (async () => {
         const counts = await inboxCounts(db, session.user.id);
         return (await spaceSummaries(db, session.user.id)).map((s) => ({
@@ -47,6 +52,14 @@ export function meRoutes(db: Db, hub: EventHub, mailer: Mailer, storage: Storage
         }));
       })(),
     });
+  });
+
+  r.post('/me/getting-started', requireSession, async (c) => {
+    const rec = parseRecord(await c.req.json().catch(() => null));
+    if (!rec) return c.json({ error: 'Send { theme: true } or { hidden: true }.' }, 400);
+    const userId = c.get('session')!.user.id;
+    await recordFirstRun(db, userId, rec);
+    return c.json({ gettingStarted: await gettingStarted(db, userId) });
   });
 
   r.post('/me/photo', requireSession, async (c) => {

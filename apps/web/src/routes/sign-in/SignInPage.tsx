@@ -1,6 +1,7 @@
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { ApiError } from '@tudu/client';
-import { SignIn, SignInError } from '@tudu/ui';
+import { ApiError, type MeResponse } from '@tudu/client';
+import { welcomeBack } from '@tudu/core';
+import { showToast, SignIn, SignInError } from '@tudu/ui';
 import { api, authClient, refreshMe } from '../../app/session';
 import { useViewport } from '../../app/viewport';
 
@@ -13,6 +14,14 @@ export function toSignInError(code: string | undefined, message: string | undefi
   if (code === 'TOO_MANY_ATTEMPTS')
     return new SignInError('locked', 'Too many tries. Send a new code and use that one.');
   return new SignInError('other', message || 'That didn’t work. Try again.');
+}
+
+/**
+ * Someone coming back (an account this sign-in did not make) is greeted by name; a new person lands quietly, and
+ * Today and Getting started welcome them instead.
+ */
+export function greet(me: MeResponse | null): void {
+  if (me && me.firstSignIn === false) showToast(welcomeBack(me.user.name));
 }
 
 export function SignInPage() {
@@ -36,7 +45,7 @@ export function SignInPage() {
   }
 
   async function done() {
-    await refreshMe();
+    greet(await refreshMe());
     const next =
       search.next && search.next.startsWith('/') && !search.next.startsWith('//') ? search.next : '/';
     void navigate({ to: next, replace: true });

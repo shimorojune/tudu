@@ -442,6 +442,9 @@ export async function signIn(app: TuduApp, email = freshEmail()): Promise<string
   const code = await codeFor(email);
   await app.eval(`T.fill(T.get('textbox', 'The 6-digit code'), ${JSON.stringify(code)});`);
   await onToday(app);
+  // Getting started hidden the way × hides it (the app's own hook), as the web tests do.
+  await app.until(`return typeof window.__tudu?.firstRun?.hide === 'function'`);
+  await app.eval(`await window.__tudu.firstRun.hide();`);
   // The desk has told the app (the summon opens the bar from now on).
   await app.waitState((s) => s.seen.signedIn);
   return email;

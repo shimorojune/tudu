@@ -1,4 +1,13 @@
-import { API_URL, codeFor, enterCode, expect, freshEmail, signInFresh, test } from '../../fixtures/app';
+import {
+  API_URL,
+  codeFor,
+  enterCode,
+  expect,
+  freshEmail,
+  quietFirstRun,
+  signInFresh,
+  test,
+} from '../../fixtures/app';
 
 test.describe('sign in', () => {
   test('C01-E01 a new person signs in with a code and lands on the empty Today', async ({ page }) => {
@@ -13,6 +22,7 @@ test.describe('sign in', () => {
     await enterCode(page, await codeFor(page, email));
     await expect(page.getByText('You’re in.')).toBeVisible();
     await expect(page).toHaveURL(/\/me$/);
+    await quietFirstRun(page);
     await expect(page.getByText('Nothing planned for today yet.')).toBeVisible();
     await expect(page.getByText(/Today · Week \d+/)).toBeVisible();
   });
@@ -41,6 +51,7 @@ test.describe('sign in', () => {
     await expect(page.getByText('That code didn’t work. Check the email, or send a new one.')).toBeVisible();
     await expect(page.getByLabel('The 6-digit code')).toHaveValue('');
     await enterCode(page, real);
+    await quietFirstRun(page);
     await expect(page.getByText('Nothing planned for today yet.')).toBeVisible();
   });
 
@@ -59,6 +70,7 @@ test.describe('sign in', () => {
     await expect(page.getByText(/A new code is on its way/)).toBeVisible();
     const fresh = await codeFor(page, email, old);
     await enterCode(page, fresh);
+    await quietFirstRun(page);
     await expect(page.getByText('Nothing planned for today yet.')).toBeVisible();
   });
 
@@ -79,6 +91,7 @@ test.describe('sign in', () => {
     await page.getByRole('button', { name: 'Send a new code' }).click();
     await expect(page.getByLabel('The 6-digit code')).toBeEnabled();
     await enterCode(page, await codeFor(page, email, real));
+    await quietFirstRun(page);
     await expect(page.getByText('Nothing planned for today yet.')).toBeVisible();
   });
 

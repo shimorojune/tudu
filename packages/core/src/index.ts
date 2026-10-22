@@ -15,3 +15,4 @@ export * from './people';
 export * from './inbox';
 export * from './jira';
 export * from './versions';
+export * from './firstRun';

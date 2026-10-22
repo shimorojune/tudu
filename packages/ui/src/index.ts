@@ -24,6 +24,7 @@ export {
   fadeTheme,
   isThemeChoice,
   resetThemeForTests,
+  onThemeChoice,
   THEME_STORAGE_KEY,
   CROSS_FADE_MS,
   MOTION_STORAGE_KEY,
@@ -304,3 +305,9 @@ export {
   type AddState,
 } from './components/JiraPanel';
 export { AppsPanel, type AppsPanelProps, type AppsPanelApp } from './components/AppsPanel';
+export {
+  GettingStarted,
+  GS_LEAVE_MS,
+  type GettingStartedProps,
+  type GettingStartedItem,
+} from './components/GettingStarted';

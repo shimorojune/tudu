@@ -244,3 +244,8 @@
   box-shadow: var(--shadow-sheet);
   overflow: hidden;
 }
+
+/* Getting started sits in the flow of the kit; at phone width it takes the room there is. */
+.kit-gs .tp-gs {
+  max-width: 100%;
+}

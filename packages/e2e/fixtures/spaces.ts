@@ -1,5 +1,5 @@
 import { expect, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test';
-import { API_URL, codeFor, enterCode, freshEmail } from './app';
+import { API_URL, codeFor, enterCode, freshEmail, quietFirstRun } from './app';
 import { fixClock } from './today';
 
 /** The space switcher's trigger: the space's tile and name at the top of the sidebar, or in the phone's header. */
@@ -85,6 +85,7 @@ export async function secondPerson(
   await expect(
     page.getByRole('heading', { name: /^(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)$/ }),
   ).toBeVisible({ timeout: 10_000 });
+  await quietFirstRun(page);
   return { context, page, email };
 }
 
