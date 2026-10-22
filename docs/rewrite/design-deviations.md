@@ -1,8 +1,117 @@
 # Design deviations
 
-Where the code departs from the canvas or the design system, and why. Written so each entry can be pasted into
-the "Build log" sticky on the canvas's Build plan page. The canvas and the design system cannot be edited from
-the coding session, so this file is the record and the canvas gets a copy by hand.
+Where the code departs from the canvas or the design system, and why. The app is the source of truth: when they
+differ, the canvas is redrawn to match the app (decided 22 Oct 2026). The first part is the register, the state of
+things today grouped by canvas page; the second is the history, one block per chunk as it was built. A chunk's PR
+updates both, and the canvas's Build log sticky on the Build plan page points here.
+
+## Register: what the canvas must show, by page
+
+Each line is true of the app on master. A line leaves the register once the canvas draws it.
+
+### Every page (the shell)
+
+- The sidebar's head is the space's tile and name, which opens the switcher; there is no Spaces list.
+- Sidebar views: Today, Week, Backlog, People (team spaces only), Inbox. Only the Inbox carries a count (to answer
+  plus unread, plus the macOS app's new version in team spaces). Personal lists the Inbox too, and its address goes
+  back to Today.
+- Jira appears in the sidebar's Apps section, the top bar and the phone tabs only while it is connected.
+- Phone header: the space's name on the left (opens the switcher sheet), then the Inbox icon with its count in an
+  ink pill, then your avatar, which opens Settings.
+- Phone tabs: Today, Week, Jira (when connected), Search, More.
+- Visible to reads "Everyone in Northwind" and "Only you".
+- The space is in the address (`/northwind/week`, `/me/today`); the open task is too (`?task=ME-52`, `/t/ME-52`).
+
+### 00 Foundations
+
+- The checkbox keeps its 19px look and takes a quiet 44px target on touch screens.
+- Less motion is a switch (Settings › Appearance), so the reduced-motion rules also apply under
+  `:root[data-motion='less']`.
+
+### 01 Today
+
+- Alt with the up or down arrow moves the focused row; a screen reader hears "Moved to place 2 of 3".
+- After midnight the list stays and the banner asks until 04:00; from 04:00 the app moves to the new day itself.
+- Undo after moving a carried task puts it back without the "From" pill. Only the click that ends a drag is
+  swallowed.
+
+### 02 Task detail
+
+- The ⋯ menus (panel and comment) are floating menus. Posting a comment keeps the caret in the box.
+- Planned's clear label is "Move to the Backlog". Notes save on leaving the field, closing or stepping.
+- Someone else's task reads as text: plain title, facts as words, Comments open.
+
+### 03 Quick Add
+
+- "New project…" is the project picker's last line and asks for a name on the spot; the colour is the next swatch.
+- File chips show their upload as a fill and read "failed" when it fails; offline, the attach button says so. Files
+  join the task as chips at the end of its notes; there is no Files section.
+- "Looks like a task you have" (or "Looks like tasks you have") lists close matches by meaning.
+- Personal alone gets the plain bar; a team space adds "In Northwind for Me" and Send.
+
+### 04 Jira
+
+- Apps and Settings › Apps are in Personal too; Personal's line leaves out "Each person connects their own."
+- Custom JQL on a saved view has a quiet "Remove view" beside Cancel, with Undo.
+- The Apps panel's line: "Your Jira issues beside your day. Add one to a day and it becomes a linked task."
+- The phone's Jira tab reads its count as "7 new".
+
+### 05 Week
+
+- On phones a Backlog row has the quiet calendar button; the scroll keeps 150px free above the New task button.
+- The panel's back label reads "Week" or "Backlog" when opened from the week. Past days take no drops.
+
+### 06 Backlog
+
+- Crossed off has its own counts: "3 crossed off", "1 crossed off in Home", "Nothing crossed off".
+- The phone's More page (`/more`): Backlog, Inbox, People (team), Settings, spaces and apps. No board draws it.
+
+### 07 Search
+
+- Close matches come from every space you are in; a row from another space carries that space's tile and name
+  before where it lives. Word matches stay in the space and include others' shared tasks.
+- "Couldn’t search right now." with Try again when the search cannot run.
+- The hint reads "Search your tasks by title, task ID or note." until Jira is connected.
+
+### 08 Inbox
+
+- Update lines are plain words ("accepted your task onto Fri 16 Oct", "declined your task: the reason").
+- The address names the view and the picked item (`?view=sent`). The reading pane is blank paper until a pick.
+- The macOS app's new version is an Updates item in every team space (see Desktop).
+
+### 09 Team space
+
+- The Members card says "Invited 18:02" (or "Just now", "Thu 10:12"), with Resend beside Cancel.
+- Task prefixes: NW, PF, HM; a clash grows a letter, then a number.
+- A person who left shows on People marked Left while they have shared tasks; an account without a name shows its
+  email. The join page signed in with another address says so and offers the way back.
+
+### 10 Settings
+
+- Sections: Account, Appearance; then Space, Members (team), Apps. No Notifications row yet (chunk 14).
+- Settings › Space has a Projects block: each project's dot opens the swatches, the name saves on leave, its
+  open-task count, Delete with Undo, New project. Members read "Its name and colour are kept by its admins."
+- Email has Change: the new address, Send code, the code field. Photo has Remove once there is one.
+- The last admin's Leave asks "Make someone admin first" with Go to Members; the last person's Leave says to Delete.
+- Settings is in the address: `?settings=members` on the desk and tablets, `/northwind/settings/members` on phones.
+
+### 11 Sign in and the first run
+
+- Sign in keeps "we" as drawn ("We’ll send you a code", "We sent a 6-digit code to …").
+- On phones Getting started hides on Settings, Jira, Apps and an open task.
+- An invited newcomer gets "Welcome to Northwind" over who is there, naming who sent the invite.
+
+### Desktop (macOS app, no page yet)
+
+- No title bar: the traffic lights sit over the sidebar's head and the top bar drags the window.
+- The tray: the ink tick; "Open Tudu", "New task ⌘⇧N", a line, "Quit Tudu" ("Tudu Staging" on staging).
+- ⌘⇧N summons the floating bar over any app, top centre of the pointer's screen; it hides 650ms after Added.
+- The dock badge carries the Inbox count across spaces. Attachments save to Downloads: "Saved to Downloads."
+- The window loads the site through a loader page that says "You're offline." with Try again.
+- Updates: "Tudu is ready: version 0.38.0", What's new, Restart to update, "Restarting…", and "Couldn't restart.
+  Quit and open Tudu again to finish."
+
+# History
 
 ## Chunk 00 · Foundations · PR #12 · 20 Oct 2026
 
@@ -150,7 +259,7 @@ the coding session, so this file is the record and the canvas gets a copy by han
   answer comes, so nothing flickers. The design's prototype searched a list in the page.
 - A plain-text copy of the notes (`notes_text`, migration 0004, backfilled once) is what the words are matched
   against, so markup, link addresses and tag names never match.
-- Close matches by meaning are not there (vector search is in later.md): no "Close matches" heading, no "Looking
+- (Superseded by chunk 13.) Close matches by meaning are not there (vector search is in later.md): no "Close matches" heading, no "Looking
   for tasks like this…", and the "Close matches aren’t available" line is not drawn. "Looks like a task you have"
   matches by shared words meanwhile, the same rule as the design's stand-in: open tasks sharing two or more of the
   title's words (one for a one- or two-word title), at most three.
@@ -283,6 +392,18 @@ the coding session, so this file is the record and the canvas gets a copy by han
 - Search across Jira: a key typed in full asks Jira for that issue; words ask Jira's text search, newest change
   first.
 
+## Chunk 11 · Desktop · 22 Oct 2026
+
+- Nothing on the canvas draws the window, the tray, installing or Tudu Staging; the choices are in
+  [chunk-11-desktop.md](chunk-11-desktop.md) (all eight approved 22 Oct 2026).
+- No title bar: the traffic lights sit over the sidebar's head (28px left for them, only in the app) and the top bar
+  is the drag region.
+- ⌘⇧N summons the floating bar and cannot be changed yet, although the decisions log says no shortcuts.
+- The dock badge shows the Inbox count across spaces. Attachments save to Downloads with "Saved to Downloads.".
+- Tudu Staging looks like Tudu: same icon, the name tells them apart.
+- The windows open the deployed site through a bundled loader page ("You're offline." with Try again), because
+  WKWebView blocked the session cookie from `tauri://localhost`.
+
 ## Chunk 12 · First run · 22 Oct 2026
 
 - Built as drawn: Getting started (the ring, the fold, the four rows, ×) in the corner of every page, beside New
@@ -294,7 +415,10 @@ the coding session, so this file is the record and the canvas gets a copy by han
   named is the one who sent the invite.
 - A returning person is told apart by the session that made the account, not by times (choice 4 as built).
 
-## Chunk 13 · Close matches
+## Chunk 13 · Close matches · 22 Oct 2026
+
+- Supersedes chunk 07's lines on close matches: the heading, "Looking for tasks like this…" and "Close matches
+  aren’t available right now. Word matches still work." are built as drawn.
 
 - Close matches come from every space you are in, where the canvas's search is per space (your decision of 22 Oct
   2026); a row from another space carries that space's tile and name before where it lives, a byline part the
