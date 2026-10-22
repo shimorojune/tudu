@@ -8,6 +8,7 @@ export { schema };
 export {
   and,
   asc,
+  cosineDistance,
   count,
   desc,
   eq,
@@ -20,6 +21,7 @@ export {
   lt,
   lte,
   ne,
+  notInArray,
   or,
   sql,
 } from 'drizzle-orm';

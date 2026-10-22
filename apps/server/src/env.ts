@@ -33,6 +33,15 @@ const schema = z.object({
   UPDATES_GITHUB_REPO: z.string().default('eGainDev/tudu'),
   /** GitHub's API; tests point it at the fake under /__test/github. */
   UPDATES_GITHUB_API: z.string().url().default('https://api.github.com'),
+  /**
+   * Close matches (chunk 13): `local` runs the embedding model inside the API; `off` keeps every task's vector
+   * empty and the meaning search answers nothing (no model loaded; local work that never searches by meaning).
+   */
+  EMBEDDINGS: z.enum(['local', 'off']).default('local'),
+  /** Where the model's files live. The image bundles them; local work downloads them here once. */
+  EMBEDDINGS_MODEL_DIR: z.string().optional(),
+  /** `1` never downloads the model: production, where the image already carries it. */
+  EMBEDDINGS_OFFLINE: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;

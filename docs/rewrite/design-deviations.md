@@ -293,3 +293,15 @@ the coding session, so this file is the record and the canvas gets a copy by han
 - Someone who joins a team space by invite and is still new gets "Welcome to Northwind" over who is there; the person
   named is the one who sent the invite.
 - A returning person is told apart by the session that made the account, not by times (choice 4 as built).
+
+## Chunk 13 · Close matches
+
+- Close matches come from every space you are in, where the canvas's search is per space (your decision of 22 Oct
+  2026); a row from another space carries that space's tile and name before where it lives, a byline part the
+  boards do not draw. Word matches stay in the space you are in.
+- The word search now lists other members' shared tasks in a team space (chunk 07 listed only your own), so word
+  and meaning searches read through one rule: your own, shared with the space, or an owner who left.
+- The floor is 0.3 cosine similarity, not the 0.45 the proposal guessed: against the labelled searches the
+  shipped model scores paraphrases between 0.3 and 0.6 and decoys under 0.3 (recall 0.91, precision 1.0 at 0.3;
+  recall 0.80 at 0.4). Notes are part of the text embedded, which spreads a title's meaning a little.
+- The API image moved from Alpine to Debian slim: the embedding runtime (ONNX) ships glibc builds only.

@@ -82,6 +82,36 @@ const RECENT: SearchItem[] = [
   },
 ];
 const HISTORY = ['release notes', 'meera'];
+const CLOSE: SearchItem[] = [
+  {
+    key: 'j',
+    id: 'ME-80',
+    title: 'Plan the team dinner after the offsite',
+    where: { label: 'Backlog' },
+    project: NW,
+  },
+  {
+    key: 'k',
+    id: 'HM-12',
+    title: 'Book the restaurant for Friday',
+    where: { label: 'Fri 23 Oct' },
+    space: { name: 'Home', color: '#8a5a00' },
+  },
+];
+const PASSPORT: SearchItem[] = [
+  { key: 'l', id: 'ME-7', title: 'Renew passport', where: { label: 'Today', tone: 'today' }, project: HM },
+  { key: 'n', id: 'ME-9', title: 'Passport expires in March', where: { label: 'Backlog' }, project: HM },
+];
+const JIRA: SearchItem[] = [
+  {
+    key: 'o',
+    id: 'NW-19',
+    title: 'Fix the gutter',
+    where: { label: 'Tomorrow' },
+    project: NW,
+    jira: 'TUDU-219',
+  },
+];
 const noop = () => {};
 
 const STATES: Array<{ title: string; note: string; props: Partial<SearchPanelProps> }> = [
@@ -114,6 +144,43 @@ const STATES: Array<{ title: string; note: string; props: Partial<SearchPanelPro
     title: 'No match',
     note: 'Create comes first (Enter creates).',
     props: { results: { query: 'gutter', hits: [] }, initial: { query: 'gutter', noFocus: true } },
+  },
+  {
+    title: 'Close matches on their way',
+    note: 'Word matches show at once; close matches (by meaning) come a moment after typing stops.',
+    props: {
+      results: { query: 'dinner', hits: [DIETARY[1]!] },
+      initial: { query: 'dinner', noFocus: true, similarState: 'loading' },
+    },
+  },
+  {
+    title: 'Close matches',
+    note: 'Under their own heading, from every space you are in: a row from another space names it.',
+    props: {
+      results: { query: 'dinner', hits: [DIETARY[1]!] },
+      initial: { query: 'dinner', noFocus: true, similarState: 'done', similar: CLOSE },
+    },
+  },
+  {
+    title: 'Close matches unavailable',
+    note: 'Offline or the model away: say so quietly, keep the word matches.',
+    props: {
+      results: { query: 'dinner', hits: [DIETARY[1]!] },
+      initial: { query: 'dinner', noFocus: true, similarState: 'error' },
+    },
+  },
+  {
+    title: 'No word match, close matches below',
+    note: 'Create comes first (Enter creates); close matches below, in case you already have it.',
+    props: {
+      results: { query: 'travel documents', hits: [] },
+      initial: { query: 'travel documents', noFocus: true, similarState: 'done', similar: PASSPORT },
+    },
+  },
+  {
+    title: 'A Jira key',
+    note: 'Typed in full, it comes first and skips close matches.',
+    props: { results: { query: 'tudu-219', hits: JIRA }, initial: { query: 'TUDU-219', noFocus: true } },
   },
   {
     title: 'Loading your tasks',

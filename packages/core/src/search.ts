@@ -13,6 +13,8 @@ export interface SearchHit {
   jira: string | null;
   /** A line of the note around the matched word, when the match is there and nowhere in the title. */
   snippet: string | null;
+  /** The space it lives in; close matches come from every space you are in, so a row says which. */
+  spaceId?: string;
 }
 
 export interface SearchResponse {
@@ -200,20 +202,91 @@ export const LOOKALIKE_MIN = 4;
  * first five letters ("interview", "interviews").
  */
 export function lookAlikes<T extends { title: string; done: boolean }>(items: T[], title: string): T[] {
+  return lookAlikesScored(items, title)
+    .slice(0, 3)
+    .map((x) => x.item);
+}
+
+/** Close matches (chunk 13): at most this many under their heading. */
+export const MEANING_LIMIT = 4;
+/**
+ * A close match needs this much cosine similarity to what you typed, so an unrelated task never shows just because
+ * it is the nearest of a few. Tuned against the labelled searches in `packages/core/test/fixtures`.
+ */
+export const MEANING_FLOOR = 0.3;
+
+/**
+ * The text a task's vector is made from: its title and the first 300 characters of its notes as plain text, so a
+ * change to either is a change to the vector.
+ */
+export function embeddingText(title: string, notesText: string | null | undefined): string {
+  const notes = (notesText ?? '').replace(/\s+/g, ' ').trim().slice(0, 300);
+  return [title.trim(), notes].filter(Boolean).join('\n').toLowerCase();
+}
+
+/** One close match with how close it is (cosine similarity, 1 is the same words). */
+export interface MeaningMatch<T> {
+  item: T;
+  similarity: number;
+}
+
+/**
+ * Close matches from the vector search, closest first: above the floor, without the rows the word search already
+ * lists, at most `limit`.
+ */
+export function closeMatches<T extends { id: string }>(
+  found: MeaningMatch<T>[],
+  exclude: Iterable<string> = [],
+  limit = MEANING_LIMIT,
+  floor = MEANING_FLOOR,
+): MeaningMatch<T>[] {
+  const skip = new Set(exclude);
+  return found
+    .filter((m) => m.similarity >= floor && !skip.has(m.item.id))
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, limit);
+}
+
+/**
+ * Quick Add's "Looks like a task you have", by words and by meaning on one scale: a shared-word look-alike scores
+ * from 0.75 (half its words) to 1 (all of them), a meaning match scores its similarity, the two are folded by task
+ * and the closest three stay. A task you wrote with the same words always shows, whatever the model thinks of it.
+ */
+export function mergeLookAlikes<T extends { id: string }>(
+  byWords: Array<{ item: T; score: number }>,
+  byMeaning: MeaningMatch<T>[],
+  limit = 3,
+): T[] {
+  const best = new Map<string, { item: T; s: number; i: number }>();
+  let i = 0;
+  const put = (item: T, s: number) => {
+    const cur = best.get(item.id);
+    if (!cur || cur.s < s) best.set(item.id, { item, s, i: cur ? cur.i : i++ });
+  };
+  for (const w of byWords) put(w.item, 0.5 + Math.min(1, Math.max(0, w.score)) / 2);
+  for (const m of byMeaning) put(m.item, m.similarity);
+  return [...best.values()]
+    .sort((a, b) => b.s - a.s || a.i - b.i)
+    .slice(0, limit)
+    .map((x) => x.item);
+}
+
+/** The shared-word look-alikes with their score, for the merge. */
+export function lookAlikesScored<T extends { title: string; done: boolean }>(
+  items: T[],
+  title: string,
+): Array<{ item: T; score: number }> {
   if (title.trim().length < LOOKALIKE_MIN) return [];
   const tw = wordsOf(title);
   if (!tw.length) return [];
   const same = (w: string, x: string) => x === w || (w.length > 4 && x.startsWith(w.slice(0, 5)));
-  const out: Array<{ s: number; i: number; it: T }> = [];
+  const out: Array<{ item: T; score: number; i: number }> = [];
   items.forEach((it, i) => {
     if (it.done) return;
     const iw = wordsOf(it.title);
     const shared = tw.filter((w) => iw.some((x) => same(w, x))).length;
     const score = shared / Math.max(2, Math.min(tw.length, iw.length));
-    if ((shared >= 2 || (shared === 1 && tw.length <= 2)) && score >= 0.5) out.push({ s: score, i, it });
+    if ((shared >= 2 || (shared === 1 && tw.length <= 2)) && score >= 0.5) out.push({ item: it, score, i });
   });
-  return out
-    .sort((a, b) => b.s - a.s || a.i - b.i)
-    .slice(0, 3)
-    .map((x) => x.it);
+  return out.sort((a, b) => b.score - a.score || a.i - b.i).map(({ item, score }) => ({ item, score }));
 }

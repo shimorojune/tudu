@@ -1,7 +1,7 @@
 # Chunk 13 · Close matches
 
-Status: proposed 22 Oct 2026, revised the same day after your first read (across spaces, who may see what, an
-accuracy gate). Awaiting your approval. Branch `rewrite/13-close-matches` once approved.
+Status: approved 22 Oct 2026 as revised; built on branch `rewrite/13-close-matches`. Tests in
+[docs/tests/chunk-13.md](../tests/chunk-13.md); deviations in [design-deviations.md](design-deviations.md).
 
 Boards: 07 Search (S-States "Close matches on their way", "Close matches unavailable", "No word matches", "A Jira
 key or task ID"; S-Motion "Close matches" and "Looks like a task you have"), 03 Quick Add. The round 2 sticky:

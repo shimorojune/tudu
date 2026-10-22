@@ -280,7 +280,8 @@ describe('spaces', () => {
     const found = (await (
       await get(server.app, `/api/spaces/${space.id}/search?q=task&today=2026-10-18`, b.jar)
     ).json()) as { hits: Array<{ title: string }> };
-    expect(found.hits.map((h) => h.title)).toEqual(['Meera’s task']);
+    // Search reads what you may see (chunk 13): your own and the shared tasks of others, best match first
+    expect(found.hits.map((h) => h.title).sort()).toEqual(['Arjun’s task', 'Meera’s task']);
     // Personal is unchanged: your own tasks, as before
     await sync(a, [create(a.personalId, 'Home thing', '2026-10-19')]);
     expect(titles(await day(a, a.personalId, '2026-10-19'))).toEqual(['Home thing']);

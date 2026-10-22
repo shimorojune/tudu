@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { searchTokens } from '@tudu/core';
+import { isRefLike, searchTokens } from '@tudu/core';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
 import { IconButton } from './IconButton';
@@ -37,6 +37,14 @@ export interface SearchPanelProps {
   onPick?: (item: SearchItem) => void;
   onCreate?: (title: string) => void;
   onClose?: () => void;
+  /**
+   * Close matches (by meaning): asked a moment after the words stop changing, listed under their own heading
+   * below the word matches; the word matches never wait for them. A rejected promise shows the quiet line.
+   */
+  similar?: (q: string) => Promise<SearchItem[]>;
+  /** How long after the last key the close matches are asked for (260ms). */
+  similarDelay?: number;
+  similarLabel?: string;
   /** Reopening brings the last search back, selected (on by default). */
   keepLast?: boolean;
   placeholder?: string;
@@ -46,18 +54,45 @@ export interface SearchPanelProps {
   /** The panel's own height limit, in px (440 by default). */
   maxHeight?: number;
   /** The kit: start in a state. */
-  initial?: { query?: string; active?: number; noFocus?: boolean };
+  initial?: {
+    query?: string;
+    active?: number;
+    noFocus?: boolean;
+    /** The kit: close matches in a state, with these rows when done. */
+    similarState?: 'loading' | 'done' | 'error';
+    similar?: SearchItem[];
+  };
   id?: string;
   className?: string;
 }
 
 export const SP_LEAVE_MS = 150;
 export const SP_LEAVE_PHONE_MS = 220;
+/** Close matches are asked for this long after the words stop changing. */
+export const SP_SIMILAR_AFTER_MS = 260;
 
-type Opt = { kind: 'query'; q: string } | { kind: 'create' } | { kind: 'task'; it: SearchItem };
+type SimState = 'off' | 'loading' | 'done' | 'error';
+interface Sim {
+  q: string;
+  state: SimState;
+  items: SearchItem[];
+}
+const SIM_OFF: Sim = { q: '', state: 'off', items: [] };
+
+type Opt =
+  | { kind: 'query'; q: string }
+  | { kind: 'create' }
+  | { kind: 'task'; it: SearchItem }
+  | { kind: 'similar'; it: SearchItem };
 
 function optKey(o: Opt): string {
-  return o.kind === 'create' ? 'create' : o.kind === 'query' ? `q:${o.q}` : o.it.key;
+  return o.kind === 'create'
+    ? 'create'
+    : o.kind === 'query'
+      ? `q:${o.q}`
+      : o.kind === 'similar'
+        ? `s:${o.it.key}`
+        : o.it.key;
 }
 
 /**
@@ -171,6 +206,38 @@ export function SearchPanel(p: SearchPanelProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- on opening, the app searches the words shown
   }, [open, overlay]);
 
+  // Close matches: a moment after the words settle, the app is asked for tasks that mean them. A task ID or Jira
+  // key typed in full is a lookup, not a topic, and skips them. The word matches never wait for them.
+  const [sim, setSim] = useState<Sim>(() =>
+    init.similarState
+      ? { q: (init.query ?? '').trim().toLowerCase(), state: init.similarState, items: init.similar ?? [] }
+      : SIM_OFF,
+  );
+  const simDelay = p.similarDelay ?? SP_SIMILAR_AFTER_MS;
+  useEffect(() => {
+    // Nothing to ask: the state is simply not for these words (simOn reads it against ql).
+    if (init.similarState || !p.similar || !ql || isRefLike(ql) || (overlay && !open)) return;
+    let on = true;
+    const t = setTimeout(() => {
+      setSim({ q: ql, state: 'loading', items: [] });
+      Promise.resolve()
+        .then(() => live.current.similar!(ql))
+        .then(
+          (items) => {
+            if (on) setSim({ q: ql, state: 'done', items: items ?? [] });
+          },
+          () => {
+            if (on) setSim({ q: ql, state: 'error', items: [] });
+          },
+        );
+    }, simDelay);
+    return () => {
+      on = false;
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `similar` is read live; only the words and the delay matter
+  }, [ql, simDelay, !!p.similar, open, overlay, init.similarState]);
+
   // The list eases to its new height as results change; past the panel's limit it scrolls.
   useEffect(() => {
     const w = wrap.current;
@@ -201,6 +268,10 @@ export function SearchPanel(p: SearchPanelProps) {
     for (const it of recent) opts.push({ kind: 'task', it });
   } else if (fresh && !hits.length && !p.error) opts.push({ kind: 'create' });
   if (ql) for (const it of hits) opts.push({ kind: 'task', it });
+  // Close matches for these very words, never a task already listed above.
+  const simOn = !!ql && !isRefLike(ql) && sim.state !== 'off' && sim.q === ql;
+  const simItems = simOn ? sim.items.filter((it) => !hits.some((h) => h.key === it.key)) : [];
+  if (simOn && sim.state === 'done') for (const it of simItems) opts.push({ kind: 'similar', it });
   const cur = Math.min(act, Math.max(0, opts.length - 1));
 
   // A search that led somewhere is kept: the box remembers it for the next opening, and the app adds it to the history.
@@ -248,6 +319,8 @@ export function SearchPanel(p: SearchPanelProps) {
           <SearchHit {...props} query={o.q} />
         ) : o.kind === 'create' ? (
           <SearchHit {...props} create={q.trim()} />
+        ) : o.kind === 'similar' ? (
+          <SearchHit {...props} item={o.it} />
         ) : (
           <SearchHit {...props} item={o.it} tokens={toks} />
         )}
@@ -323,6 +396,37 @@ export function SearchPanel(p: SearchPanelProps) {
       body.push(row(opts[n]!, n++));
     }
     for (const _ of hits) body.push(row(opts[n]!, n++));
+    if (simOn && (sim.state !== 'done' || simItems.length)) {
+      body.push(
+        <div key="sh" className="tp-sp-head tp-sp-head-sim">
+          {p.similarLabel ?? 'Close matches'}
+        </div>,
+      );
+      if (sim.state === 'loading')
+        body.push(
+          <p key="sl" className="tp-sp-quiet" role="status" aria-busy="true">
+            <svg
+              className="tp-spin"
+              width={12}
+              height={12}
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <circle cx={12} cy={12} r={9} stroke="currentColor" strokeWidth={2.5} opacity={0.25} />
+              <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" />
+            </svg>
+            Looking for tasks like this…
+          </p>,
+        );
+      else if (sim.state === 'error')
+        body.push(
+          <p key="se" className="tp-sp-quiet" role="status">
+            Close matches aren’t available right now. Word matches still work.
+          </p>,
+        );
+      else for (const _ of simItems) body.push(row(opts[n]!, n++));
+    }
   }
 
   const clearBtn = (
@@ -401,6 +505,7 @@ export function SearchPanel(p: SearchPanelProps) {
           role="listbox"
           aria-label="Matching tasks"
           data-answer={ql ? (fresh ? ql : '') : undefined}
+          data-similar={ql ? (simOn ? sim.state : 'off') : undefined}
         >
           {body}
         </div>

@@ -436,3 +436,18 @@
 .tp-set-offline {
   margin: 0 0 6px;
 }
+
+/* Search: a close match from another space names it before where it lives (chunk 13) */
+.tp-sh-by > .tp-sh-space {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tp-sh-tile {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 2.5px;
+  background: var(--ghost);
+}

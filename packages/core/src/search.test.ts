@@ -9,6 +9,11 @@ import {
   snippetOf,
   whereRank,
   wordsOf,
+  closeMatches,
+  embeddingText,
+  lookAlikesScored,
+  mergeLookAlikes,
+  MEANING_LIMIT,
 } from './search';
 
 const TODAY = '2026-10-18';
@@ -138,5 +143,74 @@ describe('C07-U03 look-alikes', () => {
     expect(lookAlikes(items, 'Buy milk')).toEqual([]);
     expect(lookAlikes(items, 'Run the dishwasher tonight')).toEqual([]);
     expect(lookAlikes(items, 'the and of')).toEqual([]);
+  });
+});
+
+describe('C13-U01 close matches', () => {
+  const t = (id: string) => ({ id });
+  it('C13-U01 orders by closeness, applies the floor, drops excluded ids and stops at four; the text embedded is the title and the first 300 characters of the notes, trimmed and lowercased', () => {
+    const found = [
+      { item: t('a'), similarity: 0.5 },
+      { item: t('b'), similarity: 0.9 },
+      { item: t('c'), similarity: 0.39 },
+      { item: t('d'), similarity: 0.7 },
+      { item: t('e'), similarity: 0.6 },
+      { item: t('f'), similarity: 0.55 },
+    ];
+    expect(closeMatches(found).map((m) => m.item.id)).toEqual(['b', 'd', 'e', 'f']);
+    expect(closeMatches(found, ['b', 'e']).map((m) => m.item.id)).toEqual(['d', 'f', 'a', 'c']);
+    expect(closeMatches(found, [], 4, 0.4).map((m) => m.item.id)).toEqual(['b', 'd', 'e', 'f']);
+    expect(closeMatches(found, [], 2).map((m) => m.item.id)).toEqual(['b', 'd']);
+    expect(closeMatches(found, [], 4, 0.65).map((m) => m.item.id)).toEqual(['b', 'd']);
+    expect(MEANING_LIMIT).toBe(4);
+    expect(embeddingText('  Renew Passport ', null)).toBe('renew passport');
+    expect(embeddingText('Renew passport', '  Photos   in the\n drawer. ')).toBe(
+      'renew passport\nphotos in the drawer.',
+    );
+    expect(embeddingText('A', 'x'.repeat(400))).toBe(`a\n${'x'.repeat(300)}`);
+  });
+});
+
+describe('C13-U02 Quick Add merge', () => {
+  const it2 = (id: string, title: string, done = false) => ({ id, title, done });
+  it('C13-U02 shared words and meaning on one scale, duplicates folded, open tasks only, at most three, nothing under four characters', () => {
+    const renew = it2('a', 'Renew passport');
+    const photos = it2('b', 'Passport photos');
+    const expires = it2('c', 'Passport expires in March');
+    const flights = it2('d', 'Book flights');
+    const done = it2('e', 'Renew my passport now', true);
+    const words = lookAlikesScored([renew, photos, done, expires], 'Renew my passport');
+    // every word shared scores 1, one of two 0.5 (chunk 07's rule); crossed off never
+    expect(words.map((w) => [w.item.id, w.score])).toEqual([
+      ['a', 1],
+      ['b', 0.5],
+      ['c', 0.5],
+    ]);
+    // on one scale a full word match is 1 and a half match 0.75; a meaning match scores its similarity
+    const merged = mergeLookAlikes(words, [
+      { item: expires, similarity: 0.62 },
+      { item: renew, similarity: 0.97 },
+      { item: flights, similarity: 0.41 },
+      { item: photos, similarity: 0.5 },
+    ]);
+    expect(merged.map((x) => x.id)).toEqual(['a', 'b', 'c']);
+    // meaning alone, closest first, three at most
+    expect(
+      mergeLookAlikes(
+        [],
+        [
+          { item: flights, similarity: 0.41 },
+          { item: expires, similarity: 0.62 },
+          { item: photos, similarity: 0.5 },
+          { item: renew, similarity: 0.45 },
+        ],
+      ).map((x) => x.id),
+    ).toEqual(['c', 'b', 'a']);
+    // the sure thing stays even when the model finds it far
+    expect(
+      mergeLookAlikes([{ item: renew, score: 0.5 }], [{ item: flights, similarity: 0.7 }]).map((x) => x.id),
+    ).toEqual(['a', 'd']);
+    expect(lookAlikesScored([renew], 'Ren')).toEqual([]);
+    expect(mergeLookAlikes([], [])).toEqual([]);
   });
 });

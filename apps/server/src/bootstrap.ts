@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { personColor } from '@tudu/core';
 import { createDb, eq, schema, type Db } from '@tudu/db';
 import { markNewAccount, takeFirstSession } from './firstRun';
@@ -9,6 +11,8 @@ import { ResendMailer } from './email/resend';
 import type { Env } from './env';
 import { createApp, type App } from './app';
 import { sweepAttachments } from './files';
+import { EMBED_EVERY_MS, Embeddings } from './closeMatches';
+import { LocalEmbedder, type Embedder } from './embeddings';
 import { MemoryStorage, S3Storage, type Storage } from './storage';
 
 export interface Server {
@@ -18,6 +22,7 @@ export interface Server {
   hub: EventHub;
   mailer: Mailer;
   storage: Storage;
+  embeddings: Embeddings;
   close: () => Promise<void>;
 }
 
@@ -34,6 +39,8 @@ export function bootstrap(
     quiet?: boolean;
     jiraFetch?: typeof fetch;
     githubFetch?: typeof fetch;
+    /** Tests pass a fake; `null` is the model off. Left out, the model inside the API (EMBEDDINGS). */
+    embedder?: Embedder | null;
   } = {},
 ): Server {
   const { db, close: closeDb } = createDb(env.DATABASE_URL);
@@ -56,8 +63,33 @@ export function bootstrap(
     env.NODE_ENV === 'test'
       ? null
       : setInterval(() => void sweepAttachments(db, storage).catch(() => {}), SWEEP_EVERY_MS);
+  // Close matches: the model inside the API, unless told off; the tick picks up what a batch missed.
+  const embedder =
+    options.embedder !== undefined
+      ? options.embedder
+      : env.EMBEDDINGS === 'off'
+        ? null
+        : new LocalEmbedder({
+            // Local work and tests keep the model in the repo's own cache; the image sets its own folder.
+            modelDir:
+              env.EMBEDDINGS_MODEL_DIR ??
+              resolve(fileURLToPath(import.meta.url), '../../../../.local/models'),
+            offline: env.EMBEDDINGS_OFFLINE === '1',
+            quiet: options.quiet,
+          });
+  const embeddings = new Embeddings(db, embedder, { quiet: options.quiet });
+  const embedTick =
+    env.NODE_ENV === 'test' || !embedder ? null : setInterval(() => embeddings.kick(), EMBED_EVERY_MS);
+  if (embedder instanceof LocalEmbedder && env.NODE_ENV !== 'test')
+    void embedder
+      .warm()
+      .then(() => embeddings.kick())
+      .catch((err) => {
+        if (!options.quiet) console.error('embeddings: the model did not load', err);
+      });
   const close = async () => {
     if (sweeper) clearInterval(sweeper);
+    if (embedTick) clearInterval(embedTick);
     await closeDb();
   };
   const mailer =
@@ -101,6 +133,7 @@ export function bootstrap(
     quiet: options.quiet,
     jiraFetch: options.jiraFetch,
     githubFetch: options.githubFetch,
+    embeddings,
   });
-  return { app, db, auth, hub, mailer, storage, close };
+  return { app, db, auth, hub, mailer, storage, embeddings, close };
 }

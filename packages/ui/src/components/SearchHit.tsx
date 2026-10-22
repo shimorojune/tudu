@@ -17,6 +17,8 @@ export interface SearchItem {
   jira?: string | null;
   /** A line of the note around the matched word. */
   snippet?: string | null;
+  /** The space it lives in, when it is not the one you are looking at (close matches come from every space). */
+  space?: { name: string; color: string | null } | null;
 }
 
 export interface SearchHitProps {
@@ -145,6 +147,12 @@ export function SearchHit(p: SearchHitProps) {
         <span className="tp-sh-title">{markWords(it.title, toks)}</span>
         {it.snippet ? <span className="tp-sh-snip">{markWords(it.snippet, toks)}</span> : null}
         <span className="tp-sh-by">
+          {it.space ? (
+            <span className="tp-sh-space">
+              <i className="tp-sh-tile" style={it.space.color ? { background: it.space.color } : undefined} />
+              {it.space.name}
+            </span>
+          ) : null}
           <span className={cx('tp-sh-where', it.where.tone === 'today' && 'tp-today')}>{it.where.label}</span>
           {it.project ? (
             <span className="tp-sh-proj">

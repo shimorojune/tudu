@@ -71,3 +71,23 @@ for (const [chunk, rows] of [...chunks].sort()) {
 }
 writeFileSync(join(ROOT, 'docs/tests/STATUS.md'), lines.join('\n'));
 console.log(`docs/tests/STATUS.md: ${status.size} cases`);
+
+// Chunk 13's accuracy gate (C13-A07) writes reports/close-matches.json; its scores go into docs/tests/chunk-13.md
+// between the accuracy marks.
+const accPath = join(ROOT, 'reports/close-matches.json');
+const docPath = join(ROOT, 'docs/tests/chunk-13.md');
+if (existsSync(accPath) && existsSync(docPath)) {
+  const a = JSON.parse(readFileSync(accPath, 'utf8'));
+  const block = [
+    '<!-- accuracy -->',
+    `Last measured ${a.at.slice(0, 16).replace('T', ' ')} UTC with \`${a.model}\` (floor ${a.floor}) over ${a.searches} labelled searches: recall at four **${a.recall}**, precision **${a.precision}**` +
+      (a.misses.length ? `. Missed: ${a.misses.map((m) => `\`${m}\``).join(', ')}.` : '.'),
+    '<!-- /accuracy -->',
+  ].join('\n');
+  const doc = readFileSync(docPath, 'utf8');
+  const next = doc.replace(/<!-- accuracy -->[\s\S]*?<!-- \/accuracy -->/, block);
+  if (next !== doc) {
+    writeFileSync(docPath, next);
+    console.log(`docs/tests/chunk-13.md: recall ${a.recall}, precision ${a.precision}`);
+  }
+}

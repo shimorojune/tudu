@@ -71,6 +71,13 @@
       "when": 1792654115522,
       "tag": "0009_first-run",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792679473865,
+      "tag": "0010_close-matches",
+      "breakpoints": true
     }
   ]
 }

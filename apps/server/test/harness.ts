@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import { inject } from 'vitest';
 import { OutboxMailer } from '../src/email';
 import { readEnv } from '../src/env';
@@ -14,6 +16,8 @@ export function startServer(overrides: Partial<NodeJS.ProcessEnv> = {}): Server 
     CORS_ORIGINS: 'http://localhost:5173',
     EMAIL_TRANSPORT: 'outbox',
     TEST_ROUTES: '1',
+    // The real model, from the repo's own cache (downloaded once).
+    EMBEDDINGS_MODEL_DIR: resolve(fileURLToPath(import.meta.url), '../../../../.local/models'),
     ...overrides,
   });
   // The server reaches "Jira" at http://jira.test, which is the fake Jira this same app serves under /__test/jira.

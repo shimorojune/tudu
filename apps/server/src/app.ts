@@ -18,6 +18,7 @@ import { TokenSeal } from './jira/seal';
 import { spaceRoutes } from './routes/spaces';
 import { taskRoutes } from './routes/tasks';
 import { testRoutes } from './routes/test';
+import type { Embeddings } from './closeMatches';
 import { updateRoutes } from './routes/updates';
 import { fakeGithub } from './updates/fake';
 import { UpdateFeed } from './updates/feed';
@@ -34,6 +35,8 @@ export interface AppDeps {
   jiraFetch?: typeof fetch;
   /** How the update feed reaches GitHub; tests route it to the fake GitHub in the same process. */
   githubFetch?: typeof fetch;
+  /** Close matches: the vectors and the meaning search (chunk 13). */
+  embeddings: Embeddings;
   /** For the live stream heartbeat in tests. */
   heartbeatMs?: number;
   quiet?: boolean;
@@ -114,7 +117,7 @@ export function createApp(deps: AppDeps) {
 
   app.use('/api/*', sessionMiddleware(auth));
   app.route('/api', meRoutes(db, hub, mailer, storage));
-  app.route('/api', taskRoutes(db, hub));
+  app.route('/api', taskRoutes(db, hub, deps.embeddings));
   app.route('/api', spaceRoutes(db, hub, mailer, env.WEB_URL!, storage));
   app.route('/api', inboxRoutes(db));
   app.route('/api', fileRoutes(db, storage));
@@ -128,7 +131,7 @@ export function createApp(deps: AppDeps) {
   app.route('/api', eventRoutes(hub, auth, { heartbeatMs: deps.heartbeatMs }));
 
   if (env.TEST_ROUTES === '1' && mailer instanceof OutboxMailer) {
-    app.route('/__test', testRoutes(mailer, db));
+    app.route('/__test', testRoutes(mailer, db, deps.embeddings));
     app.route('/__test/jira', fakeJira());
     app.route('/__test/github', fakeGithub());
     app.post('/__test/updates/reset', (c) => {

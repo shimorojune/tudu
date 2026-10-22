@@ -82,3 +82,19 @@ describe('C07-U04 a search result', () => {
     expect(markWords('a.b', ['.'])).not.toBe('a.b');
   });
 });
+
+describe('C13-U05 a close match from another space', () => {
+  it('names the space with its tile before where it lives; a row in this space names none', () => {
+    render(
+      <SearchHit item={{ ...ITEM, snippet: null, space: { name: 'Home', color: '#8a5a00' } }} tokens={[]} />,
+    );
+    const by = document.querySelector('.tp-sh-by')!;
+    expect(by.querySelector('.tp-sh-space')?.textContent).toBe('Home');
+    expect((by.querySelector('.tp-sh-tile') as HTMLElement).style.background).toMatch(
+      /rgb\(138, 90, 0\)|#8a5a00/,
+    );
+    expect(by.textContent).toMatch(/^HomeToday/);
+    render(<SearchHit item={{ ...ITEM, key: 'b', snippet: null }} />);
+    expect(document.querySelectorAll('.tp-sh-space')).toHaveLength(1);
+  });
+});

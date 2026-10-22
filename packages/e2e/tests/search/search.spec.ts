@@ -319,12 +319,13 @@ test.describe('search', () => {
     await bar.getByRole('button', { name: 'None of these' }).click();
     await expect(sim).not.toHaveClass(/tp-on/);
     await expect(line).toBeFocused();
-    // one look-alike: the title takes you there and keeps the draft
+    // the closest look-alike first (since chunk 13 meaning may add others under "N more"): the title takes you
+    // there and keeps the draft
     await line.fill('Sync with Meera about the onboarding copy');
     await expect(sim).toHaveClass(/tp-on/);
-    await expect(sim.locator('.tp-qa-sim-k')).toHaveText('Looks like a task you have');
+    await expect(sim.locator('.tp-qa-sim-k')).toHaveText(/^Looks like (a task|tasks) you have$/);
+    await expect(sim.locator('.tp-qa-sim-t').first()).toHaveText('Sync with Meera on onboarding copy');
     await expect(sim.locator('.tp-qa-sim-w').first()).toHaveText('Today');
-    await expect(bar.getByRole('button', { name: /more$/ })).toHaveCount(0);
     await expect(bar.getByRole('button', { name: /^Add( task)?$/ })).toBeEnabled();
     await sim.getByRole('button', { name: 'Sync with Meera on onboarding copy' }).click();
     await expect(bar).toHaveCount(0);

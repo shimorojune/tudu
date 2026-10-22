@@ -205,3 +205,126 @@ describe('C07-U06 working the panel', () => {
     expect(within(list()).getAllByRole('option')).toHaveLength(2);
   });
 });
+
+const CLOSE: SearchItem[] = [
+  {
+    key: 'x',
+    id: 'HM-12',
+    title: 'Book the restaurant',
+    where: { label: 'Backlog' },
+    space: { name: 'Home', color: null },
+  },
+  {
+    key: 'a',
+    id: 'ME-41',
+    title: 'Sync with Meera on onboarding copy',
+    where: { label: 'Today', tone: 'today' },
+  },
+  { key: 'y', id: 'ME-90', title: 'Plan the team dinner', where: { label: 'Tomorrow' } },
+];
+
+describe('C13-U06 close matches in the panel', () => {
+  it('asks a moment after the words settle, never for a task ID or Jira key; shows the heading with the quiet line while loading, the rows without washed words and without a task the word hits list, the error line; the arrows walk into them', async () => {
+    const user = userEvent.setup();
+    let answer: (items: SearchItem[]) => void = () => {};
+    let fail: () => void = () => {};
+    const similar = vi.fn(
+      () =>
+        new Promise<SearchItem[]>((res, rej) => {
+          answer = res;
+          fail = rej;
+        }),
+    );
+    const onPick = vi.fn();
+    const { rerender } = render(
+      <Panel
+        results={{ query: 'meera', hits: HITS }}
+        initial={{ query: 'meera' }}
+        similar={similar}
+        onPick={onPick}
+        similarDelay={150}
+      />,
+    );
+    // not at once: a moment after the words settle
+    expect(similar).not.toHaveBeenCalled();
+    expect(list().getAttribute('data-similar')).toBe('off');
+    await waitFor(() => expect(box()).toHaveFocus());
+    await waitFor(() => expect(similar).toHaveBeenCalledWith('meera'), { timeout: 1000 });
+    expect(list().getAttribute('data-similar')).toBe('loading');
+    expect(screen.getByText('Close matches')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toContain('Looking for tasks like this…');
+    await act(async () => answer(CLOSE));
+    expect(list().getAttribute('data-similar')).toBe('done');
+    // the row the word hits already list is left out; the matched words are not washed in the close matches
+    const names = options();
+    expect(names).toHaveLength(4);
+    expect(names[2]).toContain('Book the restaurant');
+    expect(names[2]).toContain('Home');
+    expect(names[3]).toContain('Plan the team dinner');
+    expect(screen.getByText('Plan the team dinner').querySelector('mark')).toBeNull();
+    // arrows walk into them and Enter picks
+    await user.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}{Enter}');
+    expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ key: 'y' }));
+    // the model away: the quiet line, the word rows still there
+    similar.mockClear();
+    await user.type(box(), ' copy');
+    rerender(
+      <Panel
+        results={{ query: 'meera copy', hits: HITS }}
+        initial={{ query: 'meera' }}
+        similar={similar}
+        onPick={onPick}
+        similarDelay={150}
+      />,
+    );
+    await waitFor(() => expect(similar).toHaveBeenCalledWith('meera copy'));
+    await act(async () => fail());
+    expect(list().getAttribute('data-similar')).toBe('error');
+    expect(screen.getByRole('status').textContent).toContain(
+      'Close matches aren’t available right now. Word matches still work.',
+    );
+    expect(options()).toHaveLength(2);
+    // a task ID in full: no close matches at all
+    similar.mockClear();
+    await user.clear(box());
+    await user.type(box(), 'ME-41');
+    rerender(
+      <Panel
+        results={{ query: 'me-41', hits: [HITS[0]!] }}
+        initial={{ query: 'meera' }}
+        similar={similar}
+        onPick={onPick}
+        similarDelay={150}
+      />,
+    );
+    await new Promise((r) => setTimeout(r, 120));
+    expect(similar).not.toHaveBeenCalled();
+    expect(list().getAttribute('data-similar')).toBe('off');
+    expect(screen.queryByText('Close matches')).toBeNull();
+  });
+});
+
+describe('C13-U07 no word match with close matches', () => {
+  it('Create first, the close matches under it; Enter still creates', async () => {
+    const user = userEvent.setup();
+    const onCreate = vi.fn();
+    const similar = vi.fn(async () => [CLOSE[2]!]);
+    render(
+      <Panel
+        results={{ query: 'dinner plans', hits: [] }}
+        initial={{ query: 'dinner plans' }}
+        similar={similar}
+        onCreate={onCreate}
+        similarDelay={0}
+      />,
+    );
+    await waitFor(() => expect(list().getAttribute('data-similar')).toBe('done'));
+    const names = options();
+    expect(names[0]).toContain('Create “dinner plans”');
+    expect(names[1]).toContain('Plan the team dinner');
+    expect(screen.getByText('Close matches')).toBeTruthy();
+    await waitFor(() => expect(box()).toHaveFocus());
+    await user.keyboard('{Enter}');
+    expect(onCreate).toHaveBeenCalledWith('dinner plans');
+  });
+});

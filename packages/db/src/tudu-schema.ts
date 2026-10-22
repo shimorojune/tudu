@@ -12,8 +12,12 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  vector,
 } from 'drizzle-orm/pg-core';
 import { user } from './auth-schema';
+
+/** How many numbers the embedding model answers with (all-MiniLM-L6-v2). A model of another width is a migration. */
+export const EMBEDDING_DIMENSIONS = 384;
 
 /** A space is its own Tudu: Personal is yours alone; a team space is shared. */
 export const spaceKind = pgEnum('space_kind', ['personal', 'team']);
@@ -215,9 +219,17 @@ export const tasks = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     clocks: jsonb('clocks').$type<TaskClocks>().notNull().default({}),
+    /**
+     * What the task means (chunk 13): a vector from its title and the first of its notes, for close matches. Null
+     * until the embedder has seen it; nulled again by any write that changes the title or the notes.
+     */
+    embedding: vector('embedding', { dimensions: EMBEDDING_DIMENSIONS }),
+    /** The exact text the vector was made from, so a change to the words is a change to the vector. */
+    embeddedText: text('embedded_text'),
   },
   (t) => [
     uniqueIndex('tasks_space_number').on(t.spaceId, t.number),
+    index('tasks_embedding').using('hnsw', t.embedding.op('vector_cosine_ops')),
     index('tasks_space_day').on(t.spaceId, t.day, t.position),
     index('tasks_owner_day').on(t.ownerId, t.spaceId, t.day),
     index('tasks_space_jira')

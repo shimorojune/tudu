@@ -9,7 +9,9 @@ import {
   isProjectMutation,
   isSettingsMutation,
   LOOKALIKE_MIN,
-  lookAlikes,
+  lookAlikesScored,
+  mergeLookAlikes,
+  type MeaningMatch,
   nextProjectColor,
   POSITION_STEP,
   rankSearch,
@@ -30,6 +32,7 @@ import {
   type TaskDetail,
 } from '@tudu/core';
 import { and, asc, count, eq, gte, inArray, isNull, lt, lte, or, schema, sql, type Db } from '@tudu/db';
+import { readableBy } from './closeMatches';
 import type { SubtaskClocks, TaskClocks } from '@tudu/db/schema';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -298,8 +301,7 @@ export async function searchTasks(
     .where(
       and(
         eq(schema.tasks.spaceId, spaceId),
-        ownedBy(userId),
-        isNull(schema.tasks.deletedAt),
+        readableBy(userId),
         or(...words, ...(n === null ? [] : [eq(schema.tasks.number, n)])),
       ),
     )
@@ -322,34 +324,41 @@ export async function searchTasks(
   return ranked.map((h) => toHit(h.item.row, h.snippet));
 }
 
-/** Open tasks in a space that read like the title (Quick Add's "Looks like a task you have"), the closest first. */
+/**
+ * Open tasks in a space that read like the title (Quick Add's "Looks like a task you have"): by shared words, and
+ * by meaning when the caller passes what the vector search found, folded on one scale, the closest first, at
+ * most three.
+ */
 export async function lookAlikeTasks(
   db: Executor,
   spaceId: string,
   userId: string,
   title: string,
+  byMeaning: MeaningMatch<SearchHit>[] = [],
 ): Promise<SearchHit[]> {
   const ws = wordsOf(title);
-  if (!ws.length || title.trim().length < LOOKALIKE_MIN) return [];
-  const rows: SearchRow[] = await db
-    .select(searchColumns)
-    .from(schema.tasks)
-    .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
-    .where(
-      and(
-        eq(schema.tasks.spaceId, spaceId),
-        ownedBy(userId),
-        isNull(schema.tasks.deletedAt),
-        isNull(schema.tasks.doneAt),
-        or(...ws.map((w) => sql`${schema.tasks.title} ILIKE ${like(w.slice(0, 5))}`)),
-      ),
-    )
-    .orderBy(asc(schema.tasks.day), asc(schema.tasks.position), asc(schema.tasks.createdAt))
-    .limit(SEARCH_CANDIDATES);
-  return lookAlikes(
-    rows.map((r) => ({ row: r, title: r.title, done: false })),
+  const words =
+    !ws.length || title.trim().length < LOOKALIKE_MIN
+      ? []
+      : await db
+          .select(searchColumns)
+          .from(schema.tasks)
+          .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
+          .where(
+            and(
+              eq(schema.tasks.spaceId, spaceId),
+              readableBy(userId),
+              isNull(schema.tasks.doneAt),
+              or(...ws.map((w) => sql`${schema.tasks.title} ILIKE ${like(w.slice(0, 5))}`)),
+            ),
+          )
+          .orderBy(asc(schema.tasks.day), asc(schema.tasks.position), asc(schema.tasks.createdAt))
+          .limit(SEARCH_CANDIDATES);
+  const scored = lookAlikesScored(
+    words.map((r) => ({ row: r, title: r.title, done: false })),
     title,
-  ).map((x) => toHit(x.row));
+  ).map((x) => ({ item: toHit(x.item.row), score: x.score }));
+  return mergeLookAlikes(scored, byMeaning);
 }
 
 /** The tasks asked for by id, as hits, in the order asked; a deleted or unknown one is left out. */
@@ -364,15 +373,7 @@ export async function hitsById(
     .select(searchColumns)
     .from(schema.tasks)
     .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
-    .where(
-      and(
-        eq(schema.tasks.spaceId, spaceId),
-        isNull(schema.tasks.deletedAt),
-        inArray(schema.tasks.id, ids),
-        // A colleague's task you opened from People is still found here.
-        or(ownedBy(userId), eq(schema.tasks.visibility, 'space')),
-      ),
-    );
+    .where(and(eq(schema.tasks.spaceId, spaceId), inArray(schema.tasks.id, ids), readableBy(userId)));
   const byId = new Map(rows.map((r) => [r.id, r]));
   return ids
     .map((id) => byId.get(id))
@@ -989,6 +990,11 @@ async function change(tx: Tx, userId: string, m: TaskChange): Promise<Applied> {
       break;
   }
   if (!Object.keys(set).length) return { ...base, days: [] };
+  // New words, new meaning: the vector is made again by the next batch (chunk 13).
+  if (set.title !== undefined || set.notes !== undefined) {
+    set.embedding = null;
+    set.embeddedText = null;
+  }
   await tx
     .update(schema.tasks)
     .set({ ...set, clocks, updatedAt: new Date() })

@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
 import { like, schema, type Db } from '@tudu/db';
 import type { OutboxMailer } from '../email';
+import type { Embeddings } from '../closeMatches';
 
 /** Test-only routes, mounted under /__test when TEST_ROUTES=1. Never in production. */
-export function testRoutes(outbox: OutboxMailer, db: Db) {
+export function testRoutes(outbox: OutboxMailer, db: Db, embeddings: Embeddings) {
   const r = new Hono();
   r.get('/outbox', (c) => {
     const to = c.req.query('to');
@@ -27,6 +28,24 @@ export function testRoutes(outbox: OutboxMailer, db: Db) {
   });
   r.delete('/outbox', (c) => {
     outbox.clear();
+    return c.body(null, 204);
+  });
+  /** Close matches: embed everything pending now (tests wait for this rather than the batch after a sync). */
+  r.post('/embeddings/drain', async (c) => {
+    const n = await embeddings.drain();
+    return c.json({ embedded: n });
+  });
+  /** The model gone: the meaning search answers 503 until it is back up; for one person (`userId`) or everyone. */
+  r.post('/embeddings/down', async (c) => {
+    const { userId } = ((await c.req.json().catch(() => null)) ?? {}) as { userId?: string };
+    if (userId) embeddings.downFor.add(userId);
+    else embeddings.down = true;
+    return c.body(null, 204);
+  });
+  r.post('/embeddings/up', async (c) => {
+    const { userId } = ((await c.req.json().catch(() => null)) ?? {}) as { userId?: string };
+    if (userId) embeddings.downFor.delete(userId);
+    else embeddings.down = false;
     return c.body(null, 204);
   });
   return r;

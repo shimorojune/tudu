@@ -12,6 +12,8 @@ const SKIP = new Set([
   'test-results',
   'reports',
   'assets',
+  // local state: databases, the close-matches model's files, run logs
+  '.local',
 ]);
 const TEXT = new Set(['.ts', '.tsx', '.js', '.mjs', '.md', '.json', '.yaml', '.yml', '.html', '.css']);
 // The design system's own files are vendored as they are.

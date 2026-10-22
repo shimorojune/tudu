@@ -25,6 +25,7 @@ import {
 } from '@tudu/core';
 import type { Db } from '@tudu/db';
 import type { EventHub } from '../events';
+import { MeaningUnavailable, searchByMeaning, type Embeddings } from '../closeMatches';
 import { requireSession, type SessionVars } from '../middleware/session';
 import { spaceSummaries } from '../spaces';
 import { announceMembers } from './spaces';
@@ -87,7 +88,7 @@ export async function announceProjects(
 }
 
 /** Days, the dots on the calendar, and the sync endpoint the outbox replays changes to. */
-export function taskRoutes(db: Db, hub: EventHub) {
+export function taskRoutes(db: Db, hub: EventHub, embeddings: Embeddings) {
   const r = new Hono<{ Variables: SessionVars }>();
 
   r.get('/spaces/:spaceId/days/:day', requireSession, async (c) => {
@@ -158,13 +159,47 @@ export function taskRoutes(db: Db, hub: EventHub) {
     let hits;
     if (ids !== undefined)
       hits = await hitsById(db, spaceId, userId, ids.split(',').filter(Boolean).slice(0, 20));
-    else if (c.req.query('for') === 'lookalike') hits = await lookAlikeTasks(db, spaceId, userId, q);
-    else {
+    else if (c.req.query('for') === 'lookalike') {
+      // By words and, when the model is up, by meaning; the words alone when it is not.
+      const byMeaning = embeddings.on
+        ? await searchByMeaning(db, embeddings, userId, q, { spaceId, openOnly: true, limit: 3 }).catch(
+            (err) => {
+              if (err instanceof MeaningUnavailable) return [];
+              throw err;
+            },
+          )
+        : [];
+      hits = await lookAlikeTasks(
+        db,
+        spaceId,
+        userId,
+        q,
+        byMeaning.map((h) => ({ item: h, similarity: h.similarity })),
+      );
+    } else {
       const today = c.req.query('today');
       hits = await searchTasks(db, spaceId, userId, q, isIsoDate(today) ? today : isoToday());
     }
     const body: SearchResponse = { hits };
     return c.json(body);
+  });
+
+  /**
+   * Close matches: tasks that mean what was typed, from every space you are in (`?q=`), without the ones the word
+   * search already lists (`?exclude=a,b`). 503 while the model is not available, so the panel says so quietly.
+   */
+  r.get('/search/meaning', requireSession, async (c) => {
+    const userId = c.get('session')!.user.id;
+    const q = (c.req.query('q') ?? '').slice(0, 200);
+    const exclude = (c.req.query('exclude') ?? '').split(',').filter(Boolean);
+    try {
+      const hits = await searchByMeaning(db, embeddings, userId, q, { exclude });
+      const body: SearchResponse = { hits: hits.map(({ similarity: _s, ...h }) => h) };
+      return c.json(body);
+    } catch (err) {
+      if (err instanceof MeaningUnavailable) return c.json({ error: err.message }, 503);
+      throw err;
+    }
   });
 
   r.get('/spaces/:spaceId/tasks/:taskId', requireSession, async (c) => {
@@ -252,6 +287,8 @@ export function taskRoutes(db: Db, hub: EventHub) {
       await announceSpace(db, hub, spaceId);
     if (applied.some((a) => a.me))
       for (const s of await spaceSummaries(db, userId)) await announceMembers(db, hub, s.id);
+    // New or changed words get their vector after the answer goes out (chunk 13).
+    if (tasky.length) embeddings.kick();
     return c.json(body);
   });
 

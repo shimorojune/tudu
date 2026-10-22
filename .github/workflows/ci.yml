@@ -60,6 +60,12 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: The close-matches model (cached)
+        uses: actions/cache@v4
+        with:
+          path: .local/models
+          key: embeddings-all-MiniLM-L6-v2-q8
+      - run: EMBEDDINGS_MODEL_DIR=$PWD/.local/models node --import tsx apps/server/src/embeddings/fetch-model.ts
       - run: pnpm test -- --reporter=default --reporter=json --outputFile=reports/vitest.json
       - uses: actions/upload-artifact@v4
         if: always()
@@ -99,6 +105,12 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: The close-matches model (cached)
+        uses: actions/cache@v4
+        with:
+          path: .local/models
+          key: embeddings-all-MiniLM-L6-v2-q8
+      - run: EMBEDDINGS_MODEL_DIR=$PWD/.local/models node --import tsx apps/server/src/embeddings/fetch-model.ts
       - run: pnpm --filter e2e exec playwright install --with-deps chromium
       - name: Create the storage bucket
         env:
@@ -123,6 +135,27 @@ jobs:
             reports/playwright-html
           if-no-files-found: ignore
 
+  # The API image builds and starts (chunk 13 bundles the close-matches model into it, on a Debian base): proved
+  # here on a GitHub runner, since staging builds it on the Dokploy host only after a merge.
+  api-image:
+    name: API image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f apps/server/Dockerfile -t tudu-api:ci .
+      - name: The model is inside (no network) and the API answers
+        run: |
+          docker run --rm --network none -w /app tudu-api:ci node --import tsx apps/server/src/embeddings/fetch-model.ts
+          docker run -d --name api -p 3456:3456 -e NODE_ENV=development \
+            -e DATABASE_URL=postgres://nobody@127.0.0.1:1/none -e AUTH_SECRET=ci-secret-ci-secret-ci-secret \
+            --entrypoint sh tudu-api:ci -c "pnpm start"
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3456/health; then exit 0; fi
+            sleep 2
+          done
+          docker logs api
+          exit 1
+
   # The desktop group: Tudu Test, the real macOS app, built twice (this version and one up, signed with a key made
   # for the run) and driven over its control channel; plus the Rust unit tests. GitHub's macOS runner has no
   # service containers, so Postgres runs on the runner itself; attachments stay in memory.
@@ -146,7 +179,20 @@ jobs:
         with:
           postgres-version: 17
       - run: echo "TUDU_CI_DATABASE_URL=postgres://$(whoami)@127.0.0.1:5432/postgres" >> "$GITHUB_ENV"
+      # pgvector for the runner's own Postgres (chunk 13): built against it, a minute.
+      - name: pgvector
+        run: |
+          git clone --depth 1 --branch v0.8.7 https://github.com/pgvector/pgvector.git /tmp/pgvector
+          make -C /tmp/pgvector -s
+          make -C /tmp/pgvector -s install
       - run: pnpm install --frozen-lockfile
+      - name: The close-matches model (cached)
+        uses: actions/cache@v4
+        with:
+          path: .local/models
+          key: embeddings-all-MiniLM-L6-v2-q8
+      - run: EMBEDDINGS_MODEL_DIR=$PWD/.local/models node --import tsx apps/server/src/embeddings/fetch-model.ts
+
       - name: Rust unit tests
         run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --features control
       - name: The desktop group

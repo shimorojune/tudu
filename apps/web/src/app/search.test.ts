@@ -12,6 +12,7 @@ import {
   resetSearchMemory,
   SEARCH_MEMORY,
 } from './search';
+import { spaceOfHit, toSearchItem } from './SearchHost';
 
 afterEach(() => {
   resetSearchMemory();
@@ -100,5 +101,39 @@ describe('C07-U09 which tab is lit on phones', () => {
     expect(phoneTab({ view: 'people', onToday: false, searchOpen: false })).toBe('more');
     expect(phoneTab({ view: 'today', onToday: true, searchOpen: false })).toBe('today');
     expect(phoneTab({ view: 'week', onToday: false, searchOpen: false })).toBe('week');
+  });
+});
+
+describe('C13-U09 close matches in the app', () => {
+  it('a hit from another space carries that space for its row; one from this space none; a pick in another space goes to its address', () => {
+    const spaces = [
+      { id: 's1', name: 'Personal', color: null, slug: 'me' },
+      { id: 's2', name: 'Northwind', color: '#3d5a80', slug: 'northwind' },
+    ] as never;
+    const hit = {
+      id: 't',
+      ref: 'NW-3',
+      title: 'Fix the gutter',
+      day: null,
+      done: false,
+      projectId: null,
+      jira: null,
+      snippet: null,
+      spaceId: 's2',
+    };
+    expect(spaceOfHit(hit, spaces, 's1')).toEqual({ name: 'Northwind', color: '#3d5a80' });
+    expect(spaceOfHit(hit, spaces, 's2')).toBeNull();
+    expect(spaceOfHit({ ...hit, spaceId: undefined }, spaces, 's1')).toBeNull();
+    expect(toSearchItem(hit, '2026-10-18', [], { name: 'Northwind', color: '#3d5a80' }).space).toEqual({
+      name: 'Northwind',
+      color: '#3d5a80',
+    });
+    expect(toSearchItem(hit, '2026-10-18', []).space).toBeNull();
+    const navigate = vi.fn();
+    expect(goToTask({ id: 't', day: null, done: false }, '2026-10-18', navigate, 'northwind')).toEqual({
+      page: 'backlog',
+      view: 'open',
+    });
+    expect(navigate).toHaveBeenCalledWith('/northwind/backlog');
   });
 });
