@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
+import { tickGettingStarted } from './firstRun';
 import { queryOptions } from '@tanstack/react-query';
 import {
   taskIdOf,
@@ -150,6 +151,7 @@ export class JiraClient {
   async connect(spaceId: string, site: string, token: string): Promise<JiraConnectionResponse> {
     const res = await this.api.post<JiraConnectionResponse>(`/api/spaces/${spaceId}/jira`, { site, token });
     this.qc.setQueryData(jiraConnectionKey(spaceId), res);
+    tickGettingStarted(this.qc, 'jira');
     void this.qc.invalidateQueries({
       queryKey: ['jira', spaceId],
       predicate: (q) => q.queryKey[2] === 'issues',

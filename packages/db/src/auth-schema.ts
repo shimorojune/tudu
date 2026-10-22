@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm';
-import { pgTable, text, timestamp, boolean, index } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, index, jsonb } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('user', {
   id: text('id').primaryKey(),
@@ -9,6 +9,11 @@ export const user = pgTable('user', {
   image: text('image'),
   /** Tudu's own: the colour of this person's mark, given at first sign-in. Better Auth leaves it alone. */
   color: text('color'),
+  /**
+   * Tudu's own: Getting started's record (when a theme was picked, when the card was hidden or done) and the
+   * session that made the account, so that sign-in is told apart from every later one.
+   */
+  firstRun: jsonb('first_run').$type<{ themeAt?: string; hiddenAt?: string; firstSession?: string }>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at')
     .defaultNow()

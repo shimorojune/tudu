@@ -11,6 +11,7 @@ import { SpacesStates } from './SpacesStates';
 import { InboxStates } from './InboxStates';
 import { SettingsStates } from './SettingsStates';
 import { JiraStates } from './JiraStates';
+import { FirstRunStates } from './FirstRunStates';
 import './kit.css';
 
 const NAV = [
@@ -32,6 +33,7 @@ const NAV = [
   ['inbox', 'The Inbox'],
   ['settings', 'Settings'],
   ['jira', 'Jira'],
+  ['first-run', 'Getting started'],
 ];
 
 /** Every primitive in every state, light and dark side by side. The place to judge the motion. */
@@ -48,7 +50,7 @@ export function KitPage() {
           ))}
         </nav>
         <span className="kit-spacer" />
-        <span className="kit-label">Kit · chunks 00 to 10</span>
+        <span className="kit-label">Kit · chunks 00 to 12</span>
       </header>
       <main className="kit-main">
         <h1 className="kit-h1">The kit</h1>
@@ -69,6 +71,7 @@ export function KitPage() {
         <InboxStates />
         <SettingsStates />
         <JiraStates />
+        <FirstRunStates />
       </main>
     </div>
   );

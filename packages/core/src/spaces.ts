@@ -164,6 +164,8 @@ export interface SpaceSummary {
   inbox: { toAnswer: number; unread: number };
   /** Slugs it answered to before a rename: an old address still lands here. */
   oldSlugs?: string[];
+  /** You came in by an invite (a team space you did not make), and who sent it, when they are still around. */
+  joined?: { by: string | null };
 }
 
 /** One member of a space. */

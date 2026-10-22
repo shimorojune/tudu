@@ -1,6 +1,6 @@
 import { createAuthClient } from 'better-auth/react';
 import { emailOTPClient } from 'better-auth/client/plugins';
-import type { SpaceSummary } from '@tudu/core';
+import type { GettingStarted, SpaceSummary } from '@tudu/core';
 
 /** The sign-in client: send a code to an email, then sign in with it. Cookies carry the session. */
 export function createAuthClientFor(baseUrl: string) {
@@ -21,6 +21,8 @@ export interface Me {
   image: string | null;
   /** The colour of your mark. */
   color: string | null;
+  /** When the account was made. */
+  createdAt?: string;
 }
 
 export type { SpaceSummary };
@@ -28,4 +30,8 @@ export type { SpaceSummary };
 export interface MeResponse {
   user: Me;
   spaces: SpaceSummary[];
+  /** This session is the sign-in that made the account: a new person, not a returning one. */
+  firstSignIn?: boolean;
+  /** Getting started: whether the card is still to show, and which of its four are done. */
+  gettingStarted?: GettingStarted;
 }
