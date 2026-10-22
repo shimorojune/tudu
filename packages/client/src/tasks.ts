@@ -48,6 +48,7 @@ import {
 } from '@tudu/core';
 import { ApiError, type Api } from './api';
 import type { MeResponse } from './auth';
+import { tickGettingStarted } from './firstRun';
 import type { LiveEvent } from './events';
 import { applyToLinks, jiraLinksKey } from './jira';
 import { Outbox, type Mutation, type OutboxStore } from './outbox';
@@ -1166,6 +1167,8 @@ export class TaskStore {
       if (me) qc.setQueryData<MeResponse>(['me'], applyToMe(me, m));
       return;
     }
+    // Your first task ticks Getting started, however it was written.
+    if (m.type === 'task.create') tickGettingStarted(qc, 'task');
     if (m.type === 'project.restore') {
       const kept = this.deletedProjects.get(m.payload.id);
       if (!kept) return;

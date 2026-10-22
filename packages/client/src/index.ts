@@ -48,3 +48,4 @@ export {
   jiraLinksKey,
   type JiraListAsk,
 } from './jira';
+export { tickGettingStarted } from './firstRun';

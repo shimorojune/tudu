@@ -41,7 +41,8 @@ export class EventHub {
     this.listeners.set(userId, set);
     return () => {
       set.delete(listener);
-      if (!set.size) this.listeners.delete(userId);
+      // Only while this set is still the person's: a later stream may have put a new one in its place.
+      if (!set.size && this.listeners.get(userId) === set) this.listeners.delete(userId);
     };
   }
 

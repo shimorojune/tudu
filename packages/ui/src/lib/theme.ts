@@ -85,6 +85,12 @@ export function setThemeChoice(next: ThemeChoice): void {
   listeners.forEach((l) => l(next));
 }
 
+/** Hear every theme pick (Light, Dark or System), wherever it was made. Returns the way to stop listening. */
+export function onThemeChoice(l: (choice: ThemeChoice) => void): () => void {
+  listeners.add(l);
+  return () => listeners.delete(l);
+}
+
 /** Keep the painted theme in step with the system while the choice is `system`. */
 function watchSystem(): () => void {
   if (typeof window === 'undefined' || !window.matchMedia) return () => {};

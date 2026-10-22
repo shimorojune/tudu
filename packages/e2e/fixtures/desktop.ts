@@ -1,5 +1,5 @@
 import { expect, type Browser, type Page } from '@playwright/test';
-import { codeFor, enterCode, freshEmail, signInFresh } from './app';
+import { codeFor, enterCode, freshEmail, quietFirstRun, signInFresh } from './app';
 import { createSpace, joinLink, me, secondPerson } from './spaces';
 import { fixClock, SUNDAY } from './today';
 
@@ -96,5 +96,6 @@ export async function signInHere(page: Page, email = freshEmail()): Promise<stri
   await expect(
     page.getByRole('heading', { name: /^(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)$/ }),
   ).toBeVisible({ timeout: 10_000 });
+  await quietFirstRun(page);
   return email;
 }

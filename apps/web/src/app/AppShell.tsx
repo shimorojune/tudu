@@ -26,6 +26,7 @@ import {
   useSearchOpen,
   useShownDay,
 } from './dayView';
+import { GettingStartedHost } from './firstRun';
 import { SearchHost } from './SearchHost';
 import { AppsHost, JiraHost } from './JiraHost';
 import { jiraParam, openApps, useJira, useJiraFresh, withJira } from './jira';
@@ -229,6 +230,7 @@ export function AppShell({
       <SettingsHost me={me} space={space} />
       <JiraHost space={space} />
       <AppsHost space={space} />
+      <GettingStartedHost me={me} space={space} vp={vp} />
     </>
   );
 

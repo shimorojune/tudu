@@ -3,12 +3,15 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import {
   addDays,
   carriedLabel,
+  peopleHere,
+  welcomeTitle,
   dayHeading,
   daysInMonth,
   dueLabel,
   nightWords,
   type IsoDate,
   type Project,
+  type SpaceSummary,
   type Task,
   type TaskRefResponse,
 } from '@tudu/core';
@@ -38,6 +41,7 @@ import { openMembers } from '../../app/dayView';
 import { api, meQuery } from '../../app/session';
 import { spacePath, useSpace } from '../../app/space';
 import { openInJira } from '../../app/jira';
+import { useFirstRunOpen } from '../../app/firstRun';
 import { taskStore, useOnline } from '../../app/tasks';
 import { useViewport, type Viewport } from '../../app/viewport';
 import { useWorkingDay } from '../../app/workingDay';
@@ -65,6 +69,46 @@ export function toItem(t: Task, today: IsoDate, projects: Project[]): TaskItem {
   };
 }
 
+/** What an empty Today says to someone new to it, and what its button does. */
+export interface Welcome {
+  title: string;
+  body: string;
+  /** Invite people (a team space you made), or open the writing line. */
+  action: 'invite' | 'write';
+}
+
+/**
+ * Today's welcome, while its day is empty. A team space you made, still just you, offers Invite people. While you are
+ * new (Getting started still open), Personal says welcome to Tudu and a space you joined by invite says who is there.
+ * Otherwise the day reads plainly.
+ */
+export function welcomeFor(
+  space: Pick<SpaceSummary, 'kind' | 'name' | 'members' | 'joined'>,
+  name: string,
+  fresh: boolean,
+): Welcome | undefined {
+  if (space.kind === 'team' && space.members <= 1 && !space.joined)
+    return {
+      title: `Welcome to ${space.name}.`,
+      body: 'It’s just you for now. Invite the people you work with, or write the first thing for the team.',
+      action: 'invite',
+    };
+  if (!fresh) return undefined;
+  if (space.kind === 'personal')
+    return {
+      title: welcomeTitle(name),
+      body: 'This is your day: one calm page. Write the first thing you want to get done; it stays here until you cross it off.',
+      action: 'write',
+    };
+  if (space.joined)
+    return {
+      title: welcomeTitle(name, space.name),
+      body: `${peopleHere(space.joined.by, space.members - 1)} What you add in ${space.name} can be shared with them; Personal stays yours.`,
+      action: 'write',
+    };
+  return undefined;
+}
+
 /** The month around a day, with a week either side, for the calendar's dots. */
 export function monthAround(day: IsoDate): { from: IsoDate; to: IsoDate } {
   const y = Number(day.slice(0, 4));
@@ -89,6 +133,7 @@ export function TodayPage() {
   const view = useDayView();
   const two = vp === 'desktop' && view === 'two';
   const ask = useNewTaskAsk();
+  const fresh = useFirstRunOpen(me);
 
   // The open task: in the address as its ref ("?task=ME-52"), so a reload and a link reopen it.
   const navigate = useNavigate();
@@ -163,8 +208,7 @@ export function TodayPage() {
 
   if (!me) return null;
   const nightText = night ? nightWords(night.now, night.from, night.to) : null;
-  // A new team space, just you in it: Today welcomes you and offers Invite people.
-  const welcome = space.kind === 'team' && space.members <= 1 ? space.name : undefined;
+  const welcome = welcomeFor(space, me.user.name, fresh);
   const sheet = (
     <DaySheet
       spaceId={space.id}
@@ -265,8 +309,8 @@ interface DaySheetProps {
   onOpenTask?: (id: string, ref: string | null | undefined) => void;
   /** The open task's row keeps the selection wash. */
   openKey?: string;
-  /** A new team space with only you in it: the empty day says welcome and offers Invite people. */
-  welcome?: string;
+  /** Someone new to this Today: the empty day says welcome (see welcomeFor). */
+  welcome?: Welcome;
 }
 
 /** One day on its sheet: the header with its arrows, calendar and ring, and the list or its states. */
@@ -336,8 +380,12 @@ function DaySheet({
     );
   else if (!tasks.length && writing === null && !group && welcome && h.isToday)
     body = (
-      <EmptyState title={`Welcome to ${welcome}.`} action="Invite people" onAction={openMembers}>
-        It’s just you for now. Invite the people you work with, or write the first thing for the team.
+      <EmptyState
+        title={welcome.title}
+        action={welcome.action === 'invite' ? 'Invite people' : 'Add a task'}
+        onAction={welcome.action === 'invite' ? openMembers : () => setWriting((n) => (n ?? 0) + 1)}
+      >
+        {welcome.body}
       </EmptyState>
     );
   else if (!tasks.length && writing === null && !group)

@@ -82,6 +82,22 @@ export async function spaceSummaries(db: Executor, userId: string): Promise<Spac
     db,
     rows.map((r) => r.id),
   );
+  // The spaces you came into by an invite, and who sent the latest one you took.
+  const invites = await db
+    .select({ spaceId: schema.spaceInvites.spaceId, by: schema.user.name })
+    .from(schema.spaceInvites)
+    .leftJoin(schema.user, eq(schema.user.id, schema.spaceInvites.invitedBy))
+    .where(
+      and(
+        eq(schema.spaceInvites.acceptedBy, userId),
+        inArray(
+          schema.spaceInvites.spaceId,
+          rows.map((r) => r.id),
+        ),
+      ),
+    )
+    .orderBy(asc(schema.spaceInvites.acceptedAt));
+  const joined = new Map(invites.map((i) => [i.spaceId, { by: i.by || null }]));
   return rows.map((r) => ({
     id: r.id,
     kind: r.kind,
@@ -93,6 +109,7 @@ export async function spaceSummaries(db: Executor, userId: string): Promise<Spac
     members: n.get(r.id) ?? 1,
     inbox: { toAnswer: 0, unread: 0 },
     oldSlugs: old.get(r.id) ?? [],
+    ...(r.kind === 'team' && joined.has(r.id) ? { joined: joined.get(r.id)! } : {}),
   }));
 }
 

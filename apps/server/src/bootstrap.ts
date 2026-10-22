@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { personColor } from '@tudu/core';
 import { createDb, eq, schema, type Db } from '@tudu/db';
+import { markNewAccount, takeFirstSession } from './firstRun';
 import { createAuth, type Auth } from './auth';
 import { EventHub } from './events';
 import { OutboxMailer, signInCodeMail, type Mailer } from './email';
@@ -85,7 +86,9 @@ export function bootstrap(
         .update(schema.user)
         .set({ color: personColor(user.id) })
         .where(eq(schema.user.id, user.id));
+      await markNewAccount(db, user.id);
     },
+    onSessionCreated: (session) => takeFirstSession(db, session.userId, session.id),
   });
   const app = createApp({
     env,

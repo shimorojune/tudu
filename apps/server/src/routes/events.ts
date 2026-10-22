@@ -37,12 +37,16 @@ export function eventRoutes(hub: EventHub, auth: Auth, options: { heartbeatMs?: 
       const timer = setInterval(() => {
         if (!open) return;
         void stream.write(': ping\n\n');
-        void auth.api.getSession({ headers }).then((s) => {
-          if (!s && open) {
-            open = false;
-            void stream.close();
-          }
-        });
+        // A check that fails (the database going away at shutdown) proves nothing: the next heartbeat asks again.
+        void auth.api
+          .getSession({ headers })
+          .then((s) => {
+            if (!s && open) {
+              open = false;
+              void stream.close();
+            }
+          })
+          .catch(() => {});
       }, heartbeat);
       stream.onAbort(() => {
         open = false;

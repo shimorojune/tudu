@@ -282,3 +282,14 @@ the coding session, so this file is the record and the canvas gets a copy by han
 - The phone's Jira tab reads its count as "7 new", as every tab badge does.
 - Search across Jira: a key typed in full asks Jira for that issue; words ask Jira's text search, newest change
   first.
+
+## Chunk 12 · First run · 22 Oct 2026
+
+- Built as drawn: Getting started (the ring, the fold, the four rows, ×) in the corner of every page, beside New
+  task on phones; the welcome on an empty Today; "Welcome back" and "You joined" toasts.
+- Each row's two lines are read as one name with a pause ("Add your name and photo, So people know it’s you"); the
+  design system's markup would run them together.
+- Phones hide the card on Settings, Jira, Apps and an open task, the pages that cover the tabs.
+- Someone who joins a team space by invite and is still new gets "Welcome to Northwind" over who is there; the person
+  named is the one who sent the invite.
+- A returning person is told apart by the session that made the account, not by times (choice 4 as built).

@@ -32,8 +32,24 @@ export async function enterCode(page: Page, code: string): Promise<void> {
   await page.getByLabel('The 6-digit code').fill(code);
 }
 
-/** Walk through sign in for a fresh person and land on the app. */
-export async function signInFresh(page: Page, email = freshEmail()): Promise<string> {
+/**
+ * Hide Getting started the way × does (the app's own hook: the server hears it), without the toast. Every test signs
+ * in a new person, who would meet the card and Today's welcome; only the first-run group keeps them.
+ */
+export async function quietFirstRun(page: Page): Promise<void> {
+  type Hook = { __tudu?: { firstRun?: { hide(): Promise<void> } } };
+  await expect
+    .poll(() => page.evaluate(() => typeof (window as unknown as Hook).__tudu?.firstRun?.hide === 'function'))
+    .toBe(true);
+  await page.evaluate(() => (window as unknown as Hook).__tudu!.firstRun!.hide());
+}
+
+/** Walk through sign in for a fresh person and land on the app; Getting started is hidden unless asked for. */
+export async function signInFresh(
+  page: Page,
+  email = freshEmail(),
+  opts: { gettingStarted?: boolean } = {},
+): Promise<string> {
   await page.goto('/sign-in');
   await page.getByLabel('Email').fill(email);
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -43,6 +59,7 @@ export async function signInFresh(page: Page, email = freshEmail()): Promise<str
   await expect(
     page.getByRole('heading', { name: /^(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)$/ }),
   ).toBeVisible({ timeout: 10_000 });
+  if (!opts.gettingStarted) await quietFirstRun(page);
   return email;
 }
 

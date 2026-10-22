@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from '@tanstack/react-router';
-import type { JoinResponse, SpaceSummary } from '@tudu/core';
+import { joinedToast, type JoinResponse, type SpaceSummary } from '@tudu/core';
 import { ApiError, type MeResponse } from '@tudu/client';
 import { AuthLayer, EmptyState, JoinCard, SignIn, showToast, type JoinInvite } from '@tudu/ui';
 import { useState } from 'react';
@@ -60,6 +60,7 @@ export function JoinPage({ me }: { me: MeResponse | null }) {
     const out = await api.post<{ space: SpaceSummary }>(`/api/join/${encodeURIComponent(token)}`);
     await refreshMe();
     rememberSpace(out.space.slug);
+    showToast(joinedToast(out.space.name, out.space.joined?.by, out.space.members - 1));
     return out.space;
   }
   async function joinNow() {
