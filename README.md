@@ -27,8 +27,8 @@ Rust (stable) and the Xcode command line tools.
 Tudu for macOS is signed ad hoc, not with an Apple Developer ID, so macOS blocks it the first time you open it. You
 allow it once; after that it opens normally and updates itself.
 
-1. Download the `.dmg` from the [latest release](https://github.com/eGainDev/tudu/releases/latest). Tudu Staging is
-   on the [`staging` pre-release](https://github.com/eGainDev/tudu/releases/tag/staging). The repository is internal,
+1. Download the `.dmg` from the [latest release](https://github.com/shimorojune/tudu/releases/latest). Tudu Staging is
+   on the [`staging` pre-release](https://github.com/shimorojune/tudu/releases/tag/staging). The repository is private,
    so sign in to GitHub first.
 2. Open the `.dmg` and drag Tudu into Applications.
 3. Open Tudu from Applications. macOS says it can't check the app for malicious software. Click **Done** (on macOS
