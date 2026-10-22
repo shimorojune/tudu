@@ -196,8 +196,12 @@ export class TuduApp {
   }
 
   /** Run `script` (an async function body with T, the page helpers) in a window's page; answers its result. */
-  async eval<R = unknown>(script: string, window: 'main' | 'floating' = 'main'): Promise<R> {
-    const r = (await this.call('/eval', { window, script: `${LIB}\n${script}` })) as {
+  async eval<R = unknown>(
+    script: string,
+    window: 'main' | 'floating' = 'main',
+    timeoutMs = 10_000,
+  ): Promise<R> {
+    const r = (await this.call('/eval', { window, script: `${LIB}\n${script}`, timeoutMs })) as {
       ok: boolean;
       value?: R;
       error?: string;
@@ -206,13 +210,16 @@ export class TuduApp {
     return r.value as R;
   }
 
-  /** Wait until the script answers something truthy (no sleeping: it asks again until then). */
+  /**
+   * Wait until the script answers something truthy (no sleeping: it asks again until then).
+   * Each ask is short: one injected while the page is navigating never replies, and it must not eat the whole wait.
+   */
   async until<R>(script: string, window: 'main' | 'floating' = 'main', timeout = 10_000): Promise<R> {
     const end = Date.now() + timeout;
     let last: unknown = null;
     while (Date.now() < end) {
       try {
-        const v = await this.eval<R>(script, window);
+        const v = await this.eval<R>(script, window, Math.max(250, Math.min(2_000, end - Date.now())));
         if (v) return v;
         last = v;
       } catch (e) {

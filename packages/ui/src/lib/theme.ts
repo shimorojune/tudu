@@ -70,6 +70,8 @@ export function fadeTheme(apply: () => void): void {
 
 type Listener = (choice: ThemeChoice) => void;
 const listeners = new Set<Listener>();
+/** Picks made in this page only; a choice taken up from another window is not a pick here. */
+const pickListeners = new Set<Listener>();
 let current: ThemeChoice | null = null;
 
 function choice(): ThemeChoice {
@@ -83,12 +85,30 @@ export function setThemeChoice(next: ThemeChoice): void {
   storeThemeChoice(next);
   fadeTheme(() => paintTheme(resolveTheme(next)));
   listeners.forEach((l) => l(next));
+  pickListeners.forEach((l) => l(next));
+}
+
+/**
+ * Take up the choice as stored now, when another window of the same site changed it (another tab, or the macOS
+ * app's other window: the floating Quick Add shares its storage with the desk). Painted at once, no cross-fade.
+ */
+export function syncThemeChoice(): void {
+  const next = readThemeChoice();
+  if (next === choice()) return;
+  current = next;
+  paintTheme(resolveTheme(next));
+  listeners.forEach((l) => l(next));
+}
+
+function onStorage(e: StorageEvent): void {
+  // A null key is storage cleared.
+  if (e.key === THEME_STORAGE_KEY || e.key === null) syncThemeChoice();
 }
 
 /** Hear every theme pick (Light, Dark or System), wherever it was made. Returns the way to stop listening. */
 export function onThemeChoice(l: (choice: ThemeChoice) => void): () => void {
-  listeners.add(l);
-  return () => listeners.delete(l);
+  pickListeners.add(l);
+  return () => pickListeners.delete(l);
 }
 
 /** Keep the painted theme in step with the system while the choice is `system`. */
@@ -112,9 +132,13 @@ export function useTheme(): { choice: ThemeChoice; theme: Theme; setTheme: (c: T
     const mq = window.matchMedia?.('(prefers-color-scheme: dark)');
     const onSys = () => setSys(systemTheme());
     mq?.addEventListener?.('change', onSys);
+    window.addEventListener('storage', onStorage);
+    // A pick in another window since this page first read the choice.
+    syncThemeChoice();
     paintTheme(resolveTheme(choice()));
     return () => {
       listeners.delete(setC);
+      window.removeEventListener('storage', onStorage);
       stop();
       mq?.removeEventListener?.('change', onSys);
     };
@@ -126,6 +150,7 @@ export function useTheme(): { choice: ThemeChoice; theme: Theme; setTheme: (c: T
 export function resetThemeForTests(): void {
   current = null;
   listeners.clear();
+  pickListeners.clear();
 }
 
 export { CROSS_FADE_MS };

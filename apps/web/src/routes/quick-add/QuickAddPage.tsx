@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { addedWords } from '@tudu/core';
-import { Desk, QuickAdd, showToast, useTheme, type QuickAddDraft } from '@tudu/ui';
+import { Desk, QuickAdd, showToast, syncThemeChoice, useTheme, type QuickAddDraft } from '@tudu/ui';
 import type { MeResponse } from '@tudu/client';
 import { useEffect, useState, type PointerEvent } from 'react';
 import { desktop } from '../../app/desktop';
@@ -31,6 +31,8 @@ export function QuickAddPage({ me }: { me: MeResponse }) {
     if (!app) return;
     return app.on('floating:shown', () => {
       setShown((n) => n + 1);
+      // The theme picked on the desk while the bar was put away (a hidden window may not hear it as it happens).
+      syncThemeChoice();
       // The line is ready to write in, with the draft you left.
       setTimeout(() => document.querySelector<HTMLInputElement>('.app-floating .tp-qa-title')?.focus(), 0);
     });

@@ -29,6 +29,7 @@ screen are kept with the results. Tudu Test hands outside links to its record in
 | C11-U06 | web       | The top bar is the drag region only in the app; the dock badge sums the Inbox counts across spaces, adds the version once (only with a team space) and is 0 when caught up; the switcher counts the version in each team space                                                                                          |
 | C11-U07 | server    | The manifest from a release: version, notes, date, the platform entry with the signature and the download address on the API's own origin; staging reads the `staging` pre-release (version from its name); a release without the bundle or signature is 404; no token 503; GitHub unreachable 502; cached five minutes |
 | C11-U08 | desktop   | Rust: the summon is ⌘⇧N; the track from the bundle identifier (name, web address, feed); the tray menu per track; the floating window's place on the pointer's screen; only Tudu on the web opens in a window; saved files keep their name and never overwrite; each data folder its own webview store                  |
+| C11-U09 | theme     | A theme picked in another window of the same site (a storage event: the desk, while the floating window is open) repaints this one and every useTheme; a cleared storage is System; a page that read the choice earlier takes up the stored one on mount, and the floating window again on the summon                   |
 
 ## API (`apps/server`)
 
@@ -50,6 +51,7 @@ screen are kept with the results. Tudu Test hands outside links to its record in
 | C11-E06 | Open in Jira goes to the app's opener, never a new window; an attachment chip is fetched, handed to the app to save and toasts "Saved to Downloads."; a task sent to you puts 1 on the dock                                                       |
 | C11-E07 | Two spaces: the version is in both Inboxes and counted once on the dock; reading it in one reads it in the other                                                                                                                                  |
 | C11-E08 | Dark: a new version (E02) and the floating page (E04)                                                                                                                                                                                             |
+| C11-E09 | The floating page follows the theme picked on the desk: Dark from the avatar menu with the bar open paints it dark; Light picked while it is put away is painted on the next summon                                                               |
 
 ## Desktop, group `desktop` (`packages/e2e/mac`, Tudu Test on a Mac)
 

@@ -384,6 +384,7 @@ test.describe('desktop', () => {
       [acme.space, second],
     ] as const) {
       await go(app, `/${sp.slug}/inbox`);
+      await app.until(`return T.all('article', /Proofread the brochure|Order the badges/).length > 0`);
       await app.eval(
         `T.click(T.all('article', /Proofread the brochure|Order the badges/)[0].querySelector('button'))`,
       );

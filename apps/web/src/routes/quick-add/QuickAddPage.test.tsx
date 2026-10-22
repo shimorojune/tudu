@@ -3,6 +3,7 @@ import type { MeResponse } from '@tudu/client';
 import type { SpaceSummary } from '@tudu/core';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { resetThemeForTests } from '@tudu/ui';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetDesktop, type DesktopFake } from '../../app/desktop';
 import { FloatingQuickAdd } from './QuickAddPage';
@@ -74,6 +75,7 @@ beforeEach(() => {
   refreshMe.mockReset();
   refreshMe.mockResolvedValue(ME);
   localStorage.clear();
+  resetThemeForTests();
 });
 
 describe('C11-U05 the floating window', () => {
@@ -128,5 +130,29 @@ describe('C11-U05 the floating window', () => {
     expect(container.querySelector('.app-floating')).toBeNull();
     emit('floating:shown');
     await waitFor(() => expect(fake.calls).toContainEqual({ name: 'showMain', args: ['/sign-in'] }));
+  });
+});
+
+describe('C11-U09 the floating window follows the theme picked on the desk', () => {
+  const painted = (c: HTMLElement) => c.querySelector('.tp-desk')?.getAttribute('data-theme');
+
+  it('a pick made while the window is open repaints it; one made while it was hidden is taken up on the summon', async () => {
+    localStorage.setItem('tudu.theme', 'light');
+    const { container } = mount(ME);
+    expect(painted(container)).toBe('light');
+
+    // Dark on the desk, the bar open: the shared storage tells this window.
+    localStorage.setItem('tudu.theme', 'dark');
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: 'tudu.theme', newValue: 'dark' }));
+    });
+    expect(painted(container)).toBe('dark');
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+
+    // Light on the desk while the bar was put away and heard nothing: the summon reads it again.
+    localStorage.setItem('tudu.theme', 'light');
+    emit('floating:shown');
+    await waitFor(() => expect(painted(container)).toBe('light'));
+    expect(document.documentElement.classList.contains('dark')).toBe(false);
   });
 });
