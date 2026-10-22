@@ -11,15 +11,8 @@ Each line is true of the app on master. A line leaves the register once the canv
 
 ### Every page (the shell)
 
-- The sidebar's head is the space's tile and name, which opens the switcher; there is no Spaces list.
-- Sidebar views: Today, Week, Backlog, People (team spaces only), Inbox. Only the Inbox carries a count (to answer
-  plus unread, plus the macOS app's new version in team spaces). Personal lists the Inbox too, and its address goes
-  back to Today.
-- Jira appears in the sidebar's Apps section, the top bar and the phone tabs only while it is connected.
-- Phone header: the space's name on the left (opens the switcher sheet), then the Inbox icon with its count in an
-  ink pill, then your avatar, which opens Settings.
-- Phone tabs: Today, Week, Jira (when connected), Search, More.
-- Visible to reads "Everyone in Northwind" and "Only you".
+- The Inbox count is what's to answer plus unread, plus the macOS app's new version in team spaces. Personal's Inbox
+  address goes back to Today. Jira shows in the sidebar, top bar and phone tabs only while it is connected.
 - The space is in the address (`/northwind/week`, `/me/today`); the open task is too (`?task=ME-52`, `/t/ME-52`).
 
 ### 00 Foundations
@@ -429,3 +422,26 @@ Each line is true of the app on master. A line leaves the register once the canv
   shipped model scores paraphrases between 0.3 and 0.6 and decoys under 0.3 (recall 0.91, precision 1.0 at 0.3;
   recall 0.80 at 0.4). Notes are part of the text embedded, which spreads a title's meaning a little.
 - The API image moved from Alpine to Debian slim: the embedding runtime (ONNX) ships glibc builds only.
+
+## Canvas redrawn to the app · 22 Oct 2026
+
+The canvas and the design system now follow the app; these lines left the register because the canvas draws them.
+
+- Shell, on every app board: the space switcher heads the sidebar (no Spaces list); People before the Inbox, and
+  only the Inbox counts; Jira's tab before Search; the phone header is the space's name, the Inbox with its count in
+  an ink pill, and your avatar; Visible to reads "Everyone in Northwind" and "Only you".
+- Motion, checked against the app's code and corrected on every board:
+  - The tick is the ink tick wiped in over 300ms (clip-path), not a drawn stroke; the sparkle is #eaa21c light,
+    #ffd27a dark, with its glow, full at 35% of 640ms.
+  - The day turn is 280ms in after a 110ms leave (it said 520ms); dur-spread 240ms is listed.
+  - A space switch fades the page up 6px over 280ms with no out phase; views change in place.
+  - Phones: no screen pushes, tabs and pages change at once, the New task button is always shown; an Inbox item
+    and a person turn the sheet the way a day does. The phone header's Inbox button has no press tint.
+  - Menus close in 130ms (tp-pop-out); press is opacity .86, never a scale; tooltips have no exit.
+  - Search hands over to Quick Add after 170ms (240ms on phones). Quick Add's inline bar clears 650ms after Added,
+    like the overlay (the design system said 1100ms).
+  - The Jira panel floats over the page on the desk and never pushes it.
+- The Motion board (00 Foundations) is rebuilt on the real Tudu Paper components, so its cards play the app's own
+  timings.
+- The design system's `bundle.css` is `components.css` plus a short tail that removes the CSS tooltip's exit, to
+  match the app's Radix tooltip. Compare the two without that tail.
