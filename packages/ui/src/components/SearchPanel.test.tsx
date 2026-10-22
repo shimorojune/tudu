@@ -262,6 +262,9 @@ describe('C13-U06 close matches in the panel', () => {
     expect(names[2]).toContain('Home');
     expect(names[3]).toContain('Plan the team dinner');
     expect(screen.getByText('Plan the team dinner').querySelector('mark')).toBeNull();
+    // the close-match rows are marked apart from the word hits
+    expect(document.querySelectorAll('.tp-sp-opt-sim')).toHaveLength(2);
+    expect(document.querySelectorAll('.tp-sp-opt:not(.tp-sp-opt-sim)')).toHaveLength(2);
     // arrows walk into them and Enter picks
     await user.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}{Enter}');
     expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ key: 'y' }));

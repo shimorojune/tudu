@@ -21,9 +21,16 @@ export async function openSearch(page: Page): Promise<void> {
   await expect(box(page)).toBeFocused();
 }
 
-/** The rows in the list, task results only, by their titles. */
+/** The word matches in the list, by their titles: not the recent searches, not Create, not the close matches. */
 export async function hitTitles(page: Page): Promise<string[]> {
-  return panel(page).locator('.tp-sh:not(.tp-sh-query):not(.tp-sh-create) .tp-sh-title').allTextContents();
+  return panel(page)
+    .locator('.tp-sp-opt:not(.tp-sp-opt-sim) .tp-sh:not(.tp-sh-query):not(.tp-sh-create) .tp-sh-title')
+    .allTextContents();
+}
+
+/** The close matches, by their titles. */
+export async function closeTitles(page: Page): Promise<string[]> {
+  return panel(page).locator('.tp-sp-opt-sim .tp-sh-title').allTextContents();
 }
 
 /** Every row's words, recent searches and Create included. */

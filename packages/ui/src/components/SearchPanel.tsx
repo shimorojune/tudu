@@ -314,7 +314,7 @@ export function SearchPanel(p: SearchPanelProps) {
       onPick: () => pick(o),
     };
     return (
-      <div key={optKey(o)} data-opt={i} className="tp-sp-opt">
+      <div key={optKey(o)} data-opt={i} className={cx('tp-sp-opt', o.kind === 'similar' && 'tp-sp-opt-sim')}>
         {o.kind === 'query' ? (
           <SearchHit {...props} query={o.q} />
         ) : o.kind === 'create' ? (
