@@ -30,7 +30,7 @@ const schema = z.object({
   UPDATES_TRACK: z.enum(['production', 'staging']).optional(),
   /** A token that can read the repository's releases; without one the feed answers 503. */
   UPDATES_GITHUB_TOKEN: z.string().optional(),
-  UPDATES_GITHUB_REPO: z.string().default('eGainDev/tudu'),
+  UPDATES_GITHUB_REPO: z.string().default('shimorojune/tudu'),
   /** GitHub's API; tests point it at the fake under /__test/github. */
   UPDATES_GITHUB_API: z.string().url().default('https://api.github.com'),
 });
