@@ -440,7 +440,8 @@ test.describe('desktop', () => {
       ],
     });
     await go(app, `/${space.slug}`);
-    await app.until(`return document.body.innerText.includes('Read the plan')`);
+    // The row's own button, not just its words (the list may draw the title before the row is ready).
+    await app.until(`return T.all('button', 'Read the plan').length > 0`);
     await app.eval(`T.click(T.get('button', 'Read the plan'))`);
     await app.until(`return !!document.querySelector('[role=dialog] a.tp-att')`);
     await app.eval(`document.querySelector('[role=dialog] a.tp-att').click()`);

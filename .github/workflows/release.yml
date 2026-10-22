@@ -67,8 +67,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if [ "$REHEARSAL" = "true" ]; then
-            # A dry run on this branch: the version and the notes, nothing tagged or pushed.
-            pnpm exec semantic-release --dry-run --no-ci --branches "$BRANCH" 2>&1 | tee release.log
+            # A dry run on this branch: the version and the notes, nothing tagged or pushed. On a pull request the
+            # checkout is the PR's merge ref, which semantic-release refuses to version; it is told it is the branch.
+            GITHUB_EVENT_NAME=push GITHUB_REF="refs/heads/$BRANCH" GITHUB_SHA="$(git rev-parse HEAD)" \
+              pnpm exec semantic-release --dry-run --no-ci --branches "$BRANCH" 2>&1 | tee release.log
           else
             pnpm exec semantic-release 2>&1 | tee release.log
           fi
