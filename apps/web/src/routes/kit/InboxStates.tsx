@@ -85,6 +85,17 @@ const SENT: InboxEntry[] = [
   },
 ];
 const noop = () => {};
+const APP: InboxEntry = {
+  id: 'app-0.38.0',
+  kind: 'app',
+  when: 'Just now',
+  unread: true,
+  text: 'is ready: version 0.38.0',
+  quote:
+    '<p><strong>Features</strong></p><ul><li>The floating bar keeps your draft between summons.</li><li>Search finds a task by its key.</li></ul>',
+  task: { title: '' },
+};
+const never = () => new Promise<void>(() => {});
 
 /** The Inbox's parts and states, and Quick Add in its send mode, light and dark. */
 export function InboxStates() {
@@ -193,6 +204,39 @@ export function InboxStates() {
               onOpen={noop}
               onPerson={noop}
               onToggle={noop}
+            />
+          </div>
+        )}
+      />
+      <Pair
+        title="A new version (the macOS app)"
+        note="Downloaded by itself: the mark, Tudu is ready, the notes. First in Updates in every team space until opened; read once, read everywhere."
+        render={() => (
+          <div style={{ width: 'min(380px, 100%)' }}>
+            <InboxSection
+              title="Updates"
+              action="Mark all as read"
+              onAction={noop}
+              items={[APP, { ...COMMENT, unread: false }]}
+              mode="list"
+              selectedKey={null}
+              onSelect={noop}
+            />
+            <InboxSection title="Updates" items={[{ ...APP, unread: false }]} mode="list" onSelect={noop} />
+          </div>
+        )}
+      />
+      <Pair
+        title="Reading a new version"
+        note="What’s new and Restart to update. Restarting shows on the button; a restart that fails frees it with a toast."
+        render={() => (
+          <div style={{ width: 'min(560px, 100%)', display: 'grid', gap: 16 }}>
+            <InboxItem item={{ ...APP, unread: false }} mode="full" onOpen={noop} onUpdate={noop} />
+            <InboxItem
+              item={{ ...APP, id: 'app-busy', unread: false }}
+              mode="full"
+              onUpdate={never}
+              initial={{ updating: true }}
             />
           </div>
         )}

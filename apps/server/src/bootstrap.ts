@@ -32,6 +32,7 @@ export function bootstrap(
     heartbeatMs?: number;
     quiet?: boolean;
     jiraFetch?: typeof fetch;
+    githubFetch?: typeof fetch;
   } = {},
 ): Server {
   const { db, close: closeDb } = createDb(env.DATABASE_URL);
@@ -96,6 +97,7 @@ export function bootstrap(
     heartbeatMs: options.heartbeatMs,
     quiet: options.quiet,
     jiraFetch: options.jiraFetch,
+    githubFetch: options.githubFetch,
   });
   return { app, db, auth, hub, mailer, storage, close };
 }

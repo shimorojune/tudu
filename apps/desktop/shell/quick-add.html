@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en" data-go="/quick-add">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tudu</title>
+    <link rel="stylesheet" href="shell.css" />
+  </head>
+  <body class="floating">
+    <main id="offline" hidden aria-live="polite">
+      <svg class="mark" width="40" height="40" viewBox="9.5 13.5 101 99.5" role="img" aria-label="Tudu">
+        <rect x="17" y="25" width="74" height="74" rx="20" transform="rotate(-10 54 62)" class="sheet" />
+        <rect x="24" y="34" width="74" height="74" rx="20" class="box" stroke-width="6" />
+      </svg>
+      <h1>You’re offline.</h1>
+      <p>Tudu opens as soon as you’re back online.</p>
+      <button id="again" type="button">Try again</button>
+    </main>
+    <script src="loader.js"></script>
+  </body>
+</html>

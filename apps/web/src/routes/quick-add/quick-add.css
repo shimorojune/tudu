@@ -30,3 +30,19 @@
   font-size: 13px;
   color: var(--muted-foreground);
 }
+
+/* In the macOS app the page is the floating window: clear all round, the bar at its top, nothing else. A click on
+   the clear part puts the window away. */
+html[data-app='floating'],
+html[data-app='floating'] body {
+  background: transparent !important;
+}
+html[data-app='floating'] .app-floating {
+  background: transparent;
+  overflow: hidden;
+}
+html[data-app='floating'] .app-floating-bar {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 16px 12px 0;
+}

@@ -103,6 +103,8 @@ export interface QuickAddProps {
   /** After "Added": the task is handed over as the bar leaves. */
   onAdded?: (task: QuickAddResult) => void;
   onClose?: () => void;
+  /** Every change to the draft (the macOS app keeps the floating bar's draft across launches). */
+  onDraftChange?: (draft: QuickAddDraft) => void;
   onNewProject?: (name: string) => string | void;
   /** Upload a file as soon as it is added; resolve with the attachment's id. */
   onUpload?: (
@@ -278,6 +280,9 @@ export function QuickAdd(p: QuickAddProps) {
     live.current = p;
   });
   const set = (patch: Partial<QuickAddDraft>) => setF((v) => ({ ...v, ...patch }));
+  useEffect(() => {
+    live.current.onDraftChange?.(f);
+  }, [f]);
 
   // Words handed in (Create from Search) become the title.
   const [seenSeed, setSeenSeed] = useState(p.seed?.nonce ?? 0);
@@ -357,8 +362,10 @@ export function QuickAdd(p: QuickAddProps) {
     const t = setTimeout(() => input.current?.focus({ preventScroll: true }), overlay ? 30 : 0);
     return () => clearTimeout(t);
   }, [mounted, open, overlay, p.initial?.noFocus]);
+  // Without a layer (the macOS app's floating window) Esc still closes the bar when there is somewhere to go.
+  const escapes = overlay || !!p.onClose;
   useEffect(() => {
-    if (!mounted || !open || !overlay) return;
+    if (!mounted || !open || !escapes) return;
     // Esc steps back one layer: a picker first, then the bar.
     function key(e: KeyboardEvent) {
       if (e.key !== 'Escape' || e.defaultPrevented) return;
@@ -373,7 +380,7 @@ export function QuickAdd(p: QuickAddProps) {
     }
     document.addEventListener('keydown', key);
     return () => document.removeEventListener('keydown', key);
-  }, [mounted, open, overlay]);
+  }, [mounted, open, escapes]);
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);

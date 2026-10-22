@@ -9,8 +9,10 @@ import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { PERSONAL_SLUG, spaceForSlug, type SpaceSummary, type TaskRefResponse } from '@tudu/core';
+import type { MeResponse } from '@tudu/client';
 import { ToastHost } from '@tudu/ui';
 import { AppShell } from './app/AppShell';
+import { DesktopHost } from './app/DesktopHost';
 import { useLiveEvents } from './app/live';
 import { onSpaceGone, SettingsPage } from './app/settings';
 import { setSpaceGoneHandler } from './app/tasks';
@@ -32,7 +34,8 @@ import { JoinPage } from './routes/join/JoinPage';
 import { MorePage } from './routes/more/MorePage';
 import { AppsPage, JiraPage } from './routes/jira/JiraPage';
 import { PeoplePage } from './routes/people/PeoplePage';
-import { QuickAddPage } from './routes/quick-add/QuickAddPage';
+import { FloatingQuickAdd, QuickAddPage } from './routes/quick-add/QuickAddPage';
+import { desktop } from './app/desktop';
 import { SignInPage } from './routes/sign-in/SignInPage';
 import { TodayPage } from './routes/today/TodayPage';
 import { WeekPage } from './routes/week/WeekPage';
@@ -46,6 +49,7 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
     <>
       <Outlet />
       <ToastHost />
+      <DesktopHost />
     </>
   ),
 });
@@ -303,25 +307,33 @@ const inboxItemRoute = createRoute({
   component: InboxPage,
 });
 const kitRoute = createRoute({ getParentRoute: () => rootRoute, path: '/kit', component: KitPage });
-/** The floating bar alone: the page the macOS window opens on the global summon (chunk 11). */
+/**
+ * The floating bar alone: the page the macOS app's floating window holds (the summon shows it). In the app it never
+ * turns into Sign in; the desk does that.
+ */
 const quickAddRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/quick-add',
   beforeLoad: async ({ context }) => {
     const me = await loadMe(context.queryClient);
-    if (!me) throw redirect({ to: '/sign-in', search: { next: '/quick-add' }, replace: true });
+    if (!me && !desktop()) throw redirect({ to: '/sign-in', search: { next: '/quick-add' }, replace: true });
     return { me };
   },
   component: function QuickAddRoute() {
     const { me } = quickAddRoute.useRouteContext();
-    useLiveEvents(true);
-    return (
-      <WorkingDayProvider>
-        <QuickAddPage me={me} />
-      </WorkingDayProvider>
-    );
+    if (desktop()) return <FloatingQuickAdd me={me} />;
+    return <WebQuickAdd me={me!} />;
   },
 });
+
+function WebQuickAdd({ me }: { me: MeResponse }) {
+  useLiveEvents(true);
+  return (
+    <WorkingDayProvider>
+      <QuickAddPage me={me} />
+    </WorkingDayProvider>
+  );
+}
 
 export const router = createRouter({
   routeTree: rootRoute.addChildren([

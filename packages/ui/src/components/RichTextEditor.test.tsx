@@ -140,4 +140,15 @@ describe('attachments (chunk 04)', () => {
     render(<RichTextEditor variant="notes" label="Plain" />);
     expect(screen.queryAllByRole('button', { name: 'Attach a file' })).toHaveLength(1);
   });
+
+  it('C11-U03 a stored chip opens in the editor as a chip (its name and size), not a plain link', () => {
+    const stored =
+      '<p>Plan: <a class="tp-att" href="/api/files/f1" data-id="f1" data-name="Q3 plan.pdf" data-size="2048"><span class="tp-att-i"></span>Q3 plan.pdf<span class="tp-att-s">2 KB</span></a></p>';
+    render(<RichTextEditor variant="notes" label="Notes" value={stored} fileBase="https://api.test" />);
+    const chip = screen.getByRole('textbox', { name: 'Notes' }).querySelector('a.tp-att')!;
+    expect(chip).toHaveAttribute('data-name', 'Q3 plan.pdf');
+    expect(chip).toHaveAttribute('data-size', '2048');
+    expect(chip).toHaveAttribute('href', 'https://api.test/api/files/f1');
+    expect(chip.querySelector('.tp-att-s')!.textContent).toBe('2 KB');
+  });
 });

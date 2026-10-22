@@ -26,6 +26,13 @@ const schema = z.object({
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   S3_REGION: z.string().default('us-east-1'),
+  /** The macOS app's update feed: which GitHub release it serves (none: the feed answers 404). */
+  UPDATES_TRACK: z.enum(['production', 'staging']).optional(),
+  /** A token that can read the repository's releases; without one the feed answers 503. */
+  UPDATES_GITHUB_TOKEN: z.string().optional(),
+  UPDATES_GITHUB_REPO: z.string().default('eGainDev/tudu'),
+  /** GitHub's API; tests point it at the fake under /__test/github. */
+  UPDATES_GITHUB_API: z.string().url().default('https://api.github.com'),
 });
 
 export type Env = z.infer<typeof schema>;

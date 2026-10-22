@@ -9,6 +9,7 @@ import {
 } from '@tudu/core';
 import { JiraClient, jiraConnectionKey } from '@tudu/client';
 import { useSyncExternalStore } from 'react';
+import { openOutside } from './links';
 import { api, queryClient } from './session';
 
 /** Jira, through the API. Every read is online and asked only while you look. */
@@ -43,11 +44,14 @@ export function useJira(spaceId: string): {
   return { conn, known: c.isFetched, links, count };
 }
 
-/** Open an issue's page in Jira, in a new tab, when Jira is connected in this space; otherwise nothing. */
+/**
+ * Open an issue's page in Jira (a new tab; in the macOS app, the default browser) when Jira is connected in this
+ * space; otherwise nothing.
+ */
 export function openInJira(spaceId: string, key: string): boolean {
   const c = queryClient.getQueryData<JiraConnectionResponse>(jiraConnectionKey(spaceId));
   if (!c?.connected) return false;
-  window.open(issueUrl(c.site, key), '_blank', 'noopener,noreferrer');
+  openOutside(issueUrl(c.site, key));
   return true;
 }
 

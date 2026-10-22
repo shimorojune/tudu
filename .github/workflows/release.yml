@@ -1,0 +1,168 @@
+name: Release
+
+# A release, by hand: the next version from the conventional commits (semantic-release: tag tudu-X, the changelog,
+# a draft GitHub release), Tudu for macOS built against production and signed for the updater, its dmg, update bundle
+# and signature on the release, the production images built on the Dokploy host and deployed, then the release
+# published (only then does the update feed offer it).
+#
+# Rehearsal (every pull request that touches the release path, or by hand with `rehearsal`): everything up to
+# publishing and deploying. The version is worked out without tagging, the app is built and signed and kept as
+# the run's artifacts, the images are built under a rehearsal tag.
+
+on:
+  workflow_dispatch:
+    inputs:
+      rehearsal:
+        description: Rehearse only (no tag, no release, no deploy)
+        type: boolean
+        default: true
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - release.config.cjs
+      - scripts/sync-version.mjs
+      - apps/desktop/**
+      - infra/production/**
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+env:
+  PNPM_VERSION: 9.15.9
+  REHEARSAL: ${{ github.event_name == 'pull_request' || inputs.rehearsal }}
+
+jobs:
+  version:
+    name: Version and notes
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      sha: ${{ steps.v.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: semantic-release
+        id: v
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+        run: |
+          set -o pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ "$REHEARSAL" = "true" ]; then
+            # A dry run on this branch: the version and the notes, nothing tagged or pushed.
+            pnpm exec semantic-release --dry-run --no-ci --branches "$BRANCH" 2>&1 | tee release.log
+          else
+            pnpm exec semantic-release 2>&1 | tee release.log
+          fi
+          VERSION=$(grep -oE 'next release version is [0-9]+\.[0-9]+\.[0-9]+' release.log | tail -1 | awk '{print $5}')
+          if [ -z "$VERSION" ]; then echo "No release: nothing to release since the last tag."; exit 1; fi
+          if [ "$REHEARSAL" = "true" ]; then SHA=$(git rev-parse HEAD); else git fetch origin master && SHA=$(git rev-parse origin/master); fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "### Tudu $VERSION" >> "$GITHUB_STEP_SUMMARY"
+
+  macos:
+    name: Tudu for macOS
+    needs: version
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - run: pnpm install --frozen-lockfile
+      - name: Build and sign
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: node apps/desktop/scripts/desktop.mjs build --track production --version ${{ needs.version.outputs.version }} --out dist
+      - name: The bundle is signed for the updater
+        run: test -s "dist/Tudu.app.tar.gz.sig" && ls -la dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tudu-${{ needs.version.outputs.version }}-macos
+          path: |
+            dist/*.dmg
+            dist/Tudu.app.tar.gz
+            dist/Tudu.app.tar.gz.sig
+      - name: Attach to the draft release
+        if: env.REHEARSAL != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "tudu-${{ needs.version.outputs.version }}" dist/*.dmg dist/Tudu.app.tar.gz dist/Tudu.app.tar.gz.sig --clobber
+
+  production:
+    name: Production images and deploy
+    needs: version
+    runs-on: [self-hosted, dokploy-deploy]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+      - name: Images
+        run: |
+          TAG=${{ env.REHEARSAL == 'true' && 'rehearsal' || 'production' }}
+          docker build -f apps/server/Dockerfile -t tudu-api:$TAG .
+          docker build -f apps/web/Dockerfile --build-arg VITE_API_URL=https://api.tudu.ezdev.net -t tudu-web:$TAG .
+      - name: Deploy through Dokploy
+        if: env.REHEARSAL != 'true'
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          COMPOSE_ID: ${{ secrets.DOKPLOY_PRODUCTION_COMPOSE_ID }}
+        run: node scripts/dokploy-deploy.mjs "$COMPOSE_ID" "release ${{ needs.version.outputs.version }}" infra/production/compose.yaml
+      - name: Wait for the API
+        if: env.REHEARSAL != 'true'
+        run: |
+          for i in $(seq 1 40); do
+            if curl -fsS https://api.tudu.ezdev.net/health >/dev/null; then echo up; exit 0; fi
+            sleep 5
+          done
+          echo "api did not come up"; exit 1
+
+  publish:
+    name: Publish the release
+    needs: [version, macos, production]
+    if: ${{ github.event_name != 'pull_request' && !inputs.rehearsal }}
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release edit "tudu-${{ needs.version.outputs.version }}" --draft=false --latest
+      - name: The feed offers it
+        run: |
+          for i in $(seq 1 20); do
+            V=$(curl -fsS https://api.tudu.ezdev.net/updates/latest.json | jq -r .version || true)
+            if [ "$V" = "${{ needs.version.outputs.version }}" ]; then echo "feed: $V"; exit 0; fi
+            sleep 30
+          done
+          echo "the feed does not offer ${{ needs.version.outputs.version }} yet (cached five minutes, or no token)"; exit 1

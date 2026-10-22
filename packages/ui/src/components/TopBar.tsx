@@ -51,6 +51,8 @@ export interface TopBarProps {
   user?: TopBarUser;
   /** With these, the avatar opens the AccountMenu; without them it is the Avatar alone. */
   account?: Omit<AccountMenuProps, 'me'>;
+  /** In the macOS app: the bar's empty parts drag the window. */
+  dragRegion?: boolean;
   className?: string;
 }
 
@@ -69,12 +71,15 @@ export function TopBar({
   compact,
   user,
   account,
+  dragRegion,
   className,
 }: TopBarProps) {
+  // The macOS app has no title bar: the bar's empty parts drag the window.
+  const drag = dragRegion ? { 'data-tauri-drag-region': '' } : {};
   const jiraCount = jira ? jira.count : undefined;
   const jiraTip = jiraCount ? `${jiraCount} assigned to you, not in Tudu yet` : 'Your Jira issues';
   return (
-    <header className={cx('tp-root tp-topbar', compact && 'tp-compact', className)}>
+    <header className={cx('tp-root tp-topbar', compact && 'tp-compact', className)} {...drag}>
       {leading ?? null}
       {views ? (
         <Segmented
@@ -85,7 +90,7 @@ export function TopBar({
           onChange={views.onChange}
         />
       ) : null}
-      <span className="tp-tb-sp" />
+      <span className="tp-tb-sp" {...drag} />
       <IconButton
         label={searchLabel}
         tipSide="bottom"

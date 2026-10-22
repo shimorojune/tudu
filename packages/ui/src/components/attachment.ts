@@ -29,7 +29,9 @@ export const Attachment = Node.create<{ base: string }>({
     };
   },
   parseHTML() {
-    return [{ tag: 'a.tp-att' }];
+    // Ahead of the link mark's `a[href]`, which would otherwise take the chip as a plain link (marks are tried first
+    // at equal priority) and lose its name and size.
+    return [{ tag: 'a.tp-att', priority: 60 }];
   },
   renderHTML({ node }) {
     const a = node.attrs as AttachmentAttrs;
