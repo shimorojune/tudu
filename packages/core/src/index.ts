@@ -14,3 +14,4 @@ export * from './spaces';
 export * from './people';
 export * from './inbox';
 export * from './jira';
+export * from './versions';

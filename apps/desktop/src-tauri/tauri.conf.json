@@ -1,0 +1,65 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Tudu",
+  "mainBinaryName": "Tudu",
+  "version": "../../../package.json",
+  "identifier": "net.ezdev.tudu",
+  "build": {
+    "frontendDist": "../shell"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "withGlobalTauri": false,
+    "windows": [],
+    "security": {
+      "csp": null,
+      "capabilities": [
+        {
+          "identifier": "web",
+          "description": "Tudu on the web, in the app's windows: the app's own commands, and dragging the window by the top bar.",
+          "windows": ["main", "floating"],
+          "remote": {
+            "urls": ["https://tudu.ezdev.net/*"]
+          },
+          "permissions": [
+            "core:default",
+            "core:window:allow-start-dragging",
+            "allow-app-info",
+            "allow-set-signed-in",
+            "allow-set-badge",
+            "allow-open-external",
+            "allow-save-download",
+            "allow-show-main",
+            "allow-hide-floating",
+            "allow-update-check",
+            "allow-update-install"
+          ]
+        }
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "createUpdaterArtifacts": true,
+    "category": "Productivity",
+    "copyright": "Tudu",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.png"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "14.0",
+      "signingIdentity": "-"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDIxOUM5NDhEMjBERDFCRjUKUldUMUc5MGdqWlNjSWJQRmJub0hNSk5rcEEwS3VJRDVtSmdWbnF2VHVzQW1UcG1lajRlVG82RG8K",
+      "endpoints": ["https://api.tudu.ezdev.net/updates/latest.json"]
+    }
+  }
+}

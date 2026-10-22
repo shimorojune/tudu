@@ -276,3 +276,20 @@
 .app-page.app-settings > .tp-set {
   height: auto;
 }
+
+/* The macOS app: no title bar. The traffic lights sit over the sidebar's head, which leaves them room; a strip along
+   the sidebar's top and the top bar's empty parts drag the window. */
+html[data-app='desktop'] .app-side {
+  position: relative;
+}
+.app-drag-strip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  z-index: 7;
+}
+html[data-app='desktop'] .app-side .tp-sidebar {
+  padding-top: 50px;
+}

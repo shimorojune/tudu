@@ -23,10 +23,20 @@ export function startServer(overrides: Partial<NodeJS.ProcessEnv> = {}): Server 
     if (url.host !== JIRA_TEST_HOST) return Promise.reject(new TypeError('fetch failed'));
     return Promise.resolve(app!.request(`/__test/jira${url.pathname}${url.search}`, init));
   };
-  const server = bootstrap(env, { mailer: outbox, heartbeatMs: 50, quiet: true, jiraFetch });
+  // And GitHub (the update feed) at http://github.test, the fake GitHub under /__test/github.
+  const githubFetch: typeof fetch = (input, init) => {
+    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+    if (url.host !== GITHUB_TEST_HOST) return Promise.reject(new TypeError('fetch failed'));
+    return Promise.resolve(app!.request(`http://${GITHUB_TEST_HOST}${url.pathname}${url.search}`, init));
+  };
+  const server = bootstrap(env, { mailer: outbox, heartbeatMs: 50, quiet: true, jiraFetch, githubFetch });
   app = server.app;
   return { ...server, outbox };
 }
+
+/** The fake GitHub in API tests: UPDATES_GITHUB_API is `${GITHUB_TEST_API}`. */
+export const GITHUB_TEST_HOST = 'github.test';
+export const GITHUB_TEST_API = `http://${GITHUB_TEST_HOST}/__test/github`;
 
 /** The address of the fake Jira in API tests. */
 export const JIRA_TEST_HOST = 'jira.test';

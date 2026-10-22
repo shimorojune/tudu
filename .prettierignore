@@ -9,3 +9,7 @@ docs/tests/STATUS.md
 reports
 packages/ui/src/styles/tokens-extra.css
 packages/ui/src/styles/less-motion.css
+apps/desktop/src-tauri/target
+apps/desktop/src-tauri/gen
+.local
+CHANGELOG.md

@@ -1,0 +1,97 @@
+/* The loader's offline page, in the Paper theme's colours. */
+:root {
+  color-scheme: light dark;
+  --background: #eeece6;
+  --card: #fffdf8;
+  --foreground: #18181b;
+  --muted-foreground: #71717a;
+  --primary: #18181b;
+  --primary-foreground: #fffdf8;
+  --brand: #e8361b;
+  --check-border: #b5b2aa;
+  --border: rgba(24, 24, 27, 0.09);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #111211;
+    --card: #1d1c1a;
+    --foreground: #f2efe8;
+    --muted-foreground: #a39f96;
+    --primary: #f2efe8;
+    --primary-foreground: #1d1c1a;
+    --brand: #ff6a4a;
+    --check-border: #6f6b64;
+    --border: rgba(242, 239, 232, 0.1);
+  }
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+  font:
+    14px/1.5 Geist,
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  color: var(--foreground);
+  -webkit-user-select: none;
+  user-select: none;
+}
+body.desk {
+  background: var(--background);
+}
+body.floating {
+  background: transparent;
+}
+main {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+}
+main[hidden] {
+  display: none;
+}
+body.floating main {
+  height: auto;
+  margin: 24px;
+  padding: 28px 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.mark {
+  margin-bottom: 10px;
+}
+.sheet {
+  fill: var(--brand);
+}
+.box {
+  fill: var(--card);
+  stroke: var(--check-border);
+}
+h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+p {
+  margin: 0 0 12px;
+  color: var(--muted-foreground);
+}
+button {
+  font: inherit;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  cursor: pointer;
+}
+button[aria-busy='true'] {
+  opacity: 0.6;
+}

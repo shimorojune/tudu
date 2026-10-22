@@ -122,3 +122,43 @@ jobs:
             reports/playwright.json
             reports/playwright-html
           if-no-files-found: ignore
+
+  # The desktop group: Tudu Test, the real macOS app, built twice (this version and one up, signed with a key made
+  # for the run) and driven over its control channel; plus the Rust unit tests. GitHub's macOS runner has no
+  # service containers, so Postgres runs on the runner itself; attachments stay in memory.
+  desktop:
+    name: Desktop (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - uses: ankane/setup-postgres@v1
+        with:
+          postgres-version: 17
+      - run: echo "TUDU_CI_DATABASE_URL=postgres://$(whoami)@127.0.0.1:5432/postgres" >> "$GITHUB_ENV"
+      - run: pnpm install --frozen-lockfile
+      - name: Rust unit tests
+        run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --features control
+      - name: The desktop group
+        run: pnpm e2e:mac
+        env:
+          CI: 'true'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-report
+          path: |
+            reports/playwright-mac.json
+            reports/playwright-mac-html
+            reports/mac-results
+          if-no-files-found: ignore

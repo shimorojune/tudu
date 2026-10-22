@@ -11,7 +11,8 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       AUTH_SECRET: ${AUTH_SECRET}
       BASE_URL: https://api.staging.tudu.ezdev.net
-      CORS_ORIGINS: https://staging.tudu.ezdev.net,tauri://localhost,http://tauri.localhost
+      # The macOS app opens the web site in its windows, so the web's origin is the only one.
+      CORS_ORIGINS: https://staging.tudu.ezdev.net
       EMAIL_TRANSPORT: resend
       RESEND_API_KEY: ${RESEND_API_KEY}
       EMAIL_FROM: Tudu <sign-in@mail.tudu.ezdev.net>
@@ -22,6 +23,10 @@ services:
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
       # The fake Jira at https://api.staging.tudu.ezdev.net/demo-jira (tokens good-…), for review without a real one.
       DEMO_JIRA: '1'
+      # Tudu Staging updates itself from the rolling `staging` pre-release (.github/workflows/desktop-staging.yml).
+      # The token reads the private repository's releases (fine-grained, Contents: read on eGainDev/tudu).
+      UPDATES_TRACK: staging
+      UPDATES_GITHUB_TOKEN: ${UPDATES_GITHUB_TOKEN}
     networks:
       - dokploy-network
     restart: unless-stopped

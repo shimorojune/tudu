@@ -252,3 +252,67 @@ describe('InboxItem', () => {
     expect(onToggle).toHaveBeenCalledWith(ANSWER, true);
   });
 });
+
+const APP: InboxEntry = {
+  id: 'app-0.38.0',
+  kind: 'app',
+  when: 'Just now',
+  unread: true,
+  text: 'is ready: version 0.38.0',
+  quote: '<p><strong>Features</strong></p><ul><li>The floating bar keeps your draft</li></ul>',
+  task: { title: '' },
+};
+
+describe('InboxItem, a new version (chunk 11)', () => {
+  it('C11-U02 the app kind: the mark, the ready line, the notes; What’s new and Restart to update in the reading pane', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    const { rerender } = render(<InboxItem item={APP} mode="list" onSelect={onSelect} />);
+    const row = screen.getByRole('article', { name: 'Tudu is ready: version 0.38.0' });
+    // The mark as the avatar, the line with the name, the notes as the quote (plain in the list), the dot.
+    expect(row.querySelector('.tp-ix-av-app [role="img"][aria-label="Tudu"]')).toBeTruthy();
+    expect(row.querySelector('.tp-ix-text')!.textContent).toBe('Tudu is ready: version 0.38.0');
+    expect(row.querySelector('.tp-ix-quote')!.textContent).toContain('The floating bar keeps your draft');
+    expect(within(row).getByLabelText('New')).toBeTruthy();
+    await user.click(within(row).getByRole('button'));
+    expect(onSelect).toHaveBeenCalledWith(APP);
+
+    // Fold mode says See what's new.
+    const onOpen = vi.fn();
+    rerender(<InboxItem item={{ ...APP, unread: false }} mode="fold" open onOpen={onOpen} />);
+    expect(screen.queryByLabelText('New')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'See what’s new' }));
+    expect(onOpen).toHaveBeenCalledTimes(1);
+
+    // The reading pane: What's new reports; Restart to update reports once, says Restarting… and stays busy.
+    const onUpdate = vi.fn();
+    rerender(<InboxItem item={APP} mode="full" onOpen={onOpen} onUpdate={onUpdate} />);
+    expect(screen.getByRole('article').querySelector('.tp-ix-quote li')!.textContent).toBe(
+      'The floating bar keeps your draft',
+    );
+    await user.click(screen.getByRole('button', { name: 'What’s new' }));
+    expect(onOpen).toHaveBeenCalledTimes(2);
+    await user.click(screen.getByRole('button', { name: 'Restart to update' }));
+    const busy = screen.getByRole('button', { name: /Restarting…/ });
+    await user.click(busy);
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: /Restarting…/ })).toBeTruthy();
+
+    // A Staging build names itself.
+    rerender(
+      <InboxItem item={{ ...APP, id: 'app-s', who: { name: 'Tudu Staging', initials: 'T' } }} mode="list" />,
+    );
+    expect(screen.getByRole('article', { name: 'Tudu Staging is ready: version 0.38.0' })).toBeTruthy();
+  });
+
+  it('C11-U02 a restart that fails frees the button', async () => {
+    const user = userEvent.setup();
+    let fail: (e: Error) => void = () => {};
+    const onUpdate = vi.fn(() => new Promise((_, reject) => (fail = reject)));
+    render(<InboxItem item={APP} mode="full" onUpdate={onUpdate} />);
+    await user.click(screen.getByRole('button', { name: 'Restart to update' }));
+    expect(screen.getByRole('button', { name: /Restarting…/ })).toBeTruthy();
+    fail(new Error('no'));
+    expect(await screen.findByRole('button', { name: 'Restart to update' })).toBeTruthy();
+  });
+});

@@ -2,6 +2,7 @@ import { addDays, formatDay, type IsoDate } from '@tudu/core';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
+import { Logo } from './Logo';
 import { closeRow } from '../lib/motion';
 import { Button } from './Button';
 import { DatePop } from './DatePop';
@@ -40,16 +41,17 @@ export type SentStatus =
 /** One thing in the Inbox, as the item shows it. */
 export interface InboxEntry {
   id: string;
-  kind: 'request' | 'comment' | 'answer' | 'sent';
+  /** `app`: a new version of the macOS app, downloaded and ready (its name in `who`, Tudu when left out). */
+  kind: 'request' | 'comment' | 'answer' | 'sent' | 'app';
   who?: InboxWho;
   /** For a sent one: who it went to. */
   to?: InboxWho;
   /** "Thu 10:12", "Just now". */
   when: string;
   unread?: boolean;
-  /** An update's line: "commented on", "accepted your task onto Fri 16 Oct". */
+  /** An update's line: "commented on", "accepted your task onto Fri 16 Oct", "is ready: version 0.38.0". */
   text?: string;
-  /** A comment's words (HTML). */
+  /** A comment's words, or a new version's notes (HTML). */
   quote?: string;
   task: InboxTaskFacts;
   outcome?: InboxOutcome | null;
@@ -74,6 +76,8 @@ export interface InboxItemProps {
   onWithdraw?: (item: InboxEntry) => void;
   onTakeBack?: (item: InboxEntry, day: IsoDate | null) => void;
   onPerson?: (who: InboxWho) => void;
+  /** A new version: Restart to update. While it runs the button says Restarting…; a promise that fails frees it. */
+  onUpdate?: (item: InboxEntry) => void | Promise<unknown>;
   /** On a person's own page the line reads "You sent this". */
   hideTo?: boolean;
   /** Phones: the back control at the top of the pane. */
@@ -81,7 +85,7 @@ export interface InboxItemProps {
   backLabel?: string;
   /** Where attachment chips in a comment link. */
   fileBase?: string;
-  initial?: { declining?: boolean; reason?: string; reply?: string };
+  initial?: { declining?: boolean; reason?: string; reply?: string; updating?: boolean };
   className?: string;
 }
 
@@ -121,7 +125,13 @@ const dayIcon = (
   </svg>
 );
 
-function Who({ who, size }: { who: InboxWho | undefined; size: number }) {
+function Who({ who, size, app }: { who: InboxWho | undefined; size: number; app?: boolean }) {
+  if (app)
+    return (
+      <span className="tp-ix-av tp-ix-av-app" aria-hidden="true" style={{ width: size, height: size }}>
+        <Logo size={Math.round(size * 0.62)} />
+      </span>
+    );
   return (
     <span
       className="tp-ix-av"
@@ -148,6 +158,7 @@ export function InboxItem(p: InboxItemProps) {
   const mode = p.mode ?? 'list';
   const req = it.kind === 'request';
   const sent = it.kind === 'sent';
+  const app = it.kind === 'app';
   const t = it.task;
   const full = mode === 'full';
   const fold = mode === 'fold';
@@ -158,6 +169,7 @@ export function InboxItem(p: InboxItemProps) {
   const [declining, setDeclining] = useState(!!p.initial?.declining);
   const [reason, setReason] = useState(p.initial?.reason ?? '');
   const [reply, setReply] = useState(p.initial?.reply ?? '');
+  const [updating, setUpdating] = useState(!!p.initial?.updating);
   const el = useRef<HTMLElement | null>(null);
   const area = useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
@@ -172,6 +184,7 @@ export function InboxItem(p: InboxItemProps) {
     setReply('');
     setPop(null);
     setTbPop(null);
+    setUpdating(false);
   }
   const cal = p.calendar;
   const today = cal?.today ?? '';
@@ -192,7 +205,7 @@ export function InboxItem(p: InboxItemProps) {
     leave(() => p.onDecline?.(it, r));
   };
 
-  const name = first(sent ? it.to?.name : it.who?.name);
+  const name = app ? (it.who?.name ?? 'Tudu') : first(sent ? it.to?.name : it.who?.name);
   const oc = it.outcome ?? null;
   const ss = sent ? (it.status ?? { state: 'waiting' as const }) : null;
 
@@ -386,6 +399,25 @@ export function InboxItem(p: InboxItemProps) {
     ) : null;
 
   const canReply = full && it.kind === 'comment' && !!p.onReply;
+  // A new version: Restart to update (it is already downloaded), with What's new beside it.
+  const update = () => {
+    if (updating) return;
+    setUpdating(true);
+    const r = p.onUpdate?.(it);
+    if (r && typeof (r as Promise<unknown>).then === 'function')
+      (r as Promise<unknown>).catch(() => setUpdating(false));
+  };
+  const appActs =
+    app && full ? (
+      <div className="tp-ix-acts">
+        <Button variant="quiet" size="sm" onClick={() => p.onOpen?.(it)}>
+          What’s new
+        </Button>
+        <Button variant="primary" size="sm" loading={updating} loadingLabel="Restarting…" onClick={update}>
+          Restart to update
+        </Button>
+      </div>
+    ) : null;
   const ocActs =
     req && oc && (full || (fold && open)) && oc.status === 'accepted' ? (
       <div className="tp-ix-acts">
@@ -457,6 +489,7 @@ export function InboxItem(p: InboxItemProps) {
     ) : null;
   const updActs =
     sentActs ??
+    appActs ??
     ocActs ??
     (!req && !sent && (full || (fold && open)) ? (
       <div className="tp-ix-upd">
@@ -473,7 +506,7 @@ export function InboxItem(p: InboxItemProps) {
         ) : null}
         <div className="tp-ix-acts">
           <Button variant={canReply ? 'quiet' : 'secondary'} size="sm" onClick={() => p.onOpen?.(it)}>
-            Open task
+            {app ? 'See what’s new' : 'Open task'}
           </Button>
           {canReply ? (
             <Button
@@ -501,7 +534,7 @@ export function InboxItem(p: InboxItemProps) {
   };
   const headInner = (
     <>
-      <Who who={sent ? it.to : it.who} size={full ? 26 : 28} />
+      <Who who={sent ? it.to : it.who} size={full ? 26 : 28} app={app} />
       <span className="tp-ix-main">
         <span className="tp-ix-line">
           <span className="tp-ix-text">{line}</span>

@@ -32,6 +32,8 @@ import { jiraParam, openApps, useJira, useJiraFresh, withJira } from './jira';
 import { QuickAddHost } from './quickAdd';
 import { initialsOf, photoSrc, signOut } from './session';
 import { SettingsHost, settingsHref } from './settings';
+import { inApp } from './desktop';
+import { useUpdate } from './updates';
 import { spacePath, switchPath, viewOf, type View } from './space';
 import { CreateSpaceHost, MembersHost } from './spaces';
 import { taskStore } from './tasks';
@@ -83,8 +85,11 @@ export function phoneTab(at: { view: View; onToday: boolean; searchOpen: boolean
   return at.onToday ? 'today' : at.view;
 }
 
-/** The spaces as the switcher lists them: Personal first, each with its quiet line. */
-export function switchSpaces(spaces: SpaceSummary[]): SwitchSpace[] {
+/**
+ * The spaces as the switcher lists them: Personal first, each with its quiet line. `update` adds the app's new
+ * version, which waits in every team space's Inbox.
+ */
+export function switchSpaces(spaces: SpaceSummary[], update = false): SwitchSpace[] {
   return spaces.map((s) => ({
     id: s.id,
     name: s.name,
@@ -92,7 +97,7 @@ export function switchSpaces(spaces: SpaceSummary[]): SwitchSpace[] {
     personal: s.kind === 'personal',
     initials: spaceInitials(s.name),
     sub: membersWords(s.members),
-    count: inboxBadge(s.inbox) || undefined,
+    count: inboxBadge(s.inbox) + (update && s.kind === 'team' ? 1 : 0) || undefined,
   }));
 }
 
@@ -156,7 +161,10 @@ export function AppShell({
     image: photoSrc(me.user.image),
   };
   const team = space.kind === 'team';
-  const inboxCount = inboxBadge(space.inbox);
+  // The macOS app's new version counts in every team space's Inbox until it is opened.
+  const update = useUpdate().unread;
+  const inboxCount = inboxBadge(space.inbox) + (team && update ? 1 : 0);
+  const app = inApp();
   const items: SidebarItem[] = VIEWS.filter((v) => team || !v.team).map((v) => ({
     value: v.value,
     label: v.label,
@@ -197,7 +205,7 @@ export function AppShell({
     <SpaceSwitch
       variant={variant}
       rail={rail}
-      spaces={switchSpaces(me.spaces)}
+      spaces={switchSpaces(me.spaces, update)}
       active={space.id}
       onPick={(s) => {
         const next = me.spaces.find((x) => x.id === s.id);
@@ -296,6 +304,7 @@ export function AppShell({
   return (
     <div className="tp-root app-desk" data-viewport={vp}>
       <div className="app-side">
+        {app ? <div className="app-drag-strip" data-tauri-drag-region="" /> : null}
         <Sidebar
           items={items}
           week={rail ? [] : week}
@@ -314,6 +323,7 @@ export function AppShell({
         <div className="app-top">
           <TopBar
             compact={rail}
+            dragRegion={app}
             jira={
               jira.conn
                 ? { count: jira.count ?? undefined, open: jiraOpen, fresh: jiraFresh, onJira: toggleJira }

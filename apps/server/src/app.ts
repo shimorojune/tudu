@@ -18,6 +18,9 @@ import { TokenSeal } from './jira/seal';
 import { spaceRoutes } from './routes/spaces';
 import { taskRoutes } from './routes/tasks';
 import { testRoutes } from './routes/test';
+import { updateRoutes } from './routes/updates';
+import { fakeGithub } from './updates/fake';
+import { UpdateFeed } from './updates/feed';
 import type { Storage } from './storage';
 
 export interface AppDeps {
@@ -29,6 +32,8 @@ export interface AppDeps {
   storage: Storage;
   /** How the server reaches Jira; tests route it to the fake Jira in the same process. */
   jiraFetch?: typeof fetch;
+  /** How the update feed reaches GitHub; tests route it to the fake GitHub in the same process. */
+  githubFetch?: typeof fetch;
   /** For the live stream heartbeat in tests. */
   heartbeatMs?: number;
   quiet?: boolean;
@@ -60,6 +65,19 @@ export function createApp(deps: AppDeps) {
   );
 
   app.get('/health', (c) => c.json({ ok: true, at: new Date().toISOString() }));
+
+  // The macOS app's updates, from the track's GitHub release.
+  const feed = env.UPDATES_TRACK
+    ? new UpdateFeed({
+        track: env.UPDATES_TRACK,
+        repo: env.UPDATES_GITHUB_REPO,
+        token: env.UPDATES_GITHUB_TOKEN,
+        api: env.UPDATES_GITHUB_API,
+        base: env.BASE_URL,
+        fetch: deps.githubFetch,
+      })
+    : null;
+  app.route('/updates', updateRoutes(feed));
 
   // Sending codes: at most five to one mailbox in ten minutes, whoever asks.
   app.post('/api/auth/email-otp/send-verification-otp', async (c, next) => {
@@ -112,6 +130,11 @@ export function createApp(deps: AppDeps) {
   if (env.TEST_ROUTES === '1' && mailer instanceof OutboxMailer) {
     app.route('/__test', testRoutes(mailer, db));
     app.route('/__test/jira', fakeJira());
+    app.route('/__test/github', fakeGithub());
+    app.post('/__test/updates/reset', (c) => {
+      feed?.reset();
+      return c.json({ ok: true });
+    });
   }
   // Staging: the same fake Jira, reachable as https://api.staging…/demo-jira, for reviewing without a real one.
   if (env.DEMO_JIRA === '1') app.route('/demo-jira', fakeJira());

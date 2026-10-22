@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-// Rewrite docs/tests/STATUS.md from the last test run: reports/vitest.json and reports/playwright.json.
-// Every case id (C00-U01, C01-E03 ...) found in test names is listed with pass, fail or skipped, grouped by chunk.
+// Rewrite docs/tests/STATUS.md from the last test run: reports/vitest.json, reports/playwright.json and, for the
+// desktop group (the real macOS app), reports/playwright-mac.json. Every case id (C00-U01, C01-E03, C11-D02 ...) found
+// in test names is listed with pass, fail or skipped, grouped by chunk.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
-const ID = /\bC(\d\d)-([UAE])(\d\d)\b/g;
+const ID = /\bC(\d\d)-([UAED])(\d\d)\b/g;
 const status = new Map(); // id -> state
 // A case runs on several viewports; one failure makes it FAIL, otherwise one pass makes it pass (a viewport that
 // skips it by design does not take that away), and skipped means it ran nowhere.
@@ -27,8 +28,8 @@ if (existsSync(vitestPath)) {
     }
   }
 }
-const pwPath = join(ROOT, 'reports/playwright.json');
-if (existsSync(pwPath)) {
+for (const pwPath of [join(ROOT, 'reports/playwright.json'), join(ROOT, 'reports/playwright-mac.json')]) {
+  if (!existsSync(pwPath)) continue;
   const report = JSON.parse(readFileSync(pwPath, 'utf8'));
   const walk = (suite) => {
     for (const spec of suite.specs ?? []) {

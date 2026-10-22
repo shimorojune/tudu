@@ -34,6 +34,9 @@ import {
 } from '@tudu/ui';
 import { useEffect, useRef, useState } from 'react';
 import { API_URL } from '../../app/config';
+import { desktop } from '../../app/desktop';
+import { useAppInfo } from '../../app/DesktopHost';
+import { appEntry, isAppItem, restartToUpdate, updateStore, useUpdate } from '../../app/updates';
 import { locateTask, showDay } from '../../app/dayView';
 import { meQuery } from '../../app/session';
 import { spacePath, useSpace } from '../../app/space';
@@ -176,6 +179,18 @@ export function InboxPage() {
   const compact = vp === 'phone';
   const data = query.data;
 
+  // The macOS app's new version, once downloaded: first in Updates, in every team space, until restarted.
+  const update = useUpdate();
+  const appName = useAppInfo()?.name ?? 'Tudu';
+  const [arrived] = useState(() => new Date().toISOString());
+  const term = q.trim().toLowerCase();
+  const appItem =
+    update.ready &&
+    view === 'inbox' &&
+    (!term || `${appName} ${update.ready.version} ${update.ready.notes}`.toLowerCase().includes(term))
+      ? appEntry(update.ready, update.unread, now, appName, arrived)
+      : null;
+
   // The open task over the Inbox: in the address as its ref, so a reload keeps it; closing lands back on the item.
   const [open, setOpen] = useState<OpenTask | null>(null);
   const openTask = (taskId: string) => setOpen({ id: taskId, dir: 'next' });
@@ -190,6 +205,7 @@ export function InboxPage() {
 
   // Reading an item clears its dot.
   const all: InboxData[] = data ? [...data.toAnswer, ...data.updates, ...data.answered] : [];
+  const pickedApp = appItem && picked === appItem.id ? { ...appItem, unread: false } : null;
   const pickedItem = picked ? all.find((i) => i.id === picked) : undefined;
   const pickedSent = picked && !pickedItem ? data?.sent.find((r) => r.id === picked) : undefined;
   const readRef = useRef<string | null>(null);
@@ -199,6 +215,10 @@ export function InboxPage() {
       taskStore.readItem(space.id, pickedItem.id);
     }
   }, [pickedItem, space.id]);
+  const readVersion = pickedApp && update.ready ? update.ready.version : null;
+  useEffect(() => {
+    if (readVersion) updateStore.markRead(readVersion);
+  }, [readVersion]);
 
   const entries = (list: InboxData[]) => list.map((i) => toEntry(i, today, now, projects));
   const requestOf = (e: InboxEntry): TaskRequest | undefined =>
@@ -232,6 +252,11 @@ export function InboxPage() {
       moveOn(e.id);
     },
     onOpen: (e: InboxEntry) => {
+      // What's new: the version's own item, its notes in the reading pane.
+      if (isAppItem(e.id)) {
+        if (picked !== e.id) select(e.id);
+        return;
+      }
       const id = taskIdOf(e);
       if (id) openTask(id);
     },
@@ -275,7 +300,9 @@ export function InboxPage() {
   const calendar = { today, marks: {} };
   if (!me) return null;
 
-  const counts = data?.counts;
+  const counts = data
+    ? { ...data.counts, unread: data.counts.unread + (appItem?.unread ? 1 : 0) }
+    : undefined;
   const headCount = !data
     ? ''
     : view === 'inbox'
@@ -285,7 +312,12 @@ export function InboxPage() {
         : sentWords(data.sent);
   const searching = !!q.trim();
   const empty =
-    data && !data.toAnswer.length && !data.updates.length && !data.answered.length && !data.sent.length;
+    data &&
+    !appItem &&
+    !data.toAnswer.length &&
+    !data.updates.length &&
+    !data.answered.length &&
+    !data.sent.length;
 
   let list;
   if (query.isPending) list = <TaskListSkeleton rows={4} compact />;
@@ -355,12 +387,15 @@ export function InboxPage() {
             onSelect={(e) => select(e.id)}
           />
         ) : null}
-        {data!.updates.length ? (
+        {data!.updates.length || appItem ? (
           <InboxSection
             title="Updates"
-            action={data!.updates.some((u) => !u.readAt) ? 'Mark all as read' : undefined}
-            onAction={() => taskStore.readAll(space.id)}
-            items={entries(data!.updates)}
+            action={data!.updates.some((u) => !u.readAt) || appItem?.unread ? 'Mark all as read' : undefined}
+            onAction={() => {
+              if (data!.updates.some((u) => !u.readAt)) taskStore.readAll(space.id);
+              if (update.ready) updateStore.markRead(update.ready.version);
+            }}
+            items={[...(appItem ? [appItem] : []), ...entries(data!.updates)]}
             mode="list"
             selectedKey={picked}
             calendar={calendar}
@@ -392,11 +427,13 @@ export function InboxPage() {
       />
     );
 
-  const pickedEntry = pickedItem
-    ? toEntry(pickedItem, today, now, projects)
-    : pickedSent
-      ? toSentEntry(pickedSent, today, now, projects)
-      : null;
+  const pickedEntry = pickedApp
+    ? pickedApp
+    : pickedItem
+      ? toEntry(pickedItem, today, now, projects)
+      : pickedSent
+        ? toSentEntry(pickedSent, today, now, projects)
+        : null;
   const pane = pickedEntry ? (
     <InboxItem
       key={pickedEntry.id}
@@ -407,6 +444,10 @@ export function InboxPage() {
       onBack={compact ? () => select(null) : undefined}
       backLabel="Inbox"
       className={compact ? 'tp-ix-phone' : undefined}
+      onUpdate={() => {
+        const d = desktop();
+        return d ? restartToUpdate(d, appName) : undefined;
+      }}
       {...handlers}
     />
   ) : compact ? null : (

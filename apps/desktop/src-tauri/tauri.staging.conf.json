@@ -1,0 +1,37 @@
+{
+  "productName": "Tudu Staging",
+  "mainBinaryName": "Tudu Staging",
+  "identifier": "net.ezdev.tudu.staging",
+  "plugins": {
+    "updater": {
+      "endpoints": ["https://api.staging.tudu.ezdev.net/updates/latest.json"]
+    }
+  },
+  "app": {
+    "security": {
+      "capabilities": [
+        {
+          "identifier": "web",
+          "description": "Tudu on the web, in the app's windows: the app's own commands, and dragging the window by the top bar.",
+          "windows": ["main", "floating"],
+          "remote": {
+            "urls": ["https://staging.tudu.ezdev.net/*"]
+          },
+          "permissions": [
+            "core:default",
+            "core:window:allow-start-dragging",
+            "allow-app-info",
+            "allow-set-signed-in",
+            "allow-set-badge",
+            "allow-open-external",
+            "allow-save-download",
+            "allow-show-main",
+            "allow-hide-floating",
+            "allow-update-check",
+            "allow-update-install"
+          ]
+        }
+      ]
+    }
+  }
+}

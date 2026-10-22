@@ -1,0 +1,16 @@
+{
+  "name": "@tudu/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tudu for macOS: the Tauri shell around the web app.",
+  "scripts": {
+    "dev": "node scripts/desktop.mjs dev",
+    "build": "node scripts/desktop.mjs build",
+    "icons": "node scripts/icons.mjs",
+    "test": "cargo test --manifest-path src-tauri/Cargo.toml --features control"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.4"
+  }
+}

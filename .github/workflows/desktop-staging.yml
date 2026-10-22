@@ -1,0 +1,64 @@
+name: Tudu Staging
+
+# Every merge to master: Tudu Staging (the app against the staging API) built and signed for the updater, and put on
+# the rolling `staging` pre-release. Its version is the next patch after the latest release plus this run's number
+# (0.37.1-staging.132), so each build is newer than the last and older than the next release. Tudu Staging updates
+# itself from it through the staging API's feed.
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  PNPM_VERSION: 9.15.9
+
+jobs:
+  build:
+    name: Build Tudu Staging
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - run: pnpm install --frozen-lockfile
+      - name: Version
+        id: v
+        run: |
+          LAST=$(git tag -l 'tudu-*' --sort=-v:refname | grep -E '^tudu-[0-9]+\.[0-9]+\.[0-9]+$' | head -1 | sed 's/^tudu-//')
+          VERSION=$(node -e "const [a,b,c]=process.argv[1].split('.').map(Number);console.log(a+'.'+b+'.'+(c+1)+'-staging.'+process.argv[2])" "$LAST" "${{ github.run_number }}")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Tudu Staging $VERSION" >> "$GITHUB_STEP_SUMMARY"
+      - name: Build and sign
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: node apps/desktop/scripts/desktop.mjs build --track staging --version ${{ steps.v.outputs.version }} --out dist
+      - name: The rolling staging pre-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          git log -1 --format='%s%n%n%b' > notes.md
+          gh release delete staging --yes --cleanup-tag || true
+          gh release create staging --prerelease --target "$GITHUB_SHA" \
+            --title "Tudu Staging ${{ steps.v.outputs.version }}" --notes-file notes.md \
+            "dist/Tudu Staging.app.tar.gz" "dist/Tudu Staging.app.tar.gz.sig" dist/*.dmg

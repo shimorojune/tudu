@@ -1,0 +1,132 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { MeResponse } from '@tudu/client';
+import type { SpaceSummary } from '@tudu/core';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resetDesktop, type DesktopFake } from '../../app/desktop';
+import { FloatingQuickAdd } from './QuickAddPage';
+
+const save = vi.fn();
+const usedSpace = vi.fn();
+vi.mock('../../app/quickAdd', () => ({
+  useQuickAddActions: (spaceId: string | undefined) => {
+    usedSpace(spaceId);
+    return {
+      today: '2026-10-18',
+      projects: [],
+      online: true,
+      save,
+      newProject: () => undefined,
+      upload: async () => ({ id: 'f', name: 'f', size: 1 }),
+    };
+  },
+}));
+vi.mock('../../app/live', () => ({ useLiveEvents: () => {} }));
+vi.mock('../../app/workingDay', () => ({
+  WorkingDayProvider: ({ children }: { children: unknown }) => children,
+}));
+const refreshMe = vi.fn();
+vi.mock('../../app/session', async (orig) => ({
+  ...(await orig<Record<string, unknown>>()),
+  refreshMe: () => refreshMe(),
+}));
+
+const space = (id: string, slug: string, kind: 'personal' | 'team'): SpaceSummary => ({
+  id,
+  kind,
+  name: slug,
+  color: null,
+  role: 'admin',
+  slug,
+  prefix: 'XX',
+  members: 1,
+  inbox: { toAnswer: 0, unread: 0 },
+});
+const ME = {
+  user: { id: 'u', name: 'Rohit', email: 'r@example.com', color: null, image: null },
+  spaces: [space('p', 'me', 'personal'), space('n', 'northwind', 'team')],
+} as unknown as MeResponse;
+
+let fake: DesktopFake;
+const emit = (event: string, payload?: unknown) =>
+  act(() => {
+    for (const fn of fake.listeners?.[event] ?? []) fn(payload);
+  });
+const hides = () => fake.calls.filter((c) => c.name === 'hideFloating').length;
+
+function mount(me: MeResponse | null) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <FloatingQuickAdd me={me} />
+    </QueryClientProvider>,
+  );
+}
+
+afterEach(cleanup);
+beforeEach(() => {
+  fake = { window: 'floating', calls: [] };
+  window.__tuduDesktopFake = fake;
+  resetDesktop();
+  save.mockReset();
+  usedSpace.mockReset();
+  refreshMe.mockReset();
+  refreshMe.mockResolvedValue(ME);
+  localStorage.clear();
+});
+
+describe('C11-U05 the floating window', () => {
+  it('Add task hides the window after the tick; the task goes to the last space’s Today', async () => {
+    localStorage.setItem('tudu.space', 'northwind');
+    const user = userEvent.setup();
+    mount(ME);
+    expect(usedSpace).toHaveBeenLastCalledWith('n');
+    await user.type(screen.getByRole('textbox', { name: 'Task title' }), 'Call the venue');
+    await user.click(screen.getByRole('button', { name: 'Add task' }));
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Call the venue', planned: '2026-10-18' }),
+    );
+    // Not at once: the tick shows first, then the window goes.
+    expect(hides()).toBe(0);
+    await waitFor(() => expect(hides()).toBe(1), { timeout: 2000 });
+    // No toast in the app (the window is gone); the web page's note is not shown either.
+    expect(screen.queryByText(/floats over whatever you are doing/)).toBeNull();
+  });
+
+  it('Esc closes a picker, then hides; a click outside the bar hides; the draft survives', async () => {
+    const user = userEvent.setup();
+    mount(ME);
+    const title = screen.getByRole('textbox', { name: 'Task title' });
+    await user.type(title, 'Draft stays');
+    await user.click(screen.getByRole('button', { name: 'Choose a project' }));
+    await user.keyboard('{Escape}');
+    expect(hides()).toBe(0);
+    await user.keyboard('{Escape}');
+    expect(hides()).toBe(1);
+    // The window is only hidden: the draft is there next time, and the line takes the keyboard on the summon.
+    (document.activeElement as HTMLElement | null)?.blur();
+    emit('floating:shown');
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Task title' })),
+    );
+    expect((screen.getByRole('textbox', { name: 'Task title' }) as HTMLInputElement).value).toBe(
+      'Draft stays',
+    );
+    // A click on the clear part around the bar.
+    const bar = document.querySelector('.app-floating-bar')!;
+    await user.pointer({ keys: '[MouseLeft]', target: bar });
+    expect(hides()).toBe(2);
+    // A click on the bar itself does not.
+    await user.click(screen.getByRole('textbox', { name: 'Task title' }));
+    expect(hides()).toBe(2);
+  });
+
+  it('with no session the desk is asked to show Sign in and the window shows nothing', async () => {
+    refreshMe.mockResolvedValue(null);
+    const { container } = mount(null);
+    expect(container.querySelector('.app-floating')).toBeNull();
+    emit('floating:shown');
+    await waitFor(() => expect(fake.calls).toContainEqual({ name: 'showMain', args: ['/sign-in'] }));
+  });
+});

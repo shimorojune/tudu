@@ -25,7 +25,10 @@ const api = spawn('node', ['--import', 'tsx', 'src/index.ts'], {
     DATABASE_URL: db.url,
     AUTH_SECRET: 'e2e-secret-e2e-secret-e2e-secret',
     BASE_URL: `http://localhost:${port}`,
-    CORS_ORIGINS: `http://localhost:${process.env.E2E_WEB_PORT ?? '5173'}`,
+    // The desktop tests add the app's origin (tauri://localhost).
+    CORS_ORIGINS: [`http://localhost:${process.env.E2E_WEB_PORT ?? '5173'}`, process.env.E2E_EXTRA_ORIGINS]
+      .filter(Boolean)
+      .join(','),
     EMAIL_TRANSPORT: 'outbox',
     TEST_ROUTES: '1',
     // Attachments: the CI runner has a RustFS bucket; a laptop without Docker keeps them in memory.
