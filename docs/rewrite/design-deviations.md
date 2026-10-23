@@ -116,12 +116,13 @@ is ahead, and each leaves when its chunk ships (or is redrawn to what shipped).
 - "Edit projects…" ends every project picker and the Backlog filter and opens Settings › Space on Projects.
 - Send feedback: the avatar menu, More and the menu bar's ⋯; Something’s wrong | An idea, one screenshot, app
   details; the screenshot shows as a preview, not a file chip. Where reports go is not decided.
-- The menu bar: a left click opens today across your spaces with the real checkbox, New task, Open Tudu and ⋯; a
-  right click keeps the Mac's menu (adds Send feedback…); the Inbox count beside the tick while
+- The menu bar: a click (left or right) opens today across your spaces with the real checkbox, New task, Open Tudu
+  (a quiet button) and ⋯ (Send feedback…, Quit Tudu). The tray's native menu goes, Rohit's call. Signed out, the
+  sheet says "Sign in to see your day." with Open Tudu and keeps ⋯ for Quit. The Inbox count beside the tick while
   the Dock icon is gone (the background-running chunk).
 - Open at login and Show Tudu in the Dock (K-Login, light and dark): a Settings › You › This Mac section in the Mac
   app only. Dock: While the window is open (default) or Always; under the default the Inbox count rides beside the
-  tick while the window is closed. Both live in Settings only: the menu bar's menus carry neither.
+  tick while the window is closed. Both live in Settings only: the menu bar's sheet carries neither.
 
 # History
 
@@ -478,7 +479,7 @@ The canvas and the design system now follow the app; these lines left the regist
 - Open questions are on the page's sticky: where feedback goes and whether anyone replies, which spaces the menu
   bar shows, the Inbox's waiting tasks in it, whether projects need more than the shortcut, and the Personal chip.
 - K-Proto, a clickable board at the left of page 13, joins the four: the menu bar sheet (ticks shared with the
-  desk's Today), its right-click menu, Quick Add over the window or the desktop, Settings › Personal › Space with
+  desk's Today, opened by either button), Quick Add over the window or the desktop, Settings › Personal › Space with
   the new Projects, Send feedback, and the window's close button (Tudu stays in the menu bar with the Inbox count).
   A demo switch in the menu bar shows Personal alone. Settings › This Mac works too (Always hides the count).
   Quick Add's own project picker has no Edit projects… yet.
