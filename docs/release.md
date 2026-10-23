@@ -11,21 +11,15 @@ This page is what has to be true before the first real run, and how to run one.
 
 ### 1. The last release's tag is on GitHub
 
-semantic-release counts from the last `tudu-*` tag. `tudu-0.36.0` (commit `6de7bd8`, "chore(release): 0.36.0") was
-not pushed when the repository moved to shimorojune/tudu. Without it the next version is 1.0.0 and the notes reach
-back to the first commit; the workflow now stops instead. From a checkout that has the tag:
-
-```sh
-git push origin tudu-0.36.0
-```
-
-(Or make it fresh: `git tag tudu-0.36.0 6de7bd8 && git push origin tudu-0.36.0`.)
+semantic-release counts from the last `tudu-*` tag (`tudu-0.36.0` today, so the next release is 0.37.0). If no
+`tudu-*` tag reaches the runner (a repository move that drops tags), it would start again at 1.0.0 with every commit
+in the notes; the workflow stops instead. Check with `git ls-remote --tags origin 'tudu-*'`.
 
 ### 2. Dokploy: production's database and storage
 
 In Dokploy (project Tudu, environment production), the compose expects two internal services:
 
-- **Postgres** `tudu-production-postgres` (Postgres 18). Create › Database › PostgreSQL, App name
+- **Postgres** `tudu-production-postgres` (Postgres 17: the 18 image refuses Dokploy's data path, as on staging). Create › Database › PostgreSQL, App name
   `tudu-production-postgres`, a database `tudu`, a generated password. No external port. Deploy.
 - **Object storage** `tudu-production-minio` (RustFS/MinIO, S3 API on 9000), as staging's `tudu-staging-minio`
   is set up: same image, App name `tudu-production-minio`, on `dokploy-network`, no public domain. Create the bucket
