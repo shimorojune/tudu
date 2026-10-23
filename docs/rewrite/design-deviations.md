@@ -82,8 +82,7 @@ Each line is true of the app on master. A line leaves the register once the canv
 ### 10 Settings
 
 - Sections: Account, Appearance; then Space, Members (team), Apps. No Notifications row yet (chunk 14).
-- Settings › Space has a Projects block: each project's dot opens the swatches, the name saves on leave, its
-  open-task count, Delete with Undo, New project. Members read "Its name and colour are kept by its admins."
+- Members read "Its name and colour are kept by its admins."
 - Email has Change: the new address, Send code, the code field. Photo has Remove once there is one.
 - The last admin's Leave asks "Make someone admin first" with Go to Members; the last person's Leave says to Delete.
 - Settings is in the address: `?settings=members` on the desk and tablets, `/northwind/settings/members` on phones.
@@ -103,6 +102,20 @@ Each line is true of the app on master. A line leaves the register once the canv
 - The window loads the site through a loader page that says "You're offline." with Try again.
 - Updates: "Tudu is ready: version 0.38.0", What's new, Restart to update, "Restarting…", and "Couldn't restart.
   Quit and open Tudu again to finish."
+
+### 13 Next (designed, not built)
+
+Page 13 draws four pieces the app does not have yet. These lines are the other way round from the rest: the canvas
+is ahead, and each leaves when its chunk ships (or is redrawn to what shipped).
+
+- Quick Add always shows "In … for Me", the floating bar included; Personal alone reads "In Personal for Me" with
+  plain chips (today: the plain bar until a team space, and the floating bar never has the line).
+- "Edit projects…" ends every project picker and the Backlog filter and opens Settings › Space on Projects.
+- Send feedback: the avatar menu, More and the menu bar's ⋯; Something’s wrong | An idea, one screenshot, app
+  details. Where reports go is not decided.
+- The menu bar: a left click opens today across your spaces with the real checkbox, New task, Open Tudu and ⋯; a
+  right click keeps the Mac's menu (adds Open at Login and Send feedback…); the Inbox count beside the tick while
+  the Dock icon is gone (the background-running chunk).
 
 # History
 
@@ -445,3 +458,18 @@ The canvas and the design system now follow the app; these lines left the regist
   timings.
 - The design system's `bundle.css` is `components.css` plus a short tail that removes the CSS tooltip's exit, to
   match the app's Radix tooltip. Compare the two without that tail.
+
+## Page 13 designed · 23 Oct 2026
+
+- New page "13 Next: four new pieces" on the canvas: Quick Add's space line everywhere (K-QuickAdd), projects per
+  space (K-Projects), Send feedback (K-Feedback), today in the menu bar (K-MenuBar, light and dark). Built from the
+  Tudu Paper components; the menu bar sheet, the feedback form's body and the static macOS menu are new markup
+  (`k-*` classes on the boards) until the build adds them to the design system.
+- Settings › Space › Projects is now drawn as built (dot and swatches, name that saves on leave, open-task count,
+  Delete with Undo, New project, the empty line), so its register line left; the app's `tp-sprj-*` rules are copied
+  onto the board.
+- The Quick Add board mounts the design system's QuickAdd, whose space chip still opens a one-line list with
+  Personal alone; the build makes it a plain chip like "Me".
+- Open questions are on the page's sticky: where feedback goes and whether anyone replies, which spaces the menu
+  bar shows, the Inbox's waiting tasks in it, whether projects need more than the shortcut, and the Personal chip.
+
