@@ -110,9 +110,12 @@ is ahead, and each leaves when its chunk ships (or is redrawn to what shipped).
 
 - Quick Add always shows "In … for Me", the floating bar included; Personal alone reads "In Personal for Me" with
   plain chips (today: the plain bar until a team space, and the floating bar never has the line).
+- Settings › Space › Projects is redrawn: a list (dot, name, "5 open", ⋯), New project in the section's head, and
+  one editor card for making and changing a project (name, swatches, the byline preview, Delete project, Cancel,
+  Save). The app still has the inline names, the dot that opens swatches, a Delete per row and the field at the foot.
 - "Edit projects…" ends every project picker and the Backlog filter and opens Settings › Space on Projects.
 - Send feedback: the avatar menu, More and the menu bar's ⋯; Something’s wrong | An idea, one screenshot, app
-  details. Where reports go is not decided.
+  details; the screenshot shows as a preview, not a file chip. Where reports go is not decided.
 - The menu bar: a left click opens today across your spaces with the real checkbox, New task, Open Tudu and ⋯; a
   right click keeps the Mac's menu (adds Open at Login and Send feedback…); the Inbox count beside the tick while
   the Dock icon is gone (the background-running chunk).
@@ -465,9 +468,8 @@ The canvas and the design system now follow the app; these lines left the regist
   space (K-Projects), Send feedback (K-Feedback), today in the menu bar (K-MenuBar, light and dark). Built from the
   Tudu Paper components; the menu bar sheet, the feedback form's body and the static macOS menu are new markup
   (`k-*` classes on the boards) until the build adds them to the design system.
-- Settings › Space › Projects is now drawn as built (dot and swatches, name that saves on leave, open-task count,
-  Delete with Undo, New project, the empty line), so its register line left; the app's `tp-sprj-*` rules are copied
-  onto the board.
+- Settings › Space › Projects was drawn as built, then redrawn the same day at Rohit's ask ("so confusing and not
+  as good looking"): the register's 13 Next section lists the new design against what the app has.
 - The Quick Add board mounts the design system's QuickAdd, whose space chip still opens a one-line list with
   Personal alone; the build makes it a plain chip like "Me".
 - Open questions are on the page's sticky: where feedback goes and whether anyone replies, which spaces the menu
