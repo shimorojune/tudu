@@ -472,4 +472,3 @@ The canvas and the design system now follow the app; these lines left the regist
   Personal alone; the build makes it a plain chip like "Me".
 - Open questions are on the page's sticky: where feedback goes and whether anyone replies, which spaces the menu
   bar shows, the Inbox's waiting tasks in it, whether projects need more than the shortcut, and the Personal chip.
-
