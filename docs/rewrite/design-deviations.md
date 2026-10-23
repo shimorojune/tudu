@@ -119,6 +119,8 @@ is ahead, and each leaves when its chunk ships (or is redrawn to what shipped).
 - The menu bar: a left click opens today across your spaces with the real checkbox, New task, Open Tudu and ⋯; a
   right click keeps the Mac's menu (adds Open at Login and Send feedback…); the Inbox count beside the tick while
   the Dock icon is gone (the background-running chunk).
+- Open at login (K-Login, light and dark): a Settings › You › This Mac section in the Mac app only, with its switch
+  and states; the menu bar's right-click menu and ⋯ carry the same item.
 
 # History
 
