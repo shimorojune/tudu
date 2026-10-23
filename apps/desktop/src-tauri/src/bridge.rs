@@ -14,6 +14,7 @@ use crate::{App, SUMMON_LABEL};
 #[serde(rename_all = "camelCase")]
 pub struct Seen {
     pub signed_in: bool,
+    /// The Inbox count the page last gave.
     pub badge: Option<i64>,
     /// Outside links handed to the default browser, in order.
     pub opened: Vec<String>,
@@ -48,15 +49,14 @@ pub fn set_signed_in(state: State<'_, App>, signed_in: bool) {
     }
 }
 
-/// The Inbox count across your spaces on the dock icon; zero clears it.
+/// The Inbox count across your spaces: on the Dock icon while there is one, beside the tick in the menu bar while
+/// there is not (chunk 16); zero clears it.
 #[tauri::command]
-pub fn set_badge(app: AppHandle, state: State<'_, App>, count: i64) -> Result<(), String> {
-    let value = (count > 0).then_some(count);
+pub fn set_badge(app: AppHandle, state: State<'_, App>, count: i64) {
     if let Ok(mut s) = state.seen.lock() {
-        s.badge = value;
+        s.badge = (count > 0).then_some(count);
     }
-    let w = app.get_webview_window(windows::MAIN).ok_or("no window")?;
-    w.set_badge_count(value).map_err(|e| e.to_string())
+    crate::background::apply(&app);
 }
 
 /// An outside link (Open in Jira, an invite's join link): the default browser opens it.

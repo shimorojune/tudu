@@ -14,6 +14,10 @@ const COMMANDS: &[&str] = &[
     "quit",
     "update_check",
     "update_install",
+    "this_mac",
+    "set_open_at_login",
+    "open_login_items",
+    "set_dock",
 ];
 const TEST_COMMANDS: &[&str] = &[
     "app_info",
@@ -28,6 +32,10 @@ const TEST_COMMANDS: &[&str] = &[
     "quit",
     "update_check",
     "update_install",
+    "this_mac",
+    "set_open_at_login",
+    "open_login_items",
+    "set_dock",
     "control_reply",
 ];
 

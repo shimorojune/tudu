@@ -2,6 +2,7 @@
 //! summon, and an updater fed from the app's own track. Tudu Test (the `control` feature) adds a loopback control
 //! channel so the desktop layer is tested for real; Tudu and Tudu Staging are built without it.
 
+mod background;
 mod bridge;
 #[cfg(feature = "control")]
 mod control;
@@ -39,6 +40,10 @@ macro_rules! handlers {
             bridge::quit,
             updates::update_check,
             updates::update_install,
+            background::this_mac,
+            background::set_open_at_login,
+            background::open_login_items,
+            background::set_dock,
             $($extra),*
         ]
     };
@@ -75,8 +80,13 @@ pub fn run() {
                 seen: Default::default(),
             });
 
-            windows::create(app.handle())?;
+            let background = background::start(app.handle());
+            let at_login = background.at_login;
+            app.manage(background);
+
+            windows::create(app.handle(), at_login)?;
             tray(app.handle(), track)?;
+            background::apply(app.handle());
             if let Err(e) = app.global_shortcut().register(SUMMON) {
                 eprintln!("tudu: the summon {SUMMON} could not be registered: {e}");
             }
@@ -88,7 +98,8 @@ pub fn run() {
         .expect("Tudu could not start");
 
     app.run(|app, event| {
-        // The dock icon, clicked while no window shows: the desk comes back.
+        // The Dock icon clicked, or Tudu opened again from Finder or Spotlight while it runs in the menu bar: the
+        // desk comes back.
         if let RunEvent::Reopen { .. } = event {
             windows::show_main(app, None);
         }

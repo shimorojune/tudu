@@ -2,7 +2,7 @@
 //! (`menubar`).
 //!
 //! The desk has no title bar: the traffic lights sit over the sidebar and the top bar drags the window. Closing it
-//! hides it. The floating window and the menu bar's sheet are non-activating panels: they take the keyboard without
+//! hides it and Tudu carries on in the menu bar (chunk 16). The floating window and the menu bar's sheet are non-activating panels: they take the keyboard without
 //! bringing Tudu (and its desk) forward, float over every app and space, and hide when they lose focus.
 
 use std::sync::Mutex;
@@ -16,7 +16,7 @@ use tauri::{
 use crate::place::{
     self, Icon, Screen, FLOATING_HEIGHT, FLOATING_WIDTH, SHEET_HEIGHT, SHEET_WIDTH,
 };
-use crate::App;
+use crate::{background, App};
 
 pub const MAIN: &str = "main";
 pub const FLOATING: &str = "floating";
@@ -92,7 +92,8 @@ fn builder<'a>(
     b
 }
 
-pub fn create(app: &AppHandle) -> tauri::Result<()> {
+/// The windows, made once at launch. Started by the login item, the desk stays hidden: Tudu is in the menu bar only.
+pub fn create(app: &AppHandle, at_login: bool) -> tauri::Result<()> {
     let track = app.state::<App>().track;
     let main = builder(app, MAIN, "index.html", "/")
         .title(track.name())
@@ -101,13 +102,18 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .center()
         .title_bar_style(tauri::TitleBarStyle::Overlay)
         .hidden_title(true)
+        .visible(!at_login)
         .build()?;
+    background::keep_awake(&main);
     let m = main.clone();
+    let a = app.clone();
     main.on_window_event(move |e| {
         if let WindowEvent::CloseRequested { api, .. } = e {
-            // Closing the desk hides it: Tudu stays in the dock and the menu bar. ⌘Q quits.
+            // Closing the desk hides it: Tudu carries on in the menu bar, and leaves the Dock unless you keep it
+            // there. ⌘Q quits.
             api.prevent_close();
             let _ = m.hide();
+            background::desk(&a, false);
         }
     });
 
@@ -124,6 +130,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .focused(false)
         .visible(false)
         .build()?;
+    background::keep_awake(&floating);
     #[cfg(target_os = "macos")]
     panel::make_panel(&floating);
     let f = floating.clone();
@@ -153,6 +160,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .focused(false)
         .visible(false)
         .build()?;
+    background::keep_awake(&sheet);
     #[cfg(target_os = "macos")]
     panel::make_panel(&sheet);
     let a = app.clone();
@@ -181,9 +189,11 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
 
 /// The desk, shown and focused; `go` takes it to a page first (Sign in from the floating window, a task from the
 /// menu bar's sheet, which hides as the desk comes forward).
+/// From the menu bar it is a regular app again first, so the Dock icon, ⌘Tab and the app menu come back with it.
 pub fn show_main(app: &AppHandle, go: Option<&str>) {
     hide_menubar(app);
     if let Some(w) = app.get_webview_window(MAIN) {
+        background::bring_forward(app);
         let _ = w.unminimize();
         let _ = w.show();
         let _ = w.set_focus();

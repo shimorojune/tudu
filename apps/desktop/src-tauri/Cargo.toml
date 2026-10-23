@@ -33,7 +33,9 @@ time = { version = "0.3", features = ["formatting"] }
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSDockTile", "NSPanel", "NSWindow", "NSResponder", "NSScreen", "NSEvent", "NSGraphics"] }
-objc2-foundation = { version = "0.3", features = ["NSString", "NSGeometry"] }
+objc2-foundation = { version = "0.3", features = ["NSString", "NSGeometry", "NSProcessInfo", "NSAppleEventManager", "NSAppleEventDescriptor", "NSError"] }
+objc2-service-management = { version = "0.3", default-features = false, features = ["std", "SMAppService", "objc2", "objc2-foundation"] }
+objc2-web-kit = { version = "0.3", features = ["WKWebView", "WKWebViewConfiguration", "WKPreferences"] }
 
 [profile.release]
 codegen-units = 1

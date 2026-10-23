@@ -3,7 +3,9 @@
 //! A small HTTP server on 127.0.0.1:$TUDU_TEST_PORT that the desktop tests drive:
 //! - `GET /state`: the app's state: track and version, each window (visibility, focus, place, size, always on top,
 //!   its page), the tray's tooltip (it has no menu: a click opens the menu bar's sheet), the summon and whether it is registered, the dock badge as the Dock
-//!   shows it, the updater's last check, download and error, and every outside link or file the app was handed.
+//!   shows it, the updater's last check, download and error, every outside link or file the app was handed, and the
+//!   background (chunk 16): the activation policy, the Dock choice, the count beside the tick, the login item, the
+//!   App Nap opt-out and each webview's inactive scheduling policy.
 //! - `POST /act {"do": …}`: what a person does outside the page: `summon`, `tray` (a click on the tick, with
 //!   `button`: left or right), `reopen` (the dock icon), `close` (with `window`), `check-update`, `quit`.
 //! - `POST /eval {"window", "script"}`: runs the script (an async function body) in that window's WKWebView and
@@ -11,7 +13,8 @@
 //!
 //! The rest of the test set-up comes from the environment the harness launches the app with: TUDU_TEST_DATA (this
 //! run's folder: the webview's own data store is derived from it, so every folder starts clean), TUDU_TEST_WEB
-//! (the local web app the windows open) and TUDU_TEST_API (the API, for the update feed). The updater's public key
+//! (the local web app the windows open), TUDU_TEST_API (the API, for the update feed) and TUDU_TEST_AT_LOGIN=1 (a
+//! launch as the login item would make it). The updater's public key
 //! is a build input (the run's throwaway key).
 
 use std::collections::HashMap;
@@ -27,7 +30,7 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Manager, State, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
-use crate::{updates, windows, App, SUMMON};
+use crate::{background, updates, windows, App, SUMMON};
 
 #[derive(Default)]
 pub struct Control {
@@ -39,7 +42,7 @@ fn env(name: &str) -> Option<String> {
     std::env::var(name).ok().filter(|v| !v.is_empty())
 }
 
-fn data_dir() -> Option<PathBuf> {
+pub fn data_dir() -> Option<PathBuf> {
     env("TUDU_TEST_DATA").map(PathBuf::from)
 }
 
@@ -241,6 +244,25 @@ fn state(app: &AppHandle) -> Value {
         })) })
     });
     let registered = app.global_shortcut().is_registered(SUMMON);
+    let bg = app.state::<background::Background>();
+    let webview = |label: &str| {
+        app.get_webview_window(label)
+            .and_then(|w| background::webview_policy(&w))
+    };
+    let background = json!({
+        "policy": background::current_policy(app),
+        "dock": bg.dock.lock().map(|d| *d).unwrap_or_default(),
+        "deskOpen": bg.desk_open.load(Ordering::SeqCst),
+        "atLogin": bg.at_login,
+        "awake": bg.awake.load(Ordering::SeqCst),
+        "trayTitle": bg.tray_title.lock().ok().and_then(|t| t.clone()),
+        "loginItem": background::login(),
+        "webviews": {
+            "main": webview(windows::MAIN),
+            "floating": webview(windows::FLOATING),
+            "menubar": webview(windows::MENUBAR),
+        },
+    });
     json!({
         "track": track,
         "name": track.name(),
@@ -255,6 +277,7 @@ fn state(app: &AppHandle) -> Value {
         "tray": tray,
         "shortcut": { "accelerator": SUMMON, "registered": registered },
         "badge": dock_badge(app),
+        "background": background,
         "updater": updater,
         "seen": seen,
     })
