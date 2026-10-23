@@ -61,11 +61,11 @@ thread); notifications themselves (chunk 14).
    (the tray's title, the number in the menu bar's own font) keeps it. That is a look nobody has drawn, so I would
    leave the drawing to the menu bar thread, which is designing that item anyway, and ship this with the count
    shown in the tray only while the Dock icon is hidden. The alternative is no count while closed.
-3. **Open at login has three handles on one setting.** A switch in a new Settings section, You › This Mac ("How
-   Tudu runs on this Mac.", Mac app only), the checked "Open at Login" in the menu bar's right-click menu, and the
-   same item under the popover's ⋯. States: off (the default), on, macOS waiting for your OK (with Open Login
-   Items) and macOS refused. Drawn on the canvas, page 13, boards K-Login and K-Login-Dark (23 Oct 2026), awaiting
-   your approval. Chunk 14's Notifications section, when it lands, points to This Mac instead of a second switch.
+3. **Open at login lives in Settings only.** A switch in a new Settings section, You › This Mac ("How Tudu runs
+   on this Mac.", Mac app only), next to Show Tudu in the Dock. No entry in the menu bar's menus (your call, 23 Oct
+   2026). States: off (the default), on, macOS waiting for your OK (with Open Login Items) and macOS refused. Drawn
+   on the canvas, page 13, K-Login and K-Login-Dark, owned by the design thread; awaiting your approval. Chunk 14's
+   Notifications section, when it lands, points to This Mac instead of a second switch.
 4. **⌘Q quits.** The macOS convention, and the only way to really stop it besides the tray. The alternative makes ⌘Q
    hide too (as some chat apps do), which leaves no keyboard way to quit and surprises people.
 
