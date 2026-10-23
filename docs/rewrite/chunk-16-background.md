@@ -1,6 +1,10 @@
 # Chunk 16 · Tudu in the background
 
-Status: proposed 23 Oct 2026. Choice 1 approved 23 Oct 2026 (Dock icon only while the window is open); the Open at login design awaits approval. Branch `claude/project-thread-3ozkfl`.
+Status: designed, not built (23 Oct 2026). Approved: the Dock icon only while the window is open (choice 1), Show
+Tudu in the Dock with two options, Open at login in Settings only with no menu bar entry (choice 3). Drawn on the
+canvas, page 13, boards K-Login and K-Login-Dark (Settings › You › This Mac) and K-MenuBar (the count beside the
+tick). Branch `claude/project-thread-3ozkfl` once building starts. Depends on chunk 11; chunk 20 (the today sheet,
+on master) already assumes it.
 
 The ask: close Tudu completely and have it keep running, without a Dock icon sitting there all day.
 
@@ -9,8 +13,8 @@ The ask: close Tudu completely and have it keep running, without a Dock icon sit
 Most of the plumbing is already there. Closing the window (the red light, ⌘W) only hides it; the process keeps
 running, and with it everything that lives in the main window's page: the outbox, the live stream (SSE), the update
 check every four hours, the dock badge. The floating Quick Add and ⌘⇧N are registered in Rust and work with the
-window hidden. The tray (the ink tick) offers Open Tudu, New task ⌘⇧N and Quit Tudu. ⌘Q and the tray's Quit end the
-process.
+window hidden. The ink tick in the menu bar opens the today sheet (chunk 20, on master): Open Tudu, New task, and a
+⋯ with Send feedback… and Quit Tudu. ⌘Q and the sheet's Quit end the process.
 
 What is missing:
 
@@ -49,7 +53,7 @@ What is missing:
 - **Data.** None. No migration, no API change. The login item lives with macOS, not on the server.
 
 Out of scope: push while Tudu is quit (later.md); a Windows or Linux build; the menu bar's content (the menu bar
-thread); notifications themselves (chunk 14).
+thread, now chunk 20); notifications themselves (chunk 14).
 
 ## Choices
 
@@ -61,13 +65,13 @@ thread); notifications themselves (chunk 14).
    Always (today's behaviour, badge included). No Never option (your call, 23 Oct 2026). Drawn on K-Login.
 2. **The Inbox count moves to the menu bar while the Dock icon is gone.** Today the count is the Dock badge (chunk
    11, choice 3); with no Dock icon it would vanish exactly when you are not looking. The count beside the tick
-   (the tray's title, the number in the menu bar's own font) keeps it. That is a look nobody has drawn, so I would
-   leave the drawing to the menu bar thread, which is designing that item anyway, and ship this with the count
-   shown in the tray only while the Dock icon is hidden. The alternative is no count while closed.
+   (the tray's title, in the menu bar's own font) keeps it, and only while the Dock icon is hidden; with Show Tudu
+   in the Dock on Always the badge stays and the tick has no count. Drawn on K-MenuBar; chunk 20 left building it
+   to this chunk.
 3. **Open at login lives in Settings only.** A switch in a new Settings section, You › This Mac ("How Tudu runs
    on this Mac.", Mac app only), next to Show Tudu in the Dock. No entry in the menu bar's menus (your call, 23 Oct
    2026). States: off (the default), on, macOS waiting for your OK (with Open Login Items) and macOS refused. Drawn
-   on the canvas, page 13, K-Login and K-Login-Dark, owned by the design thread; awaiting your approval. Chunk 14's
+   on the canvas, page 13, K-Login and K-Login-Dark. Chunk 14's
    Notifications section, when it lands, points to This Mac instead of a second switch.
 4. **⌘Q quits.** The macOS convention, and the only way to really stop it besides the today sheet's Quit Tudu. The alternative makes ⌘Q
    hide too (as some chat apps do), which leaves no keyboard way to quit and surprises people.
@@ -88,6 +92,8 @@ thread); notifications themselves (chunk 14).
 - Chunk 11: "Closing the window hides it; Tudu stays in the dock and the menu bar" becomes "Tudu stays in the menu
   bar". The dock badge shows while the Dock icon does. C11-D02 is rewritten (below).
 - Chunk 14: "The window closed" and choice 7 point here; Settings' switch drives the same login item.
+- Chunk 20: nothing changes in the sheet; C20-D02 (tick a task with the window hidden) starts passing for real once
+  the window can hide without a Dock icon.
 - design-deviations.md: the Desktop register lines and a Chunk 16 history block, in the same PR.
 
 ## Test plan
