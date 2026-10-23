@@ -1,7 +1,7 @@
 # Chunk 19 · Send feedback
 
-Status: proposed 23 Oct 2026. Awaiting your approval, and your answer to choice 1 (where reports go). Branch
-`rewrite/19-feedback` once approved.
+Status: approved 23 Oct 2026 (choice 1: a table plus an email to `FEEDBACK_TO`) and built on
+`claude/project-thread-fsltm1` (one branch for chunks 17 to 20).
 
 Boards: 13 Next, K-Feedback ("Send feedback") and K-Proto's feedback dialog, which picks, pastes and drops a real
 screenshot. One small form for both a bug and an idea, two clicks from anywhere.
@@ -33,7 +33,7 @@ screenshot. One small form for both a bug and an idea, two clicks from anywhere.
 - **App details.** These are the version and track (Tudu, Tudu Staging, web), the OS and browser, the page, the
   space's kind (personal or team, never its name), the window size, and the theme. Never task titles, notes, people
   or space names.
-- **Data.** Migration (the next free number) adds `feedback`: id, user id, kind (`bug` or `idea`), text (up to 5000
+- **Data.** Migration 0011 adds `feedback`: id, user id, kind (`bug` or `idea`), text (up to 5000
   characters), details (jsonb or null), screenshot file key (or null), created at, and the client's report id
   (unique, so a retry is one report). One new request: `POST /api/feedback`, multipart (the JSON and the image),
   idempotent by the report id. It is limited to 10 per person per hour. The image goes to object storage under

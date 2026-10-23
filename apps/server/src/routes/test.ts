@@ -8,7 +8,16 @@ export function testRoutes(outbox: OutboxMailer, db: Db, embeddings: Embeddings)
   const r = new Hono();
   r.get('/outbox', (c) => {
     const to = c.req.query('to');
-    return c.json({ mails: to ? outbox.to(to) : outbox.sent });
+    // Attachments go out as their name, type and size: the bytes stay here.
+    const mails = (to ? outbox.to(to) : outbox.sent).map((m) => ({
+      ...m,
+      attachments: m.attachments?.map((a) => ({
+        filename: a.filename,
+        type: a.type,
+        size: a.content.byteLength,
+      })),
+    }));
+    return c.json({ mails });
   });
   r.get('/outbox/code', (c) => {
     const to = c.req.query('to') ?? '';

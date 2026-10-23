@@ -9,6 +9,7 @@ import type { EventHub } from './events';
 import { OutboxMailer, type Mailer } from './email';
 import { sessionMiddleware, type SessionVars } from './middleware/session';
 import { eventRoutes } from './routes/events';
+import { feedbackRoutes } from './routes/feedback';
 import { fileRoutes } from './routes/files';
 import { meRoutes } from './routes/me';
 import { inboxRoutes } from './routes/inbox';
@@ -121,6 +122,7 @@ export function createApp(deps: AppDeps) {
   app.route('/api', spaceRoutes(db, hub, mailer, env.WEB_URL!, storage));
   app.route('/api', inboxRoutes(db));
   app.route('/api', fileRoutes(db, storage));
+  app.route('/api', feedbackRoutes(db, storage, mailer, env.FEEDBACK_TO));
   app.route(
     '/api',
     jiraRoutes(db, hub, {

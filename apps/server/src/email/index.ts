@@ -1,8 +1,17 @@
+export interface MailAttachment {
+  filename: string;
+  content: Uint8Array;
+  type?: string;
+}
+
 export interface Mail {
   to: string;
   subject: string;
   text: string;
   html?: string;
+  /** Where a reply goes: the person who sent a report, so answering them is just replying. */
+  replyTo?: string;
+  attachments?: MailAttachment[];
 }
 
 export interface Mailer {
@@ -12,7 +21,10 @@ export interface Mailer {
 /** Keeps every mail in memory. Tests read it through /__test/outbox. */
 export class OutboxMailer implements Mailer {
   readonly sent: Array<Mail & { at: string }> = [];
+  /** Tests: every send fails while this is on, as Resend would when it is down. */
+  failing = false;
   async send(mail: Mail): Promise<void> {
+    if (this.failing) throw new Error('The outbox is failing on purpose.');
     this.sent.push({ ...mail, at: new Date().toISOString() });
   }
   /** The mails sent to one address, newest last. */

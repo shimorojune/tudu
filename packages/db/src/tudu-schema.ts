@@ -454,3 +454,27 @@ export const appliedMutations = pgTable('applied_mutations', {
     .references(() => user.id, { onDelete: 'cascade' }),
   appliedAt: timestamp('applied_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Send feedback (chunk 19): a bug or an idea, its words, the app details when the person left them on, and the
+ * screenshot's object key (under `feedback/`, outside any space). `report_id` is the client's, so a retry is one row.
+ */
+export const feedback = pgTable(
+  'feedback',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    reportId: text('report_id').notNull(),
+    kind: text('kind', { enum: ['bug', 'idea'] }).notNull(),
+    text: text('text').notNull(),
+    details: jsonb('details').$type<Record<string, unknown>>(),
+    screenshotKey: text('screenshot_key'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('feedback_report').on(t.userId, t.reportId),
+    index('feedback_user_created').on(t.userId, t.createdAt),
+  ],
+);

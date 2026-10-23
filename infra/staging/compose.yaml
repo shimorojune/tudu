@@ -16,6 +16,8 @@ services:
       EMAIL_TRANSPORT: resend
       RESEND_API_KEY: ${RESEND_API_KEY}
       EMAIL_FROM: Tudu <sign-in@mail.tudu.ezdev.net>
+      # Send feedback mails each report here (set in Dokploy's environment); empty saves reports without mail.
+      FEEDBACK_TO: ${FEEDBACK_TO:-}
       STORAGE_DRIVER: s3
       S3_ENDPOINT: http://tudu-staging-minio:9000
       S3_BUCKET: tudu-staging

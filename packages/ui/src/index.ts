@@ -312,3 +312,4 @@ export {
   type GettingStartedProps,
   type GettingStartedItem,
 } from './components/GettingStarted';
+export { FeedbackDialog, type FeedbackDialogProps, type FeedbackPhase } from './components/FeedbackDialog';

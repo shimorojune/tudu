@@ -26,6 +26,7 @@ import {
   useSearchOpen,
   useShownDay,
 } from './dayView';
+import { FeedbackHost, openFeedback } from './feedback';
 import { GettingStartedHost } from './firstRun';
 import { SearchHost } from './SearchHost';
 import { AppsHost, JiraHost } from './JiraHost';
@@ -200,6 +201,7 @@ export function AppShell({
     theme: choice,
     onTheme: setTheme,
     onSettings: () => void navigate({ href: settingsHref(loc, space.slug, 'account', vp === 'phone') }),
+    onFeedback: openFeedback,
     onSignOut: () => void signOut().then(() => navigate({ to: '/sign-in', replace: true })),
   };
   const switcher = (variant: 'menu' | 'sheet', rail = false) => (
@@ -231,6 +233,7 @@ export function AppShell({
       <JiraHost space={space} />
       <AppsHost space={space} />
       <GettingStartedHost me={me} space={space} vp={vp} />
+      <FeedbackHost space={space} vp={vp} />
     </>
   );
 

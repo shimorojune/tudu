@@ -16,3 +16,4 @@ export * from './inbox';
 export * from './jira';
 export * from './versions';
 export * from './firstRun';
+export * from './feedback';

@@ -53,7 +53,7 @@ Tudu.
   menu bar."), kept by macOS as a login item. Not drawn (choice 7).
 - **Phones.** No push (decided 20 Oct), so a phone is told only while Tudu is open in the browser and the tab is
   hidden; the Settings line says so.
-- **Data.** Migration 0011 adds `user.notify` (jsonb: `sent`, `answered`, `comments`, `jira`, `version`, each
+- **Data.** Migration 0012 (0011 went to chunk 19's feedback) adds `user.notify` (jsonb: `sent`, `answered`, `comments`, `jira`, `version`, each
   true or false, missing means the default). `GET /api/me` gains `notify`; one new request,
   `POST /api/me/notify` with the switches, idempotent. One new read, `GET /api/spaces/:id/jira/assigned?since=`,
   for issues assigned to you created since a time, through chunk 10's proxy. The Inbox read gains the sender's
@@ -123,7 +123,7 @@ API (`apps/server`):
 | C14-A01 | `GET /api/me` carries `notify` with the defaults; `POST /api/me/notify` saves and is idempotent; a bad body is 400; one person's switches never show on another's      |
 | C14-A02 | Inbox items carry the sender's name and the task's title; a deleted task's item still reads                                                                            |
 | C14-A03 | `jira/assigned?since=` returns issues assigned to you created since then, without keys already in Tudu, through the fake Jira; no connection is 409; a stranger is 403 |
-| C14-A04 | Migration 0011 applies on a database at 0010 and `notify` starts null for everyone                                                                                     |
+| C14-A04 | Migration 0012 applies on a database at 0011 and `notify` starts null for everyone                                                                                     |
 
 End-to-end, group `notifications` (desktop unless said; a fake `Notification` installed before the page loads
 records every banner and its click; looking is faked through the page's visibility and focus; the fake desktop

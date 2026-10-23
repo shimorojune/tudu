@@ -15,6 +15,8 @@ const schema = z.object({
   EMAIL_TRANSPORT: z.enum(['resend', 'outbox']).default('outbox'),
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default('Tudu <sign-in@mail.tudu.ezdev.net>'),
+  /** Where Send feedback mails each report (chunk 19). Left out, reports are saved but not mailed. */
+  FEEDBACK_TO: z.preprocess((v) => (v === '' ? undefined : v), z.string().email().optional()),
   /** `1` exposes /__test/* (the outbox) for end-to-end tests. Never on in production. */
   TEST_ROUTES: z.string().optional(),
   /** `1` serves the fake Jira at /demo-jira, so staging can be reviewed without a real Jira. Fixed data only. */

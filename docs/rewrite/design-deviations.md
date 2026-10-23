@@ -110,8 +110,6 @@ Each line is true of the app on master. A line leaves the register once the canv
 Page 13 draws four pieces the app does not have yet. These lines are the other way round from the rest: the canvas
 is ahead, and each leaves when its chunk ships (or is redrawn to what shipped).
 
-- Send feedback: the avatar menu, More and the menu bar's ⋯; Something’s wrong | An idea, one screenshot, app
-  details; the screenshot shows as a preview, not a file chip. Where reports go is not decided.
 - The menu bar: a click (left or right) opens today across your spaces with the real checkbox, New task, Open Tudu
   (a quiet button) and ⋯ (Send feedback…, Quit Tudu). The tray's native menu goes, Rohit's call. Signed out, the
   sheet says "Sign in to see your day." with Open Tudu and keeps ⋯ for Quit. The Inbox count beside the tick while
@@ -501,3 +499,16 @@ The canvas and the design system now follow the app; these lines left the regist
 - Delete's toast says what happened to the tasks: "Home deleted. Its 2 tasks keep no project.", with Undo.
 - The editor's preview says "No open tasks" as well as the byline for an existing project, as the board does; a new
   project's preview has only the byline.
+
+## Chunk 19 · Send feedback · 23 Oct 2026
+
+- Built as K-Feedback and K-Proto draw it: Send feedback in the avatar menu between Settings and Sign out, and a
+  row at the foot of More on phones (a sheet there). The menu bar's ⋯ way in comes with chunk 20.
+- The details line reads from the real build: "Tudu 0.38.0 on the web, macOS, the Today page. Never your tasks."
+  on the web, "Tudu Staging 0.38.0, macOS, …" in the Mac app. Browsers freeze macOS's version, so the line says
+  "macOS" without one (the board's "macOS 15.1" is the app's own reading, not the browser's).
+- A file that is not an image, or is over 10 MB, attaches nothing and the hint beside Add a screenshot says why
+  ("That’s not an image. Add a screenshot or a photo." or "That image is over 10 MB. Try a smaller one."), in the
+  warning tone. The board has no such state.
+- Reports go to the `feedback` table and are mailed to `FEEDBACK_TO` with the screenshot attached and the sender as
+  reply-to (Rohit's call, 23 Oct 2026).

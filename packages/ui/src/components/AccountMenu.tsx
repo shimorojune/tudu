@@ -22,6 +22,8 @@ export interface AccountMenuProps {
   theme?: ThemeChoice;
   onTheme?: (choice: ThemeChoice) => void;
   onSettings?: () => void;
+  /** Send feedback, between Settings and Sign out. Without it the line stays out. */
+  onFeedback?: () => void;
   onSignOut?: () => void;
   /** For static boards: start open. */
   defaultOpen?: boolean;
@@ -36,7 +38,7 @@ const THEMES: SegmentedItem<ThemeChoice>[] = [
 
 /**
  * You, from the avatar at the end of the top bar: your mark, name and email, the theme as a small
- * Light | Dark | System switch, Settings and Sign out. Radix floats the pop and handles Escape, a click outside
+ * Light | Dark | System switch, Settings, Send feedback and Sign out. Radix floats the pop and handles Escape, a click outside
  * and focus; it eases in and out like every pop (tp-acct-pop, see app.css).
  */
 export function AccountMenu({
@@ -44,6 +46,7 @@ export function AccountMenu({
   theme,
   onTheme,
   onSettings,
+  onFeedback,
   onSignOut,
   defaultOpen,
   className,
@@ -106,6 +109,17 @@ export function AccountMenu({
                 <Icon name="settings" size={15} />
                 Settings
               </button>
+              {onFeedback ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="tp-mi tp-acct-mi"
+                  onClick={() => closeThen(onFeedback)}
+                >
+                  <Icon name="comment" size={15} />
+                  Send feedback
+                </button>
+              ) : null}
               <button
                 type="button"
                 role="menuitem"
