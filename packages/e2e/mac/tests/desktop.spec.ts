@@ -127,6 +127,7 @@ test.describe('desktop', () => {
     await app.waitState((s) => !s.windows.main.visible);
     expect(alive(pid)).toBe(true);
     await openSheet(app);
+    await app.until(`return T.all('button', 'Open Tudu Test').length > 0`, 'menubar');
     await app.eval(`T.click(T.get('button', 'Open Tudu Test'))`, 'menubar');
     await app.waitState(
       (s) => s.windows.main.visible && s.windows.main.focused && !s.windows.menubar.visible,
@@ -553,9 +554,7 @@ test.describe('desktop', () => {
       (x) => x.windows.main.visible && x.windows.main.focused && !x.windows.menubar.visible,
     );
     await app.until(`return location.search.includes('task=')`);
-    await app.until(
-      `return T.all('heading', 'Renew the passport').length > 0 || !!document.querySelector('.tp-panel')`,
-    );
+    await app.until(`return !!document.querySelector('[role=dialog][aria-label="Task details"]')`);
   });
 
   test('C20-D04 clicking another app hides the sheet; so does Esc', async ({ app }) => {
@@ -563,6 +562,8 @@ test.describe('desktop', () => {
     await openSheet(app);
     clickAnotherApp();
     await sheetHidden(app);
+    // Past the grace that keeps the blurring click on the tick from reopening it.
+    await new Promise((r) => setTimeout(r, 400));
     await openSheet(app);
     await app.eval(`T.press('Escape')`, 'menubar');
     await sheetHidden(app);
@@ -574,7 +575,11 @@ test.describe('desktop', () => {
     await app.until(`return T.all('heading', 'Sign in to see your day.').length > 0`, 'menubar');
     await app.eval(`T.click(T.get('button', 'More'))`, 'menubar');
     expect(await app.until<number>(`return T.all('[role=menuitem]').length`, 'menubar')).toBe(1);
+    // Esc closes ⋯, then the sheet.
     await app.eval(`T.press('Escape')`, 'menubar');
+    await app.until(`return T.all('[role=menuitem]').length === 0`, 'menubar');
+    await app.eval(`T.press('Escape')`, 'menubar');
+    await sheetHidden(app);
     await signIn(app);
     const pid = (await app.state()).pid;
     await quitFromSheet(app);

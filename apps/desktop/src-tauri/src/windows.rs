@@ -157,11 +157,18 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     panel::make_panel(&sheet);
     let a = app.clone();
     sheet.on_window_event(move |e| match e {
+        // Hiding the sheet also takes its focus; only a blur while it shows counts.
         WindowEvent::Focused(false) => {
-            if let Ok(mut t) = SHEET_BLURRED.lock() {
-                *t = Some(Instant::now());
+            let shown = a
+                .get_webview_window(MENUBAR)
+                .and_then(|w| w.is_visible().ok())
+                .unwrap_or(false);
+            if shown {
+                if let Ok(mut t) = SHEET_BLURRED.lock() {
+                    *t = Some(Instant::now());
+                }
+                hide_menubar(&a);
             }
-            hide_menubar(&a);
         }
         WindowEvent::CloseRequested { api, .. } => {
             api.prevent_close();
