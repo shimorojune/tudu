@@ -46,10 +46,18 @@ async function openSheet(app: App): Promise<void> {
   await app.until(`return !!document.querySelector('.tp-mb')`, 'menubar');
 }
 
-/** ⋯ › Quit Tudu Test, in the sheet. */
+/** The sheet on your day (signed in, its days read), not the signed-out face it starts with. */
+const sheetDay = (app: App) =>
+  app.until(`return !!document.querySelector('[role=dialog][aria-label="Today"]')`, 'menubar');
+
+/** ⋯ › Quit Tudu Test, in the sheet, signed in. */
 async function quitFromSheet(app: App): Promise<void> {
   await openSheet(app);
-  await app.eval(`T.click(T.get('button', 'More'))`, 'menubar');
+  await sheetDay(app);
+  await app.eval(
+    `if (!T.all('button', /^Quit Tudu Test/).length) T.click(T.get('button', 'More'))`,
+    'menubar',
+  );
   await app.until(`return T.all('button', /^Quit Tudu Test/).length > 0`, 'menubar');
   await app.eval(`T.click(T.get('button', /^Quit Tudu Test/))`, 'menubar');
 }
@@ -127,7 +135,7 @@ test.describe('desktop', () => {
     await app.waitState((s) => !s.windows.main.visible);
     expect(alive(pid)).toBe(true);
     await openSheet(app);
-    await app.until(`return T.all('button', 'Open Tudu Test').length > 0`, 'menubar');
+    await sheetDay(app);
     await app.eval(`T.click(T.get('button', 'Open Tudu Test'))`, 'menubar');
     await app.waitState(
       (s) => s.windows.main.visible && s.windows.main.focused && !s.windows.menubar.visible,
@@ -575,10 +583,8 @@ test.describe('desktop', () => {
     await app.until(`return T.all('heading', 'Sign in to see your day.').length > 0`, 'menubar');
     await app.eval(`T.click(T.get('button', 'More'))`, 'menubar');
     expect(await app.until<number>(`return T.all('[role=menuitem]').length`, 'menubar')).toBe(1);
-    // Esc closes ⋯, then the sheet.
-    await app.eval(`T.press('Escape')`, 'menubar');
-    await app.until(`return T.all('[role=menuitem]').length === 0`, 'menubar');
-    await app.eval(`T.press('Escape')`, 'menubar');
+    // The tick puts the sheet away before signing in on the desk.
+    await app.act('tray');
     await sheetHidden(app);
     await signIn(app);
     const pid = (await app.state()).pid;
