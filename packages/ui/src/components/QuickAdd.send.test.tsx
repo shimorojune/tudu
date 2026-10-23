@@ -121,3 +121,50 @@ describe('Quick Add: the top line', () => {
     expect(within(bar).getByRole('button', { name: /^Planned for:/ })).toBeInTheDocument();
   });
 });
+
+describe('Quick Add: always says where (chunk 17)', () => {
+  it('C17-U01 Personal alone reads "In Personal for Me" with plain chips: no buttons, no menus, Tab goes to the title', async () => {
+    const user = userEvent.setup();
+    const send = sendProps({ spaces: [SPACES[0]!], spaceId: 'me', people: [], canSend: false });
+    render(<Bar send={send} />);
+    const bar = screen.getByRole('dialog', { name: 'Quick Add' });
+    const line = bar.querySelector('.tp-qa-toline')!;
+    expect(line.textContent).toMatch(/^In.*Personal.*for.*Me/);
+    expect(within(bar).queryByRole('button', { name: /^Space:/ })).toBeNull();
+    expect(within(bar).queryByRole('button', { name: 'Who it’s for' })).toBeNull();
+    expect(line.querySelectorAll('.tp-qa-static-chip')).toHaveLength(2);
+    await user.click(within(line as HTMLElement).getByText('Personal'));
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(send.onSpace).not.toHaveBeenCalled();
+    const title = within(bar).getByRole('textbox', { name: 'Task title' });
+    (document.activeElement as HTMLElement | null)?.blur();
+    await user.tab();
+    expect(document.activeElement).toBe(title);
+  });
+
+  it('C17-U02 two spaces: the space chip opens the list and the person chip the people; picking Meera changes the placeholder', async () => {
+    const user = userEvent.setup();
+    const send = sendProps();
+    const { rerender } = render(<Bar send={send} />);
+    const bar = screen.getByRole('dialog', { name: 'New task' });
+    await user.click(within(bar).getByRole('button', { name: 'Space: Northwind' }));
+    expect(screen.getByRole('menu', { name: 'Which space' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    rerender(<Bar send={sendProps({ to: MEERA })} />);
+    expect(within(bar).getByRole('textbox', { name: 'Task title' })).toHaveAttribute(
+      'placeholder',
+      'What should Meera do?',
+    );
+  });
+
+  it('C17-U03 a team space joining turns the plain chips into buttons without losing the draft', async () => {
+    const user = userEvent.setup();
+    const alone = sendProps({ spaces: [SPACES[0]!], spaceId: 'me', people: [], canSend: false });
+    const { rerender } = render(<Bar send={alone} />);
+    const title = screen.getByRole('textbox', { name: 'Task title' });
+    await user.type(title, 'Renew passport');
+    rerender(<Bar send={sendProps({ spaceId: 'me', canSend: false })} />);
+    expect(screen.getByRole('button', { name: 'Space: Personal' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Task title' })).toHaveValue('Renew passport');
+  });
+});

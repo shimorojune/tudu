@@ -238,6 +238,7 @@ export {
 export { ThemePick, type ThemePickProps } from './components/ThemePick';
 export {
   ProjectSettings,
+  openShort,
   openWords,
   type ProjectSettingsProps,
   type ProjectSettingsProject,
@@ -311,3 +312,11 @@ export {
   type GettingStartedProps,
   type GettingStartedItem,
 } from './components/GettingStarted';
+export { FeedbackDialog, type FeedbackDialogProps, type FeedbackPhase } from './components/FeedbackDialog';
+export {
+  MenuBarSheet,
+  MenuBarRow,
+  type MenuBarSheetProps,
+  type MenuBarRowItem,
+  type MenuBarGroupItem,
+} from './components/MenuBarSheet';

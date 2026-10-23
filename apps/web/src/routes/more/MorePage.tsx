@@ -1,6 +1,7 @@
 import { useNavigate } from '@tanstack/react-router';
 import { inboxCountWords, type SpaceSummary } from '@tudu/core';
 import { Icon, Sheet, SheetBody, type IconName } from '@tudu/ui';
+import { openFeedback } from '../../app/feedback';
 import { useJira } from '../../app/jira';
 import { spacePath, useSpace, type View } from '../../app/space';
 
@@ -76,6 +77,15 @@ export function MorePage() {
                 </span>
               </button>
             ))}
+            <button type="button" className="app-more-item" onClick={openFeedback}>
+              <span className="app-more-icon" aria-hidden="true">
+                <Icon name="comment" size={18} />
+              </span>
+              <span className="app-more-words">
+                <span className="app-more-label">Send feedback</span>
+                <span className="app-more-hint">Something wrong, or an idea</span>
+              </span>
+            </button>
           </nav>
         </SheetBody>
       </Sheet>

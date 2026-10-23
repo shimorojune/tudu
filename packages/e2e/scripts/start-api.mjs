@@ -31,6 +31,8 @@ const api = spawn('node', ['--import', 'tsx', 'src/index.ts'], {
       .join(','),
     EMAIL_TRANSPORT: 'outbox',
     TEST_ROUTES: '1',
+    // Send feedback mails each report here; the tests read it from the outbox.
+    FEEDBACK_TO: 'reports@tudu.test',
     // Attachments: the CI runner has a RustFS bucket; a laptop without Docker keeps them in memory.
     ...(process.env.TUDU_CI_S3_ENDPOINT
       ? {

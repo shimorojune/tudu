@@ -223,7 +223,12 @@ test.describe('backlog', () => {
     await expect(backlogCount(page)).toHaveText('4 tasks');
     await filterChip(page).click();
     const menu = page.getByRole('menu');
-    await expect(menu.getByRole('menuitem')).toHaveText(['All projects4', 'Platform2', 'Home1']);
+    await expect(menu.getByRole('menuitem')).toHaveText([
+      'All projects4',
+      'Platform2',
+      'Home1',
+      'Edit projects…',
+    ]);
     await menu.getByRole('menuitem', { name: 'Platform' }).click();
     await expect(filterChip(page)).toHaveText('Platform');
     await expect(filterChip(page).locator('.tp-dot')).toBeVisible();

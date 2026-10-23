@@ -1,5 +1,5 @@
 //! What the web page asks of the app: who it is, whether someone is signed in, the dock badge, outside links,
-//! saving a file to Downloads, and moving between the two windows.
+//! saving a file to Downloads, and moving between the windows (the desk, the floating bar and the menu bar's sheet).
 
 use std::path::PathBuf;
 
@@ -165,7 +165,8 @@ fn percent_decode(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-/// From the floating window: the desk, on a page (Sign in when nobody is signed in).
+/// From the floating window or the menu bar's sheet: the desk, on a page (Sign in when nobody is signed in, a task
+/// from the sheet, or `feedback` for the Send feedback form).
 #[tauri::command]
 pub fn show_main(app: AppHandle, path: Option<String>) {
     windows::hide_floating(&app);
@@ -175,6 +176,25 @@ pub fn show_main(app: AppHandle, path: Option<String>) {
 #[tauri::command]
 pub fn hide_floating(app: AppHandle) {
     windows::hide_floating(&app);
+}
+
+/// The sheet's New task: the sheet goes and the floating bar comes up, as the summon brings it.
+#[tauri::command]
+pub fn summon(app: AppHandle) {
+    windows::hide_menubar(&app);
+    windows::summon(&app, false);
+}
+
+/// Esc in the sheet, or a click on its clear edge.
+#[tauri::command]
+pub fn hide_menubar(app: AppHandle) {
+    windows::hide_menubar(&app);
+}
+
+/// The sheet's ⋯ › Quit Tudu: there is no other menu to quit from.
+#[tauri::command]
+pub fn quit(app: AppHandle) {
+    app.exit(0);
 }
 
 #[cfg(test)]

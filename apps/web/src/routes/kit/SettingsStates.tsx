@@ -6,6 +6,12 @@ const ME = { name: 'Rohit Raj', email: 'rohit@northwind.io', initials: 'RR' };
 const NW = { name: 'Northwind', color: '#3d5a80', members: 19, role: 'admin' as const };
 const noop = () => {};
 
+const KIT_PROJECTS = [
+  { id: 'p1', name: 'Onboarding', color: '#3d5a80', open: 5 },
+  { id: 'p2', name: 'Platform', color: '#5a7a4e', open: 3 },
+  { id: 'p3', name: 'Offsite', color: '#8a5a00', open: 0 },
+];
+
 /** Settings as a phone shows it, Appearance, the Projects block and Delete's ask, light and dark. */
 export function SettingsStates() {
   const ask = deleteAsk('Northwind', 19);
@@ -39,15 +45,23 @@ export function SettingsStates() {
       />
       <Pair
         title="Projects"
-        note="In Settings › Space: each project's dot opens the swatches, the name saves when you leave it, Delete has Undo."
-        render={() => (
-          <ProjectSettings
-            projects={[
-              { id: 'p1', name: 'Launch', color: '#3d5a80', open: 3 },
-              { id: 'p2', name: 'Hiring', color: '#5a7a4e', open: 0 },
-            ]}
-          />
-        )}
+        note="In Settings › Space: a quiet list (dot, name, how many open, ⋯) and New project. A row opens the editor."
+        render={() => <ProjectSettings projects={KIT_PROJECTS} />}
+      />
+      <Pair
+        title="Projects, editing one"
+        note="The one editor card: name, swatches, how it reads on a task; Delete project, Cancel, Save."
+        render={() => <ProjectSettings projects={KIT_PROJECTS} defaultEditing="p2" />}
+      />
+      <Pair
+        title="Projects, a new one"
+        note="New project opens the same card at the top, the next unused colour picked."
+        render={() => <ProjectSettings projects={KIT_PROJECTS} defaultEditing="new" />}
+      />
+      <Pair
+        title="Projects, none yet"
+        note="The empty state says what a project is for, with New project."
+        render={() => <ProjectSettings projects={[]} />}
       />
       <Pair
         title="Asking first"

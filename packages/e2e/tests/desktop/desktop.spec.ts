@@ -299,4 +299,23 @@ test.describe('desktop', () => {
     await expect(desk).toHaveAttribute('data-theme', 'light');
     await expect(f.locator('html')).not.toHaveClass(/dark/);
   });
+
+  test('C17-E04 the floating page says where: it starts on the desk’s last space, and a task sent to Northwind lands there', async ({
+    page,
+  }) => {
+    test.skip(test.info().project.name !== 'desktop', 'the floating bar is the Mac’s');
+    await inAppWithTeam(page);
+    // The desk was last on Northwind.
+    const f = await floating(page);
+    const line = f.locator('.tp-qa-toline');
+    await expect(line).toHaveText(/^In.*Northwind.*for.*Me$/);
+    await f.getByRole('button', { name: 'Space: Northwind' }).click();
+    await f.getByRole('menuitemradio', { name: /Personal/ }).click();
+    await expect(line).toHaveText(/^In.*Personal.*for/);
+    await f.getByRole('textbox', { name: 'Task title' }).fill('From the floating bar');
+    await f.getByRole('button', { name: 'Add task' }).click();
+    await expect.poll(async () => (await calls(f, 'hideFloating')).length).toBe(1);
+    await switchTo(page, 'Personal');
+    await expect(row(dayList(page), 'From the floating bar')).toBeVisible({ timeout: 10_000 });
+  });
 });

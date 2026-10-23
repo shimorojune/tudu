@@ -386,7 +386,8 @@ test.describe('search', () => {
     await context.setOffline(true);
     await openSearch(page);
     await box(page).fill('passport');
-    const quiet = panel(page).getByRole('status');
+    // The close-matches line can show beside it while offline; this is the search's own.
+    const quiet = panel(page).getByRole('status').filter({ hasText: 'Couldn’t search right now.' });
     await expect(quiet).toHaveText('Couldn’t search right now.Try again');
     await expect(panel(page).locator('.tp-sp-load')).toHaveCount(0);
     await box(page).fill('');

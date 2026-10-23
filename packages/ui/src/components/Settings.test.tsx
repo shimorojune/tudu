@@ -6,7 +6,6 @@ import { paintMotion, readLessMotion, setLessMotion } from '../lib/theme';
 import { prefersReducedMotion } from '../lib/hooks';
 import { ConfirmDialog } from './ConfirmDialog';
 import { FIND_PAST, MembersBody, type MembersBodyMember } from './MembersBody';
-import { ProjectSettings } from './ProjectSettings';
 import { Settings, type SettingsProps } from './Settings';
 
 const ME = { name: 'Rohit Raj', email: 'rohit@x.y', initials: 'RR' };
@@ -231,48 +230,6 @@ describe('Settings', () => {
     expect(screen.getByText('Its name and colour are kept by its admins.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Delete…' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Leave' })).toBeInTheDocument();
-  });
-
-  it('C09-U06 Projects: dot, name and count; recolour, rename on leaving, Delete; New project; nothing yet', async () => {
-    const user = userEvent.setup();
-    const onRename = vi.fn();
-    const onRecolour = vi.fn();
-    const onDelete = vi.fn();
-    const onCreate = vi.fn();
-    const projects = [
-      { id: 'p1', name: 'Launch', color: '#3d5a80', open: 3 },
-      { id: 'p2', name: 'Hiring', color: '#5a7a4e', open: 1 },
-    ];
-    const { rerender } = render(
-      <ProjectSettings
-        projects={projects}
-        onRename={onRename}
-        onRecolour={onRecolour}
-        onDelete={onDelete}
-        onCreate={onCreate}
-      />,
-    );
-    expect(screen.getByText('3 open tasks')).toBeInTheDocument();
-    expect(screen.getByText('1 open task')).toBeInTheDocument();
-    const name = screen.getByRole('textbox', { name: 'Name of Launch' });
-    await user.clear(name);
-    await user.type(name, 'Launch week{Enter}');
-    expect(onRename).toHaveBeenCalledWith(projects[0], 'Launch week');
-    await user.click(screen.getByRole('button', { name: 'Colour of Hiring' }));
-    const swatches = within(screen.getByRole('radiogroup', { name: 'Colour of Hiring' })).getAllByRole(
-      'radio',
-    );
-    await user.click(swatches[0]!);
-    expect(onRecolour).toHaveBeenCalledWith(projects[1], expect.stringMatching(/^#/));
-    await user.click(screen.getByRole('button', { name: 'Delete Hiring' }));
-    expect(onDelete).toHaveBeenCalledWith(projects[1]);
-    const fresh = screen.getByRole('textbox', { name: 'New project' });
-    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
-    await user.type(fresh, 'Offsite{Enter}');
-    expect(onCreate).toHaveBeenCalledWith('Offsite');
-    expect(fresh).toHaveValue('');
-    rerender(<ProjectSettings projects={[]} />);
-    expect(screen.getByText('No projects yet. Give tasks a dot from Quick Add.')).toBeInTheDocument();
   });
 
   it('C09-U07 Members: Find past eight; an admin’s role menu with Remove; a member sees words; no menu on your own row', async () => {

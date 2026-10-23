@@ -1,5 +1,5 @@
-//! Where the floating Quick Add appears: top centre of the screen the pointer is on. Physical pixels throughout,
-//! as the monitors and the pointer report them.
+//! Where the floating Quick Add appears (top centre of the screen the pointer is on), and where the menu bar's sheet
+//! drops (under the tick). Physical pixels throughout, as the monitors, the pointer and the tray report them.
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Screen {
@@ -37,6 +37,37 @@ pub fn floating_origin(screen: Screen) -> (f64, f64) {
     let x = screen.x + ((screen.width - w) / 2.0).round();
     let top = FLOATING_TOP.min(screen.height / screen.scale / 4.0) * screen.scale;
     (x, screen.y + top.round())
+}
+
+/// The tick's place in the menu bar, as its click reports it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Icon {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+/// The sheet's size in points (K-MenuBar): 360 wide, up to 600 tall; it scrolls past that.
+pub const SHEET_WIDTH: f64 = 360.0;
+pub const SHEET_HEIGHT: f64 = 600.0;
+/// Between the menu bar and the sheet, in points.
+pub const SHEET_GAP: f64 = 6.0;
+/// The least room between the sheet and the screen's side, in points.
+pub const SHEET_MARGIN: f64 = 8.0;
+
+/// The sheet's top-left corner: centred under the tick, slid along so it stays on the tick's screen.
+pub fn sheet_origin(icon: Icon, screen: Screen) -> (f64, f64) {
+    let w = SHEET_WIDTH * screen.scale;
+    let m = SHEET_MARGIN * screen.scale;
+    let centred = icon.x + icon.width / 2.0 - w / 2.0;
+    let x = centred
+        .min(screen.x + screen.width - w - m)
+        .max(screen.x + m);
+    (
+        x.round(),
+        (icon.y + icon.height + SHEET_GAP * screen.scale).round(),
+    )
 }
 
 #[cfg(test)]
@@ -84,5 +115,41 @@ mod tests {
             scale: 1.0,
         };
         assert_eq!(floating_origin(small), (320.0, 100.0));
+    }
+
+    /// A tick 44 by 48 physical pixels (22 by 24 points), at `x` on the top edge of a screen.
+    fn tick(x: f64, screen: Screen) -> Icon {
+        Icon {
+            x: screen.x + x,
+            y: screen.y,
+            width: 22.0 * screen.scale,
+            height: 24.0 * screen.scale,
+        }
+    }
+
+    #[test]
+    fn c20_u05_the_sheet_drops_centred_under_the_tick() {
+        let i = tick(2000.0, LEFT);
+        assert_eq!(sheet_origin(i, LEFT), (2000.0 + 22.0 - 360.0, 48.0 + 12.0));
+    }
+
+    #[test]
+    fn c20_u05_near_the_right_edge_the_sheet_slides_left_to_stay_on_screen() {
+        let i = tick(2960.0, LEFT);
+        assert_eq!(sheet_origin(i, LEFT).0, 3024.0 - 720.0 - 16.0);
+        let i = tick(1880.0, RIGHT);
+        let (x, y) = sheet_origin(i, RIGHT);
+        assert_eq!(x, 3024.0 + 1920.0 - 360.0 - 8.0);
+        assert_eq!(y, 24.0 + 6.0);
+    }
+
+    #[test]
+    fn c20_u05_near_the_left_edge_it_slides_right() {
+        let i = tick(10.0, RIGHT);
+        assert_eq!(sheet_origin(i, RIGHT).0, 3024.0 + 8.0);
+        assert_eq!(
+            screen_for(Some((i.x + 11.0, i.y + 12.0)), &[LEFT, RIGHT]),
+            Some(RIGHT)
+        );
     }
 }

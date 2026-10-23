@@ -17,6 +17,12 @@ export class ResendMailer implements Mailer {
       subject: mail.subject,
       text: mail.text,
       html: mail.html,
+      replyTo: mail.replyTo,
+      attachments: mail.attachments?.map((a) => ({
+        filename: a.filename,
+        content: Buffer.from(a.content),
+        contentType: a.type,
+      })),
     });
     if (error) throw new Error(`Resend: ${error.name}: ${error.message}`);
   }

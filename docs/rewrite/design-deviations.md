@@ -40,7 +40,9 @@ Each line is true of the app on master. A line leaves the register once the canv
 - File chips show their upload as a fill and read "failed" when it fails; offline, the attach button says so. Files
   join the task as chips at the end of its notes; there is no Files section.
 - "Looks like a task you have" (or "Looks like tasks you have") lists close matches by meaning.
-- Personal alone gets the plain bar; a team space adds "In Northwind for Me" and Send.
+- Every Quick Add, the floating bar included, opens on "In … for Me". With Personal alone both chips are plain
+  ("In Personal for Me"); a team space makes them open and adds Send. Picking someone makes the placeholder "What
+  should Meera do?".
 
 ### 04 Jira
 
@@ -82,8 +84,7 @@ Each line is true of the app on master. A line leaves the register once the canv
 ### 10 Settings
 
 - Sections: Account, Appearance; then Space, Members (team), Apps. No Notifications row yet (chunk 14).
-- Settings › Space has a Projects block: each project's dot opens the swatches, the name saves on leave, its
-  open-task count, Delete with Undo, New project. Members read "Its name and colour are kept by its admins."
+- Members read "Its name and colour are kept by its admins."
 - Email has Change: the new address, Send code, the code field. Photo has Remove once there is one.
 - The last admin's Leave asks "Make someone admin first" with Go to Members; the last person's Leave says to Delete.
 - Settings is in the address: `?settings=members` on the desk and tablets, `/northwind/settings/members` on phones.
@@ -97,12 +98,24 @@ Each line is true of the app on master. A line leaves the register once the canv
 ### Desktop (macOS app, no page yet)
 
 - No title bar: the traffic lights sit over the sidebar's head and the top bar drags the window.
-- The tray: the ink tick; "Open Tudu", "New task ⌘⇧N", a line, "Quit Tudu" ("Tudu Staging" on staging).
+- The tray: the ink tick with no native menu. A click (left or right) drops today from the menu bar under it
+  (K-MenuBar, light and dark): the day and its ring, every space's tasks (Personal first, headed when there is more
+  than one), New task ⌘⇧N, Open Tudu and ⋯ (Send feedback…, Quit Tudu). "Tudu Staging" names the app on staging.
 - ⌘⇧N summons the floating bar over any app, top centre of the pointer's screen; it hides 650ms after Added.
 - The dock badge carries the Inbox count across spaces. Attachments save to Downloads: "Saved to Downloads."
 - The window loads the site through a loader page that says "You're offline." with Try again.
 - Updates: "Tudu is ready: version 0.38.0", What's new, Restart to update, "Restarting…", and "Couldn't restart.
   Quit and open Tudu again to finish."
+
+### 13 Next (designed, not built)
+
+Page 13 draws four pieces the app does not have yet. These lines are the other way round from the rest: the canvas
+is ahead, and each leaves when its chunk ships (or is redrawn to what shipped).
+
+- The Inbox count beside the tick while the Dock icon is gone (the background-running chunk).
+- Open at login and Show Tudu in the Dock (K-Login, light and dark): a Settings › You › This Mac section in the Mac
+  app only. Dock: While the window is open (default) or Always; under the default the Inbox count rides beside the
+  tick while the window is closed. Both live in Settings only: the menu bar's sheet carries neither.
 
 # History
 
@@ -445,3 +458,69 @@ The canvas and the design system now follow the app; these lines left the regist
   timings.
 - The design system's `bundle.css` is `components.css` plus a short tail that removes the CSS tooltip's exit, to
   match the app's Radix tooltip. Compare the two without that tail.
+
+## Page 13 designed · 23 Oct 2026
+
+- New page "13 Next: four new pieces" on the canvas: Quick Add's space line everywhere (K-QuickAdd), projects per
+  space (K-Projects), Send feedback (K-Feedback), today in the menu bar (K-MenuBar, light and dark). Built from the
+  Tudu Paper components; the menu bar sheet, the feedback form's body and the static macOS menu are new markup
+  (`k-*` classes on the boards) until the build adds them to the design system.
+- Settings › Space › Projects was drawn as built, then redrawn the same day at Rohit's ask ("so confusing and not
+  as good looking"): the register's 13 Next section lists the new design against what the app has.
+- The Quick Add board mounts the design system's QuickAdd, whose space chip still opens a one-line list with
+  Personal alone; the build makes it a plain chip like "Me".
+- Open questions are on the page's sticky: where feedback goes and whether anyone replies, which spaces the menu
+  bar shows, the Inbox's waiting tasks in it, whether projects need more than the shortcut, and the Personal chip.
+- K-Proto, a clickable board at the left of page 13, joins the four: the menu bar sheet (ticks shared with the
+  desk's Today, opened by either button), Quick Add over the window or the desktop, Settings › Personal › Space with
+  the new Projects, Send feedback, and the window's close button (Tudu stays in the menu bar with the Inbox count).
+  A demo switch in the menu bar shows Personal alone. Settings › This Mac works too (Always hides the count).
+  Quick Add's own project picker has no Edit projects… yet.
+
+## Chunk 17 · Quick Add always says where · 23 Oct 2026
+
+- Built as K-QuickAdd draws it: the line on every Quick Add. One space makes both chips plain text with the chip's
+  look (not disabled buttons), so Tab skips them and a screen reader reads "In Personal for Me".
+- The bar's accessible name stays "Quick Add" with one space and "New task" once there is a team space, as before.
+- The floating bar starts on the desk's last space (the stored one it already wrote into) and its line switches it;
+  a task for someone is sent from there too.
+- The placeholder "What should Meera do?" was drawn but not built before; it is now.
+
+## Chunk 18 · Projects per space · 23 Oct 2026
+
+- Settings › Space › Projects is built as K-Projects draws it: the list (dot, name, "5 open" or "None open", ⋯ with
+  Edit name and colour and Delete), New project in the block's head, one editor card at a time (name, swatches,
+  the byline preview, Delete project, Cancel, Create project or Save), and the empty state "No projects yet".
+- "Edit projects…" ends the project picker in Quick Add (the desk's and the floating bar's) and in the task panel,
+  and the Backlog's project filter. It opens Settings › Space for that space scrolled to Projects; on phones, the
+  Space page. Closing Settings from Quick Add's way in brings Quick Add back with its draft; the floating bar
+  hands over to the window instead.
+- Delete's toast says what happened to the tasks: "Home deleted. Its 2 tasks keep no project.", with Undo.
+- The editor's preview says "No open tasks" as well as the byline for an existing project, as the board does; a new
+  project's preview has only the byline.
+
+## Chunk 19 · Send feedback · 23 Oct 2026
+
+- Built as K-Feedback and K-Proto draw it: Send feedback in the avatar menu between Settings and Sign out, and a
+  row at the foot of More on phones (a sheet there). The menu bar's ⋯ way in comes with chunk 20.
+- The details line reads from the real build: "Tudu 0.38.0 on the web, macOS, the Today page. Never your tasks."
+  on the web, "Tudu Staging 0.38.0, macOS, …" in the Mac app. Browsers freeze macOS's version, so the line says
+  "macOS" without one (the board's "macOS 15.1" is the app's own reading, not the browser's).
+- A file that is not an image, or is over 10 MB, attaches nothing and the hint beside Add a screenshot says why
+  ("That’s not an image. Add a screenshot or a photo." or "That image is over 10 MB. Try a smaller one."), in the
+  warning tone. The board has no such state.
+- Reports go to the `feedback` table and are mailed to `FEEDBACK_TO` with the screenshot attached and the sender as
+  reply-to (Rohit's call, 23 Oct 2026).
+
+## Chunk 20 · Today in the menu bar · 23 Oct 2026
+
+- Built as K-MenuBar draws it, as `MenuBarSheet` in Tudu Paper and a `/menubar` page in a third window of the Mac
+  app. The tray's native menu is gone (Rohit's call): a click, left or right, opens the sheet under the tick and a
+  second click, Esc, or another app hides it. Signed out it says "Sign in to see your day." with Open Tudu, and ⋯
+  holds Quit alone.
+- The tick does not show as pressed while the sheet is open: Tauri does not reach the status item's highlight. The
+  sheet under it says it is open.
+- A click on the window's clear edge around the sheet puts it away, as the floating bar's does. The board has no
+  clear edge.
+- Offline, the line under the head is the warning Banner ("You’re offline." over "Ticks save here and go when
+  you’re back."), the same one the desk shows, not the board's bare line.

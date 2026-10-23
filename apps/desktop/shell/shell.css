@@ -95,3 +95,8 @@ button {
 button[aria-busy='true'] {
   opacity: 0.6;
 }
+body.menubar main {
+  width: 312px;
+  margin: 0;
+  border-radius: 12px;
+}

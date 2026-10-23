@@ -35,6 +35,7 @@ import { MorePage } from './routes/more/MorePage';
 import { AppsPage, JiraPage } from './routes/jira/JiraPage';
 import { PeoplePage } from './routes/people/PeoplePage';
 import { FloatingQuickAdd, QuickAddPage } from './routes/quick-add/QuickAddPage';
+import { MenuBarPage } from './routes/menubar/MenuBarPage';
 import { desktop } from './app/desktop';
 import { SignInPage } from './routes/sign-in/SignInPage';
 import { TodayPage } from './routes/today/TodayPage';
@@ -326,6 +327,24 @@ const quickAddRoute = createRoute({
   },
 });
 
+/**
+ * Today from the menu bar: the page the macOS app's sheet holds (a click on the tick shows it). In the app it says
+ * Sign in in place, and Open Tudu takes you to the desk to do it.
+ */
+const menuBarRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/menubar',
+  beforeLoad: async ({ context }) => {
+    const me = await loadMe(context.queryClient);
+    if (!me && !desktop()) throw redirect({ to: '/sign-in', search: { next: '/menubar' }, replace: true });
+    return { me };
+  },
+  component: function MenuBarRoute() {
+    const { me } = menuBarRoute.useRouteContext();
+    return <MenuBarPage me={me} />;
+  },
+});
+
 function WebQuickAdd({ me }: { me: MeResponse }) {
   useLiveEvents(true);
   return (
@@ -360,6 +379,7 @@ export const router = createRouter({
     ]),
     kitRoute,
     quickAddRoute,
+    menuBarRoute,
   ]),
   context: { queryClient },
   defaultPreload: 'intent',

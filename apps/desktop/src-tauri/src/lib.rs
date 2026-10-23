@@ -11,8 +11,7 @@ mod updates;
 mod windows;
 
 use tauri::{
-    menu::{Menu, MenuItem, PredefinedMenuItem},
-    tray::TrayIconBuilder,
+    tray::{TrayIcon, TrayIconBuilder, TrayIconEvent},
     Manager, RunEvent,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
@@ -35,6 +34,9 @@ macro_rules! handlers {
             bridge::save_download,
             bridge::show_main,
             bridge::hide_floating,
+            bridge::summon,
+            bridge::hide_menubar,
+            bridge::quit,
             updates::update_check,
             updates::update_install,
             $($extra),*
@@ -93,34 +95,46 @@ pub fn run() {
     });
 }
 
-/// The menu-bar icon: the ink tick as a template image, and its menu.
+/// The menu-bar icon: the ink tick as a template image. It has no menu: a click, left or right, opens today from the
+/// menu bar (the `menubar` window) under it.
 fn tray(app: &tauri::AppHandle, track: Track) -> tauri::Result<()> {
-    let menu = Menu::new(app)?;
-    for item in track::tray_items(track) {
-        match item {
-            Some(i) => menu.append(&MenuItem::with_id(app, i.id, &i.text, true, i.accelerator)?)?,
-            None => menu.append(&PredefinedMenuItem::separator(app)?)?,
-        }
-    }
     TrayIconBuilder::with_id("tray")
         .icon(tauri::image::Image::from_bytes(include_bytes!(
             "../icons/tray.png"
         ))?)
         .icon_as_template(true)
         .tooltip(track.name())
-        .menu(&menu)
-        .show_menu_on_left_click(true)
-        .on_menu_event(|app, event| tray_action(app, event.id.as_ref()))
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button,
+                button_state,
+                rect,
+                ..
+            } = event
+            {
+                if windows::tray_toggles(button, button_state) {
+                    windows::toggle_menubar(tray.app_handle(), Some(icon_of(rect)));
+                }
+            }
+        })
         .build(app)?;
     Ok(())
 }
 
-/// A tray item, by id: what clicking it does.
-pub fn tray_action(app: &tauri::AppHandle, id: &str) {
-    match id {
-        "open" => windows::show_main(app, None),
-        "new" => windows::summon(app, false),
-        "quit" => app.exit(0),
-        _ => {}
+/// The tick's place, in physical pixels.
+fn icon_of(rect: tauri::Rect) -> place::Icon {
+    let p = rect.position.to_physical::<f64>(1.0);
+    let s = rect.size.to_physical::<f64>(1.0);
+    place::Icon {
+        x: p.x,
+        y: p.y,
+        width: s.width,
+        height: s.height,
     }
+}
+
+/// Where the tick is now (for the control channel's click, which has no event to read it from).
+pub fn tray_icon(app: &tauri::AppHandle) -> Option<place::Icon> {
+    let tray: TrayIcon = app.tray_by_id("tray")?;
+    tray.rect().ok().flatten().map(icon_of)
 }

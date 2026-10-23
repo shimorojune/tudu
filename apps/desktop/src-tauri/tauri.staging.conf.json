@@ -13,7 +13,7 @@
         {
           "identifier": "web",
           "description": "Tudu on the web, in the app's windows: the app's own commands, and dragging the window by the top bar.",
-          "windows": ["main", "floating"],
+          "windows": ["main", "floating", "menubar"],
           "remote": {
             "urls": ["https://staging.tudu.ezdev.net/*"]
           },
@@ -27,6 +27,9 @@
             "allow-save-download",
             "allow-show-main",
             "allow-hide-floating",
+            "allow-summon",
+            "allow-hide-menubar",
+            "allow-quit",
             "allow-update-check",
             "allow-update-install"
           ]

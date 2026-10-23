@@ -28,3 +28,9 @@ export function nextProjectColor(taken: string[]): string {
   if (free) return free;
   return PROJECT_COLORS[taken.length % PROJECT_COLORS.length]!;
 }
+
+/** The toast after a project is deleted: "Platform deleted. Its 3 tasks keep no project." */
+export function projectDeletedWords(name: string, open: number): string {
+  if (open === 0) return `${name} deleted.`;
+  return `${name} deleted. Its ${open === 1 ? 'task keeps' : `${open} tasks keep`} no project.`;
+}

@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { inboxBadge } from '@tudu/core';
 import { useEffect, useState } from 'react';
-import { desktop, type AppInfo, type UpdateReady } from './desktop';
+import { desktop, FEEDBACK_GO, type AppInfo, type UpdateReady } from './desktop';
+import { openFeedback } from './feedback';
 import { interceptLinks } from './links';
 import { meQuery } from './session';
 import { startUpdates, updateStore, useUpdate } from './updates';
@@ -60,7 +61,8 @@ export function DesktopHost() {
   useEffect(() => {
     if (!d || !main) return;
     return d.on('go', (path) => {
-      if (typeof path === 'string' && path.startsWith('/')) void navigate({ href: path });
+      if (path === FEEDBACK_GO) openFeedback();
+      else if (typeof path === 'string' && path.startsWith('/')) void navigate({ href: path });
     });
   }, [d, main, navigate]);
 

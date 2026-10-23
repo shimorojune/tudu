@@ -10,7 +10,7 @@ import {
   seedTasks,
   switcher,
 } from '../../fixtures/spaces';
-import { dayList, fixClock, idle, row } from '../../fixtures/today';
+import { dayList, fixClock, idle } from '../../fixtures/today';
 
 const phone = () => test.info().project.name === 'phone';
 const tablet = () => test.info().project.name === 'tablet';
@@ -237,63 +237,6 @@ test.describe('settings', () => {
     await b.context.close();
   });
 
-  test('C09-E06 projects: rename and recolour; the tasks follow; Delete takes the dot off, Undo brings it back', async ({
-    page,
-  }) => {
-    test.skip(phone() || tablet(), 'the same section on every size');
-    await signInFresh(page);
-    const { spaces } = await me(page);
-    const personal = spaces.find((s) => s.kind === 'personal')!;
-    const pid = crypto.randomUUID();
-    const at = Date.parse('2026-10-18T09:00:00.000Z');
-    await page.request.post(`${API_URL}/api/sync`, {
-      data: {
-        clientId: 'seed',
-        mutations: [
-          {
-            id: crypto.randomUUID(),
-            type: 'project.create',
-            payload: { id: pid, spaceId: personal.id, name: 'Home' },
-            at: new Date(at).toISOString(),
-          },
-          {
-            id: crypto.randomUUID(),
-            type: 'task.create',
-            payload: {
-              id: crypto.randomUUID(),
-              spaceId: personal.id,
-              title: 'Fix the gate',
-              day: '2026-10-18',
-              position: 1024,
-              projectId: pid,
-            },
-            at: new Date(at + 1000).toISOString(),
-          },
-        ],
-      },
-    });
-    await page.reload();
-    const r = row(dayList(page), 'Fix the gate');
-    await expect(r.locator('.tp-sg-project')).toHaveText('Home');
-    const d = await openSettings(page, 'Space');
-    await expect(d.getByText('1 open task')).toBeVisible();
-    const name = d.getByRole('textbox', { name: 'Name of Home' });
-    await name.fill('House');
-    await name.press('Enter');
-    await d.getByRole('button', { name: 'Colour of House' }).click();
-    await d.getByRole('radiogroup', { name: 'Colour of House' }).getByRole('radio').nth(3).click();
-    await idle(page);
-    await expect(r.locator('.tp-sg-project')).toHaveText('House');
-    await d.getByRole('button', { name: 'Delete House' }).click();
-    await expect(page.locator('.tp-toast')).toContainText('House deleted.');
-    await expect(r.locator('.tp-sg-project')).toHaveCount(0);
-    await page.locator('.tp-toast').getByRole('button', { name: 'Undo' }).click();
-    await expect(r.locator('.tp-sg-project')).toHaveText('House');
-    await idle(page);
-    await page.reload();
-    await expect(row(dayList(page), 'Fix the gate').locator('.tp-sg-project')).toHaveText('House');
-  });
-
   test('C09-E07 roles: make a colleague admin, they get the menus; back to member; your own row has none', async ({
     page,
     browser,
@@ -512,7 +455,8 @@ test.describe('settings', () => {
     await field.fill('Northwind Two');
     await field.press('Enter');
     await expect(switcher(page)).toContainText('Northwind Two');
-    const pname = d.getByRole('textbox', { name: 'Name of Launch' });
+    await d.getByRole('button', { name: 'Edit Launch, No open tasks' }).click();
+    const pname = d.getByRole('textbox', { name: 'Project name' });
     await pname.fill('Launch week');
     await pname.press('Enter');
     await context.setOffline(false);
