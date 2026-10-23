@@ -501,4 +501,29 @@ test.describe('desktop', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  test('C17-D01 the summon says where: the floating bar opens on the space the desk was last on, and adds there', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const space = await teamSpace(app, 'Northwind');
+    await app.act('summon');
+    await floatingShown(app);
+    const line = await app.until<string>(
+      `const l = document.querySelector('.tp-qa-toline'); return l && l.textContent`,
+      'floating',
+    );
+    expect(line).toMatch(/^In.*Northwind.*for.*Me$/);
+    await app.eval(
+      `T.fill(T.get('textbox', 'Task title'), 'Book the offsite'); T.click(T.get('button', 'Add task'));`,
+      'floating',
+    );
+    await floatingHidden(app);
+    const day = await asPage<{ tasks: Array<{ title: string }> }>(
+      app,
+      'GET',
+      `/api/spaces/${space.id}/days/${today()}`,
+    );
+    expect(day.tasks.map((t) => t.title)).toContain('Book the offsite');
+  });
 });

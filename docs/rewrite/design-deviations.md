@@ -40,7 +40,9 @@ Each line is true of the app on master. A line leaves the register once the canv
 - File chips show their upload as a fill and read "failed" when it fails; offline, the attach button says so. Files
   join the task as chips at the end of its notes; there is no Files section.
 - "Looks like a task you have" (or "Looks like tasks you have") lists close matches by meaning.
-- Personal alone gets the plain bar; a team space adds "In Northwind for Me" and Send.
+- Every Quick Add, the floating bar included, opens on "In … for Me". With Personal alone both chips are plain
+  ("In Personal for Me"); a team space makes them open and adds Send. Picking someone makes the placeholder "What
+  should Meera do?".
 
 ### 04 Jira
 
@@ -108,8 +110,6 @@ Each line is true of the app on master. A line leaves the register once the canv
 Page 13 draws four pieces the app does not have yet. These lines are the other way round from the rest: the canvas
 is ahead, and each leaves when its chunk ships (or is redrawn to what shipped).
 
-- Quick Add always shows "In … for Me", the floating bar included; Personal alone reads "In Personal for Me" with
-  plain chips (today: the plain bar until a team space, and the floating bar never has the line).
 - Settings › Space › Projects is redrawn: a list (dot, name, "5 open", ⋯), New project in the section's head, and
   one editor card for making and changing a project (name, swatches, the byline preview, Delete project, Cancel,
   Save). The app still has the inline names, the dot that opens swatches, a Delete per row and the field at the foot.
@@ -483,3 +483,12 @@ The canvas and the design system now follow the app; these lines left the regist
   the new Projects, Send feedback, and the window's close button (Tudu stays in the menu bar with the Inbox count).
   A demo switch in the menu bar shows Personal alone. Settings › This Mac works too (Always hides the count).
   Quick Add's own project picker has no Edit projects… yet.
+
+## Chunk 17 · Quick Add always says where · 23 Oct 2026
+
+- Built as K-QuickAdd draws it: the line on every Quick Add. One space makes both chips plain text with the chip's
+  look (not disabled buttons), so Tab skips them and a screen reader reads "In Personal for Me".
+- The bar's accessible name stays "Quick Add" with one space and "New task" once there is a team space, as before.
+- The floating bar starts on the desk's last space (the stored one it already wrote into) and its line switches it;
+  a task for someone is sent from there too.
+- The placeholder "What should Meera do?" was drawn but not built before; it is now.

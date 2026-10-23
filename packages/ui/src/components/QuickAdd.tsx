@@ -672,60 +672,67 @@ export function QuickAdd(p: QuickAddProps) {
       {to ? 'Send' : phone ? 'Add' : 'Add task'}
     </Button>
   );
-  const spaceChip = p.send ? (
-    <QAChip
-      open={pop === 'space'}
-      onOpen={(v) => setPop(v ? 'space' : null)}
-      up={phone}
-      aria={`Space: ${space?.name ?? ''}`}
-      icon={space ? <SpaceTile space={space} size={18} /> : <Ic name="project" />}
-      label={space?.name ?? ''}
-      pop={
-        <div className="tp-ppick-pop">
-          <div className="tp-sswl" role="menu" aria-label="Which space">
-            <div className="tp-mh">Which space</div>
-            {p.send.spaces.map((s) => {
-              const on = s.id === space?.id;
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={on ? 'true' : 'false'}
-                  className={cx('tp-sswl-it', on && 'tp-on')}
-                  onClick={() => {
-                    setPop(null);
-                    if (!on) p.send!.onSpace(s.id);
-                  }}
-                >
-                  <SpaceTile space={s} size={24} />
-                  <span className="tp-sswl-n">
-                    <span>{s.name}</span>
-                  </span>
-                  {on ? (
-                    <span className="tp-sswl-ok" aria-hidden="true">
-                      <svg
-                        width={14}
-                        height={14}
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2.6}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M5 12.4 9.8 17.2 19.2 6.8" />
-                      </svg>
+  // With one space there is nothing to pick: the chip reads where the task goes and is not a button.
+  const spaceChip =
+    p.send && p.send.spaces.length < 2 ? (
+      <span className="tp-qa-chip tp-qa-static-chip" aria-label={`In ${space?.name ?? ''}`}>
+        {space ? <SpaceTile space={space} size={18} /> : null}
+        <span>{space?.name ?? ''}</span>
+      </span>
+    ) : p.send ? (
+      <QAChip
+        open={pop === 'space'}
+        onOpen={(v) => setPop(v ? 'space' : null)}
+        up={phone}
+        aria={`Space: ${space?.name ?? ''}`}
+        icon={space ? <SpaceTile space={space} size={18} /> : <Ic name="project" />}
+        label={space?.name ?? ''}
+        pop={
+          <div className="tp-ppick-pop">
+            <div className="tp-sswl" role="menu" aria-label="Which space">
+              <div className="tp-mh">Which space</div>
+              {p.send.spaces.map((s) => {
+                const on = s.id === space?.id;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={on ? 'true' : 'false'}
+                    className={cx('tp-sswl-it', on && 'tp-on')}
+                    onClick={() => {
+                      setPop(null);
+                      if (!on) p.send!.onSpace(s.id);
+                    }}
+                  >
+                    <SpaceTile space={s} size={24} />
+                    <span className="tp-sswl-n">
+                      <span>{s.name}</span>
                     </span>
-                  ) : null}
-                </button>
-              );
-            })}
+                    {on ? (
+                      <span className="tp-sswl-ok" aria-hidden="true">
+                        <svg
+                          width={14}
+                          height={14}
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2.6}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M5 12.4 9.8 17.2 19.2 6.8" />
+                        </svg>
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      }
-    />
-  ) : null;
+        }
+      />
+    ) : null;
   const forChip =
     p.send && p.send.canSend ? (
       <QAChip
@@ -771,7 +778,7 @@ export function QuickAdd(p: QuickAddProps) {
         saving && 'tp-qa-saving',
       )}
       role="dialog"
-      aria-label={p.send ? 'New task' : 'Quick Add'}
+      aria-label={p.send && p.send.spaces.length > 1 ? 'New task' : 'Quick Add'}
       aria-busy={saving ? 'true' : undefined}
       onPaste={onPaste}
       onDragEnter={(e) => {
@@ -831,7 +838,7 @@ export function QuickAdd(p: QuickAddProps) {
           className="tp-qa-title"
           value={f.title}
           readOnly={saving}
-          placeholder="What needs doing?"
+          placeholder={to ? `What should ${toName} do?` : 'What needs doing?'}
           aria-label="Task title"
           spellCheck
           enterKeyHint="done"

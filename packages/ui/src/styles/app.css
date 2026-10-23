@@ -292,9 +292,14 @@
   margin-left: 8px;
 }
 
-/* Personal: "for Me" is a plain chip, nothing to pick. */
+/* Nothing to pick (one space, or "for Me" in Personal): a plain chip that does not light up. */
 .tp-qa-static-chip {
   cursor: default;
+}
+.tp-root .tp-qa-static-chip:hover,
+.tp-root .tp-qa-static-chip:active {
+  background: transparent;
+  color: var(--foreground-2);
 }
 
 /* Photos (chunk 09): a person's photo fills their round mark in place of the initials. */

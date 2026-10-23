@@ -1,6 +1,6 @@
 # Chunk 17 · Quick Add always says where
 
-Status: proposed 23 Oct 2026. Awaiting your approval. Branch `rewrite/17-quick-add-space-line` once approved.
+Status: approved 23 Oct 2026 and built on `claude/project-thread-fsltm1` (one branch for chunks 17 to 20).
 
 Boards: 13 Next, K-QuickAdd ("Quick Add always says where the task goes"), and K-Proto's New task. Today the top
 line "In Northwind for Me" appears only once you are in a team space, and the floating bar never has it. This chunk

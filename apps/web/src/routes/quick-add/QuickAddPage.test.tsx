@@ -6,11 +6,14 @@ import userEvent from '@testing-library/user-event';
 import { resetThemeForTests } from '@tudu/ui';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetDesktop, type DesktopFake } from '../../app/desktop';
+import type * as QuickAddModule from '../../app/quickAdd';
 import { FloatingQuickAdd } from './QuickAddPage';
 
 const save = vi.fn();
 const usedSpace = vi.fn();
-vi.mock('../../app/quickAdd', () => ({
+vi.mock('../../app/quickAdd', async (orig) => ({
+  sendLine: (await orig<typeof QuickAddModule>()).sendLine,
+  useSpacePeople: () => [],
   useQuickAddActions: (spaceId: string | undefined) => {
     usedSpace(spaceId);
     return {
@@ -76,6 +79,25 @@ beforeEach(() => {
   refreshMe.mockResolvedValue(ME);
   localStorage.clear();
   resetThemeForTests();
+});
+
+describe('C17-U04 the floating window says where', () => {
+  it('starts on the space the desk was last on, Personal before any; the line can switch it; a summon reads it again', async () => {
+    const user = userEvent.setup();
+    mount(ME);
+    const line = () => document.querySelector('.tp-qa-toline')!.textContent;
+    expect(line()).toMatch(/^In.*me.*for.*Me/);
+    expect(usedSpace).toHaveBeenLastCalledWith('p');
+    await user.click(screen.getByRole('button', { name: 'Space: me' }));
+    await user.click(screen.getByRole('menuitemradio', { name: /northwind/ }));
+    expect(usedSpace).toHaveBeenLastCalledWith('n');
+    localStorage.setItem('tudu.space', 'me');
+    emit('floating:shown');
+    await waitFor(() => expect(usedSpace).toHaveBeenLastCalledWith('p'));
+    localStorage.setItem('tudu.space', 'northwind');
+    emit('floating:shown');
+    await waitFor(() => expect(line()).toMatch(/^In.*northwind.*for/));
+  });
 });
 
 describe('C11-U05 the floating window', () => {

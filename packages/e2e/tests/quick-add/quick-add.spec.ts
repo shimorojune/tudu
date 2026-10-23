@@ -1,5 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
+import { createSpace, switchTo } from '../../fixtures/spaces';
 import { dayList, fixClock, idle, row, titlesOf, writeTasks } from '../../fixtures/today';
 
 /** The bar (or the sheet on phones). */
@@ -407,5 +408,62 @@ test.describe('quick-add', () => {
     await idle(page);
     await page.reload();
     await expect.poll(() => titlesOf(dayList(page))).toEqual(['In the dark']);
+  });
+
+  test('C17-E01 Personal alone: Quick Add opens on "In Personal for Me" and neither chip opens', async ({
+    page,
+  }) => {
+    test.skip(test.info().project.name === 'phone', 'C17-E03 is the phone’s');
+    await signInFresh(page);
+    const b = await openBar(page);
+    const line = b.locator('.tp-qa-toline');
+    await expect(line).toHaveText(/^In.*Personal.*for.*Me$/);
+    await expect(line.locator('.tp-qa-static-chip')).toHaveCount(2);
+    await expect(b.getByRole('button', { name: /^Space:/ })).toHaveCount(0);
+    await line.getByText('Personal', { exact: true }).click();
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await b.getByRole('textbox', { name: 'Task title' }).fill('Plain as ever');
+    await addButton(b).click();
+    await expect(bar(page)).toHaveCount(0, { timeout: 5000 });
+    await expect(row(dayList(page), 'Plain as ever')).toBeVisible();
+  });
+
+  test('C17-E02 with a team space the chips open, and a task added for Northwind lands on its Today', async ({
+    page,
+  }) => {
+    test.skip(test.info().project.name === 'phone', 'the switcher flow is the desk’s');
+    await signInFresh(page);
+    await createSpace(page, 'Northwind');
+    await switchTo(page, 'Personal');
+    await page.getByRole('button', { name: 'New task' }).first().click();
+    const b = page.getByRole('dialog', { name: 'New task' });
+    await expect(b.locator('.tp-qa-toline')).toHaveText(/^In.*Personal.*for.*Me$/);
+    await b.getByRole('button', { name: 'Space: Personal' }).click();
+    await page.getByRole('menuitemradio', { name: /Northwind/ }).click();
+    await expect(b.locator('.tp-qa-toline')).toHaveText(/^In.*Northwind.*for/);
+    await b.getByRole('textbox', { name: 'Task title' }).fill('Book the offsite');
+    await addButton(b).click();
+    await expect(b).toHaveCount(0, { timeout: 5000 });
+    await expect(page.locator('.tp-toast')).toContainText('in Northwind');
+    await switchTo(page, 'Northwind');
+    await expect(row(dayList(page), 'Book the offsite')).toBeVisible();
+  });
+
+  test('C17-E03 phone: the sheet says "In Personal for Me" with plain chips', async ({ page }) => {
+    test.skip(test.info().project.name !== 'phone', 'the sheet is the phone’s');
+    await signInFresh(page);
+    const b = await openBar(page);
+    await expect(b.locator('.tp-qa-toline')).toHaveText(/^In.*Personal.*for.*Me$/);
+    await expect(b.locator('.tp-qa-toline .tp-qa-static-chip')).toHaveCount(2);
+  });
+
+  test('C17-E05 dark: the line reads the same and its chips stay plain', async ({ page }) => {
+    test.skip(test.info().project.name !== 'desktop', 'one theme check is enough');
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await signInFresh(page);
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    const b = await openBar(page);
+    await expect(b.locator('.tp-qa-toline')).toHaveText(/^In.*Personal.*for.*Me$/);
+    await expect(b.getByRole('button', { name: /^Space:/ })).toHaveCount(0);
   });
 });
