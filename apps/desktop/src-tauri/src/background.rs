@@ -109,7 +109,13 @@ fn prefs_path(app: &AppHandle) -> Option<PathBuf> {
 fn load(app: &AppHandle) -> Dock {
     prefs_path(app)
         .and_then(|p| std::fs::read(p).ok())
-        .and_then(|b| serde_json::from_slice::<Prefs>(&b).ok())
+        .map(|b| dock_from(&b))
+        .unwrap_or_default()
+}
+
+/// The saved choice; anything unreadable (an old "never", a torn write) is the default.
+fn dock_from(bytes: &[u8]) -> Dock {
+    serde_json::from_slice::<Prefs>(bytes)
         .unwrap_or_default()
         .dock
 }
@@ -225,7 +231,8 @@ pub fn set_open_at_login(on: bool) -> Login {
 #[tauri::command]
 pub fn open_login_items(app: AppHandle) {
     if let Ok(mut s) = app.state::<App>().seen.lock() {
-        s.opened.push("x-apple.systempreferences:com.apple.LoginItems-Settings.extension".into());
+        s.opened
+            .push("x-apple.systempreferences:com.apple.LoginItems-Settings.extension".into());
     }
     if cfg!(feature = "control") {
         return;
@@ -307,8 +314,13 @@ mod mac {
         let (tx, rx) = std::sync::mpsc::channel();
         let _ = w.with_webview(move |v| {
             let wk = v.inner() as *const WKWebView;
-            let p = (!wk.is_null())
-                .then(|| unsafe { (*wk).configuration().preferences().inactiveSchedulingPolicy().0 });
+            let p = (!wk.is_null()).then(|| unsafe {
+                (*wk)
+                    .configuration()
+                    .preferences()
+                    .inactiveSchedulingPolicy()
+                    .0
+            });
             let _ = tx.send(p);
         });
         rx.recv_timeout(std::time::Duration::from_secs(2))
@@ -416,15 +428,30 @@ mod tests {
         assert_eq!(policy(Dock::Always, false), Policy::Regular);
         assert_eq!(Dock::default(), Dock::Open);
         assert_eq!(serde_json::to_string(&Dock::Always).unwrap(), "\"always\"");
-        assert_eq!(serde_json::from_str::<Dock>("\"open\"").unwrap(), Dock::Open);
+        assert_eq!(
+            serde_json::from_str::<Dock>("\"open\"").unwrap(),
+            Dock::Open
+        );
     }
 
     #[test]
     fn c16_u01_the_count_rides_beside_the_tick_only_while_there_is_no_dock_icon() {
         assert_eq!(count_places(Policy::Regular, Some(3)), (Some(3), None));
-        assert_eq!(count_places(Policy::Accessory, Some(3)), (None, Some("3".into())));
+        assert_eq!(
+            count_places(Policy::Accessory, Some(3)),
+            (None, Some("3".into()))
+        );
         assert_eq!(count_places(Policy::Accessory, Some(0)), (None, None));
         assert_eq!(count_places(Policy::Regular, None), (None, None));
+    }
+
+    #[test]
+    fn c16_u02_the_dock_choice_is_kept_and_anything_unreadable_is_the_default() {
+        let saved = serde_json::to_vec(&Prefs { dock: Dock::Always }).unwrap();
+        assert_eq!(dock_from(&saved), Dock::Always);
+        assert_eq!(dock_from(b"{}"), Dock::Open);
+        assert_eq!(dock_from(br#"{"dock":"never"}"#), Dock::Open);
+        assert_eq!(dock_from(b"{\"do"), Dock::Open);
     }
 
     #[test]
@@ -433,6 +460,9 @@ mod tests {
         assert_eq!(login_from_status(1), Login::On);
         assert_eq!(login_from_status(2), Login::Approval);
         assert_eq!(login_from_status(3), Login::Off);
-        assert_eq!(serde_json::to_string(&Login::Approval).unwrap(), "\"approval\"");
+        assert_eq!(
+            serde_json::to_string(&Login::Approval).unwrap(),
+            "\"approval\""
+        );
     }
 }

@@ -68,6 +68,20 @@ export interface AppState {
     error: string | null;
   };
   seen: { signedIn: boolean; badge: number | null; opened: string[]; saved: string[] };
+  /** Chunk 16: what macOS is told the app is, and what keeps it running in the background. */
+  background: {
+    policy: 'regular' | 'accessory';
+    dock: 'open' | 'always';
+    deskOpen: boolean;
+    atLogin: boolean;
+    /** The App Nap opt-out is held. */
+    awake: boolean;
+    /** Beside the tick: the Inbox count while there is no Dock icon. */
+    trayTitle: string | null;
+    loginItem: 'off' | 'on' | 'approval' | 'refused';
+    /** Each page's inactive scheduling policy: 0 suspend, 1 throttle, 2 none. */
+    webviews: { main: number | null; floating: number | null; menubar: number | null };
+  };
 }
 
 async function freePort(): Promise<number> {
@@ -148,7 +162,8 @@ export class TuduApp {
     return join(this.bundle, 'Contents/MacOS/Tudu Test');
   }
 
-  async launch(): Promise<void> {
+  /** `env` adds to the launch's environment (TUDU_TEST_AT_LOGIN=1: as the login item would start it). */
+  async launch(env: Record<string, string> = {}): Promise<void> {
     if (!this.port) this.port = await freePort();
     rmSync(join(this.dir, 'control.json'), { force: true });
     const out = openSync(this.log, 'a');
@@ -160,6 +175,7 @@ export class TuduApp {
         TUDU_TEST_DATA: this.dir,
         TUDU_TEST_WEB: WEB,
         TUDU_TEST_API: API,
+        ...env,
       },
     });
     await this.ready();

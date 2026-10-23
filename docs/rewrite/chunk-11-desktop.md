@@ -23,6 +23,7 @@ updater's signing key, the release flow, the cookie set-up for the app's origin)
   be installed side by side. The main window opens on the last space's Today, 1200×800 by default, no smaller
   than 900×600 (under 1024px the app shows the tablet rail, as the web does). Closing the window hides it; Tudu
   stays in the dock and the menu bar, and the dock icon, the tray's "Open Tudu" or the summon bring it back.
+  (Chunk 16: closing now also drops the Dock icon unless Settings › This Mac keeps it, and C11-D02 checks that.)
   ⌘Q quits. The app menu is macOS's: About Tudu shows the version and the track.
 - **The window is the desk.** No title bar: the traffic lights sit over the sidebar's top, the top bar is the
   drag region, and the desk runs to the window's edge (choice 1). Everything else looks exactly as it does in the

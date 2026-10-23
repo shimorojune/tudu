@@ -21,6 +21,17 @@ export interface AppInfo {
 
 export type DesktopWindow = 'main' | 'floating' | 'menubar';
 
+/** Open at login, as macOS has it: `approval` waits for your OK in Login Items, `refused` is macOS saying no. */
+export type LoginState = 'off' | 'on' | 'approval' | 'refused';
+
+/** Show Tudu in the Dock: only while the window is open, or always. */
+export type DockMode = 'open' | 'always';
+
+export interface ThisMac {
+  openAtLogin: LoginState;
+  dock: DockMode;
+}
+
 export interface DesktopBridge {
   /** Which of the app's windows this page is in. */
   window: DesktopWindow;
@@ -45,6 +56,13 @@ export interface DesktopBridge {
   checkUpdate(): Promise<UpdateReady | null>;
   /** Installs the downloaded version and relaunches; fails when it could not. */
   installUpdate(): Promise<void>;
+  /** Settings › This Mac as it stands, read fresh from macOS. */
+  thisMac(): Promise<ThisMac>;
+  /** Registers or unregisters the login item; answers where macOS left it. */
+  setOpenAtLogin(on: boolean): Promise<LoginState>;
+  /** System Settings › General › Login Items. */
+  openLoginItems(): void;
+  setDock(mode: DockMode): void;
   /**
    * `go` (the desk is asked to show a page, or `feedback` for the form), `floating:shown` (the summon),
    * `menubar:shown` and `menubar:hidden` (the tick's click, and the sheet put away), and `update:ready` (a check,
@@ -66,6 +84,9 @@ export interface DesktopFake {
   update?: UpdateReady | null;
   failCheck?: boolean;
   refuseRestart?: boolean;
+  /** Settings › This Mac as the fake app has it; the switch answers `loginAnswer` when set. */
+  thisMac?: Partial<ThisMac>;
+  loginAnswer?: LoginState;
   calls: Array<{ name: string; args: unknown[] }>;
   listeners?: Record<string, Array<(payload: unknown) => void>>;
 }
@@ -115,6 +136,21 @@ function fakeBridge(f: DesktopFake): DesktopBridge {
       call('installUpdate');
       if (f.refuseRestart) throw new Error('Could not restart.');
     },
+    thisMac: async () => {
+      call('thisMac');
+      return { openAtLogin: 'off', dock: 'open', ...f.thisMac };
+    },
+    setOpenAtLogin: async (on) => {
+      call('setOpenAtLogin', on);
+      const answer = f.loginAnswer ?? (on ? 'on' : 'off');
+      f.thisMac = { ...f.thisMac, openAtLogin: answer === 'refused' ? 'off' : answer };
+      return answer;
+    },
+    openLoginItems: () => call('openLoginItems'),
+    setDock: (mode) => {
+      call('setDock', mode);
+      f.thisMac = { ...f.thisMac, dock: mode };
+    },
     on: (event, fn) => {
       (f.listeners![event] ??= []).push(fn);
       return () => {
@@ -148,6 +184,10 @@ function tauriBridge(t: NonNullable<Window['__TAURI_INTERNALS__']>): DesktopBrid
     quit: () => quiet(invoke('quit')),
     checkUpdate: () => invoke<UpdateReady | null>('update_check'),
     installUpdate: () => invoke('update_install'),
+    thisMac: () => invoke<ThisMac>('this_mac'),
+    setOpenAtLogin: (on) => invoke<LoginState>('set_open_at_login', { on }),
+    openLoginItems: () => quiet(invoke('open_login_items')),
+    setDock: (dock) => quiet(invoke('set_dock', { dock })),
     on: (event, fn) => {
       let stop: (() => void) | null = null;
       let gone = false;

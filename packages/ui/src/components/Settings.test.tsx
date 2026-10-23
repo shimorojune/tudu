@@ -367,3 +367,68 @@ describe('asking first', () => {
     expect(onConfirm).toHaveBeenCalled();
   });
 });
+
+describe('C16-U04 Settings › This Mac', () => {
+  const mac = (extra: Partial<NonNullable<SettingsProps['mac']>> = {}) => ({
+    openAtLogin: 'off' as const,
+    dock: 'open' as const,
+    onOpenAtLogin: vi.fn(),
+    onLoginItems: vi.fn(),
+    onDock: vi.fn(),
+    ...extra,
+  });
+
+  it('is listed under You only in the Mac app; a link to it on the web falls back to Account', () => {
+    const { rerender } = settings({ section: 'mac' });
+    expect(within(nav()).queryByRole('button', { name: 'This Mac' })).toBeNull();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Account');
+
+    rerender(<Settings me={ME} space={NW} still section="mac" mac={mac()} />);
+    expect(
+      within(nav())
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['Account', 'Appearance', 'This Mac', 'Space', 'Members19', 'Apps']);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('This Mac');
+    expect(screen.getByText('How Tudu runs on this Mac.')).toBeInTheDocument();
+  });
+
+  it('Open at login: off, on, waiting for macOS with Open Login Items, refused', async () => {
+    const user = userEvent.setup();
+    const m = mac();
+    const { rerender } = settings({ section: 'mac', mac: m });
+    const sw = () => screen.getByRole('switch', { name: 'Open at login' });
+    expect(sw()).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByText(/starts in the menu bar when you log in/)).toBeInTheDocument();
+    await user.click(sw());
+    expect(m.onOpenAtLogin).toHaveBeenCalledWith(true);
+
+    rerender(<Settings me={ME} space={NW} still section="mac" mac={{ ...m, openAtLogin: 'approval' }} />);
+    expect(sw()).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText(/needs you to allow Tudu in System Settings/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Open Login Items' }));
+    expect(m.onLoginItems).toHaveBeenCalled();
+
+    rerender(<Settings me={ME} space={NW} still section="mac" mac={{ ...m, openAtLogin: 'refused' }} />);
+    expect(sw()).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByText(/macOS didn’t allow it/)).toHaveClass('tp-set-bad');
+    expect(screen.queryByRole('button', { name: 'Open Login Items' })).toBeNull();
+
+    rerender(<Settings me={ME} space={NW} still section="mac" mac={{ ...m, openAtLogin: 'on' }} />);
+    expect(sw()).toHaveAttribute('aria-checked', 'true');
+    expect(within(nav()).getByRole('button', { name: 'This Mac' })).toBeInTheDocument();
+  });
+
+  it('Show Tudu in the Dock: two choices, While the window is open by default', async () => {
+    const user = userEvent.setup();
+    const m = mac();
+    settings({ section: 'mac', mac: m });
+    const group = screen.getByRole('group', { name: 'Show Tudu in the Dock' });
+    const options = within(group).getAllByRole('button');
+    expect(options.map((b) => b.textContent)).toEqual(['While the window is open', 'Always']);
+    expect(options[0]).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText(/Quit Tudu \(⌘Q\) stops it/)).toBeInTheDocument();
+    await user.click(options[1]!);
+    expect(m.onDock).toHaveBeenCalledWith('always');
+  });
+});

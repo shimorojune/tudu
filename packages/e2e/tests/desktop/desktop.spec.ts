@@ -319,3 +319,74 @@ test.describe('desktop', () => {
     await expect(row(dayList(page), 'From the floating bar')).toBeVisible({ timeout: 10_000 });
   });
 });
+
+test.describe('This Mac', () => {
+  const dialog = (page: Page) => page.getByRole('dialog', { name: 'Settings' });
+  const nav = (page: Page) => page.getByRole('navigation', { name: 'Settings' });
+  const openThisMac = async (page: Page) => {
+    await page.getByRole('button', { name: /^You: / }).click();
+    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    await expect(dialog(page)).toBeVisible();
+    await nav(page)
+      .getByRole('button', { name: /^This Mac/ })
+      .click();
+    await expect(dialog(page).getByRole('heading', { level: 1 })).toHaveText('This Mac');
+  };
+  const loginSwitch = (page: Page) => dialog(page).getByRole('switch', { name: 'Open at login' });
+
+  test('C16-E01 Settings › This Mac is only in the app: Open at login asks the app, waits for macOS, opens Login Items', async ({
+    page,
+  }) => {
+    await fixClock(page);
+    await signInFresh(page);
+    await page.getByRole('button', { name: /^You: / }).click();
+    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    await expect(nav(page).getByRole('button', { name: /^Appearance/ })).toBeVisible();
+    await expect(nav(page).getByRole('button', { name: /^This Mac/ })).toHaveCount(0);
+
+    await installFake(page, { loginAnswer: 'approval' });
+    await page.goto('/');
+    await openThisMac(page);
+    expect(await calls(page, 'thisMac')).toHaveLength(1);
+    await expect(loginSwitch(page)).toHaveAttribute('aria-checked', 'false');
+    await loginSwitch(page).click();
+    await expect(dialog(page)).toContainText('macOS needs you to allow Tudu');
+    await expect(loginSwitch(page)).toHaveAttribute('aria-checked', 'true');
+    await dialog(page).getByRole('button', { name: 'Open Login Items' }).click();
+    expect((await calls(page, 'setOpenAtLogin')).map((c) => c.args)).toEqual([[true]]);
+    expect(await calls(page, 'openLoginItems')).toHaveLength(1);
+
+    // macOS says no: the switch goes back off and says so.
+    await setFake(page, { loginAnswer: 'refused' });
+    await loginSwitch(page).click();
+    await expect(dialog(page)).toContainText('macOS didn’t allow it.');
+    await expect(loginSwitch(page)).toHaveAttribute('aria-checked', 'false');
+  });
+
+  test('C16-E02 Show Tudu in the Dock: the choice goes to the app at once and reads back when Settings opens again', async ({
+    page,
+  }) => {
+    await fixClock(page);
+    await installFake(page, { thisMac: { openAtLogin: 'on', dock: 'open' } });
+    await signInFresh(page);
+    await openThisMac(page);
+    await expect(loginSwitch(page)).toHaveAttribute('aria-checked', 'true');
+    const dock = dialog(page).getByRole('group', { name: 'Show Tudu in the Dock' });
+    await expect(dock.getByRole('button', { name: 'While the window is open' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await dock.getByRole('button', { name: 'Always' }).click();
+    expect((await calls(page, 'setDock')).map((c) => c.args)).toEqual([['always']]);
+
+    await dialog(page).getByRole('button', { name: 'Close' }).click();
+    await expect(dialog(page)).toHaveCount(0);
+    await openThisMac(page);
+    expect(await calls(page, 'thisMac')).toHaveLength(2);
+    await expect(
+      dialog(page)
+        .getByRole('group', { name: 'Show Tudu in the Dock' })
+        .getByRole('button', { name: 'Always' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+  });
+});

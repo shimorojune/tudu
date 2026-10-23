@@ -25,10 +25,12 @@ import {
   useLessMotion,
   useTheme,
   type MembersBodyMember,
+  type SettingsMac,
   type SettingsSectionName,
 } from '@tudu/ui';
 import { useEffect, useState } from 'react';
 import { openCreateSpace } from './dayView';
+import { desktop, inApp, type ThisMac } from './desktop';
 import { scrollToProjects, settingsClosed } from './editProjects';
 import { api, initialsOf, photoSrc, queryClient, refreshMe, signOut } from './session';
 import { forgetSpace, spacePath, useSpace as useSpaceFromShell } from './space';
@@ -37,12 +39,13 @@ import { hostOf, jiraClient, useJira } from './jira';
 import { taskStore, useOnline } from './tasks';
 import { useViewport } from './viewport';
 
-export const SECTIONS: SettingsSectionName[] = ['account', 'appearance', 'space', 'members', 'apps'];
+export const SECTIONS: SettingsSectionName[] = ['account', 'appearance', 'mac', 'space', 'members', 'apps'];
 
-/** A section this space has: Personal has no Members. */
+/** A section this space has: Personal has no Members, and This Mac is only in the Mac app. */
 export function sectionFor(raw: unknown, space: Pick<SpaceSummary, 'kind'>): SettingsSectionName | null {
   if (typeof raw !== 'string' || !SECTIONS.includes(raw as SettingsSectionName)) return null;
   if (raw === 'members' && space.kind !== 'team') return 'space';
+  if (raw === 'mac' && !inApp()) return 'account';
   return raw as SettingsSectionName;
 }
 
@@ -114,6 +117,42 @@ interface Asking {
 }
 
 /**
+ * Settings › This Mac in the Mac app: read fresh from the app each time Settings opens, since you can change the
+ * login item in System Settings too. Null on the web (the section is not listed).
+ */
+export function useThisMac(): SettingsMac | undefined {
+  const bridge = desktop();
+  const [mac, setMac] = useState<ThisMac | null>(null);
+  useEffect(() => {
+    if (!bridge) return;
+    let live = true;
+    void bridge.thisMac().then(
+      (m) => live && setMac(m),
+      () => live && setMac({ openAtLogin: 'off', dock: 'open' }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [bridge]);
+  if (!bridge || !mac) return undefined;
+  return {
+    ...mac,
+    onOpenAtLogin: (on) => {
+      setMac((m) => m && { ...m, openAtLogin: on ? 'on' : 'off' });
+      void bridge.setOpenAtLogin(on).then(
+        (openAtLogin) => setMac((m) => m && { ...m, openAtLogin }),
+        () => setMac((m) => m && { ...m, openAtLogin: 'refused' }),
+      );
+    },
+    onLoginItems: () => bridge.openLoginItems(),
+    onDock: (dock) => {
+      setMac((m) => m && { ...m, dock });
+      bridge.setDock(dock);
+    },
+  };
+}
+
+/**
  * Settings over the app: the dialog on the desk and tablets, the page on phones. Every change here saves as you
  * make it (names and colours through the outbox; photos, email, roles and leaving online) and every other member's
  * Tudu follows from the live stream.
@@ -140,6 +179,7 @@ export function SettingsView({
   const navigate = useNavigate();
   const { choice, setTheme } = useTheme();
   const [lessMotion, setLessMotion] = useLessMotion();
+  const mac = useThisMac();
   const team = space.kind === 'team';
   const members = useQuery({ ...taskStore.membersQuery(space.id), enabled: team });
   const projects = useQuery(taskStore.projectsQuery(space.id));
@@ -301,6 +341,7 @@ export function SettingsView({
         onTheme={setTheme}
         lessMotion={lessMotion}
         onLessMotion={setLessMotion}
+        mac={mac}
         onSpaceName={(name) => taskStore.updateSpace(space.id, { name })}
         onSpaceColor={(color) => taskStore.updateSpace(space.id, { color })}
         onLeave={leave}

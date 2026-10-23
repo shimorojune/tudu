@@ -13,6 +13,9 @@ export interface FakeInit {
   update?: { version: string; notes: string; date: string | null } | null;
   failCheck?: boolean;
   refuseRestart?: boolean;
+  /** Settings › This Mac as the app has it; the login switch answers `loginAnswer` when set. */
+  thisMac?: { openAtLogin?: 'off' | 'on' | 'approval' | 'refused'; dock?: 'open' | 'always' };
+  loginAnswer?: 'off' | 'on' | 'approval' | 'refused';
 }
 
 export const NOTES = '### Features\n\n* The floating bar keeps your draft\n* Search finds a task by its key';
