@@ -50,10 +50,12 @@ export interface AppState {
   identifier: string;
   version: string;
   pid: number;
-  windows: { main: WindowState; floating: WindowState };
+  windows: { main: WindowState; floating: WindowState; menubar: WindowState };
+  /** The tick: no native menu any more (items is empty); a click opens the menu bar's sheet under `rect`. */
   tray: {
     tooltip: string;
-    items: Array<{ id?: string; text?: string; accelerator?: string | null; separator?: boolean }>;
+    items: unknown[];
+    rect: { x: number; y: number; width: number; height: number } | null;
   };
   shortcut: { accelerator: string; registered: boolean };
   badge: string | null;
@@ -90,6 +92,7 @@ const T = {
     link: 'a[href]',
     heading: 'h1,h2,h3,h4,[role=heading]',
     article: 'article,[role=article]',
+    checkbox: '[role=checkbox],input[type=checkbox]',
   },
   all(role, name, root = document) {
     const els = [...root.querySelectorAll(T.roles[role] || role)].filter(T.visible);
@@ -190,7 +193,7 @@ export class TuduApp {
     return (await this.call('/state')) as AppState;
   }
 
-  /** What a person does outside the page: summon, tray (item), reopen, close (window), check-update, quit. */
+  /** What a person does outside the page: summon, tray (a click on the tick), reopen, close (window), check-update, quit. */
   async act(what: string, extra: Record<string, unknown> = {}): Promise<unknown> {
     return this.call('/act', { do: what, ...extra });
   }
@@ -198,7 +201,7 @@ export class TuduApp {
   /** Run `script` (an async function body with T, the page helpers) in a window's page; answers its result. */
   async eval<R = unknown>(
     script: string,
-    window: 'main' | 'floating' = 'main',
+    window: 'main' | 'floating' | 'menubar' = 'main',
     timeoutMs = 10_000,
   ): Promise<R> {
     const r = (await this.call('/eval', { window, script: `${LIB}\n${script}`, timeoutMs })) as {
@@ -214,7 +217,11 @@ export class TuduApp {
    * Wait until the script answers something truthy (no sleeping: it asks again until then).
    * Each ask is short: one injected while the page is navigating never replies, and it must not eat the whole wait.
    */
-  async until<R>(script: string, window: 'main' | 'floating' = 'main', timeout = 10_000): Promise<R> {
+  async until<R>(
+    script: string,
+    window: 'main' | 'floating' | 'menubar' = 'main',
+    timeout = 10_000,
+  ): Promise<R> {
     const end = Date.now() + timeout;
     let last: unknown = null;
     while (Date.now() < end) {

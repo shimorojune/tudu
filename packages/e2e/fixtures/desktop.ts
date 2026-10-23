@@ -8,7 +8,7 @@ import { fixClock, SUNDAY } from './today';
  * window.__tuduDesktopFake (apps/web/src/app/desktop.ts reads it). Installed before every load of the page.
  */
 export interface FakeInit {
-  window?: 'main' | 'floating';
+  window?: 'main' | 'floating' | 'menubar';
   info?: { track?: string; name?: string; version?: string };
   update?: { version: string; notes: string; date: string | null } | null;
   failCheck?: boolean;

@@ -9,7 +9,7 @@ import './styles.css';
 
 // In the macOS app the page knows it at once, so the desk's chrome (room for the traffic lights) never jumps.
 const app = desktop();
-if (app) document.documentElement.dataset.app = app.window === 'floating' ? 'floating' : 'desktop';
+if (app) document.documentElement.dataset.app = app.window === 'main' ? 'desktop' : app.window;
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

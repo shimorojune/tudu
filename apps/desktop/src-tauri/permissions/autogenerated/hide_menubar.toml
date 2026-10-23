@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-hide-menubar"
+description = "Enables the hide_menubar command without any pre-configured scope."
+commands.allow = ["hide_menubar"]
+
+[[permission]]
+identifier = "deny-hide-menubar"
+description = "Denies the hide_menubar command without any pre-configured scope."
+commands.deny = ["hide_menubar"]

@@ -1,6 +1,6 @@
 # Chunk 20 · Today in the menu bar
 
-Status: proposed 23 Oct 2026. Awaiting your approval. Branch `rewrite/20-menu-bar-today` once approved.
+Status: approved 23 Oct 2026 and built on `claude/project-thread-fsltm1` (one branch for chunks 17 to 20).
 
 Boards: 13 Next, K-MenuBar and K-MenuBar-Dark ("Today, from the menu bar"), and K-Proto's menu bar. A click on the ink
 tick, left or right, opens a small sheet: today's tasks across your spaces, ticked off right there, with New task,

@@ -60,38 +60,8 @@ impl Track {
 
 /// The summon: one global shortcut that brings up the floating Quick Add over whatever you are doing.
 pub const SUMMON: &str = "CommandOrControl+Shift+N";
-/// The summon as the tray menu and the web app show it.
+/// The summon as the web app (and the menu bar's New task) shows it.
 pub const SUMMON_LABEL: &str = "⌘⇧N";
-
-/// One line of the tray's menu; `None` in a list is the separator.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-pub struct TrayItem {
-    pub id: &'static str,
-    pub text: String,
-    pub accelerator: Option<&'static str>,
-}
-
-/// The tray's menu: Open, New task with the summon beside it, a line, Quit.
-pub fn tray_items(track: Track) -> Vec<Option<TrayItem>> {
-    vec![
-        Some(TrayItem {
-            id: "open",
-            text: format!("Open {}", track.name()),
-            accelerator: None,
-        }),
-        Some(TrayItem {
-            id: "new",
-            text: "New task".into(),
-            accelerator: Some(SUMMON),
-        }),
-        None,
-        Some(TrayItem {
-            id: "quit",
-            text: format!("Quit {}", track.name()),
-            accelerator: None,
-        }),
-    ]
-}
 
 #[cfg(test)]
 mod tests {
@@ -128,30 +98,5 @@ mod tests {
         assert!(Track::Test.endpoint().starts_with("http://localhost:"));
         assert_eq!(Track::Production.web(), "https://tudu.ezdev.net");
         assert_eq!(Track::Staging.web(), "https://staging.tudu.ezdev.net");
-    }
-
-    #[test]
-    fn c11_u08_the_tray_menu_per_track() {
-        let words = |t: Track| -> Vec<String> {
-            tray_items(t)
-                .into_iter()
-                .map(|i| i.map(|i| i.text).unwrap_or_else(|| "(line)".into()))
-                .collect()
-        };
-        assert_eq!(
-            words(Track::Production),
-            ["Open Tudu", "New task", "(line)", "Quit Tudu"]
-        );
-        assert_eq!(
-            words(Track::Staging),
-            [
-                "Open Tudu Staging",
-                "New task",
-                "(line)",
-                "Quit Tudu Staging"
-            ]
-        );
-        let new = tray_items(Track::Production)[1].clone().unwrap();
-        assert_eq!(new.accelerator, Some(SUMMON));
     }
 }

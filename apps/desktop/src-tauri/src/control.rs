@@ -2,10 +2,10 @@
 //!
 //! A small HTTP server on 127.0.0.1:$TUDU_TEST_PORT that the desktop tests drive:
 //! - `GET /state`: the app's state: track and version, each window (visibility, focus, place, size, always on top,
-//!   its page), the tray's tooltip and menu, the summon and whether it is registered, the dock badge as the Dock
+//!   its page), the tray's tooltip (it has no menu: a click opens the menu bar's sheet), the summon and whether it is registered, the dock badge as the Dock
 //!   shows it, the updater's last check, download and error, and every outside link or file the app was handed.
-//! - `POST /act {"do": …}`: what a person does outside the page: `summon`, `tray` (with `item`), `reopen` (the
-//!   dock icon), `close` (with `window`), `check-update`, `quit`.
+//! - `POST /act {"do": …}`: what a person does outside the page: `summon`, `tray` (a click on the tick, with
+//!   `button`: left or right), `reopen` (the dock icon), `close` (with `window`), `check-update`, `quit`.
 //! - `POST /eval {"window", "script"}`: runs the script (an async function body) in that window's WKWebView and
 //!   answers its result, so the tests drive the real page.
 //!
@@ -27,7 +27,7 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Manager, State, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
-use crate::{track, updates, windows, App, SUMMON};
+use crate::{updates, windows, App, SUMMON};
 
 #[derive(Default)]
 pub struct Control {
@@ -234,15 +234,11 @@ fn state(app: &AppHandle) -> Value {
         .lock()
         .map(|s| s.clone())
         .unwrap_or_default();
+    // No native menu any more: an empty list says so (chunk 20).
     let tray = app.tray_by_id("tray").map(|_| {
-        let items: Vec<Value> = track::tray_items(track)
-            .into_iter()
-            .map(|i| match i {
-                Some(i) => json!({ "id": i.id, "text": i.text, "accelerator": i.accelerator }),
-                None => json!({ "separator": true }),
-            })
-            .collect();
-        json!({ "tooltip": track.name(), "items": items })
+        json!({ "tooltip": track.name(), "items": [], "rect": crate::tray_icon(app).map(|i| json!({
+            "x": i.x, "y": i.y, "width": i.width, "height": i.height,
+        })) })
     });
     let registered = app.global_shortcut().is_registered(SUMMON);
     json!({
@@ -254,6 +250,7 @@ fn state(app: &AppHandle) -> Value {
         "windows": {
             "main": window_state(app.get_webview_window(windows::MAIN)),
             "floating": window_state(app.get_webview_window(windows::FLOATING)),
+            "menubar": window_state(app.get_webview_window(windows::MENUBAR)),
         },
         "tray": tray,
         "shortcut": { "accelerator": SUMMON, "registered": registered },
@@ -275,10 +272,8 @@ fn act(app: &AppHandle, input: &Value) -> (u16, Value) {
             let _ = app.run_on_main_thread(move || {
                 match w.as_str() {
                     "summon" => windows::summon(&a, true),
-                    "tray" => crate::tray_action(
-                        &a,
-                        input.get("item").and_then(Value::as_str).unwrap_or(""),
-                    ),
+                    // Either button toggles the sheet; the click comes from where the tick is.
+                    "tray" => windows::toggle_menubar(&a, crate::tray_icon(&a)),
                     "reopen" => windows::show_main(&a, None),
                     "close" => {
                         let label = input

@@ -165,7 +165,8 @@ test.describe('quick-add', () => {
     await b.getByRole('textbox', { name: 'Task title' }).fill('Second');
     await b.getByRole('button', { name: 'Choose a project' }).click();
     const items = b.locator('.tp-qa-pop').getByRole('menuitem');
-    await expect(items).toHaveText(['Home', 'New project…']);
+    // Edit projects… ends the list (chunk 18).
+    await expect(items).toHaveText(['Home', 'New project…', 'Edit projects…']);
     await items.first().click();
     await addButton(b).click();
     await expect(bar(page)).toHaveCount(0, { timeout: 5000 });

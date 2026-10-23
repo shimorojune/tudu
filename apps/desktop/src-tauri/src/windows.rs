@@ -1,19 +1,31 @@
-//! The two windows: the desk (`main`) and the floating Quick Add (`floating`).
+//! The three windows: the desk (`main`), the floating Quick Add (`floating`) and today from the menu bar
+//! (`menubar`).
 //!
 //! The desk has no title bar: the traffic lights sit over the sidebar and the top bar drags the window. Closing it
-//! hides it. The floating window is a non-activating panel: it takes the keyboard without bringing Tudu (and its
-//! desk) forward, floats over every app and space, and hides when it loses focus.
+//! hides it. The floating window and the menu bar's sheet are non-activating panels: they take the keyboard without
+//! bringing Tudu (and its desk) forward, float over every app and space, and hide when they lose focus.
+
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use tauri::{
     AppHandle, Emitter, Manager, PhysicalPosition, Url, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder, WindowEvent,
 };
 
-use crate::place::{self, Screen, FLOATING_HEIGHT, FLOATING_WIDTH};
+use crate::place::{
+    self, Icon, Screen, FLOATING_HEIGHT, FLOATING_WIDTH, SHEET_HEIGHT, SHEET_WIDTH,
+};
 use crate::App;
 
 pub const MAIN: &str = "main";
 pub const FLOATING: &str = "floating";
+pub const MENUBAR: &str = "menubar";
+
+/// When the sheet last hid because it lost focus. A click on the tick takes the focus first, so a click that comes
+/// this soon after is the one that closed it, and must not open it again.
+static SHEET_BLURRED: Mutex<Option<Instant>> = Mutex::new(None);
+const BLUR_GRACE: Duration = Duration::from_millis(300);
 
 /// Where this build's windows find Tudu on the web.
 pub fn web(app: &AppHandle) -> Url {
@@ -127,11 +139,43 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         }
         _ => {}
     });
+
+    let sheet = builder(app, MENUBAR, "menubar.html", "/menubar")
+        .title("Today")
+        .inner_size(SHEET_WIDTH, SHEET_HEIGHT)
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .resizable(false)
+        .always_on_top(true)
+        .visible_on_all_workspaces(true)
+        .skip_taskbar(true)
+        .focused(false)
+        .visible(false)
+        .build()?;
+    #[cfg(target_os = "macos")]
+    panel::make_panel(&sheet);
+    let a = app.clone();
+    sheet.on_window_event(move |e| match e {
+        WindowEvent::Focused(false) => {
+            if let Ok(mut t) = SHEET_BLURRED.lock() {
+                *t = Some(Instant::now());
+            }
+            hide_menubar(&a);
+        }
+        WindowEvent::CloseRequested { api, .. } => {
+            api.prevent_close();
+            hide_menubar(&a);
+        }
+        _ => {}
+    });
     Ok(())
 }
 
-/// The desk, shown and focused; `go` takes it to a page first (Sign in, from the floating window).
+/// The desk, shown and focused; `go` takes it to a page first (Sign in from the floating window, a task from the
+/// menu bar's sheet, which hides as the desk comes forward).
 pub fn show_main(app: &AppHandle, go: Option<&str>) {
+    hide_menubar(app);
     if let Some(w) = app.get_webview_window(MAIN) {
         let _ = w.unminimize();
         let _ = w.show();
@@ -178,9 +222,63 @@ pub fn summon(app: &AppHandle, toggle: bool) {
     let _ = w.emit_to(FLOATING, "floating:shown", ());
 }
 
-fn place_floating(app: &AppHandle, w: &WebviewWindow) {
-    let screens: Vec<Screen> = w
-        .available_monitors()
+/// A click on the tick, either button, as it comes up: the sheet opens under the tick, or closes when open.
+pub fn tray_toggles(
+    button: tauri::tray::MouseButton,
+    state: tauri::tray::MouseButtonState,
+) -> bool {
+    use tauri::tray::{MouseButton, MouseButtonState};
+    matches!(button, MouseButton::Left | MouseButton::Right) && state == MouseButtonState::Up
+}
+
+/// Whether a click opens the sheet: it is hidden, and it did not just hide because this same click took its focus.
+fn opens(visible: bool, blurred: Option<Duration>) -> bool {
+    !visible && blurred.is_none_or(|ago| ago > BLUR_GRACE)
+}
+
+/// The tick's click: the sheet under `icon` (the tick's place), or hidden again.
+pub fn toggle_menubar(app: &AppHandle, icon: Option<Icon>) {
+    let Some(w) = app.get_webview_window(MENUBAR) else {
+        return;
+    };
+    let visible = w.is_visible().unwrap_or(false);
+    let blurred = SHEET_BLURRED
+        .lock()
+        .ok()
+        .and_then(|t| t.map(|t| t.elapsed()));
+    if visible {
+        hide_menubar(app);
+        return;
+    }
+    if !opens(visible, blurred) {
+        return;
+    }
+    if let Some(icon) = icon {
+        let screens = screens(&w);
+        let centre = (icon.x + icon.width / 2.0, icon.y + icon.height / 2.0);
+        if let Some(s) = place::screen_for(Some(centre), &screens) {
+            let (x, y) = place::sheet_origin(icon, s);
+            let _ = w.set_size(tauri::LogicalSize::new(SHEET_WIDTH, SHEET_HEIGHT));
+            let _ = w.set_position(PhysicalPosition::new(x as i32, y as i32));
+        }
+    }
+    let _ = w.show();
+    focus_floating(&w);
+    let _ = w.emit_to(MENUBAR, "menubar:shown", ());
+}
+
+/// The sheet away: it lost focus, Esc, a click on the tick, or something in it brought another window forward.
+pub fn hide_menubar(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window(MENUBAR) {
+        if w.is_visible().unwrap_or(false) {
+            let _ = w.hide();
+            let _ = w.emit_to(MENUBAR, "menubar:hidden", ());
+        }
+    }
+}
+
+fn screens(w: &WebviewWindow) -> Vec<Screen> {
+    w.available_monitors()
         .unwrap_or_default()
         .iter()
         .map(|m| Screen {
@@ -190,7 +288,11 @@ fn place_floating(app: &AppHandle, w: &WebviewWindow) {
             height: m.size().height as f64,
             scale: m.scale_factor(),
         })
-        .collect();
+        .collect()
+}
+
+fn place_floating(app: &AppHandle, w: &WebviewWindow) {
+    let screens = screens(w);
     let pointer = app.cursor_position().ok().map(|p| (p.x, p.y));
     if let Some(s) = place::screen_for(pointer, &screens) {
         let (x, y) = place::floating_origin(s);
@@ -199,7 +301,7 @@ fn place_floating(app: &AppHandle, w: &WebviewWindow) {
     }
 }
 
-/// Key window without activating the app, so the desk stays where it is.
+/// Key window without activating the app, so the desk stays where it is (the floating bar and the sheet).
 fn focus_floating(w: &WebviewWindow) {
     #[cfg(target_os = "macos")]
     panel::make_key(w);
@@ -238,6 +340,23 @@ mod tests {
             &web,
             true
         ));
+    }
+
+    #[test]
+    fn c20_u05_left_and_right_click_both_toggle_the_sheet_as_they_come_up() {
+        use tauri::tray::{MouseButton, MouseButtonState};
+        assert!(tray_toggles(MouseButton::Left, MouseButtonState::Up));
+        assert!(tray_toggles(MouseButton::Right, MouseButtonState::Up));
+        assert!(!tray_toggles(MouseButton::Left, MouseButtonState::Down));
+        assert!(!tray_toggles(MouseButton::Middle, MouseButtonState::Up));
+    }
+
+    #[test]
+    fn c20_u05_the_click_that_took_the_sheets_focus_does_not_open_it_again() {
+        assert!(opens(false, None));
+        assert!(!opens(true, None));
+        assert!(!opens(false, Some(Duration::from_millis(40))));
+        assert!(opens(false, Some(Duration::from_millis(900))));
     }
 }
 

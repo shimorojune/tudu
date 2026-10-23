@@ -98,7 +98,9 @@ Each line is true of the app on master. A line leaves the register once the canv
 ### Desktop (macOS app, no page yet)
 
 - No title bar: the traffic lights sit over the sidebar's head and the top bar drags the window.
-- The tray: the ink tick; "Open Tudu", "New task ⌘⇧N", a line, "Quit Tudu" ("Tudu Staging" on staging).
+- The tray: the ink tick with no native menu. A click (left or right) drops today from the menu bar under it
+  (K-MenuBar, light and dark): the day and its ring, every space's tasks (Personal first, headed when there is more
+  than one), New task ⌘⇧N, Open Tudu and ⋯ (Send feedback…, Quit Tudu). "Tudu Staging" names the app on staging.
 - ⌘⇧N summons the floating bar over any app, top centre of the pointer's screen; it hides 650ms after Added.
 - The dock badge carries the Inbox count across spaces. Attachments save to Downloads: "Saved to Downloads."
 - The window loads the site through a loader page that says "You're offline." with Try again.
@@ -110,10 +112,7 @@ Each line is true of the app on master. A line leaves the register once the canv
 Page 13 draws four pieces the app does not have yet. These lines are the other way round from the rest: the canvas
 is ahead, and each leaves when its chunk ships (or is redrawn to what shipped).
 
-- The menu bar: a click (left or right) opens today across your spaces with the real checkbox, New task, Open Tudu
-  (a quiet button) and ⋯ (Send feedback…, Quit Tudu). The tray's native menu goes, Rohit's call. Signed out, the
-  sheet says "Sign in to see your day." with Open Tudu and keeps ⋯ for Quit. The Inbox count beside the tick while
-  the Dock icon is gone (the background-running chunk).
+- The Inbox count beside the tick while the Dock icon is gone (the background-running chunk).
 - Open at login and Show Tudu in the Dock (K-Login, light and dark): a Settings › You › This Mac section in the Mac
   app only. Dock: While the window is open (default) or Always; under the default the Inbox count rides beside the
   tick while the window is closed. Both live in Settings only: the menu bar's sheet carries neither.
@@ -512,3 +511,16 @@ The canvas and the design system now follow the app; these lines left the regist
   warning tone. The board has no such state.
 - Reports go to the `feedback` table and are mailed to `FEEDBACK_TO` with the screenshot attached and the sender as
   reply-to (Rohit's call, 23 Oct 2026).
+
+## Chunk 20 · Today in the menu bar · 23 Oct 2026
+
+- Built as K-MenuBar draws it, as `MenuBarSheet` in Tudu Paper and a `/menubar` page in a third window of the Mac
+  app. The tray's native menu is gone (Rohit's call): a click, left or right, opens the sheet under the tick and a
+  second click, Esc, or another app hides it. Signed out it says "Sign in to see your day." with Open Tudu, and ⋯
+  holds Quit alone.
+- The tick does not show as pressed while the sheet is open: Tauri does not reach the status item's highlight. The
+  sheet under it says it is open.
+- A click on the window's clear edge around the sheet puts it away, as the floating bar's does. The board has no
+  clear edge.
+- Offline, the line under the head is the warning Banner ("You’re offline." over "Ticks save here and go when
+  you’re back."), the same one the desk shows, not the board's bare line.

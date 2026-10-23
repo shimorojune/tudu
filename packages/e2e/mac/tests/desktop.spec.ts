@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
 import { rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import {
   alive,
   API,
@@ -34,6 +35,29 @@ import {
 const today = () => new Date().toLocaleDateString('en-CA');
 const floatingShown = (a: App) => a.waitState((s) => s.windows.floating.visible);
 const floatingHidden = (a: App) => a.waitState((s) => !s.windows.floating.visible);
+
+const sheetShown = (a: App) => a.waitState((s) => s.windows.menubar.visible);
+const sheetHidden = (a: App) => a.waitState((s) => !s.windows.menubar.visible);
+
+/** A click on the tick: the sheet under it, its page ready. */
+async function openSheet(app: App): Promise<void> {
+  await app.act('tray');
+  await sheetShown(app);
+  await app.until(`return !!document.querySelector('.tp-mb')`, 'menubar');
+}
+
+/** ⋯ › Quit Tudu Test, in the sheet. */
+async function quitFromSheet(app: App): Promise<void> {
+  await openSheet(app);
+  await app.eval(`T.click(T.get('button', 'More'))`, 'menubar');
+  await app.until(`return T.all('button', /^Quit Tudu Test/).length > 0`, 'menubar');
+  await app.eval(`T.click(T.get('button', /^Quit Tudu Test/))`, 'menubar');
+}
+
+/** Another app comes forward, as a click on it would bring it. */
+function clickAnotherApp(): void {
+  spawnSync('osascript', ['-e', 'tell application "Finder" to activate']);
+}
 
 /** Your Personal space, as the page's person. */
 async function personal(app: App): Promise<Space> {
@@ -74,12 +98,8 @@ test.describe('desktop', () => {
     expect(s.version).toBe(run().current.version);
     expect(s.shortcut).toEqual({ accelerator: 'CommandOrControl+Shift+N', registered: true });
     expect(s.tray.tooltip).toBe('Tudu Test');
-    expect(s.tray.items).toEqual([
-      { id: 'open', text: 'Open Tudu Test', accelerator: null },
-      { id: 'new', text: 'New task', accelerator: 'CommandOrControl+Shift+N' },
-      { separator: true },
-      { id: 'quit', text: 'Quit Tudu Test', accelerator: null },
-    ]);
+    // No native menu (chunk 20): the tick opens today from the menu bar, which has Open, New task and Quit.
+    expect(s.tray.items).toEqual([]);
     expect(s.badge).toBeNull();
     expect(s.windows.main.visible).toBe(true);
     // The window opens Tudu on the web (the harness's), on Sign in.
@@ -106,15 +126,18 @@ test.describe('desktop', () => {
     await app.act('close', { window: 'main' });
     await app.waitState((s) => !s.windows.main.visible);
     expect(alive(pid)).toBe(true);
-    await app.act('tray', { item: 'open' });
-    await app.waitState((s) => s.windows.main.visible && s.windows.main.focused);
+    await openSheet(app);
+    await app.eval(`T.click(T.get('button', 'Open Tudu Test'))`, 'menubar');
+    await app.waitState(
+      (s) => s.windows.main.visible && s.windows.main.focused && !s.windows.menubar.visible,
+    );
 
     await app.act('close', { window: 'main' });
     await app.waitState((s) => !s.windows.main.visible);
     await app.act('reopen');
     await app.waitState((s) => s.windows.main.visible);
 
-    await app.act('tray', { item: 'quit' });
+    await quitFromSheet(app);
     const code = await new Promise<number | null>((r) => app.child!.once('exit', (c) => r(c)));
     expect(code).toBe(0);
     expect(alive(pid)).toBe(false);
@@ -231,7 +254,7 @@ test.describe('desktop', () => {
       await expect.poll(() => sidebarInbox(app)).toBe(0);
       // Hide and show: still read.
       await app.act('close', { window: 'main' });
-      await app.act('tray', { item: 'open' });
+      await app.act('reopen');
       await app.waitState((x) => x.windows.main.visible);
       await go(app, `/${space.slug}/inbox`);
       await app.until(hasRow(next));
@@ -462,6 +485,102 @@ test.describe('desktop', () => {
     await app.eval(`location.href = 'https://example.com/elsewhere'`).catch(() => {});
     const s = await app.waitState((x) => x.seen.opened.includes('https://example.com/elsewhere'));
     expect(new URL(s.windows.main.url).origin).toBe(new URL(before).origin);
+  });
+
+  test('C20-D01 a click on the tick shows the sheet under it; again hides it; either button opens it; no native menu', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const before = await app.state();
+    expect(before.tray.items).toEqual([]);
+    expect(before.windows.menubar.visible).toBe(false);
+    await openSheet(app);
+    const s = await app.state();
+    const m = s.windows.menubar;
+    expect(m.alwaysOnTop).toBe(true);
+    expect(m.decorated).toBe(false);
+    expect(m.width).toBe(360);
+    // Under the tick, on its screen.
+    const r = s.tray.rect;
+    if (r && m.screen) {
+      const scale = (await app.eval<number>(`return window.devicePixelRatio`, 'menubar')) || 1;
+      expect(m.y).toBeGreaterThanOrEqual((r.y + r.height) / scale - 1);
+      expect(m.x).toBeGreaterThanOrEqual(m.screen.x);
+      expect(m.x + m.width).toBeLessThanOrEqual(m.screen.x + m.screen.width);
+    }
+    // The desk stays where it was.
+    expect(s.windows.main.focused).toBe(false);
+    await app.act('tray');
+    await sheetHidden(app);
+    await app.act('tray', { button: 'right' });
+    await sheetShown(app);
+    await app.act('tray');
+    await sheetHidden(app);
+  });
+
+  test('C20-D02 with the desk hidden: tick a task in the sheet, Open Tudu, and the desk shows it ticked', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const space = await personal(app);
+    await writeTask(app, space.id, 'Water the plants', today());
+    await app.act('close', { window: 'main' });
+    await app.waitState((x) => !x.windows.main.visible);
+    await openSheet(app);
+    await app.until(`return T.all('checkbox', 'Water the plants').length > 0`, 'menubar');
+    await app.eval(`T.click(T.get('checkbox', 'Water the plants'))`, 'menubar');
+    await app.until(
+      `return T.get('checkbox', 'Water the plants').getAttribute('aria-checked') === 'true'`,
+      'menubar',
+    );
+    await app.eval(`T.click(T.get('button', 'Open Tudu Test'))`, 'menubar');
+    await app.waitState((x) => x.windows.main.visible && !x.windows.menubar.visible);
+    await app.until(
+      `return T.all('checkbox', /Water the plants/).some((c) => c.getAttribute('aria-checked') === 'true')`,
+    );
+  });
+
+  test('C20-D03 a title brings the desk forward on that task with its panel open, and the sheet goes', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const space = await personal(app);
+    await writeTask(app, space.id, 'Renew the passport', today());
+    await openSheet(app);
+    await app.until(`return T.all('button', 'Open Renew the passport in Tudu').length > 0`, 'menubar');
+    await app.eval(`T.click(T.get('button', 'Open Renew the passport in Tudu'))`, 'menubar');
+    await app.waitState(
+      (x) => x.windows.main.visible && x.windows.main.focused && !x.windows.menubar.visible,
+    );
+    await app.until(`return location.search.includes('task=')`);
+    await app.until(
+      `return T.all('heading', 'Renew the passport').length > 0 || !!document.querySelector('.tp-panel')`,
+    );
+  });
+
+  test('C20-D04 clicking another app hides the sheet; so does Esc', async ({ app }) => {
+    await signIn(app);
+    await openSheet(app);
+    clickAnotherApp();
+    await sheetHidden(app);
+    await openSheet(app);
+    await app.eval(`T.press('Escape')`, 'menubar');
+    await sheetHidden(app);
+  });
+
+  test('C20-D05 ⋯ › Quit ends the process, signed in and signed out', async ({ app }) => {
+    // Signed out first: the sheet says Sign in, and ⋯ has Quit alone.
+    await openSheet(app);
+    await app.until(`return T.all('heading', 'Sign in to see your day.').length > 0`, 'menubar');
+    await app.eval(`T.click(T.get('button', 'More'))`, 'menubar');
+    expect(await app.until<number>(`return T.all('[role=menuitem]').length`, 'menubar')).toBe(1);
+    await app.eval(`T.press('Escape')`, 'menubar');
+    await signIn(app);
+    const pid = (await app.state()).pid;
+    await quitFromSheet(app);
+    const code = await new Promise<number | null>((r) => app.child!.once('exit', (c) => r(c)));
+    expect(code).toBe(0);
+    expect(alive(pid)).toBe(false);
   });
 
   test('C11-D11 across launches: still signed in, the theme holds, the floating draft holds; a fresh folder starts clean', async ({

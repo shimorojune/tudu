@@ -199,3 +199,6 @@
   transition: none;
   animation: none;
 }
+:root[data-motion='less'] .tp-root.tp-mb {
+  animation: none;
+}
