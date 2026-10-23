@@ -110,10 +110,6 @@ Each line is true of the app on master. A line leaves the register once the canv
 Page 13 draws four pieces the app does not have yet. These lines are the other way round from the rest: the canvas
 is ahead, and each leaves when its chunk ships (or is redrawn to what shipped).
 
-- Settings › Space › Projects is redrawn: a list (dot, name, "5 open", ⋯), New project in the section's head, and
-  one editor card for making and changing a project (name, swatches, the byline preview, Delete project, Cancel,
-  Save). The app still has the inline names, the dot that opens swatches, a Delete per row and the field at the foot.
-- "Edit projects…" ends every project picker and the Backlog filter and opens Settings › Space on Projects.
 - Send feedback: the avatar menu, More and the menu bar's ⋯; Something’s wrong | An idea, one screenshot, app
   details; the screenshot shows as a preview, not a file chip. Where reports go is not decided.
 - The menu bar: a click (left or right) opens today across your spaces with the real checkbox, New task, Open Tudu
@@ -492,3 +488,16 @@ The canvas and the design system now follow the app; these lines left the regist
 - The floating bar starts on the desk's last space (the stored one it already wrote into) and its line switches it;
   a task for someone is sent from there too.
 - The placeholder "What should Meera do?" was drawn but not built before; it is now.
+
+## Chunk 18 · Projects per space · 23 Oct 2026
+
+- Settings › Space › Projects is built as K-Projects draws it: the list (dot, name, "5 open" or "None open", ⋯ with
+  Edit name and colour and Delete), New project in the block's head, one editor card at a time (name, swatches,
+  the byline preview, Delete project, Cancel, Create project or Save), and the empty state "No projects yet".
+- "Edit projects…" ends the project picker in Quick Add (the desk's and the floating bar's) and in the task panel,
+  and the Backlog's project filter. It opens Settings › Space for that space scrolled to Projects; on phones, the
+  Space page. Closing Settings from Quick Add's way in brings Quick Add back with its draft; the floating bar
+  hands over to the window instead.
+- Delete's toast says what happened to the tasks: "Home deleted. Its 2 tasks keep no project.", with Undo.
+- The editor's preview says "No open tasks" as well as the byline for an existing project, as the board does; a new
+  project's preview has only the byline.

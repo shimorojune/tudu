@@ -316,85 +316,175 @@
   object-fit: cover;
 }
 
-/* Settings › Space › Projects (chunk 09, not drawn): a dot that opens the swatches, a name that saves on leave. */
-.tp-sprj-t {
+/* Settings › Space › Projects (chunk 18, K-Projects): a quiet list with one way in per row, and one editor card for
+   making and changing a project. */
+.tp-prj-top {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-width: 0;
-  flex: 1;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 8px;
 }
-.tp-root .tp-sprj-dot {
-  flex: none;
-  width: 14px;
-  height: 14px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  cursor: pointer;
-  box-shadow:
-    0 0 0 3px var(--card),
-    0 0 0 3px transparent;
-  transition: box-shadow var(--dur-menu) var(--ease-change);
+.tp-prj-top p {
+  margin: 0;
+  max-width: 380px;
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--muted-foreground);
 }
-.tp-root .tp-sprj-dot:hover,
-.tp-root .tp-sprj-dot.tp-on {
-  box-shadow:
-    0 0 0 3px var(--card),
-    0 0 0 5px var(--border-strong);
-}
-.tp-root .tp-sprj-dot:focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 3px var(--card),
-    0 0 0 5px var(--ring);
-}
-.tp-sprj-pick {
-  padding: 2px 0 2px 24px;
-}
-.tp-root .tp-sprj-name {
-  flex: 1;
-  min-width: 0;
-  height: 32px;
-  padding: 0 8px;
-  margin-left: -8px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--foreground);
-  text-overflow: ellipsis;
-  outline: none;
-  transition:
-    background-color var(--dur-menu) var(--ease-change),
-    box-shadow var(--dur-menu) var(--ease-change);
-}
-.tp-root .tp-sprj-name:hover {
-  background: var(--muted);
-}
-.tp-root .tp-sprj-name:focus,
-.tp-root .tp-sprj-name:focus-visible {
+.tp-prj-list {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 0 0 1px var(--line);
   background: var(--card);
-  box-shadow:
-    inset 0 0 0 1px var(--border-strong),
-    0 0 0 4px var(--accent);
-  outline: none;
 }
-.tp-root .tp-sprj-name::placeholder {
-  color: var(--ghost);
-  font-weight: 400;
-}
-.tp-sprj-new {
+.tp-prj-row {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 0 0 32px;
+  gap: 4px;
+  padding: 0 6px 0 0;
+}
+.tp-prj-row + .tp-prj-row,
+.tp-prj-row + .tp-prj-ed {
   border-top: 1px solid var(--line);
 }
-.tp-sprj-new .tp-sprj-name {
-  margin-left: -8px;
+.tp-root .tp-prj-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  padding: 0 12px 0 16px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  font: inherit;
+  color: var(--foreground);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur-menu) var(--ease-change);
+}
+.tp-root .tp-prj-main:hover {
+  background: var(--accent);
+}
+.tp-root .tp-prj-main:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--ring);
+}
+.tp-prj-dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+.tp-prj-n {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 500;
+}
+.tp-prj-c {
+  flex: none;
+  font-size: 12.5px;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.tp-prj-ed {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 16px 14px;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--background) 35%, var(--card));
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  animation: tp-prj-in var(--dur-menu) var(--ease-change) both;
+}
+.tp-prj-ed + .tp-prj-row {
+  border-top: 0;
+}
+@keyframes tp-prj-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+.tp-prj-l {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+.tp-prj-prev {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+  font-size: 12.5px;
+  color: var(--muted-foreground);
+}
+.tp-prj-prev .tp-tl-by i {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.tp-prj-prev .tp-prj-open {
+  margin-left: auto;
+}
+.tp-prj-f {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tp-prj-f .tp-prj-sp {
+  flex: 1;
+}
+.tp-prj-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 24px;
+  text-align: center;
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.tp-prj-empty h3 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 400;
+}
+.tp-prj-empty p {
+  max-width: 340px;
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--muted-foreground);
+}
+.tp-prj-dots {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.tp-prj-dots i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+@media (max-width: 599px) {
+  .tp-prj-top {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 
 /* Settings (chunk 09): the email change line, a photo that failed, and ‹ Settings on a phone section. */

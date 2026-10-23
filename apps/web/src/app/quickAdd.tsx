@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useRouterState } from '@tanstack/react-router';
 import {
   addedWords,
   initialsOf,
@@ -26,6 +26,7 @@ import type { MeResponse } from '@tudu/client';
 import {
   closeQuickAdd,
   flashTask,
+  openQuickAdd,
   showDay,
   showWeek,
   useDayView,
@@ -36,6 +37,7 @@ import {
   useShownDay,
   useShownWeek,
 } from './dayView';
+import { editProjects, editProjectsHref } from './editProjects';
 import { goToTask } from './search';
 import { api } from './session';
 import { spacePath, useSpace } from './space';
@@ -187,6 +189,7 @@ export function QuickAddHost({ me }: { me: MeResponse }) {
   const lastId = useRef<string | null>(null);
   const day2: IsoDate | null = useSecondDay();
   const navigate = useNavigate();
+  const loc = useRouterState({ select: (s) => s.location });
   // Tasks that read like the title, from the same search as the panel's, so "Looks like a task you have" can open one.
   const alike = useRef(new Map<string, SearchHit>());
   const similar = async (title: string): Promise<SimilarItem[]> => {
@@ -217,6 +220,16 @@ export function QuickAddHost({ me }: { me: MeResponse }) {
       send={sendLine(me, target, people, to, setSendTo)}
       onClose={closeQuickAdd}
       onNewProject={a.newProject}
+      onEditProjects={() => {
+        closeQuickAdd();
+        const here = { slug: space.slug, pathname: loc.pathname, searchStr: loc.searchStr };
+        editProjects(
+          (href) => void navigate({ href }),
+          editProjectsHref(target.slug, here, vp === 'phone'),
+          // On the desk and tablets Quick Add comes back with its draft when Settings closes.
+          vp === 'phone' ? undefined : () => openQuickAdd(),
+        );
+      }}
       onUpload={a.upload}
       onSave={(t) => {
         if (t.toId) {

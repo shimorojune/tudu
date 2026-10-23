@@ -20,6 +20,8 @@ export interface ProjectFilterProps {
   value: string | null;
   onChange?: (id: string | null) => void;
   allLabel?: string;
+  /** "Edit projects…", the menu's last line: Settings on the space's Projects. */
+  onEdit?: () => void;
   className?: string;
 }
 
@@ -33,6 +35,7 @@ export function ProjectFilter({
   value,
   onChange,
   allLabel = 'All projects',
+  onEdit,
   className,
 }: ProjectFilterProps) {
   const [open, setOpen] = useState(false);
@@ -65,6 +68,7 @@ export function ProjectFilter({
             hint: p.count != null ? String(p.count) : undefined,
             onSelect: pick(p.id),
           })),
+          onEdit && { label: <span className="tp-td-mi">Edit projects…</span>, onSelect: onEdit },
         ]}
       >
         <button

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate, useSearch } from '@tanstack/react-router';
+import { useNavigate, useRouterState, useSearch } from '@tanstack/react-router';
 import {
   addDays,
   backlogCount,
@@ -34,6 +34,7 @@ import { spacePath, useSpace } from '../../app/space';
 import { openInJira } from '../../app/jira';
 import { taskStore, useOnline } from '../../app/tasks';
 import { useViewport, type Viewport } from '../../app/viewport';
+import { editProjects, editProjectsHref } from '../../app/editProjects';
 import { useWorkingDay } from '../../app/workingDay';
 import { monthAround, toItem } from '../today/TodayPage';
 import { TaskPanel, type OpenTask } from '../today/TaskPanel';
@@ -133,6 +134,9 @@ interface BacklogSheetProps {
 
 /** The sheet: the header with the filter and the view switch, then the list for the view or its states. */
 function BacklogSheet({ spaceId, today, vp, onOpenTask, openKey }: BacklogSheetProps) {
+  const space = useSpace();
+  const navigate = useNavigate();
+  const loc = useRouterState({ select: (s) => s.location });
   const compact = vp === 'phone';
   const q = useQuery(taskStore.backlogQuery(spaceId));
   const projects = useQuery(taskStore.projectsQuery(spaceId)).data ?? [];
@@ -311,6 +315,16 @@ function BacklogSheet({ spaceId, today, vp, onOpenTask, openKey }: BacklogSheetP
           total={inView.length}
           value={filterProject?.id ?? null}
           onChange={(id) => setBacklogFilter(spaceId, id)}
+          onEdit={() =>
+            editProjects(
+              (href) => void navigate({ href }),
+              editProjectsHref(
+                space.slug,
+                { slug: space.slug, pathname: loc.pathname, searchStr: loc.searchStr },
+                vp === 'phone',
+              ),
+            )
+          }
         />
         <Segmented items={VIEWS} value={view} onChange={turnTo} label="View" />
       </DayHeader>

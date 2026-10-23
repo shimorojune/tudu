@@ -238,6 +238,7 @@ export {
 export { ThemePick, type ThemePickProps } from './components/ThemePick';
 export {
   ProjectSettings,
+  openShort,
   openWords,
   type ProjectSettingsProps,
   type ProjectSettingsProject,

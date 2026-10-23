@@ -5,6 +5,7 @@ import {
   goneWords,
   leaveAsk,
   PERSONAL_SLUG,
+  projectDeletedWords,
   removeAsk,
   spaceRules,
   whenWords,
@@ -28,6 +29,7 @@ import {
 } from '@tudu/ui';
 import { useEffect, useState } from 'react';
 import { openCreateSpace } from './dayView';
+import { scrollToProjects, settingsClosed } from './editProjects';
 import { api, initialsOf, photoSrc, queryClient, refreshMe, signOut } from './session';
 import { forgetSpace, spacePath, useSpace as useSpaceFromShell } from './space';
 import { invitedWords } from './spaces';
@@ -313,10 +315,10 @@ export function SettingsView({
           })),
           onRename: (p, name) => taskStore.updateProject(space.id, p.id, { name }),
           onRecolour: (p, color) => taskStore.updateProject(space.id, p.id, { color }),
-          onCreate: (name) => void taskStore.createProject(space.id, name),
+          onCreate: (name, color) => void taskStore.createProject(space.id, name, color),
           onDelete: (p) => {
             taskStore.deleteProject(space.id, p.id);
-            showToast(`${p.name} deleted. Its tasks keep no project.`, {
+            showToast(projectDeletedWords(p.name, p.open), {
               action: 'Undo',
               onAction: () => taskStore.restoreProject(space.id, p.id),
             });
@@ -422,8 +424,15 @@ export function SettingsHost({ me, space }: { me: MeResponse; space: SpaceSummar
     if (phone && section)
       void navigate({ href: settingsHref(loc, space.slug, section, true), replace: true });
   }, [phone, section, loc, space.slug, navigate]);
+  // "Edit projects…" lands here with #projects: the block comes into view.
+  useEffect(() => {
+    if (section === 'space' && loc.hash === 'projects') scrollToProjects();
+  }, [section, loc.hash]);
   if (phone) return null;
-  const close = () => void navigate({ href: settingsHref(loc, space.slug, null, false) });
+  const close = () => {
+    void navigate({ href: settingsHref(loc, space.slug, null, false) });
+    settingsClosed();
+  };
   return (
     <Dialog open={!!section} onClose={close} size="lg" bare label="Settings">
       <SettingsView
@@ -449,6 +458,10 @@ export function SettingsPage({ me, section }: { me: MeResponse; section?: string
     if (vp !== 'phone')
       void navigate({ href: `${spacePath(space.slug)}?settings=${picked ?? 'account'}`, replace: true });
   }, [vp, picked, space.slug, navigate]);
+  const hash = useRouterState({ select: (s) => s.location.hash });
+  useEffect(() => {
+    if (vp === 'phone' && picked === 'space' && hash === 'projects') scrollToProjects();
+  }, [vp, picked, hash]);
   if (vp !== 'phone') return null;
   return (
     <div className="app-page app-settings">

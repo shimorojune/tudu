@@ -17,6 +17,8 @@ export interface ProjectMenuProps {
   onPick: (id: string | null) => void;
   /** "New project…": asks for a name on the spot. Without it the line stays out. */
   onNew?: (name: string) => void;
+  /** "Edit projects…", the last line: opens Settings on the space's Projects. Without it the line stays out. */
+  onEdit?: () => void;
   heading?: string;
   className?: string;
 }
@@ -30,6 +32,7 @@ export function ProjectMenu({
   selected,
   onPick,
   onNew,
+  onEdit,
   heading = 'Project',
   className,
 }: ProjectMenuProps) {
@@ -89,6 +92,7 @@ export function ProjectMenu({
         })),
         selected ? { label: 'No project', onSelect: () => onPick(null) } : null,
         onNew ? { label: 'New project…', onSelect: () => setNaming(true) } : null,
+        onEdit ? { label: 'Edit projects…', onSelect: onEdit } : null,
       ]}
     />
   );

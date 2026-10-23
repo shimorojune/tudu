@@ -66,6 +66,14 @@ export function QuickAddPage({ me }: { me: MeResponse }) {
           projects={a.projects}
           offline={!a.online}
           onNewProject={a.newProject}
+          onEditProjects={
+            app
+              ? () => {
+                  // The desk opens Settings on this space's Projects (the bar is put away and keeps its draft).
+                  app.showMain(`/${target.slug}?settings=space#projects`);
+                }
+              : undefined
+          }
           onUpload={a.upload}
           send={sendLine(me, target, people, to, setSendTo)}
           onSave={(t) => {

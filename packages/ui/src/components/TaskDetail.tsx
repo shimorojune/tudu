@@ -127,6 +127,8 @@ export interface TaskDetailProps {
   onOpenJira?: (key: string) => void;
   /** "New project…": make one with this name and return its id. */
   onNewProject?: (name: string) => string | void;
+  /** "Edit projects…" at the foot of the project picker: Settings on this space's Projects. */
+  onEditProjects?: () => void;
   onNotes?: (html: string) => void;
   /** "Attach a file" in the notes and comment editors. */
   onAttach?: (
@@ -562,6 +564,14 @@ export function TaskDetail(p: TaskDetailProps) {
                       const id = p.onNewProject!(name);
                       setPop(null);
                       if (id) p.onProject?.(id);
+                    }
+                  : undefined
+              }
+              onEdit={
+                p.onEditProjects
+                  ? () => {
+                      setPop(null);
+                      p.onEditProjects!();
                     }
                   : undefined
               }

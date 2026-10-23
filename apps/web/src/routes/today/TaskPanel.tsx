@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate, useRouterState } from '@tanstack/react-router';
 import {
   addDays,
   carriedLabel,
@@ -24,6 +25,7 @@ import {
 } from '@tudu/ui';
 import { useEffect, useState } from 'react';
 import { API_URL } from '../../app/config';
+import { editProjects, editProjectsHref } from '../../app/editProjects';
 import { initialsOf } from '../../app/session';
 import { addRecentTask } from '../../app/search';
 import { useSpace } from '../../app/space';
@@ -74,6 +76,8 @@ export function TaskPanel(p: TaskPanelProps) {
   const { spaceId, open, today, vp } = p;
   const compact = vp === 'phone';
   const space = useSpace();
+  const navigate = useNavigate();
+  const loc = useRouterState({ select: (s) => s.location });
   // "Just now", "Thu 10:12": the clock is read when the panel opens or changes task, and once a minute.
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -237,6 +241,16 @@ export function TaskPanel(p: TaskPanelProps) {
         onJira={(key) => taskStore.linkJira(d.id, key)}
         onOpenJira={conn ? (key) => void openInJira(spaceId, key) : undefined}
         onNewProject={(name) => taskStore.createProject(spaceId, name)}
+        onEditProjects={() =>
+          editProjects(
+            (href) => void navigate({ href }),
+            editProjectsHref(
+              space.slug,
+              { slug: space.slug, pathname: loc.pathname, searchStr: loc.searchStr },
+              compact,
+            ),
+          )
+        }
         onNotes={(html) => taskStore.notes(d.id, html)}
         onAttach={(file, onProgress) => taskStore.upload(spaceId, file, d.id, onProgress)}
         onAddSubtask={(title) => taskStore.addSubtask(spaceId, d.id, title)}

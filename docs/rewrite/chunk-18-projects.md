@@ -1,6 +1,6 @@
 # Chunk 18 · Projects per space
 
-Status: proposed 23 Oct 2026. Awaiting your approval. Branch `rewrite/18-projects` once approved.
+Status: approved 23 Oct 2026 and built on `claude/project-thread-fsltm1` (one branch for chunks 17 to 20).
 
 Boards: 13 Next, K-Projects ("Projects, per space") and K-Proto's Settings › Personal › Space. The data is already
 per space: `projects.space_id` since chunk 02, the `project.create`, `project.update`, `project.delete` and
