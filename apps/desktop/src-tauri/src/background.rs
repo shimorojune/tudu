@@ -86,6 +86,8 @@ pub struct Background {
     pub awake: AtomicBool,
     /// What the tick carries beside it now (the Inbox count, while there is no Dock icon).
     pub tray_title: Mutex<Option<String>>,
+    /// What macOS was last told, so a badge change that leaves the policy as it was does not tell it again.
+    pub applied: Mutex<Option<Policy>>,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -139,6 +141,7 @@ pub fn start(app: &AppHandle) -> Background {
         at_login,
         awake: AtomicBool::new(false),
         tray_title: Mutex::new(None),
+        applied: Mutex::new(None),
     };
     b.awake.store(mac::hold_awake(), Ordering::SeqCst);
     b
@@ -160,19 +163,29 @@ pub fn current_policy(app: &AppHandle) -> Policy {
 
 /// Tell macOS what the app is now, and put the Inbox count where it can be seen.
 pub fn apply(app: &AppHandle) {
+    let b = app.state::<Background>();
     let p = current_policy(app);
-    mac::set_policy(app, p);
+    // Only a real change reaches macOS: the page reports its count often, and a status item or an activation
+    // policy set again for nothing can disturb the window that has the focus.
+    if let Ok(mut last) = b.applied.lock() {
+        if *last != Some(p) {
+            mac::set_policy(app, p);
+            *last = Some(p);
+        }
+    }
     let count = app.state::<App>().seen.lock().ok().and_then(|s| s.badge);
     let (badge, title) = count_places(p, count);
     if let Some(w) = app.get_webview_window(windows::MAIN) {
         let _ = w.set_badge_count(badge);
     }
-    if let Some(tray) = app.tray_by_id("tray") {
-        let _ = tray.set_title(title.as_deref());
-    }
-    if let Ok(mut t) = app.state::<Background>().tray_title.lock() {
-        *t = title;
-    }
+    if let Ok(mut t) = b.tray_title.lock() {
+        if *t != title {
+            if let Some(tray) = app.tray_by_id("tray") {
+                let _ = tray.set_title(title.as_deref());
+            }
+            *t = title;
+        }
+    };
 }
 
 /// The desk opened (the sheet's Open Tudu, the Dock icon, opening Tudu again) or was closed.
