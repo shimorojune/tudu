@@ -36,6 +36,10 @@
             "allow-quit",
             "allow-update-check",
             "allow-update-install",
+            "allow-this-mac",
+            "allow-set-open-at-login",
+            "allow-open-login-items",
+            "allow-set-dock",
             "allow-control-reply"
           ]
         }

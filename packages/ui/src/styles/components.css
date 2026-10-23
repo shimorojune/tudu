@@ -2028,6 +2028,7 @@ button.tp-ix-head:hover { background: var(--selection); }
 @keyframes tp-set-in { from { opacity: 0; transform: translateY(6px); } }
 @media (prefers-reduced-motion: reduce) { .tp-set-in { animation: tp-label-in 160ms linear both; } }
 .tp-set-photo { display: flex; align-items: center; gap: 14px; }
+.tp-set-login { display: flex; align-items: center; gap: 12px; }
 .tp-set-name { display: flex; align-items: center; gap: 12px; }
 .tp-set-name .tp-root { flex: 1; min-width: 0; }
 .tp-set-name .tp-stile { transition: background-color 200ms var(--ease-change); }

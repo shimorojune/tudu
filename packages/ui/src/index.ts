@@ -248,6 +248,9 @@ export {
   type SettingsProps,
   type SettingsMe,
   type SettingsSpace,
+  type SettingsMac,
+  type SettingsLogin,
+  type SettingsDock,
   type SettingsSectionName,
 } from './components/Settings';
 export {

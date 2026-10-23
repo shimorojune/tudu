@@ -119,7 +119,7 @@ test.describe('desktop', () => {
     expect((await app.state()).badge).toBeNull();
   });
 
-  test('C11-D02 the window: no title bar, room for the lights; close hides it; the tray and the dock bring it back; Quit ends it', async ({
+  test('C11-D02 the window: no title bar, room for the lights; close hides it and drops the Dock icon; the sheet and the reopen bring it back; Quit ends it', async ({
     app,
   }) => {
     await signIn(app);
@@ -131,21 +131,26 @@ test.describe('desktop', () => {
       await app.eval(`return !!document.querySelector('header.tp-topbar[data-tauri-drag-region]')`),
     ).toBe(true);
     const pid = (await app.state()).pid;
+    expect((await app.state()).background.policy).toBe('regular');
 
     await app.act('close', { window: 'main' });
-    await app.waitState((s) => !s.windows.main.visible);
+    await app.waitState((s) => !s.windows.main.visible && s.background.policy === 'accessory');
     expect(alive(pid)).toBe(true);
     await openSheet(app);
     await sheetDay(app);
     await app.eval(`T.click(T.get('button', 'Open Tudu Test'))`, 'menubar');
     await app.waitState(
-      (s) => s.windows.main.visible && s.windows.main.focused && !s.windows.menubar.visible,
+      (s) =>
+        s.windows.main.visible &&
+        s.windows.main.focused &&
+        !s.windows.menubar.visible &&
+        s.background.policy === 'regular',
     );
 
     await app.act('close', { window: 'main' });
-    await app.waitState((s) => !s.windows.main.visible);
+    await app.waitState((s) => !s.windows.main.visible && s.background.policy === 'accessory');
     await app.act('reopen');
-    await app.waitState((s) => s.windows.main.visible);
+    await app.waitState((s) => s.windows.main.visible && s.background.policy === 'regular');
 
     await quitFromSheet(app);
     const code = await new Promise<number | null>((r) => app.child!.once('exit', (c) => r(c)));
@@ -656,5 +661,251 @@ test.describe('desktop', () => {
       `/api/spaces/${space.id}/days/${today()}`,
     );
     expect(day.tasks.map((t) => t.title)).toContain('Book the offsite');
+  });
+});
+
+/** Settings › This Mac on the desk. */
+async function thisMac(app: App): Promise<void> {
+  await go(app, `/me?settings=mac`);
+  await app.until(
+    `return T.all('heading', 'This Mac').length > 0 && T.all('[role=switch]', 'Open at login').length > 0`,
+  );
+}
+const loginSwitchOn = `return T.get('[role=switch]', 'Open at login').getAttribute('aria-checked') === 'true'`;
+const loginSwitchOff = `return T.get('[role=switch]', 'Open at login').getAttribute('aria-checked') === 'false'`;
+const dockChoice = (label: string) =>
+  `T.click(T.get('button', ${JSON.stringify(label)}, document.querySelector('[role=group][aria-label="Show Tudu in the Dock"]')))`;
+
+/** A request from the second person to you, in their space. */
+async function sendRequest(
+  b: { call: <T>(m: string, p: string, body?: unknown) => Promise<T> },
+  spaceId: string,
+  toId: string,
+  title: string,
+) {
+  await b.call('POST', '/api/sync', {
+    clientId: 'b',
+    mutations: [
+      {
+        id: crypto.randomUUID(),
+        type: 'request.send',
+        payload: { id: crypto.randomUUID(), spaceId, toId, title, askedDay: today() },
+        at: new Date().toISOString(),
+      },
+    ],
+  });
+}
+
+test.describe('background', () => {
+  test('C16-D01 close: hidden, no Dock icon, still running and awake; Open Tudu from the sheet brings it back in front', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const s = await app.state();
+    expect(s.background).toMatchObject({
+      policy: 'regular',
+      dock: 'open',
+      deskOpen: true,
+      atLogin: false,
+      awake: true,
+    });
+    // The pages are never put to sleep while hidden.
+    expect(s.background.webviews).toEqual({ main: 2, floating: 2, menubar: 2 });
+    const pid = s.pid;
+
+    await app.act('close', { window: 'main' });
+    const hidden = await app.waitState((x) => !x.windows.main.visible && x.background.policy === 'accessory');
+    expect(hidden.background.deskOpen).toBe(false);
+    expect(hidden.background.awake).toBe(true);
+    expect(alive(pid)).toBe(true);
+
+    await openSheet(app);
+    await sheetDay(app);
+    await app.eval(`T.click(T.get('button', 'Open Tudu Test'))`, 'menubar');
+    const back = await app.waitState(
+      (x) => x.windows.main.visible && x.windows.main.focused && x.background.policy === 'regular',
+    );
+    expect(back.background.deskOpen).toBe(true);
+  });
+
+  test('C16-D02 hidden for a while: a task sent to you arrives, the count rides beside the tick, then moves to the Dock when the window opens', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const { b, space, meId } = await withSecond(app);
+    // Written just before closing: it reaches the API though the window is gone.
+    const own = await personal(app);
+    await app.eval(
+      `fetch(${JSON.stringify(API)} + '/api/sync', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ clientId: 'mac-close', mutations: [{ id: crypto.randomUUID(), type: 'task.create', payload: { id: crypto.randomUUID(), spaceId: ${JSON.stringify(own.id)}, title: 'Last thing before closing', day: ${JSON.stringify(today())}, position: 1024 }, at: new Date().toISOString() }] }) })`,
+    );
+    await app.act('close', { window: 'main' });
+    await app.waitState((x) => x.background.policy === 'accessory');
+    // A while hidden: long enough for anything that would park the page to have done so.
+    await new Promise((r) => setTimeout(r, 15_000));
+    await sendRequest(b, space.id, meId, 'Proofread the brochure');
+    const s = await app.waitState((x) => x.background.trayTitle === '1', 15_000);
+    expect(s.badge).toBeNull();
+    const day = await asPage<{ tasks: Array<{ title: string }> }>(
+      app,
+      'GET',
+      `/api/spaces/${own.id}/days/${today()}`,
+    );
+    expect(day.tasks.map((t) => t.title)).toContain('Last thing before closing');
+
+    await app.act('reopen');
+    await app.waitState(
+      (x) => x.background.policy === 'regular' && x.badge === '1' && x.background.trayTitle === null,
+    );
+  });
+
+  test('C16-D03 the summon with the window hidden: the floating bar shows and adds, and Tudu stays out of the Dock', async ({
+    app,
+  }) => {
+    await signIn(app);
+    await app.act('close', { window: 'main' });
+    await app.waitState((x) => x.background.policy === 'accessory');
+    await app.act('summon');
+    const s = await floatingShown(app);
+    expect(s.background.policy).toBe('accessory');
+    expect(s.windows.main.visible).toBe(false);
+    await app.until(`return !!T.all('textbox', 'Task title')[0]`, 'floating');
+    await app.eval(
+      `T.fill(T.get('textbox', 'Task title'), 'Call the plumber'); T.click(T.get('button', 'Add task'));`,
+      'floating',
+    );
+    const after = await floatingHidden(app);
+    expect(after.background.policy).toBe('accessory');
+    expect(after.windows.main.visible).toBe(false);
+    const own = await personal(app);
+    const day = await asPage<{ tasks: Array<{ title: string }> }>(
+      app,
+      'GET',
+      `/api/spaces/${own.id}/days/${today()}`,
+    );
+    expect(day.tasks.map((t) => t.title)).toContain('Call the plumber');
+  });
+
+  test('C16-D04 reopen: launching Tudu again while it is hidden brings the window back as a regular app', async ({
+    app,
+  }) => {
+    await signIn(app);
+    await app.act('close', { window: 'main' });
+    await app.waitState((x) => x.background.policy === 'accessory');
+    await app.act('reopen');
+    await app.waitState(
+      (x) => x.windows.main.visible && x.windows.main.focused && x.background.policy === 'regular',
+    );
+  });
+
+  test('C16-D05 Settings › This Mac › Open at login: on registers with macOS, off unregisters; a launch at login starts in the menu bar', async ({
+    app,
+  }) => {
+    await signIn(app);
+    await thisMac(app);
+    await app.until(loginSwitchOff);
+    try {
+      await app.eval(`T.click(T.get('[role=switch]', 'Open at login'))`);
+      // macOS's answer, read back: on, or waiting for your OK in Login Items. Never refused.
+      const on = await app.waitState(
+        (x) => x.background.loginItem === 'on' || x.background.loginItem === 'approval',
+      );
+      await app.until(loginSwitchOn);
+      if (on.background.loginItem === 'approval') {
+        await app.eval(`T.click(T.get('button', 'Open Login Items'))`);
+        await app.waitState((x) => x.seen.opened.some((u) => u.includes('LoginItems')));
+      }
+      // Across a relaunch, Settings reads macOS again.
+      await app.quit();
+      await app.launch();
+      await onToday(app);
+      await thisMac(app);
+      await app.until(loginSwitchOn);
+      await app.eval(`T.click(T.get('[role=switch]', 'Open at login'))`);
+      await app.waitState((x) => x.background.loginItem === 'off');
+      await app.until(loginSwitchOff);
+    } finally {
+      // Never leave Tudu Test in this Mac's Login Items.
+      await app
+        .eval(
+          `const s = T.all('[role=switch]', 'Open at login')[0]; if (s && s.getAttribute('aria-checked') === 'true') T.click(s);`,
+        )
+        .catch(() => {});
+    }
+
+    // As the login item starts it: no window, no Dock icon, the tick ready.
+    await app.quit();
+    await app.launch({ TUDU_TEST_AT_LOGIN: '1' });
+    const s = await app.state();
+    expect(s.background).toMatchObject({ atLogin: true, policy: 'accessory', deskOpen: false, awake: true });
+    expect(s.windows.main.visible).toBe(false);
+    await app.waitState((x) => x.seen.signedIn, 20_000);
+    await openSheet(app);
+    await sheetDay(app);
+    await app.eval(`T.click(T.get('button', 'Open Tudu Test'))`, 'menubar');
+    await app.waitState((x) => x.windows.main.visible && x.background.policy === 'regular');
+  });
+
+  test('C16-D06 Quit ends the process from the shown and the hidden state: ⋯ in the sheet and ⌘Q', async ({
+    app,
+  }) => {
+    await signIn(app);
+    // ⌘Q with the window shown.
+    let pid = (await app.state()).pid;
+    await app.quit();
+    expect(alive(pid)).toBe(false);
+
+    // ⌘Q with the window hidden.
+    await app.launch();
+    await onToday(app);
+    await app.act('close', { window: 'main' });
+    await app.waitState((x) => x.background.policy === 'accessory');
+    pid = (await app.state()).pid;
+    await app.quit();
+    expect(alive(pid)).toBe(false);
+
+    // ⋯ › Quit in the sheet with the window hidden.
+    await app.launch();
+    await onToday(app);
+    await app.act('close', { window: 'main' });
+    await app.waitState((x) => x.background.policy === 'accessory');
+    pid = (await app.state()).pid;
+    const exited = new Promise<number | null>((r) => app.child!.once('exit', (c) => r(c)));
+    await quitFromSheet(app);
+    expect(await exited).toBe(0);
+    expect(alive(pid)).toBe(false);
+  });
+
+  test('C16-D07 Settings › This Mac › Show Tudu in the Dock: Always keeps the icon and the badge after close; the choice holds across a relaunch', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const { b, space, meId } = await withSecond(app);
+    await sendRequest(b, space.id, meId, 'Order the badges');
+    await app.waitState((x) => x.badge === '1');
+    await thisMac(app);
+    await app.eval(dockChoice('Always'));
+    await app.waitState((x) => x.background.dock === 'always');
+
+    await app.act('close', { window: 'main' });
+    const kept = await app.waitState((x) => !x.windows.main.visible);
+    expect(kept.background.policy).toBe('regular');
+    expect(kept.badge).toBe('1');
+    expect(kept.background.trayTitle).toBeNull();
+
+    await app.quit();
+    await app.launch();
+    await onToday(app);
+    expect((await app.state()).background.dock).toBe('always');
+    await thisMac(app);
+    await app.until(
+      `return T.get('button', 'Always', document.querySelector('[role=group][aria-label="Show Tudu in the Dock"]')).getAttribute('aria-pressed') === 'true'`,
+    );
+    // Back to While the window is open: at once, the icon goes when the window does and the count moves to the tick.
+    await app.eval(dockChoice('While the window is open'));
+    await app.waitState((x) => x.background.dock === 'open');
+    await app.act('close', { window: 'main' });
+    await app.waitState(
+      (x) => x.background.policy === 'accessory' && x.badge === null && x.background.trayTitle === '1',
+    );
   });
 });

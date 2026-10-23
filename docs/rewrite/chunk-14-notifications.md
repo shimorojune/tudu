@@ -50,7 +50,8 @@ Tudu.
 - **Tudu quit.** After ⌘Q nothing of Tudu runs, so nothing can tell you until it opens again; what arrived waits in
   the Inbox and the badge shows it at the next launch. So that this is rare, Settings › Notifications in the Mac
   app gains **Open Tudu at login** (a switch, off until you turn it on, the helper "So it can tell you from the
-  menu bar."), kept by macOS as a login item. Not drawn (choice 7).
+  menu bar."), kept by macOS as a login item. Not drawn (choice 7). Chunk 16 built that switch in Settings › This
+  Mac; this section points there instead of a second switch, and C14-D11 is covered by C16-D05.
 - **Phones.** No push (decided 20 Oct), so a phone is told only while Tudu is open in the browser and the tab is
   hidden; the Settings line says so.
 - **Data.** Migration 0012 (0011 went to chunk 19's feedback) adds `user.notify` (jsonb: `sent`, `answered`, `comments`, `jira`, `version`, each

@@ -12,13 +12,29 @@ import { JiraMark } from './JiraMark';
 import { MembersBody, type MembersBodyInvite, type MembersBodyMember } from './MembersBody';
 import { PersonDot } from './PersonDot';
 import { ProjectSettings, type ProjectSettingsProps } from './ProjectSettings';
+import { Segmented } from './Segmented';
 import { SettingRow, SettingsSection } from './SettingsSection';
 import { SettingsNav, type SettingsNavGroup } from './SettingsNav';
 import { SpaceTile } from './SpaceTile';
 import { Switch } from './Switch';
 import { ThemePick } from './ThemePick';
 
-export type SettingsSectionName = 'account' | 'appearance' | 'space' | 'members' | 'apps';
+export type SettingsSectionName = 'account' | 'appearance' | 'mac' | 'space' | 'members' | 'apps';
+
+/** Open at login, as macOS has it: `approval` waits for your OK in Login Items, `refused` is macOS saying no. */
+export type SettingsLogin = 'off' | 'on' | 'approval' | 'refused';
+
+/** Show Tudu in the Dock: only while the window is open, or always. */
+export type SettingsDock = 'open' | 'always';
+
+/** Settings › This Mac, in the Mac app only. */
+export interface SettingsMac {
+  openAtLogin: SettingsLogin;
+  onOpenAtLogin?: (on: boolean) => void;
+  onLoginItems?: () => void;
+  dock: SettingsDock;
+  onDock?: (dock: SettingsDock) => void;
+}
 
 export interface SettingsMe {
   name: string;
@@ -70,6 +86,9 @@ export interface SettingsProps {
   onTheme?: (t: ThemeChoice) => void;
   lessMotion?: boolean;
   onLessMotion?: (on: boolean) => void;
+
+  // This Mac: the Mac app only; without it the section is not listed.
+  mac?: SettingsMac;
 
   // Space
   onSpaceName?: (name: string) => void;
@@ -268,6 +287,7 @@ function EmailRow({
 const TITLES = (p: SettingsProps): Record<SettingsSectionName, [string, string]> => ({
   account: ['Account', p.me.email],
   appearance: ['Appearance', 'How Tudu looks on this computer.'],
+  mac: ['This Mac', 'How Tudu runs on this Mac.'],
   space: [
     p.space.name,
     p.space.personal ? 'Yours alone. Nothing here is shared.' : spaceLine(p.space.members, p.space.role),
@@ -285,13 +305,13 @@ const TITLES = (p: SettingsProps): Record<SettingsSectionName, [string, string]>
 
 /**
  * Settings: on the desk a large dialog over the page you were on, the sections listed on the left (You: Account,
- * Appearance; then the space: Space, and in a team space Members); on phones a page, the list first and a section
+ * Appearance, and This Mac in the Mac app; then the space: Space, and in a team space Members); on phones a page, the list first and a section
  * pushed in with ‹ Settings. Fields save as you leave them; there is no Save button.
  */
 export function Settings(p: SettingsProps) {
   const layout = p.layout ?? 'dialog';
   const phone = layout === 'phone';
-  const sec = p.section ?? 'account';
+  const sec = p.section === 'mac' && !p.mac ? 'account' : (p.section ?? 'account');
   const sp = p.space;
   const team = !sp.personal;
   const admin = team && sp.role === 'admin';
@@ -311,6 +331,16 @@ export function Settings(p: SettingsProps) {
           icon: 'sun',
           sub: { light: 'Light', dark: 'Dark', system: 'System' }[p.theme ?? 'system'],
         },
+        ...(p.mac
+          ? [
+              {
+                value: 'mac',
+                label: 'This Mac',
+                icon: 'laptop' as const,
+                sub: p.mac.openAtLogin === 'on' ? 'Opens at login' : 'Login, Dock',
+              },
+            ]
+          : []),
       ],
     },
     {
@@ -429,7 +459,57 @@ export function Settings(p: SettingsProps) {
         </SettingsSection>
       </>
     );
-  else if (sec === 'space' && !team)
+  else if (sec === 'mac' && p.mac) {
+    const m = p.mac;
+    const on = m.openAtLogin === 'on' || m.openAtLogin === 'approval';
+    body = (
+      <>
+        <SettingsSection title="Starting up">
+          <SettingRow
+            title="Open at login"
+            sub={
+              m.openAtLogin === 'refused' ? (
+                <span className="tp-set-bad">
+                  macOS didn’t allow it. Try again, or add Tudu in Login Items yourself.
+                </span>
+              ) : m.openAtLogin === 'approval' ? (
+                'macOS needs you to allow Tudu in System Settings › General › Login Items first.'
+              ) : (
+                'Tudu starts in the menu bar when you log in, with no window, so today is a click away.'
+              )
+            }
+            control={
+              <div className="tp-set-login">
+                {m.openAtLogin === 'approval' ? (
+                  <Button variant="secondary" size="sm" onClick={m.onLoginItems}>
+                    Open Login Items
+                  </Button>
+                ) : null}
+                <Switch label="Open at login" checked={on} onChange={m.onOpenAtLogin} />
+              </div>
+            }
+          />
+        </SettingsSection>
+        <SettingsSection title="The Dock">
+          <SettingRow
+            title="Show Tudu in the Dock"
+            sub="Closing the window keeps Tudu running in the menu bar either way. Quit Tudu (⌘Q) stops it."
+            stack
+          >
+            <Segmented<SettingsDock>
+              label="Show Tudu in the Dock"
+              value={m.dock}
+              onChange={m.onDock}
+              items={[
+                { value: 'open', label: 'While the window is open' },
+                { value: 'always', label: 'Always' },
+              ]}
+            />
+          </SettingRow>
+        </SettingsSection>
+      </>
+    );
+  } else if (sec === 'space' && !team)
     body = (
       <>
         <SettingsSection title="This space">

@@ -83,7 +83,8 @@ Each line is true of the app on master. A line leaves the register once the canv
 
 ### 10 Settings
 
-- Sections: Account, Appearance; then Space, Members (team), Apps. No Notifications row yet (chunk 14).
+- Sections: Account, Appearance, This Mac (the Mac app only); then Space, Members (team), Apps. No Notifications row
+  yet (chunk 14).
 - Members read "Its name and colour are kept by its admins."
 - Email has Change: the new address, Send code, the code field. Photo has Remove once there is one.
 - The last admin's Leave asks "Make someone admin first" with Go to Members; the last person's Leave says to Delete.
@@ -103,21 +104,24 @@ Each line is true of the app on master. A line leaves the register once the canv
   than one), New task ⌘⇧N, Open Tudu and ⋯ (Send feedback…, Quit Tudu). "Tudu Staging" names the app on staging.
 - ⌘⇧N summons the floating bar over any app, top centre of the pointer's screen; it hides 650ms after Added.
 - The dock badge carries the Inbox count across spaces. Attachments save to Downloads: "Saved to Downloads."
+- Closing the window keeps Tudu running in the menu bar and drops the Dock icon (unless This Mac › Show Tudu in the
+  Dock is Always); while there is no Dock icon the Inbox count sits beside the tick. Open at login starts Tudu in
+  the menu bar with no window. Settings › This Mac (K-Login) holds both; the sheet carries neither.
 - The window loads the site through a loader page that says "You're offline." with Try again.
 - Updates: "Tudu is ready: version 0.38.0", What's new, Restart to update, "Restarting…", and "Couldn't restart.
   Quit and open Tudu again to finish."
 
-### 13 Next (designed, not built)
-
-Page 13 draws four pieces the app does not have yet. These lines are the other way round from the rest: the canvas
-is ahead, and each leaves when its chunk ships (or is redrawn to what shipped).
-
-- The Inbox count beside the tick while the Dock icon is gone (the background-running chunk).
-- Open at login and Show Tudu in the Dock (K-Login, light and dark): a Settings › You › This Mac section in the Mac
-  app only. Dock: While the window is open (default) or Always; under the default the Inbox count rides beside the
-  tick while the window is closed. Both live in Settings only: the menu bar's sheet carries neither.
-
 # History
+
+## Chunk 16 · Tudu in the background · 23 Oct 2026
+
+- Built as the chunk 16 write-up and K-Login draw it: the Dock icon only while the window is open (or Always), the
+  Inbox count beside the tick while there is none, Open at login through macOS's own login item, and Tudu kept
+  awake while hidden. Page 13's two lines leave the register for Desktop and 10 Settings.
+- The line under This Mac in the Settings list ("Login, Dock", or "Opens at login" when it is on) is the app's own
+  wording; redraw K-Login's list to it if the board differs.
+- When macOS refuses the login item the switch goes back off with the red line; while it waits for your OK in Login
+  Items the switch stays on with Open Login Items beside it, as drawn.
 
 ## Chunk 00 · Foundations · PR #12 · 20 Oct 2026
 
