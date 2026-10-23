@@ -90,7 +90,7 @@ thread); notifications themselves (chunk 14).
 ## Test plan
 
 Unit (`apps/desktop`, Rust): C16-U01 the policy for each state (window shown, hidden, floating shown with the window
-hidden, launched at login); C16-U02 the tray's items per track with the login item checked and unchecked; C16-U03
+hidden, launched at login); C16-U02 the tray's items per track (no login item; Open, New task, Send feedback, Quit); C16-U03
 a launch is "at login" only when macOS says so.
 
 Desktop, group `desktop` (Tudu Test over the control channel, which learns to report the activation policy, the
@@ -102,7 +102,8 @@ App Nap activity, the tray's title and the login item's status):
 | C16-D02 | Hidden for a while: a task sent by a second person reaches the hidden page within seconds (the badge count in the tray's title rises); an outbox write made just before closing reaches the API |
 | C16-D03 | The summon with the window hidden: the floating bar shows and adds; the policy stays accessory before, during and after                                                                        |
 | C16-D04 | Reopen: launching the bundle again while hidden brings the window back as a regular app                                                                                                       |
-| C16-D05 | Open at Login: checking it registers the login item (macOS's answer read back), unchecking unregisters, the state survives a relaunch; a launch flagged as at login starts hidden, accessory  |
+| C16-D05 | Settings › This Mac › Open at login: switching it on registers the login item (macOS's answer read back), off unregisters, it survives a relaunch; a launch at login starts hidden, accessory |
+| C16-D07 | Settings › This Mac › Show Tudu in the Dock: Always keeps the Dock icon and badge after close; While the window is open drops it; the change applies at once and survives a relaunch |
 | C16-D06 | Quit from the tray and ⌘Q end the process cleanly from both the shown and the hidden state                                                                                                     |
 | C11-D02 | Rewritten: closing hides the window and drops the Dock icon; the tray and the reopen bring it back                                                                                            |
 
@@ -113,5 +114,5 @@ restart with an ad hoc signed Tudu Staging. You judge those on Tudu Staging.
 
 - The cases above pass three runs in a row locally and on the macOS runner, with `pnpm verify` green.
 - On Tudu Staging: close the window, the Dock icon goes, a task sent from your phone an hour later shows in the
-  menu bar count and in the window when you open it; with Open at Login on, a Mac restart brings Tudu Staging back
+  menu bar count and in the window when you open it; with Open at login on, a Mac restart brings Tudu Staging back
   to the menu bar with no window.
