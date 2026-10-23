@@ -53,8 +53,10 @@ thread); notifications themselves (chunk 14).
 1. **The Dock icon shows only while the window does.** The Dropbox and Docker pattern: in the Dock while you work in
    it, gone when you close it. The alternative, a menu-bar-only app that is never in the Dock, loses ⌘Tab to the
    window and the app menu, and without the app menu macOS gives the page no Edit shortcuts (copy, paste, undo
-   break in the editor) unless the app builds its own key handling. A third option, a Settings switch for "Show
-   Tudu in the Dock", is a look to draw and can come later.
+   break in the editor) unless the app builds its own key handling. Approved 23 Oct 2026 as the default, and on
+   your ask the same day Settings › This Mac gains "Show Tudu in the Dock": While the window is open (default),
+   Always (today's behaviour, badge included), Never (menu bar only; the Inbox count rides beside the tick, and
+   the app keeps its Edit menu's key equivalents, which needs proving on a real Mac). Drawn on K-Login.
 2. **The Inbox count moves to the menu bar while the Dock icon is gone.** Today the count is the Dock badge (chunk
    11, choice 3); with no Dock icon it would vanish exactly when you are not looking. The count beside the tick
    (the tray's title, the number in the menu bar's own font) keeps it. That is a look nobody has drawn, so I would
