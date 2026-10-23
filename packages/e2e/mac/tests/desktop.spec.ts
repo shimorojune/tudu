@@ -59,7 +59,8 @@ async function quitFromSheet(app: App): Promise<void> {
     'menubar',
   );
   await app.until(`return T.all('button', /^Quit Tudu Test/).length > 0`, 'menubar');
-  await app.eval(`T.click(T.get('button', /^Quit Tudu Test/))`, 'menubar');
+  // After the answer goes back: the app may be gone before it could reply.
+  await app.eval(`const q = T.get('button', /^Quit Tudu Test/); setTimeout(() => T.click(q), 50)`, 'menubar');
 }
 
 /** Another app comes forward, as a click on it would bring it. */
@@ -588,9 +589,9 @@ test.describe('desktop', () => {
     await sheetHidden(app);
     await signIn(app);
     const pid = (await app.state()).pid;
+    const exited = new Promise<number | null>((r) => app.child!.once('exit', (c) => r(c)));
     await quitFromSheet(app);
-    const code = await new Promise<number | null>((r) => app.child!.once('exit', (c) => r(c)));
-    expect(code).toBe(0);
+    expect(await exited).toBe(0);
     expect(alive(pid)).toBe(false);
   });
 
