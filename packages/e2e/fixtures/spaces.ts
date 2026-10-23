@@ -20,6 +20,8 @@ export async function switchTo(page: Page, name: string): Promise<void> {
   const menu = await openSwitcher(page);
   await menu.getByRole('menuitemradio', { name: new RegExp(`^.?${name}`) }).click();
   await expect(switcher(page)).toContainText(name);
+  // The list stays in the page while it closes; a menu opened next must not find its items too (C17-E02).
+  await expect(menu).toHaveCount(0);
 }
 
 /** Create a team space from the switcher and land on its Today. Returns its slug (the address). */

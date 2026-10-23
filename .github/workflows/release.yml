@@ -66,6 +66,12 @@ jobs:
           set -o pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Without the last release's tag semantic-release starts again at 1.0.0 with every commit in the notes
+          # (docs/release.md).
+          if ! git tag -l 'tudu-*' | grep -q .; then
+            echo "::error::No tudu-* tag on the repository; push the last release's tag first (docs/release.md)"
+            exit 1
+          fi
           if [ "$REHEARSAL" = "true" ]; then
             # A dry run on this branch: the version and the notes, nothing tagged or pushed. On a pull request the
             # checkout is the PR's merge ref, which semantic-release refuses to version; it is told it is the branch.
@@ -149,6 +155,13 @@ jobs:
             sleep 5
           done
           echo "api did not come up"; exit 1
+      - name: Smoke test production
+        if: env.REHEARSAL != 'true'
+        run: pnpm install --frozen-lockfile && pnpm e2e smoke
+        env:
+          E2E_BASE_URL: https://tudu.ezdev.net
+          E2E_API_URL: https://api.tudu.ezdev.net
+          CI: 'true'
 
   publish:
     name: Publish the release
