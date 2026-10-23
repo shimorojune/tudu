@@ -26,11 +26,11 @@ What is missing:
 ## Scope
 
 - **Close drops the Dock icon.** When the main window hides, Tudu switches to an accessory app (no Dock icon, not in
-  ⌘Tab, the tray stays). When the window shows again (tray's Open Tudu, opening Tudu from Finder, Spotlight or
+  ⌘Tab, the tray stays). When the window shows again (the today sheet's Open Tudu, opening Tudu from Finder, Spotlight or
   Launchpad, a notification click later), it switches back to a regular app first and then brings the window
   forward, so the Dock icon, ⌘Tab and the app menu (and with it ⌘C, ⌘V, ⌘Z in the page) are there while you work.
   The floating Quick Add never changes the policy: summoning it from the menu bar state leaves no Dock icon behind.
-- **Quit is quit.** ⌘Q and the tray's Quit Tudu end the process as today. Close is the only way into the background.
+- **Quit is quit.** ⌘Q and Quit Tudu in the today sheet's ⋯ end the process. Close is the only way into the background.
 - **Kept awake while hidden.** While the window is hidden Tudu holds a macOS activity that opts it out of App Nap
   but still lets the Mac sleep (`NSProcessInfo` `beginActivity`, user-initiated, idle system sleep allowed), and the
   webviews are set to keep running when not visible (WebKit's inactive scheduling policy set to none, macOS 14+,
@@ -40,9 +40,12 @@ What is missing:
   System Settings › General › Login Items under Tudu and you can switch it off there too. Off until you turn it on.
   A launch at login starts straight into the menu bar state: no window, no Dock icon. A launch you make yourself
   opens the window as today.
-- **The tray stays the way back in.** With no Dock icon, the menu bar item is the one always-visible handle, so
-  whatever the menu bar thread designs for it (today's items, ticking them off), it keeps "Open Tudu" and "Quit Tudu".
-  Opening Tudu again from Finder or Spotlight also brings the window back (macOS sends the running app a reopen).
+- **The menu bar stays the way back in.** With no Dock icon, the ink tick is the one always-visible handle. Left
+  and right click both open the today sheet (no native menu, decided 23 Oct 2026 with the menu bar design); its
+  Open Tudu brings the window back, and its ⋯ holds Send feedback… and Quit Tudu. Signed out, the sheet says "Sign
+  in to see your day." with Open Tudu, and its ⋯ holds Quit Tudu. Opening Tudu again from Finder or Spotlight also
+  brings the window back (macOS sends the running app a reopen). The sheet is a webview created hidden at launch,
+  so it is kept awake with the rest.
 - **Data.** None. No migration, no API change. The login item lives with macOS, not on the server.
 
 Out of scope: push while Tudu is quit (later.md); a Windows or Linux build; the menu bar's content (the menu bar
@@ -66,7 +69,7 @@ thread); notifications themselves (chunk 14).
    2026). States: off (the default), on, macOS waiting for your OK (with Open Login Items) and macOS refused. Drawn
    on the canvas, page 13, K-Login and K-Login-Dark, owned by the design thread; awaiting your approval. Chunk 14's
    Notifications section, when it lands, points to This Mac instead of a second switch.
-4. **⌘Q quits.** The macOS convention, and the only way to really stop it besides the tray. The alternative makes ⌘Q
+4. **⌘Q quits.** The macOS convention, and the only way to really stop it besides the today sheet's Quit Tudu. The alternative makes ⌘Q
    hide too (as some chat apps do), which leaves no keyboard way to quit and surprises people.
 
 ## Risks I cannot settle from here
@@ -90,7 +93,7 @@ thread); notifications themselves (chunk 14).
 ## Test plan
 
 Unit (`apps/desktop`, Rust): C16-U01 the policy for each state (window shown, hidden, floating shown with the window
-hidden, launched at login); C16-U02 the tray's items per track (no login item; Open, New task, Send feedback, Quit); C16-U03
+hidden, launched at login); C16-U02 the tray has no native menu (left and right click both open the today sheet) and its tooltip per track; C16-U03
 a launch is "at login" only when macOS says so.
 
 Desktop, group `desktop` (Tudu Test over the control channel, which learns to report the activation policy, the
@@ -98,14 +101,14 @@ App Nap activity, the tray's title and the login item's status):
 
 | ID      | Case                                                                                                                                                                                           |
 | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C16-D01 | Close the window: hidden, policy accessory, the process stays, the activity is held; Open Tudu from the tray: regular, the window is in front and focused, the activity is gone                |
+| C16-D01 | Close the window: hidden, policy accessory, the process stays, the activity is held; Open Tudu from the today sheet: regular, the window is in front and focused, the activity is gone                |
 | C16-D02 | Hidden for a while: a task sent by a second person reaches the hidden page within seconds (the badge count in the tray's title rises); an outbox write made just before closing reaches the API |
 | C16-D03 | The summon with the window hidden: the floating bar shows and adds; the policy stays accessory before, during and after                                                                        |
 | C16-D04 | Reopen: launching the bundle again while hidden brings the window back as a regular app                                                                                                       |
 | C16-D05 | Settings › This Mac › Open at login: switching it on registers the login item (macOS's answer read back), off unregisters, it survives a relaunch; a launch at login starts hidden, accessory |
 | C16-D07 | Settings › This Mac › Show Tudu in the Dock: Always keeps the Dock icon and badge after close; While the window is open drops it; the change applies at once and survives a relaunch |
-| C16-D06 | Quit from the tray and ⌘Q end the process cleanly from both the shown and the hidden state                                                                                                     |
-| C11-D02 | Rewritten: closing hides the window and drops the Dock icon; the tray and the reopen bring it back                                                                                            |
+| C16-D06 | Quit Tudu from the sheet's ⋯ (signed in and signed out) and ⌘Q end the process cleanly from both the shown and the hidden state                                                                                                     |
+| C11-D02 | Rewritten: closing hides the window and drops the Dock icon; the today sheet's Open Tudu and the reopen bring it back                                                                                            |
 
 Not automated: how it feels over a working day, energy use in Activity Monitor, and Login Items after a real Mac
 restart with an ad hoc signed Tudu Staging. You judge those on Tudu Staging.
