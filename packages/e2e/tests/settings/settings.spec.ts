@@ -23,10 +23,17 @@ async function openSettings(
   page: Page,
   section?: 'Account' | 'Appearance' | 'Space' | 'Members',
 ): Promise<Locator> {
-  await page.getByRole('button', { name: /^You: / }).click();
-  await page.getByRole('menuitem', { name: 'Settings' }).click();
   const d = dialog(page);
-  await expect(d).toBeVisible();
+  const item = page.getByRole('menuitem', { name: 'Settings' });
+  // Right after sign in the shell can still be settling, and once on CI (tablet) the menu's Settings click opened
+  // nothing. Open the menu again if it went, and click again until the dialog shows.
+  await expect(async () => {
+    if (!(await d.isVisible())) {
+      if (!(await item.isVisible())) await page.getByRole('button', { name: /^You: / }).click();
+      await item.click({ timeout: 2_000 });
+    }
+    await expect(d).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 10_000 });
   if (section)
     await nav(page)
       .getByRole('button', { name: new RegExp(`^${section}`) })
