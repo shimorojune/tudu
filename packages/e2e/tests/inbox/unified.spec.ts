@@ -94,6 +94,8 @@ async function twoSpaces(page: Page, browser: Browser) {
   await sendRequest(w.b.page, w.nw.id, w.aId, 'Draft the Q4 plan');
   const ids = await seedTasks(page, w.pf.id, [{ title: 'Order seed potatoes', day: '2026-10-18' }]);
   await comment(w.b.page, ids['Order seed potatoes']!, ['The supplier is closed Monday']);
+  // Load the page after both exist: these cases are about what the Inbox shows, not how fast it hears (E29, E31).
+  await page.goto('/me');
   return { ...w, taskId: ids['Order seed potatoes']! };
 }
 
