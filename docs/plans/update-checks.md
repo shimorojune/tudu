@@ -137,11 +137,11 @@ server doesn't change. Each ID goes in its test's name so `pnpm test:status` fin
 
 ### Real app (`pnpm e2e:mac`, Tudu Test)
 
-| ID      | Case                                                                                                                                                                                                                            |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C11-D14 | Regression for 24 Oct: launch with no release (check: none), publish the next version, focus the desk with the last check over 30 min old (`age-check 31`), and the version downloads and the Inbox item shows with no relaunch |
-| C11-D15 | The floor: focus again within 30 min, and no check (the count stays); a `wake` past 30 min checks once                                                                                                                          |
-| C11-D16 | Settings › This Mac › Check now on the real app finds the next version, shows Downloading then Ready; Restart to update relaunches on it (as C11-D07)                                                                           |
+| ID      | Case                                                                                                                                                                                                                                                                                                                                                                  |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C11-D14 | Regression for 24 Oct: launch with only this version on the feed (check: none; changed while building, since with no release at all the feed answers 404 and the updater counts that as an error), publish the next version, focus the desk with the last check over 30 min old (`age-check 31`), and the version downloads and the Inbox item shows with no relaunch |
+| C11-D15 | The floor: focus again within 30 min, and no check (the count stays); a `wake` past 30 min checks once                                                                                                                                                                                                                                                                |
+| C11-D16 | Settings › This Mac › Check now on the real app finds the next version, shows Downloading then Ready; Restart to update relaunches on it (as C11-D07)                                                                                                                                                                                                                 |
 
 The existing C11-U04, C11-E02/E03 and C11-D06 to D08 keep their IDs, unchanged.
 

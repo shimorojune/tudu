@@ -431,8 +431,15 @@ export function freshFolder(): string {
  * `app`: Tudu Test (this version) launched on a fresh folder, stopped after the test. On a failure the app's log
  * and a capture of the screen are kept with the test's results.
  */
-export const test = base.extend<{ app: TuduApp; folder: string; release: 'next' | 'bad' | null }>({
-  /** A release on the feed before the app launches: the next version, or the next with a signature that fails. */
+export const test = base.extend<{
+  app: TuduApp;
+  folder: string;
+  release: 'current' | 'next' | 'bad' | null;
+}>({
+  /**
+   * A release on the feed before the app launches: this version (so a check finds nothing newer, as on staging and
+   * production, whose feed always has one), the next version, or the next with a signature that fails.
+   */
   release: [null, { option: true }],
   // Playwright reads the fixtures a fixture needs from its first argument, so it stays a pattern even when empty.
   // eslint-disable-next-line no-empty-pattern
@@ -445,6 +452,7 @@ export const test = base.extend<{ app: TuduApp; folder: string; release: 'next' 
     await noReleases();
     const r = run();
     // A bad one: the next version's bundle with this version's signature.
+    if (release === 'current') await publish(r.current.version, r.current.update, r.current.signature);
     if (release === 'next') await publish(r.next.version, r.next.update, r.next.signature);
     if (release === 'bad') await publish(r.next.version, r.next.update, r.current.signature);
     const app = new TuduApp(folder, copyBundle(run().current.app, folder));
