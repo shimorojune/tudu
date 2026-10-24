@@ -147,14 +147,10 @@ jobs:
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
           COMPOSE_ID: ${{ secrets.DOKPLOY_PRODUCTION_COMPOSE_ID }}
         run: node scripts/dokploy-deploy.mjs "$COMPOSE_ID" "release ${{ needs.version.outputs.version }}" infra/production/compose.yaml
-      - name: Wait for the API
+      # Web and API both, several passes in a row: Dokploy reports done while the containers are still swapping.
+      - name: Wait until production is ready
         if: env.REHEARSAL != 'true'
-        run: |
-          for i in $(seq 1 40); do
-            if curl -fsS https://api.tudu.ezdev.net/health >/dev/null; then echo up; exit 0; fi
-            sleep 5
-          done
-          echo "api did not come up"; exit 1
+        run: node scripts/wait-ready.mjs https://tudu.ezdev.net https://api.tudu.ezdev.net
       - name: Smoke test production
         if: env.REHEARSAL != 'true'
         run: pnpm install --frozen-lockfile && pnpm e2e smoke

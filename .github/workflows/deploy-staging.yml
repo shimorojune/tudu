@@ -38,13 +38,9 @@ jobs:
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
           COMPOSE_ID: ${{ secrets.DOKPLOY_STAGING_COMPOSE_ID }}
         run: node scripts/dokploy-deploy.mjs "$COMPOSE_ID" "staging ${{ github.sha }}" infra/staging/compose.yaml
-      - name: Wait for the API
-        run: |
-          for i in $(seq 1 40); do
-            if curl -fsS https://api.staging.tudu.ezdev.net/health >/dev/null; then echo up; exit 0; fi
-            sleep 5
-          done
-          echo "api did not come up"; exit 1
+      # The same readiness wait the release uses, so staging exercises production's path.
+      - name: Wait until staging is ready
+        run: node scripts/wait-ready.mjs https://staging.tudu.ezdev.net https://api.staging.tudu.ezdev.net
 
   smoke:
     name: Smoke test staging

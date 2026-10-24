@@ -1,6 +1,6 @@
 # Release and staging: wait for the whole app before the smoke test
 
-Status: proposal, waiting for Rohit's approval. Canvas: not applicable (release tooling only, no visible change);
+Status: approved by Rohit 24 Oct 2026; implemented. Canvas: not applicable (release tooling only, no visible change);
 skipping it approved by Rohit 24 Oct 2026.
 
 ## The bug
@@ -41,17 +41,17 @@ Not changing: Playwright `retries: 0` stays (a retry would hide real regressions
 
 ## Tests
 
-Unit (vitest, `scripts/wait-ready.test.mjs`, a local `node:http` server whose answers each case scripts):
+Unit (vitest, `scripts/wait-ready.test.mjs`, listed in `docs/tests/chunk-01.md`, a local `node:http` server whose answers each case scripts):
 
 | Id      | Scenario                                                                                                           |
 | ------- | ------------------------------------------------------------------------------------------------------------------ |
-| R01-U01 | All three probes pass from the start: exits 0 after exactly 3 rounds.                                              |
-| R01-U02 | The web `/health` 404s for the first 2 rounds, then passes: exits 0, and only after 3 passes counted from round 3. |
-| R01-U03 | Flapping: pass, pass, 404, pass, pass, pass: the 404 resets the count, exits 0 at round 6, not round 3.            |
-| R01-U04 | `/sign-in` returns 200 without `id="root"` (an error page): counts as a failure.                                   |
-| R01-U05 | The API answers 200 with `{ ok: false }`: counts as a failure.                                                     |
-| R01-U06 | The API never comes up: exits 1 at the timeout, and the output names `api /health` and its last status.            |
-| R01-U07 | Connection refused on the web: counted as a failure (no crash), and reported as such on timeout.                   |
+| C01-U09 | All three probes pass from the start: exits 0 after exactly 3 rounds.                                              |
+| C01-U10 | The web `/health` 404s for the first 2 rounds, then passes: exits 0, and only after 3 passes counted from round 3. |
+| C01-U11 | Flapping: pass, pass, 404, pass, pass, pass: the 404 resets the count, exits 0 at round 6, not round 3.            |
+| C01-U12 | `/sign-in` returns 200 without `id="root"` (an error page): counts as a failure.                                   |
+| C01-U13 | The API answers 200 with `{ ok: false }`: counts as a failure.                                                     |
+| C01-U14 | The API never comes up: exits 1 at the timeout, and the output names `api /health` and its last status.            |
+| C01-U15 | Connection refused on the web: counted as a failure (no crash), and reported as such on timeout.                   |
 
 Workflow checks:
 
