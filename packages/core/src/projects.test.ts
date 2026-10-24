@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { nextProjectColor, PROJECT_COLORS, projectDeletedWords, projectNameSchema } from './projects';
+import {
+  nextProjectColor,
+  PROJECT_COLOR_NAMES,
+  PROJECT_COLORS,
+  projectDeletedWords,
+  projectNamed,
+  projectNameSchema,
+} from './projects';
 
 describe('C04-U16 project colours and names', () => {
   it('C04-U16 hands out the palette in order, skipping colours already taken, then round again', () => {
@@ -24,5 +31,35 @@ describe('projectDeletedWords', () => {
     expect(projectDeletedWords('Offsite', 0)).toBe('Offsite deleted.');
     expect(projectDeletedWords('Hiring', 1)).toBe('Hiring deleted. Its task keeps no project.');
     expect(projectDeletedWords('Platform', 3)).toBe('Platform deleted. Its 3 tasks keep no project.');
+  });
+});
+
+describe('projectNamed', () => {
+  const list = [
+    { id: 'a', name: 'Hiring' },
+    { id: 'b', name: 'Q4  planning' },
+  ];
+  it('C18-U08 matches ignoring case and extra spaces, skips exceptId, and finds nothing for an empty name', () => {
+    expect(projectNamed(list, '  hiring ')).toBe(list[0]);
+    expect(projectNamed(list, 'HIRING')).toBe(list[0]);
+    expect(projectNamed(list, 'q4 Planning')).toBe(list[1]);
+    expect(projectNamed(list, 'Q4   planning')).toBe(list[1]);
+    expect(projectNamed(list, 'hiring', 'a')).toBeNull();
+    expect(projectNamed(list, 'Hiring team')).toBeNull();
+    expect(projectNamed(list, '   ')).toBeNull();
+    expect(projectNamed([], 'Hiring')).toBeNull();
+  });
+
+  it('C18-U14 every project colour has a name', () => {
+    expect(PROJECT_COLORS.map((c) => PROJECT_COLOR_NAMES[c])).toEqual([
+      'Navy',
+      'Moss',
+      'Ochre',
+      'Plum',
+      'Teal',
+      'Rust',
+      'Slate',
+      'Umber',
+    ]);
   });
 });

@@ -12,7 +12,35 @@ export const PROJECT_COLORS = [
   '#6b5b3e',
 ] as const;
 
+/** What a screen reader says for each swatch of PROJECT_COLORS, in the same order. */
+export const PROJECT_COLOR_NAMES: Record<string, string> = {
+  '#3d5a80': 'Navy',
+  '#5b7553': 'Moss',
+  '#8a5a00': 'Ochre',
+  '#7a4e7a': 'Plum',
+  '#2f6f6f': 'Teal',
+  '#a0522d': 'Rust',
+  '#4a6670': 'Slate',
+  '#6b5b3e': 'Umber',
+};
+
 export const PROJECT_NAME_MAX = 60;
+
+/** A name as compared for "already has": outer spaces gone, inner runs of spaces as one, any case. */
+function nameKey(name: string): string {
+  return name.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+}
+
+/** The project already called `name` (ignoring case and extra spaces), other than `exceptId`; null for none or an empty name. */
+export function projectNamed<P extends { id: string; name: string }>(
+  projects: readonly P[],
+  name: string,
+  exceptId?: string | null,
+): P | null {
+  const key = nameKey(name);
+  if (!key) return null;
+  return projects.find((p) => p.id !== exceptId && nameKey(p.name) === key) ?? null;
+}
 
 export const projectNameSchema = z
   .string()

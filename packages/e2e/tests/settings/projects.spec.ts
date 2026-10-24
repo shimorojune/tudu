@@ -87,13 +87,15 @@ async function createFlow(page: Page) {
   let s = await openProjects(page);
   await expect(s.getByRole('heading', { name: 'No projects yet' })).toBeVisible();
   await s.getByRole('button', { name: 'New project' }).click();
-  const ed = s.getByRole('group', { name: 'New project' });
+  // The editor is a popup over Settings, not inside it.
+  const ed = page.getByRole('dialog', { name: 'New project' });
   await expect(ed.getByRole('textbox', { name: 'Project name' })).toBeFocused();
   await ed.getByRole('textbox', { name: 'Project name' }).fill('Hiring');
   await ed.getByRole('radiogroup', { name: 'Project colour' }).getByRole('radio').nth(4).click();
-  await expect(ed.getByLabel('On a task')).toContainText('Hiring');
   await ed.getByRole('button', { name: 'Create project' }).click();
+  await expect(ed).toHaveCount(0);
   await expect(list(s).getByRole('listitem')).toHaveText(['HiringNone open']);
+  await expect(s.getByRole('button', { name: 'Edit Hiring, No open tasks' })).toBeFocused();
   await idle(page);
   const saved = await serverProjects(page, space.id);
   expect(saved.map((p) => p.name)).toEqual(['Hiring']);
@@ -148,8 +150,8 @@ async function editFlow(page: Page) {
   const before = (await serverProjects(page, space.id))[0]!.color;
   const s = await openProjects(page);
   await s.getByRole('button', { name: 'Edit Home, 1 open task' }).click();
-  const ed = s.getByRole('group', { name: 'Edit Home' });
-  await expect(ed.getByText('1 open task')).toBeVisible();
+  const ed = page.getByRole('dialog', { name: 'Edit Home' });
+  await expect(ed.getByRole('heading', { name: 'Edit Home' })).toBeVisible();
   await ed.getByRole('textbox', { name: 'Project name' }).fill('House');
   await ed
     .getByRole('radiogroup', { name: 'Project colour' })
@@ -221,13 +223,13 @@ test.describe('settings › projects', () => {
     // The member, not an admin, makes one.
     const s = await openProjects(b.page);
     await s.getByRole('button', { name: 'New project' }).click();
-    await s.getByRole('textbox', { name: 'Project name' }).fill('Launch');
-    await s.getByRole('button', { name: 'Create project' }).click();
+    await b.page.getByRole('textbox', { name: 'Project name' }).fill('Launch');
+    await b.page.getByRole('button', { name: 'Create project' }).click();
     await expect(list(mine).getByRole('listitem')).toHaveText(['LaunchNone open'], { timeout: 2000 });
     // And renames it.
     await s.getByRole('button', { name: 'Edit Launch, No open tasks' }).click();
-    await s.getByRole('textbox', { name: 'Project name' }).fill('Launch week');
-    await s.getByRole('textbox', { name: 'Project name' }).press('Enter');
+    await b.page.getByRole('textbox', { name: 'Project name' }).fill('Launch week');
+    await b.page.getByRole('textbox', { name: 'Project name' }).press('Enter');
     await expect(list(mine).getByRole('listitem')).toHaveText(['Launch weekNone open'], { timeout: 2000 });
     await b.context.close();
   });
@@ -321,11 +323,11 @@ test.describe('settings › projects', () => {
       ['Projects', (l: Locator) => expect(l.getByRole('list', { name: 'Projects' })).toBeVisible()],
       [
         'Projects, editing one',
-        (l: Locator) => expect(l.getByRole('group', { name: /^Edit / })).toBeVisible(),
+        (l: Locator) => expect(l.getByRole('dialog', { name: /^Edit / })).toBeVisible(),
       ],
       [
         'Projects, a new one',
-        (l: Locator) => expect(l.getByRole('group', { name: 'New project' })).toBeVisible(),
+        (l: Locator) => expect(l.getByRole('dialog', { name: 'New project' })).toBeVisible(),
       ],
       [
         'Projects, none yet',
@@ -347,5 +349,129 @@ test.describe('settings › projects', () => {
       return past;
     });
     expect(over).toEqual([]);
+  });
+
+  test('C18-E10 New project lands first, in view, with the wash and focus; nothing under the popup moves while it is open', async ({
+    page,
+  }) => {
+    test.skip(!desktop(), 'the same popup on every size');
+    await signInFresh(page);
+    const space = await personal(page);
+    await seedProject(page, space.id, 'Home', []);
+    await seedProject(page, space.id, 'Errands', []);
+    await page.reload();
+    const s = await openProjects(page);
+    const rows = list(s).getByRole('listitem');
+    await expect(rows).toHaveText(['ErrandsNone open', 'HomeNone open']);
+    // Read once nothing is animating (Settings and the popup both open with a scale), measured against the list, in
+    // whole pixels.
+    const boxes = async () => {
+      await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'));
+      const top = (await list(s).boundingBox())!;
+      return (await Promise.all((await rows.all()).map((r) => r.boundingBox()))).map((b) => [
+        Math.round(b!.x - top.x) || 0,
+        Math.round(b!.y - top.y) || 0,
+        Math.round(b!.height),
+      ]);
+    };
+    const before = await boxes();
+    await s.getByRole('button', { name: 'New project' }).click();
+    const ed = page.getByRole('dialog', { name: 'New project' });
+    await expect(ed).toBeVisible();
+    expect(await boxes()).toEqual(before);
+    await ed.getByRole('textbox', { name: 'Project name' }).fill('Garden');
+    await ed.getByRole('button', { name: 'Create project' }).click();
+    await expect(rows).toHaveText(['GardenNone open', 'ErrandsNone open', 'HomeNone open']);
+    await expect(rows.first()).toHaveClass(/tp-prj-fresh/);
+    await expect(rows.first()).toBeInViewport();
+    await expect(s.getByRole('button', { name: 'Edit Garden, No open tasks' })).toBeFocused();
+    await idle(page);
+    expect((await serverProjects(page, space.id)).map((p) => p.name)).toEqual(['Garden', 'Errands', 'Home']);
+  });
+
+  test('C18-E11 a name the space already has, in any case: "Personal already has Home." and Create stays off', async ({
+    page,
+  }) => {
+    test.skip(!desktop(), 'the same popup on every size');
+    await signInFresh(page);
+    const space = await personal(page);
+    await seedProject(page, space.id, 'Home', []);
+    await page.reload();
+    const s = await openProjects(page);
+    await s.getByRole('button', { name: 'New project' }).click();
+    const ed = page.getByRole('dialog', { name: 'New project' });
+    await ed.getByRole('textbox', { name: 'Project name' }).fill('  hOME ');
+    await expect(ed.getByRole('alert')).toHaveText('Personal already has Home.');
+    await expect(ed.getByRole('button', { name: 'Create project' })).toBeDisabled();
+    await ed.getByRole('textbox', { name: 'Project name' }).press('Enter');
+    await expect(ed).toBeVisible();
+    await idle(page);
+    expect((await serverProjects(page, space.id)).map((p) => p.name)).toEqual(['Home']);
+  });
+
+  test('C18-E12 a click outside closes the popup and makes nothing; Esc closes the popup first, then Settings', async ({
+    page,
+  }) => {
+    test.skip(!desktop(), 'the Settings dialog is the desk and tablet');
+    await signInFresh(page);
+    const space = await personal(page);
+    const s = await openProjects(page);
+    await s.getByRole('button', { name: 'New project' }).click();
+    const ed = page.getByRole('dialog', { name: 'New project' });
+    await ed.getByRole('textbox', { name: 'Project name' }).fill('Garden');
+    await s.getByRole('heading', { name: 'No projects yet' }).click();
+    await expect(ed).toHaveCount(0);
+    await expect(dialog(page)).toBeVisible();
+    await s.getByRole('button', { name: 'New project' }).click();
+    await expect(ed).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(ed).toHaveCount(0);
+    await expect(dialog(page)).toBeVisible();
+    await expect(s.getByRole('button', { name: 'New project' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(dialog(page)).toHaveCount(0);
+    await idle(page);
+    expect(await serverProjects(page, space.id)).toEqual([]);
+  });
+
+  test('C18-E13 near the bottom of the window the popup opens upward and stays on screen', async ({
+    page,
+  }) => {
+    test.skip(!desktop(), 'one window size is enough');
+    await page.setViewportSize({ width: 1440, height: 700 });
+    await signInFresh(page);
+    const space = await personal(page);
+    for (let i = 1; i <= 12; i++) await seedProject(page, space.id, `Project ${i}`, []);
+    await page.reload();
+    const s = await openProjects(page);
+    const last = s.getByRole('button', { name: 'Edit Project 1, No open tasks' });
+    await last.scrollIntoViewIfNeeded();
+    await last.click();
+    const ed = page.getByRole('dialog', { name: 'Edit Project 1' });
+    await expect(ed).toBeVisible();
+    // The popup is measured off screen for a frame before it is placed.
+    await expect.poll(async () => (await ed.boundingBox())!.y).toBeGreaterThanOrEqual(0);
+    const box = (await ed.boundingBox())!;
+    const row = (await last.boundingBox())!;
+    expect(box.y + box.height).toBeLessThanOrEqual(700);
+    expect(box.y + box.height).toBeLessThanOrEqual(row.y + 1);
+  });
+
+  test('C18-E14 phone: the popup fits the screen and Create works', async ({ page }) => {
+    test.skip(!phone(), 'phone only');
+    await signInFresh(page);
+    const space = await personal(page);
+    const s = await openProjects(page);
+    await s.getByRole('button', { name: 'New project' }).click();
+    const ed = page.getByRole('dialog', { name: 'New project' });
+    await expect(ed).toBeVisible();
+    await expect.poll(async () => (await ed.boundingBox())!.x).toBeGreaterThanOrEqual(0);
+    const box = (await ed.boundingBox())!;
+    expect(box.x + box.width).toBeLessThanOrEqual(390);
+    await ed.getByRole('textbox', { name: 'Project name' }).fill('Errands');
+    await ed.getByRole('button', { name: 'Create project' }).click();
+    await expect(list(s).getByRole('listitem')).toHaveText(['ErrandsNone open']);
+    await idle(page);
+    expect((await serverProjects(page, space.id)).map((p) => p.name)).toEqual(['Errands']);
   });
 });

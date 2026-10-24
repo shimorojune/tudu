@@ -223,10 +223,11 @@ test.describe('backlog', () => {
     await expect(backlogCount(page)).toHaveText('4 tasks');
     await filterChip(page).click();
     const menu = page.getByRole('menu');
+    // Newest project first.
     await expect(menu.getByRole('menuitem')).toHaveText([
       'All projects4',
-      'Platform2',
       'Home1',
+      'Platform2',
       'Edit projects…',
     ]);
     await menu.getByRole('menuitem', { name: 'Platform' }).click();

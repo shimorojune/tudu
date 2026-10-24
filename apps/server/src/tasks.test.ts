@@ -669,15 +669,16 @@ describe('projects and Quick Add (chunk 04)', () => {
       m('task.project', { id: t, projectId: b }),
     ]);
     let list = await projects(p);
+    // Newest first.
     expect(list.map((x) => [x.name, x.color])).toEqual([
-      ['Northwind', '#3d5a80'],
       ['Platform', '#5b7553'],
+      ['Northwind', '#3d5a80'],
     ]);
     await sync(p, [
       m('project.update', { id: b, spaceId: p.spaceId, name: 'Platform team', color: '#8a5a00' }),
     ]);
     list = await projects(p);
-    expect(list[1]).toMatchObject({ name: 'Platform team', color: '#8a5a00' });
+    expect(list[0]).toMatchObject({ name: 'Platform team', color: '#8a5a00' });
     expect((await detail(p, t)).projectId).toBe(b);
     await sync(p, [m('project.delete', { id: b, spaceId: p.spaceId })]);
     expect((await projects(p)).map((x) => x.name)).toEqual(['Northwind']);
@@ -692,6 +693,19 @@ describe('projects and Quick Add (chunk 04)', () => {
     expect((await get(server.app, `/api/spaces/${p.spaceId}/projects`, stranger.jar)).status).toBe(403);
     const bad = await sync(p, [m('project.create', { id: randomUUID(), spaceId: p.spaceId, name: '   ' })]);
     expect(bad.results[0]).toMatchObject({ status: 'rejected', code: 400 });
+  });
+
+  it('C18-S01 new projects go first, at the positions the client gives them while it waits', async () => {
+    const p = await person();
+    const ids = [randomUUID(), randomUUID(), randomUUID()];
+    for (const [i, name] of ['Home', 'Garden', 'Errands'].entries())
+      await sync(p, [m('project.create', { id: ids[i]!, spaceId: p.spaceId, name })]);
+    const list = (await projects(p)) as unknown as Array<{ name: string; position: number }>;
+    expect(list.map((x) => [x.name, x.position])).toEqual([
+      ['Errands', -1024],
+      ['Garden', 0],
+      ['Home', 1024],
+    ]);
   });
 
   it('C04-A02 set a task’s project: last write wins; a project from another space is refused; the day’s rows carry it', async () => {

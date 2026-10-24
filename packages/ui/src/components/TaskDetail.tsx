@@ -126,7 +126,7 @@ export interface TaskDetailProps {
   /** "Open TUDU-212 in Jira": only while Jira is connected; otherwise the key reads as words. */
   onOpenJira?: (key: string) => void;
   /** "New project…": make one with this name and return its id. */
-  onNewProject?: (name: string) => string | void;
+  onNewProject?: (name: string, color: string) => string | void;
   /** "Edit projects…" at the foot of the project picker: Settings on this space's Projects. */
   onEditProjects?: () => void;
   onNotes?: (html: string) => void;
@@ -560,8 +560,8 @@ export function TaskDetail(p: TaskDetailProps) {
               }}
               onNew={
                 p.onNewProject
-                  ? (name) => {
-                      const id = p.onNewProject!(name);
+                  ? (name, color) => {
+                      const id = p.onNewProject!(name, color);
                       setPop(null);
                       if (id) p.onProject?.(id);
                     }

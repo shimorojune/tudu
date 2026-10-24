@@ -11,6 +11,8 @@ export interface ColorPickProps {
   /** The swatches, the design's eight muted ones by default. */
   colors?: readonly string[];
   label?: string;
+  /** What each swatch is called for a screen reader; a swatch without one is read by its hex. */
+  names?: Readonly<Record<string, string>>;
   className?: string;
 }
 
@@ -21,6 +23,7 @@ export function ColorPick({
   onChange,
   colors = SPACE_COLORS,
   label = 'Colour',
+  names,
   className,
 }: ColorPickProps) {
   const [val, setVal] = useControllable<string | undefined>(value, defaultValue ?? colors[0]);
@@ -34,7 +37,7 @@ export function ColorPick({
             type="button"
             role="radio"
             aria-checked={on ? 'true' : 'false'}
-            aria-label={c}
+            aria-label={names?.[c] ?? c}
             className={cx('tp-cpick-o', on && 'tp-on')}
             style={{ '--sw': c } as CSSProperties}
             onClick={() => {

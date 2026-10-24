@@ -105,7 +105,7 @@ export interface QuickAddProps {
   onClose?: () => void;
   /** Every change to the draft (the macOS app keeps the floating bar's draft across launches). */
   onDraftChange?: (draft: QuickAddDraft) => void;
-  onNewProject?: (name: string) => string | void;
+  onNewProject?: (name: string, color: string) => string | void;
   /** "Edit projects…" at the foot of the project picker: Settings on this space's Projects. */
   onEditProjects?: () => void;
   /** Upload a file as soon as it is added; resolve with the attachment's id. */
@@ -599,8 +599,8 @@ export function QuickAdd(p: QuickAddProps) {
           }}
           onNew={
             p.onNewProject
-              ? (name) => {
-                  const id = p.onNewProject!(name);
+              ? (name, color) => {
+                  const id = p.onNewProject!(name, color);
                   if (id) set({ projectId: id });
                   setPop(null);
                 }

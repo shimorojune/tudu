@@ -240,7 +240,7 @@ export function TaskPanel(p: TaskPanelProps) {
         onProject={(projectId) => taskStore.setProject(d.id, projectId)}
         onJira={(key) => taskStore.linkJira(d.id, key)}
         onOpenJira={conn ? (key) => void openInJira(spaceId, key) : undefined}
-        onNewProject={(name) => taskStore.createProject(spaceId, name)}
+        onNewProject={(name, color) => taskStore.createProject(spaceId, name, color)}
         onEditProjects={() =>
           editProjects(
             (href) => void navigate({ href }),

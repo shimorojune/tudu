@@ -46,22 +46,22 @@ export function SettingsStates() {
       <Pair
         title="Projects"
         note="In Settings › Space: a quiet list (dot, name, how many open, ⋯) and New project. A row opens the editor."
-        render={() => <ProjectSettings projects={KIT_PROJECTS} />}
+        render={() => <ProjectSettings projects={KIT_PROJECTS} inline />}
       />
       <Pair
         title="Projects, editing one"
         note="The one editor card: name, swatches, how it reads on a task; Delete project, Cancel, Save."
-        render={() => <ProjectSettings projects={KIT_PROJECTS} defaultEditing="p2" />}
+        render={() => <ProjectSettings projects={KIT_PROJECTS} defaultEditing="p2" inline />}
       />
       <Pair
         title="Projects, a new one"
         note="New project opens the same card at the top, the next unused colour picked."
-        render={() => <ProjectSettings projects={KIT_PROJECTS} defaultEditing="new" />}
+        render={() => <ProjectSettings projects={KIT_PROJECTS} defaultEditing="new" inline />}
       />
       <Pair
         title="Projects, none yet"
         note="The empty state says what a project is for, with New project."
-        render={() => <ProjectSettings projects={[]} />}
+        render={() => <ProjectSettings projects={[]} inline />}
       />
       <Pair
         title="Asking first"
