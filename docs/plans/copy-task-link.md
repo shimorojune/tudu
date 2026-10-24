@@ -1,6 +1,6 @@
 # The task ID chip copies the task's link
 
-Status: proposal, waiting for Rohit's approval. Canvas: board `D-CopyLink` on the Task detail page of the canvas (v63),
+Status: proposal, waiting for Rohit's approval. Canvas: approved 24 Oct 2026 (board `D-CopyLink` on the Task detail page, v67),
 light and dark.
 
 ## What Rohit asked for
