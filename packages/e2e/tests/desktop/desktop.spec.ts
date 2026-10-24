@@ -485,3 +485,45 @@ test.describe('This Mac', () => {
     await expect(updatesButton(page)).toHaveClass(/tp-btn-primary/);
   });
 });
+
+test.describe('the version in Settings', () => {
+  const dialog = (page: Page) => page.getByRole('dialog', { name: 'Settings' });
+  const openSettings = async (page: Page) => {
+    await page.getByRole('button', { name: /^You: / }).click();
+    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    await expect(dialog(page)).toBeVisible();
+  };
+
+  test('C11-E10 Tudu Staging: the app’s own name and version with the dot; the click goes to the app’s opener', async ({
+    page,
+  }) => {
+    await fixClock(page);
+    await installFake(page, {
+      info: { track: 'staging', name: 'Tudu Staging', version: '0.37.1-staging.132' },
+    });
+    await signInFresh(page);
+    await openSettings(page);
+    const link = dialog(page).getByRole('link', {
+      name: /^Tudu Staging 0\.37\.1-staging\.132, a staging build/,
+    });
+    await expect(link).toHaveText('Tudu Staging0.37.1-staging.132');
+    await expect(link.locator('.tp-ver-dot')).toBeVisible();
+    const tabs = page.context().pages().length;
+    await link.click();
+    await expect
+      .poll(async () => (await calls(page, 'openExternal')).map((c) => c.args[0]))
+      .toEqual(['https://github.com/shimorojune/tudu/releases#release-staging']);
+    expect(page.context().pages()).toHaveLength(tabs);
+  });
+
+  test('C11-E11 Tudu Test: the version is plain text, no link and no dot', async ({ page }) => {
+    await fixClock(page);
+    await installFake(page, { info: { track: 'test', name: 'Tudu Test', version: '0.37.0' } });
+    await signInFresh(page);
+    await openSettings(page);
+    const line = dialog(page).locator('.tp-set-ver');
+    await expect(line).toHaveText('Tudu Test0.37.0');
+    await expect(dialog(page).getByRole('link', { name: /^Tudu Test/ })).toHaveCount(0);
+    await expect(line.locator('.tp-ver-dot')).toHaveCount(0);
+  });
+});

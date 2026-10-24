@@ -237,6 +237,7 @@ export {
   type SettingsNavGroup,
   type SettingsNavItem,
 } from './components/SettingsNav';
+export { VersionLink, STAGING_TIP, type VersionLinkProps } from './components/VersionLink';
 export { ThemePick, type ThemePickProps } from './components/ThemePick';
 export {
   ProjectSettings,

@@ -16,6 +16,7 @@ import { Segmented } from './Segmented';
 import { SettingRow, SettingsSection } from './SettingsSection';
 import { SettingsNav, type SettingsNavGroup } from './SettingsNav';
 import { Skeleton } from './Skeleton';
+import { VersionLink, type VersionLinkProps } from './VersionLink';
 import { SpaceTile } from './SpaceTile';
 import { Switch } from './Switch';
 import { ThemePick } from './ThemePick';
@@ -142,6 +143,9 @@ export interface SettingsProps {
   jira?: { connected: boolean; who?: string; site?: string };
   /** Connect (not connected) or Disconnect (connected). */
   onJira?: () => void;
+
+  /** Which Tudu this is, at the foot of the list: a link to its release on GitHub. */
+  version?: VersionLinkProps;
 
   /** No connection: names and colours wait in the outbox; the page says so. */
   offline?: boolean;
@@ -834,6 +838,7 @@ export function Settings(p: SettingsProps) {
                 </span>
               </div>
               <SettingsNav list groups={groups} onPick={pick} />
+              {p.version ? <VersionLink {...p.version} className="tp-set-ver" /> : null}
             </div>
           </div>
         )}
@@ -846,6 +851,7 @@ export function Settings(p: SettingsProps) {
           <h2>Settings</h2>
         </div>
         <SettingsNav groups={groups} active={sec} onPick={pick} />
+        {p.version ? <VersionLink {...p.version} className="tp-set-ver" /> : null}
       </aside>
       {main}
     </div>

@@ -237,6 +237,10 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 .tp-tip.tp-below.tp-end::after { left: auto; right: 0; transform: translate(0, -4px); }
 .tp-tip.tp-below.tp-end:hover::after, .tp-tip.tp-below.tp-end.tp-show::after, .tp-tip.tp-below.tp-end:has(:focus-visible)::after { transform: none; }
 
+/* Above, from the left edge: for a control at the foot of a side list, where a side tip would cover the page */
+.tp-tip.tp-above::after { right: auto; left: 0; top: auto; bottom: calc(100% + 8px); transform: translate(0, 3px); }
+.tp-tip.tp-above:hover::after, .tp-tip.tp-above.tp-show::after, .tp-tip.tp-above:focus-visible::after { transform: none; }
+
 /* Banner */
 .tp-banner { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: var(--radius-lg); font-size: 13.5px; color: var(--foreground-2); }
 .tp-banner > svg { flex: none; margin-top: 1px; }
@@ -2094,6 +2098,22 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 .tp-set-me > span > span { font-size: 13px; color: var(--muted-foreground); }
 .tp-set-phone .tp-set-invite { flex-direction: column; align-items: stretch; }
 .tp-set-phone .tp-set-invite .tp-btn { margin-top: 0; align-self: flex-end; }
+
+/* VersionLink: which Tudu this is, one quiet line at the foot of Settings' list */
+.tp-ver { display: flex; align-items: center; gap: 6px; min-width: 0; height: 32px; padding: 0 10px; border-radius: var(--radius-md); color: var(--muted-foreground); text-decoration: none; white-space: nowrap; }
+.tp-ver-link { cursor: pointer; transition: background-color var(--dur-menu) var(--ease-change), color var(--dur-menu) var(--ease-change); }
+.tp-ver-link:hover, .tp-ver-link:focus-visible { background: var(--sidebar-accent); color: var(--foreground-2); outline: none; }
+.tp-ver-link:focus-visible { box-shadow: 0 0 0 2px var(--ring); }
+.tp-ver-name { font-size: 12px; }
+.tp-ver-num { min-width: 0; font-family: var(--font-mono); font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
+.tp-ver-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--warning); }
+.tp-ver-arrow { flex: none; margin-left: auto; opacity: 0; transform: translate(-2px, 2px); transition: opacity var(--dur-menu) var(--ease-change), transform 220ms var(--ease-arrive); }
+.tp-ver-link:hover .tp-ver-arrow, .tp-ver-link:focus-visible .tp-ver-arrow { opacity: 1; transform: none; }
+.tp-set-side > .tp-set-ver { flex: none; margin-top: auto; }
+/* Phones: centred under the list, tall enough to tap, the arrow always showing (no hover) */
+.tp-set-phone .tp-set-ver { justify-content: center; height: 44px; margin: 0 16px 24px 18px; }
+.tp-set-phone .tp-set-ver .tp-ver-arrow { margin-left: 2px; opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .tp-ver-arrow { transform: none; transition: opacity 120ms linear; } }
 
 /* CreateSpace */
 .tp-cs-row { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }

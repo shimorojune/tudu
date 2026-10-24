@@ -7,6 +7,7 @@ import { interceptLinks } from './links';
 import { meQuery } from './session';
 import { settingsHref } from './settings';
 import { inboxTotal, startUpdates, updateStore, useUpdate } from './updates';
+import { appVersion } from './version';
 
 let appInfo: AppInfo | null = null;
 /** The app's name and track, once known ("Tudu" until then). */
@@ -25,6 +26,13 @@ export function useAppInfo(): AppInfo | null {
     };
   }, [info]);
   return info;
+}
+
+/** The version for Settings: the Mac app's own once it answers (nothing until then), the build's on the web. */
+export function useAppVersion(): ReturnType<typeof appVersion> | null {
+  const info = useAppInfo();
+  if (desktop() && !info) return null;
+  return appVersion(info);
 }
 
 /**

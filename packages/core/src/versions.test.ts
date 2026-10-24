@@ -6,6 +6,7 @@ import {
   notesHtml,
   readyText,
   readyWords,
+  releaseUrl,
   stagingVersion,
   trackName,
   versionIn,
@@ -76,5 +77,17 @@ describe('C11-U15 checkedWords', () => {
     expect(checkedWords('2026-10-24T11:00:00Z', NOW)).toBe('Checked 1 hour ago');
     expect(checkedWords('2026-10-24T07:10:00Z', NOW)).toBe('Checked 4 hours ago');
     expect(checkedWords('2026-10-22T09:00:00Z', NOW)).toBe('Checked 2 days ago');
+  });
+});
+
+describe('The version in Settings (chunk 09)', () => {
+  it('C09-U10 a build links to its release: the tag, the rolling staging release, or nothing', () => {
+    const releases = 'https://github.com/shimorojune/tudu/releases';
+    expect(releaseUrl('production', '0.37.0')).toBe(`${releases}/tag/tudu-0.37.0`);
+    expect(releaseUrl('staging', '0.37.1-staging.132')).toBe(`${releases}#release-staging`);
+    expect(releaseUrl('staging', '0.37.1-staging+3f9c2ab')).toBe(`${releases}#release-staging`);
+    expect(releaseUrl('test', '0.37.1')).toBeNull();
+    expect(releaseUrl('dev', '0.37.0-dev')).toBeNull();
+    expect(releaseUrl('production', 'not a version')).toBeNull();
   });
 });

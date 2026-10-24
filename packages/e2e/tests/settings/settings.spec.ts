@@ -1,4 +1,5 @@
 import { request as pwRequest, type Locator, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 import { API_URL, codeFor, enterCode, expect, freshEmail, signInFresh, test } from '../../fixtures/app';
 import {
   createSpace,
@@ -489,5 +490,89 @@ test.describe('settings', () => {
     expect(bg).not.toBe('rgb(255, 255, 255)');
     await page.keyboard.press('Escape');
     await b.context.close();
+  });
+
+  test.describe('the version at the foot of the list', () => {
+    const VERSION = (
+      JSON.parse(readFileSync(new URL('../../../../package.json', import.meta.url), 'utf8')) as {
+        version: string;
+      }
+    ).version;
+    const RELEASE = `https://github.com/shimorojune/tudu/releases/tag/tudu-${VERSION}`;
+    const versionLink = (page: Page) =>
+      page.getByRole('link', { name: `Tudu ${VERSION}. Open its release on GitHub` });
+
+    test('C09-E14 "Tudu <version>" at the foot of Settings opens its release in a new tab; tablet and phone too', async ({
+      page,
+    }) => {
+      await signInFresh(page);
+      if (phone()) {
+        await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'More' }).click();
+        await page.locator('.app-more-item', { hasText: 'Settings' }).click();
+        await expect(page).toHaveURL(/\/me\/settings$/);
+      } else await openSettings(page);
+      const link = versionLink(page);
+      await expect(link).toBeVisible();
+      await expect(link).toHaveText(`Tudu${VERSION}`);
+      await expect(link).toHaveAttribute('href', RELEASE);
+      await expect(link.locator('.tp-ver-dot')).toHaveCount(0);
+      // the last thing in the list (desk and tablet: the foot of the side list)
+      if (!phone())
+        expect(
+          await link.evaluate(
+            (el) => el.parentElement?.classList.contains('tp-set-side') && !el.nextElementSibling,
+          ),
+        ).toBe(true);
+      const tab = page.context().waitForEvent('page');
+      await link.click();
+      const opened = await tab;
+      expect(opened.url()).toBe(RELEASE);
+      await opened.close();
+    });
+
+    test('C09-E15 hover shows the arrow; Tab reaches it with the focus ring; less motion only fades it', async ({
+      page,
+    }) => {
+      test.skip(phone(), 'no hover on a phone: the arrow always shows there (E14)');
+      await signInFresh(page);
+      await openSettings(page);
+      const link = versionLink(page);
+      const arrow = link.locator('.tp-ver-arrow');
+      await expect(arrow).toHaveCSS('opacity', '0');
+      await link.hover();
+      await expect(arrow).toHaveCSS('opacity', '1');
+      await page.mouse.move(0, 0);
+      await expect(arrow).toHaveCSS('opacity', '0');
+      await link.focus();
+      await page.keyboard.press('Shift+Tab');
+      await page.keyboard.press('Tab');
+      await expect(link).toBeFocused();
+      await expect(arrow).toHaveCSS('opacity', '1');
+      await expect(link).not.toHaveCSS('box-shadow', 'none');
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await expect(arrow).toHaveCSS('transition-property', 'opacity');
+    });
+
+    test('C09-E16 dark: the line takes the dark muted colour', async ({ page }) => {
+      test.skip(phone() || tablet(), 'the same row on every size');
+      await signInFresh(page);
+      const d = await openSettings(page, 'Appearance');
+      const name = versionLink(page).locator('.tp-ver-name');
+      const muted = () =>
+        page.evaluate(() => {
+          const probe = document.createElement('span');
+          probe.style.color = 'var(--muted-foreground)';
+          document.querySelector('.tp-set-side')!.appendChild(probe);
+          const c = getComputedStyle(probe).color;
+          probe.remove();
+          return c;
+        });
+      const light = await name.evaluate((el) => getComputedStyle(el).color);
+      expect(light).toBe(await muted());
+      await d.getByRole('radio', { name: 'Dark' }).click();
+      await expect(page.locator('html')).toHaveClass(/dark/);
+      await expect.poll(() => name.evaluate((el) => getComputedStyle(el).color)).not.toBe(light);
+      await expect.poll(() => name.evaluate((el) => getComputedStyle(el).color)).toBe(await muted());
+    });
   });
 });
