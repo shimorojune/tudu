@@ -111,7 +111,7 @@ jobs:
           path: .local/models
           key: embeddings-all-MiniLM-L6-v2-q8
       - run: EMBEDDINGS_MODEL_DIR=$PWD/.local/models pnpm --filter @tudu/server exec node --import tsx src/embeddings/fetch-model.ts
-      - run: pnpm --filter e2e exec playwright install --with-deps chromium
+      - run: pnpm --filter e2e exec playwright install --with-deps chromium webkit
       - name: Create the storage bucket
         env:
           AWS_ACCESS_KEY_ID: tudu-ci

@@ -1,6 +1,7 @@
 # The writing line's 1px jump, and "Looks like a task you have" leaving without a fold
 
-Status: proposal, waiting for Rohit's approval. Asked for on 24 Oct 2026 (items 5 and 7 of the bug list).
+Status: approved by Rohit (24 Oct 2026, canvas skipped: no design change); built on branch `claude/project-thread-cvx0hp`.
+Asked for on 24 Oct 2026 (items 5 and 7 of the bug list).
 
 ## What's wrong
 
@@ -16,8 +17,8 @@ same serif at the same size, so their boxes are identical, but the text inside t
 So, depending on where the row lands on the page (its y position is fractional most of the time), the placeholder
 paints 1 CSS px lower than the label it replaces. Measured in Chromium on the kit page, compact row, at 1x and 2x:
 
-| Row's sub-pixel offset | 0  | .25 | .5 | .75 |
-| ---------------------- | -- | --- | -- | --- |
+| Row's sub-pixel offset | 0   | .25 | .5  | .75  |
+| ---------------------- | --- | --- | --- | ---- |
 | Shifts on focus today  | 1px | 1px | 1px | none |
 
 The boxes do not move (both report the same rect), only the ink does.
@@ -61,9 +62,11 @@ list and fold out properly today.
 - Render `simShown.length ? simShown : simLast` inside `.tp-qa-simwrap`. When `simOn` goes false the wrap loses
   `tp-on`, keeps `inert`, and folds its still-present content over 220ms with the 180ms fade, exactly as the Add path
   does today.
-- Once the fold ends (`transitionend` on `grid-template-rows`, or straight away under less/reduced motion), drop
-  `simLast` so stale titles do not sit in the DOM or reappear on a later open.
-- "N more" open/closed state folds with it (the inner `.tp-qa-sim-rest` is left as it was during the exit).
+- Once the fold ends (`transitionend` on `grid-template-rows`, or after `QA_SIMILAR_FOLD_MS` = 400ms if that never
+  fires), drop `simLast` so stale titles do not sit in the DOM or reappear on a later open. Less motion and reduced
+  motion still fold, at 120ms, so they take the same path.
+- "N more" open/closed state folds with it (the inner `.tp-qa-sim-rest` is left as it was during the exit; an empty
+  answer from the search no longer resets it).
 - A new match while folding: the list switches to the new hits and the wrap reopens from wherever the fold is (the CSS
   transition reverses on its own).
 
@@ -96,32 +99,32 @@ These run in a context with `reducedMotion: 'no-preference'` (only these tests; 
 
 ### E2E (`packages/e2e/tests`, ids `FX-…`, run with `-g FX-`)
 
-| ID     | Case |
-| ------ | ---- |
+| ID     | Case                                                                                                                                                        |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | FX-E01 | Today: clicking "Write the next thing…" draws the placeholder exactly where the label was, at all four offsets, light and dark, desktop and phone (compact) |
-| FX-E02 | Backlog: same for "Add to the Backlog…" |
-| FX-E03 | Esc back to the label: no shift the other way either |
-| FX-E04 | Quick Add, one match: × folds the block (≥3 in-between frames, ends at 0, then `.tp-qa-sim` is removed) |
-| FX-E05 | Quick Add, three matches with "2 more" open: × folds the whole block, the open rest included |
-| FX-E06 | Quick Add: editing the title until nothing matches folds the block |
-| FX-E07 | Quick Add: cutting the title under four letters folds the block |
-| FX-E08 | Quick Add: a new match arriving mid-fold reopens with the new titles, never the old ones |
-| FX-E09 | Reduced motion: × hides the block straight away (no fold) and nothing is left in the DOM |
+| FX-E02 | Backlog: same for "Add to the Backlog…"                                                                                                                     |
+| FX-E03 | Esc back to the label: no shift the other way either                                                                                                        |
+| FX-E04 | Quick Add, one match: × folds the block (≥3 in-between frames, ends at 0, then `.tp-qa-sim` is removed)                                                     |
+| FX-E05 | Quick Add, three matches with "2 more" open: × folds the whole block, the open rest included                                                                |
+| FX-E06 | Quick Add: editing the title until nothing matches folds the block                                                                                          |
+| FX-E07 | Quick Add: cutting the title under four letters folds the block                                                                                             |
+| FX-E08 | Quick Add: a new match after a fold shows its own titles                                                                                                    |
+| FX-E09 | Reduced motion: × still hides the block (its short fold) and nothing is left in the DOM                                                                     |
 
 ### WebKit (`packages/e2e/playwright.config.ts`, new `webkit` project limited to `FX-E01`–`FX-E03`)
 
-| ID     | Case |
-| ------ | ---- |
+| ID     | Case                                                                                                 |
+| ------ | ---------------------------------------------------------------------------------------------------- |
 | FX-W01 | FX-E01 to FX-E03 in Playwright's WebKit (Safari's rounding). CI installs WebKit for this one project |
 
 ### Unit (`packages/ui`, vitest)
 
-| ID     | Case |
-| ------ | ---- |
+| ID     | Case                                                                                                                    |
+| ------ | ----------------------------------------------------------------------------------------------------------------------- |
 | FX-U01 | QuickAdd: after ×, `.tp-qa-simwrap` loses `tp-on`, stays `inert`, and still holds the last titles until `transitionend` |
-| FX-U02 | QuickAdd: after `transitionend` the titles are gone; reopening with new hits never shows the old ones |
-| FX-U03 | QuickAdd under less motion: the list is dropped immediately |
-| FX-U04 | C07-U07 still passes unchanged |
+| FX-U02 | QuickAdd: editing to no match, or under four letters, folds with the titles kept; a later match shows its own           |
+| FX-U03 | QuickAdd: the folded titles leave after `QA_SIMILAR_FOLD_MS` even if `transitionend` never fires                        |
+| FX-U04 | C07-U07 still passes unchanged                                                                                          |
 
 ## Out of scope
 

@@ -38,6 +38,13 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], viewport: { width: 834, height: 1112 }, hasTouch: true },
     },
     { name: 'phone', use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } } },
+    // Safari's engine for the checks where engines round differently (where text is painted); the Mac app is WebKit.
+    {
+      name: 'webkit',
+      use: { ...devices['Desktop Safari'], viewport: { width: 1440, height: 900 } },
+      testMatch: /motion\.spec\.ts/,
+      grep: /FX-E0[1-3]/,
+    },
   ],
   // The API on a throwaway database, then the built web app. With E2E_BASE_URL set (staging) nothing is started.
   webServer: process.env.E2E_BASE_URL
