@@ -190,6 +190,8 @@ describe('C08-U01 the Inbox’s words', () => {
         id: 'a',
         kind: 'request' as const,
         spaceId: 's',
+        space: null,
+        spaceName: 'Northwind',
         createdAt: '',
         readAt: null,
         request: {
@@ -216,6 +218,8 @@ describe('C08-U01 the Inbox’s words', () => {
         id: 'b',
         kind: 'comment' as const,
         spaceId: 's',
+        space: null,
+        spaceName: 'Northwind',
         createdAt: '',
         readAt: null,
         comment: {

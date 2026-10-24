@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { canChangeRole, spaceRules, spaceSlug, type SpaceGoneEvent } from '@tudu/core';
 import { and, eq, inArray, isNull, ne, schema, type Db } from '@tudu/db';
 import { membersDetail, SpaceError } from './spaces';
+import { forgetRemoval, noteSpaceGone } from './inbox';
 import { roleIn } from './tasks';
 import type { Storage } from './storage';
 
@@ -198,7 +199,10 @@ export async function removeMember(
   return db.transaction(async (tx) => {
     await mustAdmin(tx, userId, spaceId);
     if (target === userId) throw new SpaceError(400, 'To go yourself, leave the space.');
-    return depart(tx, spaceId, target, 'removed', userId);
+    const out = await depart(tx, spaceId, target, 'removed', userId);
+    const space = (await spaceRow(tx, spaceId))!;
+    await noteSpaceGone(tx, [target], { id: spaceId, name: space.name }, 'removed', await nameOf(tx, userId));
+    return out;
   });
 }
 
@@ -237,6 +241,7 @@ export async function restoreMember(
     }
     if (f.undo.answers.length)
       await tx.delete(schema.inboxItems).where(inArray(schema.inboxItems.id, f.undo.answers));
+    await forgetRemoval(tx, target, spaceId);
     await tx
       .delete(schema.formerMembers)
       .where(and(eq(schema.formerMembers.spaceId, spaceId), eq(schema.formerMembers.userId, target)));
@@ -278,8 +283,17 @@ export async function deleteSpace(
       .select({ key: schema.attachments.key })
       .from(schema.attachments)
       .where(eq(schema.attachments.spaceId, spaceId));
+    const by = await nameOf(tx, userId);
+    // Everyone else hears it in their Inbox too; the notice keeps the name once the space is gone.
+    await noteSpaceGone(
+      tx,
+      members.filter((m) => m !== userId),
+      { id: spaceId, name: s.name },
+      'deleted',
+      by,
+    );
     await tx.delete(schema.spaces).where(eq(schema.spaces.id, spaceId));
-    const event: SpaceGoneEvent = { spaceId, name: s.name, how: 'deleted', by: await nameOf(tx, userId) };
+    const event: SpaceGoneEvent = { spaceId, name: s.name, how: 'deleted', by };
     return { members, keys: keys.map((k) => k.key), event };
   });
   // The rows are gone; the objects follow. One that fails to go is only storage, never data anyone can reach.

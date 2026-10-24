@@ -1,10 +1,11 @@
 import { addDays, formatDay, type IsoDate } from '@tudu/core';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
 import { Logo } from './Logo';
 import { closeRow } from '../lib/motion';
 import { Button } from './Button';
+import { IconButton } from './IconButton';
 import { DatePop } from './DatePop';
 import { MiniCalendar, type MiniCalendarProps } from './MiniCalendar';
 import { RichTextContent } from './RichTextEditor';
@@ -41,9 +42,17 @@ export type SentStatus =
 /** One thing in the Inbox, as the item shows it. */
 export interface InboxEntry {
   id: string;
-  /** `app`: a new version of the macOS app, downloaded and ready (its name in `who`, Tudu when left out). */
-  kind: 'request' | 'comment' | 'answer' | 'sent' | 'app';
+  /**
+   * `app`: a new version of the macOS app, downloaded and ready (its name in `who`, Tudu when left out). `invite`: an
+   * invite to a space (`task.title` is the space). `notice`: a space went away for you (`task.title` is the space,
+   * `text` what happened, `who` who did it when known).
+   */
+  kind: 'request' | 'comment' | 'answer' | 'sent' | 'app' | 'invite' | 'notice';
   who?: InboxWho;
+  /** The picture on the row when it isn't `who`'s: a notice shows its space's initials. */
+  mark?: InboxWho;
+  /** The space it is about, first on the byline: "Northwind · Today". */
+  space?: string | null;
   /** For a sent one: who it went to. */
   to?: InboxWho;
   /** "Thu 10:12", "Just now". */
@@ -78,6 +87,16 @@ export interface InboxItemProps {
   onPerson?: (who: InboxWho) => void;
   /** A new version: Restart to update. While it runs the button says Restarting…; a promise that fails frees it. */
   onUpdate?: (item: InboxEntry) => void | Promise<unknown>;
+  /** An invite: Join. While it runs the button says Joining…; a promise that fails frees it. */
+  onJoin?: (item: InboxEntry) => void | Promise<unknown>;
+  /** An invite: Not now, which puts it away. */
+  onNotNow?: (item: InboxEntry) => void;
+  /** On hover (list rows): Mark as read or unread. */
+  onToggleRead?: (item: InboxEntry) => void;
+  /** On hover (list rows), and by swiping left on phones: Delete. Never offered on a request still to answer. */
+  onDelete?: (item: InboxEntry) => void;
+  /** Phones: a list row swipes left to delete. */
+  swipe?: boolean;
   /** On a person's own page the line reads "You sent this". */
   hideTo?: boolean;
   /** Phones: the back control at the top of the pane. */
@@ -159,6 +178,8 @@ export function InboxItem(p: InboxItemProps) {
   const req = it.kind === 'request';
   const sent = it.kind === 'sent';
   const app = it.kind === 'app';
+  const invite = it.kind === 'invite';
+  const notice = it.kind === 'notice';
   const t = it.task;
   const full = mode === 'full';
   const fold = mode === 'fold';
@@ -170,6 +191,9 @@ export function InboxItem(p: InboxItemProps) {
   const [reason, setReason] = useState(p.initial?.reason ?? '');
   const [reply, setReply] = useState(p.initial?.reply ?? '');
   const [updating, setUpdating] = useState(!!p.initial?.updating);
+  const [joining, setJoining] = useState(false);
+  const [drag, setDrag] = useState(0);
+  const swipeFrom = useRef<{ x: number; y: number; on: boolean } | null>(null);
   const el = useRef<HTMLElement | null>(null);
   const area = useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
@@ -185,6 +209,8 @@ export function InboxItem(p: InboxItemProps) {
     setPop(null);
     setTbPop(null);
     setUpdating(false);
+    setJoining(false);
+    setDrag(0);
   }
   const cal = p.calendar;
   const today = cal?.today ?? '';
@@ -205,7 +231,13 @@ export function InboxItem(p: InboxItemProps) {
     leave(() => p.onDecline?.(it, r));
   };
 
-  const name = app ? (it.who?.name ?? 'Tudu') : first(sent ? it.to?.name : it.who?.name);
+  const name = app
+    ? (it.who?.name ?? 'Tudu')
+    : invite || notice
+      ? it.who
+        ? first(it.who.name)
+        : ''
+      : first(sent ? it.to?.name : it.who?.name);
   const oc = it.outcome ?? null;
   const ss = sent ? (it.status ?? { state: 'waiting' as const }) : null;
 
@@ -221,6 +253,21 @@ export function InboxItem(p: InboxItemProps) {
     <>
       <b>{name}</b> sent you a task
     </>
+  ) : invite ? (
+    <>
+      {name ? (
+        <>
+          <b>{name}</b> invited you to
+        </>
+      ) : (
+        'You’re invited to'
+      )}{' '}
+      <b className="tp-ix-tt">{t.title}</b>
+    </>
+  ) : notice && !name ? (
+    <>
+      <b className="tp-ix-tt">{t.title}</b> {it.text ?? 'is gone'}
+    </>
   ) : (
     <>
       <b>{name}</b> {it.text ?? 'updated'}
@@ -234,6 +281,7 @@ export function InboxItem(p: InboxItemProps) {
   );
 
   const by: ReactNode[] = [];
+  if (it.space) by.push(<span key="s">{it.space}</span>);
   if (req && t.forLabel) by.push(<span key="f">For {t.forLabel}</span>);
   if (sent) by.push(<span key="f">{t.forLabel ? `Asked for ${t.forLabel}` : 'No day asked'}</span>);
   if (t.due)
@@ -418,6 +466,37 @@ export function InboxItem(p: InboxItemProps) {
         </Button>
       </div>
     ) : null;
+  const join = () => {
+    if (joining) return;
+    setJoining(true);
+    const r = p.onJoin?.(it);
+    if (r && typeof (r as Promise<unknown>).then === 'function')
+      (r as Promise<unknown>).catch(() => setJoining(false));
+  };
+  const inviteActs =
+    invite && (full || (fold && open)) ? (
+      <div className="tp-ix-acts">
+        <Button variant="quiet" size="sm" onClick={() => leave(() => p.onNotNow?.(it))}>
+          Not now
+        </Button>
+        <Button variant="primary" size="sm" loading={joining} loadingLabel="Joining…" onClick={join}>
+          Join {t.title}
+        </Button>
+      </div>
+    ) : null;
+  const noticeActs =
+    notice && (full || (fold && open)) && p.onDelete ? (
+      <div className="tp-ix-acts">
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<Icon name="trash" size={14} />}
+          onClick={() => leave(() => p.onDelete?.(it))}
+        >
+          Delete
+        </Button>
+      </div>
+    ) : null;
   const ocActs =
     req && oc && (full || (fold && open)) && oc.status === 'accepted' ? (
       <div className="tp-ix-acts">
@@ -489,6 +568,8 @@ export function InboxItem(p: InboxItemProps) {
     ) : null;
   const updActs =
     sentActs ??
+    inviteActs ??
+    noticeActs ??
     appActs ??
     ocActs ??
     (!req && !sent && (full || (fold && open)) ? (
@@ -534,7 +615,7 @@ export function InboxItem(p: InboxItemProps) {
   };
   const headInner = (
     <>
-      <Who who={sent ? it.to : it.who} size={full ? 26 : 28} app={app} />
+      <Who who={it.mark ?? (sent ? it.to : it.who)} size={full ? 26 : 28} app={app} />
       <span className="tp-ix-main">
         <span className="tp-ix-line">
           <span className="tp-ix-text">{line}</span>
@@ -579,11 +660,72 @@ export function InboxItem(p: InboxItemProps) {
     ) : (
       actions
     );
+  // Row actions on hover: read or unread, and Delete (not while a request waits for its answer).
+  const deletable = !!p.onDelete && !(req && !oc);
+  const racts =
+    list && (p.onToggleRead || deletable) ? (
+      <span className="tp-ix-racts">
+        {p.onToggleRead ? (
+          <IconButton
+            label={it.unread ? 'Mark as read' : 'Mark as unread'}
+            tipSide="bottom"
+            onClick={() => p.onToggleRead?.(it)}
+          >
+            <Icon name={it.unread ? 'read' : 'unread'} />
+          </IconButton>
+        ) : null}
+        {deletable ? (
+          <IconButton label="Delete" tipSide="bottom" onClick={() => leave(() => p.onDelete?.(it))}>
+            <Icon name="trash" />
+          </IconButton>
+        ) : null}
+      </span>
+    ) : null;
+  // Phones: swipe a row left; past 40% of its width it is deleted, short of that it springs back.
+  const canSwipe = list && !!p.swipe && deletable;
+  const swipeHandlers = canSwipe
+    ? {
+        onPointerDown: (e: PointerEvent) => {
+          if (e.pointerType === 'mouse') return;
+          swipeFrom.current = { x: e.clientX, y: e.clientY, on: false };
+        },
+        onPointerMove: (e: PointerEvent) => {
+          const f = swipeFrom.current;
+          if (!f) return;
+          const dx = e.clientX - f.x;
+          if (!f.on) {
+            if (Math.abs(e.clientY - f.y) > 10) {
+              swipeFrom.current = null;
+              return;
+            }
+            if (dx > -10) return;
+            f.on = true;
+          }
+          setDrag(Math.min(0, dx));
+        },
+        onPointerUp: () => {
+          const f = swipeFrom.current;
+          swipeFrom.current = null;
+          if (!f?.on) return;
+          const w = el.current?.offsetWidth ?? 1;
+          if (-drag > w * 0.4) leave(() => p.onDelete?.(it));
+          else setDrag(0);
+        },
+        onPointerCancel: () => {
+          swipeFrom.current = null;
+          setDrag(0);
+        },
+      }
+    : {};
   const label = sent
     ? `You sent ${name} ${t.title}`
     : req
       ? `${name} sent you ${t.title}`
-      : `${name} ${it.text ?? ''} ${t.title ?? ''}`.trim();
+      : invite
+        ? `${name || 'Someone'} invited you to ${t.title}`
+        : notice && !name
+          ? `${t.title} ${it.text ?? ''}`.trim()
+          : `${name} ${it.text ?? ''} ${t.title ?? ''}`.trim();
   return (
     <article
       ref={el}
@@ -591,14 +733,24 @@ export function InboxItem(p: InboxItemProps) {
         'tp-root tp-ix',
         `tp-ix-${mode}`,
         req && 'tp-ix-req',
+        invite && 'tp-ix-inv',
         it.unread && 'tp-unread',
+        canSwipe && 'tp-ix-swipe',
+        drag < 0 && 'tp-dragging',
         p.selected && 'tp-sel',
         open && 'tp-open',
         p.className,
       )}
       aria-label={label}
       aria-current={p.selected ? 'true' : undefined}
+      {...swipeHandlers}
     >
+      {canSwipe ? (
+        <span className="tp-ix-swipe-bg" aria-hidden="true">
+          <Icon name="trash" size={16} />
+          Delete
+        </span>
+      ) : null}
       {full && p.onBack ? (
         <div className="tp-ix-backrow">
           <button type="button" className="tp-td-back" onClick={p.onBack}>
@@ -607,7 +759,14 @@ export function InboxItem(p: InboxItemProps) {
           </button>
         </div>
       ) : null}
-      {head}
+      {canSwipe ? (
+        <div className="tp-ix-slide" style={drag ? { transform: `translateX(${drag}px)` } : undefined}>
+          {head}
+        </div>
+      ) : (
+        head
+      )}
+      {racts}
       {more}
       {datePop}
       {tbCal}
@@ -618,7 +777,7 @@ export function InboxItem(p: InboxItemProps) {
 export interface InboxSectionProps {
   title: string;
   count?: number;
-  /** A quiet action on the right: "Mark all as read". */
+  /** A quiet action on the right: "Clear all". */
   action?: string;
   onAction?: () => void;
   items?: InboxEntry[];
@@ -634,6 +793,11 @@ export interface InboxSectionProps {
   onWithdraw?: InboxItemProps['onWithdraw'];
   onTakeBack?: InboxItemProps['onTakeBack'];
   onPerson?: InboxItemProps['onPerson'];
+  onJoin?: InboxItemProps['onJoin'];
+  onNotNow?: InboxItemProps['onNotNow'];
+  onToggleRead?: InboxItemProps['onToggleRead'];
+  onDelete?: InboxItemProps['onDelete'];
+  swipe?: boolean;
   hideTo?: boolean;
   fileBase?: string;
   className?: string;
@@ -673,6 +837,11 @@ export function InboxSection(p: InboxSectionProps) {
                   onWithdraw={p.onWithdraw}
                   onTakeBack={p.onTakeBack}
                   onPerson={p.onPerson}
+                  onJoin={p.onJoin}
+                  onNotNow={p.onNotNow}
+                  onToggleRead={p.onToggleRead}
+                  onDelete={p.onDelete}
+                  swipe={p.swipe}
                   hideTo={p.hideTo}
                   fileBase={p.fileBase}
                 />

@@ -39,7 +39,35 @@ export interface TaskRequest {
   answeredAt: string | null;
 }
 
-export type InboxKind = 'request' | 'comment' | 'answer';
+export type InboxKind = 'request' | 'comment' | 'answer' | 'invite' | 'notice';
+
+/** The space an Inbox item belongs to, when you are in it: its row says so and the filter narrows by it. */
+export interface InboxSpace {
+  id: string;
+  slug: string;
+  name: string;
+  color: string | null;
+  kind: 'personal' | 'team';
+}
+
+/** Where an invite stands: open to join, or ended one way or another. */
+export type InviteState = 'open' | 'expired' | 'cancelled' | 'spent';
+
+/** An invite to a space, as the Inbox shows it: Join or Not now. */
+export interface InboxInvite {
+  id: string;
+  /** Who sent it, when they are still around. */
+  from: InboxPerson | null;
+  space: { id: string; name: string; color: string | null; initials: string };
+  state: InviteState;
+}
+
+/** A space went away for you: you were removed from it, or it was deleted. */
+export interface InboxNotice {
+  type: 'removed' | 'deleted';
+  /** Who did it, by name. */
+  by: string | null;
+}
 
 /** A comment on one of your tasks, as the Inbox shows it. */
 export interface InboxComment {
@@ -49,15 +77,25 @@ export interface InboxComment {
   task: { id: string; ref: string | null; title: string; day: IsoDate | null; done: boolean };
 }
 
-/** One thing in the Inbox: a request to answer, a comment on your task, or an answer to a request you sent. */
+/**
+ * One thing in the Inbox: a request to answer, a comment on your task, an answer to a request you sent, an invite to
+ * a space, or a notice that a space went away.
+ */
 export interface InboxItem {
   id: string;
   kind: InboxKind;
-  spaceId: string;
+  /** The space it is about; null when that space was deleted. */
+  spaceId: string | null;
+  /** The space, when you are in it. */
+  space: InboxSpace | null;
+  /** The space's name, kept for when it is gone or you are not in it. */
+  spaceName: string;
   createdAt: string;
   readAt: string | null;
   request?: TaskRequest;
   comment?: InboxComment;
+  invite?: InboxInvite;
+  notice?: InboxNotice;
 }
 
 export type InboxView = 'inbox' | 'answered' | 'sent';
@@ -72,7 +110,10 @@ export interface InboxResponse {
   answered: InboxItem[];
   /** Requests you sent, newest first (taken-back ones left out). */
   sent: TaskRequest[];
+  /** Across every space, whatever the filter. */
   counts: InboxCounts;
+  /** Each space you are in, for the space filter's menu. */
+  bySpace: Record<string, InboxCounts>;
 }
 
 export interface InboxCounts {
@@ -82,9 +123,9 @@ export interface InboxCounts {
   unread: number;
 }
 
-/** Something landed in or left this person's Inbox in a space: read it again. */
+/** Something landed in or left this person's Inbox: read it again. `spaceId` names the space, when one did. */
 export interface InboxChangedEvent {
-  spaceId: string;
+  spaceId?: string | null;
 }
 export const INBOX_CHANGED = 'inbox.changed';
 
@@ -111,9 +152,55 @@ export function sentWords(sent: Array<{ state: RequestState }>): string {
   return waiting ? `${sent.length} sent · ${waiting} waiting` : `${sent.length} sent`;
 }
 
-/** The sidebar's Inbox count: to answer plus new. */
+/** The Inbox count: to answer plus new. */
 export function inboxBadge(c: InboxCounts | undefined): number {
   return c ? c.toAnswer + c.unread : 0;
+}
+
+/** Add Inbox counts up: every space's into one. */
+export function sumCounts(all: Iterable<InboxCounts | undefined>): InboxCounts {
+  const out: InboxCounts = { toAnswer: 0, unread: 0 };
+  for (const c of all) {
+    if (!c) continue;
+    out.toAnswer += c.toAnswer;
+    out.unread += c.unread;
+  }
+  return out;
+}
+
+/** "3 updates deleted", "1 update deleted": Clear all's toast. */
+export function clearedWords(n: number): string {
+  return `${n} ${n === 1 ? 'update' : 'updates'} deleted`;
+}
+
+/** "Accepted onto Today in Northwind.": the toast when the request is from another space than the one you're in. */
+export function acceptedInWords(day: IsoDate | null, today: IsoDate, spaceName: string): string {
+  return `Accepted onto ${dayWord(day, today)} in ${spaceName}.`;
+}
+
+/** "Sana Qureshi invited you to Design Guild." */
+export function inviteWords(i: InboxInvite): string {
+  return i.from
+    ? `${i.from.name || i.from.email} invited you to ${i.space.name}`
+    : `You’re invited to ${i.space.name}`;
+}
+
+/** "Arjun removed you from Pilot Farm", "Pilot Farm was deleted". */
+export function noticeWords(n: InboxNotice, spaceName: string): string {
+  if (n.type === 'removed')
+    return n.by ? `${n.by} removed you from ${spaceName}` : `You were removed from ${spaceName}`;
+  return n.by ? `${n.by} deleted ${spaceName}` : `${spaceName} was deleted`;
+}
+
+/** Why Join didn't work, in the banner's words. */
+export function inviteEndedWords(state: InviteState): string {
+  if (state === 'expired') return 'That invite has expired.';
+  return 'That invite has ended.';
+}
+
+/** "Nothing from Northwind": the empty Inbox under a space filter. */
+export function nothingFromWords(spaceName: string): string {
+  return `Nothing from ${spaceName}`;
 }
 
 /** "Accepted onto Fri 16 Oct. It's in Answered." */
@@ -142,7 +229,13 @@ export function forWords(day: IsoDate | null): string | null {
 export function inboxText(item: InboxItem): string {
   const r = item.request;
   const c = item.comment;
+  const v = item.invite;
   return [
+    item.spaceName,
+    v?.from?.name,
+    v?.from?.email,
+    v?.space.name,
+    item.notice?.by,
     r?.from.name,
     r?.from.email,
     r?.to.name,

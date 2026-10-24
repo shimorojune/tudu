@@ -1,12 +1,14 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { API_URL } from './app';
 
-/** Go to the Inbox: the sidebar or the rail, or the header's icon on phones. */
+/** The Inbox's button: the top bar's on the desk and tablets, the header's icon on phones. */
+export function inboxButton(page: Page): Locator {
+  return page.locator('.tp-tb-inbox, .app-phone-inbox').first();
+}
+
+/** Go to the one Inbox from wherever you are. */
 export async function goInbox(page: Page): Promise<void> {
-  const icon = page.getByRole('button', { name: /^Inbox(,| |$)/ }).filter({ has: page.locator('svg') });
-  const nav = page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: /^Inbox(,| |$)/ });
-  if (await nav.count()) await nav.first().click();
-  else await icon.first().click();
+  await inboxButton(page).click();
   await expect(page.getByRole('region', { name: 'The Inbox' })).toBeVisible();
 }
 
@@ -67,17 +69,11 @@ export async function sendRequest(
   return id;
 }
 
-/** The sidebar's or rail's Inbox count, as a number (0 when none shows). */
-export async function sidebarInboxCount(page: Page): Promise<number> {
-  const nav = page
-    .getByRole('navigation', { name: 'Main' })
-    .getByRole('button', { name: /^Inbox/ })
-    .first();
-  // Phones keep the Inbox behind the header's icon, whose label carries the count.
-  const icon = page.locator('.app-phone-inbox');
-  const el = (await nav.count()) ? nav : (await icon.count()) ? icon : null;
-  if (!el) return 0;
-  const label = (await el.getAttribute('aria-label')) ?? (await el.textContent()) ?? '';
-  const m = /(\d+)/.exec(label.replace('Inbox', ''));
+/** The Inbox button's count across every space, as a number (0 when none shows). Its label carries it. */
+export async function inboxPip(page: Page): Promise<number> {
+  const el = inboxButton(page);
+  if (!(await el.count())) return 0;
+  const label = (await el.getAttribute('aria-label')) ?? '';
+  const m = /(\d+)/.exec(label);
   return m ? Number(m[1]) : 0;
 }

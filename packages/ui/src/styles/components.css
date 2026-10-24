@@ -415,6 +415,10 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 /* Top bar */
 .tp-topbar { display: flex; align-items: center; gap: 10px; height: 64px; padding: 0 4px; }
 .tp-tb-sp { flex: 1; }
+/* The one Inbox beside Search: a count pip on its corner that pops in when it changes. */
+.tp-tb-inbox { position: relative; }
+.tp-tb-pip { position: absolute; top: 2px; right: 1px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px; background: var(--foreground); color: var(--background); font-family: var(--font-mono); font-size: 10px; line-height: 16px; text-align: center; box-shadow: 0 0 0 2px var(--background); pointer-events: none; animation: tp-pip-in 220ms var(--ease-arrive) both; }
+@keyframes tp-pip-in { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
 .tp-search { display: inline-flex; align-items: center; gap: 9px; width: 280px; height: var(--control-height); padding: 0 14px; border: 0; border-radius: var(--radius-lg); background: var(--secondary); color: var(--muted-foreground); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer;
   box-shadow: inset 0 0 0 1px transparent; transition: background var(--dur-arrive) var(--ease-change), box-shadow var(--dur-arrive) var(--ease-change), color var(--dur-arrive) var(--ease-change); }
 /* A button that opens the search panel. It never changes size, so nothing in the top bar moves. */
@@ -1445,6 +1449,14 @@ html.tp-is-dragging .tp-row-plan { opacity: 0 !important; }
 /* ProjectFilter */
 .tp-pf { display: inline-flex; }
 .tp-pf .tp-td-mi { display: inline-flex; align-items: center; gap: 8px; }
+/* The Inbox's space filter: a muted pill, card-white with a ring while its menu is open. */
+.tp-sf { display: inline-flex; flex: none; }
+.tp-sf .tp-td-mi { display: inline-flex; align-items: center; gap: 8px; }
+.tp-sf .tp-stile { flex: none; }
+.tp-root .tp-sf-pill { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px 0 10px; border: 0; border-radius: var(--radius-full); background: var(--muted); font: inherit; font-size: 13px; color: var(--foreground-2); white-space: nowrap; cursor: pointer; transition: background-color var(--dur-menu) var(--ease-change), box-shadow var(--dur-menu) var(--ease-change); }
+.tp-root .tp-sf-pill:hover { color: var(--foreground); }
+.tp-sf.tp-on .tp-sf-pill, .tp-root .tp-sf-pill:focus-visible { outline: none; background: var(--card); box-shadow: 0 0 0 1px var(--border-strong); color: var(--foreground); }
+.tp-sf-caret { transform: rotate(90deg); color: var(--muted-foreground); }
 /* DatePop align end: hangs down and to the left of a button at a row's right edge */
 .tp-datepop.tp-end { transform-origin: top right; }
 .tp-datepop.tp-end.tp-up { transform-origin: bottom right; }
@@ -1555,7 +1567,7 @@ html.tp-is-dragging .tp-row-plan { opacity: 0 !important; }
 .tp-ixs-list > :last-child > .tp-ix, .tp-ixs-list > .tp-ix:last-child { border-bottom: 0; }
 .tp-root .tp-ix-head { display: flex; align-items: flex-start; gap: 12px; width: 100%; margin: 0; padding: 14px 24px 14px 22px; border: 0; background: transparent; font: inherit; color: inherit; text-align: left; }
 button.tp-ix-head { cursor: pointer; transition: background-color var(--dur-menu) var(--ease-change); }
-button.tp-ix-head:hover { background: var(--selection); }
+button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, var(--card)); }
 .tp-ix.tp-sel > .tp-ix-head { background: var(--accent); }
 .tp-root .tp-ix-head:focus-visible { outline: none; box-shadow: inset 0 0 0 1.5px var(--ring); }
 .tp-ix-av { flex: none; margin-top: 1px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--foreground); color: var(--card); font-weight: 600; letter-spacing: .02em; box-shadow: 0 0 0 2px var(--card); }
@@ -1576,6 +1588,28 @@ button.tp-ix-head:hover { background: var(--selection); }
 .tp-ix-by > span + span::before { content: '·'; margin: 0 2px 0 7px; color: var(--ghost); }
 .tp-ix-by .tp-od { color: var(--destructive); }
 .tp-ix-dot { flex: none; width: 7px; height: 7px; margin-top: 7px; border-radius: 50%; background: var(--foreground); }
+/* New vs read (one Inbox): a new row sits on a faint ink wash with full ink, an ink dot and a bold name; a read row
+   goes quiet. Never the brand red, and hover is an ink wash too, never --selection. */
+.tp-ix-list.tp-unread > .tp-ix-head, .tp-ix-list.tp-unread > .tp-ix-slide > .tp-ix-head { background: color-mix(in srgb, var(--foreground) 4%, var(--card)); }
+.tp-ix-list.tp-unread > .tp-ix-head:hover, .tp-ix-list.tp-unread:hover > .tp-ix-slide > .tp-ix-head, .tp-ix-list.tp-unread:hover > .tp-ix-head { background: color-mix(in srgb, var(--foreground) 7%, var(--card)); }
+.tp-ix-list:not(.tp-unread):hover > .tp-ix-head, .tp-ix-list:not(.tp-unread):hover > .tp-ix-slide > .tp-ix-head { background: color-mix(in srgb, var(--foreground) 4%, var(--card)); }
+.tp-ix-list.tp-unread .tp-ix-dot { width: 8px; height: 8px; }
+.tp-ix-list:not(.tp-unread):not(.tp-ix-req):not(.tp-ix-inv) .tp-ix-line, .tp-ix-list:not(.tp-unread):not(.tp-ix-req):not(.tp-ix-inv) .tp-ix-quote, .tp-ix-list:not(.tp-unread):not(.tp-ix-req):not(.tp-ix-inv) .tp-ix-title { color: var(--muted-foreground); }
+.tp-ix-list:not(.tp-unread):not(.tp-ix-req):not(.tp-ix-inv) .tp-ix-text b { color: var(--foreground-2); font-weight: 500; }
+.tp-ix-list:not(.tp-unread):not(.tp-ix-req):not(.tp-ix-inv) .tp-ix-av { opacity: .6; filter: saturate(.5); }
+/* Row actions: Mark as read or unread, and Delete, slide in on hover over the time. */
+.tp-ix-racts { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: none; gap: 2px; padding: 2px; border-radius: var(--radius-md); background: var(--card); box-shadow: var(--shadow-seg, 0 1px 2px rgba(0,0,0,.08)); }
+.tp-ix-list:hover > .tp-ix-racts, .tp-ix-list:focus-within > .tp-ix-racts { display: flex; animation: tp-racts-in var(--dur-menu) var(--ease-arrive) both; }
+.tp-ix-list:hover .tp-ix-when, .tp-ix-list:focus-within .tp-ix-when { visibility: hidden; }
+.tp-ix-racts .tp-ib { width: 30px; height: 30px; color: var(--muted-foreground); }
+.tp-ix-racts .tp-ib:hover { color: var(--foreground); }
+@keyframes tp-racts-in { from { opacity: 0; transform: translateY(-50%) translateX(4px); } to { opacity: 1; transform: translateY(-50%); } }
+@media (hover: none) { .tp-ix-list:hover > .tp-ix-racts { display: none; } .tp-ix-list:hover .tp-ix-when { visibility: visible; } }
+/* Phones: swipe left to delete; the row slides off a quiet Delete underneath. */
+.tp-ix-swipe { overflow: hidden; touch-action: pan-y; }
+.tp-ix-slide { position: relative; background: var(--card); transition: transform 200ms var(--ease-change); }
+.tp-ix-swipe.tp-dragging .tp-ix-slide { transition: none; }
+.tp-ix-swipe-bg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding-right: 20px; background: var(--muted); color: var(--foreground-2); font-size: 13px; font-weight: 500; }
 /* Requests act right on the row: Accept (a day picker, Today first) and Decline (a reason, then Send). */
 .tp-ix-acts { display: flex; align-items: center; gap: 6px; padding: 0 24px 14px 62px; }
 .tp-ix-full .tp-ix-acts { padding-left: 0; padding-right: 0; }

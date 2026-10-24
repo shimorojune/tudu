@@ -276,10 +276,9 @@ export function taskRoutes(db: Db, hub: EventHub, embeddings: Embeddings) {
     const told = new Set<string>();
     for (const a of applied)
       for (const u of a.inbox ?? []) {
-        const key = `${u}:${a.spaceId}`;
-        if (told.has(key)) continue;
-        told.add(key);
-        const event: InboxChangedEvent = { spaceId: a.spaceId };
+        if (told.has(u)) continue;
+        told.add(u);
+        const event: InboxChangedEvent = { spaceId: a.spaceId || null };
         hub.publish(u, INBOX_CHANGED, event);
       }
     // A space renamed or recoloured: its people read /api/me again. A new name: every space you are in shows it.

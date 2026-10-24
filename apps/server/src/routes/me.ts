@@ -7,7 +7,7 @@ import type { Mailer } from '../email';
 import { gettingStarted, isFirstSession, parseRecord, recordFirstRun } from '../firstRun';
 import type { EventHub } from '../events';
 import { requireSession, type SessionVars } from '../middleware/session';
-import { inboxCounts } from '../requests';
+import { inboxCounts } from '../inbox';
 import { colourOf, SpaceError, spaceSummaries } from '../spaces';
 import type { Storage } from '../storage';
 import { announceMembers } from './spaces';
@@ -44,13 +44,17 @@ export function meRoutes(db: Db, hub: EventHub, mailer: Mailer, storage: Storage
       /** This session is the sign-in that made the account: a new person, not a returning one. */
       firstSignIn: await isFirstSession(db, session.user.id, session.session.id),
       gettingStarted: await gettingStarted(db, session.user.id),
-      spaces: await (async () => {
-        const counts = await inboxCounts(db, session.user.id);
-        return (await spaceSummaries(db, session.user.id)).map((s) => ({
-          ...s,
-          inbox: counts.get(s.id) ?? { toAnswer: 0, unread: 0 },
-        }));
-      })(),
+      ...(await (async () => {
+        const counts = await inboxCounts(db, session.user);
+        return {
+          spaces: (await spaceSummaries(db, session.user.id)).map((s) => ({
+            ...s,
+            inbox: counts.bySpace.get(s.id) ?? { toAnswer: 0, unread: 0 },
+          })),
+          /** The one Inbox's count: every space, plus invites and notices. */
+          inbox: counts.total,
+        };
+      })()),
     });
   });
 

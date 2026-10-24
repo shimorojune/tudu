@@ -14,6 +14,7 @@ import { sweepAttachments } from './files';
 import { EMBED_EVERY_MS, Embeddings } from './closeMatches';
 import { LocalEmbedder, type Embedder } from './embeddings';
 import { MemoryStorage, S3Storage, type Storage } from './storage';
+import { sweepCleared } from './inbox';
 
 export interface Server {
   app: App;
@@ -62,7 +63,11 @@ export function bootstrap(
   const sweeper =
     env.NODE_ENV === 'test'
       ? null
-      : setInterval(() => void sweepAttachments(db, storage).catch(() => {}), SWEEP_EVERY_MS);
+      : setInterval(() => {
+          void sweepAttachments(db, storage).catch(() => {});
+          // Inbox items cleared over 30 days ago: Undo is long past.
+          void sweepCleared(db).catch(() => {});
+        }, SWEEP_EVERY_MS);
   // Close matches: the model inside the API, unless told off; the tick picks up what a batch missed.
   const embedder =
     options.embedder !== undefined

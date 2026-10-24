@@ -1,4 +1,4 @@
-import { notesHtml, readyText, whenWords } from '@tudu/core';
+import { inboxBadge, notesHtml, readyText, sumCounts, whenWords, type InboxCounts } from '@tudu/core';
 import { showToast, type InboxEntry } from '@tudu/ui';
 import { useSyncExternalStore } from 'react';
 import type { DesktopBridge, UpdateReady } from './desktop';
@@ -6,6 +6,7 @@ import type { DesktopBridge, UpdateReady } from './desktop';
 /** The app asks for a newer version on launch and then this often. */
 export const CHECK_EVERY_MS = 4 * 60 * 60 * 1000;
 const READ_KEY = 'tudu.update.read';
+const HIDDEN_KEY = 'tudu.update.hidden';
 
 /**
  * The version that is downloaded and ready, and which versions you have read: the Updates item in every space's
@@ -14,17 +15,23 @@ const READ_KEY = 'tudu.update.read';
 export class UpdateStore {
   private ready: UpdateReady | null = null;
   private readList: string[] = [];
+  private hiddenList: string[] = [];
   private listeners = new Set<() => void>();
-  private snap: { ready: UpdateReady | null; unread: boolean } = { ready: null, unread: false };
+  private snap: { ready: UpdateReady | null; unread: boolean; hidden: boolean } = {
+    ready: null,
+    unread: false,
+    hidden: false,
+  };
 
   constructor(private readonly storage: Pick<Storage, 'getItem' | 'setItem'> | null = safeStorage()) {
     this.readList = this.load();
+    this.hiddenList = this.load(HIDDEN_KEY);
     this.snapshot();
   }
 
-  private load(): string[] {
+  private load(key = READ_KEY): string[] {
     try {
-      const v = JSON.parse(this.storage?.getItem(READ_KEY) ?? '[]') as unknown;
+      const v = JSON.parse(this.storage?.getItem(key) ?? '[]') as unknown;
       return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
     } catch {
       return [];
@@ -33,7 +40,8 @@ export class UpdateStore {
 
   private snapshot() {
     const r = this.ready;
-    this.snap = { ready: r, unread: !!r && !this.readList.includes(r.version) };
+    const hidden = !!r && this.hiddenList.includes(r.version);
+    this.snap = { ready: r, unread: !!r && !hidden && !this.readList.includes(r.version), hidden };
     for (const l of this.listeners) l();
   }
 
@@ -64,9 +72,37 @@ export class UpdateStore {
     this.snapshot();
   }
 
+  /** Mark as unread, from the Inbox row. */
+  markUnread(version: string) {
+    if (!this.readList.includes(version)) return;
+    this.readList = this.readList.filter((v) => v !== version);
+    this.save(READ_KEY, this.readList);
+    this.snapshot();
+  }
+
+  /** Deleted from the Inbox (or cleared): this version's item stays away; `false` puts it back (Undo). */
+  hide(version: string, on = true) {
+    const has = this.hiddenList.includes(version);
+    if (on === has) return;
+    this.hiddenList = on
+      ? [...this.hiddenList, version].slice(-20)
+      : this.hiddenList.filter((v) => v !== version);
+    this.save(HIDDEN_KEY, this.hiddenList);
+    this.snapshot();
+  }
+
+  private save(key: string, list: string[]) {
+    try {
+      this.storage?.setItem(key, JSON.stringify(list));
+    } catch {
+      /* fine: it lasts until the next launch */
+    }
+  }
+
   /** Another window of the app marked it read. */
   reload() {
     this.readList = this.load();
+    this.hiddenList = this.load(HIDDEN_KEY);
     this.snapshot();
   }
 }
@@ -120,6 +156,17 @@ export async function restartToUpdate(bridge: Pick<DesktopBridge, 'installUpdate
     showToast(`Couldn’t restart. Quit and open ${name} again to finish.`);
     throw err;
   }
+}
+
+/**
+ * The Inbox's count across every space (the top bar's pip, the phone's and the dock badge): requests to answer and
+ * unread updates, plus the Mac app's new version once. Without the server's total the spaces' counts are added up.
+ */
+export function inboxTotal(
+  me: { inbox?: InboxCounts; spaces: Array<{ inbox?: InboxCounts }> },
+  update = false,
+): number {
+  return inboxBadge(me.inbox ?? sumCounts(me.spaces.map((s) => s.inbox))) + (update ? 1 : 0);
 }
 
 /** The Updates item for a version that is ready. */

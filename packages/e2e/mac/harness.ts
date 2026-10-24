@@ -538,11 +538,11 @@ export async function go(app: TuduApp, path: string): Promise<void> {
   );
 }
 
-/** The sidebar's Inbox count on the desk (0 when none shows). */
-export async function sidebarInbox(app: TuduApp): Promise<number> {
+/** The top bar's Inbox count on the desk, every space together (0 when none shows). */
+export async function inboxPip(app: TuduApp): Promise<number> {
   return app.eval<number>(`
-    const b = T.all('button', /^Inbox/, document.querySelector('nav[aria-label="Main"]') || document)[0];
-    const m = b && /([0-9]+)/.exec(T.name(b));
+    const b = document.querySelector('.tp-tb-inbox');
+    const m = b && /([0-9]+)/.exec(b.getAttribute('aria-label') || '');
     return m ? Number(m[1]) : 0;`);
 }
 

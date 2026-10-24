@@ -8,8 +8,11 @@ test.describe('the shell', () => {
     const vp = testInfo.project.name;
     if (vp === 'desktop') {
       const nav = page.getByRole('navigation', { name: 'Main' });
-      for (const item of ['Today', 'Week', 'Backlog', 'Inbox'])
+      for (const item of ['Today', 'Week', 'Backlog'])
         await expect(nav.getByRole('button', { name: item })).toBeVisible();
+      // The Inbox is one for every space and opens from the top bar, not the sidebar.
+      await expect(nav.getByRole('button', { name: 'Inbox' })).toHaveCount(0);
+      await expect(page.locator('.tp-tb-inbox')).toBeVisible();
       await expect(nav.getByText('Personal')).toBeVisible();
       await expect(page.getByRole('button', { name: 'Collapse sidebar' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'New task' })).toBeVisible();

@@ -31,22 +31,57 @@ export function withSlug(pathname: string, slug: string): string {
   return pathname.replace(/^\/[^/]+/, `/${slug}`);
 }
 
-/** The path of a view in a space: `/northwind`, `/northwind/week`. */
+/** The path of a view in a space: `/northwind`, `/northwind/week`. The Inbox is every space's: `/inbox`. */
 export function spacePath(slug: string, view: View = 'today'): string {
+  if (view === 'inbox') return INBOX_PATH;
   return `/${slug}${VIEW_PATHS[view]}`;
 }
 
-/** Which view a path inside a space shows: `/northwind/week` is the week. */
+/** The one Inbox, across every space. */
+export const INBOX_PATH = '/inbox';
+
+/**
+ * The Inbox's address: `/inbox`, an item `/inbox/<id>`, narrowed to a space `?space=northwind`, on a view
+ * `?view=sent`.
+ */
+export function inboxPath(
+  o: { item?: string | null; space?: string | null; view?: string | null } = {},
+): string {
+  const q = new URLSearchParams();
+  if (o.space) q.set('space', o.space);
+  if (o.view && o.view !== 'inbox') q.set('view', o.view);
+  const qs = q.toString();
+  return `${INBOX_PATH}${o.item ? `/${o.item}` : ''}${qs ? `?${qs}` : ''}`;
+}
+
+/**
+ * Where an old per-space Inbox address goes: the one Inbox narrowed to that team space, keeping the item and view.
+ * Personal's never worked, so /me/inbox is the whole Inbox.
+ */
+export function oldInboxPath(
+  space: Pick<SpaceSummary, 'kind' | 'slug'>,
+  item?: string | null,
+  view?: string | null,
+): string {
+  return inboxPath({ item, space: space.kind === 'team' ? space.slug : null, view });
+}
+
+/** Which view a path inside a space shows: `/northwind/week` is the week; `/inbox` is the Inbox. */
 export function viewOf(pathname: string): View {
+  if (pathname === INBOX_PATH || pathname.startsWith(`${INBOX_PATH}/`)) return 'inbox';
   const rest = pathname.replace(/^\/[^/]+/, '').replace(/\/$/, '');
   if (rest === '') return 'today';
   const seg = rest.split('/')[1] ?? '';
   return (Object.keys(VIEW_PATHS) as View[]).find((v) => VIEW_PATHS[v] === `/${seg}`) ?? 'today';
 }
 
-/** The same view in another space: switching keeps you where you were (a person's page goes back to People). */
+/**
+ * The same view in another space: switching keeps you where you were (a person's page goes back to People). The
+ * Inbox is not a space's, so switching from it opens that space's Today.
+ */
 export function switchPath(pathname: string, slug: string): string {
-  return spacePath(slug, viewOf(pathname));
+  const view = viewOf(pathname);
+  return spacePath(slug, view === 'inbox' ? 'today' : view);
 }
 
 export function rememberSpace(slug: string): void {

@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router';
-import { inboxCountWords, type SpaceSummary } from '@tudu/core';
+import type { SpaceSummary } from '@tudu/core';
 import { Icon, Sheet, SheetBody, type IconName } from '@tudu/ui';
 import { openFeedback } from '../../app/feedback';
 import { useJira } from '../../app/jira';
@@ -12,23 +12,13 @@ export interface MoreItem {
   hint: string;
 }
 
-/** What More keeps on phones: the Backlog, People in a team space, the Inbox, Apps and Settings. */
-export function moreItems(
-  space: Pick<SpaceSummary, 'kind' | 'name'> & { inbox?: SpaceSummary['inbox'] },
-  jira = false,
-): MoreItem[] {
+/** What More keeps on phones: the Backlog, People in a team space, Apps and Settings (the Inbox is in the header). */
+export function moreItems(space: Pick<SpaceSummary, 'kind' | 'name'>, jira = false): MoreItem[] {
   const items: MoreItem[] = [
     { value: 'backlog', label: 'Backlog', icon: 'backlog', hint: 'Tasks without a day' },
   ];
   if (space.kind === 'team')
     items.push({ value: 'people', label: 'People', icon: 'team', hint: `Everyone in ${space.name}` });
-  const n = space.inbox ? space.inbox.toAnswer + space.inbox.unread : 0;
-  items.push({
-    value: 'inbox',
-    label: 'Inbox',
-    icon: 'inbox',
-    hint: n ? inboxCountWords(space.inbox!) : 'All caught up',
-  });
   items.push({ value: 'apps', label: 'Apps', icon: 'plug', hint: jira ? 'Jira' : 'None yet' });
   items.push({
     value: 'settings',

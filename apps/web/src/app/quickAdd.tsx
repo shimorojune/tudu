@@ -40,7 +40,7 @@ import {
 import { editProjects, editProjectsHref } from './editProjects';
 import { goToTask } from './search';
 import { api } from './session';
-import { spacePath, useSpace } from './space';
+import { inboxPath, spacePath, useSpace } from './space';
 import { taskStore, useOnline } from './tasks';
 import { useViewport } from './viewport';
 import { useWorkingDay } from './workingDay';
@@ -250,11 +250,11 @@ export function QuickAddHost({ me }: { me: MeResponse }) {
         const id = lastId.current;
         if (!id) return;
         if (t.toId) {
-          // Sent: it waits in their Inbox, and in your Sent, in that space.
+          // Sent: it waits in their Inbox, and in your Sent.
           const first = (to?.name ?? 'them').trim().split(/\s+/)[0]!;
           showToast(sentToWords(first, target.id !== space.id ? target.name : undefined), {
             action: 'Show',
-            onAction: () => void navigate({ href: `${spacePath(target.slug, 'inbox')}?view=sent` }),
+            onAction: () => void navigate({ href: inboxPath({ view: 'sent' }) }),
           });
           return;
         }

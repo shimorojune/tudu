@@ -3,10 +3,9 @@ import { showToast, TopBar } from '@tudu/ui';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { switchSpaces } from './AppShell';
-import { badgeCount } from './DesktopHost';
 import { desktop, resetDesktop, type DesktopFake } from './desktop';
 import { interceptLinks, linkKind, openOutside } from './links';
-import { appEntry, CHECK_EVERY_MS, restartToUpdate, startUpdates, UpdateStore } from './updates';
+import { appEntry, inboxTotal, CHECK_EVERY_MS, restartToUpdate, startUpdates, UpdateStore } from './updates';
 
 vi.mock('@tudu/ui', async (orig) => ({ ...(await orig<Record<string, unknown>>()), showToast: vi.fn() }));
 
@@ -171,7 +170,7 @@ describe('C11-U04 updates', () => {
     await vi.advanceTimersByTimeAsync(CHECK_EVERY_MS);
     expect(checkUpdate).toHaveBeenCalledTimes(1);
     await act(async () => answer(READY));
-    expect(store.get()).toEqual({ ready: READY, unread: true });
+    expect(store.get()).toEqual({ ready: READY, unread: true, hidden: false });
     await vi.advanceTimersByTimeAsync(CHECK_EVERY_MS);
     expect(checkUpdate).toHaveBeenCalledTimes(2);
     stop();
@@ -209,6 +208,16 @@ describe('C11-U04 updates', () => {
     again.setReady({ ...READY, version: '0.39.0' });
     expect(again.get().unread).toBe(true);
 
+    // The Inbox row: mark unread, delete (hidden, so not counted) and Undo, kept per version.
+    again.setReady(READY);
+    again.markUnread('0.38.0');
+    expect(again.get()).toMatchObject({ unread: true, hidden: false });
+    again.hide('0.38.0');
+    expect(again.get()).toMatchObject({ unread: false, hidden: true });
+    expect(new UpdateStore(storage).isRead('0.38.0')).toBe(false);
+    again.hide('0.38.0', false);
+    expect(again.get()).toMatchObject({ unread: true, hidden: false });
+
     const now = new Date('2026-10-30T09:05:00Z');
     const e = appEntry(READY, true, now);
     expect(e).toMatchObject({
@@ -245,14 +254,17 @@ describe('C11-U06 the chrome and the dock badge', () => {
     fireEvent.click(screen.getByRole('button', { name: 'New task' }));
   });
 
-  it('the badge follows the Inbox count across spaces, the version once, and clears at zero', () => {
+  it('C08-U22 the badge is the one Inbox total, the version once, and clears at zero', () => {
     const spaces = [space('me', 'personal'), space('nw', 'team', 1, 2), space('ac', 'team', 0, 1)];
-    expect(badgeCount(spaces, false)).toBe(4);
-    expect(badgeCount(spaces, true)).toBe(5);
-    expect(badgeCount([space('me', 'personal')], true)).toBe(0);
-    expect(badgeCount([space('me', 'personal'), space('nw', 'team')], false)).toBe(0);
-    // The switcher counts the version in each team space's Inbox.
-    expect(switchSpaces(spaces, true).map((s) => s.count)).toEqual([undefined, 4, 2]);
+    // The server's total wins: it has invites and notices, which belong to no space.
+    expect(inboxTotal({ spaces, inbox: { toAnswer: 1, unread: 5 } }, false)).toBe(6);
+    expect(inboxTotal({ spaces, inbox: { toAnswer: 1, unread: 5 } }, true)).toBe(7);
+    // Without it, the spaces are added up; the version counts once however many team spaces there are.
+    expect(inboxTotal({ spaces }, false)).toBe(4);
+    expect(inboxTotal({ spaces }, true)).toBe(5);
+    expect(inboxTotal({ spaces: [space('me', 'personal')] }, true)).toBe(1);
+    expect(inboxTotal({ spaces: [space('me', 'personal'), space('nw', 'team')] }, false)).toBe(0);
+    // The switcher keeps each space's own count, without the version.
     expect(switchSpaces(spaces).map((s) => s.count)).toEqual([undefined, 3, 1]);
   });
 });

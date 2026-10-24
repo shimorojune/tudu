@@ -14,7 +14,7 @@ import {
   INBOX_CHANGED,
   type InboxChangedEvent,
 } from '@tudu/core';
-import { eq, schema, type Db } from '@tudu/db';
+import { eq, inArray, schema, sql, type Db } from '@tudu/db';
 import type { Mailer } from '../email';
 import type { EventHub } from '../events';
 import { requireSession, type SessionVars } from '../middleware/session';
@@ -24,6 +24,7 @@ import {
   invite,
   join,
   joinInfo,
+  joinInvite,
   membersDetail,
   pendingInvites,
   peopleOf,
@@ -59,6 +60,21 @@ export function spaceRoutes(db: Db, hub: EventHub, mailer: Mailer, webUrl: strin
     throw err;
   };
 
+  /** People with an account at these addresses have a new invite waiting in their Inbox. */
+  const tellInvited = async (emails: string[]) => {
+    if (!emails.length) return;
+    const users = await db
+      .select({ id: schema.user.id })
+      .from(schema.user)
+      .where(
+        inArray(
+          sql`lower(${schema.user.email})`,
+          emails.map((e) => e.toLowerCase()),
+        ),
+      );
+    for (const u of users) hub.publish(u.id, INBOX_CHANGED, {} satisfies InboxChangedEvent);
+  };
+
   r.post('/spaces', requireSession, async (c) => {
     const userId = c.get('session')!.user.id;
     const parsed = createSchema.safeParse(await c.req.json().catch(() => null));
@@ -69,6 +85,7 @@ export function spaceRoutes(db: Db, hub: EventHub, mailer: Mailer, webUrl: strin
     let sent: string[] = [];
     if (emails.length) sent = (await invite(db, mailer, webUrl, userId, space.id, emails)).sent;
     await announceMembers(db, hub, space.id);
+    await tellInvited(sent);
     return c.json({ space, invited: sent }, 201);
   });
 
@@ -94,6 +111,7 @@ export function spaceRoutes(db: Db, hub: EventHub, mailer: Mailer, webUrl: strin
     try {
       const out = await invite(db, mailer, webUrl, userId, spaceId, parsed.data.emails);
       await announceMembers(db, hub, spaceId);
+      await tellInvited(out.sent);
       return c.json({ results: out.results, invites: out.invites });
     } catch (err) {
       return fail(c, err);
@@ -105,6 +123,11 @@ export function spaceRoutes(db: Db, hub: EventHub, mailer: Mailer, webUrl: strin
     try {
       const spaceId = await cancelInvite(db, userId, c.req.param('id'));
       await announceMembers(db, hub, spaceId);
+      const [inv] = await db
+        .select({ email: schema.spaceInvites.email })
+        .from(schema.spaceInvites)
+        .where(eq(schema.spaceInvites.id, c.req.param('id')));
+      if (inv) await tellInvited([inv.email]);
       return c.body(null, 204);
     } catch (err) {
       return fail(c, err);
@@ -141,6 +164,7 @@ export function spaceRoutes(db: Db, hub: EventHub, mailer: Mailer, webUrl: strin
       by: how === 'removed' ? await nameOf(db, by) : null,
     };
     hub.publish(gone, SPACE_GONE, event);
+    if (how === 'removed') hub.publish(gone, INBOX_CHANGED, { spaceId } satisfies InboxChangedEvent);
     for (const u of told) hub.publish(u, INBOX_CHANGED, { spaceId } satisfies InboxChangedEvent);
     await announceMembers(db, hub, spaceId);
   };
@@ -177,6 +201,7 @@ export function spaceRoutes(db: Db, hub: EventHub, mailer: Mailer, webUrl: strin
     const { spaceId, userId } = c.req.param();
     try {
       const told = await restoreMember(db, me, spaceId, userId);
+      hub.publish(userId, INBOX_CHANGED, { spaceId } satisfies InboxChangedEvent);
       for (const u of told) hub.publish(u, INBOX_CHANGED, { spaceId } satisfies InboxChangedEvent);
       await announceMembers(db, hub, spaceId);
       return c.json({ members: await membersDetail(db, spaceId) });
@@ -202,7 +227,10 @@ export function spaceRoutes(db: Db, hub: EventHub, mailer: Mailer, webUrl: strin
     const { spaceId } = c.req.param();
     try {
       const out = await deleteSpace(db, storage, me, spaceId);
-      for (const u of out.members) hub.publish(u, SPACE_GONE, out.event);
+      for (const u of out.members) {
+        hub.publish(u, SPACE_GONE, out.event);
+        hub.publish(u, INBOX_CHANGED, {} satisfies InboxChangedEvent);
+      }
       return c.body(null, 204);
     } catch (err) {
       return fail(c, err);
@@ -231,6 +259,19 @@ export function spaceRoutes(db: Db, hub: EventHub, mailer: Mailer, webUrl: strin
     try {
       const out = await join(db, c.req.param('token'), { id: session.user.id, email: session.user.email });
       if (out.joined) await announceMembers(db, hub, out.space.id);
+      return c.json(out);
+    } catch (err) {
+      return fail(c, err);
+    }
+  });
+
+  /** Join from the Inbox: an invite to your address, by its id. */
+  r.post('/invites/:id/join', requireSession, async (c) => {
+    const session = c.get('session')!;
+    try {
+      const out = await joinInvite(db, c.req.param('id'), { id: session.user.id, email: session.user.email });
+      if (out.joined) await announceMembers(db, hub, out.space.id);
+      hub.publish(session.user.id, INBOX_CHANGED, { spaceId: out.space.id } satisfies InboxChangedEvent);
       return c.json(out);
     } catch (err) {
       return fail(c, err);

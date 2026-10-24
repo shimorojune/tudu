@@ -6,8 +6,10 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronRight as Caret,
+  Circle,
   CircleAlert,
   CircleCheck,
+  CircleDot,
   Clock,
   CornerDownRight,
   Ellipsis,
@@ -26,6 +28,7 @@ import {
   Search,
   Send,
   SlidersVertical,
+  Trash2,
   Sun,
   TriangleAlert,
   User,
@@ -71,6 +74,12 @@ export const ICONS = {
   success: CircleCheck,
   info: Moon,
   carried: ArrowRight,
+  /** Delete an Inbox item. */
+  trash: Trash2,
+  /** Mark as unread: a ring with the dot in it. */
+  unread: CircleDot,
+  /** Mark as read: the empty ring. */
+  read: Circle,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

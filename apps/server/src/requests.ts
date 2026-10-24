@@ -1,26 +1,20 @@
 import { randomUUID } from 'node:crypto';
 import {
   cleanHtml,
-  filterInbox,
-  filterSent,
   initialsOf,
   POSITION_STEP,
   textOf,
-  type InboxCounts,
-  type InboxItem,
   type InboxPerson,
-  type InboxResponse,
-  type InboxView,
   type IsoDate,
   type SyncMutation,
   type TaskRequest,
 } from '@tudu/core';
-import { and, asc, count, desc, eq, inArray, isNull, ne, schema, sql, type Db } from '@tudu/db';
+import { and, asc, desc, eq, inArray, isNull, schema, sql, type Db } from '@tudu/db';
 import type { TaskClocks } from '@tudu/db/schema';
 import { Rejected, roleIn, type Applied } from './tasks';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
-type Executor = Db | Tx;
+export type Executor = Db | Tx;
 
 type RequestMutation = Extract<SyncMutation, { type: `request.${string}` | `inbox.${string}` }>;
 
@@ -28,7 +22,7 @@ const NO_REQUEST = 'That request isn’t there any more.';
 const NOT_YOURS_TO_ANSWER = 'That request isn’t yours to answer.';
 const ALREADY = 'That request was already answered.';
 
-function person(u: { id: string; name: string; email: string; color: string | null }): InboxPerson {
+export function person(u: { id: string; name: string; email: string; color: string | null }): InboxPerson {
   return { id: u.id, name: u.name, email: u.email, color: u.color, initials: initialsOf(u.name, u.email) };
 }
 
@@ -296,15 +290,15 @@ export async function applyRequest(tx: Tx, userId: string, m: RequestMutation): 
         inbox: [r.toId, userId],
       };
     }
-    case 'inbox.read': {
-      const [item] = await tx
-        .select()
-        .from(schema.inboxItems)
-        .where(eq(schema.inboxItems.id, m.payload.id))
-        .for('update');
-      if (!item) throw new Rejected(404, 'That item isn’t in your Inbox any more.');
-      if (item.userId !== userId) throw new Rejected(403, 'That isn’t your Inbox.');
+    case 'inbox.read':
+    case 'inbox.unread': {
+      const item = await ownItem(tx, userId, m.payload.id);
       const tell = [userId];
+      if (m.type === 'inbox.unread') {
+        if (item.readAt)
+          await tx.update(schema.inboxItems).set({ readAt: null }).where(eq(schema.inboxItems.id, item.id));
+        return { taskId: item.id, spaceId: item.spaceId ?? '', days: [], requests: true, inbox: tell };
+      }
       if (!item.readAt)
         await tx.update(schema.inboxItems).set({ readAt: at }).where(eq(schema.inboxItems.id, item.id));
       // Opening a request tells the sender it was seen.
@@ -318,7 +312,7 @@ export async function applyRequest(tx: Tx, userId: string, m: RequestMutation): 
           tell.push(r.fromId);
         }
       }
-      return { taskId: item.id, spaceId: item.spaceId, days: [], requests: true, inbox: tell };
+      return { taskId: item.id, spaceId: item.spaceId ?? '', days: [], requests: true, inbox: tell };
     }
     case 'inbox.readAll': {
       const { spaceId } = m.payload;
@@ -335,13 +329,65 @@ export async function applyRequest(tx: Tx, userId: string, m: RequestMutation): 
         );
       return { taskId: m.payload.id, spaceId, days: [], requests: true, inbox: [userId] };
     }
+    case 'inbox.delete': {
+      const item = await ownItem(tx, userId, m.payload.id);
+      if (await waiting(tx, item)) throw new Rejected(409, MUST_ANSWER);
+      if (!item.clearedAt)
+        await tx.update(schema.inboxItems).set({ clearedAt: at }).where(eq(schema.inboxItems.id, item.id));
+      return { taskId: item.id, spaceId: item.spaceId ?? '', days: [], requests: true, inbox: [userId] };
+    }
+    case 'inbox.clear': {
+      const items = await tx
+        .select()
+        .from(schema.inboxItems)
+        .where(
+          and(
+            inArray(schema.inboxItems.id, m.payload.ids),
+            eq(schema.inboxItems.userId, userId),
+            isNull(schema.inboxItems.clearedAt),
+          ),
+        );
+      const ids: string[] = [];
+      // Requests still to answer stay: they are answered or declined, never cleared away.
+      for (const i of items) if (!(await waiting(tx, i))) ids.push(i.id);
+      if (ids.length)
+        await tx.update(schema.inboxItems).set({ clearedAt: at }).where(inArray(schema.inboxItems.id, ids));
+      return { taskId: m.payload.id, spaceId: '', days: [], requests: true, inbox: [userId] };
+    }
+    case 'inbox.restore': {
+      await tx
+        .update(schema.inboxItems)
+        .set({ clearedAt: null })
+        .where(and(inArray(schema.inboxItems.id, m.payload.ids), eq(schema.inboxItems.userId, userId)));
+      return { taskId: m.payload.id, spaceId: '', days: [], requests: true, inbox: [userId] };
+    }
   }
+}
+
+const MUST_ANSWER = 'Answer or decline it first.';
+
+/** An item of this person's Inbox, locked; someone else's is 403. */
+async function ownItem(tx: Tx, userId: string, id: string) {
+  const [item] = await tx.select().from(schema.inboxItems).where(eq(schema.inboxItems.id, id)).for('update');
+  if (!item) throw new Rejected(404, 'That item isn’t in your Inbox any more.');
+  if (item.userId !== userId) throw new Rejected(403, 'That isn’t your Inbox.');
+  return item;
+}
+
+/** A request to you that still waits for your answer. */
+async function waiting(tx: Executor, item: { kind: string; requestId: string | null }): Promise<boolean> {
+  if (item.kind !== 'request' || !item.requestId) return false;
+  const [r] = await tx
+    .select({ state: schema.requests.state })
+    .from(schema.requests)
+    .where(eq(schema.requests.id, item.requestId));
+  return r?.state === 'waiting';
 }
 
 const fromUser = schema.user;
 
 /** The requests to or from a person in a space, with both people and the day of the task they became. */
-async function requestsWhere(db: Executor, where: ReturnType<typeof and>): Promise<TaskRequest[]> {
+export async function requestsWhere(db: Executor, where: ReturnType<typeof and>): Promise<TaskRequest[]> {
   const toUser = sql`to_user`;
   const rows = await db
     .select({
@@ -379,141 +425,6 @@ async function requestsWhere(db: Executor, where: ReturnType<typeof and>): Promi
     createdAt: r.createdAt.toISOString(),
     answeredAt: r.answeredAt?.toISOString() ?? null,
   }));
-}
-
-/** Everything in a person's Inbox for a space, in its three views, narrowed by `q`. */
-export async function inboxOf(
-  db: Executor,
-  userId: string,
-  spaceId: string,
-  view: InboxView,
-  q = '',
-): Promise<InboxResponse> {
-  const items = await db
-    .select()
-    .from(schema.inboxItems)
-    .where(and(eq(schema.inboxItems.userId, userId), eq(schema.inboxItems.spaceId, spaceId)))
-    .orderBy(desc(schema.inboxItems.createdAt));
-  const reqIds = [...new Set(items.map((i) => i.requestId).filter((x): x is string => !!x))];
-  const requests = reqIds.length ? await requestsWhere(db, and(inArray(schema.requests.id, reqIds))) : [];
-  const byReq = new Map(requests.map((r) => [r.id, r]));
-  const cmIds = items.map((i) => i.commentId).filter((x): x is string => !!x);
-  const comments = cmIds.length
-    ? await db
-        .select({
-          id: schema.comments.id,
-          html: schema.comments.html,
-          deletedAt: schema.comments.deletedAt,
-          author: {
-            id: schema.user.id,
-            name: schema.user.name,
-            email: schema.user.email,
-            color: schema.user.color,
-          },
-          task: {
-            id: schema.tasks.id,
-            number: schema.tasks.number,
-            prefix: schema.spaces.taskPrefix,
-            title: schema.tasks.title,
-            day: schema.tasks.day,
-            doneAt: schema.tasks.doneAt,
-            deletedAt: schema.tasks.deletedAt,
-          },
-        })
-        .from(schema.comments)
-        .innerJoin(schema.user, eq(schema.user.id, schema.comments.authorId))
-        .innerJoin(schema.tasks, eq(schema.tasks.id, schema.comments.taskId))
-        .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
-        .where(inArray(schema.comments.id, cmIds))
-    : [];
-  const byCm = new Map(comments.map((c) => [c.id, c]));
-  const all: InboxItem[] = [];
-  for (const i of items) {
-    const base = {
-      id: i.id,
-      kind: i.kind,
-      spaceId: i.spaceId,
-      createdAt: i.createdAt.toISOString(),
-      readAt: i.readAt?.toISOString() ?? null,
-    };
-    if (i.kind === 'comment') {
-      const c = i.commentId ? byCm.get(i.commentId) : undefined;
-      if (!c || c.deletedAt || c.task.deletedAt) continue;
-      all.push({
-        ...base,
-        comment: {
-          id: c.id,
-          html: c.html,
-          author: person(c.author),
-          task: {
-            id: c.task.id,
-            ref: `${c.task.prefix}-${c.task.number}`,
-            title: c.task.title,
-            day: c.task.day,
-            done: c.task.doneAt !== null,
-          },
-        },
-      });
-    } else {
-      const r = i.requestId ? byReq.get(i.requestId) : undefined;
-      if (!r) continue;
-      all.push({ ...base, request: r });
-    }
-  }
-  const toAnswer = all.filter((i) => i.kind === 'request' && i.request!.state === 'waiting');
-  const answered = all.filter(
-    (i) => i.kind === 'request' && i.request!.state !== 'waiting' && i.request!.state !== 'withdrawn',
-  );
-  const updates = all.filter((i) => i.kind !== 'request');
-  const sent =
-    view === 'sent'
-      ? await requestsWhere(
-          db,
-          and(
-            eq(schema.requests.fromId, userId),
-            eq(schema.requests.spaceId, spaceId),
-            ne(schema.requests.state, 'withdrawn'),
-          ),
-        )
-      : [];
-  return {
-    view,
-    toAnswer: view === 'inbox' ? filterInbox(toAnswer, q) : [],
-    updates: view === 'inbox' ? filterInbox(updates, q) : [],
-    answered: view === 'answered' ? filterInbox(answered, q) : [],
-    sent: view === 'sent' ? filterSent(sent, q) : [],
-    counts: { toAnswer: toAnswer.length, unread: updates.filter((i) => !i.readAt).length },
-  };
-}
-
-/** The Inbox counts per space for /api/me: requests waiting, and updates not read. */
-export async function inboxCounts(db: Executor, userId: string): Promise<Map<string, InboxCounts>> {
-  const rows = await db
-    .select({
-      spaceId: schema.inboxItems.spaceId,
-      kind: schema.inboxItems.kind,
-      state: schema.requests.state,
-      readAt: schema.inboxItems.readAt,
-      n: count(),
-    })
-    .from(schema.inboxItems)
-    .leftJoin(schema.requests, eq(schema.requests.id, schema.inboxItems.requestId))
-    .where(eq(schema.inboxItems.userId, userId))
-    .groupBy(
-      schema.inboxItems.spaceId,
-      schema.inboxItems.kind,
-      schema.requests.state,
-      schema.inboxItems.readAt,
-    );
-  const out = new Map<string, InboxCounts>();
-  for (const r of rows) {
-    const c = out.get(r.spaceId) ?? { toAnswer: 0, unread: 0 };
-    if (r.kind === 'request') {
-      if (r.state === 'waiting') c.toAnswer += r.n;
-    } else if (!r.readAt) c.unread += r.n;
-    out.set(r.spaceId, c);
-  }
-  return out;
 }
 
 /** A comment on someone's task lands in their Inbox (never your own). */

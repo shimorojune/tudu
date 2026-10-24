@@ -390,7 +390,7 @@ async function inviteByToken(db: Executor, token: string) {
   return row ?? null;
 }
 
-function stateOf(row: {
+export function stateOf(row: {
   acceptedAt: Date | null;
   cancelledAt: Date | null;
   sentAt: Date;
@@ -470,8 +470,30 @@ export async function join(
         .update(schema.spaceInvites)
         .set({ acceptedAt: new Date(), acceptedBy: you.id })
         .where(eq(schema.spaceInvites.id, row.id));
+    // Its Inbox item has done its job, whichever way you came in.
+    await tx
+      .update(schema.inboxItems)
+      .set({ clearedAt: new Date(), readAt: new Date() })
+      .where(and(eq(schema.inboxItems.userId, you.id), eq(schema.inboxItems.inviteId, row.id)));
     return { space: (await spaceSummary(tx, you.id, row.spaceId))!, joined: !already };
   });
+}
+
+/**
+ * Join from the Inbox: the invite by its id rather than its link, with the same answers as the link (expired, taken
+ * back, another address).
+ */
+export async function joinInvite(
+  db: Db,
+  inviteId: string,
+  you: { id: string; email: string },
+): Promise<{ space: SpaceSummary; joined: boolean }> {
+  const [row] = await db
+    .select({ token: schema.spaceInvites.token })
+    .from(schema.spaceInvites)
+    .where(eq(schema.spaceInvites.id, inviteId));
+  if (!row) throw new SpaceError(410, 'That invite has ended.', { state: 'cancelled' });
+  return join(db, row.token, you);
 }
 
 /** Give a new person their colour, once. */
