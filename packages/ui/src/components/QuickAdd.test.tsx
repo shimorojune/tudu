@@ -7,6 +7,7 @@ import {
   QA_LEAVE_MS,
   QA_LEAVE_PHONE_MS,
   QA_SIMILAR_AFTER_MS,
+  QA_SIMILAR_FOLD_MS,
   QuickAdd,
   type QuickAddProps,
 } from './QuickAdd';
@@ -404,6 +405,91 @@ describe('QuickAdd', () => {
       expect(wrap.querySelector('.tp-qa-sim-k')!.textContent).toBe('Looks like a task you have'),
     );
     expect(screen.queryByRole('button', { name: /more$/ })).toBeNull();
+  });
+
+  describe('the look-alikes fold away instead of snapping (focus-shift-and-sim-exit)', () => {
+    const titles = () =>
+      [...document.querySelectorAll('.tp-qa-simwrap .tp-qa-sim-t')].map((b) => b.textContent);
+    const wrap = () => document.querySelector('.tp-qa-simwrap')!;
+    const folded = () => fireEvent.transitionEnd(wrap(), { propertyName: 'grid-template-rows' });
+
+    async function shown(similar: QuickAddProps['similar'], title: string) {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<Bar similar={similar} />);
+      const line = screen.getByRole('textbox', { name: 'Task title' });
+      await waitFor(() => expect(line).toHaveFocus());
+      await user.type(line, title);
+      act(() => vi.advanceTimersByTime(QA_SIMILAR_AFTER_MS + 20));
+      await waitFor(() => expect(wrap()).toHaveClass('tp-on'));
+      return { user, line };
+    }
+
+    it('FX-U01 after × the block folds with the last titles still in it, inert, until the fold ends', async () => {
+      const { user } = await shown(
+        async () => [
+          { key: 'a', title: 'Fix the roof' },
+          { key: 'b', title: 'Fix the roof tiles' },
+        ],
+        'Fix roof',
+      );
+      await user.click(screen.getByRole('button', { name: '1 more' }));
+      await user.click(screen.getByRole('button', { name: 'None of these' }));
+      expect(wrap()).not.toHaveClass('tp-on');
+      expect(wrap()).toHaveAttribute('inert');
+      expect(titles()).toEqual(['Fix the roof', 'Fix the roof tiles']);
+      // "1 more" stays open while it folds, so it leaves the way it looked
+      expect(wrap().querySelector('.tp-qa-sim-rest')).toHaveClass('tp-on');
+      // another property ending is not the fold
+      fireEvent.transitionEnd(wrap(), { propertyName: 'opacity' });
+      expect(titles()).toHaveLength(2);
+      folded();
+      expect(wrap().querySelector('.tp-qa-sim')).toBeNull();
+    });
+
+    it('FX-U02 editing to no match, or under four letters, folds the same way; a later match shows its own titles', async () => {
+      const similar = vi.fn(async (t: string) =>
+        t.startsWith('Fix')
+          ? [{ key: 'a', title: 'Fix the roof' }]
+          : t.startsWith('Paint')
+            ? [{ key: 'p', title: 'Paint the fence' }]
+            : [],
+      );
+      const { user, line } = await shown(similar, 'Fix roof');
+      // no match
+      await user.clear(line);
+      await user.type(line, 'Water plants');
+      act(() => vi.advanceTimersByTime(QA_SIMILAR_AFTER_MS + 20));
+      await waitFor(() => expect(wrap()).not.toHaveClass('tp-on'));
+      expect(titles()).toEqual(['Fix the roof']);
+      folded();
+      expect(titles()).toEqual([]);
+      // under four letters
+      await user.clear(line);
+      await user.type(line, 'Fix roof');
+      act(() => vi.advanceTimersByTime(QA_SIMILAR_AFTER_MS + 20));
+      await waitFor(() => expect(wrap()).toHaveClass('tp-on'));
+      await user.clear(line);
+      await user.type(line, 'Fi');
+      expect(wrap()).not.toHaveClass('tp-on');
+      expect(titles()).toEqual(['Fix the roof']);
+      // a new match mid-fold takes over at once
+      await user.clear(line);
+      await user.type(line, 'Paint it');
+      act(() => vi.advanceTimersByTime(QA_SIMILAR_AFTER_MS + 20));
+      await waitFor(() => expect(titles()).toEqual(['Paint the fence']));
+      expect(wrap()).toHaveClass('tp-on');
+    });
+
+    it('FX-U03 the folded titles leave even if the fold never reports its end', async () => {
+      const { user } = await shown(async () => [{ key: 'a', title: 'Fix the roof' }], 'Fix roof');
+      await user.click(screen.getByRole('button', { name: 'Not the same task' }));
+      expect(titles()).toEqual(['Fix the roof']);
+      act(() => vi.advanceTimersByTime(QA_SIMILAR_FOLD_MS - 50));
+      expect(titles()).toEqual(['Fix the roof']);
+      act(() => vi.advanceTimersByTime(100));
+      expect(wrap().querySelector('.tp-qa-sim')).toBeNull();
+    });
   });
 
   it('C07-U07 words handed in become the title; the kit line opens already shown', () => {

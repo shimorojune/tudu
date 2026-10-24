@@ -148,6 +148,12 @@ export interface SimilarItem {
 export const QA_SIMILAR_AFTER_MS = 380;
 /** Titles shorter than this are never checked. */
 export const QA_SIMILAR_MIN = 4;
+/** Longest the folded look-alikes stay in the DOM: the fold's 220ms and a margin. */
+export const QA_SIMILAR_FOLD_MS = 400;
+
+function sameSimilar(a: SimilarItem[], b: SimilarItem[]) {
+  return a.length === b.length && a.every((x, i) => x === b[i]);
+}
 
 /** The bar confirms "Added" for this long, then leaves. */
 export const QA_CLOSE_AFTER_MS = 650;
@@ -313,7 +319,8 @@ export function QuickAdd(p: QuickAddProps) {
             const next = (r ?? []).slice(0, 3);
             setSimHits((cur) => {
               const same = cur.length === next.length && cur.every((x, i) => x.key === next[i]!.key);
-              if (!same) setSimMore(false);
+              // An empty answer leaves "N more" as it is, so the block folds away the way it looked.
+              if (!same && next.length) setSimMore(false);
               return same ? cur : next;
             });
           },
@@ -329,6 +336,18 @@ export function QuickAdd(p: QuickAddProps) {
   }, [titleWords, simAsked]);
   const simShown = simAsked ? simHits.filter((x) => !simGone[x.key]) : [];
   const simOn = simShown.length > 0 && !added && !saving;
+  // Whatever empties the list (×, a title with no matches, one under four letters) also folds the block, so the last
+  // list stays in it until the fold is over; with nothing inside, the fold would snap shut in one frame.
+  const [simLast, setSimLast] = useState<SimilarItem[]>([]);
+  if (simShown.length && !sameSimilar(simShown, simLast)) setSimLast(simShown);
+  const simList = simShown.length ? simShown : simLast;
+  const simFolded = !simOn && simLast.length > 0;
+  useEffect(() => {
+    if (!simFolded) return;
+    // In case the fold never reports its end (the wrap was hidden, or no transition ran).
+    const t = setTimeout(() => setSimLast([]), QA_SIMILAR_FOLD_MS);
+    return () => clearTimeout(t);
+  }, [simFolded]);
 
   // Opening: the panel arrives, Planned follows the day you are looking at, and the line is ready to write in.
   // Closing keeps the draft for next time.
@@ -867,35 +886,43 @@ export function QuickAdd(p: QuickAddProps) {
         )}
       </div>
       {p.similar || p.initial?.similar ? (
-        <div className={cx('tp-qa-simwrap', simOn && 'tp-on')} aria-live="polite" inert={!simOn}>
+        <div
+          className={cx('tp-qa-simwrap', simOn && 'tp-on')}
+          aria-live="polite"
+          inert={!simOn}
+          onTransitionEnd={(e) => {
+            if (e.target === e.currentTarget && e.propertyName === 'grid-template-rows' && !simOn)
+              setSimLast([]);
+          }}
+        >
           <div>
-            {simShown.length ? (
+            {simList.length ? (
               <div className="tp-qa-sim">
                 <div className="tp-qa-sim-head">
                   <span className="tp-qa-sim-k">
-                    {simShown.length > 1 ? 'Looks like tasks you have' : 'Looks like a task you have'}
+                    {simList.length > 1 ? 'Looks like tasks you have' : 'Looks like a task you have'}
                   </span>
                   <span className="tp-qa-sp" />
-                  {simShown.length > 1 ? (
+                  {simList.length > 1 ? (
                     <button
                       type="button"
                       className={cx('tp-qa-sim-more', simMore && 'tp-on')}
                       aria-expanded={simMore}
                       onClick={() => setSimMore((v) => !v)}
                     >
-                      {simShown.length - 1} more
+                      {simList.length - 1} more
                       <span className="tp-qa-sim-chev" aria-hidden="true">
                         <Icon name="right" size={12} />
                       </span>
                     </button>
                   ) : null}
                   <IconButton
-                    label={simShown.length > 1 ? 'None of these' : 'Not the same task'}
+                    label={simList.length > 1 ? 'None of these' : 'Not the same task'}
                     tip={false}
                     className="tp-qa-sim-x"
                     onClick={() => {
                       const g: Record<string, true> = {};
-                      for (const x of simShown) g[x.key] = true;
+                      for (const x of simList) g[x.key] = true;
                       setSimGone((v) => ({ ...v, ...g }));
                       input.current?.focus();
                     }}
@@ -903,10 +930,10 @@ export function QuickAdd(p: QuickAddProps) {
                     <Icon name="x" size={12} />
                   </IconButton>
                 </div>
-                {simLink(simShown[0]!)}
-                {simShown.length > 1 ? (
+                {simLink(simList[0]!)}
+                {simList.length > 1 ? (
                   <div className={cx('tp-qa-sim-rest', simMore && 'tp-on')} inert={!simMore}>
-                    <div>{simShown.slice(1).map(simLink)}</div>
+                    <div>{simList.slice(1).map(simLink)}</div>
                   </div>
                 ) : null}
               </div>
