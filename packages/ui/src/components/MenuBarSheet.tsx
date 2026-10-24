@@ -47,6 +47,11 @@ export interface MenuBarSheetProps {
   onOpenApp?: () => void;
   onFeedback?: () => void;
   onQuit?: () => void;
+  /**
+   * The ⋯'s first item, in an app that can say where its updates stand: Check for updates…, or Restart to update
+   * (with the version as its hint) once one is downloaded. Not while signed out: Settings needs you signed in.
+   */
+  update?: { ready?: string; onCheck?: () => void; onRestart?: () => void };
   className?: string;
 }
 
@@ -121,6 +126,7 @@ export function MenuBarSheet({
   onOpenApp,
   onFeedback,
   onQuit,
+  update,
   className,
 }: MenuBarSheetProps) {
   const total = groups.reduce((n, g) => n + g.rows.length, 0);
@@ -132,6 +138,11 @@ export function MenuBarSheet({
       side="top"
       align="end"
       items={[
+        update &&
+          state !== 'signed-out' &&
+          (update.ready
+            ? { label: 'Restart to update', hint: update.ready, onSelect: update.onRestart }
+            : { label: 'Check for updates…', onSelect: update.onCheck }),
         state !== 'signed-out' && { label: 'Send feedback…', onSelect: onFeedback },
         { label: `Quit ${appName}`, hint: '⌘Q', onSelect: onQuit },
       ]}

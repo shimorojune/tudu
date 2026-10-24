@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   TRACKS,
+  checkedWords,
   compareVersions,
   notesHtml,
   readyText,
@@ -63,6 +64,19 @@ describe('Versions and tracks (chunk 11)', () => {
       'net.ezdev.tudu.staging',
       'net.ezdev.tudu.test',
     ]);
+  });
+});
+
+describe('C11-U15 checkedWords', () => {
+  const NOW = new Date('2026-10-24T12:00:00Z');
+  it('C11-U15 just now, minutes, hours, days', () => {
+    expect(checkedWords('2026-10-24T11:59:40Z', NOW)).toBe('Checked just now');
+    expect(checkedWords('2026-10-24T12:00:30Z', NOW)).toBe('Checked just now');
+    expect(checkedWords('2026-10-24T11:59:00Z', NOW)).toBe('Checked 1 minute ago');
+    expect(checkedWords('2026-10-24T11:48:00Z', NOW)).toBe('Checked 12 minutes ago');
+    expect(checkedWords('2026-10-24T11:00:00Z', NOW)).toBe('Checked 1 hour ago');
+    expect(checkedWords('2026-10-24T07:10:00Z', NOW)).toBe('Checked 4 hours ago');
+    expect(checkedWords('2026-10-22T09:00:00Z', NOW)).toBe('Checked 2 days ago');
   });
 });
 

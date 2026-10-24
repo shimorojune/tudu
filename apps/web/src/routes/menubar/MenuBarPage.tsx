@@ -10,14 +10,15 @@ import {
   type SpaceSummary,
   type Task,
 } from '@tudu/core';
-import { MenuBarSheet, type MenuBarGroupItem, type MenuBarRowItem } from '@tudu/ui';
+import { MenuBarSheet, type MenuBarGroupItem, type MenuBarRowItem, type MenuBarSheetProps } from '@tudu/ui';
 import { useEffect, useState } from 'react';
 import { useAppInfo } from '../../app/DesktopHost';
-import { desktop, type DesktopBridge } from '../../app/desktop';
+import { desktop, UPDATES_GO, type DesktopBridge } from '../../app/desktop';
 import { useLiveEvents } from '../../app/live';
 import { meQuery, refreshMe } from '../../app/session';
 import { spacePath } from '../../app/space';
 import { taskStore, useOnline } from '../../app/tasks';
+import { restartToUpdate, useUpdateStatus } from '../../app/updates';
 import { useWorkingDay, WorkingDayProvider } from '../../app/workingDay';
 import { toItem } from '../today/TodayPage';
 import './menubar.css';
@@ -84,11 +85,26 @@ export function MenuBarPage({ me: first }: { me: MeResponse | null }) {
     return () => window.removeEventListener('keydown', key);
   }, [app]);
 
+  const { status } = useUpdateStatus(app);
   const name = info?.name ?? 'Tudu';
+  // ⋯'s first item, only from an app that can say where its updates stand.
+  const update: MenuBarSheetProps['update'] =
+    app && status
+      ? {
+          ready: status.ready?.version,
+          // The check starts here; the desk shows it in Settings › This Mac.
+          onCheck: () => {
+            void app.checkUpdate(true).catch(() => {});
+            app.showMain(UPDATES_GO);
+          },
+          onRestart: () => void restartToUpdate(app, name).catch(() => {}),
+        }
+      : undefined;
   const common = {
     appName: name,
     onOpenApp: () => (app ? app.showMain() : go('/')),
     onQuit: () => app?.quit(),
+    update,
   };
   return (
     <div
@@ -116,6 +132,7 @@ function Today({
   appName,
   onOpenApp,
   onQuit,
+  update,
 }: {
   me: MeResponse;
   app: DesktopBridge | null;
@@ -123,6 +140,7 @@ function Today({
   appName: string;
   onOpenApp: () => void;
   onQuit: () => void;
+  update?: MenuBarSheetProps['update'];
 }) {
   const { today } = useWorkingDay();
   const online = useOnline();
@@ -181,6 +199,7 @@ function Today({
       onOpenApp={onOpenApp}
       onFeedback={() => app?.feedback()}
       onQuit={onQuit}
+      update={update}
     />
   );
 }

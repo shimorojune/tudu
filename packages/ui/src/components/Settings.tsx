@@ -1,5 +1,5 @@
 import { deleteWords, membersWords, spaceInitials, spaceLine } from '@tudu/core';
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
 import type { ThemeChoice } from '../lib/theme';
@@ -15,6 +15,7 @@ import { ProjectSettings, type ProjectSettingsProps } from './ProjectSettings';
 import { Segmented } from './Segmented';
 import { SettingRow, SettingsSection } from './SettingsSection';
 import { SettingsNav, type SettingsNavGroup } from './SettingsNav';
+import { Skeleton } from './Skeleton';
 import { VersionLink, type VersionLinkProps } from './VersionLink';
 import { SpaceTile } from './SpaceTile';
 import { Switch } from './Switch';
@@ -35,6 +36,35 @@ export interface SettingsMac {
   onLoginItems?: () => void;
   dock: SettingsDock;
   onDock?: (dock: SettingsDock) => void;
+  /** This Mac › Updates; an app too old to answer leaves it out. */
+  updates?: SettingsUpdates;
+}
+
+/**
+ * Where the updater stands: `loading` until the app answers, `never` before a first check, `idle` up to date,
+ * `checking`, `downloading` (with `progress` when the size is known), `ready` (downloaded and verified), `error`.
+ */
+export type SettingsUpdateState =
+  'loading' | 'never' | 'idle' | 'checking' | 'downloading' | 'ready' | 'error';
+
+export interface SettingsUpdates {
+  /** The app's name: "Tudu", "Tudu Staging". */
+  name: string;
+  /** The version it runs: "0.37.0". */
+  current: string;
+  state: SettingsUpdateState;
+  /** "Checked 12 minutes ago". */
+  checked?: string;
+  /** The version downloading or ready. */
+  version?: string;
+  /** 0 to 1 while downloading. */
+  progress?: number;
+  /** The line for `error`: "Couldn’t check for updates. …". */
+  error?: string;
+  onCheck?: () => void;
+  onRestart?: () => void;
+  /** Restart to update failed: what to do instead. */
+  restartError?: string;
 }
 
 export interface SettingsMe {
@@ -288,6 +318,93 @@ function EmailRow({
   );
 }
 
+/** How long Check now's tick stays when nothing new was found. */
+export const UP_TO_DATE_MS = 1600;
+
+/**
+ * This Mac › Updates: the version you run, what the last check found, and one button. A Check now that finds nothing
+ * ends on the tick ("Up to date") for a moment; each new line fades up into place.
+ */
+function UpdatesSection({ u }: { u: SettingsUpdates }) {
+  const [asked, setAsked] = useState(false);
+  const [tick, setTick] = useState(false);
+  const [was, setWas] = useState(u.state);
+  if (u.state !== was) {
+    setWas(u.state);
+    if (u.state === 'idle' && was === 'checking' && asked) setTick(true);
+    if (u.state !== 'checking') setAsked(false);
+  }
+  useEffect(() => {
+    if (!tick) return;
+    const t = setTimeout(() => setTick(false), UP_TO_DATE_MS);
+    return () => clearTimeout(t);
+  }, [tick]);
+  const check = () => {
+    setAsked(true);
+    u.onCheck?.();
+  };
+  const v = u.version ?? '';
+  const line: ReactNode =
+    u.state === 'loading' ? (
+      <Skeleton width={220} height={10} />
+    ) : u.state === 'never' ? (
+      'Not checked yet.'
+    ) : u.state === 'idle' ? (
+      `Up to date.${u.checked ? ` ${u.checked}.` : ''}`
+    ) : u.state === 'checking' ? (
+      'Looking for a new version…'
+    ) : u.state === 'downloading' ? (
+      `Downloading ${u.name} ${v}…`
+    ) : u.state === 'ready' ? (
+      <>
+        <span className="tp-set-ready">{`${u.name} ${v} is ready.`}</span> Restart to use it.
+      </>
+    ) : (
+      <span className="tp-set-bad">
+        {u.error ?? 'Couldn’t check for updates. Check your connection and try again.'}
+      </span>
+    );
+  const control =
+    u.state === 'ready' ? (
+      <Button variant="primary" size="sm" onClick={u.onRestart}>
+        Restart to update
+      </Button>
+    ) : u.state === 'downloading' ? (
+      <Button variant="secondary" size="sm" progress={u.progress ?? 0}>
+        Downloading
+      </Button>
+    ) : (
+      <Button
+        variant="secondary"
+        size="sm"
+        disabled={u.state === 'loading'}
+        loading={u.state === 'checking'}
+        loadingLabel="Checking…"
+        success={tick}
+        successLabel="Up to date"
+        onClick={check}
+      >
+        {u.state === 'error' ? 'Try again' : 'Check now'}
+      </Button>
+    );
+  return (
+    <SettingsSection title="Updates">
+      <SettingRow
+        title={`${u.name} ${u.current}`}
+        sub={
+          <>
+            <span key={u.state} className="tp-set-st" aria-live="polite">
+              {line}
+            </span>
+            {u.restartError ? <span className="tp-set-st tp-set-bad">{u.restartError}</span> : null}
+          </>
+        }
+        control={control}
+      />
+    </SettingsSection>
+  );
+}
+
 const TITLES = (p: SettingsProps): Record<SettingsSectionName, [string, string]> => ({
   account: ['Account', p.me.email],
   appearance: ['Appearance', 'How Tudu looks on this computer.'],
@@ -511,6 +628,7 @@ export function Settings(p: SettingsProps) {
             />
           </SettingRow>
         </SettingsSection>
+        {m.updates ? <UpdatesSection u={m.updates} /> : null}
       </>
     );
   } else if (sec === 'space' && !team)

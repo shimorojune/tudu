@@ -433,6 +433,117 @@ describe('C16-U04 Settings › This Mac', () => {
   });
 });
 
+describe('C11-U12 Settings › This Mac › Updates', () => {
+  const base = { openAtLogin: 'off' as const, dock: 'open' as const };
+  const row = (u: Partial<NonNullable<NonNullable<SettingsProps['mac']>['updates']>>) =>
+    settings({
+      section: 'mac',
+      mac: { ...base, updates: { name: 'Tudu', current: '0.37.0', state: 'idle', ...u } },
+    });
+  const button = () => within(screen.getByRole('region', { name: 'Updates' })).getByRole('button');
+
+  it('C11-U12 no updates prop: no section (an app too old to say)', () => {
+    settings({ section: 'mac', mac: base });
+    expect(screen.queryByText('Updates')).toBeNull();
+  });
+
+  it('C11-U12 each state: the title, the line and the button', () => {
+    const { rerender } = row({ state: 'loading' });
+    const at = (u: object) =>
+      rerender(
+        <Settings
+          me={ME}
+          space={NW}
+          still
+          section="mac"
+          mac={{ ...base, updates: { name: 'Tudu', current: '0.37.0', state: 'idle', ...u } }}
+        />,
+      );
+    expect(screen.getByText('Tudu 0.37.0')).toBeInTheDocument();
+    expect(button()).toHaveTextContent('Check now');
+    expect(button()).toBeDisabled();
+
+    at({ state: 'never' });
+    expect(screen.getByText('Not checked yet.')).toBeInTheDocument();
+    expect(button()).toBeEnabled();
+
+    at({ state: 'idle', checked: 'Checked 12 minutes ago' });
+    expect(screen.getByText('Up to date. Checked 12 minutes ago.')).toHaveClass('tp-set-st');
+
+    at({ state: 'checking' });
+    expect(screen.getByText('Looking for a new version…')).toBeInTheDocument();
+    expect(button()).toHaveTextContent('Checking…');
+
+    at({ state: 'downloading', version: '0.37.1', progress: 0.42 });
+    expect(screen.getByText('Downloading Tudu 0.37.1…')).toBeInTheDocument();
+    expect(button()).toHaveTextContent('42%');
+
+    at({ state: 'ready', version: '0.37.1' });
+    expect(screen.getByText('Tudu 0.37.1 is ready.')).toHaveClass('tp-set-ready');
+    expect(button()).toHaveTextContent('Restart to update');
+    expect(button()).toHaveClass('tp-btn-primary');
+
+    at({ state: 'error', error: 'Couldn’t check for updates. Check your connection and try again.' });
+    expect(screen.getByText(/Couldn’t check for updates/)).toHaveClass('tp-set-bad');
+    expect(button()).toHaveTextContent('Try again');
+  });
+
+  it('C11-U12 Tudu Staging: its own name and full version', () => {
+    row({ name: 'Tudu Staging', current: '0.37.1-staging.10', state: 'never' });
+    expect(screen.getByText('Tudu Staging 0.37.1-staging.10')).toBeInTheDocument();
+  });
+});
+
+describe('C11-U13 Settings › This Mac › Updates, acting', () => {
+  afterEach(() => vi.useRealTimers());
+  const base = { openAtLogin: 'off' as const, dock: 'open' as const };
+  const view = (u: object) => (
+    <Settings
+      me={ME}
+      space={NW}
+      still
+      section="mac"
+      mac={{ ...base, updates: { name: 'Tudu', current: '0.37.0', state: 'idle', ...u } }}
+    />
+  );
+  const button = () => within(screen.getByRole('region', { name: 'Updates' })).getByRole('button');
+
+  it('C11-U13 Check now that finds nothing ends on the tick, then settles back', () => {
+    vi.useFakeTimers();
+    const onCheck = vi.fn();
+    const { rerender } = render(view({ onCheck, checked: 'Checked 2 hours ago' }));
+    fireEvent.click(button());
+    expect(onCheck).toHaveBeenCalledOnce();
+    rerender(view({ onCheck, state: 'checking' }));
+    rerender(view({ onCheck, state: 'idle', checked: 'Checked just now' }));
+    expect(button()).toHaveTextContent('Up to date');
+    act(() => vi.advanceTimersByTime(1600));
+    expect(button()).toHaveTextContent('Check now');
+  });
+
+  it('C11-U13 a check you did not ask for ends without the tick', () => {
+    const { rerender } = render(view({ state: 'checking' }));
+    rerender(view({ state: 'idle', checked: 'Checked just now' }));
+    expect(button()).toHaveTextContent('Check now');
+  });
+
+  it('C11-U13 Restart to update calls onRestart; a failed restart says what to do', () => {
+    const onRestart = vi.fn();
+    const { rerender } = render(view({ state: 'ready', version: '0.37.1', onRestart }));
+    fireEvent.click(button());
+    expect(onRestart).toHaveBeenCalledOnce();
+    rerender(
+      view({
+        state: 'ready',
+        version: '0.37.1',
+        onRestart,
+        restartError: 'Couldn’t restart. Quit and open Tudu again to finish.',
+      }),
+    );
+    expect(screen.getByText(/Couldn’t restart/)).toHaveClass('tp-set-bad');
+  });
+});
+
 describe('the version at the foot of the list', () => {
   const RELEASE = 'https://github.com/shimorojune/tudu/releases/tag/tudu-0.37.0';
   const STAGING = 'https://github.com/shimorojune/tudu/releases#release-staging';

@@ -32,6 +32,7 @@
             "allow-quit",
             "allow-update-check",
             "allow-update-install",
+            "allow-update-status",
             "allow-this-mac",
             "allow-set-open-at-login",
             "allow-open-login-items",

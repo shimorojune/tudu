@@ -242,6 +242,70 @@ test.describe('desktop', () => {
     await app.until(`return !!T.all('textbox', 'Task title')[0]`, 'floating');
   });
 
+  test.describe('with this version on the feed', () => {
+    // A check finds nothing newer (none), as on staging and production; with no release at all the feed answers 404,
+    // which the updater counts as an error.
+    test.use({ release: 'current' });
+
+    test('C11-D14 regression (24 Oct): a version published while the app runs shows once the desk comes back, no relaunch', async ({
+      app,
+    }) => {
+      const next = run().next.version;
+      await app.waitState((x) => x.updater.lastResult === 'none');
+      await signIn(app);
+      const pid = (await app.state()).pid;
+      // Published after the launch check; the four-hour check is hours away.
+      await publish(next, run().next.update, run().next.signature);
+      await app.act('age-check', { minutes: 31 });
+      // The desk put away and brought back: it comes to the front, and that checks.
+      await app.act('close', { window: 'main' });
+      await app.act('reopen');
+      const s = await app.waitState((x) => x.updater.ready?.version === next, 30_000);
+      expect(s.updater.lastManual).toBe(false);
+      expect(s.pid).toBe(pid);
+      await expect.poll(() => inboxPip(app)).toBe(1);
+    });
+
+    test('C11-D15 the floor: coming to the front within 30 minutes asks nothing; a wake past it checks once', async ({
+      app,
+    }) => {
+      const first = await app.waitState((x) => x.updater.lastResult === 'none' && !x.updater.checking);
+      await app.act('close', { window: 'main' });
+      await app.act('reopen');
+      await app.waitState((x) => x.windows.main.visible && x.windows.main.focused);
+      expect(await app.act('check-update', { auto: true })).toEqual({ started: false });
+      expect((await app.state()).updater.checks).toBe(first.updater.checks);
+      await app.act('age-check', { minutes: 31 });
+      await app.act('wake');
+      await app.waitState((x) => x.updater.checks === first.updater.checks + 1 && !x.updater.checking);
+      // And not again straight after.
+      await app.act('wake');
+      expect((await app.state()).updater.checks).toBe(first.updater.checks + 1);
+    });
+
+    test('C11-D16 Settings › This Mac › Check now on the real app: Downloading, Ready, then Restart to update relaunches on it', async ({
+      app,
+    }) => {
+      const next = run().next.version;
+      await app.waitState((x) => x.updater.lastResult === 'none');
+      await signIn(app);
+      await publish(next, run().next.update, run().next.signature);
+      await go(app, '/me?settings=mac');
+      const updates = `document.querySelector('[aria-label="Updates"]')`;
+      await app.until(`return !!${updates} && ${updates}.innerText.includes('Up to date.')`);
+      await app.eval(`T.click(${updates}.querySelector('button'))`);
+      await app.until(`return ${updates}.innerText.includes('is ready. Restart to use it.')`, 'main', 30_000);
+      const s = await app.state();
+      expect(s.updater.ready?.version).toBe(next);
+      expect(s.updater.lastManual).toBe(true);
+      await expect.poll(() => inboxPip(app)).toBe(1);
+      const old = s.pid;
+      await app.eval(`T.click(${updates}.querySelector('button'))`);
+      await app.waitState((x) => x.pid !== old && x.version === next, 60_000);
+      await app.ready();
+    });
+  });
+
   test.describe('with the next version on the feed', () => {
     test.use({ release: 'next' });
 

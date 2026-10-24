@@ -16,6 +16,50 @@ export interface FakeInit {
   /** Settings › This Mac as the app has it; the login switch answers `loginAnswer` when set. */
   thisMac?: { openAtLogin?: 'off' | 'on' | 'approval' | 'refused'; dock?: 'open' | 'always' };
   loginAnswer?: 'off' | 'on' | 'approval' | 'refused';
+  /** An app older than update_status: no Check now. */
+  noStatus?: boolean;
+  /** A check's steps this far apart, so a test sees Checking… and Downloading. */
+  stepMs?: number;
+  /** The updater as the fake app has it. */
+  status?: Partial<FakeStatus>;
+}
+
+/** The updater's state as the app sends it (`update:status`). */
+export interface FakeStatus {
+  checks: number;
+  lastCheck: string | null;
+  lastResult: 'none' | 'ready' | 'error' | null;
+  lastManual: boolean;
+  ready: { version: string; notes: string; date: string | null } | null;
+  error: string | null;
+  downloads: number;
+  checking: boolean;
+  downloading: { version: string; received: number; total: number | null } | null;
+}
+
+/** The fake app's updater moves on: its status changes and every window hears `update:status`. */
+export async function updaterSays(page: Page, patch: Partial<FakeStatus>): Promise<void> {
+  await page.evaluate((p) => {
+    const f = (
+      window as unknown as {
+        __tuduDesktopFake: { status?: object; listeners: Record<string, Array<(x: unknown) => void>> };
+      }
+    ).__tuduDesktopFake;
+    f.status = {
+      checks: 1,
+      lastCheck: new Date().toISOString(),
+      lastResult: 'none',
+      lastManual: false,
+      ready: null,
+      error: null,
+      downloads: 0,
+      checking: false,
+      downloading: null,
+      ...f.status,
+      ...p,
+    };
+    for (const fn of f.listeners['update:status'] ?? []) fn(f.status);
+  }, patch);
 }
 
 export const NOTES = '### Features\n\n* The floating bar keeps your draft\n* Search finds a task by its key';

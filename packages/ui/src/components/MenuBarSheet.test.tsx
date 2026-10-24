@@ -120,3 +120,43 @@ describe('C20-U03 MenuBarSheet', () => {
     expect(onOpen).toHaveBeenCalledWith(personal.rows[2]);
   });
 });
+
+describe('C11-U14 MenuBarSheet › updates', () => {
+  it('C11-U14 ⋯ starts with Check for updates…, then Send feedback… and Quit', async () => {
+    const user = userEvent.setup();
+    const onCheck = vi.fn();
+    render(<MenuBarSheet state="empty" heading={heading} update={{ onCheck }} />);
+    await user.click(screen.getByRole('button', { name: 'More' }));
+    const items = screen.getAllByRole('menuitem').map((m) => m.textContent);
+    expect(items[0]).toBe('Check for updates…');
+    expect(items[1]).toContain('Send feedback…');
+    expect(items[2]).toContain('Quit Tudu');
+    await user.click(screen.getByRole('menuitem', { name: 'Check for updates…' }));
+    expect(onCheck).toHaveBeenCalledOnce();
+  });
+
+  it('C11-U14 with a version ready it reads Restart to update, the version as its hint', async () => {
+    const user = userEvent.setup();
+    const onRestart = vi.fn();
+    render(<MenuBarSheet state="empty" heading={heading} update={{ ready: '0.37.1', onRestart }} />);
+    await user.click(screen.getByRole('button', { name: 'More' }));
+    const first = screen.getAllByRole('menuitem')[0]!;
+    expect(first).toHaveTextContent('Restart to update');
+    expect(first).toHaveTextContent('0.37.1');
+    await user.click(first);
+    expect(onRestart).toHaveBeenCalledOnce();
+  });
+
+  it('C11-U14 without update (an older app), or signed out, there is no such item', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<MenuBarSheet state="empty" heading={heading} />);
+    await user.click(screen.getByRole('button', { name: 'More' }));
+    expect(screen.queryByRole('menuitem', { name: /update/ })).toBeNull();
+    unmount();
+    render(<MenuBarSheet state="signed-out" update={{ onCheck: vi.fn() }} />);
+    await user.click(screen.getByRole('button', { name: 'More' }));
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual([
+      expect.stringContaining('Quit'),
+    ]);
+  });
+});

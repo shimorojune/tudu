@@ -13,7 +13,7 @@ mod windows;
 
 use tauri::{
     tray::{TrayIcon, TrayIconBuilder, TrayIconEvent},
-    Manager, RunEvent,
+    Manager, RunEvent, WindowEvent,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
@@ -40,6 +40,7 @@ macro_rules! handlers {
             bridge::quit,
             updates::update_check,
             updates::update_install,
+            updates::update_status,
             background::this_mac,
             background::set_open_at_login,
             background::open_login_items,
@@ -63,7 +64,13 @@ pub fn run() {
                 })
                 .build(),
         )
-        .manage(updates::Updates::default());
+        .manage(updates::Updates::default())
+        // Any of the three windows coming to the front checks for a new version, once the last check is old enough.
+        .on_window_event(|w, e| {
+            if let WindowEvent::Focused(true) = e {
+                updates::auto_check(w.app_handle());
+            }
+        });
 
     #[cfg(feature = "control")]
     let builder = builder
@@ -89,6 +96,7 @@ pub fn run() {
             tray(app.handle(), track)?;
             background::apply(app.handle());
             background::watch_tick(app.handle());
+            updates::watch_wake(app.handle());
             if let Err(e) = app.global_shortcut().register(SUMMON) {
                 eprintln!("tudu: the summon {SUMMON} could not be registered: {e}");
             }

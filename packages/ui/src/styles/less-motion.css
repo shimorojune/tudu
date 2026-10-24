@@ -169,6 +169,9 @@
 :root[data-motion='less'] .tp-set-in {
   animation: tp-label-in 160ms linear both;
 }
+:root[data-motion='less'] .tp-set-st {
+  animation: tp-fade-in 160ms linear both;
+}
 :root[data-motion='less'] .tp-ver-arrow {
   transform: none;
   transition: opacity 120ms linear;

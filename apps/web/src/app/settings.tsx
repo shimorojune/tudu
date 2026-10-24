@@ -32,6 +32,8 @@ import { useEffect, useState } from 'react';
 import { openCreateSpace } from './dayView';
 import { useAppVersion } from './DesktopHost';
 import { desktop, inApp, type ThisMac } from './desktop';
+import { useAppInfo } from './DesktopHost';
+import { updateStore, updatesRow, useUpdateStatus } from './updates';
 import { scrollToProjects, settingsClosed } from './editProjects';
 import { api, initialsOf, photoSrc, queryClient, refreshMe, signOut } from './session';
 import { forgetSpace, spacePath, useSpace as useSpaceFromShell } from './space';
@@ -124,6 +126,9 @@ interface Asking {
 export function useThisMac(): SettingsMac | undefined {
   const bridge = desktop();
   const [mac, setMac] = useState<ThisMac | null>(null);
+  const info = useAppInfo();
+  const { supported, status } = useUpdateStatus(bridge);
+  const [restartError, setRestartError] = useState<string | undefined>();
   useEffect(() => {
     if (!bridge) return;
     let live = true;
@@ -136,8 +141,31 @@ export function useThisMac(): SettingsMac | undefined {
     };
   }, [bridge]);
   if (!bridge || !mac) return undefined;
+  const name = info?.name ?? 'Tudu';
   return {
     ...mac,
+    // An app too old to say where its updates stand has no Updates section.
+    updates:
+      supported === false
+        ? undefined
+        : {
+            ...updatesRow(supported ? status : null, { name, version: info?.version ?? '' }, new Date()),
+            onCheck: () => {
+              setRestartError(undefined);
+              // The Inbox hears of a new version at once (the app also says so to the desk).
+              void bridge.checkUpdate(true).then(
+                (r) => r && updateStore.setReady(r),
+                () => {},
+              );
+            },
+            onRestart: () => {
+              setRestartError(undefined);
+              void bridge
+                .installUpdate()
+                .catch(() => setRestartError(`Couldn’t restart. Quit and open ${name} again to finish.`));
+            },
+            restartError,
+          },
     onOpenAtLogin: (on) => {
       setMac((m) => m && { ...m, openAtLogin: on ? 'on' : 'off' });
       void bridge.setOpenAtLogin(on).then(
