@@ -38,6 +38,8 @@ async function expectLineStill(page: Page, sheet: Locator, label: string) {
 
 test.describe('motion', () => {
   test.beforeEach(async ({ page }) => {
+    // Four offsets, each two screenshots decoded in the page: WebKit on a CI runner needs more than 30s for that.
+    test.slow();
     await fixClock(page);
   });
 
