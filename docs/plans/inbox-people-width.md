@@ -1,6 +1,6 @@
 # Inbox and People: use the width the design gives them
 
-Status: proposal, waiting for Rohit's approval. Canvas: approved 24 Oct 2026 (notes `p08-width` on the Inbox page and
+Status: approved by Rohit 24 Oct 2026; implemented. Canvas: approved 24 Oct 2026 (notes `p08-width` on the Inbox page and
 `p09-width` on the Spaces page of the canvas, v32), with a 1120px cap as drawn.
 
 ## The bug
@@ -40,12 +40,12 @@ column is narrower than 800px already, so it does not change.
 
 New end-to-end cases, in the existing groups (Playwright, desktop project at 1440x900 unless said):
 
-| Id | Where | Scenario |
-| -- | ----- | -------- |
-| C08-E21 | `packages/e2e/tests/inbox/inbox.spec.ts` | Desk at 1440x900: the Inbox sheet is 1120px wide (±1) and centred in the page column (left and right gaps equal ±1). Resize to 1920x1080: still 1120px and centred. Resize to 1100x800: the sheet fills the column (its width equals the column's). Skipped on tablet and phone. |
-| C08-E22 | `packages/e2e/tests/spaces/spaces.spec.ts` | The same three checks for People in Northwind, with Everyone and then one person picked (picking only turns the right side; the sheet width does not change). Skipped on tablet and phone. |
-| C08-E23 | `packages/e2e/tests/inbox/inbox.spec.ts` | Offline on the desk at 1440: the "You're offline." banner on the Inbox and on People is as wide as the sheet below it and lines up with its left edge. |
-| C01-E09 | `packages/e2e/tests/shell/shell.spec.ts` | Regression: Today and Backlog at 1440 stay at 800px, centred, so the change does not leak to the one-column pages. |
+| Id      | Where                                      | Scenario                                                                                                                                                                                                                                                                         |
+| ------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C08-E21 | `packages/e2e/tests/inbox/inbox.spec.ts`   | Desk at 1440x900: the Inbox sheet is 1120px wide (±1) and centred in the page column (left and right gaps equal ±1). Resize to 1920x1080: still 1120px and centred. Resize to 1100x800: the sheet fills the column (its width equals the column's). Skipped on tablet and phone. |
+| C08-E22 | `packages/e2e/tests/spaces/spaces.spec.ts` | The same three checks for People in Northwind, with Everyone and then one person picked (picking only turns the right side; the sheet width does not change). Skipped on tablet and phone.                                                                                       |
+| C08-E23 | `packages/e2e/tests/inbox/inbox.spec.ts`   | Offline on the desk at 1440: the "You're offline." banner on the Inbox and on People is as wide as the sheet below it and lines up with its left edge.                                                                                                                           |
+| C01-E09 | `packages/e2e/tests/shell/shell.spec.ts`   | Regression: the Backlog at 1440 stays at 800px, centred, so the change does not leak to the one-sheet pages. (Today on the desk is a spread with its own width, so it is not part of this check.)                                                                                |
 
 Existing cases to re-run, unchanged: C08-E05, C08-E08, C08-E09 (People on all three sizes), C08-E10 to C08-E20 (the
 Inbox flows), and the kit pages' visual checks if they cover the Inbox or People.
