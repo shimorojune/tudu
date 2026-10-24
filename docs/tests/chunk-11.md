@@ -30,6 +30,7 @@ screen are kept with the results. Tudu Test hands outside links to its record in
 | C11-U07 | server    | The manifest from a release: version, notes, date, the platform entry with the signature and the download address on the API's own origin; staging reads the `staging` pre-release (version from its name); a release without the bundle or signature is 404; no token 503; GitHub unreachable 502; cached five minutes                            |
 | C11-U08 | desktop   | Rust: the summon is ⌘⇧N; the track from the bundle identifier (name, web address, feed); the tray menu per track (removed in chunk 20: the tick has no menu); the floating window's place on the pointer's screen; only Tudu on the web opens in a window; saved files keep their name and never overwrite; each data folder its own webview store |
 | C11-U09 | theme     | A theme picked in another window of the same site (a storage event: the desk, while the floating window is open) repaints this one and every useTheme; a cleared storage is System; a page that read the choice earlier takes up the stored one on mount, and the floating window again on the summon                                              |
+| C11-U10 | version   | Settings' version: the Mac app's own name, version and release from the bridge; on the web the build's; dev builds add -dev and link nowhere                                                                                                                                                                                                       |
 
 ## API (`apps/server`)
 
@@ -52,6 +53,8 @@ screen are kept with the results. Tudu Test hands outside links to its record in
 | C11-E07 | Two spaces: the version is in both Inboxes and counted once on the dock; reading it in one reads it in the other                                                                                                                                  |
 | C11-E08 | Dark: a new version (E02) and the floating page (E04)                                                                                                                                                                                             |
 | C11-E09 | The floating page follows the theme picked on the desk: Dark from the avatar menu with the bar open paints it dark; Light picked while it is put away is painted on the next summon                                                               |
+| C11-E10 | Tudu Staging in Settings: the app's own name and version with the staging dot; the click goes to the app's opener, no tab                                                                                                                         |
+| C11-E11 | Tudu Test in Settings: the version is plain text, no link, no dot                                                                                                                                                                                 |
 
 ## Desktop, group `desktop` (`packages/e2e/mac`, Tudu Test on a Mac)
 
@@ -69,6 +72,7 @@ screen are kept with the results. Tudu Test hands outside links to its record in
 | C11-D10 | Links and files: Open in Jira (the fake Jira) and a link in a comment are handed to the default browser, and a page sending itself elsewhere too, the window staying put; an attachment chip lands in Downloads and "Saved to Downloads." toasts                                    |
 | C11-D11 | Across launches: quit and launch on the same folder and you are still signed in, the dark theme you picked holds, the floating draft holds; a launch on a fresh folder starts on Sign in                                                                                            |
 | C11-D12 | Two spaces in the app: the version is in the one Inbox once, unread, counted once on the dock; reading it there clears it                                                                                                                                                           |
+| C11-D13 | Settings in the real app shows "Tudu Test" and the app's own version as plain text                                                                                                                                                                                                  |
 
 Not automated: Gatekeeper on the first open of a downloaded dmg, About Tudu, the look of the window and the bar over
 other apps, a real key press of ⌘⇧N (the tests press it through the same handler), the default browser actually

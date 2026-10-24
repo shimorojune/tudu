@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { switchSpaces } from './AppShell';
 import { desktop, resetDesktop, type DesktopFake } from './desktop';
 import { interceptLinks, linkKind, openOutside } from './links';
+import { appVersion } from './version';
 import { appEntry, inboxTotal, CHECK_EVERY_MS, restartToUpdate, startUpdates, UpdateStore } from './updates';
 
 vi.mock('@tudu/ui', async (orig) => ({ ...(await orig<Record<string, unknown>>()), showToast: vi.fn() }));
@@ -266,5 +267,32 @@ describe('C11-U06 the chrome and the dock badge', () => {
     expect(inboxTotal({ spaces: [space('me', 'personal'), space('nw', 'team')] }, false)).toBe(0);
     // The switcher keeps each space's own count, without the version.
     expect(switchSpaces(spaces).map((s) => s.count)).toEqual([undefined, 3, 1]);
+  });
+});
+
+describe('C11-U10 the version in Settings', () => {
+  it('is the Mac app’s own with its release; on the web the build’s; dev builds link nowhere', () => {
+    expect(appVersion({ track: 'staging', name: 'Tudu Staging', version: '0.37.1-staging.132' })).toEqual({
+      name: 'Tudu Staging',
+      version: '0.37.1-staging.132',
+      track: 'staging',
+      href: 'https://github.com/shimorojune/tudu/releases#release-staging',
+    });
+    expect(appVersion({ track: 'test', name: 'Tudu Test', version: '0.37.0' }).href).toBeNull();
+    expect(appVersion(null, { version: '0.37.0', track: 'production' })).toEqual({
+      name: 'Tudu',
+      version: '0.37.0',
+      track: 'production',
+      href: 'https://github.com/shimorojune/tudu/releases/tag/tudu-0.37.0',
+    });
+    expect(appVersion(null, { version: '0.37.1-staging+3f9c2ab', track: 'staging' }).href).toBe(
+      'https://github.com/shimorojune/tudu/releases#release-staging',
+    );
+    expect(appVersion(null, { version: '0.37.0', track: 'dev' })).toEqual({
+      name: 'Tudu',
+      version: '0.37.0-dev',
+      track: 'dev',
+      href: null,
+    });
   });
 });

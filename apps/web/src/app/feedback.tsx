@@ -12,11 +12,9 @@ import { FeedbackDialog, showToast, type FeedbackPhase } from '@tudu/ui';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { desktop, type AppInfo } from './desktop';
 import { api } from './session';
+import { APP_VERSION } from './version';
 import { viewOf } from './space';
 import type { Viewport } from './viewport';
-
-/** The version this build is: the release's, set by Vite from package.json. */
-export const APP_VERSION: string = (import.meta.env.VITE_TUDU_VERSION as string | undefined) ?? '0.0.0';
 
 /** "Sent" shows this long before the dialog goes. */
 export const SENT_MS = 650;

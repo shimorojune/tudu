@@ -17,6 +17,11 @@ fix the clock at Sunday 18 October 2026, 10:00; a second person signs in in a br
 | C09-U07 | MembersBody    | Find someone past eight people narrows and says when no one matches; your own row has no menu; an admin's role menu (Admin, Member with their lines, the tick) reports a role; Remove from Northwind reports; a member sees roles as words and no Find under nine                             |
 | C09-U08 | ConfirmDialog  | Delete's button wakes only on the exact name; Leave, the last-admin ask and Remove with their words; the sheet form on phones confirms                                                                                                                                                        |
 | C09-U09 | web            | The section from the address (Personal has no Members); `?settings=` over the page on the desk and the page on phones, Back closes; an old slug finds the renamed space and the path keeps its view; space.gone sends you to Personal only when you are in it; More lists Settings            |
+| C09-U10 | core           | `releaseUrl`: a release links to its `tudu-<version>` tag, any staging build to the rolling `#release-staging`, Tudu Test and dev builds to nothing                                                                                                                                           |
+| C09-U11 | Settings       | The version at the foot of the list: "Tudu 0.37.0" links to its tag in a new tab, is the list's last item, no staging dot                                                                                                                                                                     |
+| C09-U12 | Settings       | A staging build: the amber dot, "a staging build" in its name, the tooltip, the staging release                                                                                                                                                                                               |
+| C09-U13 | Settings       | No release (dev, Tudu Test): plain text, not a link, not focusable; no version given: nothing                                                                                                                                                                                                 |
+| C09-U14 | Settings       | Phones: the version under the list on the list page, not on a section                                                                                                                                                                                                                         |
 
 ## API (`apps/server`)
 
@@ -48,6 +53,9 @@ fix the clock at Sunday 18 October 2026, 10:00; a second person signs in in a br
 | C09-E11 | Phone            | The avatar opens the Settings page; Appearance pushes in, ‹ Settings goes back; More lists Settings; the desk's `?settings=` turns into the page; Sign out from Account (phone)           |
 | C09-E12 | Tablet           | The dialog nearly full width; nine people in the space: Find someone narrows and says when no one matches (tablet)                                                                        |
 | C09-E13 | Offline, dark    | Offline the page says "Saves when you're back."; a space and a project renamed offline land when back; in dark, the dialog and the role menu paint on the dark surfaces                   |
+| C09-E14 | Version          | "Tudu <root package.json version>" at the foot of Settings links to its tag and opens it in a new tab; on tablet and on the phone's Settings page too                                     |
+| C09-E15 | Version          | Hover and keyboard focus show the arrow and the focus ring; with reduced motion the arrow only fades                                                                                      |
+| C09-E16 | Version, dark    | In dark the line takes the dark muted colour                                                                                                                                              |
 
 Not automated: the dialog's rise and sink, a section rising in, the theme cross-fade, the switch knob, the tile
 recolouring, the fade into Personal after leaving; judged on staging.

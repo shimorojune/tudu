@@ -432,3 +432,58 @@ describe('C16-U04 Settings › This Mac', () => {
     expect(m.onDock).toHaveBeenCalledWith('always');
   });
 });
+
+describe('the version at the foot of the list', () => {
+  const RELEASE = 'https://github.com/shimorojune/tudu/releases/tag/tudu-0.37.0';
+  const STAGING = 'https://github.com/shimorojune/tudu/releases#release-staging';
+
+  it('C09-U11 a release: "Tudu 0.37.0" linking to its tag in a new tab, last in the list, no staging dot', () => {
+    settings({ version: { name: 'Tudu', version: '0.37.0', track: 'production', href: RELEASE } });
+    const link = screen.getByRole('link', { name: 'Tudu 0.37.0. Open its release on GitHub' });
+    expect(link).toHaveAttribute('href', RELEASE);
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener');
+    expect(link).toHaveTextContent('Tudu0.37.0');
+    expect(link.closest('.tp-set-side')?.lastElementChild).toBe(link);
+    expect(link.querySelector('.tp-ver-dot')).toBeNull();
+    expect(link).not.toHaveAttribute('data-tip');
+  });
+
+  it('C09-U12 a staging build: the dot, "a staging build" in its name, the tooltip, the staging release', () => {
+    settings({
+      version: { name: 'Tudu Staging', version: '0.37.1-staging.132', track: 'staging', href: STAGING },
+    });
+    const link = screen.getByRole('link', {
+      name: 'Tudu Staging 0.37.1-staging.132, a staging build. Open its release on GitHub',
+    });
+    expect(link).toHaveAttribute('href', STAGING);
+    expect(link.querySelector('.tp-ver-dot')).not.toBeNull();
+    expect(link).toHaveAttribute('data-tip', 'Staging build · opens its release on GitHub');
+  });
+
+  it('C09-U13 no release (dev, Tudu Test): plain text, not focusable; no version: nothing', () => {
+    const { rerender } = settings({
+      version: { name: 'Tudu', version: '0.37.0-dev', track: 'dev', href: null },
+    });
+    expect(screen.queryByRole('link', { name: /Tudu/ })).toBeNull();
+    const line = document.querySelector('.tp-set-ver')!;
+    expect(line).toHaveTextContent('Tudu0.37.0-dev');
+    expect(line.tagName).toBe('SPAN');
+    expect(line).not.toHaveAttribute('tabindex');
+    expect(line.querySelector('.tp-ver-arrow')).toBeNull();
+
+    rerender(<Settings me={ME} space={NW} still />);
+    expect(document.querySelector('.tp-set-ver')).toBeNull();
+  });
+
+  it('C09-U14 phones: under the list on the list page, not on a section', () => {
+    const version = { name: 'Tudu', version: '0.37.0', track: 'production' as const, href: RELEASE };
+    const { rerender } = settings({ layout: 'phone', version });
+    const link = screen.getByRole('link', { name: /^Tudu 0\.37\.0/ });
+    expect(link.previousElementSibling).toBe(nav());
+    rerender(
+      <Settings me={ME} space={NW} still layout="phone" view="section" section="account" version={version} />,
+    );
+    expect(screen.queryByRole('link', { name: /^Tudu 0\.37\.0/ })).toBeNull();
+  });
+});

@@ -1,6 +1,6 @@
 # The version at the foot of Settings, linked to its release
 
-Status: proposal, waiting for Rohit's approval. Canvas: approved 24 Oct 2026 (board `G-Version` on the Settings & theme
+Status: approved by Rohit 24 Oct 2026; implemented. Canvas: approved 24 Oct 2026 (board `G-Version` on the Settings & theme
 page of the canvas, v55): Settings only, not the app sidebar.
 
 ## What Rohit asked for

@@ -2,6 +2,11 @@
 FROM node:22-alpine AS build
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
+# Which build this is (production, staging) and, for staging, its own version; empty means the root package.json's.
+ARG VITE_TUDU_TRACK
+ENV VITE_TUDU_TRACK=$VITE_TUDU_TRACK
+ARG VITE_TUDU_VERSION
+ENV VITE_TUDU_VERSION=$VITE_TUDU_VERSION
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 WORKDIR /app
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc tsconfig.base.json ./
