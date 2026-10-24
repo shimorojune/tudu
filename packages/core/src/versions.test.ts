@@ -5,6 +5,7 @@ import {
   notesHtml,
   readyText,
   readyWords,
+  releaseUrl,
   stagingVersion,
   trackName,
   versionIn,
@@ -62,5 +63,17 @@ describe('Versions and tracks (chunk 11)', () => {
       'net.ezdev.tudu.staging',
       'net.ezdev.tudu.test',
     ]);
+  });
+});
+
+describe('The version in Settings (chunk 09)', () => {
+  it('C09-U10 a build links to its release: the tag, the rolling staging release, or nothing', () => {
+    const releases = 'https://github.com/shimorojune/tudu/releases';
+    expect(releaseUrl('production', '0.37.0')).toBe(`${releases}/tag/tudu-0.37.0`);
+    expect(releaseUrl('staging', '0.37.1-staging.132')).toBe(`${releases}#release-staging`);
+    expect(releaseUrl('staging', '0.37.1-staging+3f9c2ab')).toBe(`${releases}#release-staging`);
+    expect(releaseUrl('test', '0.37.1')).toBeNull();
+    expect(releaseUrl('dev', '0.37.0-dev')).toBeNull();
+    expect(releaseUrl('production', 'not a version')).toBeNull();
   });
 });

@@ -796,6 +796,17 @@ test.describe('background', () => {
     );
   });
 
+  test('C11-D13 Settings shows the app’s own name and version, Tudu Test, as plain text: it is never released', async ({
+    app,
+  }) => {
+    await signIn(app);
+    await go(app, `/me?settings=account`);
+    const version = run().current.version;
+    await app.until(
+      `const v = document.querySelector('.tp-set-ver'); return !!v && v.textContent === ${JSON.stringify(`Tudu Test${version}`)} && v.tagName === 'SPAN' && !v.querySelector('.tp-ver-dot')`,
+    );
+  });
+
   test('C16-D05 Settings › This Mac › Open at login: on registers with macOS, off unregisters; a launch at login starts in the menu bar', async ({
     app,
   }) => {

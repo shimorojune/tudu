@@ -1,6 +1,7 @@
 import type { LucideIcon, LucideProps } from 'lucide-react';
 import {
   ArrowRight,
+  ArrowUpRight,
   Bell,
   Calendar,
   ChevronLeft,
@@ -74,6 +75,8 @@ export const ICONS = {
   success: CircleCheck,
   info: Moon,
   carried: ArrowRight,
+  /** Opens outside Tudu (a release on GitHub). */
+  external: ArrowUpRight,
   /** Delete an Inbox item. */
   trash: Trash2,
   /** Mark as unread: a ring with the dot in it. */

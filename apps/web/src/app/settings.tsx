@@ -30,6 +30,7 @@ import {
 } from '@tudu/ui';
 import { useEffect, useState } from 'react';
 import { openCreateSpace } from './dayView';
+import { useAppVersion } from './DesktopHost';
 import { desktop, inApp, type ThisMac } from './desktop';
 import { scrollToProjects, settingsClosed } from './editProjects';
 import { api, initialsOf, photoSrc, queryClient, refreshMe, signOut } from './session';
@@ -180,6 +181,7 @@ export function SettingsView({
   const { choice, setTheme } = useTheme();
   const [lessMotion, setLessMotion] = useLessMotion();
   const mac = useThisMac();
+  const version = useAppVersion();
   const team = space.kind === 'team';
   const members = useQuery({ ...taskStore.membersQuery(space.id), enabled: team });
   const projects = useQuery(taskStore.projectsQuery(space.id));
@@ -280,6 +282,7 @@ export function SettingsView({
         onClose={onClose}
         onBack={onBack}
         offline={!online}
+        version={version ?? undefined}
         me={{
           name: me.user.name || me.user.email,
           fieldName: me.user.name,

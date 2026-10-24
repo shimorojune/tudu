@@ -139,7 +139,7 @@ jobs:
         run: |
           TAG=${{ env.REHEARSAL == 'true' && 'rehearsal' || 'production' }}
           docker build -f apps/server/Dockerfile -t tudu-api:$TAG .
-          docker build -f apps/web/Dockerfile --build-arg VITE_API_URL=https://api.tudu.ezdev.net -t tudu-web:$TAG .
+          docker build -f apps/web/Dockerfile --build-arg VITE_API_URL=https://api.tudu.ezdev.net --build-arg VITE_TUDU_TRACK=production --build-arg VITE_TUDU_VERSION=${{ needs.version.outputs.version }} -t tudu-web:$TAG .
       - name: Deploy through Dokploy
         if: env.REHEARSAL != 'true'
         env:

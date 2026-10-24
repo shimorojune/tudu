@@ -67,6 +67,22 @@ export function stagingVersion(released: string, run: number): string {
   return `${v.core[0]}.${v.core[1]}.${v.core[2] + 1}-staging.${run}`;
 }
 
+/** Where a build came from: one of the app's tracks, or a local `vite` dev server. */
+export type BuildTrack = Track | 'dev';
+
+export const RELEASES_URL = 'https://github.com/shimorojune/tudu/releases';
+
+/**
+ * The GitHub release a build belongs to: a release's own tag ("tudu-0.37.0"), the rolling `staging` pre-release for
+ * any staging build, and nothing for Tudu Test and dev builds, which are never released.
+ */
+export function releaseUrl(track: BuildTrack, version: string): string | null {
+  if (track === 'staging') return `${RELEASES_URL}#release-staging`;
+  if (track === 'production' && parseVersion(version))
+    return `${RELEASES_URL}/tag/tudu-${version.replace(/^v/, '')}`;
+  return null;
+}
+
 /** The Inbox line after the app's name: "is ready: version 0.38.0". */
 export function readyText(version: string): string {
   return `is ready: version ${version}`;
