@@ -1,4 +1,6 @@
 import { expect, signInFresh, test } from '../../fixtures/app';
+import { goBacklog } from '../../fixtures/backlog';
+import { expectSheetWidth } from '../../fixtures/layout';
 
 test.describe('the shell', () => {
   test('C01-E07 the shell fits the screen: sidebar, rail or tabs', async ({ page }, testInfo) => {
@@ -57,5 +59,14 @@ test.describe('the shell', () => {
     await expect(page.getByRole('button', { name: 'Back to today' })).toBeVisible();
     await page.getByRole('button', { name: 'Back to today' }).click();
     await expect(page.getByText(/Today · Week \d+/)).toBeVisible();
+  });
+
+  test('C01-E09 one-sheet pages keep the 800px column on the desk: the Backlog stays 800px and centred', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'the desk only');
+    await signInFresh(page);
+    await goBacklog(page);
+    await expectSheetWidth(page, 800);
   });
 });

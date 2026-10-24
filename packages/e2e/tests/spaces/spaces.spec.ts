@@ -12,6 +12,7 @@ import {
   switchTo,
   switcher,
 } from '../../fixtures/spaces';
+import { expectSheetWidth } from '../../fixtures/layout';
 import { dayList, fixClock, idle, titlesOf, writeTasks } from '../../fixtures/today';
 
 const phone = () => test.info().project.name === 'phone';
@@ -425,5 +426,25 @@ test.describe('spaces', () => {
     await expect(page).toHaveURL(new RegExp(`/${slug}/people$`));
     await expect(page.getByRole('region', { name: 'People' })).toBeVisible();
     await expect(page.getByRole('heading', { level: 1, name: 'Everyone' })).toBeVisible();
+  });
+
+  test('C08-E22 width: on the desk People is 1120px and centred with Everyone and with a person; wide and narrower windows too', async ({
+    page,
+    browser,
+  }) => {
+    test.skip(phone() || tablet(), 'the desk only; tablet and phone columns are narrower');
+    const { b } = await team(page, browser);
+    await goPeople(page);
+    await expect(peopleList(page).getByRole('listitem')).toHaveCount(3);
+    await expectSheetWidth(page, 1120);
+    // picking someone turns only the right side; the sheet keeps its width
+    await peopleList(page).getByRole('listitem').nth(2).click();
+    await expect(page.getByRole('heading', { name: b.email }).first()).toBeVisible();
+    await expectSheetWidth(page, 1120);
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await expectSheetWidth(page, 1120);
+    await page.setViewportSize({ width: 1100, height: 800 });
+    await expectSheetWidth(page, 1120);
+    await b.context.close();
   });
 });

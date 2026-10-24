@@ -19,6 +19,7 @@ import {
   seedTasks,
   switcher,
 } from '../../fixtures/spaces';
+import { expectSheetWidth, pageBoxes } from '../../fixtures/layout';
 import { dayList, fixClock, idle, row, SUNDAY, titlesOf } from '../../fixtures/today';
 
 const phone = () => test.info().project.name === 'phone';
@@ -485,6 +486,53 @@ test.describe('inbox', () => {
     await goInbox(b.page);
     await turnTo(b.page, 'Sent');
     await expect(rows(section(b.page, 'Sent')).first()).toContainText(/accepted it onto/);
+    await b.context.close();
+  });
+
+  test('C08-E21 width: on the desk the Inbox is 1120px and centred; a wide window keeps 1120px; a narrower one fills the column', async ({
+    page,
+    browser,
+  }) => {
+    test.skip(phone() || tablet(), 'the desk only; tablet and phone columns are narrower');
+    const { b } = await team(page, browser);
+    await goInbox(page);
+    await expectSheetWidth(page, 1120);
+    expect((await pageBoxes(page)).sheet?.width).toBeCloseTo(1120, 0);
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await expectSheetWidth(page, 1120);
+    await page.setViewportSize({ width: 1100, height: 800 });
+    await expectSheetWidth(page, 1120);
+    // the column is wider than the old 800px cap, and the sheet takes all of it
+    expect((await pageBoxes(page)).sheet!.width).toBeGreaterThan(800);
+    await b.context.close();
+  });
+
+  test('C08-E23 offline on the desk: the banner on the Inbox and on People is as wide as the sheet and lines up with it', async ({
+    page,
+    browser,
+    context,
+  }) => {
+    test.skip(phone() || tablet(), 'the desk only');
+    const { b } = await team(page, browser);
+    for (const go of [goInbox, goPeople]) {
+      await go(page);
+      await context.setOffline(true);
+      await expect(page.getByText('You’re offline.')).toBeVisible({ timeout: 15_000 });
+      await expect
+        .poll(async () => {
+          const { sheet, banner } = await pageBoxes(page);
+          return (
+            !!sheet &&
+            !!banner &&
+            Math.abs(sheet.left - banner.left) <= 1 &&
+            Math.abs(sheet.width - banner.width) <= 1
+          );
+        })
+        .toBe(true);
+      expect((await pageBoxes(page)).banner!.width).toBeGreaterThan(1100);
+      await context.setOffline(false);
+      await expect(page.getByText('You’re offline.')).toBeHidden({ timeout: 15_000 });
+    }
     await b.context.close();
   });
 });

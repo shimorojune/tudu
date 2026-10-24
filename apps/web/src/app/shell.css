@@ -53,6 +53,11 @@
   flex: 1 1 auto;
   max-width: none;
 }
+/* Inbox and People: two panes, wider than one sheet; phones keep the one column. */
+.app-page:is(.app-inbox, .app-people):not(.app-inbox-phone, .app-people-phone) > .tp-sheet,
+.app-page:is(.app-inbox, .app-people):not(.app-inbox-phone, .app-people-phone) > .tp-banner-wrap {
+  max-width: var(--panes-max-width);
+}
 .app-week-error {
   flex: 1;
   display: flex;
