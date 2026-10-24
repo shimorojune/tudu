@@ -80,7 +80,14 @@ jobs:
           else
             pnpm exec semantic-release 2>&1 | tee release.log
           fi
-          VERSION=$(grep -oE 'next release version is [0-9]+\.[0-9]+\.[0-9]+' release.log | tail -1 | awk '{print $5}')
+          VERSION=$(grep -oE 'next release version is [0-9]+\.[0-9]+\.[0-9]+' release.log | tail -1 | awk '{print $5}' || true)
+          if [ -z "$VERSION" ] && [ "$REHEARSAL" = "true" ]; then
+            # Nothing releasable yet (only ci/docs/chore commits since the last tag): rehearse the build as the next
+            # patch anyway, so a pull request that touches the release path is still checked.
+            LAST=$(git tag -l 'tudu-*' --sort=-v:refname | grep -E '^tudu-[0-9]+\.[0-9]+\.[0-9]+$' | head -1 | sed 's/^tudu-//')
+            VERSION=$(echo "$LAST" | awk -F. '{print $1"."$2"."$3+1}')
+            echo "No releasable commits since tudu-$LAST; rehearsing as $VERSION."
+          fi
           if [ -z "$VERSION" ]; then echo "No release: nothing to release since the last tag."; exit 1; fi
           if [ "$REHEARSAL" = "true" ]; then SHA=$(git rev-parse HEAD); else git fetch origin master && SHA=$(git rev-parse origin/master); fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -147,14 +154,10 @@ jobs:
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
           COMPOSE_ID: ${{ secrets.DOKPLOY_PRODUCTION_COMPOSE_ID }}
         run: node scripts/dokploy-deploy.mjs "$COMPOSE_ID" "release ${{ needs.version.outputs.version }}" infra/production/compose.yaml
-      - name: Wait for the API
+      # Web and API both, several passes in a row: Dokploy reports done while the containers are still swapping.
+      - name: Wait until production is ready
         if: env.REHEARSAL != 'true'
-        run: |
-          for i in $(seq 1 40); do
-            if curl -fsS https://api.tudu.ezdev.net/health >/dev/null; then echo up; exit 0; fi
-            sleep 5
-          done
-          echo "api did not come up"; exit 1
+        run: node scripts/wait-ready.mjs https://tudu.ezdev.net https://api.tudu.ezdev.net
       - name: Smoke test production
         if: env.REHEARSAL != 'true'
         run: pnpm install --frozen-lockfile && pnpm e2e smoke

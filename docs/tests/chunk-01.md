@@ -15,6 +15,13 @@ one throwaway database per run; end-to-end tests read sign-in codes from the tes
 | C01-U06 | Bottom tabs                 | The active tab, the round New task button, badge counts                                                                                                                                        |
 | C01-U07 | Account menu                | Name and email, the theme switch changes the theme, Settings and Sign out call their handlers                                                                                                  |
 | C01-U08 | Live stream client          | Reconnects with backoff (1, 2, 4, 8s, capped) and resumes from the last event id; a good connection resets the wait                                                                            |
+| C01-U09 | Readiness wait              | All probes pass from the start: ready after exactly 3 rounds (`scripts/wait-ready.mjs`)                                                                                                        |
+| C01-U10 | Readiness wait              | Web /health 404s for 2 rounds: ready only after 3 passes counted from round 3                                                                                                                  |
+| C01-U11 | Readiness wait              | A failure mid-streak resets the count                                                                                                                                                          |
+| C01-U12 | Readiness wait              | /sign-in answering 200 without the app root counts as a failure                                                                                                                                |
+| C01-U13 | Readiness wait              | The API answering { ok: false } counts as a failure                                                                                                                                            |
+| C01-U14 | Readiness wait              | The API never comes up: gives up at the timeout and names the probe and its last status                                                                                                        |
+| C01-U15 | Readiness wait              | Connection refused on the web is a failure, not a crash, and is reported                                                                                                                       |
 
 ## API (`apps/server`)
 

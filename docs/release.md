@@ -78,3 +78,7 @@ If the deploy or the smoke test fails, the GitHub release stays a draft and the 
 version. Fix, then run again: semantic-release has already tagged, so delete the draft release and its tag first
 (`git push --delete origin tudu-X.Y.Z`) and revert the `chore(release)` commit, or let the next run release the
 version after.
+
+A smoke test that fails right after a green "Wait until production is ready" is not explained by a slow rollout: the
+wait already needs the web and the API to pass three rounds in a row. If the build is good and only the timing is in
+doubt, re-run the failed jobs: the tag and the draft release are reused.
