@@ -78,6 +78,12 @@ export interface AppState {
     awake: boolean;
     /** Beside the tick: the Inbox count while there is no Dock icon. */
     trayTitle: string | null;
+    /** The tick's place as macOS keeps it: the saved position (points from the right edge), null before any. */
+    trayPosition: number | null;
+    /** The status item's autosave name, the key that position is saved under. */
+    trayAutosave: string | null;
+    /** macOS is not drawing the tick (a full menu bar): the Dock icon stays. */
+    tickHidden: boolean;
     loginItem: 'off' | 'on' | 'approval' | 'refused';
     /** Each page's inactive scheduling policy: 0 suspend, 1 throttle, 2 none. */
     webviews: { main: number | null; floating: number | null; menubar: number | null };
@@ -209,7 +215,10 @@ export class TuduApp {
     return (await this.call('/state')) as AppState;
   }
 
-  /** What a person does outside the page: summon, tray (a click on the tick), reopen, close (window), check-update, quit. */
+  /**
+   * What a person does outside the page: summon, tray (a click on the tick), reopen, close (window), check-update,
+   * quit; and tick (hidden: true or false stands in for macOS hiding or showing the tick, null gives it back).
+   */
   async act(what: string, extra: Record<string, unknown> = {}): Promise<unknown> {
     return this.call('/act', { do: what, ...extra });
   }

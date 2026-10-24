@@ -5,9 +5,11 @@
 //!   its page), the tray's tooltip (it has no menu: a click opens the menu bar's sheet), the summon and whether it is registered, the dock badge as the Dock
 //!   shows it, the updater's last check, download and error, every outside link or file the app was handed, and the
 //!   background (chunk 16): the activation policy, the Dock choice, the count beside the tick, the login item, the
-//!   App Nap opt-out and each webview's inactive scheduling policy.
+//!   App Nap opt-out and each webview's inactive scheduling policy; and the tick's place as macOS keeps it (its
+//!   autosave name and saved position) and whether it is hidden.
 //! - `POST /act {"do": …}`: what a person does outside the page: `summon`, `tray` (a click on the tick, with
-//!   `button`: left or right), `reopen` (the dock icon), `close` (with `window`), `check-update`, `quit`.
+//!   `button`: left or right), `reopen` (the dock icon), `close` (with `window`), `check-update`, `quit`,
+//!   `tick` (with `hidden`: true or false says macOS hides or shows the tick, null hands the answer back to macOS).
 //! - `POST /eval {"window", "script"}`: runs the script (an async function body) in that window's WKWebView and
 //!   answers its result, so the tests drive the real page.
 //!
@@ -256,6 +258,9 @@ fn state(app: &AppHandle) -> Value {
         "atLogin": bg.at_login,
         "awake": bg.awake.load(Ordering::SeqCst),
         "trayTitle": bg.tray_title.lock().ok().and_then(|t| t.clone()),
+        "trayPosition": background::tray_position(),
+        "trayAutosave": background::tray_autosave(app),
+        "tickHidden": bg.tick_hidden.load(Ordering::SeqCst),
         "loginItem": background::login(),
         "webviews": {
             "main": webview(windows::MAIN),
@@ -315,6 +320,13 @@ fn act(app: &AppHandle, input: &Value) -> (u16, Value) {
                 Ok(v) => (200, v),
                 Err(_) => (504, json!({ "error": "the main thread did not answer" })),
             }
+        }
+        "tick" => {
+            let hidden = input.get("hidden").and_then(Value::as_bool);
+            if let Ok(mut o) = app.state::<background::Background>().tick_override.lock() {
+                *o = hidden;
+            }
+            (200, json!({ "ok": true }))
         }
         "check-update" => {
             let r = tauri::async_runtime::block_on(updates::update_check(app.clone()));

@@ -1,6 +1,6 @@
 # Menu bar tick: the bare ink tick, and keeping it in a crowded menu bar
 
-Status: proposal, awaiting Rohit's approval (24 Oct 2026). Design approved on the canvas the same day: board
+Status: approved by Rohit (24 Oct 2026); built on branch `claude/project-thread-0gyuix`. Test cases: [docs/tests/menu-bar-tick.md](../tests/menu-bar-tick.md). Design approved on the canvas the same day: board
 "The menu bar tick" (`K-TrayIcon`) on the page "Menu bar & This Mac".
 
 ## Why
@@ -64,42 +64,42 @@ costly and unlike native items). The pressed highlight is macOS's own.
 
 ### Rust unit tests (`apps/desktop/src-tauri`, run on the macOS runner with the crate)
 
-| ID | Scenario |
-| --- | --- |
-| MB-U01 | `tray_title(count)`: `None`/0 → none; 7 → "7"; 99 → "99"; 100 → "99+"; 12345 → "99+" |
-| MB-U02 | `count_places(Accessory, Some(150))` → (no badge, "99+"); `count_places(Regular, Some(150))` → (150, none) |
-| MB-U03 | `tray_place(stored)`: none stored → seed value; any stored number (incl. 0 and far left) → leave as is |
+| ID     | Scenario                                                                                                                                                                       |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| MB-U01 | `tray_title(count)`: `None`/0 → none; 7 → "7"; 99 → "99"; 100 → "99+"; 12345 → "99+"                                                                                           |
+| MB-U02 | `count_places(Accessory, Some(150))` → (no badge, "99+"); `count_places(Regular, Some(150))` → (150, none)                                                                     |
+| MB-U03 | `tray_place(stored)`: none stored → seed value; any stored number (incl. 0 and far left) → leave as is                                                                         |
 | MB-U04 | `policy(dock, desk_open, tick_hidden)`: closed + While open + shown → Accessory; closed + hidden → Regular; Always → Regular either way; open → Regular (only if part 4 ships) |
 
 ### Script test (vitest, Linux CI)
 
-| ID | Scenario |
-| --- | --- |
+| ID     | Scenario                                                                                                 |
+| ------ | -------------------------------------------------------------------------------------------------------- |
 | MB-S01 | `icons/tray.svg` is the ink tick only: one `<path>` with `INK_SHAPE`, no `<rect>`, black on clear, 36×36 |
-| MB-S02 | `icons/tray.png` is 36×36 RGBA and its alpha matches a render of `tray.svg` (guards a stale PNG) |
+| MB-S02 | `icons/tray.png` is 36×36 RGBA and its alpha matches a render of `tray.svg` (guards a stale PNG)         |
 
 ### Mac E2E (`packages/e2e/mac/tests/desktop.spec.ts`, macOS runner)
 
 The control channel's state gains `background.trayPosition` (the stored default, or null) and, if part 4 ships,
 `background.tickHidden`; `POST /act` gains `trayHidden` (test builds only) to fake the occlusion signal.
 
-| ID | Scenario |
-| --- | --- |
-| MB-D01 | Fresh defaults domain: launch → `trayPosition` equals the seed; the tray rect exists |
-| MB-D02 | A stored position (test writes 400 before launch) → after launch still 400; after a relaunch still 400 |
-| MB-D03 | Window closed with 120 in the Inbox → `trayTitle` is "99+"; window open → title null, badge "120" |
+| ID     | Scenario                                                                                                                            |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| MB-D01 | Fresh defaults domain: launch → `trayPosition` equals the seed; the tray rect exists                                                |
+| MB-D02 | A stored position (test writes 400 before launch) → after launch still 400; after a relaunch still 400                              |
+| MB-D03 | Window closed with 120 in the Inbox → `trayTitle` is "99+"; window open → title null, badge "120"                                   |
 | MB-D04 | (part 4) window closed, `trayHidden` true → policy regular, Dock icon and badge shown; false → back to accessory, count on the tick |
-| MB-D05 | Regression: C16-D01, C16-D02, C20-D01, C20-D04 still pass (policy is set only on change) |
+| MB-D05 | Regression: C16-D01, C16-D02, C20-D01, C20-D04 still pass (policy is set only on change)                                            |
 
 ### Manual on Rohit's Mac (checked before merge, results in the PR)
 
-| ID | Scenario |
-| --- | --- |
-| MB-M01 | Delete Tudu Staging's defaults key, launch → the tick sits at the right end of the apps' icons |
-| MB-M02 | ⌘-drag it elsewhere, quit, relaunch → it stays where dragged |
-| MB-M03 | Crowd the bar (an app with many menus, on the notched screen) → other apps' icons go first, the tick stays |
+| ID     | Scenario                                                                                                      |
+| ------ | ------------------------------------------------------------------------------------------------------------- |
+| MB-M01 | Delete Tudu Staging's defaults key, launch → the tick sits at the right end of the apps' icons                |
+| MB-M02 | ⌘-drag it elsewhere, quit, relaunch → it stays where dragged                                                  |
+| MB-M03 | Crowd the bar (an app with many menus, on the notched screen) → other apps' icons go first, the tick stays    |
 | MB-M04 | (part 4) force the tick hidden → the Dock icon appears; uncrowd → the Dock icon leaves with the window closed |
-| MB-M05 | The bare tick reads right in light, dark and a tinted wallpaper bar, idle and pressed, with a count |
+| MB-M05 | The bare tick reads right in light, dark and a tinted wallpaper bar, idle and pressed, with a count           |
 
 ## Out of scope
 

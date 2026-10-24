@@ -909,3 +909,95 @@ test.describe('background', () => {
     );
   });
 });
+
+/** The tick's saved place lives in Tudu Test's own defaults, under macOS's key for its status item. */
+const TRAY_KEY = 'NSStatusItem Preferred Position Item-0';
+/** Where Tudu seeds it on a first launch (TRAY_SEED in background.rs). */
+const TRAY_SEED = 20;
+const defaults = (...args: string[]) => spawnSync('defaults', args, { encoding: 'utf8' });
+/** The page reports the Inbox count to the app as it would (set_badge), so a big count needs no hundred requests. */
+const reportBadge = (app: App, count: number) =>
+  app.eval(`await window.__TAURI_INTERNALS__.invoke('set_badge', { count: ${count} }); return true`);
+
+test.describe('the menu bar tick', () => {
+  test('MB-D01 first launch: no saved place, so Tudu seeds the one next to the system icons under the item’s own name', async ({
+    app,
+  }) => {
+    const { identifier } = await app.state();
+    await app.quit();
+    defaults('delete', identifier, TRAY_KEY);
+    await app.launch();
+    const s = await app.waitState((x) => x.tray.rect !== null && x.background.trayAutosave !== null);
+    expect(s.background.trayAutosave).toBe('Item-0');
+    expect(s.background.trayPosition).toBe(TRAY_SEED);
+    expect(Number(defaults('read', identifier, TRAY_KEY).stdout.trim())).toBe(TRAY_SEED);
+  });
+
+  test('MB-D02 a saved place (your ⌘-drag) is never moved: kept at launch and across a relaunch', async ({
+    app,
+  }) => {
+    const { identifier } = await app.state();
+    await app.quit();
+    defaults('write', identifier, TRAY_KEY, '-float', '400');
+    try {
+      await app.launch();
+      expect((await app.waitState((x) => x.tray.rect !== null)).background.trayPosition).toBe(400);
+      await app.quit();
+      await app.launch();
+      expect((await app.waitState((x) => x.tray.rect !== null)).background.trayPosition).toBe(400);
+    } finally {
+      await app.quit();
+      defaults('delete', identifier, TRAY_KEY);
+    }
+  });
+
+  test('MB-D03 the count beside the tick stops at 99+; the Dock badge keeps the real number', async ({
+    app,
+  }) => {
+    await signIn(app);
+    await app.act('close', { window: 'main' });
+    await app.waitState((x) => x.background.policy === 'accessory');
+    await reportBadge(app, 120);
+    const hidden = await app.waitState((x) => x.background.trayTitle === '99+');
+    expect(hidden.badge).toBeNull();
+    await reportBadge(app, 99);
+    await app.waitState((x) => x.background.trayTitle === '99');
+    await reportBadge(app, 120);
+    await app.waitState((x) => x.background.trayTitle === '99+');
+    await app.act('reopen');
+    await app.waitState(
+      (x) => x.background.policy === 'regular' && x.badge === '120' && x.background.trayTitle === null,
+    );
+  });
+
+  test('MB-D04 macOS hides the tick in a full menu bar: the Dock icon and its badge stay while the window is closed', async ({
+    app,
+  }) => {
+    await signIn(app);
+    await app.act('close', { window: 'main' });
+    await app.waitState((x) => x.background.policy === 'accessory');
+    await reportBadge(app, 3);
+    await app.waitState((x) => x.background.trayTitle === '3');
+    try {
+      await app.act('tick', { hidden: true });
+      const kept = await app.waitState(
+        (x) => x.background.tickHidden && x.background.policy === 'regular',
+        15_000,
+      );
+      expect(kept.windows.main.visible).toBe(false);
+      await app.waitState((x) => x.badge === '3' && x.background.trayTitle === null);
+      // Room again: out of the Dock, the count back beside the tick.
+      await app.act('tick', { hidden: false });
+      await app.waitState(
+        (x) =>
+          !x.background.tickHidden &&
+          x.background.policy === 'accessory' &&
+          x.badge === null &&
+          x.background.trayTitle === '3',
+        15_000,
+      );
+    } finally {
+      await app.act('tick', { hidden: null });
+    }
+  });
+});
