@@ -433,7 +433,7 @@ function PersonPane(p: {
   const days = personDays(w.tasks, p.monday, p.sunday, p.today);
   const first = firstName(w.name, w.email);
   // What you sent them: the requests from you to them in this space, with where each stands.
-  const sent = useQuery({ ...taskStore.inboxQuery(p.spaceId, 'sent'), enabled: !w.you });
+  const sent = useQuery({ ...taskStore.inboxQuery('sent', '', p.spaceId), enabled: !w.you });
   const toThem = (sent.data?.sent ?? []).filter((r) => r.to.id === w.id);
   const [now] = useState(() => new Date());
   const [openSent, setOpenSent] = useState<string | null>(null);

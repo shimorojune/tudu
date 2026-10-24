@@ -1,24 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { inboxBadge } from '@tudu/core';
 import { useEffect, useState } from 'react';
 import { desktop, FEEDBACK_GO, type AppInfo, type UpdateReady } from './desktop';
 import { openFeedback } from './feedback';
 import { interceptLinks } from './links';
 import { meQuery } from './session';
-import { startUpdates, updateStore, useUpdate } from './updates';
-
-/**
- * The dock badge: the Inbox count (to answer plus new) across your spaces, and a version not read yet, once (it is
- * in every team space's Inbox; Personal has none).
- */
-export function badgeCount(
-  spaces: Array<{ kind: string; inbox: { toAnswer: number; unread: number } }>,
-  update: boolean,
-): number {
-  const team = spaces.some((s) => s.kind === 'team');
-  return spaces.reduce((n, s) => n + inboxBadge(s.inbox), 0) + (update && team ? 1 : 0);
-}
+import { inboxTotal, startUpdates, updateStore, useUpdate } from './updates';
 
 let appInfo: AppInfo | null = null;
 /** The app's name and track, once known ("Tudu" until then). */
@@ -85,7 +72,8 @@ export function DesktopHost() {
     };
   }, [d, main]);
 
-  const count = me ? badgeCount(me.spaces, update.unread) : 0;
+  // The dock badge is the Inbox's count, the same as the top bar's.
+  const count = me ? inboxTotal(me, update.unread) : 0;
   useEffect(() => {
     if (!d || !main || !isFetched) return;
     d.setBadge(count);

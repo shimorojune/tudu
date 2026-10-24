@@ -22,6 +22,7 @@ import {
   type CommentAuthor,
   type DayResponse,
   type InboxChangedEvent,
+  type InboxItem,
   type InboxResponse,
   type InboxView,
   type IsoDate,
@@ -76,7 +77,9 @@ export const peopleKey = (spaceId: string, from: IsoDate, to: IsoDate) =>
   ['people', spaceId, from, to] as const;
 export const personKey = (spaceId: string, userId: string, from: IsoDate, to: IsoDate) =>
   ['people', spaceId, 'one', userId, from, to] as const;
-export const inboxKey = (spaceId: string, view: InboxView, q = '') => ['inbox', spaceId, view, q] as const;
+/** The one Inbox: every space, or one (`spaceId`), in a view, narrowed by words. */
+export const inboxKey = (view: InboxView, q = '', spaceId: string | null = null) =>
+  ['inbox', spaceId ?? 'all', view, q] as const;
 
 function byPosition(a: { position: number; createdAt: string }, b: { position: number; createdAt: string }) {
   return a.position - b.position || a.createdAt.localeCompare(b.createdAt);
@@ -643,13 +646,13 @@ export class TaskStore {
 
   // ---- the Inbox ------------------------------------------------------------------------------------------
 
-  /** One view of a space's Inbox, narrowed by words. Reads live, like every list. */
-  inboxQuery(spaceId: string, view: InboxView, q = '') {
+  /** One view of the Inbox across every space (or one), narrowed by words. Reads live, like every list. */
+  inboxQuery(view: InboxView, q = '', spaceId: string | null = null) {
     return queryOptions({
-      queryKey: inboxKey(spaceId, view, q),
+      queryKey: inboxKey(view, q, spaceId),
       queryFn: async (): Promise<InboxResponse> => {
         const res = await this.o.api.get<InboxResponse>(
-          `/api/spaces/${spaceId}/inbox?view=${view}&q=${encodeURIComponent(q)}`,
+          `/api/inbox?view=${view}&q=${encodeURIComponent(q)}${spaceId ? `&space=${spaceId}` : ''}`,
         );
         this.setReachable(true);
         return res;
@@ -733,7 +736,8 @@ export class TaskStore {
     remove = false,
   ): void {
     const qc = this.o.queryClient;
-    for (const [key, data] of qc.getQueriesData<InboxResponse>({ queryKey: ['inbox', spaceId] })) {
+    void spaceId;
+    for (const [key, data] of qc.getQueriesData<InboxResponse>({ queryKey: ['inbox'] })) {
       if (!data) continue;
       const fix = (list: typeof data.toAnswer) =>
         list
@@ -782,47 +786,64 @@ export class TaskStore {
     return taskId;
   }
 
-  /** Reading an item clears its dot (and tells a request's sender it was seen). */
-  readItem(spaceId: string, itemId: string): void {
+  /** Change Inbox items in every cached view at once: `fn` gives each item its new self, or null to drop it. */
+  private patchInbox(fn: (i: InboxItem) => InboxItem | null): void {
     const qc = this.o.queryClient;
-    const at = this.nextAt();
-    let unread = false;
-    for (const [key, data] of qc.getQueriesData<InboxResponse>({ queryKey: ['inbox', spaceId] })) {
+    for (const [key, data] of qc.getQueriesData<InboxResponse>({ queryKey: ['inbox'] })) {
       if (!data) continue;
-      const mark = (list: typeof data.toAnswer) =>
-        list.map((i) => {
-          if (i.id !== itemId || i.readAt) return i;
-          if (i.kind !== 'request') unread = true;
-          return { ...i, readAt: at };
-        });
-      const updates = mark(data.updates);
+      const map = (list: InboxItem[]) => list.map(fn).filter((i): i is InboxItem => i !== null);
+      const toAnswer = map(data.toAnswer);
+      const updates = map(data.updates);
+      const answered = map(data.answered);
+      const gone = (list: InboxItem[], next: InboxItem[]) =>
+        list.filter((i) => !next.some((n) => n.id === i.id));
+      // The counts across every space follow what changed in this view.
+      const unreadBefore = data.updates.filter((i) => !i.readAt).length;
+      const unreadAfter = updates.filter((i) => !i.readAt).length;
       qc.setQueryData<InboxResponse>(key, {
         ...data,
-        toAnswer: mark(data.toAnswer),
+        toAnswer,
         updates,
-        answered: mark(data.answered),
-        counts: { ...data.counts, unread: updates.filter((i) => !i.readAt).length },
+        answered,
+        counts: {
+          toAnswer: Math.max(0, data.counts.toAnswer - gone(data.toAnswer, toAnswer).length),
+          unread: Math.max(0, data.counts.unread + unreadAfter - unreadBefore),
+        },
       });
     }
-    void unread;
+  }
+
+  /** Reading an item clears its dot (and tells a request's sender it was seen). */
+  readItem(itemId: string): void {
+    const at = this.nextAt();
+    this.patchInbox((i) => (i.id === itemId && !i.readAt ? { ...i, readAt: at } : i));
     this.mutate({ type: 'inbox.read', payload: { id: itemId } });
   }
 
-  readAll(spaceId: string): void {
-    const qc = this.o.queryClient;
-    const at = this.nextAt();
-    for (const [key, data] of qc.getQueriesData<InboxResponse>({ queryKey: ['inbox', spaceId] })) {
-      if (!data) continue;
-      const mark = (list: typeof data.toAnswer) => list.map((i) => (i.readAt ? i : { ...i, readAt: at }));
-      qc.setQueryData<InboxResponse>(key, {
-        ...data,
-        toAnswer: mark(data.toAnswer),
-        updates: mark(data.updates),
-        answered: mark(data.answered),
-        counts: { ...data.counts, unread: 0 },
-      });
-    }
-    this.mutate({ type: 'inbox.readAll', payload: { id: this.o.newId?.() ?? crypto.randomUUID(), spaceId } });
+  /** Mark as unread: the dot comes back. */
+  unreadItem(itemId: string): void {
+    this.patchInbox((i) => (i.id === itemId ? { ...i, readAt: null } : i));
+    this.mutate({ type: 'inbox.unread', payload: { id: itemId } });
+  }
+
+  /** Delete one item (Not now on an invite too). Restore puts it back. */
+  deleteItem(itemId: string): void {
+    this.patchInbox((i) => (i.id === itemId ? null : i));
+    this.mutate({ type: 'inbox.delete', payload: { id: itemId } });
+  }
+
+  /** Clear all: exactly these items go. Restore puts them back. */
+  clearItems(ids: string[]): void {
+    if (!ids.length) return;
+    const set = new Set(ids);
+    this.patchInbox((i) => (set.has(i.id) ? null : i));
+    this.mutate({ type: 'inbox.clear', payload: { id: this.o.newId?.() ?? crypto.randomUUID(), ids } });
+  }
+
+  /** Undo a delete or Clear all: the server has them, so read the Inbox again once it has heard. */
+  restoreItems(ids: string[]): void {
+    if (!ids.length) return;
+    this.mutate({ type: 'inbox.restore', payload: { id: this.o.newId?.() ?? crypto.randomUUID(), ids } });
   }
 
   cachedProjects(spaceId: string): Project[] | undefined {
@@ -1070,8 +1091,9 @@ export class TaskStore {
       return;
     }
     if (e.type === INBOX_CHANGED) {
-      const ie = e.data as InboxChangedEvent;
-      void this.o.queryClient.invalidateQueries({ queryKey: ['inbox', ie.spaceId] });
+      // One Inbox across every space: whatever changed, read it again.
+      void (e.data as InboxChangedEvent);
+      void this.o.queryClient.invalidateQueries({ queryKey: ['inbox'] });
       void this.o.queryClient.invalidateQueries({ queryKey: ['me'] });
       return;
     }

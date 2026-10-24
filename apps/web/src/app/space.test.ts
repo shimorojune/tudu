@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   forgetSpace,
   homePath,
+  inboxPath,
   lastSpace,
+  oldInboxPath,
   rememberSpace,
   spaceBySlug,
   spacePath,
@@ -72,5 +74,28 @@ describe('C08-U11 the space in the address', () => {
     expect(lastSpace(SPACES)).toBeNull();
     expect(localStorage.getItem('tudu.space')).toBeNull();
     expect(homePath(SPACES)).toBe('/me');
+  });
+});
+
+describe('C08-U20 the one Inbox has its own address', () => {
+  it('C08-U20 old per-space addresses land on /inbox narrowed to that space, keeping the item and view', () => {
+    const [me, nw] = SPACES as [SpaceSummary, SpaceSummary];
+    // Personal's Inbox never worked: its old address is the whole Inbox.
+    expect(oldInboxPath(me)).toBe('/inbox');
+    expect(oldInboxPath(nw)).toBe('/inbox?space=northwind');
+    expect(oldInboxPath(nw, 'abc')).toBe('/inbox/abc?space=northwind');
+    expect(oldInboxPath(nw, null, 'sent')).toBe('/inbox?space=northwind&view=sent');
+  });
+
+  it('C08-U20 /inbox is its own place: every space links there, and switching from it opens Today', () => {
+    expect(spacePath('northwind', 'inbox')).toBe('/inbox');
+    expect(spacePath('me', 'inbox')).toBe('/inbox');
+    expect(viewOf('/inbox')).toBe('inbox');
+    expect(viewOf('/inbox/abc')).toBe('inbox');
+    expect(inboxPath()).toBe('/inbox');
+    expect(inboxPath({ view: 'inbox' })).toBe('/inbox');
+    expect(inboxPath({ view: 'sent' })).toBe('/inbox?view=sent');
+    expect(switchPath('/inbox', 'northwind')).toBe('/northwind');
+    expect(switchPath('/inbox/abc', 'me')).toBe('/me');
   });
 });

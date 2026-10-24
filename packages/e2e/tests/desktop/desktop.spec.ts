@@ -11,7 +11,7 @@ import {
   signInHere,
   teamOfTwo,
 } from '../../fixtures/desktop';
-import { goInbox, pane, rows, section, sendRequest, sidebarInboxCount } from '../../fixtures/inbox';
+import { goInbox, pane, rows, section, sendRequest, inboxPip } from '../../fixtures/inbox';
 import { connectByApi, issueRow, JIRA_SITE, openJira } from '../../fixtures/jira';
 import { createSpace, switchTo } from '../../fixtures/spaces';
 import { dayList, fixClock, idle, row } from '../../fixtures/today';
@@ -38,7 +38,7 @@ async function floating(page: Page): Promise<Page> {
 }
 
 async function newVersion(page: Page) {
-  await expect.poll(() => sidebarInboxCount(page)).toBe(1);
+  await expect.poll(() => inboxPip(page)).toBe(1);
   await goInbox(page);
   await expect(appRow(page)).toBeVisible();
   await expect(appRow(page).getByLabel('New')).toBeVisible();
@@ -52,7 +52,7 @@ async function newVersion(page: Page) {
   await expect(pane(page).getByRole('button', { name: 'What’s new' })).toBeVisible();
   await expect(pane(page).getByRole('button', { name: 'Restart to update' })).toBeVisible();
   await expect(appRow(page).getByLabel('New')).toHaveCount(0);
-  await expect.poll(() => sidebarInboxCount(page)).toBe(0);
+  await expect.poll(() => inboxPip(page)).toBe(0);
 }
 
 async function floatingAdd(page: Page, title: string) {
@@ -105,7 +105,7 @@ test.describe('desktop', () => {
     await page.reload();
     await expect(appRow(page)).toBeVisible();
     await expect(appRow(page).getByLabel('New')).toHaveCount(0);
-    await expect.poll(() => sidebarInboxCount(page)).toBe(0);
+    await expect.poll(() => inboxPip(page)).toBe(0);
     // What's new keeps you on the item.
     await pane(page).getByRole('button', { name: 'What’s new' }).click();
     await expect(pane(page)).toContainText(ITEM);

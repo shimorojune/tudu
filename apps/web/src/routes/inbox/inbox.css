@@ -15,6 +15,13 @@
 .app-ix-panes .app-panes-l .tp-dh-tools .tp-seg button {
   flex: 1;
 }
+/* The space filter sits beside Search at its own width. */
+.app-inbox .tp-dh-tools .tp-sf {
+  flex: 0 0 auto;
+}
+.app-ix-banner {
+  padding: 12px 16px 0;
+}
 .app-ix-r {
   overflow-y: auto;
   scrollbar-width: thin;

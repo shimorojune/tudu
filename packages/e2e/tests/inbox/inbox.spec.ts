@@ -7,7 +7,7 @@ import {
   rows,
   section,
   sendRequest,
-  sidebarInboxCount,
+  inboxPip,
   turnTo,
 } from '../../fixtures/inbox';
 import {
@@ -76,7 +76,7 @@ test.describe('inbox', () => {
     // nothing landed on a day of yours
     await expect((await (await page.request.get(`${API_URL}/api/me`)).json()).user).toBeTruthy();
     // Meera's Inbox has it, with the count on the sidebar (the rail, or the header's icon on phones)
-    await expect.poll(() => sidebarInboxCount(b.page)).toBe(1);
+    await expect.poll(() => inboxPip(b.page)).toBe(1);
     if (phone()) await expect(b.page.getByRole('button', { name: 'Inbox, 1 new' })).toBeVisible();
     await goInbox(b.page);
     await expect(inboxCount(b.page)).toHaveText('1 to answer');
@@ -236,7 +236,7 @@ test.describe('inbox', () => {
     await theirPanel.getByRole('button', { name: 'Comment', exact: true }).click();
     await idle(b.page);
     // the owner's Inbox
-    await expect.poll(() => sidebarInboxCount(page)).toBe(1);
+    await expect.poll(() => inboxPip(page)).toBe(1);
     await goInbox(page);
     await expect(inboxCount(page)).toHaveText('1 new');
     const upd = rows(section(page, 'Updates')).first();
@@ -273,7 +273,7 @@ test.describe('inbox', () => {
     await b.context.close();
   });
 
-  test('C08-E15 Mark all as read clears the dots and the count; a read item keeps its place; a request stays counted until answered', async ({
+  test('C08-E15 Mark as read from a row clears its dot and the count; a read item keeps its place; a request stays counted until answered', async ({
     page,
     browser,
   }) => {
@@ -303,13 +303,18 @@ test.describe('inbox', () => {
     void bId;
     await goInbox(page);
     await expect(inboxCount(page)).toHaveText('1 to answer · 2 new');
-    expect(await sidebarInboxCount(page)).toBe(3);
+    expect(await inboxPip(page)).toBe(3);
     await expect(page.locator('.tp-ix-dot')).toHaveCount(3);
-    await page.getByRole('button', { name: 'Mark all as read' }).click();
+    // Mark all as read is gone (Clear all took its place, C08-E28); each row reads from its hover actions.
+    await expect(page.getByRole('button', { name: 'Mark all as read' })).toHaveCount(0);
+    for (let i = 0; i < 2; i++) {
+      const row = rows(section(page, 'Updates')).nth(i);
+      await row.hover();
+      await row.getByRole('button', { name: 'Mark as read' }).click();
+    }
     await expect(inboxCount(page)).toHaveText('1 to answer');
     await expect(section(page, 'Updates').locator('.tp-ix-dot')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Mark all as read' })).toHaveCount(0);
-    await expect.poll(() => sidebarInboxCount(page)).toBe(1);
+    await expect.poll(() => inboxPip(page)).toBe(1);
     // the items keep their place, newest first
     await expect(rows(section(page, 'Updates')).first()).toContainText('Two');
     // a read request still counts
@@ -406,7 +411,7 @@ test.describe('inbox', () => {
     await sendRequest(b.page, space.id, aId, 'Live one');
     await expect(rows(section(page, 'To answer')).first()).toContainText('Live one');
     await expect(inboxCount(page)).toHaveText('1 to answer');
-    await expect.poll(() => sidebarInboxCount(page)).toBe(1);
+    await expect.poll(() => inboxPip(page)).toBe(1);
     // from Personal, the switcher carries the other space's count
     await switcher(page).click();
     await page

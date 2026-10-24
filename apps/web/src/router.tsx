@@ -25,6 +25,8 @@ import {
   spacePath,
   SpaceProvider,
   withSlug,
+  oldInboxPath,
+  spaceBySlug,
   type View,
 } from './app/space';
 import { KitPage } from './routes/kit/KitPage';
@@ -130,7 +132,6 @@ function legacy(path: string, view: View) {
 const legacyRoutes = [
   legacy('/week', 'week'),
   legacy('/backlog', 'backlog'),
-  legacy('/inbox', 'inbox'),
   legacy('/people', 'people'),
   legacy('/more', 'more'),
 ];
@@ -192,33 +193,49 @@ const spaceRoute = createRoute({
     rememberSpace(hit.space.slug);
     return { space: hit.space, me };
   },
-  component: function SpaceLayout() {
+  component: function SpaceRoute() {
     const ctx = spaceRoute.useRouteContext();
-    const navigate = useNavigate();
-    // The route context is read once per navigation; the counts on the sidebar and the switcher (the Inbox, the
-    // members) follow the me query instead, so a change that arrives live shows without a navigation.
-    const { data: liveMe } = useQuery({ ...meQuery, initialData: ctx.me });
-    const me = liveMe ?? ctx.me;
-    const live = me.spaces.find((s) => s.id === ctx.space.id);
-    const space = live ?? ctx.space;
-    useLiveEvents(true);
-
-    useEffect(() => {
-      setSpaceGoneHandler((e) => onSpaceGone(e, space, (href) => void navigate({ href, replace: true })));
-      return () => setSpaceGoneHandler(null);
-    }, [space, navigate]);
-    return (
-      <WorkingDayProvider>
-        <SpaceProvider space={space}>
-          <SlugFollow space={live} was={ctx.space.slug} />
-          <AppShell me={me} space={space}>
-            <Outlet />
-          </AppShell>
-        </SpaceProvider>
-      </WorkingDayProvider>
-    );
+    return <SpaceLayout me={ctx.me} space={ctx.space} follow />;
   },
 });
+
+/**
+ * The shell around a page: the space's sidebar, the top bar, live events. The route context is read once per
+ * navigation; the counts on the sidebar and the switcher (the Inbox, the members) follow the me query instead, so a
+ * change that arrives live shows without a navigation. `follow` keeps the address on a renamed space's new slug
+ * (not for the Inbox, whose address has no space in it).
+ */
+function SpaceLayout({
+  me: ctxMe,
+  space: ctxSpace,
+  follow,
+}: {
+  me: MeResponse;
+  space: SpaceSummary;
+  follow?: boolean;
+}) {
+  const navigate = useNavigate();
+  const { data: liveMe } = useQuery({ ...meQuery, initialData: ctxMe });
+  const me = liveMe ?? ctxMe;
+  const live = me.spaces.find((s) => s.id === ctxSpace.id);
+  const space = live ?? ctxSpace;
+  useLiveEvents(true);
+
+  useEffect(() => {
+    setSpaceGoneHandler((e) => onSpaceGone(e, space, (href) => void navigate({ href, replace: true })));
+    return () => setSpaceGoneHandler(null);
+  }, [space, navigate]);
+  return (
+    <WorkingDayProvider>
+      <SpaceProvider space={space}>
+        {follow ? <SlugFollow space={live} was={ctxSpace.slug} /> : null}
+        <AppShell me={me} space={space}>
+          <Outlet />
+        </AppShell>
+      </SpaceProvider>
+    </WorkingDayProvider>
+  );
+}
 
 const todayRoute = createRoute({
   getParentRoute: () => spaceRoute,
@@ -282,30 +299,68 @@ const jiraRoute = createRoute({ getParentRoute: () => spaceRoute, path: '/jira',
 const appsRoute = createRoute({ getParentRoute: () => spaceRoute, path: '/apps', component: AppsPage });
 /** The phone's More tab: the views with no tab of their own. */
 const moreRoute = createRoute({ getParentRoute: () => spaceRoute, path: '/more', component: MorePage });
-/** The Inbox's address may name the view: /northwind/inbox?view=sent. */
+/** The Inbox's address may name the view and a space: /inbox?view=sent&space=northwind. */
 const inboxSearch = (
   s: Record<string, unknown>,
-): { task?: string; view?: 'inbox' | 'answered' | 'sent' } => ({
+): { task?: string; view?: 'inbox' | 'answered' | 'sent'; space?: string } => ({
   ...taskSearch(s),
   ...(s.view === 'answered' || s.view === 'sent' || s.view === 'inbox' ? { view: s.view } : {}),
+  ...(typeof s.space === 'string' && s.space ? { space: s.space } : {}),
 });
-/** Personal has no Inbox (nobody sends you tasks there): its address goes back to Today, like People. */
-const teamOnly = ({ context }: { context: { space: SpaceSummary } }) => {
-  if (context.space.kind !== 'team') throw redirect({ href: spacePath(context.space.slug), replace: true });
-};
-const inboxRoute = createRoute({
-  getParentRoute: () => spaceRoute,
+
+/**
+ * One Inbox across every space, at /inbox. Its address has no space in it, so the shell around it is the last
+ * space you were in (Personal the first time); nothing in the sidebar is lit.
+ */
+const inboxLayoutRoute = createRoute({
+  getParentRoute: () => appRoute,
   path: '/inbox',
+  beforeLoad: ({ context }) => {
+    const me = context.me;
+    const slug = lastSpace(me.spaces) ?? PERSONAL_SLUG;
+    const space = spaceBySlug(me.spaces, slug) ?? me.spaces[0]!;
+    return { space, me };
+  },
+  component: function InboxLayout() {
+    const ctx = inboxLayoutRoute.useRouteContext();
+    return <SpaceLayout me={ctx.me} space={ctx.space} />;
+  },
+});
+const inboxRoute = createRoute({
+  getParentRoute: () => inboxLayoutRoute,
+  path: '/',
   validateSearch: inboxSearch,
-  beforeLoad: teamOnly,
   component: InboxPage,
 });
 const inboxItemRoute = createRoute({
+  getParentRoute: () => inboxLayoutRoute,
+  path: '/$itemId',
+  validateSearch: inboxSearch,
+  component: InboxPage,
+});
+/** Before the one Inbox, each space had its own: /northwind/inbox lands on the Inbox narrowed to Northwind. */
+const oldInbox = ({
+  context,
+  params,
+  search,
+}: {
+  context: { space: SpaceSummary };
+  params: { itemId?: string };
+  search: { view?: string };
+}) => {
+  throw redirect({ href: oldInboxPath(context.space, params.itemId, search.view), replace: true });
+};
+const oldInboxRoute = createRoute({
+  getParentRoute: () => spaceRoute,
+  path: '/inbox',
+  validateSearch: inboxSearch,
+  beforeLoad: oldInbox,
+});
+const oldInboxItemRoute = createRoute({
   getParentRoute: () => spaceRoute,
   path: '/inbox/$itemId',
   validateSearch: inboxSearch,
-  beforeLoad: teamOnly,
-  component: InboxPage,
+  beforeLoad: oldInbox,
 });
 const kitRoute = createRoute({ getParentRoute: () => rootRoute, path: '/kit', component: KitPage });
 /**
@@ -362,6 +417,7 @@ export const router = createRouter({
       homeRoute,
       ...legacyRoutes,
       taskLinkRoute,
+      inboxLayoutRoute.addChildren([inboxRoute, inboxItemRoute]),
       spaceRoute.addChildren([
         todayRoute,
         weekRoute,
@@ -371,8 +427,8 @@ export const router = createRouter({
         moreRoute,
         jiraRoute,
         appsRoute,
-        inboxRoute,
-        inboxItemRoute,
+        oldInboxRoute,
+        oldInboxItemRoute,
         settingsRoute,
         settingsSectionRoute,
       ]),
