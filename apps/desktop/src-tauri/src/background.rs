@@ -5,6 +5,11 @@
 //! The Dock icon follows the desk: a regular app while the desk is open (or always, if you chose that in Settings ›
 //! This Mac), an accessory app (no Dock icon, not in ⌘Tab) once it is closed. The Inbox count goes where you can see
 //! it: the Dock's badge while there is a Dock icon, beside the tick in the menu bar while there is not.
+//!
+//! The tick in a crowded menu bar: macOS has no priority for an app's icon and hides them from the left when the bar
+//! is full. On a first launch Tudu takes the place macOS would save for a ⌘-drag to the right end of the apps' icons;
+//! once there is a saved place (yours or that seed) it is never touched again. If macOS hides the tick anyway, Tudu
+//! keeps its Dock icon while it runs, so it is never out of reach.
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -35,8 +40,9 @@ pub enum Policy {
     Accessory,
 }
 
-pub fn policy(dock: Dock, desk_open: bool) -> Policy {
-    if desk_open || dock == Dock::Always {
+/// `tick_hidden`: macOS is not showing the tick (a full menu bar), so the Dock icon is the way back in.
+pub fn policy(dock: Dock, desk_open: bool, tick_hidden: bool) -> Policy {
+    if desk_open || dock == Dock::Always || tick_hidden {
         Policy::Regular
     } else {
         Policy::Accessory
@@ -49,7 +55,32 @@ pub fn count_places(policy: Policy, count: Option<i64>) -> (Option<i64>, Option<
     let count = count.filter(|n| *n > 0);
     match policy {
         Policy::Regular => (count, None),
-        Policy::Accessory => (None, count.map(|n| n.to_string())),
+        Policy::Accessory => (None, tray_title(count)),
+    }
+}
+
+/// The count beside the tick stops at 99+, so the tick stays narrow; the Dock badge keeps the real number.
+pub fn tray_title(count: Option<i64>) -> Option<String> {
+    match count.filter(|n| *n > 0)? {
+        n if n > 99 => Some("99+".into()),
+        n => Some(n.to_string()),
+    }
+}
+
+/// Where macOS keeps the tick's place: the app's defaults, under the status item's autosave name. Tudu's tray sets
+/// none, so macOS names the first (and only) item `Item-0`.
+pub const TRAY_AUTOSAVE: &str = "Item-0";
+pub const TRAY_POSITION_KEY: &str = "NSStatusItem Preferred Position Item-0";
+/// The seed, in points from the right edge of the screen: as far right as macOS lets an app's icon go, which is just
+/// left of its own icons.
+pub const TRAY_SEED: f64 = 20.0;
+
+/// What to write before the tick appears: the seed when macOS has no place for it yet, nothing when it has one (a
+/// drag of yours, or an earlier seed).
+pub fn tray_place(stored: Option<f64>) -> Option<f64> {
+    match stored {
+        Some(_) => None,
+        None => Some(TRAY_SEED),
     }
 }
 
@@ -88,6 +119,11 @@ pub struct Background {
     pub tray_title: Mutex<Option<String>>,
     /// What macOS was last told, so a badge change that leaves the policy as it was does not tell it again.
     pub applied: Mutex<Option<Policy>>,
+    /// macOS is not drawing the tick (the menu bar is full).
+    pub tick_hidden: AtomicBool,
+    /// Tudu Test: what the tests say about the tick, in place of what macOS says.
+    #[cfg(feature = "control")]
+    pub tick_override: Mutex<Option<bool>>,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -142,6 +178,9 @@ pub fn start(app: &AppHandle) -> Background {
         awake: AtomicBool::new(false),
         tray_title: Mutex::new(None),
         applied: Mutex::new(None),
+        tick_hidden: AtomicBool::new(false),
+        #[cfg(feature = "control")]
+        tick_override: Mutex::new(None),
     };
     b.awake.store(mac::hold_awake(), Ordering::SeqCst);
     b
@@ -158,7 +197,67 @@ fn launched_at_login() -> bool {
 pub fn current_policy(app: &AppHandle) -> Policy {
     let b = app.state::<Background>();
     let dock = b.dock.lock().map(|d| *d).unwrap_or_default();
-    policy(dock, b.desk_open.load(Ordering::SeqCst))
+    policy(
+        dock,
+        b.desk_open.load(Ordering::SeqCst),
+        b.tick_hidden.load(Ordering::SeqCst),
+    )
+}
+
+/// Before the tick is built: seed its place if macOS has none (see `tray_place`).
+pub fn seed_tray_place() {
+    if let Some(at) = tray_place(mac::tray_position()) {
+        mac::set_tray_position(at);
+    }
+}
+
+/// The tick's place as macOS keeps it, for the control channel.
+#[cfg(feature = "control")]
+pub fn tray_position() -> Option<f64> {
+    mac::tray_position()
+}
+
+/// The tick's autosave name as macOS has it, for the control channel.
+#[cfg(feature = "control")]
+pub fn tray_autosave(app: &AppHandle) -> Option<String> {
+    mac::tray_autosave(app)
+}
+
+/// Every two seconds: is macOS drawing the tick? Two hidden answers in a row count, so a passing moment (a space
+/// switching, the screen locking) does not flip the Dock icon. Only a change reaches `apply`.
+pub fn watch_tick(app: &AppHandle) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let mut hidden_runs = 0u8;
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(2));
+            // Asked from here: macOS is asked on the main thread, and this waits for its answer.
+            let seen = mac::tick_hidden(&app);
+            #[cfg(feature = "control")]
+            let seen = app
+                .state::<Background>()
+                .tick_override
+                .lock()
+                .ok()
+                .and_then(|o| *o)
+                .or(seen);
+            let Some(hidden) = seen else { continue };
+            hidden_runs = if hidden {
+                hidden_runs.saturating_add(1)
+            } else {
+                0
+            };
+            tick(&app, hidden_runs >= 2);
+        }
+    });
+}
+
+/// The tick shown or hidden, applied only when it changes.
+pub fn tick(app: &AppHandle, hidden: bool) {
+    let b = app.state::<Background>();
+    if b.tick_hidden.swap(hidden, Ordering::SeqCst) != hidden {
+        apply(app);
+    }
 }
 
 /// Tell macOS what the app is now, and put the Inbox count where it can be seen.
@@ -267,10 +366,10 @@ pub fn set_dock(app: AppHandle, state: State<'_, Background>, dock: Dock) {
 mod mac {
     use objc2::msg_send;
     use objc2::rc::Retained;
-    use objc2_app_kit::NSApplication;
+    use objc2_app_kit::{NSApplication, NSMenu, NSWindowOcclusionState};
     use objc2_foundation::{
         MainThreadMarker, NSActivityOptions, NSAppleEventDescriptor, NSAppleEventManager,
-        NSProcessInfo, NSString,
+        NSProcessInfo, NSString, NSUserDefaults,
     };
     use objc2_service_management::{SMAppService, SMAppServiceStatus};
     use objc2_web_kit::{WKInactiveSchedulingPolicy, WKWebView};
@@ -341,6 +440,52 @@ mod mac {
             .flatten()
     }
 
+    fn defaults() -> Retained<NSUserDefaults> {
+        NSUserDefaults::standardUserDefaults()
+    }
+
+    pub fn tray_position() -> Option<f64> {
+        let key = NSString::from_str(super::TRAY_POSITION_KEY);
+        let d = defaults();
+        d.objectForKey(&key).map(|_| d.doubleForKey(&key))
+    }
+
+    pub fn set_tray_position(at: f64) {
+        defaults().setDouble_forKey(at, &NSString::from_str(super::TRAY_POSITION_KEY));
+    }
+
+    #[cfg(feature = "control")]
+    pub fn tray_autosave(app: &AppHandle) -> Option<String> {
+        let tray = app.tray_by_id("tray")?;
+        tray.with_inner_tray_icon(|t| {
+            t.ns_status_item()
+                .map(|item| item.autosaveName().to_string())
+        })
+        .ok()
+        .flatten()
+    }
+
+    /// Whether macOS is drawing the tick: its button's window not on screen while the menu bar itself is (a full
+    /// screen app or an auto-hiding menu bar hides every icon, and that is not ours to answer). None: no answer.
+    /// Called off the main thread; the tray runs the question there.
+    pub fn tick_hidden(app: &AppHandle) -> Option<bool> {
+        let tray = app.tray_by_id("tray")?;
+        tray.with_inner_tray_icon(|t| {
+            let mtm = MainThreadMarker::new()?;
+            if !NSMenu::menuBarVisible(mtm) {
+                return None;
+            }
+            let window = t.ns_status_item()?.button(mtm)?.window()?;
+            Some(
+                !window
+                    .occlusionState()
+                    .contains(NSWindowOcclusionState::Visible),
+            )
+        })
+        .ok()
+        .flatten()
+    }
+
     fn service() -> Retained<SMAppService> {
         unsafe { SMAppService::mainAppService() }
     }
@@ -409,6 +554,17 @@ mod mac {
 
     pub fn set_policy(_: &AppHandle, _: Policy) {}
     pub fn activate(_: &AppHandle) {}
+    pub fn tray_position() -> Option<f64> {
+        None
+    }
+    pub fn set_tray_position(_: f64) {}
+    #[cfg(feature = "control")]
+    pub fn tray_autosave(_: &AppHandle) -> Option<String> {
+        None
+    }
+    pub fn tick_hidden(_: &AppHandle) -> Option<bool> {
+        None
+    }
     pub fn hold_awake() -> bool {
         false
     }
@@ -435,10 +591,10 @@ mod tests {
 
     #[test]
     fn c16_u01_the_dock_icon_follows_the_desk_unless_you_keep_it() {
-        assert_eq!(policy(Dock::Open, true), Policy::Regular);
-        assert_eq!(policy(Dock::Open, false), Policy::Accessory);
-        assert_eq!(policy(Dock::Always, true), Policy::Regular);
-        assert_eq!(policy(Dock::Always, false), Policy::Regular);
+        assert_eq!(policy(Dock::Open, true, false), Policy::Regular);
+        assert_eq!(policy(Dock::Open, false, false), Policy::Accessory);
+        assert_eq!(policy(Dock::Always, true, false), Policy::Regular);
+        assert_eq!(policy(Dock::Always, false, false), Policy::Regular);
         assert_eq!(Dock::default(), Dock::Open);
         assert_eq!(serde_json::to_string(&Dock::Always).unwrap(), "\"always\"");
         assert_eq!(
@@ -456,6 +612,44 @@ mod tests {
         );
         assert_eq!(count_places(Policy::Accessory, Some(0)), (None, None));
         assert_eq!(count_places(Policy::Regular, None), (None, None));
+    }
+
+    #[test]
+    fn mb_u01_the_count_beside_the_tick_stops_at_99_plus() {
+        assert_eq!(tray_title(None), None);
+        assert_eq!(tray_title(Some(0)), None);
+        assert_eq!(tray_title(Some(-2)), None);
+        assert_eq!(tray_title(Some(7)), Some("7".into()));
+        assert_eq!(tray_title(Some(99)), Some("99".into()));
+        assert_eq!(tray_title(Some(100)), Some("99+".into()));
+        assert_eq!(tray_title(Some(12345)), Some("99+".into()));
+    }
+
+    #[test]
+    fn mb_u02_only_the_tick_is_capped_the_dock_badge_keeps_the_number() {
+        assert_eq!(
+            count_places(Policy::Accessory, Some(150)),
+            (None, Some("99+".into()))
+        );
+        assert_eq!(count_places(Policy::Regular, Some(150)), (Some(150), None));
+    }
+
+    #[test]
+    fn mb_u03_the_place_is_seeded_once_and_a_saved_place_is_left_alone() {
+        assert_eq!(tray_place(None), Some(TRAY_SEED));
+        assert_eq!(tray_place(Some(TRAY_SEED)), None);
+        assert_eq!(tray_place(Some(0.0)), None);
+        assert_eq!(tray_place(Some(1400.0)), None);
+        assert!(TRAY_POSITION_KEY.ends_with(TRAY_AUTOSAVE));
+    }
+
+    #[test]
+    fn mb_u04_a_hidden_tick_keeps_the_dock_icon() {
+        assert_eq!(policy(Dock::Open, false, false), Policy::Accessory);
+        assert_eq!(policy(Dock::Open, false, true), Policy::Regular);
+        assert_eq!(policy(Dock::Open, true, true), Policy::Regular);
+        assert_eq!(policy(Dock::Always, false, true), Policy::Regular);
+        assert_eq!(policy(Dock::Always, false, false), Policy::Regular);
     }
 
     #[test]

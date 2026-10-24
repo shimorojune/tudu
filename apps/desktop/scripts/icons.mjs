@@ -2,7 +2,7 @@
 // The app and tray icons, drawn from the Logo board's stacked ink tick (packages/ui Logo and INK_SHAPE):
 // `pnpm --filter @tudu/desktop icons` rewrites src-tauri/icons. The Dock icon sits on Apple's grid (a 1024 canvas,
 // an 824 paper tile inset 100 with 22.37% corners, the mark at 76% of the tile); the tray icon is a 36px template
-// (black on clear, 18pt @2x): the box and the tick with a heavier edge, no back sheet.
+// (black on clear, 18pt @2x): the bare ink tick, as every menu bar board draws it.
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -37,10 +37,10 @@ const app = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" 
   <g transform="translate(${offset} ${offset}) scale(${scale}) translate(-9.5 -13.5)">${mark()}</g>
 </svg>`;
 
-// Tray: the box and the tick only, black on clear, a heavier edge so it holds at 18pt.
-const tray = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="9.5 13.5 101 99.5">
-  <rect x="26" y="36" width="70" height="70" rx="19" fill="none" stroke="#000" stroke-width="11"/>
-  <path transform="translate(27.89 6.74) scale(3.5702)" d="${shape}" fill="#000"/>
+// Tray: the ink tick alone, black on clear. The boards draw it 16pt in the bar's 18pt slot, so the 24-unit tick sits
+// in a 27-unit view: 1.5 units of air all round.
+const tray = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="-1.5 -1.5 27 27">
+  <path d="${shape}" fill="#000"/>
 </svg>`;
 
 const work = mkdtempSync(join(tmpdir(), 'tudu-icons-'));

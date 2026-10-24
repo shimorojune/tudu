@@ -85,8 +85,10 @@ pub fn run() {
             app.manage(background);
 
             windows::create(app.handle(), at_login)?;
+            background::seed_tray_place();
             tray(app.handle(), track)?;
             background::apply(app.handle());
+            background::watch_tick(app.handle());
             if let Err(e) = app.global_shortcut().register(SUMMON) {
                 eprintln!("tudu: the summon {SUMMON} could not be registered: {e}");
             }
@@ -106,7 +108,7 @@ pub fn run() {
     });
 }
 
-/// The menu-bar icon: the ink tick as a template image. It has no menu: a click, left or right, opens today from the
+/// The menu-bar icon: the bare ink tick as a template image. It has no menu: a click, left or right, opens today from the
 /// menu bar (the `menubar` window) under it.
 fn tray(app: &tauri::AppHandle, track: Track) -> tauri::Result<()> {
     TrayIconBuilder::with_id("tray")
