@@ -176,6 +176,48 @@ test.describe('quick-add', () => {
     await expect(panel.getByRole('button', { name: 'Project', exact: true })).toHaveText('Home');
   });
 
+  test('C18-E15 New project… in Quick Add takes a colour; the same name again offers Use instead of a twin', async ({
+    page,
+  }) => {
+    test.skip(test.info().project.name !== 'desktop', 'the same picker on every size');
+    await signInFresh(page);
+    const me = await (await page.request.get(`${API_URL}/api/me`)).json();
+    const space = (me as { spaces: Array<{ id: string; kind: string }> }).spaces.find(
+      (x) => x.kind === 'personal',
+    )!;
+    let b = await openBar(page);
+    await b.getByRole('textbox', { name: 'Task title' }).fill('Buy stamps');
+    await b.getByRole('button', { name: 'Choose a project' }).click();
+    await b.locator('.tp-qa-pop').getByRole('menuitem', { name: 'New project…' }).click();
+    const card = b.getByRole('group', { name: 'New project' });
+    await card.getByRole('radio', { name: 'Teal' }).click();
+    await card.getByRole('textbox', { name: 'Project name' }).fill('Errands');
+    await card.getByRole('textbox', { name: 'Project name' }).press('Enter');
+    const chip = b.getByRole('button', { name: 'Project: Errands' });
+    await expect(chip).toBeVisible();
+    expect(await chip.locator('.tp-dot').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(
+      'rgb(47, 111, 111)',
+    );
+    await addButton(b).click();
+    await expect(bar(page)).toHaveCount(0, { timeout: 5000 });
+    await idle(page);
+    const res = await page.request.get(`${API_URL}/api/spaces/${space.id}/projects`);
+    const saved = ((await res.json()) as { projects: Array<{ name: string; color: string }> }).projects;
+    expect(saved).toEqual([expect.objectContaining({ name: 'Errands', color: '#2f6f6f' })]);
+    // The same name again: the card offers the one there is.
+    b = await openBar(page);
+    await b.getByRole('button', { name: 'Choose a project' }).click();
+    await b.locator('.tp-qa-pop').getByRole('menuitem', { name: 'New project…' }).click();
+    await b.getByRole('textbox', { name: 'Project name' }).fill('errands');
+    await expect(b.getByText('Errands is already here.')).toBeVisible();
+    await b.getByRole('button', { name: 'Use Errands' }).click();
+    await expect(b.getByRole('button', { name: 'Project: Errands' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await idle(page);
+    const again = await page.request.get(`${API_URL}/api/spaces/${space.id}/projects`);
+    expect(((await again.json()) as { projects: unknown[] }).projects).toHaveLength(1);
+  });
+
   test('C04-E06 a note becomes the task’s notes; a file attached shows as a chip in the notes and opens', async ({
     page,
   }) => {

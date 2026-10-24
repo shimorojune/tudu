@@ -1,10 +1,18 @@
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
-import { addDays } from '@tudu/core';
-import type { DayResponse, Project, SyncResponse, Task, TaskDetail, WeekResponse } from '@tudu/core';
+import { POSITION_STEP, addDays } from '@tudu/core';
+import type {
+  DayResponse,
+  Project,
+  SyncMutation,
+  SyncResponse,
+  Task,
+  TaskDetail,
+  WeekResponse,
+} from '@tudu/core';
 import { createApi } from './api';
 import { MemoryOutboxStore, type OutboxStore } from './outbox';
-import { TaskStore, applyToDay, dayKey, projectsKey, taskKey, type DayData } from './tasks';
+import { TaskStore, applyToDay, applyToProjects, dayKey, projectsKey, taskKey, type DayData } from './tasks';
 
 const SPACE = 'space-1';
 const SUN = '2026-10-18';
@@ -444,6 +452,34 @@ describe('C03-U22 delete, restore and live events for a task', () => {
   });
 });
 
+describe('C18-U15 a new project goes first', () => {
+  const create = (id: string, name: string) =>
+    ({
+      id: `m-${id}`,
+      type: 'project.create',
+      at: '2026-10-24T10:00:00.000Z',
+      payload: { id, spaceId: SPACE, name, color: '#3d5a80' },
+    }) as SyncMutation;
+  const proj = (id: string, position: number): Project => ({
+    id,
+    spaceId: SPACE,
+    name: id,
+    color: '#3d5a80',
+    position,
+    createdAt: '2026-10-01T00:00:00.000Z',
+  });
+
+  it('C18-U15 into an empty space it gets POSITION_STEP; before 1024 and 2048 it gets 0 and sorts first', () => {
+    expect(applyToProjects([], SPACE, create('a', 'Home')).map((p) => p.position)).toEqual([POSITION_STEP]);
+    const after = applyToProjects([proj('p1', 1024), proj('p2', 2048)], SPACE, create('n', 'Garden'));
+    expect(after.map((p) => [p.id, p.position])).toEqual([
+      ['n', 0],
+      ['p1', 1024],
+      ['p2', 2048],
+    ]);
+  });
+});
+
 describe('C04-U14 projects and a task from Quick Add', () => {
   it('C04-U14 a new project shows at once with the next colour; set project shows on the row and in the panel', async () => {
     const t = setup({ [SUN]: [task('t1', 'One', SUN, 1024)] }, [
@@ -460,15 +496,16 @@ describe('C04-U14 projects and a task from Quick Add', () => {
     await t.loadTask('t1');
     await t.loadProjects();
     const p2 = t.store.createProject(SPACE, ' Platform ');
-    expect(t.readProjects().map((p) => [p.name, p.color])).toEqual([
-      ['Northwind', '#3d5a80'],
-      ['Platform', '#5b7553'],
+    // New projects go first, before Northwind's 1024.
+    expect(t.readProjects().map((p) => [p.name, p.color, p.position])).toEqual([
+      ['Platform', '#5b7553', 0],
+      ['Northwind', '#3d5a80', 1024],
     ]);
     t.store.setProject('t1', p2);
     expect(t.read(SUN)[0]!.projectId).toBe(p2);
     expect(t.readTask('t1')!.projectId).toBe(p2);
     t.store.updateProject(SPACE, p2, { name: 'Platform team' });
-    expect(t.readProjects()[1]!.name).toBe('Platform team');
+    expect(t.readProjects()[0]!.name).toBe('Platform team');
     t.store.deleteProject(SPACE, p2);
     expect(t.readProjects().map((p) => p.id)).toEqual(['p1']);
     expect(t.read(SUN)[0]!.projectId).toBeNull();

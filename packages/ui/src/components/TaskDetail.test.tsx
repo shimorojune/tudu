@@ -514,7 +514,7 @@ describe('TaskDetail project (chunk 04)', () => {
     const pop2 = c2.querySelector('.tp-td-pop') as HTMLElement;
     await user.click(within(pop2).getByRole('menuitem', { name: 'New project…' }));
     await user.type(within(pop2).getByRole('textbox', { name: 'Project name' }), 'Home{Enter}');
-    expect(onNewProject).toHaveBeenCalledWith('Home');
+    expect(onNewProject).toHaveBeenCalledWith('Home', '#8a5a00');
     expect(onProject).toHaveBeenLastCalledWith('new-1');
     // without a project list the fact stays out
     const { container: c3 } = render(<Panel initial={{ ...FULL, key: 't3' }} />);

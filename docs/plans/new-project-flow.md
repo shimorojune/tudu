@@ -1,6 +1,6 @@
 # New project: a popup, not a card in the list
 
-Status: proposal, waiting for Rohit's approval. Canvas: board `K-Projects-Flow` ("13b · New project, smoothed") on the
+Status: approved by Rohit 24 Oct 2026; implemented. Canvas: board `K-Projects-Flow` ("13b · New project, smoothed") on the
 Spaces page, approved by Rohit 24 Oct 2026 (v52).
 
 ## Why it feels janky today

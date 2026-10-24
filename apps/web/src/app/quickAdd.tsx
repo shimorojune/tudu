@@ -104,7 +104,8 @@ export function useQuickAddActions(spaceId: string | undefined) {
     projects,
     online,
     save,
-    newProject: (name: string) => (spaceId ? taskStore.createProject(spaceId, name) : undefined),
+    newProject: (name: string, color: string) =>
+      spaceId ? taskStore.createProject(spaceId, name, color) : undefined,
     upload: (file: File, onProgress: (ratio: number) => void) =>
       spaceId ? taskStore.upload(spaceId, file, null, onProgress) : Promise.reject(new Error('no space')),
   };

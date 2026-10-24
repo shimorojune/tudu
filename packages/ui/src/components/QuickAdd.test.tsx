@@ -144,8 +144,14 @@ describe('QuickAdd', () => {
     );
     const field = screen.getByRole('textbox', { name: 'Project name' });
     expect(field).toHaveFocus();
+    // The next unused colour is picked to start with.
+    expect(
+      within(screen.getByRole('radiogroup', { name: 'Project colour' })).getByRole('radio', {
+        checked: true,
+      }),
+    ).toHaveAccessibleName('Ochre');
     await user.type(field, ' Home {Enter}');
-    expect(onNewProject).toHaveBeenCalledWith('Home');
+    expect(onNewProject).toHaveBeenCalledWith('Home', '#8a5a00');
     rerender(
       <Bar
         onNewProject={onNewProject}
@@ -418,5 +424,67 @@ describe('QuickAdd', () => {
     expect(document.querySelector('.tp-qa-simwrap')).toHaveClass('tp-on');
     expect(document.querySelector('.tp-qa-sim-k')!.textContent).toBe('Looks like a task you have');
     expect(document.querySelector('.tp-qa-sim-w')!.textContent).toBe('Backlog');
+  });
+
+  describe('New project… in the picker (new project flow)', () => {
+    async function nameCard(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(chip('Choose a project'));
+      await user.click(
+        within(document.querySelector('.tp-qa-pop') as HTMLElement).getByRole('menuitem', {
+          name: 'New project…',
+        }),
+      );
+      return screen.getByRole('group', { name: 'New project' });
+    }
+
+    it('C18-U16 a swatch picked in the name card is the colour Add makes it with; the dot in the field follows it', async () => {
+      const user = userEvent.setup();
+      const onNewProject = vi.fn(() => 'new-1');
+      render(<Bar onNewProject={onNewProject} />);
+      const card = await nameCard(user);
+      await user.click(within(card).getByRole('radio', { name: 'Plum' }));
+      expect((card.querySelector('.tp-pm-field i') as HTMLElement).style.background).toBe(
+        'rgb(122, 78, 122)',
+      );
+      await user.type(within(card).getByRole('textbox', { name: 'Project name' }), 'Errands');
+      await user.click(within(card).getByRole('button', { name: 'Add' }));
+      expect(onNewProject).toHaveBeenCalledWith('Errands', '#7a4e7a');
+    });
+
+    it('C18-U17 a name that is already a project offers it: "Platform is already here.", Use Platform; Enter picks it and makes nothing', async () => {
+      const user = userEvent.setup();
+      const onNewProject = vi.fn(() => 'new-1');
+      render(<Bar onNewProject={onNewProject} />);
+      const card = await nameCard(user);
+      expect(within(card).getByRole('button', { name: 'Add' })).toBeDisabled();
+      expect(card).toHaveTextContent('Its colour, here or later in Settings.');
+      await user.type(within(card).getByRole('textbox', { name: 'Project name' }), ' platform');
+      expect(card).toHaveTextContent('Platform is already here.');
+      expect(within(card).getByRole('button', { name: 'Use Platform' })).toBeEnabled();
+      await user.keyboard('{Enter}');
+      expect(onNewProject).not.toHaveBeenCalled();
+      expect(chip('Project: Platform')).toBeInTheDocument();
+    });
+
+    it('C18-U18 ‹ and Esc go back to the list without closing the picker or making anything', async () => {
+      const user = userEvent.setup();
+      const onNewProject = vi.fn(() => 'new-1');
+      render(<Bar onNewProject={onNewProject} />);
+      let card = await nameCard(user);
+      await user.type(within(card).getByRole('textbox', { name: 'Project name' }), 'Garden');
+      await user.click(within(card).getByRole('button', { name: 'Back to projects' }));
+      const pop = document.querySelector('.tp-qa-pop') as HTMLElement;
+      expect(within(pop).getByRole('menuitem', { name: 'New project…' })).toBeInTheDocument();
+      await user.click(within(pop).getByRole('menuitem', { name: 'New project…' }));
+      card = screen.getByRole('group', { name: 'New project' });
+      expect(within(card).getByRole('textbox', { name: 'Project name' })).toHaveValue('');
+      await user.keyboard('{Escape}');
+      expect(
+        within(document.querySelector('.tp-qa-pop') as HTMLElement).getByRole('menuitem', {
+          name: 'Platform',
+        }),
+      ).toBeInTheDocument();
+      expect(onNewProject).not.toHaveBeenCalled();
+    });
   });
 });

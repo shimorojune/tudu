@@ -456,7 +456,8 @@ test.describe('settings', () => {
     await field.press('Enter');
     await expect(switcher(page)).toContainText('Northwind Two');
     await d.getByRole('button', { name: 'Edit Launch, No open tasks' }).click();
-    const pname = d.getByRole('textbox', { name: 'Project name' });
+    // The editor is a popup over Settings.
+    const pname = page.getByRole('textbox', { name: 'Project name' });
     await pname.fill('Launch week');
     await pname.press('Enter');
     await context.setOffline(false);

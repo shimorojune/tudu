@@ -13,6 +13,7 @@ import {
   nextProjectColor,
   placeAt,
   POSITION_STEP,
+  positionBetween,
   PROJECTS_CHANGED,
   TASKS_CHANGED,
   taskIdOf,
@@ -116,16 +117,17 @@ export function applyToProjects(projects: Project[], spaceId: string, m: SyncMut
   switch (m.type) {
     case 'project.create':
       if (projects.some((p) => p.id === m.payload.id)) return projects;
+      // New projects go first, as the server places them.
       return [
-        ...projects,
         {
           id: m.payload.id,
           spaceId,
           name: m.payload.name,
           color: m.payload.color ?? nextProjectColor(projects.map((p) => p.color)),
-          position: (projects.at(-1)?.position ?? 0) + POSITION_STEP,
+          position: positionBetween(null, projects[0]?.position),
           createdAt: m.at,
         },
+        ...projects,
       ];
     case 'project.update':
       return projects

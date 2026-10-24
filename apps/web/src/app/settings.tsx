@@ -356,7 +356,8 @@ export function SettingsView({
           })),
           onRename: (p, name) => taskStore.updateProject(space.id, p.id, { name }),
           onRecolour: (p, color) => taskStore.updateProject(space.id, p.id, { color }),
-          onCreate: (name, color) => void taskStore.createProject(space.id, name, color),
+          spaceName: space.name,
+          onCreate: (name, color) => taskStore.createProject(space.id, name, color),
           onDelete: (p) => {
             taskStore.deleteProject(space.id, p.id);
             showToast(projectDeletedWords(p.name, p.open), {

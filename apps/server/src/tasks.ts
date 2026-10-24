@@ -14,6 +14,7 @@ import {
   type MeaningMatch,
   nextProjectColor,
   POSITION_STEP,
+  positionBetween,
   rankSearch,
   searchTokens,
   syncMutationSchema,
@@ -1153,7 +1154,8 @@ async function project(tx: Tx, userId: string, m: ProjectMutation): Promise<Appl
     if (existing) return { ...base, projects: false };
     const others = await projectsOf(tx, spaceId);
     const color = m.payload.color ?? nextProjectColor(others.map((p) => p.color));
-    const position = (others.at(-1)?.position ?? 0) + POSITION_STEP;
+    // New projects go first: the list reads newest first in Settings and every picker.
+    const position = positionBetween(null, others[0]?.position);
     await tx.insert(schema.projects).values({
       id: m.payload.id,
       spaceId,
