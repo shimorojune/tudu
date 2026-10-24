@@ -37,6 +37,10 @@ rollover ~30s of slack. It still hit this once (the transient smoke failure on 4
 5. `docs/release.md`: one line in the troubleshooting part: a smoke failure right after deploy with the wait step
    green means the wait is wrong, not the build; re-run failed jobs.
 
+6. `release.yml`, version job: a rehearsal with nothing releasable since the last tag (only `ci`/`docs`/`chore`
+   commits, as on this fix right after 0.38.0) rehearses as the next patch instead of failing, so a pull request that
+   touches the release path is still checked. Real releases still stop with "No release".
+
 Not changing: Playwright `retries: 0` stays (a retry would hide real regressions), and the smoke test itself.
 
 ## Tests
