@@ -363,13 +363,17 @@ test.describe('settings › projects', () => {
     const s = await openProjects(page);
     const rows = list(s).getByRole('listitem');
     await expect(rows).toHaveText(['ErrandsNone open', 'HomeNone open']);
-    // Whole pixels: the Settings dialog may still be settling by a fraction when the first boxes are read.
-    const boxes = async () =>
-      (await Promise.all((await rows.all()).map((r) => r.boundingBox()))).map((b) => [
-        Math.round(b!.x),
-        Math.round(b!.y),
+    // Read once nothing is animating (Settings and the popup both open with a scale), measured against the list, in
+    // whole pixels.
+    const boxes = async () => {
+      await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'));
+      const top = (await list(s).boundingBox())!;
+      return (await Promise.all((await rows.all()).map((r) => r.boundingBox()))).map((b) => [
+        Math.round(b!.x - top.x) || 0,
+        Math.round(b!.y - top.y) || 0,
         Math.round(b!.height),
       ]);
+    };
     const before = await boxes();
     await s.getByRole('button', { name: 'New project' }).click();
     const ed = page.getByRole('dialog', { name: 'New project' });
