@@ -310,7 +310,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn c11_u10_a_check_by_itself_waits_for_the_floor_and_never_runs_beside_another() {
+    fn c11_u11_a_check_by_itself_waits_for_the_floor_and_never_runs_beside_another() {
         let now = SystemTime::now();
         // Never checked: due.
         assert!(auto_due(false, None, now));
@@ -335,7 +335,7 @@ mod tests {
     }
 
     #[test]
-    fn c11_u10_a_jump_of_the_wall_clock_means_the_mac_slept() {
+    fn c11_u11_a_jump_of_the_wall_clock_means_the_mac_slept() {
         let s = Duration::from_secs;
         assert!(!slept(s(30), s(30)));
         assert!(!slept(s(31), s(30)));

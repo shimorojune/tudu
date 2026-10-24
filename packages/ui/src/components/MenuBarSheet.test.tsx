@@ -121,8 +121,8 @@ describe('C20-U03 MenuBarSheet', () => {
   });
 });
 
-describe('C11-U13 MenuBarSheet › updates', () => {
-  it('C11-U13 ⋯ starts with Check for updates…, then Send feedback… and Quit', async () => {
+describe('C11-U14 MenuBarSheet › updates', () => {
+  it('C11-U14 ⋯ starts with Check for updates…, then Send feedback… and Quit', async () => {
     const user = userEvent.setup();
     const onCheck = vi.fn();
     render(<MenuBarSheet state="empty" heading={heading} update={{ onCheck }} />);
@@ -135,7 +135,7 @@ describe('C11-U13 MenuBarSheet › updates', () => {
     expect(onCheck).toHaveBeenCalledOnce();
   });
 
-  it('C11-U13 with a version ready it reads Restart to update, the version as its hint', async () => {
+  it('C11-U14 with a version ready it reads Restart to update, the version as its hint', async () => {
     const user = userEvent.setup();
     const onRestart = vi.fn();
     render(<MenuBarSheet state="empty" heading={heading} update={{ ready: '0.37.1', onRestart }} />);
@@ -147,7 +147,7 @@ describe('C11-U13 MenuBarSheet › updates', () => {
     expect(onRestart).toHaveBeenCalledOnce();
   });
 
-  it('C11-U13 without update (an older app), or signed out, there is no such item', async () => {
+  it('C11-U14 without update (an older app), or signed out, there is no such item', async () => {
     const user = userEvent.setup();
     const { unmount } = render(<MenuBarSheet state="empty" heading={heading} />);
     await user.click(screen.getByRole('button', { name: 'More' }));

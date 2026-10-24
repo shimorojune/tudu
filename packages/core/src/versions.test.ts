@@ -66,9 +66,9 @@ describe('Versions and tracks (chunk 11)', () => {
   });
 });
 
-describe('C11-U14 checkedWords', () => {
+describe('C11-U15 checkedWords', () => {
   const NOW = new Date('2026-10-24T12:00:00Z');
-  it('C11-U14 just now, minutes, hours, days', () => {
+  it('C11-U15 just now, minutes, hours, days', () => {
     expect(checkedWords('2026-10-24T11:59:40Z', NOW)).toBe('Checked just now');
     expect(checkedWords('2026-10-24T12:00:30Z', NOW)).toBe('Checked just now');
     expect(checkedWords('2026-10-24T11:59:00Z', NOW)).toBe('Checked 1 minute ago');

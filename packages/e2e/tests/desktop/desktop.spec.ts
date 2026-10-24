@@ -394,7 +394,7 @@ test.describe('This Mac', () => {
   const updatesRow = (page: Page) => dialog(page).getByRole('region', { name: 'Updates' });
   const updatesButton = (page: Page) => updatesRow(page).getByRole('button');
 
-  test('C11-E10 Updates: up to date; Check now → Checking… → the tick → Check now; one manual check', async ({
+  test('C11-E12 Updates: up to date; Check now → Checking… → the tick → Check now; one manual check', async ({
     page,
   }) => {
     await fixClock(page);
@@ -412,7 +412,7 @@ test.describe('This Mac', () => {
     expect((await calls(page, 'checkUpdate')).map((c) => c.args)).toEqual([[], [true]]);
   });
 
-  test('C11-E11 Check now finds 0.38.0: Downloading fills, then Ready with Restart to update; the Inbox count rises', async ({
+  test('C11-E13 Check now finds 0.38.0: Downloading fills, then Ready with Restart to update; the Inbox count rises', async ({
     page,
   }) => {
     await fixClock(page);
@@ -434,7 +434,7 @@ test.describe('This Mac', () => {
     await expect(updatesRow(page)).toContainText('Couldn’t restart. Quit and open Tudu again to finish.');
   });
 
-  test('C11-E12 Check now failing: the line and Try again, which clears it; an automatic failure shows nothing', async ({
+  test('C11-E14 Check now failing: the line and Try again, which clears it; an automatic failure shows nothing', async ({
     page,
   }) => {
     await fixClock(page);
@@ -458,7 +458,7 @@ test.describe('This Mac', () => {
     await expect(updatesButton(page)).toHaveText('Check now');
   });
 
-  test('C11-E15 an older app (no update_status): This Mac has no Updates section', async ({ page }) => {
+  test('C11-E17 an older app (no update_status): This Mac has no Updates section', async ({ page }) => {
     await fixClock(page);
     await installFake(page, { noStatus: true });
     await signInFresh(page);
@@ -467,7 +467,7 @@ test.describe('This Mac', () => {
     await expect(updatesRow(page)).toHaveCount(0);
   });
 
-  test('C11-E14 dark: Updates up to date, ready and failed', async ({ page }) => {
+  test('C11-E16 dark: Updates up to date, ready and failed', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.addInitScript(() => {
       if (!localStorage.getItem('tudu.theme')) localStorage.setItem('tudu.theme', 'dark');

@@ -433,7 +433,7 @@ describe('C16-U04 Settings › This Mac', () => {
   });
 });
 
-describe('C11-U11 Settings › This Mac › Updates', () => {
+describe('C11-U12 Settings › This Mac › Updates', () => {
   const base = { openAtLogin: 'off' as const, dock: 'open' as const };
   const row = (u: Partial<NonNullable<NonNullable<SettingsProps['mac']>['updates']>>) =>
     settings({
@@ -442,12 +442,12 @@ describe('C11-U11 Settings › This Mac › Updates', () => {
     });
   const button = () => within(screen.getByRole('region', { name: 'Updates' })).getByRole('button');
 
-  it('C11-U11 no updates prop: no section (an app too old to say)', () => {
+  it('C11-U12 no updates prop: no section (an app too old to say)', () => {
     settings({ section: 'mac', mac: base });
     expect(screen.queryByText('Updates')).toBeNull();
   });
 
-  it('C11-U11 each state: the title, the line and the button', () => {
+  it('C11-U12 each state: the title, the line and the button', () => {
     const { rerender } = row({ state: 'loading' });
     const at = (u: object) =>
       rerender(
@@ -488,13 +488,13 @@ describe('C11-U11 Settings › This Mac › Updates', () => {
     expect(button()).toHaveTextContent('Try again');
   });
 
-  it('C11-U11 Tudu Staging: its own name and full version', () => {
+  it('C11-U12 Tudu Staging: its own name and full version', () => {
     row({ name: 'Tudu Staging', current: '0.37.1-staging.10', state: 'never' });
     expect(screen.getByText('Tudu Staging 0.37.1-staging.10')).toBeInTheDocument();
   });
 });
 
-describe('C11-U12 Settings › This Mac › Updates, acting', () => {
+describe('C11-U13 Settings › This Mac › Updates, acting', () => {
   afterEach(() => vi.useRealTimers());
   const base = { openAtLogin: 'off' as const, dock: 'open' as const };
   const view = (u: object) => (
@@ -508,7 +508,7 @@ describe('C11-U12 Settings › This Mac › Updates, acting', () => {
   );
   const button = () => within(screen.getByRole('region', { name: 'Updates' })).getByRole('button');
 
-  it('C11-U12 Check now that finds nothing ends on the tick, then settles back', () => {
+  it('C11-U13 Check now that finds nothing ends on the tick, then settles back', () => {
     vi.useFakeTimers();
     const onCheck = vi.fn();
     const { rerender } = render(view({ onCheck, checked: 'Checked 2 hours ago' }));
@@ -521,13 +521,13 @@ describe('C11-U12 Settings › This Mac › Updates, acting', () => {
     expect(button()).toHaveTextContent('Check now');
   });
 
-  it('C11-U12 a check you did not ask for ends without the tick', () => {
+  it('C11-U13 a check you did not ask for ends without the tick', () => {
     const { rerender } = render(view({ state: 'checking' }));
     rerender(view({ state: 'idle', checked: 'Checked just now' }));
     expect(button()).toHaveTextContent('Check now');
   });
 
-  it('C11-U12 Restart to update calls onRestart; a failed restart says what to do', () => {
+  it('C11-U13 Restart to update calls onRestart; a failed restart says what to do', () => {
     const onRestart = vi.fn();
     const { rerender } = render(view({ state: 'ready', version: '0.37.1', onRestart }));
     fireEvent.click(button());

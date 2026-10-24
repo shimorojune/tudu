@@ -267,7 +267,7 @@ test.describe('menubar', () => {
     }
   });
 
-  test('C11-E13 ⋯ › Check for updates… checks and opens Settings › This Mac on the desk; with a version ready, ⋯ › Restart to update', async ({
+  test('C11-E15 ⋯ › Check for updates… checks and opens Settings › This Mac on the desk; with a version ready, ⋯ › Restart to update', async ({
     page,
   }) => {
     const { m } = await threeToday(page);
@@ -292,7 +292,7 @@ test.describe('menubar', () => {
     expect(await calls(m, 'installUpdate')).toHaveLength(1);
   });
 
-  test('C11-E14 dark: the ⋯ with Check for updates…', async ({ page }) => {
+  test('C11-E16 dark: the ⋯ with Check for updates…', async ({ page }) => {
     await dark(page);
     const { m } = await threeToday(page);
     await expect(m.locator('html')).toHaveClass(/dark/);

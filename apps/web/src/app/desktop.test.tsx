@@ -281,7 +281,7 @@ describe('C11-U06 the chrome and the dock badge', () => {
   });
 });
 
-describe('C11-U14 where the updater stands', () => {
+describe('C11-U15 where the updater stands', () => {
   const APP = { name: 'Tudu', version: '0.37.0' };
   const NOW = new Date('2026-10-24T12:00:00Z');
   const st = (over: Partial<UpdateStatus> = {}): UpdateStatus => ({
@@ -297,7 +297,7 @@ describe('C11-U14 where the updater stands', () => {
     ...over,
   });
 
-  it('C11-U14 the row follows the status; an error shows only after Check now', () => {
+  it('C11-U15 the row follows the status; an error shows only after Check now', () => {
     expect(updatesRow(null, APP, NOW).state).toBe('loading');
     expect(updatesRow(st({ checks: 0, lastCheck: null, lastResult: null }), APP, NOW).state).toBe('never');
     expect(updatesRow(st(), APP, NOW)).toMatchObject({
@@ -335,7 +335,7 @@ describe('C11-U14 where the updater stands', () => {
     ).toBe('ready');
   });
 
-  it('C11-U14 the hook asks once, then follows update:status through a check', async () => {
+  it('C11-U15 the hook asks once, then follows update:status through a check', async () => {
     const f = fake({ update: { version: '0.38.0', notes: '', date: null } });
     const d = desktop()!;
     const { result } = renderHook(() => useUpdateStatus(d));
@@ -357,8 +357,8 @@ describe('C11-U14 where the updater stands', () => {
   });
 });
 
-describe('C11-U15 an older Mac app', () => {
-  it('C11-U15 no update_status: not supported, so no Check now; checks still answer', async () => {
+describe('C11-U16 an older Mac app', () => {
+  it('C11-U16 no update_status: not supported, so no Check now; checks still answer', async () => {
     fake({ noStatus: true, update: { version: '0.38.0', notes: '', date: null } });
     const d = desktop()!;
     const { result } = renderHook(() => useUpdateStatus(d));
@@ -367,7 +367,7 @@ describe('C11-U15 an older Mac app', () => {
     expect(await d.checkUpdate()).toMatchObject({ version: '0.38.0' });
   });
 
-  it('C11-U15 the real bridge answers null when the app refuses the command', async () => {
+  it('C11-U16 the real bridge answers null when the app refuses the command', async () => {
     window.__TAURI_INTERNALS__ = {
       invoke: (cmd: string) =>
         cmd === 'update_status'
@@ -378,7 +378,7 @@ describe('C11-U15 an older Mac app', () => {
     expect(await desktop()!.updateStatus()).toBeNull();
   });
 
-  it('C11-U15 on the web there is no bridge and nothing to say', () => {
+  it('C11-U16 on the web there is no bridge and nothing to say', () => {
     const { result } = renderHook(() => useUpdateStatus(null));
     expect(result.current).toEqual({ supported: false, status: null });
   });

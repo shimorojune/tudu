@@ -64,7 +64,7 @@ describe('C16-U05 Settings › This Mac and the bridge', () => {
     act(() => result.current!.onLoginItems!());
     act(() => result.current!.onDock!('always'));
     expect(result.current?.dock).toBe('always');
-    // Settings › This Mac also asks where updates stand (C11-U14).
+    // Settings › This Mac also asks where updates stand (C11-U15).
     expect(f.calls.map((c) => c.name)).toEqual([
       'updateStatus',
       'thisMac',

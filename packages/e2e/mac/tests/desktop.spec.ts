@@ -242,7 +242,7 @@ test.describe('desktop', () => {
     await app.until(`return !!T.all('textbox', 'Task title')[0]`, 'floating');
   });
 
-  test('C11-D13 regression (24 Oct): a version published while the app runs shows once the desk comes back, no relaunch', async ({
+  test('C11-D14 regression (24 Oct): a version published while the app runs shows once the desk comes back, no relaunch', async ({
     app,
   }) => {
     const next = run().next.version;
@@ -261,7 +261,7 @@ test.describe('desktop', () => {
     await expect.poll(() => inboxPip(app)).toBe(1);
   });
 
-  test('C11-D14 the floor: coming to the front within 30 minutes asks nothing; a wake past it checks once', async ({
+  test('C11-D15 the floor: coming to the front within 30 minutes asks nothing; a wake past it checks once', async ({
     app,
   }) => {
     const first = await app.waitState((x) => x.updater.lastResult === 'none' && !x.updater.checking);
@@ -278,7 +278,7 @@ test.describe('desktop', () => {
     expect((await app.state()).updater.checks).toBe(first.updater.checks + 1);
   });
 
-  test('C11-D15 Settings › This Mac › Check now on the real app: Downloading, Ready, then Restart to update relaunches on it', async ({
+  test('C11-D16 Settings › This Mac › Check now on the real app: Downloading, Ready, then Restart to update relaunches on it', async ({
     app,
   }) => {
     const next = run().next.version;

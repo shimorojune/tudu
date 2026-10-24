@@ -110,38 +110,38 @@ checks from every Mac are cheap.
 
 ## Test scenarios
 
-IDs continue chunk 11's series in `docs/tests/chunk-11.md`: U10, E10, D13. There are no API cases, since the
+IDs continue chunk 11's series in `docs/tests/chunk-11.md`: U11, E12, D14 (PR #11 took U10, E10, E11 and D13 for the version in Settings). There are no API cases, since the
 server doesn't change. Each ID goes in its test's name so `pnpm test:status` finds it.
 
 ### Unit (vitest, cargo)
 
 | ID      | Where                        | Case                                                                                                                                                           |
 | ------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C11-U10 | desktop `updates.rs` (cargo) | `auto_check` gate: skips while a check runs; skips when the last check finished under 30 min ago; runs at 30 min and with no check yet                         |
-| C11-U11 | ui `Settings.test.tsx`       | Updates row, each state in the table: title, status line, button variant/label; loading skeleton with Check now disabled; no `updates` prop draws no section   |
-| C11-U12 | ui `Settings.test.tsx`       | Check now calls `onCheck`; nothing found shows the tick and "Up to date", then Check now again; Restart calls `onRestart`; `restartError` shows its line       |
-| C11-U13 | ui `MenuBarSheet.test.tsx`   | With `update`, ⋯ lists Check for updates… first, then Send feedback…, Quit; with `ready` it reads Restart to update with the version hint; without it, no item |
-| C11-U14 | web `desktop.test.tsx`, core | `update:status` drives the store; an automatic check's error never sets the error line; a manual one does; a later success clears it                           |
-| C11-U15 | web `desktop.test.tsx`       | Old app: `updateStatus()` rejects (no command), so Settings has no Updates section and the sheet has no item; the Inbox update item still works                |
+| C11-U11 | desktop `updates.rs` (cargo) | `auto_check` gate: skips while a check runs; skips when the last check finished under 30 min ago; runs at 30 min and with no check yet                         |
+| C11-U12 | ui `Settings.test.tsx`       | Updates row, each state in the table: title, status line, button variant/label; loading skeleton with Check now disabled; no `updates` prop draws no section   |
+| C11-U13 | ui `Settings.test.tsx`       | Check now calls `onCheck`; nothing found shows the tick and "Up to date", then Check now again; Restart calls `onRestart`; `restartError` shows its line       |
+| C11-U14 | ui `MenuBarSheet.test.tsx`   | With `update`, ⋯ lists Check for updates… first, then Send feedback…, Quit; with `ready` it reads Restart to update with the version hint; without it, no item |
+| C11-U15 | web `desktop.test.tsx`, core | `update:status` drives the store; an automatic check's error never sets the error line; a manual one does; a later success clears it                           |
+| C11-U16 | web `desktop.test.tsx`       | Old app: `updateStatus()` rejects (no command), so Settings has no Updates section and the sheet has no item; the Inbox update item still works                |
 
 ### End to end, web against the app fake (`packages/e2e/tests/desktop`)
 
 | ID      | Case                                                                                                                                                                 |
 | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C11-E10 | Settings › This Mac shows "Tudu 0.37.0 · Up to date. Checked …"; Check now → Checking… → nothing new → the tick → Check now; the fake saw one manual check           |
-| C11-E11 | Check now finds 0.38.0: Downloading with the fill growing as the fake sends progress, then Ready with Restart to update; the top-bar Inbox count rises by one        |
-| C11-E12 | Check now with the fake failing: the error line and Try again; Try again succeeds and the line clears. An automatic failure while open shows nothing                 |
-| C11-E13 | Menu bar sheet: ⋯ › Check for updates… asks the app to show the desk on Settings › This Mac and a check starts; with a version ready, ⋯ › Restart to update installs |
-| C11-E14 | Dark: the Updates section in Up to date, Ready and Error, and the ⋯ menu, in dark                                                                                    |
-| C11-E15 | Added while building: an older app (no `update_status`) has no Updates section in This Mac                                                                           |
+| C11-E12 | Settings › This Mac shows "Tudu 0.37.0 · Up to date. Checked …"; Check now → Checking… → nothing new → the tick → Check now; the fake saw one manual check           |
+| C11-E13 | Check now finds 0.38.0: Downloading with the fill growing as the fake sends progress, then Ready with Restart to update; the top-bar Inbox count rises by one        |
+| C11-E14 | Check now with the fake failing: the error line and Try again; Try again succeeds and the line clears. An automatic failure while open shows nothing                 |
+| C11-E15 | Menu bar sheet: ⋯ › Check for updates… asks the app to show the desk on Settings › This Mac and a check starts; with a version ready, ⋯ › Restart to update installs |
+| C11-E16 | Dark: the Updates section in Up to date, Ready and Error, and the ⋯ menu, in dark                                                                                    |
+| C11-E17 | Added while building: an older app (no `update_status`) has no Updates section in This Mac                                                                           |
 
 ### Real app (`pnpm e2e:mac`, Tudu Test)
 
 | ID      | Case                                                                                                                                                                                                                            |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C11-D13 | Regression for 24 Oct: launch with no release (check: none), publish the next version, focus the desk with the last check over 30 min old (`age-check 31`), and the version downloads and the Inbox item shows with no relaunch |
-| C11-D14 | The floor: focus again within 30 min, and no check (the count stays); a `wake` past 30 min checks once                                                                                                                          |
-| C11-D15 | Settings › This Mac › Check now on the real app finds the next version, shows Downloading then Ready; Restart to update relaunches on it (as C11-D07)                                                                           |
+| C11-D14 | Regression for 24 Oct: launch with no release (check: none), publish the next version, focus the desk with the last check over 30 min old (`age-check 31`), and the version downloads and the Inbox item shows with no relaunch |
+| C11-D15 | The floor: focus again within 30 min, and no check (the count stays); a `wake` past 30 min checks once                                                                                                                          |
+| C11-D16 | Settings › This Mac › Check now on the real app finds the next version, shows Downloading then Ready; Restart to update relaunches on it (as C11-D07)                                                                           |
 
 The existing C11-U04, C11-E02/E03 and C11-D06 to D08 keep their IDs, unchanged.
 
