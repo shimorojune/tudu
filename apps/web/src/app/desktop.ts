@@ -258,7 +258,8 @@ function tauriBridge(t: NonNullable<Window['__TAURI_INTERNALS__']>): DesktopBrid
     summon: () => quiet(invoke('summon')),
     hideMenubar: () => quiet(invoke('hide_menubar')),
     quit: () => quiet(invoke('quit')),
-    checkUpdate: (manual) => invoke<UpdateReady | null>('update_check', { manual: !!manual }),
+    // Not asked for: the page's own check, which keeps to the app's 30-minute floor (an older app ignores `auto`).
+    checkUpdate: (manual) => invoke<UpdateReady | null>('update_check', { manual: !!manual, auto: !manual }),
     // An app before this command refuses it: no Check now there.
     updateStatus: () => invoke<UpdateStatus>('update_status').catch(() => null),
     installUpdate: () => invoke('update_install'),

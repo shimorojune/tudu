@@ -65,6 +65,8 @@ too. It doesn't apply, since chunk 16 already turns that throttling off with `ke
   - `update_check` takes an optional `{ manual: bool }`, which defaults to false so today's callers are
     unchanged, and still answers `Option<Ready>`.
   - New command `update_status` answers the current `Status`.
+  - (Added while building: the page's own check, on load and every four hours, passes `auto` and keeps to the
+    floor too. The desk's webview loads again each time it is reopened, so without this every reopen checked.)
   - New `auto_check(app)`: does nothing if a check is running or `last_check` is under 30 minutes old;
     otherwise it spawns `update_check`.
 - **`lib.rs`**: `WindowEvent::Focused(true)` on any of the three windows calls `auto_check`.

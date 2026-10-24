@@ -130,14 +130,45 @@ fn ready_before(app: &AppHandle) -> Option<Ready> {
 /// Check the feed, and download a newer version straight away. Answers the version that is ready to install,
 /// if any. Never two at once: a check asked for while one runs waits its turn, then asks the feed again. A check or
 /// download that fails answers what was ready before it (the failure is kept in the status and tried again at the
-/// next check). `manual`: asked for with Check now, so the page may show its error.
+/// next check). `manual`: asked for with Check now, so the page may show its error. `auto`: the page's own check (on
+/// load and every four hours), which keeps to the floor as focus and wake do: a desk reopened within 30 minutes of a
+/// check asks nothing and answers what is ready.
 #[tauri::command]
-pub async fn update_check(app: AppHandle, manual: Option<bool>) -> Result<Option<Ready>, String> {
-    change(&app, |s| {
-        s.pending += 1;
-        s.checking = true;
-    });
+pub async fn update_check(
+    app: AppHandle,
+    manual: Option<bool>,
+    auto: Option<bool>,
+) -> Result<Option<Ready>, String> {
+    if auto == Some(true) {
+        if !claim(&app) {
+            return Ok(ready_before(&app));
+        }
+    } else {
+        change(&app, |s| {
+            s.pending += 1;
+            s.checking = true;
+        });
+    }
     run(app, manual.unwrap_or(false)).await
+}
+
+/// Counts a check by itself in if it is due, decided and counted under one lock, so a burst of focus changes (or a
+/// focus and a page load together) starts one check.
+fn claim(app: &AppHandle) -> bool {
+    let snap = app.state::<Updates>().0.lock().ok().and_then(|mut s| {
+        auto_due(s.checking, s.finished, SystemTime::now()).then(|| {
+            s.pending += 1;
+            s.checking = true;
+            s.clone()
+        })
+    });
+    match snap {
+        Some(snap) => {
+            let _ = app.emit("update:status", &snap);
+            true
+        }
+        None => false,
+    }
 }
 
 /// One check, counted in `pending` by whoever started it.
@@ -245,17 +276,8 @@ pub fn update_status(state: State<'_, Updates>) -> Result<Status, String> {
 /// A check by itself, when a window comes to the front or the Mac wakes: only past the floor, never beside another.
 /// Answers whether one started.
 pub fn auto_check(app: &AppHandle) -> bool {
-    // Decided and counted under one lock, so a burst of focus changes starts one check.
-    let snap = app.state::<Updates>().0.lock().ok().and_then(|mut s| {
-        auto_due(s.checking, s.finished, SystemTime::now()).then(|| {
-            s.pending += 1;
-            s.checking = true;
-            s.clone()
-        })
-    });
-    let due = snap.is_some();
-    if let Some(snap) = snap {
-        let _ = app.emit("update:status", &snap);
+    let due = claim(app);
+    if due {
         let a = app.clone();
         tauri::async_runtime::spawn(async move {
             let _ = run(a, false).await;

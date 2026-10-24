@@ -334,7 +334,7 @@ fn act(app: &AppHandle, input: &Value) -> (u16, Value) {
             if input.get("auto").and_then(Value::as_bool) == Some(true) {
                 return (200, json!({ "started": updates::auto_check(app) }));
             }
-            let r = tauri::async_runtime::block_on(updates::update_check(app.clone(), None));
+            let r = tauri::async_runtime::block_on(updates::update_check(app.clone(), None, None));
             (200, json!({ "ready": r.ok().flatten() }))
         }
         "wake" => {
