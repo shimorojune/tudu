@@ -1,3 +1,14 @@
+## [0.38.0](https://github.com/shimorojune/tudu/compare/tudu-0.37.0...tudu-0.38.0) (2026-10-24)
+
+### Features
+
+* **desktop:** bare ink tick in the menu bar, kept visible when the bar is full ([70a4a2a](https://github.com/shimorojune/tudu/commit/70a4a2a5e1a364ea449bb01c7db99c1ae6e0944f))
+* **inbox:** one Inbox across every space on the server ([2913713](https://github.com/shimorojune/tudu/commit/2913713fd7d289cae95baaf0a3dfb8ea13dc8a30))
+* **projects:** New project as a popup, newest first, same-name check ([17f4585](https://github.com/shimorojune/tudu/commit/17f4585228c4f965887f7e67a9d3df7ef42b0256))
+* **settings:** the version at the foot of Settings, linked to its release ([583b6ab](https://github.com/shimorojune/tudu/commit/583b6ab5f44e73c130d419a473dbd5f79897c989))
+* **ui:** top-bar Inbox, space filter, row actions and neutral unread rows ([06a3a47](https://github.com/shimorojune/tudu/commit/06a3a47426ac59d6b2daba5cfdcacb4ac33c3a45))
+* **web:** one Inbox at /inbox, opened from the top bar ([0ee00e2](https://github.com/shimorojune/tudu/commit/0ee00e26c4b6ab54fc97fd500797cff95859e901))
+
 ## [0.37.0](https://github.com/shimorojune/tudu/compare/tudu-0.36.0...tudu-0.37.0) (2026-10-23)
 
 ### Features
