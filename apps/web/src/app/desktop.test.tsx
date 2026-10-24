@@ -5,7 +5,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { switchSpaces } from './AppShell';
 import { desktop, resetDesktop, type DesktopFake } from './desktop';
 import { interceptLinks, linkKind, openOutside } from './links';
-import { appEntry, inboxTotal, CHECK_EVERY_MS, restartToUpdate, startUpdates, UpdateStore } from './updates';
+import {
+  appEntry,
+  CHECK_FAILED,
+  inboxTotal,
+  CHECK_EVERY_MS,
+  restartToUpdate,
+  startUpdates,
+  updatesRow,
+  UpdateStore,
+  useUpdateStatus,
+} from './updates';
+import { renderHook, waitFor } from '@testing-library/react';
+import type { UpdateStatus } from './desktop';
 
 vi.mock('@tudu/ui', async (orig) => ({ ...(await orig<Record<string, unknown>>()), showToast: vi.fn() }));
 
@@ -266,5 +278,108 @@ describe('C11-U06 the chrome and the dock badge', () => {
     expect(inboxTotal({ spaces: [space('me', 'personal'), space('nw', 'team')] }, false)).toBe(0);
     // The switcher keeps each space's own count, without the version.
     expect(switchSpaces(spaces).map((s) => s.count)).toEqual([undefined, 3, 1]);
+  });
+});
+
+describe('C11-U14 where the updater stands', () => {
+  const APP = { name: 'Tudu', version: '0.37.0' };
+  const NOW = new Date('2026-10-24T12:00:00Z');
+  const st = (over: Partial<UpdateStatus> = {}): UpdateStatus => ({
+    checks: 1,
+    lastCheck: '2026-10-24T11:48:00Z',
+    lastResult: 'none',
+    lastManual: false,
+    ready: null,
+    error: null,
+    downloads: 0,
+    checking: false,
+    downloading: null,
+    ...over,
+  });
+
+  it('C11-U14 the row follows the status; an error shows only after Check now', () => {
+    expect(updatesRow(null, APP, NOW).state).toBe('loading');
+    expect(updatesRow(st({ checks: 0, lastCheck: null, lastResult: null }), APP, NOW).state).toBe('never');
+    expect(updatesRow(st(), APP, NOW)).toMatchObject({
+      state: 'idle',
+      checked: 'Checked 12 minutes ago',
+      name: 'Tudu',
+      current: '0.37.0',
+    });
+    expect(updatesRow(st({ checking: true }), APP, NOW).state).toBe('checking');
+    expect(
+      updatesRow(
+        st({ checking: true, downloading: { version: '0.38.0', received: 250, total: 1000 } }),
+        APP,
+        NOW,
+      ),
+    ).toMatchObject({ state: 'downloading', version: '0.38.0', progress: 0.25 });
+    expect(
+      updatesRow(st({ ready: { version: '0.38.0', notes: '', date: null }, lastResult: 'ready' }), APP, NOW),
+    ).toMatchObject({ state: 'ready', version: '0.38.0' });
+    // An automatic check's failure leaves the row as it was; Check now's shows.
+    expect(updatesRow(st({ lastResult: 'error', error: 'down' }), APP, NOW).state).toBe('idle');
+    expect(updatesRow(st({ lastResult: 'error', error: 'down', lastManual: true }), APP, NOW)).toMatchObject({
+      state: 'error',
+      error: CHECK_FAILED,
+    });
+    // A later success clears it.
+    expect(updatesRow(st({ lastManual: true }), APP, NOW).state).toBe('idle');
+    // A version ready stays ready through a failed Check now.
+    expect(
+      updatesRow(
+        st({ ready: { version: '0.38.0', notes: '', date: null }, lastResult: 'error', lastManual: true }),
+        APP,
+        NOW,
+      ).state,
+    ).toBe('ready');
+  });
+
+  it('C11-U14 the hook asks once, then follows update:status through a check', async () => {
+    const f = fake({ update: { version: '0.38.0', notes: '', date: null } });
+    const d = desktop()!;
+    const { result } = renderHook(() => useUpdateStatus(d));
+    await waitFor(() => expect(result.current.supported).toBe(true));
+    expect(result.current.status?.checks).toBe(0);
+    const seen: string[] = [];
+    d.on('update:status', (s) => {
+      const x = s as UpdateStatus;
+      seen.push(x.downloading ? 'downloading' : x.checking ? 'checking' : (x.lastResult ?? ''));
+    });
+    await act(async () => {
+      await d.checkUpdate(true);
+    });
+    expect(seen[0]).toBe('checking');
+    expect(seen).toContain('downloading');
+    expect(seen.at(-1)).toBe('ready');
+    expect(result.current.status).toMatchObject({ lastResult: 'ready', lastManual: true, checks: 1 });
+    expect(f.calls).toContainEqual({ name: 'checkUpdate', args: [true] });
+  });
+});
+
+describe('C11-U15 an older Mac app', () => {
+  it('C11-U15 no update_status: not supported, so no Check now; checks still answer', async () => {
+    fake({ noStatus: true, update: { version: '0.38.0', notes: '', date: null } });
+    const d = desktop()!;
+    const { result } = renderHook(() => useUpdateStatus(d));
+    await waitFor(() => expect(result.current.supported).toBe(false));
+    expect(result.current.status).toBeNull();
+    expect(await d.checkUpdate()).toMatchObject({ version: '0.38.0' });
+  });
+
+  it('C11-U15 the real bridge answers null when the app refuses the command', async () => {
+    window.__TAURI_INTERNALS__ = {
+      invoke: (cmd: string) =>
+        cmd === 'update_status'
+          ? Promise.reject(new Error('command update_status not found'))
+          : Promise.resolve(null),
+    };
+    resetDesktop();
+    expect(await desktop()!.updateStatus()).toBeNull();
+  });
+
+  it('C11-U15 on the web there is no bridge and nothing to say', () => {
+    const { result } = renderHook(() => useUpdateStatus(null));
+    expect(result.current).toEqual({ supported: false, status: null });
   });
 });

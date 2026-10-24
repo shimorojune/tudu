@@ -12,6 +12,21 @@ export interface UpdateReady {
   date: string | null;
 }
 
+/** Where the app's updater stands (`update_status`, and the `update:status` event on every change). */
+export interface UpdateStatus {
+  checks: number;
+  /** When the last check finished. */
+  lastCheck: string | null;
+  lastResult: 'none' | 'ready' | 'error' | null;
+  /** The last check was Check now's: only then does its error show. */
+  lastManual: boolean;
+  ready: UpdateReady | null;
+  error: string | null;
+  downloads: number;
+  checking: boolean;
+  downloading: { version: string; received: number; total: number | null } | null;
+}
+
 export interface AppInfo {
   track: Track;
   name: string;
@@ -52,8 +67,13 @@ export interface DesktopBridge {
   summon(): void;
   hideMenubar(): void;
   quit(): void;
-  /** Checks the feed; a newer version is downloaded and verified before it is answered. */
-  checkUpdate(): Promise<UpdateReady | null>;
+  /**
+   * Checks the feed; a newer version is downloaded and verified before it is answered. `manual`: Check now, so a
+   * failure shows.
+   */
+  checkUpdate(manual?: boolean): Promise<UpdateReady | null>;
+  /** Where the updater stands; null from an app too old to say (no Check now there). */
+  updateStatus(): Promise<UpdateStatus | null>;
   /** Installs the downloaded version and relaunches; fails when it could not. */
   installUpdate(): Promise<void>;
   /** Settings › This Mac as it stands, read fresh from macOS. */
@@ -65,16 +85,19 @@ export interface DesktopBridge {
   setDock(mode: DockMode): void;
   /**
    * `go` (the desk is asked to show a page, or `feedback` for the form), `floating:shown` (the summon),
-   * `menubar:shown` and `menubar:hidden` (the tick's click, and the sheet put away), and `update:ready` (a check,
-   * whoever asked for it, downloaded a newer version).
+   * `menubar:shown` and `menubar:hidden` (the tick's click, and the sheet put away), `update:ready` (a check,
+   * whoever asked for it, downloaded a newer version) and `update:status` (the updater's state changed).
    */
   on(event: DesktopEvent, fn: (payload: unknown) => void): () => void;
 }
 
-export type DesktopEvent = 'go' | 'floating:shown' | 'menubar:shown' | 'menubar:hidden' | 'update:ready';
+export type DesktopEvent =
+  'go' | 'floating:shown' | 'menubar:shown' | 'menubar:hidden' | 'update:ready' | 'update:status';
 
 /** What the sheet asks the desk to show for Send feedback, in place of a page. */
 export const FEEDBACK_GO = 'feedback';
+/** What the sheet's ⋯ › Check for updates… asks the desk to show: Settings › This Mac over the page it is on. */
+export const UPDATES_GO = 'updates';
 
 /** What a test installs to stand in for the app; every call is recorded in `calls`. */
 export interface DesktopFake {
@@ -84,6 +107,12 @@ export interface DesktopFake {
   update?: UpdateReady | null;
   failCheck?: boolean;
   refuseRestart?: boolean;
+  /** An app older than update_status: no Check now. */
+  noStatus?: boolean;
+  /** A check's steps (checking, each download step, the end) this far apart, so a test sees them; 0 by default. */
+  stepMs?: number;
+  /** The updater as the fake app has it; checks keep it. */
+  status?: Partial<UpdateStatus>;
   /** Settings › This Mac as the fake app has it; the switch answers `loginAnswer` when set. */
   thisMac?: Partial<ThisMac>;
   loginAnswer?: LoginState;
@@ -103,6 +132,21 @@ declare global {
     };
     __tuduDesktopFake?: DesktopFake;
   }
+}
+
+function fakeStatus(f: DesktopFake): UpdateStatus {
+  return {
+    checks: 0,
+    lastCheck: null,
+    lastResult: null,
+    lastManual: false,
+    ready: null,
+    error: null,
+    downloads: 0,
+    checking: false,
+    downloading: null,
+    ...f.status,
+  };
 }
 
 function fakeBridge(f: DesktopFake): DesktopBridge {
@@ -127,10 +171,42 @@ function fakeBridge(f: DesktopFake): DesktopBridge {
     summon: () => call('summon'),
     hideMenubar: () => call('hideMenubar'),
     quit: () => call('quit'),
-    checkUpdate: async () => {
-      call('checkUpdate');
-      if (f.failCheck) throw new Error('The feed could not be reached.');
-      return f.update ?? null;
+    checkUpdate: async (manual) => {
+      call('checkUpdate', ...(manual ? [true] : []));
+      // A fake app old or new: the status steps through as the real one's do, then the answer.
+      const step = (s: Partial<UpdateStatus>) => {
+        f.status = { ...fakeStatus(f), ...s };
+        for (const l of f.listeners!['update:status'] ?? []) l(f.status);
+      };
+      const wait = () => new Promise((r) => setTimeout(r, f.stepMs ?? 0));
+      const end = (s: Partial<UpdateStatus>) =>
+        step({
+          ...s,
+          checking: false,
+          downloading: null,
+          lastManual: !!manual,
+          checks: fakeStatus(f).checks + 1,
+          lastCheck: new Date().toISOString(),
+        });
+      if (!f.noStatus) step({ checking: true });
+      await wait();
+      if (f.failCheck) {
+        if (!f.noStatus) end({ lastResult: 'error', error: 'The feed could not be reached.' });
+        throw new Error('The feed could not be reached.');
+      }
+      const u = f.update ?? null;
+      if (u && !f.noStatus && fakeStatus(f).ready?.version !== u.version)
+        for (const received of [0, 0.25, 0.5, 0.75, 1]) {
+          step({ downloading: { version: u.version, received: received * 1000, total: 1000 } });
+          await wait();
+        }
+      if (!f.noStatus)
+        end(u ? { lastResult: 'ready', ready: u, error: null } : { lastResult: 'none', error: null });
+      return u;
+    },
+    updateStatus: async () => {
+      call('updateStatus');
+      return f.noStatus ? null : fakeStatus(f);
     },
     installUpdate: async () => {
       call('installUpdate');
@@ -182,7 +258,9 @@ function tauriBridge(t: NonNullable<Window['__TAURI_INTERNALS__']>): DesktopBrid
     summon: () => quiet(invoke('summon')),
     hideMenubar: () => quiet(invoke('hide_menubar')),
     quit: () => quiet(invoke('quit')),
-    checkUpdate: () => invoke<UpdateReady | null>('update_check'),
+    checkUpdate: (manual) => invoke<UpdateReady | null>('update_check', { manual: !!manual }),
+    // An app before this command refuses it: no Check now there.
+    updateStatus: () => invoke<UpdateStatus>('update_status').catch(() => null),
     installUpdate: () => invoke('update_install'),
     thisMac: () => invoke<ThisMac>('this_mac'),
     setOpenAtLogin: (on) => invoke<LoginState>('set_open_at_login', { on }),

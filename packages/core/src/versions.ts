@@ -72,6 +72,17 @@ export function readyText(version: string): string {
   return `is ready: version ${version}`;
 }
 
+/** Settings › This Mac › Updates: "Checked just now", "Checked 12 minutes ago", "Checked 3 hours ago", "Checked 2 days ago". */
+export function checkedWords(at: string, now: Date): string {
+  const mins = Math.floor((now.getTime() - new Date(at).getTime()) / 60_000);
+  if (!(mins >= 1)) return 'Checked just now';
+  if (mins < 60) return `Checked ${mins} minute${mins === 1 ? '' : 's'} ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `Checked ${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hours / 24);
+  return `Checked ${days} day${days === 1 ? '' : 's'} ago`;
+}
+
 /** "Tudu is ready: version 0.38.0". */
 export function readyWords(version: string, name = 'Tudu'): string {
   return `${name} ${readyText(version)}`;

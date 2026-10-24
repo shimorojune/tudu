@@ -8,7 +8,8 @@
 //!   App Nap opt-out and each webview's inactive scheduling policy; and the tick's place as macOS keeps it (its
 //!   autosave name and saved position) and whether it is hidden.
 //! - `POST /act {"do": …}`: what a person does outside the page: `summon`, `tray` (a click on the tick, with
-//!   `button`: left or right), `reopen` (the dock icon), `close` (with `window`), `check-update`, `quit`,
+//!   `button`: left or right), `reopen` (the dock icon), `close` (with `window`), `check-update` (`auto`: only past
+//!   the floor, as focus would), `wake`, `age-check` (with `minutes`), `quit`,
 //!   `tick` (with `hidden`: true or false says macOS hides or shows the tick, null hands the answer back to macOS).
 //! - `POST /eval {"window", "script"}`: runs the script (an async function body) in that window's WKWebView and
 //!   answers its result, so the tests drive the real page.
@@ -329,8 +330,25 @@ fn act(app: &AppHandle, input: &Value) -> (u16, Value) {
             (200, json!({ "ok": true }))
         }
         "check-update" => {
-            let r = tauri::async_runtime::block_on(updates::update_check(app.clone()));
+            // `auto`: as a window coming to the front would, so only past the floor; else a check now.
+            if input.get("auto").and_then(Value::as_bool) == Some(true) {
+                return (200, json!({ "started": updates::auto_check(app) }));
+            }
+            let r = tauri::async_runtime::block_on(updates::update_check(app.clone(), None));
             (200, json!({ "ready": r.ok().flatten() }))
+        }
+        "wake" => {
+            updates::woke(app);
+            (200, json!({ "ok": true }))
+        }
+        "age-check" => {
+            // Moves the last check back this many minutes, so the floor is tested without waiting.
+            let minutes = input.get("minutes").and_then(Value::as_u64).unwrap_or(0);
+            if let Ok(mut s) = app.state::<updates::Updates>().0.lock() {
+                let back = Duration::from_secs(minutes * 60);
+                s.finished = Some(s.finished.unwrap_or_else(std::time::SystemTime::now) - back);
+            }
+            (200, json!({ "ok": true }))
         }
         "quit" => {
             let a = app.clone();

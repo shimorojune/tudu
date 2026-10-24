@@ -10,6 +10,7 @@ import {
   setFake,
   signInHere,
   teamOfTwo,
+  updaterSays,
 } from '../../fixtures/desktop';
 import { goInbox, pane, rows, section, sendRequest, inboxPip } from '../../fixtures/inbox';
 import { connectByApi, issueRow, JIRA_SITE, openJira } from '../../fixtures/jira';
@@ -388,5 +389,99 @@ test.describe('This Mac', () => {
         .getByRole('group', { name: 'Show Tudu in the Dock' })
         .getByRole('button', { name: 'Always' }),
     ).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  const updatesRow = (page: Page) => dialog(page).getByRole('region', { name: 'Updates' });
+  const updatesButton = (page: Page) => updatesRow(page).getByRole('button');
+
+  test('C11-E10 Updates: up to date; Check now → Checking… → the tick → Check now; one manual check', async ({
+    page,
+  }) => {
+    await fixClock(page);
+    await installFake(page, { stepMs: 400 });
+    await signInFresh(page);
+    await openThisMac(page);
+    await expect(updatesRow(page)).toContainText('Tudu 0.37.0');
+    await expect(updatesRow(page)).toContainText(/Up to date\. Checked just now\./);
+    await updatesButton(page).click();
+    await expect(updatesRow(page)).toContainText('Looking for a new version…');
+    await expect(updatesButton(page)).toContainText('Checking…');
+    await expect(updatesButton(page)).toContainText('Up to date');
+    await expect(updatesButton(page)).toHaveText('Check now');
+    // The launch check, then Check now's.
+    expect((await calls(page, 'checkUpdate')).map((c) => c.args)).toEqual([[], [true]]);
+  });
+
+  test('C11-E11 Check now finds 0.38.0: Downloading fills, then Ready with Restart to update; the Inbox count rises', async ({
+    page,
+  }) => {
+    await fixClock(page);
+    await installFake(page, { stepMs: 300 });
+    await signInFresh(page);
+    await openThisMac(page);
+    await expect(updatesRow(page)).toContainText('Up to date.');
+    await setFake(page, { update: READY });
+    await updatesButton(page).click();
+    await expect(updatesRow(page)).toContainText('Downloading Tudu 0.38.0…');
+    await expect(updatesButton(page)).toContainText('%');
+    await expect(updatesRow(page)).toContainText('Tudu 0.38.0 is ready. Restart to use it.');
+    await expect(updatesButton(page)).toHaveText('Restart to update');
+    await expect.poll(() => inboxPip(page)).toBe(1);
+    await updatesButton(page).click();
+    expect(await calls(page, 'installUpdate')).toHaveLength(1);
+    await setFake(page, { refuseRestart: true });
+    await updatesButton(page).click();
+    await expect(updatesRow(page)).toContainText('Couldn’t restart. Quit and open Tudu again to finish.');
+  });
+
+  test('C11-E12 Check now failing: the line and Try again, which clears it; an automatic failure shows nothing', async ({
+    page,
+  }) => {
+    await fixClock(page);
+    await installFake(page);
+    await signInFresh(page);
+    await openThisMac(page);
+    await expect(updatesRow(page)).toContainText('Up to date.');
+    await setFake(page, { failCheck: true });
+    await updatesButton(page).click();
+    await expect(updatesRow(page).locator('.tp-set-bad')).toHaveText(
+      'Couldn’t check for updates. Check your connection and try again.',
+    );
+    await expect(updatesButton(page)).toHaveText('Try again');
+    await setFake(page, { failCheck: false });
+    await updatesButton(page).click();
+    await expect(updatesRow(page).locator('.tp-set-bad')).toHaveCount(0);
+    await expect(updatesRow(page)).toContainText('Up to date.');
+    // A check the app made by itself (focus, wake) fails: the row stays as it was.
+    await updaterSays(page, { lastResult: 'error', error: 'down', lastManual: false });
+    await expect(updatesRow(page).locator('.tp-set-bad')).toHaveCount(0);
+    await expect(updatesButton(page)).toHaveText('Check now');
+  });
+
+  test('C11-E15 an older app (no update_status): This Mac has no Updates section', async ({ page }) => {
+    await fixClock(page);
+    await installFake(page, { noStatus: true });
+    await signInFresh(page);
+    await openThisMac(page);
+    await expect(dialog(page).getByText('Show Tudu in the Dock')).toBeVisible();
+    await expect(updatesRow(page)).toHaveCount(0);
+  });
+
+  test('C11-E14 dark: Updates up to date, ready and failed', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.addInitScript(() => {
+      if (!localStorage.getItem('tudu.theme')) localStorage.setItem('tudu.theme', 'dark');
+    });
+    await fixClock(page);
+    await installFake(page);
+    await signInFresh(page);
+    await openThisMac(page);
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await expect(updatesRow(page)).toContainText('Up to date.');
+    await updaterSays(page, { lastResult: 'error', lastManual: true, error: 'down' });
+    await expect(updatesRow(page).locator('.tp-set-bad')).toBeVisible();
+    await updaterSays(page, { lastResult: 'ready', ready: READY, error: null });
+    await expect(updatesButton(page)).toHaveText('Restart to update');
+    await expect(updatesButton(page)).toHaveClass(/tp-btn-primary/);
   });
 });

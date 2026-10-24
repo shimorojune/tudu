@@ -253,7 +253,10 @@ export {
   type SettingsMac,
   type SettingsLogin,
   type SettingsDock,
+  type SettingsUpdates,
+  type SettingsUpdateState,
   type SettingsSectionName,
+  UP_TO_DATE_MS,
 } from './components/Settings';
 export {
   MembersCard,

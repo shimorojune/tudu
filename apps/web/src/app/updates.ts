@@ -1,7 +1,15 @@
-import { inboxBadge, notesHtml, readyText, sumCounts, whenWords, type InboxCounts } from '@tudu/core';
-import { showToast, type InboxEntry } from '@tudu/ui';
-import { useSyncExternalStore } from 'react';
-import type { DesktopBridge, UpdateReady } from './desktop';
+import {
+  checkedWords,
+  inboxBadge,
+  notesHtml,
+  readyText,
+  sumCounts,
+  whenWords,
+  type InboxCounts,
+} from '@tudu/core';
+import { showToast, type InboxEntry, type SettingsUpdates } from '@tudu/ui';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import type { DesktopBridge, UpdateReady, UpdateStatus } from './desktop';
 
 /** The app asks for a newer version on launch and then this often. */
 export const CHECK_EVERY_MS = 4 * 60 * 60 * 1000;
@@ -191,3 +199,60 @@ export function appEntry(
 
 export const appItemId = (version: string) => `app-${version}`;
 export const isAppItem = (id: string | null | undefined) => !!id && id.startsWith('app-');
+
+/**
+ * Where the app's updater stands, for Settings › This Mac and the menu bar's ⋯: asked once, then followed through
+ * `update:status`. `supported` is null until the app answers and false from an app too old to say.
+ */
+export function useUpdateStatus(bridge: Pick<DesktopBridge, 'updateStatus' | 'on'> | null): {
+  supported: boolean | null;
+  status: UpdateStatus | null;
+} {
+  const [state, setState] = useState<{ supported: boolean | null; status: UpdateStatus | null }>({
+    supported: bridge ? null : false,
+    status: null,
+  });
+  useEffect(() => {
+    if (!bridge) return;
+    let live = true;
+    void bridge.updateStatus().then(
+      (status) => live && setState((s) => (s.status ? s : { supported: !!status, status })),
+      () => live && setState({ supported: false, status: null }),
+    );
+    const stop = bridge.on('update:status', (status) => {
+      if (live && status && typeof status === 'object')
+        setState({ supported: true, status: status as UpdateStatus });
+    });
+    return () => {
+      live = false;
+      stop();
+    };
+  }, [bridge]);
+  return state;
+}
+
+/** Check now's failure, as the row says it. */
+export const CHECK_FAILED = 'Couldn’t check for updates. Check your connection and try again.';
+
+/**
+ * This Mac › Updates from the updater's state. A failure shows only after Check now; an automatic check's failure
+ * leaves the row as it was (the next check tries again).
+ */
+export function updatesRow(
+  status: UpdateStatus | null,
+  app: { name: string; version: string },
+  now: Date,
+): Omit<SettingsUpdates, 'onCheck' | 'onRestart' | 'restartError'> {
+  const base = { name: app.name, current: app.version };
+  if (!status) return { ...base, state: 'loading' };
+  if (status.downloading) {
+    const { version, received, total } = status.downloading;
+    return { ...base, state: 'downloading', version, progress: total ? Math.min(1, received / total) : 0 };
+  }
+  if (status.checking) return { ...base, state: 'checking' };
+  if (status.ready) return { ...base, state: 'ready', version: status.ready.version };
+  if (status.lastResult === 'error' && status.lastManual)
+    return { ...base, state: 'error', error: CHECK_FAILED };
+  if (!status.lastCheck || status.lastResult === null) return { ...base, state: 'never' };
+  return { ...base, state: 'idle', checked: checkedWords(status.lastCheck, now) };
+}

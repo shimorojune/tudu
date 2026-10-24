@@ -64,8 +64,12 @@ export interface AppState {
     downloads: number;
     lastCheck: string | null;
     lastResult: 'none' | 'ready' | 'error' | null;
+    /** The last check was Check now's. */
+    lastManual: boolean;
     ready: { version: string; notes: string; date: string | null } | null;
     error: string | null;
+    checking: boolean;
+    downloading: { version: string; received: number; total: number | null } | null;
   };
   seen: { signedIn: boolean; badge: number | null; opened: string[]; saved: string[] };
   /** Chunk 16: what macOS is told the app is, and what keeps it running in the background. */

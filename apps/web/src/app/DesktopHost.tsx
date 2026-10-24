@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useRouter } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
-import { desktop, FEEDBACK_GO, type AppInfo, type UpdateReady } from './desktop';
+import { desktop, FEEDBACK_GO, UPDATES_GO, type AppInfo, type UpdateReady } from './desktop';
 import { openFeedback } from './feedback';
 import { interceptLinks } from './links';
 import { meQuery } from './session';
+import { settingsHref } from './settings';
 import { inboxTotal, startUpdates, updateStore, useUpdate } from './updates';
 
 let appInfo: AppInfo | null = null;
@@ -34,6 +35,7 @@ export function useAppInfo(): AppInfo | null {
 export function DesktopHost() {
   const d = desktop();
   const navigate = useNavigate();
+  const router = useRouter();
   const main = d?.window === 'main';
   const { data: me, isFetched } = useQuery({ ...meQuery, enabled: !!d && main });
   const update = useUpdate();
@@ -49,9 +51,12 @@ export function DesktopHost() {
     if (!d || !main) return;
     return d.on('go', (path) => {
       if (path === FEEDBACK_GO) openFeedback();
+      // Settings › This Mac over the page the desk is on; the sheet already started the check.
+      else if (path === UPDATES_GO)
+        void navigate({ href: settingsHref(router.state.location, '', 'mac', false) });
       else if (typeof path === 'string' && path.startsWith('/')) void navigate({ href: path });
     });
-  }, [d, main, navigate]);
+  }, [d, main, navigate, router]);
 
   useEffect(() => {
     if (!d || !main) return;

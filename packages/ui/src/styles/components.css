@@ -2063,6 +2063,10 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 @media (prefers-reduced-motion: reduce) { .tp-set-in { animation: tp-label-in 160ms linear both; } }
 .tp-set-photo { display: flex; align-items: center; gap: 14px; }
 .tp-set-login { display: flex; align-items: center; gap: 12px; }
+/* This Mac › Updates: each new status line fades up into place; reduced motion only fades. */
+.tp-set-st { display: block; animation: tp-label-in 160ms var(--ease-arrive) both; }
+.tp-set-ready { color: var(--foreground); }
+@media (prefers-reduced-motion: reduce) { .tp-set-st { animation: tp-fade-in 160ms linear both; } }
 .tp-set-name { display: flex; align-items: center; gap: 12px; }
 .tp-set-name .tp-root { flex: 1; min-width: 0; }
 .tp-set-name .tp-stile { transition: background-color 200ms var(--ease-change); }

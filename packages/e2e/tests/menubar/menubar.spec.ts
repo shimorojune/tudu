@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
-import { calls, emit, installFake, teamOfTwo } from '../../fixtures/desktop';
+import { calls, emit, installFake, READY, teamOfTwo, updaterSays } from '../../fixtures/desktop';
 import { createSpace, me, seedTasks } from '../../fixtures/spaces';
 import { dayList, fixClock, idle, row, SUNDAY } from '../../fixtures/today';
 
@@ -265,5 +265,38 @@ test.describe('menubar', () => {
       const block = page.getByRole('region', { name: title, exact: true });
       for (const i of [0, 1]) await check(block.locator('.kit-desk').nth(i));
     }
+  });
+
+  test('C11-E13 ⋯ › Check for updates… checks and opens Settings › This Mac on the desk; with a version ready, ⋯ › Restart to update', async ({
+    page,
+  }) => {
+    const { m } = await threeToday(page);
+    await m.getByRole('button', { name: 'More' }).click();
+    await expect(m.getByRole('menuitem').first()).toHaveText('Check for updates…');
+    await m.getByRole('menuitem', { name: 'Check for updates…' }).click();
+    expect((await calls(m, 'checkUpdate')).map((c) => c.args)).toEqual([[true]]);
+    expect((await calls(m, 'showMain')).map((c) => c.args)).toEqual([['updates']]);
+    // The app hands the desk the request: Settings › This Mac over the page it is on.
+    await emit(page, 'go', 'updates');
+    await expect(page).toHaveURL(/[?&]settings=mac/);
+    await expect(
+      page.getByRole('dialog', { name: 'Settings' }).getByRole('region', { name: 'Updates' }),
+    ).toBeVisible();
+
+    await updaterSays(m, { lastResult: 'ready', ready: READY });
+    await m.getByRole('button', { name: 'More' }).click();
+    const first = m.getByRole('menuitem').first();
+    await expect(first).toContainText('Restart to update');
+    await expect(first).toContainText('0.38.0');
+    await first.click();
+    expect(await calls(m, 'installUpdate')).toHaveLength(1);
+  });
+
+  test('C11-E14 dark: the ⋯ with Check for updates…', async ({ page }) => {
+    await dark(page);
+    const { m } = await threeToday(page);
+    await expect(m.locator('html')).toHaveClass(/dark/);
+    await m.getByRole('button', { name: 'More' }).click();
+    await expect(m.getByRole('menuitem').first()).toHaveText('Check for updates…');
   });
 });
