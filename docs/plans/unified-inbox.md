@@ -128,68 +128,61 @@ These changes go in the kit and are mirrored in the design-system artifact in th
 
 ## Test scenarios
 
+IDs continue chunk 08's series (`docs/tests/README.md`). U01–U11, A01–A10 and E01–E20 already exist, and
+E21–E23 are taken by the Inbox/People width plan, so this plan starts at U12, A11 and E24. The cases go into
+`docs/tests/chunk-08.md` in the same PR, and each ID is in its test's name so `pnpm test:status` finds it.
+
 ### Unit (vitest)
 
-- **core**:
-  - `inboxCountWords` and `inboxBadge` with `bySpace` totals.
-  - `filterInbox` matches invite and notice text (space name, inviter).
-  - Item ordering across spaces is newest first.
-- **server, `requests.test.ts` / new `inbox.test.ts`** (against the test database):
-  - Items from two spaces come back in one list, each with its `space`.
-  - `?space=` narrows the list, while `counts.bySpace` still has every space.
-  - Items from a space you've left are not returned. A `removed` notice for it is returned.
-  - Deleting a space keeps the `deleted` notice, with `space: null` and `space_name` set. Request and comment
-    items for that space disappear.
-  - `inbox.unread` then `inbox.read` round-trips `readAt`, and counts follow.
-  - `inbox.delete` on a waiting request returns 409 with the message, and on a comment hides it.
-  - `inbox.clear` with ids clears only those ids. An item that arrives after the read survives.
-  - `inbox.restore` brings the cleared items back with their read state.
-  - Someone else's item returns 403.
-  - Inviting an existing user creates one invite item. Inviting twice still leaves one. Sign-up backfill
-    creates it.
-  - `POST /invites/:id/join`: success makes you a member and clears the item. Expired, taken back and wrong
-    email each return their error, and the item stays.
-  - `removeMember` creates a notice, and `restoreMember` removes it.
-  - The old `/spaces/:id/inbox` still answers (compat).
-- **ui**:
-  - `TopBar` renders the inbox button with its pip, an `aria-label` of "Inbox, 4 new", and the `tp-on` state.
-  - `InboxItem`:
-    - Unread class, dot and bold name; read rows are muted.
-    - Hover actions call `onToggleRead`/`onDelete`.
-    - No Delete on waiting requests.
-    - Invite and notice kinds render their buttons and words.
-    - The space byline renders.
-  - `SpaceFilter`: the menu lists spaces with counts, and choosing one calls `onChange`.
-- **web**:
-  - Router: `/me/inbox` and `/northwind/inbox` redirect to `/inbox?space=…`. `/inbox` renders without
-    redirecting.
-  - `AppShell`: no Inbox in the sidebar or More, and the top bar pip shows the total.
-  - `DesktopHost`: the dock badge is the total plus the update, counted once.
+| ID      | Where                                      | Case                                                                                                                                  |
+| ------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| C08-U12 | core `inbox.test.ts`                       | `inboxBadge` and `inboxCountWords` add up `bySpace`; the total matches the sum of the spaces                                           |
+| C08-U13 | core `inbox.test.ts`                       | `filterInbox` matches an invite's inviter and space name and a notice's space name; items from several spaces stay newest first        |
+| C08-U14 | ui `TopBar.test.tsx`                       | Inbox button between Search and Jira; pip shows 4, `aria-label` "Inbox, 4 new"; no pip at 0; `open` adds `tp-on`; click calls `onInbox` |
+| C08-U15 | ui `InboxItem.test.tsx`                    | Unread: `tp-unread`, the dot and a bold name. Read: no dot, muted classes. Neither uses `--selection`                                  |
+| C08-U16 | ui `InboxItem.test.tsx`                    | Hover actions: Mark as read/unread calls `onToggleRead`, Delete calls `onDelete`; a waiting request has no Delete                      |
+| C08-U17 | ui `InboxItem.test.tsx`                    | Kinds: invite shows Join and Not now; notice shows its words and no buttons; the byline shows the space name                           |
+| C08-U18 | ui `InboxItem.test.tsx`                    | Swipe: a left drag past 40% calls `onDelete`; under 40% it snaps back; a request can't be swiped                                       |
+| C08-U19 | ui `SpaceFilter.test.tsx`                  | Menu lists All spaces then each space with its count; choosing one calls `onChange`; the chip reads the chosen space                   |
+| C08-U20 | web `router.test.ts`                       | `/me/inbox` and `/northwind/inbox` go to `/inbox?space=…`; `/northwind/inbox/<id>` keeps the item; `/inbox` renders with no redirect   |
+| C08-U21 | web `AppShell` test                        | No Inbox in the sidebar (Personal and team) or in More; the top bar pip is the total from `/api/me` plus the Mac update, once           |
+| C08-U22 | web `desktop.test.tsx`                     | Dock badge is the total plus a waiting update, counted once however many team spaces there are                                       |
 
-### End to end (Playwright, packages/e2e/tests/inbox)
+### API (apps/server, against the test database)
 
-1. From Personal, click the top-bar Inbox. You see a request from Northwind and a comment from Pilot Farm, each
-   labelled with its space. (This covers the original bug.)
-2. Pick Northwind in the space filter. Only Northwind's items remain, and the address has `?space=northwind`.
-   Reload, and the filter is kept.
-3. Open an unread comment, and it turns read: the dot is gone and the pip drops by 1. Mark it unread from hover,
-   and the dot and count come back.
-4. Delete a comment from hover, and it's gone after reload. Waiting requests show no Delete.
-5. Clear all with 3 updates: the toast says "3 updates deleted". Undo brings all 3 back. Clear all again
-   without Undo, and after reload Updates is empty while requests remain.
-6. Meera invites the signed-in user to a new space. The invite appears without a reload, via sync. Join takes
-   you into the space with the toast. The invite is gone, and the space is in the switcher.
-7. Join on an invite that was taken back shows the "That invite has ended." banner. Remove clears the row.
-8. Meera removes you from Pilot Farm. The notice appears, and Pilot Farm is gone from the switcher. Deleting the
-   notice works.
-9. Old link: `/northwind/inbox` lands on `/inbox?space=northwind`.
-10. Phone viewport: the header inbox icon opens the Inbox. Swiping left on a comment deletes it. More has no
-    Inbox row.
-11. Error state: the route fails (`page.route` returns 500), so the banner shows. Try again succeeds once the
-    route is fulfilled.
-12. Dark theme: a visual snapshot of the list, new and read rows (no red pixels in rows, only an ink wash).
+| ID      | Case                                                                                                                                                       |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C08-A11 | `GET /api/inbox`: items from Northwind and Pilot Farm in one list, newest first, each with its `space`; Personal is included                                |
+| C08-A12 | `?space=` narrows the list while `counts.bySpace` still has every space; a space you aren't in returns 403                                                  |
+| C08-A13 | After you're removed from Pilot Farm, its items are gone and the `removed` notice is there; `restoreMember` takes the notice away                           |
+| C08-A14 | Deleting Pilot Farm leaves a `deleted` notice for each other member with `space: null` and the name kept; its request and comment items are gone          |
+| C08-A15 | `inbox.unread` then `inbox.read` round-trips `readAt`, and `counts.unread` follows; someone else's item returns 403                                       |
+| C08-A16 | `inbox.delete`: a comment is hidden and stays hidden after a re-read; a waiting request returns 409 "Answer or decline it first."                        |
+| C08-A17 | `inbox.clear` with ids clears only those ids; an item that arrived after the read survives; `inbox.restore` brings them back with their read state      |
+| C08-A18 | Inviting an existing user creates one invite item; inviting again still leaves one; signing up with an invited email backfills it                         |
+| C08-A19 | `POST /api/invites/:id/join`: success makes you a member, spends the invite, clears the item and returns the slug                                           |
+| C08-A20 | Join on an expired, taken-back or other-address invite returns that error, and the item stays                                                              |
+| C08-A21 | Compat: `GET /spaces/:id/inbox` still answers as before, and `inbox.readAll` is still accepted                                                           |
 
-The existing C08 inbox specs (11 tests) are updated to the new address and the top-bar entry. None are dropped.
+### End to end (`packages/e2e/tests/inbox`, desktop unless noted)
+
+| ID      | Case                                                                                                                                                   |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| C08-E24 | Regression for the original bug: from Personal, the top-bar Inbox opens `/inbox` with a Northwind request and a Pilot Farm comment, each labelled  |
+| C08-E25 | Space filter: pick Northwind, only its items remain and the address has `?space=northwind`; reload keeps it; All spaces brings everything back        |
+| C08-E26 | Opening an unread comment turns it read (dot gone, pip −1); Mark as unread from hover brings both back                                               |
+| C08-E27 | Delete from hover: the row collapses and is gone after reload; a waiting request shows no Delete                                                    |
+| C08-E28 | Clear all with 3 updates: "3 updates deleted. Undo"; Undo brings all 3 back; Clear all again, reload, Updates is empty and requests are still there  |
+| C08-E29 | Meera invites you to a new space: the invite appears live; Join opens the space with its toast; the invite is gone and the space is in the switcher |
+| C08-E30 | Join on a taken-back invite: "That invite has ended." banner; Remove clears the row; Not now on another invite hides it and the email link still works |
+| C08-E31 | Meera removes you from Pilot Farm: the notice appears live and Pilot Farm leaves the switcher; deleting the notice works                             |
+| C08-E32 | Old links: `/northwind/inbox` lands on `/inbox?space=northwind`; `/me/inbox` lands on `/inbox`                                                         |
+| C08-E33 | Phone: the header inbox icon opens the Inbox with the total; swiping left on a comment deletes it; More has no Inbox row                             |
+| C08-E34 | Error: `/api/inbox` returns 500, so the error banner shows; Try again succeeds once the route is fulfilled; offline shows the warning banner          |
+| C08-E35 | Dark: E24's list in dark; new rows use the ink wash and dot, read rows are muted, and no row pixels use the brand red                                |
+
+The existing C08-E10 to C08-E20 Inbox specs keep their IDs. They are updated to the new address and the
+top-bar entry, and none are dropped.
 
 ## Out of scope, and open questions
 
