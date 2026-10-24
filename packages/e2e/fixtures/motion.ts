@@ -70,12 +70,20 @@ export async function expectNoInkShift(
       (e as HTMLElement).style.marginTop = `${off}px`;
     }, off);
     await page.mouse.move(0, 0);
+    await settle(page, row);
+    // The clip follows the row, so a page that scrolls the field into view (phones) or a sheet still arriving does not
+    // count: only text moving inside its row does.
     const box = (await text.boundingBox())!;
-    const clip = { x: box.x, y: box.y, width: box.width, height: box.height };
-    const before = await inkBounds(page, clip);
+    const rowTop = (await row.boundingBox())!.y;
+    const clipAt = async () => {
+      const y = (await row.boundingBox())!.y + (box.y - rowTop);
+      return { x: box.x, y, width: box.width, height: box.height };
+    };
+    const before = await inkBounds(page, await clipAt());
     await act();
     await page.mouse.move(0, 0);
-    const after = await inkBounds(page, clip);
+    await settle(page, row);
+    const after = await inkBounds(page, await clipAt());
     expect(before, `ink before, offset ${off}`).not.toBeNull();
     expect(after, `ink after, offset ${off}px`).toEqual(before);
     await undo();
@@ -83,6 +91,34 @@ export async function expectNoInkShift(
   await row.evaluate((e) => {
     (e as HTMLElement).style.marginTop = '';
   });
+}
+
+/** Wait until finite animations on the page are over and `el` has stayed put for a few frames. */
+export async function settle(page: Page, el: Locator): Promise<void> {
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => Number.isFinite(a.effect?.getComputedTiming().endTime ?? Infinity))
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  );
+  await el.evaluate(
+    (e) =>
+      new Promise<void>((done) => {
+        let last = '';
+        let still = 0;
+        const tick = () => {
+          const r = e.getBoundingClientRect();
+          const now = `${r.x},${r.y},${r.width},${r.height}`;
+          still = now === last ? still + 1 : 0;
+          last = now;
+          if (still >= 3) done();
+          else requestAnimationFrame(tick);
+        };
+        tick();
+      }),
+  );
 }
 
 /** The element's height on every animation frame from just before `act` until `ms` after it. */

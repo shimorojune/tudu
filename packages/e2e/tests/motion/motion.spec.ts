@@ -105,6 +105,9 @@ async function seedLookAlikes(page: Page) {
   const res = await page.request.post(`${API_URL}/api/sync`, { data: { clientId: 'seed', mutations } });
   expect(res.status()).toBe(200);
   await page.reload();
+  await expect(
+    page.getByRole('heading', { name: /^(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)$/ }),
+  ).toBeVisible({ timeout: 10_000 });
 }
 
 /** Quick Add open with "Looks like tasks you have" showing for a near-duplicate title. */
