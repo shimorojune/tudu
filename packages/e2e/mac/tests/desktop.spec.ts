@@ -15,7 +15,7 @@ import {
   person,
   publish,
   run,
-  sidebarInbox,
+  inboxPip,
   signIn,
   teamSpace,
   test,
@@ -254,9 +254,9 @@ test.describe('desktop', () => {
       expect(s.updater.downloads).toBe(1);
       expect(s.updater.error).toBeNull();
       await signIn(app);
-      const space = await teamSpace(app, 'Northwind');
-      await expect.poll(() => sidebarInbox(app)).toBe(1);
-      await go(app, `/${space.slug}/inbox`);
+      await teamSpace(app, 'Northwind');
+      await expect.poll(() => inboxPip(app)).toBe(1);
+      await go(app, '/inbox');
       await app.until(hasRow(next));
       expect(await app.eval(rowIsNew(next))).toBe(true);
       await app.eval(openRow(next));
@@ -266,12 +266,12 @@ test.describe('desktop', () => {
       await app.until(
         `return T.all('button', 'What’s new').length === 1 && T.all('button', 'Restart to update').length === 1`,
       );
-      await expect.poll(() => sidebarInbox(app)).toBe(0);
+      await expect.poll(() => inboxPip(app)).toBe(0);
       // Hide and show: still read.
       await app.act('close', { window: 'main' });
       await app.act('reopen');
       await app.waitState((x) => x.windows.main.visible);
-      await go(app, `/${space.slug}/inbox`);
+      await go(app, '/inbox');
       await app.until(hasRow(next));
       expect(await app.eval(rowIsNew(next))).toBe(false);
     });
@@ -282,8 +282,8 @@ test.describe('desktop', () => {
       const next = run().next.version;
       await app.waitState((x) => x.updater.lastResult === 'ready');
       await signIn(app);
-      const space = await teamSpace(app, 'Northwind');
-      await go(app, `/${space.slug}/inbox`);
+      await teamSpace(app, 'Northwind');
+      await go(app, '/inbox');
       await app.until(hasRow(next));
       await app.eval(openRow(next));
       const old = (await app.state()).pid;
@@ -296,29 +296,28 @@ test.describe('desktop', () => {
       await app.waitState((x) => x.updater.lastResult === 'none', 20_000);
       await onToday(app);
       expect(new URL((await app.state()).windows.main.url).origin).toBe(WEB);
-      await go(app, `/${space.slug}/inbox`);
+      await go(app, '/inbox');
       await app.until(`return !!document.querySelector('[aria-label="The Inbox"]')`);
       expect(await app.eval(hasRow(next))).toBe(false);
-      expect(await sidebarInbox(app)).toBe(0);
+      expect(await inboxPip(app)).toBe(0);
     });
 
-    test('C11-D12 two spaces in the app: the version in both Inboxes, read together; the dock counts it once', async ({
+    test('C11-D12 two spaces in the app: the version once in the one Inbox; read once; the dock counts it once', async ({
       app,
     }) => {
       const next = run().next.version;
       await app.waitState((x) => x.updater.lastResult === 'ready');
       await signIn(app);
-      const nw = await teamSpace(app, 'Northwind');
-      const acme = await teamSpace(app, 'Acme');
+      await teamSpace(app, 'Northwind');
+      await teamSpace(app, 'Acme');
       await app.waitState((x) => x.badge === '1');
-      for (const sp of [nw, acme]) {
-        await go(app, `/${sp.slug}/inbox`);
-        await app.until(hasRow(next));
-        expect(await app.eval(rowIsNew(next))).toBe(true);
-      }
+      await go(app, '/inbox');
+      await app.until(hasRow(next));
+      expect(await app.eval(`return T.all('article', ${JSON.stringify(ITEM(next))}).length`)).toBe(1);
+      expect(await app.eval(rowIsNew(next))).toBe(true);
       await app.eval(openRow(next));
       await app.waitState((x) => x.badge === null);
-      await go(app, `/${nw.slug}/inbox`);
+      await go(app, '/inbox');
       await app.until(hasRow(next));
       expect(await app.eval(rowIsNew(next))).toBe(false);
     });
@@ -335,8 +334,8 @@ test.describe('desktop', () => {
       expect(s.updater.ready).toBeNull();
       expect(s.updater.error).toMatch(/signature/i);
       await signIn(app);
-      const space = await teamSpace(app, 'Northwind');
-      await go(app, `/${space.slug}/inbox`);
+      await teamSpace(app, 'Northwind');
+      await go(app, '/inbox');
       await app.until(`return !!document.querySelector('[aria-label="The Inbox"]')`);
       expect(await app.eval(hasRow(r.next.version))).toBe(false);
 
@@ -345,13 +344,13 @@ test.describe('desktop', () => {
       const down = await app.state();
       expect(down.updater.lastResult).toBe('error');
       expect(down.updater.ready).toBeNull();
-      expect(await sidebarInbox(app)).toBe(0);
+      expect(await inboxPip(app)).toBe(0);
 
       await publish(r.next.version, r.next.update, r.next.signature);
       await app.act('check-update');
       await app.waitState((x) => x.updater.ready?.version === r.next.version);
       await app.until(hasRow(r.next.version));
-      await expect.poll(() => sidebarInbox(app)).toBe(1);
+      await expect.poll(() => inboxPip(app)).toBe(1);
     });
   });
 
@@ -415,13 +414,13 @@ test.describe('desktop', () => {
       'GET',
       `/api/spaces/${space.id}/inbox`,
     );
-    await go(app, `/${space.slug}/inbox/${inbox.updates[0]!.id}`);
+    await go(app, `/inbox/${inbox.updates[0]!.id}`);
     await app.waitState((x) => x.badge === '2');
     for (const [sp, id] of [
       [space, requestId],
       [acme.space, second],
     ] as const) {
-      await go(app, `/${sp.slug}/inbox`);
+      await go(app, `/inbox?space=${sp.slug}`);
       await app.until(`return T.all('article', /Proofread the brochure|Order the badges/).length > 0`);
       await app.eval(
         `T.click(T.all('article', /Proofread the brochure|Order the badges/)[0].querySelector('button'))`,
