@@ -299,7 +299,15 @@ export const taskMutationSchema = z.discriminatedUnion('type', [
     payload: z.object({ id, taskId: id, day: isoDay.nullable() }),
   }),
   z.object({ type: z.literal('inbox.read'), payload: z.object({ id }) }),
+  z.object({ type: z.literal('inbox.unread'), payload: z.object({ id }) }),
+  /** Kept for one release: clients from before the one Inbox still send it. */
   z.object({ type: z.literal('inbox.readAll'), payload: z.object({ id, spaceId: id }) }),
+  /** Delete one item (requests waiting for an answer can't be). */
+  z.object({ type: z.literal('inbox.delete'), payload: z.object({ id }) }),
+  /** Clear all: exactly the items the client showed, so nothing that arrived since goes with them. */
+  z.object({ type: z.literal('inbox.clear'), payload: z.object({ id, ids: z.array(id).min(1).max(500) }) }),
+  /** Undo a delete or a Clear all. */
+  z.object({ type: z.literal('inbox.restore'), payload: z.object({ id, ids: z.array(id).min(1).max(500) }) }),
 ]);
 
 /** The task a mutation is about, whatever it names; a project change names its project instead. */

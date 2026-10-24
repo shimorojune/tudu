@@ -373,9 +373,20 @@ export const requests = pgTable(
   ],
 );
 
-export const inboxKind = pgEnum('inbox_kind', ['request', 'comment', 'answer']);
+export const inboxKind = pgEnum('inbox_kind', ['request', 'comment', 'answer', 'invite', 'notice']);
 
-/** One thing in someone's Inbox: a request to answer, a comment on their task, an answer to a request they sent. */
+/** Why a notice is in the Inbox: you were taken out of a space, or the space itself went. */
+export interface InboxNotice {
+  type: 'removed' | 'deleted';
+  /** Who did it, by name, when known. */
+  by: string | null;
+}
+
+/**
+ * One thing in someone's Inbox: a request to answer, a comment on their task, an answer to a request they sent, an
+ * invite to a space, or a notice that a space went. One Inbox across every space (chunk 08, unified Inbox): a
+ * notice outlives its space, so `space_id` is set null when the space is deleted and `space_name` keeps its name.
+ */
 export const inboxItems = pgTable(
   'inbox_items',
   {
@@ -383,18 +394,26 @@ export const inboxItems = pgTable(
     userId: text('user_id')
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
-    spaceId: text('space_id')
-      .notNull()
-      .references(() => spaces.id, { onDelete: 'cascade' }),
+    spaceId: text('space_id').references(() => spaces.id, { onDelete: 'set null' }),
+    /** The space's name when the item was made, for when the space is gone. */
+    spaceName: text('space_name'),
     kind: inboxKind('kind').notNull(),
     requestId: text('request_id').references(() => requests.id, { onDelete: 'cascade' }),
     taskId: text('task_id').references(() => tasks.id, { onDelete: 'cascade' }),
     commentId: text('comment_id').references(() => comments.id, { onDelete: 'cascade' }),
+    inviteId: text('invite_id').references(() => spaceInvites.id, { onDelete: 'cascade' }),
+    notice: jsonb('notice').$type<InboxNotice>(),
     readAt: timestamp('read_at', { withTimezone: true }),
     answeredAt: timestamp('answered_at', { withTimezone: true }),
+    /** Deleted or cleared by its person; Undo puts it back. Swept after 30 days. */
+    clearedAt: timestamp('cleared_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('inbox_items_user').on(t.userId, t.spaceId, t.createdAt)],
+  (t) => [
+    index('inbox_items_user').on(t.userId, t.spaceId, t.createdAt),
+    index('inbox_items_user_cleared').on(t.userId, t.clearedAt, t.createdAt),
+    uniqueIndex('inbox_items_invite').on(t.userId, t.inviteId),
+  ],
 );
 
 export const jiraState = pgEnum('jira_state', ['ok', 'expired']);
