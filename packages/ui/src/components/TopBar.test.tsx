@@ -121,3 +121,34 @@ describe('TopBar', () => {
     expect(onChange).toHaveBeenCalledWith('two');
   });
 });
+
+describe('C08-U14 TopBar inbox', () => {
+  it('sits between Search and New task, with a pip for the count, an open look and a click', async () => {
+    const onInbox = vi.fn();
+    const { user, bar } = setup({ inbox: { count: 4, onInbox } });
+    const buttons = within(bar).getAllByRole('button');
+    const names = buttons.map((b) => b.getAttribute('aria-label') ?? b.textContent);
+    expect(names.indexOf('Inbox, 4 new')).toBe(names.indexOf('Search tasks') + 1);
+    const ib = screen.getByRole('button', { name: 'Inbox, 4 new' });
+    expect(ib).toHaveClass('tp-ib', 'tp-tb-inbox');
+    expect(ib).not.toHaveClass('tp-on');
+    expect(ib.querySelector('.tp-tb-pip')).toHaveTextContent('4');
+    await user.click(ib);
+    expect(onInbox).toHaveBeenCalledTimes(1);
+  });
+
+  it('no pip at 0, 99+ past 99, and tp-on with aria-current while open', () => {
+    const { bar } = setup({ inbox: { count: 0, open: true, onInbox: () => {} } });
+    const ib = within(bar).getByRole('button', { name: 'Inbox' });
+    expect(ib.querySelector('.tp-tb-pip')).toBeNull();
+    expect(ib).toHaveClass('tp-on');
+    expect(ib).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('caps the pip at 99+ and leaves the button out when there is no inbox prop', () => {
+    const { bar } = setup({ inbox: { count: 140, onInbox: () => {} } });
+    expect(
+      within(bar).getByRole('button', { name: 'Inbox, 140 new' }).querySelector('.tp-tb-pip'),
+    ).toHaveTextContent('99+');
+  });
+});

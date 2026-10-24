@@ -33,6 +33,14 @@ export interface TopBarJira {
   fresh?: boolean;
 }
 
+export interface TopBarInbox {
+  /** To answer plus new, across every space. Hidden at 0. */
+  count?: number;
+  /** Holds the button in its open look while the Inbox is showing. */
+  open?: boolean;
+  onInbox: () => void;
+}
+
 export interface TopBarProps {
   /** Content on the left. */
   leading?: ReactNode;
@@ -43,6 +51,8 @@ export interface TopBarProps {
   /** Holds the search icon in its open look while the panel is open. */
   searchOpen?: boolean;
   searchLabel?: string;
+  /** The one Inbox, across every space: beside Search, in the same quiet button. */
+  inbox?: TopBarInbox;
   /** The Jira button. Leave it out, or pass false, until Jira is connected. */
   jira?: false | TopBarJira;
   onNewTask?: () => void;
@@ -57,7 +67,8 @@ export interface TopBarProps {
 }
 
 /**
- * The row above the sheet, on the desk: search (one quiet icon that opens the search panel), Jira, New task (the
+ * The row above the sheet, on the desk: search (one quiet icon that opens the search panel), the Inbox (every
+ * space's, with its count), Jira, New task (the
  * one ink button on the page) and you. Nothing in the bar changes size, so nothing moves.
  */
 export function TopBar({
@@ -66,6 +77,7 @@ export function TopBar({
   onSearch,
   searchOpen,
   searchLabel = 'Search tasks',
+  inbox,
   jira,
   onNewTask,
   compact,
@@ -99,6 +111,22 @@ export function TopBar({
       >
         <Icon name="search" size={17} />
       </IconButton>
+      {inbox ? (
+        <IconButton
+          label={inbox.count ? `Inbox, ${inbox.count} new` : 'Inbox'}
+          tipSide="bottom"
+          className={cx('tp-tb-inbox', inbox.open && 'tp-on')}
+          aria-current={inbox.open ? 'page' : undefined}
+          onClick={inbox.onInbox}
+        >
+          <Icon name="inbox" size={17} />
+          {inbox.count ? (
+            <span className="tp-tb-pip" key={inbox.count} aria-hidden="true">
+              {inbox.count > 99 ? '99+' : inbox.count}
+            </span>
+          ) : null}
+        </IconButton>
+      ) : null}
       {jira ? (
         <span className="tp-tip tp-below" data-tip={jiraTip}>
           <button

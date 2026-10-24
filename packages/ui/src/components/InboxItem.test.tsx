@@ -1,6 +1,7 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { readStylesheet } from '../test-utils/stylesheet';
 import { InboxItem, InboxSection, type InboxEntry } from './InboxItem';
 
 const TODAY = '2026-10-18';
@@ -314,5 +315,132 @@ describe('InboxItem, a new version (chunk 11)', () => {
     expect(screen.getByRole('button', { name: /Restarting…/ })).toBeTruthy();
     fail(new Error('no'));
     expect(await screen.findByRole('button', { name: 'Restart to update' })).toBeTruthy();
+  });
+});
+
+describe('InboxItem, one Inbox (unified)', () => {
+  it('C08-U15 new rows: tp-unread, the dot and a bold name; read rows: no dot and quiet; neither uses --selection', () => {
+    const { container, rerender } = render(
+      <InboxItem item={{ ...COMMENT, space: 'Northwind' }} mode="list" />,
+    );
+    const row = container.querySelector('article')!;
+    expect(row).toHaveClass('tp-ix-list', 'tp-unread');
+    expect(row.querySelector('.tp-ix-dot')).toHaveAttribute('aria-label', 'New');
+    rerender(<InboxItem item={{ ...COMMENT, unread: false }} mode="list" />);
+    expect(row).not.toHaveClass('tp-unread');
+    expect(row.querySelector('.tp-ix-dot')).toBeNull();
+    // the kit's stylesheet: rows wash in ink, never the brand selection
+    const css = readStylesheet('components.css');
+    const rowRules = css.split('\n').filter((l) => /tp-ix-(head|list)/.test(l) && /background/.test(l));
+    expect(rowRules.length).toBeGreaterThan(2);
+    for (const l of rowRules) expect(l).not.toMatch(/--selection|--brand/);
+  });
+
+  it('C08-U16 hover actions: Mark as read or unread, and Delete; a request still to answer has no Delete', async () => {
+    const user = userEvent.setup();
+    const onToggleRead = vi.fn();
+    const onDelete = vi.fn();
+    const { rerender } = render(
+      <InboxItem item={COMMENT} mode="list" onToggleRead={onToggleRead} onDelete={onDelete} />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Mark as read' }));
+    expect(onToggleRead).toHaveBeenCalledWith(COMMENT);
+    rerender(
+      <InboxItem
+        item={{ ...COMMENT, unread: false }}
+        mode="list"
+        onToggleRead={onToggleRead}
+        onDelete={onDelete}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Mark as unread' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(onDelete).toHaveBeenCalledTimes(1));
+    rerender(<InboxItem item={REQUEST} mode="list" onToggleRead={onToggleRead} onDelete={onDelete} />);
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Mark as read' })).toBeInTheDocument();
+    // answered requests can go
+    rerender(
+      <InboxItem
+        item={{ ...REQUEST, outcome: { status: 'declined', reason: 'Busy' } }}
+        mode="list"
+        onDelete={onDelete}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+  });
+
+  it('C08-U17 an invite: Join and Not now; a notice: its words and only Delete; the byline names the space', async () => {
+    const user = userEvent.setup();
+    const onJoin = vi.fn(() => Promise.reject(new Error('ended')));
+    const onNotNow = vi.fn();
+    const invite: InboxEntry = {
+      id: 'v1',
+      kind: 'invite',
+      who: { name: 'Sana Qureshi', initials: 'SQ', color: '#8a5a00' },
+      when: '2h',
+      unread: true,
+      task: { title: 'Design Guild' },
+    };
+    const { container, rerender } = render(<InboxItem item={invite} mode="list" />);
+    expect(container.querySelector('.tp-ix-text')).toHaveTextContent('Sana invited you to Design Guild');
+    expect(container.querySelector('article')).toHaveClass('tp-ix-inv');
+    rerender(<InboxItem item={invite} mode="full" onJoin={onJoin} onNotNow={onNotNow} />);
+    const join = screen.getByRole('button', { name: 'Join Design Guild' });
+    await user.click(join);
+    expect(onJoin).toHaveBeenCalledWith(invite);
+    // a join that fails frees the button
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Join Design Guild' })).not.toBeDisabled());
+    await user.click(screen.getByRole('button', { name: 'Not now' }));
+    expect(onNotNow).toHaveBeenCalledWith(invite);
+
+    const onDelete = vi.fn();
+    const notice: InboxEntry = {
+      id: 'n1',
+      kind: 'notice',
+      mark: { name: 'Pilot Farm', initials: 'PF', color: '#5b7553' },
+      when: 'Fri',
+      text: 'was deleted',
+      task: { title: 'Pilot Farm' },
+    };
+    rerender(<InboxItem item={notice} mode="full" onDelete={onDelete} />);
+    expect(container.querySelector('.tp-ix-text')).toHaveTextContent('Pilot Farm was deleted');
+    expect(container.querySelector('.tp-ix-av')).toHaveTextContent('PF');
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Delete']);
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(onDelete).toHaveBeenCalledWith(notice);
+    rerender(
+      <InboxItem
+        item={{ ...notice, who: { name: 'Arjun Kumar', initials: 'AK' }, text: 'removed you from' }}
+        mode="list"
+      />,
+    );
+    expect(container.querySelector('.tp-ix-text')).toHaveTextContent('Arjun removed you from Pilot Farm');
+    rerender(<InboxItem item={{ ...COMMENT, space: 'Northwind' }} mode="list" />);
+    expect(container.querySelector('.tp-ix-by')).toHaveTextContent('NorthwindToday');
+  });
+
+  it('C08-U18 swipe: past 40% of the row deletes, short of it springs back; a request still to answer never swipes', async () => {
+    const onDelete = vi.fn();
+    const { container, rerender } = render(
+      <InboxItem item={COMMENT} mode="list" swipe onDelete={onDelete} />,
+    );
+    const row = container.querySelector('article')!;
+    Object.defineProperty(row, 'offsetWidth', { value: 300, configurable: true });
+    const slide = row.querySelector('.tp-ix-slide') as HTMLElement;
+    expect(row.querySelector('.tp-ix-swipe-bg')).toHaveTextContent('Delete');
+    fireEvent.pointerDown(row, { pointerType: 'touch', clientX: 280, clientY: 40 });
+    fireEvent.pointerMove(row, { pointerType: 'touch', clientX: 200, clientY: 42 });
+    expect(slide.style.transform).toBe('translateX(-80px)');
+    fireEvent.pointerUp(row, { pointerType: 'touch' });
+    expect(slide.style.transform).toBe('');
+    expect(onDelete).not.toHaveBeenCalled();
+    fireEvent.pointerDown(row, { pointerType: 'touch', clientX: 280, clientY: 40 });
+    fireEvent.pointerMove(row, { pointerType: 'touch', clientX: 120, clientY: 40 });
+    fireEvent.pointerUp(row, { pointerType: 'touch' });
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith(COMMENT));
+    rerender(<InboxItem item={REQUEST} mode="list" swipe onDelete={onDelete} />);
+    expect(container.querySelector('.tp-ix-slide')).toBeNull();
+    expect(within(container).queryByText('Delete')).toBeNull();
   });
 });
