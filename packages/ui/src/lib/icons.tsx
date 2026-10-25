@@ -18,6 +18,7 @@ import {
   House,
   Inbox,
   Laptop,
+  Layers,
   Link2,
   List,
   Lock,
@@ -89,6 +90,8 @@ export const ICONS = {
   link: Link2,
   /** Copied. */
   check: Check,
+  /** All spaces: the sheets of every space stacked. */
+  layers: Layers,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

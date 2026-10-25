@@ -142,6 +142,7 @@ export {
   type TaskCarried,
   type TaskProject,
   type TaskSignal,
+  type TaskSpace,
 } from './components/TaskRow';
 export { TaskList, FRESH_MS, type TaskListProps, type TaskItem, type TaskMove } from './components/TaskList';
 export { AddTask, type AddTaskProps } from './components/AddTask';
@@ -206,6 +207,7 @@ export {
 export {
   SpaceSwitch,
   SSW_SHEET_LEAVE_MS,
+  SSW_PICK_MS,
   type SpaceSwitchProps,
   type SwitchSpace,
 } from './components/SpaceSwitch';

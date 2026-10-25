@@ -8,6 +8,7 @@ import {
   isInboxMutation,
   isProjectMutation,
   isSettingsMutation,
+  isAllMutation,
   LOOKALIKE_MIN,
   lookAlikesScored,
   mergeLookAlikes,
@@ -21,6 +22,7 @@ import {
   taskIdOf,
   textOf,
   wordsOf,
+  type AllSpacesPlace,
   type Comment,
   type HistoryEvent,
   type IsoDate,
@@ -32,7 +34,22 @@ import {
   type Task,
   type TaskDetail,
 } from '@tudu/core';
-import { and, asc, count, eq, gte, inArray, isNull, lt, lte, or, schema, sql, type Db } from '@tudu/db';
+import {
+  and,
+  asc,
+  count,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  or,
+  schema,
+  sql,
+  type Db,
+} from '@tudu/db';
 import { readableBy } from './closeMatches';
 import type { SubtaskClocks, TaskClocks } from '@tudu/db/schema';
 
@@ -224,6 +241,7 @@ export async function tasksOfBacklog(db: Executor, spaceId: string, userId: stri
 
 const searchColumns = {
   id: schema.tasks.id,
+  spaceId: schema.tasks.spaceId,
   number: schema.tasks.number,
   prefix: schema.spaces.taskPrefix,
   title: schema.tasks.title,
@@ -235,6 +253,7 @@ const searchColumns = {
 };
 type SearchRow = {
   id: string;
+  spaceId: string;
   number: number;
   prefix: string;
   title: string;
@@ -260,6 +279,8 @@ function toHit(r: SearchRow, snippet: string | null = null): SearchHit {
     projectId: r.projectId,
     jira: r.jiraKey,
     snippet,
+    // Search spans every space (chunk 21), so every hit says where it lives.
+    spaceId: r.spaceId,
   };
 }
 
@@ -280,10 +301,13 @@ function numberOf(q: string): number | null {
  */
 export async function searchTasks(
   db: Executor,
-  spaceId: string,
+  /** One space, or null for every space you are in (chunk 21: Search always spans them). */
+  spaceId: string | null,
   userId: string,
   q: string,
   today: IsoDate,
+  /** Only breaks ties: hits from the space you are looking at come first. Never a filter. */
+  here: string | null = null,
 ): Promise<SearchHit[]> {
   const toks = searchTokens(q);
   if (!toks.length) return [];
@@ -301,12 +325,18 @@ export async function searchTasks(
     .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
     .where(
       and(
-        eq(schema.tasks.spaceId, spaceId),
+        spaceId ? eq(schema.tasks.spaceId, spaceId) : undefined,
         readableBy(userId),
         or(...words, ...(n === null ? [] : [eq(schema.tasks.number, n)])),
       ),
     )
-    .orderBy(asc(schema.tasks.day), asc(schema.tasks.position), asc(schema.tasks.createdAt))
+    .orderBy(
+      // The ranking keeps the order it is given for equal scores: the space you are in first.
+      ...(here ? [sql`${schema.tasks.spaceId} = ${here} desc`] : []),
+      asc(schema.tasks.day),
+      asc(schema.tasks.position),
+      asc(schema.tasks.createdAt),
+    )
     .limit(SEARCH_CANDIDATES);
   const ranked = rankSearch(
     rows.map((r) => ({
@@ -365,7 +395,8 @@ export async function lookAlikeTasks(
 /** The tasks asked for by id, as hits, in the order asked; a deleted or unknown one is left out. */
 export async function hitsById(
   db: Executor,
-  spaceId: string,
+  /** One space, or null for every space you are in. */
+  spaceId: string | null,
   userId: string,
   ids: string[],
 ): Promise<SearchHit[]> {
@@ -374,7 +405,13 @@ export async function hitsById(
     .select(searchColumns)
     .from(schema.tasks)
     .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
-    .where(and(eq(schema.tasks.spaceId, spaceId), inArray(schema.tasks.id, ids), readableBy(userId)));
+    .where(
+      and(
+        spaceId ? eq(schema.tasks.spaceId, spaceId) : undefined,
+        inArray(schema.tasks.id, ids),
+        readableBy(userId),
+      ),
+    );
   const byId = new Map(rows.map((r) => [r.id, r]));
   return ids
     .map((id) => byId.get(id))
@@ -707,6 +744,8 @@ export interface Applied {
   space?: boolean;
   /** The person's own name changed: every space they are in shows it. */
   me?: boolean;
+  /** Their All spaces order changed on this day (chunk 21): only they hear, and no space's list changed. */
+  allPlace?: { day: IsoDate | null };
 }
 
 /** Apply one mutation for `userId`, once. Throws Rejected for a change that will never apply. */
@@ -723,7 +762,8 @@ export async function applyMutation(db: Db, userId: string, raw: unknown): Promi
       .returning({ id: schema.appliedMutations.id });
     if (!claimed.length) {
       // Already applied: nothing changes, and the client gets the row as it is.
-      if (isProjectMutation(m) || isInboxMutation(m) || isSettingsMutation(m)) return null;
+      if (isProjectMutation(m) || isInboxMutation(m) || isSettingsMutation(m) || isAllMutation(m))
+        return null;
       const taskId = taskIdOf(m);
       const [t] = await tx
         .select({ spaceId: schema.tasks.spaceId, day: schema.tasks.day })
@@ -735,6 +775,7 @@ export async function applyMutation(db: Db, userId: string, raw: unknown): Promi
     if (isInboxMutation(m)) return applyRequest(tx, userId, m);
     if (isProjectMutation(m)) return project(tx, userId, m);
     if (isSettingsMutation(m)) return settings(tx, userId, m);
+    if (isAllMutation(m)) return placeInAll(tx, userId, m);
     if (m.type.startsWith('subtask.')) return subtask(tx, userId, m as SubtaskMutation);
     if (m.type.startsWith('comment.')) return comment(tx, userId, m as CommentMutation);
     return change(tx, userId, m as TaskChange);
@@ -746,6 +787,7 @@ type CommentMutation = Extract<SyncMutation, { type: `comment.${string}` }>;
 type ProjectMutation = Extract<SyncMutation, { type: `project.${string}` }>;
 type InboxMutation = Extract<SyncMutation, { type: `request.${string}` | `inbox.${string}` }>;
 type SettingsMutation = Extract<SyncMutation, { type: `me.${string}` | `space.${string}` }>;
+type AllMutation = Extract<SyncMutation, { type: `all.${string}` }>;
 type TaskChange = Exclude<
   SyncMutation,
   | { type: 'task.create' }
@@ -754,6 +796,7 @@ type TaskChange = Exclude<
   | ProjectMutation
   | InboxMutation
   | SettingsMutation
+  | AllMutation
 >;
 
 /** The position after the last task of a day (or of the Backlog). */
@@ -1236,6 +1279,69 @@ async function settings(tx: Tx, userId: string, m: SettingsMutation): Promise<Ap
   await tx.update(schema.spaces).set(set).where(eq(schema.spaces.id, spaceId));
   if (m.payload.name !== undefined) await moveSlug(tx, spaceId, m.payload.name);
   return { taskId: spaceId, spaceId, days: [], space: true };
+}
+
+/**
+ * Your place for a task in All spaces' own order (chunk 21). Only for a task that is yours to plan: in a space you
+ * are in, and yours or ownerless (a colleague's task is not on your list). The task itself never changes.
+ */
+async function placeInAll(tx: Tx, userId: string, m: AllMutation): Promise<Applied> {
+  const p = m.payload;
+  const t = await lockTask(tx, userId, p.id);
+  if (t.deletedAt) throw new Rejected(410, DELETED);
+  if (t.day !== p.day) throw new Rejected(400, 'That task isn’t on that day any more.');
+  const at = new Date(m.at);
+  const [have] = await tx
+    .select({ clock: schema.allSpacesPlaces.clock })
+    .from(schema.allSpacesPlaces)
+    .where(and(eq(schema.allSpacesPlaces.userId, userId), eq(schema.allSpacesPlaces.taskId, p.id)));
+  // Last write wins: an older place than the one kept changes nothing.
+  if (have && have.clock.getTime() > at.getTime()) return { taskId: p.id, spaceId: '', days: [] };
+  await tx
+    .insert(schema.allSpacesPlaces)
+    .values({ userId, taskId: p.id, day: p.day, position: p.position, clock: at })
+    .onConflictDoUpdate({
+      target: [schema.allSpacesPlaces.userId, schema.allSpacesPlaces.taskId],
+      set: { day: p.day, position: p.position, clock: at, updatedAt: new Date() },
+    });
+  return { taskId: p.id, spaceId: '', days: [], allPlace: { day: p.day } };
+}
+
+/**
+ * Your All spaces places for these days (and the Backlog, with `backlog`): only for tasks in spaces you are in now,
+ * yours or ownerless, still on the day the place was given on.
+ */
+export async function allSpacesPlaces(
+  db: Executor,
+  userId: string,
+  from: IsoDate,
+  to: IsoDate,
+  backlog: boolean,
+): Promise<AllSpacesPlace[]> {
+  const P = schema.allSpacesPlaces;
+  const rows = await db
+    .select({ taskId: P.taskId, day: P.day, position: P.position })
+    .from(P)
+    .innerJoin(schema.tasks, eq(schema.tasks.id, P.taskId))
+    .innerJoin(
+      schema.spaceMembers,
+      and(eq(schema.spaceMembers.spaceId, schema.tasks.spaceId), eq(schema.spaceMembers.userId, userId)),
+    )
+    .where(
+      and(
+        eq(P.userId, userId),
+        isNull(schema.tasks.deletedAt),
+        ownedBy(userId),
+        // A place only counts on the day it was given: a task moved since has none.
+        or(
+          and(isNull(P.day), isNull(schema.tasks.day)),
+          and(eq(P.day, schema.tasks.day), gte(P.day, from), lte(P.day, to)),
+        ),
+        backlog ? undefined : isNotNull(P.day),
+      ),
+    )
+    .orderBy(asc(P.day), asc(P.position));
+  return rows;
 }
 
 /** Apply a batch in order. Each mutation stands alone: a rejected one does not stop the rest. */

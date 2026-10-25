@@ -7,7 +7,14 @@ import { itemByKey, moveItem, useDropGroup, useReorder } from '../lib/reorder';
 import { AddTask } from './AddTask';
 import type { MiniCalendarProps } from './MiniCalendar';
 import type { SubtaskItem } from './SubtaskList';
-import { TaskRow, type TaskCarried, type TaskDue, type TaskProject, type TaskSignal } from './TaskRow';
+import {
+  TaskRow,
+  type TaskCarried,
+  type TaskDue,
+  type TaskProject,
+  type TaskSignal,
+  type TaskSpace,
+} from './TaskRow';
 import { showToast } from './Toast';
 
 export interface TaskItem {
@@ -22,6 +29,8 @@ export interface TaskItem {
   comments?: number;
   jira?: string;
   project?: TaskProject;
+  /** All spaces: the space it lives in, shown as a pill in its byline. */
+  inSpace?: TaskSpace;
   subtasks?: SubtaskItem[];
 }
 
@@ -60,6 +69,8 @@ export interface TaskListProps {
   resetKey?: string | number;
   /** A project name: only its tasks show, and the "+" and dragging between lists turn off. */
   filter?: string;
+  /** All spaces: a space's id; only its tasks show, and like `filter` the "+" and dragging between lists turn off. */
+  filterSpace?: string | null;
   /** A task added from outside the list (Quick Add): it opens its gap and gets the wash, on mount too. */
   flashKey?: string;
   /** Show a task already here: scroll it to the middle, focus it, flash it. Add ":anything" to show it again. */
@@ -120,7 +131,9 @@ export const LEAVE_MS = 900;
  * task in that spot; lists in a group trade rows. The list is controlled: it shows `tasks` and reports changes.
  */
 export function TaskList(p: TaskListProps) {
-  const { tasks, compact, filter } = p;
+  const { tasks, compact, filter, filterSpace } = p;
+  // Narrowed by a project or a space: a slice of the list, so slotting in and trading rows are off.
+  const narrowed = !!filter || !!filterSpace;
   const ref = useRef<HTMLDivElement | null>(null);
   const [fresh, setFresh] = useState<{ key: string; follow?: 'add' | 'out' } | null>(null);
   const [insKey, setIns] = useState<string | null>(null);
@@ -149,7 +162,11 @@ export function TaskList(p: TaskListProps) {
     if (p.flashKey) setFresh({ key: p.flashKey, follow: 'out' });
   }
 
-  const shown = filter ? tasks.filter((t) => t.project?.name === filter) : tasks;
+  const shown = narrowed
+    ? tasks.filter(
+        (t) => (!filter || t.project?.name === filter) && (!filterSpace || t.inSpace?.id === filterSpace),
+      )
+    : tasks;
 
   // A fresh row opens its gap in the same frame it first appears, so it never shows at full size first.
   useLayoutEffect(() => {
@@ -236,7 +253,7 @@ export function TaskList(p: TaskListProps) {
     const nextShown = moveItem(shown, from, to);
     let next = nextShown;
     let toFull = to;
-    if (filter) {
+    if (narrowed) {
       // Slot it next to the same neighbour in the full list.
       const rest = tasks.filter((t) => t.key !== key);
       const after = nextShown[to + 1];
@@ -247,8 +264,8 @@ export function TaskList(p: TaskListProps) {
     const fromFull = tasks.findIndex((t) => t.key === key);
     p.onReorder?.(next, { key, from: fromFull, to: toFull });
   }
-  const down = useReorder(ref, reorder, { group: filter ? null : p.group });
-  useDropGroup(filter || p.locked ? null : p.group, ref, (key, at) => {
+  const down = useReorder(ref, reorder, { group: narrowed ? null : p.group });
+  useDropGroup(narrowed || p.locked ? null : p.group, ref, (key, at) => {
     p.onReceive?.(key, at);
     setFresh({ key });
     opened.current = null;
@@ -284,7 +301,7 @@ export function TaskList(p: TaskListProps) {
       setFresh({ key });
     }
   }
-  const canInsert = !compact && p.insertable !== false && !filter && !!p.onAdd;
+  const canInsert = !compact && p.insertable !== false && !narrowed && !!p.onAdd;
 
   // Crossing off (or unticking) a row that leaves this list: it waits a beat ticked, then folds away with Undo.
   const leaves = (done: boolean) => (done ? p.leaveDone : p.leaveUndone);
@@ -426,6 +443,7 @@ export function TaskList(p: TaskListProps) {
                 comments={t.comments}
                 jira={t.jira}
                 project={t.project}
+                inSpace={t.inSpace}
                 reorderable={!p.static}
                 compact={compact}
                 brief={p.brief}

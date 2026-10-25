@@ -1,7 +1,12 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { queryOptions } from '@tanstack/react-query';
 import {
+  ALL_SPACES_CHANGED,
+  type AllSpacesChangedEvent,
+  type AllSpacesPlace,
+  type AllSpacesPlacesResponse,
   INBOX_CHANGED,
+  isAllMutation,
   isInboxMutation,
   isProjectMutation,
   isSettingsMutation,
@@ -12,6 +17,7 @@ import {
   type SpaceSummary,
   nextProjectColor,
   placeAt,
+  placesFor,
   POSITION_STEP,
   positionBetween,
   PROJECTS_CHANGED,
@@ -79,6 +85,9 @@ export const peopleKey = (spaceId: string, from: IsoDate, to: IsoDate) =>
 export const personKey = (spaceId: string, userId: string, from: IsoDate, to: IsoDate) =>
   ['people', spaceId, 'one', userId, from, to] as const;
 /** The one Inbox: every space, or one (`spaceId`), in a view, narrowed by words. */
+/** Your places in All spaces for the days from `from` to `to` (and the Backlog, when asked). */
+export const allPlacesKey = (from: IsoDate, to: IsoDate, backlog = false) =>
+  ['all-places', from, to, backlog] as const;
 export const inboxKey = (view: InboxView, q = '', spaceId: string | null = null) =>
   ['inbox', spaceId ?? 'all', view, q] as const;
 
@@ -512,6 +521,27 @@ export class TaskStore {
         const res = await this.o.api.get<TaskDetail>(`/api/spaces/${spaceId}/tasks/${taskId}`);
         this.setReachable(true);
         return this.overlayDetail(res);
+      },
+    });
+  }
+
+  /**
+   * Your own order in All spaces for a span of days (and the Backlog with `backlog`), with the places still on
+   * their way applied on top. The lists themselves are each space's day reads.
+   */
+  allPlacesQuery(from: IsoDate, to: IsoDate, backlog = false) {
+    return queryOptions({
+      queryKey: allPlacesKey(from, to, backlog),
+      queryFn: async (): Promise<AllSpacesPlace[]> => {
+        const res = await this.o.api.get<AllSpacesPlacesResponse>(
+          `/api/all-spaces/places?from=${from}&to=${to}${backlog ? '&backlog=1' : ''}`,
+        );
+        this.setReachable(true);
+        let places = res.places;
+        for (const { m } of this.pending.values())
+          if (m.type === 'all.place' && inSpan(m.payload.day, from, to, backlog))
+            places = applyPlace(places, m);
+        return places;
       },
     });
   }
@@ -988,6 +1018,36 @@ export class TaskStore {
     this.mutate({ type: 'task.place', payload: { id, day, position: this.positionFor(t.spaceId, day, id) } });
   }
 
+  /**
+   * Put a task at `index` (counted without it) in All spaces' order of its day, shown as `order` (each row with
+   * its place, or null when it has none yet). Only your places change: the task keeps its place in its space.
+   */
+  placeInAll(
+    id: string,
+    day: IsoDate | null,
+    index: number,
+    order: Array<{ id: string; position: number | null }>,
+  ): void {
+    for (const p of placesFor(order, id, index))
+      this.mutate({ type: 'all.place', payload: { id: p.id, day, position: p.position } });
+  }
+
+  /**
+   * Move a task to another day from All spaces, at `index` there. The task goes to the end of that day in its
+   * space, and to `index` in All spaces' order of it.
+   */
+  moveInAll(
+    id: string,
+    day: IsoDate | null,
+    index: number,
+    order: Array<{ id: string; position: number | null }>,
+  ): void {
+    const t = this.known.get(id);
+    if (!t) return;
+    if (t.day !== day) this.place(id, day);
+    this.placeInAll(id, day, index, order);
+  }
+
   // ---- subtasks and comments -----------------------------------------------------------------------------
 
   /** The subtasks of a task as this tab last saw them: from its open detail, else from its row. */
@@ -1111,6 +1171,12 @@ export class TaskStore {
       void this.o.queryClient.invalidateQueries({ queryKey: ['jira', je.spaceId, 'connection'] });
       return;
     }
+    if (e.type === ALL_SPACES_CHANGED) {
+      const ae = e.data as AllSpacesChangedEvent;
+      if (ae.clientId && ae.clientId === this.clientId) return;
+      void this.o.queryClient.invalidateQueries({ queryKey: ['all-places'] });
+      return;
+    }
     if (e.type === PROJECTS_CHANGED) {
       const pe = e.data as ProjectsChangedEvent;
       if (pe.clientId && pe.clientId === this.clientId) return;
@@ -1139,10 +1205,22 @@ export class TaskStore {
     void this.o.queryClient.invalidateQueries({ queryKey: ['people'] });
     void this.o.queryClient.invalidateQueries({ queryKey: ['members'] });
     void this.o.queryClient.invalidateQueries({ queryKey: ['inbox'] });
+    void this.o.queryClient.invalidateQueries({ queryKey: ['all-places'] });
     void this.o.queryClient.invalidateQueries({
       queryKey: ['jira'],
       predicate: (q) => q.queryKey[2] === 'links',
     });
+  }
+
+  /**
+   * You left a space, or it was deleted or you were removed: forget everything cached of it, so All spaces and
+   * the menus stop showing it at once.
+   */
+  forgetSpace(spaceId: string): void {
+    const qc = this.o.queryClient;
+    for (const k of ['day', 'week', 'task', 'marks', 'projects', 'members', 'people'])
+      qc.removeQueries({ queryKey: [k, spaceId] });
+    for (const [id, t] of this.known) if (t.spaceId === spaceId) this.known.delete(id);
   }
 
   stop(): void {
@@ -1186,6 +1264,13 @@ export class TaskStore {
   /** Apply a mutation to every cached day and task. */
   private applyEverywhere(m: SyncMutation): void {
     const qc = this.o.queryClient;
+    if (isAllMutation(m)) {
+      for (const [key, data] of qc.getQueriesData<AllSpacesPlace[]>({ queryKey: ['all-places'] })) {
+        const [, from, to, backlog] = key as unknown as [string, IsoDate, IsoDate, boolean];
+        if (data && inSpan(m.payload.day, from, to, backlog)) qc.setQueryData(key, applyPlace(data, m));
+      }
+      return;
+    }
     if (isSettingsMutation(m)) {
       const me = qc.getQueryData<MeResponse>(['me']);
       if (me) qc.setQueryData<MeResponse>(['me'], applyToMe(me, m));
@@ -1292,13 +1377,18 @@ export class TaskStore {
     this.merge(res);
     const touched = new Set<string>();
     for (const b of batch)
-      if (!isProjectMutation(b as SyncMutation) && !isSettingsMutation(b as SyncMutation))
+      if (
+        !isProjectMutation(b as SyncMutation) &&
+        !isSettingsMutation(b as SyncMutation) &&
+        !isAllMutation(b as SyncMutation)
+      )
         touched.add(taskIdOf(b as SyncMutation));
     if (rejected.length) {
       // Undo by reading the days again: the server's rows plus whatever is still on its way.
       void this.o.queryClient.invalidateQueries({ queryKey: ['day'] });
       void this.o.queryClient.invalidateQueries({ queryKey: ['task'] });
       void this.o.queryClient.invalidateQueries({ queryKey: ['projects'] });
+      void this.o.queryClient.invalidateQueries({ queryKey: ['all-places'] });
       this.o.onRejected?.(rejected[0]!.error ?? 'That change couldn’t be saved.');
     } else {
       // The detail of each task touched reads again, so server-made facts (history, numbers) arrive.
@@ -1343,7 +1433,7 @@ export class TaskStore {
       let tasks = data.tasks.filter((t) => !rows.has(t.id) && !gone.has(t.id));
       for (const t of rows.values()) if (t.spaceId === spaceId && t.day === day) tasks.push(t);
       for (const { m } of this.pending.values())
-        if (!isProjectMutation(m) && !isSettingsMutation(m) && rows.has(taskIdOf(m)))
+        if (!isProjectMutation(m) && !isSettingsMutation(m) && !isAllMutation(m) && rows.has(taskIdOf(m)))
           tasks = applyToDay(tasks, day, spaceId, m, (id) => this.known.get(id));
       tasks.sort(byPosition);
       if (!sameTasks(tasks, data.tasks)) qc.setQueryData<DayData>(key, { day, tasks });
@@ -1371,6 +1461,21 @@ export class TaskStore {
     this.reachable = on;
     this.o.onReachable?.(on);
   }
+}
+
+function inSpan(day: IsoDate | null, from: IsoDate, to: IsoDate, backlog: boolean): boolean {
+  return day === null ? backlog : day >= from && day <= to;
+}
+
+/** One all.place on a list of places: the task's place on that day, replacing any it had. */
+function applyPlace(
+  places: AllSpacesPlace[],
+  m: Extract<SyncMutation, { type: 'all.place' }>,
+): AllSpacesPlace[] {
+  const { id, day, position } = m.payload;
+  const old = places.find((p) => p.taskId === id);
+  if (old && old.day === day && old.position === position) return places;
+  return [...places.filter((p) => p.taskId !== id), { taskId: id, day, position }];
 }
 
 function sameTasks(a: Task[], b: Task[]): boolean {

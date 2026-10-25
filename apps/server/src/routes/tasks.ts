@@ -7,6 +7,9 @@ import {
   mondayOf,
   syncRequestSchema,
   TASKS_CHANGED,
+  ALL_SPACES_CHANGED,
+  type AllSpacesChangedEvent,
+  type AllSpacesPlacesResponse,
   INBOX_CHANGED,
   type InboxChangedEvent,
   type DayResponse,
@@ -30,6 +33,7 @@ import { requireSession, type SessionVars } from '../middleware/session';
 import { spaceSummaries } from '../spaces';
 import { announceMembers } from './spaces';
 import {
+  allSpacesPlaces,
   applyBatch,
   hitsById,
   lookAlikeTasks,
@@ -185,6 +189,25 @@ export function taskRoutes(db: Db, hub: EventHub, embeddings: Embeddings) {
   });
 
   /**
+   * Search every space you are in (chunk 21): `?q=` the words (ranked, at most thirty; `today` for the tie order,
+   * `here` the space you are looking at, which only breaks ties), `?ids=` the tasks asked for in that order
+   * (Recently opened). Every task you can see: yours, ownerless, and a colleague's shared with the space.
+   */
+  r.get('/search', requireSession, async (c) => {
+    const userId = c.get('session')!.user.id;
+    const ids = c.req.query('ids');
+    const q = (c.req.query('q') ?? '').slice(0, 200);
+    const today = c.req.query('today');
+    const here = c.req.query('here') || null;
+    const hits =
+      ids !== undefined
+        ? await hitsById(db, null, userId, ids.split(',').filter(Boolean).slice(0, 20))
+        : await searchTasks(db, null, userId, q, isIsoDate(today) ? today : isoToday(), here);
+    const body: SearchResponse = { hits };
+    return c.json(body);
+  });
+
+  /**
    * Close matches: tasks that mean what was typed, from every space you are in (`?q=`), without the ones the word
    * search already lists (`?exclude=a,b`). 503 while the model is not available, so the panel says so quietly.
    */
@@ -246,6 +269,19 @@ export function taskRoutes(db: Db, hub: EventHub, embeddings: Embeddings) {
     return c.json(body);
   });
 
+  /** Your All spaces order for `from`..`to` (at most MARKS_SPAN days), and the Backlog's with `backlog=1`. */
+  r.get('/all-spaces/places', requireSession, async (c) => {
+    const userId = c.get('session')!.user.id;
+    const from = c.req.query('from');
+    const to = c.req.query('to');
+    if (!isIsoDate(from) || !isIsoDate(to) || diffDays(from, to) < 0 || diffDays(from, to) > MARKS_SPAN)
+      return c.json({ error: 'Those days aren’t valid.' }, 400);
+    const body: AllSpacesPlacesResponse = {
+      places: await allSpacesPlaces(db, userId, from, to, c.req.query('backlog') === '1'),
+    };
+    return c.json(body);
+  });
+
   r.post('/sync', requireSession, async (c) => {
     const userId = c.get('session')!.user.id;
     const parsed = syncRequestSchema.safeParse(await c.req.json().catch(() => null));
@@ -253,7 +289,7 @@ export function taskRoutes(db: Db, hub: EventHub, embeddings: Embeddings) {
     const { clientId, mutations } = parsed.data;
     const { results, applied } = await applyBatch(db, userId, mutations);
 
-    const tasky = applied.filter((a) => !a.space && !a.me);
+    const tasky = applied.filter((a) => !a.space && !a.me && !a.allPlace);
     const touched = [
       ...new Set(tasky.filter((a) => !a.projects && (!a.requests || a.days.length)).map((a) => a.taskId)),
     ];
@@ -286,6 +322,15 @@ export function taskRoutes(db: Db, hub: EventHub, embeddings: Embeddings) {
       await announceSpace(db, hub, spaceId);
     if (applied.some((a) => a.me))
       for (const s of await spaceSummaries(db, userId)) await announceMembers(db, hub, s.id);
+    // All spaces' own order: yours alone, so only your other tabs hear.
+    const placed = applied.filter((a) => a.allPlace);
+    if (placed.length) {
+      const event: AllSpacesChangedEvent = {
+        days: [...new Set(placed.map((a) => a.allPlace!.day))],
+        clientId,
+      };
+      hub.publish(userId, ALL_SPACES_CHANGED, event);
+    }
     // New or changed words get their vector after the answer goes out (chunk 13).
     if (tasky.length) embeddings.kick();
     return c.json(body);

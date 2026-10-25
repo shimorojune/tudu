@@ -663,3 +663,26 @@ describe('TaskDetail, someone else’s task (chunk 08)', () => {
     expect(still.declarations.transform).toBe('none !important');
   });
 });
+
+describe('TaskDetail in All spaces', () => {
+  it('C21-U13 the Space fact comes first, reads the space and opens it; without inSpace it stays out', async () => {
+    const user = userEvent.setup();
+    const onOpenSpace = vi.fn();
+    const { container, rerender } = render(
+      <Panel
+        inSpace={{ id: 'nw', name: 'Northwind', color: '#3d5a80', initials: 'N' }}
+        onOpenSpace={onOpenSpace}
+      />,
+    );
+    const facts = container.querySelectorAll('.tp-td-props > .tp-td-prop');
+    expect(facts[0]!.querySelector('dt')).toHaveTextContent('Space');
+    expect(facts[0]!.querySelector('dd')).toHaveTextContent('Northwind');
+    const btn = screen.getByRole('button', { name: 'Space: Northwind. Open in Northwind' });
+    expect(btn).not.toHaveAttribute('aria-haspopup');
+    expect(btn.querySelector('.tp-stile')).not.toBeNull();
+    await user.click(btn);
+    expect(onOpenSpace).toHaveBeenCalledTimes(1);
+    rerender(<Panel />);
+    expect(screen.queryByRole('button', { name: /^Space:/ })).toBeNull();
+  });
+});

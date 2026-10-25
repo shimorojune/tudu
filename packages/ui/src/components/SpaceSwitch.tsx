@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { cx } from '../lib/cx';
 import { useOutside } from '../lib/hooks';
@@ -32,6 +32,8 @@ export interface SpaceSwitchProps {
 
 /** The sheet slides back down for this long before it goes. */
 export const SSW_SHEET_LEAVE_MS = 220;
+/** The picked row's check draws in for this long before the list closes. */
+export const SSW_PICK_MS = 150;
 
 /**
  * The space's tile and name with a chevron, at the top of the sidebar or in the phone's header. It opens the list of
@@ -75,6 +77,18 @@ export function SpaceSwitch({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- close reads the latest state through setState
   }, [open]);
 
+  // The row you chose takes the check (drawn in) for a beat before the list goes, so the choice reads as made.
+  const [picked, setPicked] = useState<string | null>(null);
+  const pickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (pickTimer.current) clearTimeout(pickTimer.current);
+    },
+    [],
+  );
+  // The trigger's tile and name rise in when the space changes, never on first paint.
+  const first = useRef(cur?.id);
+
   const others = spaces.reduce((n, s) => n + (s.id !== cur?.id && s.count ? s.count : 0), 0);
 
   // The sheet slides back down before it goes (and before the space changes), so closing reads as calmly as opening.
@@ -92,20 +106,35 @@ export function SpaceSwitch({
       then?.();
     }, SSW_SHEET_LEAVE_MS);
   }
-  const pick = (s: SwitchSpace) => close(() => s.id !== cur?.id && onPick?.(s));
+  function pick(s: SwitchSpace) {
+    if (s.id === cur?.id) {
+      close();
+      return;
+    }
+    if (picked) return;
+    setPicked(s.id);
+    pickTimer.current = setTimeout(
+      () =>
+        close(() => {
+          setPicked(null);
+          onPick?.(s);
+        }),
+      SSW_PICK_MS,
+    );
+  }
 
   const list = (
     <div className="tp-sswl" role="menu" aria-label="Spaces">
       <div className="tp-mh">Spaces</div>
       {spaces.map((s) => {
-        const on = s.id === cur?.id;
-        return (
+        const on = picked ? s.id === picked : s.id === cur?.id;
+        const row = (
           <button
             key={s.id}
             type="button"
             role="menuitemradio"
             aria-checked={on ? 'true' : 'false'}
-            className={cx('tp-sswl-it', on && 'tp-on')}
+            className={cx('tp-sswl-it', on && 'tp-on', picked === s.id && 'tp-picked')}
             onClick={() => pick(s)}
           >
             <SpaceTile space={s} size={28} />
@@ -133,6 +162,15 @@ export function SpaceSwitch({
             ) : null}
           </button>
         );
+        // All spaces sits on top, apart from the spaces themselves.
+        return s.all ? (
+          <Fragment key={s.id}>
+            {row}
+            <div className="tp-sswl-sep" role="separator" />
+          </Fragment>
+        ) : (
+          row
+        );
       })}
       {onCreate ? (
         <div className="tp-sswl-foot">
@@ -154,8 +192,12 @@ export function SpaceSwitch({
       aria-label={rail ? `Space: ${cur?.name ?? ''}` : undefined}
       onClick={() => (open ? close() : setOpen(true))}
     >
-      {cur ? <SpaceTile space={cur} size={26} /> : null}
-      <span className="tp-ssw-name">{cur?.name}</span>
+      {cur ? (
+        <span key={cur.id} className={cx('tp-ssw-id', cur.id !== first.current && 'tp-ssw-swap')}>
+          <SpaceTile space={cur} size={26} />
+          <span className="tp-ssw-name">{cur.name}</span>
+        </span>
+      ) : null}
       {others ? <span className="tp-ssw-pip" aria-label={`${others} new in other spaces`} /> : null}
       <span className="tp-ssw-chev" aria-hidden="true">
         <Icon name="right" size={13} />

@@ -27,6 +27,7 @@ export {
   peopleKey,
   personKey,
   inboxKey,
+  allPlacesKey,
   draftOf,
   dayKey,
   weekKey,

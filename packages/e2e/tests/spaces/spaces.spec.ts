@@ -61,12 +61,14 @@ test.describe('spaces', () => {
     await expect(switcher(page)).toContainText('Northwind');
     const again = await openSwitcher(page);
     const items = again.getByRole('menuitemradio');
-    await expect(items).toHaveCount(2);
-    await expect(items.nth(0)).toContainText('Personal');
-    await expect(items.nth(1)).toContainText('Northwind');
-    await expect(items.nth(1)).toHaveAttribute('aria-checked', 'true');
-    await expect(items.nth(1).locator('.tp-sswl-ok')).toBeVisible();
-    await expect(items.nth(1)).toContainText('Just you');
+    // With two spaces All spaces heads the list (chunk 21).
+    await expect(items).toHaveCount(3);
+    await expect(items.nth(0)).toContainText('All spaces');
+    await expect(items.nth(1)).toContainText('Personal');
+    await expect(items.nth(2)).toContainText('Northwind');
+    await expect(items.nth(2)).toHaveAttribute('aria-checked', 'true');
+    await expect(items.nth(2).locator('.tp-sswl-ok')).toBeVisible();
+    await expect(items.nth(2)).toContainText('Just you');
     await page.keyboard.press('Escape');
     await expect(again).toBeHidden();
   });
@@ -385,7 +387,7 @@ test.describe('spaces', () => {
     await switcher(page).click();
     const sheet = page.getByRole('dialog', { name: 'Spaces' });
     await expect(sheet).toBeVisible();
-    await expect(sheet.getByRole('menuitemradio')).toHaveCount(2);
+    await expect(sheet.getByRole('menuitemradio')).toHaveCount(3);
     await sheet.getByRole('menuitemradio', { name: /Personal/ }).click();
     await expect(page).toHaveURL(/\/me$/);
     await expect(switcher(page)).toContainText('Personal');

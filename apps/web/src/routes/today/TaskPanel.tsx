@@ -11,6 +11,7 @@ import {
   weekdayName,
   whenWords,
   type IsoDate,
+  type SpaceSummary,
   type TaskDetail as TaskDetailData,
 } from '@tudu/core';
 import {
@@ -28,6 +29,7 @@ import { API_URL } from '../../app/config';
 import { editProjects, editProjectsHref } from '../../app/editProjects';
 import { initialsOf } from '../../app/session';
 import { addRecentTask } from '../../app/search';
+import { tileOf } from '../../app/allSpaces';
 import { useSpace } from '../../app/space';
 import { jiraClient, openInJira, useJira } from '../../app/jira';
 import { taskStore } from '../../app/tasks';
@@ -35,6 +37,8 @@ import type { Viewport } from '../../app/viewport';
 
 export interface OpenTask {
   id: string;
+  /** Its space, when the page shows more than one (All spaces). */
+  spaceId?: string;
   /** Which way the panel's content slid in: stepping with the arrows. */
   dir: 'next' | 'prev';
 }
@@ -56,6 +60,12 @@ export interface TaskPanelProps {
   backFor?: (day: IsoDate | null) => string;
   /** Over the Inbox: "Go to Fri 16 Oct" turns the page to the task's day (or the Backlog). */
   onLocate?: (day: IsoDate | null) => void;
+  /** The task's own space when it is not the page's (All spaces): its projects, its words, its Jira. */
+  space?: SpaceSummary;
+  /** All spaces: the Space fact leads the facts, and pressing it opens the task in its space. */
+  onOpenSpace?: (space: SpaceSummary, ref: string | null) => void;
+  /** All spaces: the arrows step through the list as shown (every space's tasks of the day), not the space's day. */
+  neighbours?: (day: IsoDate | null) => string[];
 }
 
 /** The month around a day, with a week either side, for the Planned picker's dots. */
@@ -75,7 +85,8 @@ function monthAround(day: IsoDate): { from: IsoDate; to: IsoDate } {
 export function TaskPanel(p: TaskPanelProps) {
   const { spaceId, open, today, vp } = p;
   const compact = vp === 'phone';
-  const space = useSpace();
+  const pageSpace = useSpace();
+  const space = p.space ?? pageSpace;
   const navigate = useNavigate();
   const loc = useRouterState({ select: (s) => s.location });
   // "Just now", "Thu 10:12": the clock is read when the panel opens or changes task, and once a minute.
@@ -91,8 +102,8 @@ export function TaskPanel(p: TaskPanelProps) {
   }
   // A task you open joins Search's "Recently opened".
   useEffect(() => {
-    if (open) addRecentTask(spaceId, open.id);
-  }, [open, spaceId]);
+    if (open) addRecentTask(open.id);
+  }, [open]);
   // The last task keeps rendering while the drawer eases out.
   const [last, setLast] = useState<OpenTask | null>(open);
   if (open && open !== last) setLast(open);
@@ -118,9 +129,10 @@ export function TaskPanel(p: TaskPanelProps) {
     ...jiraClient.issueQuery(spaceId, detail?.jira ?? ''),
     enabled: !!shown && !!detail?.jira && conn?.state === 'ok',
   }).data;
-  const at = list?.findIndex((t) => t.id === id) ?? -1;
-  const prev = at > 0 ? list![at - 1] : undefined;
-  const next = at >= 0 && list && at < list.length - 1 ? list[at + 1] : undefined;
+  const ids = p.neighbours && detail ? p.neighbours(detail.day) : list?.map((t) => t.id);
+  const at = ids?.indexOf(id) ?? -1;
+  const prev = at > 0 ? { id: ids![at - 1]! } : undefined;
+  const next = at >= 0 && ids && at < ids.length - 1 ? { id: ids[at + 1]! } : undefined;
 
   const onRef = p.onRef;
   useEffect(() => {
@@ -207,6 +219,8 @@ export function TaskPanel(p: TaskPanelProps) {
             : [{ value: 'space', label: 'Only you' }]
         }
         readOnly={theirs}
+        inSpace={p.onOpenSpace ? tileOf(space) : undefined}
+        onOpenSpace={p.onOpenSpace ? () => p.onOpenSpace!(space, d.ref) : undefined}
         owner={
           theirs && owner
             ? {

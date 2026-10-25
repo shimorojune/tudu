@@ -1,8 +1,12 @@
 import type { SpaceSummary } from '@tudu/core';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { filterOf, targetOf } from './allSpaces';
 import {
+  allPath,
   forgetSpace,
   homePath,
+  inAllPath,
+  pagePath,
   inboxPath,
   lastSpace,
   oldInboxPath,
@@ -97,5 +101,40 @@ describe('C08-U20 the one Inbox has its own address', () => {
     expect(inboxPath({ view: 'sent' })).toBe('/inbox?view=sent');
     expect(switchPath('/inbox', 'northwind')).toBe('/northwind');
     expect(switchPath('/inbox/abc', 'me')).toBe('/me');
+  });
+});
+
+describe('C21-U15 All spaces in the address', () => {
+  beforeEach(() => forgetSpace());
+
+  it('C21-U15 /all keeps its filter by slug; an unknown slug is no filter; Personal is where a task goes otherwise', () => {
+    expect(allPath()).toBe('/all');
+    expect(allPath('week', 'northwind')).toBe('/all/week?space=northwind');
+    expect(allPath('people')).toBe('/all');
+    expect(filterOf(SPACES, 'northwind')?.id).toBe('n');
+    expect(filterOf(SPACES, 'me')?.id).toBe('p');
+    expect(filterOf(SPACES, 'gone')).toBeNull();
+    expect(filterOf(SPACES, undefined)).toBeNull();
+    expect(targetOf(SPACES, null).id).toBe('p');
+    expect(targetOf(SPACES, SPACES[1]!).id).toBe('n');
+    expect(viewOf('/all/backlog')).toBe('backlog');
+    expect(inAllPath('/all/week')).toBe(true);
+    expect(inAllPath('/allotment')).toBe(false);
+  });
+
+  it('C21-U15 switching to and from All spaces keeps the view it has; anything else opens its Today', () => {
+    expect(switchPath('/northwind/week', 'all')).toBe('/all/week');
+    expect(switchPath('/northwind/people', 'all')).toBe('/all');
+    expect(switchPath('/all/backlog', 'northwind')).toBe('/northwind/backlog');
+    expect(pagePath('me', true, 'settings')).toBe('/me/settings');
+    expect(pagePath('me', true, 'backlog')).toBe('/all/backlog');
+  });
+
+  it('C21-U15 homePath opens All spaces when it was last, while you are in two spaces; with one it is Personal', () => {
+    rememberSpace('all');
+    expect(homePath(SPACES)).toBe('/all');
+    expect(homePath([SPACES[0]!])).toBe('/me');
+    // With one space All spaces is forgotten.
+    expect(lastSpace(SPACES)).toBeNull();
   });
 });

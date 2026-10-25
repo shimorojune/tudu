@@ -171,6 +171,18 @@ async function depart(
     createdAt: at,
   }));
   if (answers.length) await tx.insert(schema.inboxItems).values(answers);
+  // Their All spaces order for this space's tasks goes too (chunk 21); being put back starts it afresh.
+  await tx
+    .delete(schema.allSpacesPlaces)
+    .where(
+      and(
+        eq(schema.allSpacesPlaces.userId, target),
+        inArray(
+          schema.allSpacesPlaces.taskId,
+          tx.select({ id: schema.tasks.id }).from(schema.tasks).where(eq(schema.tasks.spaceId, spaceId)),
+        ),
+      ),
+    );
   await tx
     .delete(schema.spaceMembers)
     .where(and(eq(schema.spaceMembers.spaceId, spaceId), eq(schema.spaceMembers.userId, target)));

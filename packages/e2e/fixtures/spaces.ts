@@ -96,9 +96,11 @@ export async function seedTasks(
   page: Page,
   spaceId: string,
   rows: Array<{ title: string; day: string | null; visibility?: 'me' }>,
+  /** When the rows were written; before the page's clock, or its own changes lose to them. */
+  from = '2026-10-18T09:00:00.000Z',
 ): Promise<Record<string, string>> {
   const ids: Record<string, string> = {};
-  let at = Date.parse('2026-10-18T09:00:00.000Z');
+  let at = Date.parse(from);
   const mutations: unknown[] = [];
   for (const [i, r] of rows.entries()) {
     const id = crypto.randomUUID();

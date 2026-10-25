@@ -9,6 +9,7 @@ import {
   getRecentTasks,
   getSearches,
   goToTask,
+  mergeOld,
   resetSearchMemory,
   SEARCH_MEMORY,
 } from './search';
@@ -20,43 +21,40 @@ afterEach(() => {
 });
 
 describe('C07-U08 what Search remembers and where a pick goes', () => {
-  it('keeps the searches that led somewhere per browser and space, five, newest first, the same words once', () => {
-    addSearch('s1', 'release notes');
-    addSearch('s1', ' meera ');
-    addSearch('s1', 'Release Notes');
-    addSearch('s2', 'pay');
-    expect(getSearches('s1')).toEqual(['Release Notes', 'meera']);
-    expect(getSearches('s2')).toEqual(['pay']);
-    expect(JSON.parse(localStorage.getItem('tudu.search.history')!)).toEqual({
-      s1: ['Release Notes', 'meera'],
-      s2: ['pay'],
-    });
-    for (let i = 0; i < 7; i++) addSearch('s1', `word ${i}`);
-    expect(getSearches('s1')).toHaveLength(SEARCH_MEMORY);
-    expect(getSearches('s1')[0]).toBe('word 6');
-    addSearch('s1', '   ');
-    expect(getSearches('s1')[0]).toBe('word 6');
-    clearSearches('s1');
-    expect(getSearches('s1')).toEqual([]);
-    expect(getSearches('s2')).toEqual(['pay']);
-    expect(getSearches('never')).toEqual([]);
+  it('keeps the searches that led somewhere per browser, across spaces, five, newest first, the same words once', () => {
+    addSearch('release notes');
+    addSearch(' meera ');
+    addSearch('Release Notes');
+    addSearch('pay');
+    expect(getSearches()).toEqual(['pay', 'Release Notes', 'meera']);
+    expect(JSON.parse(localStorage.getItem('tudu.search.history.all')!)).toEqual([
+      'pay',
+      'Release Notes',
+      'meera',
+    ]);
+    for (let i = 0; i < 7; i++) addSearch(`word ${i}`);
+    expect(getSearches()).toHaveLength(SEARCH_MEMORY);
+    expect(getSearches()[0]).toBe('word 6');
+    addSearch('   ');
+    expect(getSearches()[0]).toBe('word 6');
+    clearSearches();
+    expect(getSearches()).toEqual([]);
   });
 
-  it('keeps the tasks you opened lately per space, five, newest first', () => {
-    addRecentTask('s1', 'a');
-    addRecentTask('s1', 'b');
-    addRecentTask('s1', 'a');
-    expect(getRecentTasks('s1')).toEqual(['a', 'b']);
-    for (let i = 0; i < 6; i++) addRecentTask('s1', `t${i}`);
-    expect(getRecentTasks('s1')).toEqual(['t5', 't4', 't3', 't2', 't1']);
-    expect(JSON.parse(localStorage.getItem('tudu.search.recent')!).s1).toEqual([
+  it('keeps the tasks you opened lately, in any space, five, newest first', () => {
+    addRecentTask('a');
+    addRecentTask('b');
+    addRecentTask('a');
+    expect(getRecentTasks()).toEqual(['a', 'b']);
+    for (let i = 0; i < 6; i++) addRecentTask(`t${i}`);
+    expect(getRecentTasks()).toEqual(['t5', 't4', 't3', 't2', 't1']);
+    expect(JSON.parse(localStorage.getItem('tudu.search.recent.all')!)).toEqual([
       't5',
       't4',
       't3',
       't2',
       't1',
     ]);
-    expect(getRecentTasks('s2')).toEqual([]);
   });
 
   it('a task on a day goes to Today showing that day, with the row to locate; one with no day goes to the Backlog on its view', () => {
@@ -135,5 +133,55 @@ describe('C13-U09 close matches in the app', () => {
       view: 'open',
     });
     expect(navigate).toHaveBeenCalledWith('/northwind/backlog');
+  });
+});
+
+describe('C21-U16 Search across every space', () => {
+  const spaces = [
+    { id: 's1', name: 'Personal', color: null, slug: 'me' },
+    { id: 's2', name: 'Northwind', color: '#3d5a80', slug: 'northwind' },
+  ] as never;
+  const hit = {
+    id: 't',
+    ref: 'ME-3',
+    title: 'Fix the gutter',
+    day: null,
+    done: false,
+    projectId: null,
+    jira: null,
+    snippet: null,
+    spaceId: 's1',
+  };
+
+  it('C21-U16 a hit outside the open space is labelled; in All spaces (no open space) every hit is', () => {
+    expect(spaceOfHit(hit, spaces, 's1')).toBeNull();
+    expect(spaceOfHit({ ...hit, spaceId: 's2' }, spaces, 's1')).toEqual({
+      name: 'Northwind',
+      color: '#3d5a80',
+    });
+    expect(spaceOfHit(hit, spaces, '')).toEqual({ name: 'Personal', color: null });
+    expect(spaceOfHit({ ...hit, spaceId: 's2' }, spaces, '')).toEqual({
+      name: 'Northwind',
+      color: '#3d5a80',
+    });
+  });
+
+  it('C21-U16 the old per-space recent and history lists merge into one, newest first, without repeats', () => {
+    localStorage.setItem(
+      'tudu.search.history',
+      JSON.stringify({ s1: ['pay', 'Gutter', 'lease'], s2: ['gutter', 'release notes'] }),
+    );
+    localStorage.setItem(
+      'tudu.search.recent',
+      JSON.stringify({ s1: ['a', 'b', 'c', 'd'], s2: ['x', 'a', 'y'] }),
+    );
+    resetSearchMemory(true);
+    expect(getSearches()).toEqual(['pay', 'gutter', 'release notes', 'lease']);
+    expect(getRecentTasks()).toEqual(['a', 'x', 'b', 'c', 'y']);
+    // Once: the old keys are gone, the one list is kept.
+    expect(localStorage.getItem('tudu.search.history')).toBeNull();
+    expect(localStorage.getItem('tudu.search.recent')).toBeNull();
+    expect(JSON.parse(localStorage.getItem('tudu.search.recent.all')!)).toEqual(['a', 'x', 'b', 'c', 'y']);
+    expect(mergeOld({}, (a, b) => a === b)).toEqual([]);
   });
 });

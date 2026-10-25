@@ -298,3 +298,86 @@ html[data-app='desktop'] .app-side {
 html[data-app='desktop'] .app-side .tp-sidebar {
   padding-top: 50px;
 }
+/* Switching space: the page fades out (110ms) before the next one rises in. */
+.app-scroll > .app-page-out > .app-page,
+.app-phone-scroll > .app-page-out > .app-page {
+  animation: tp-pg-out 110ms var(--ease-leave) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-scroll > .app-page-out > .app-page,
+  .app-phone-scroll > .app-page-out > .app-page {
+    animation: tp-veil-out 110ms linear both;
+  }
+}
+/*
+ * All spaces' filter chips: the row under the title opens and the chip fades in; clearing reverses it before the
+ * list turns back (as on the canvas, A-Motion).
+ */
+.app-all-dh,
+.app-all-chipw {
+  display: contents;
+}
+.app-all-dh .tp-dh-tools:not(:has(.tp-chip)) {
+  display: none;
+}
+.app-all-dh .tp-dh-tools {
+  overflow: hidden;
+  animation: app-all-tools-in 260ms var(--ease-arrive) both;
+}
+.app-all-dh .tp-chip {
+  animation: app-all-chip-in 220ms var(--ease-arrive) 40ms both;
+}
+.app-all-dh.app-all-closing .tp-dh-tools {
+  animation: app-all-tools-out 180ms var(--ease-leave) both;
+}
+.app-all-dh .app-all-out .tp-chip {
+  animation: app-all-chip-out 150ms var(--ease-leave) both;
+}
+@keyframes app-all-tools-in {
+  from {
+    max-height: 0;
+    margin-top: 0;
+    opacity: 0;
+  }
+  to {
+    max-height: 28px;
+    margin-top: 16px;
+    opacity: 1;
+  }
+}
+@keyframes app-all-tools-out {
+  from {
+    max-height: 28px;
+    margin-top: 16px;
+    opacity: 1;
+  }
+  to {
+    max-height: 0;
+    margin-top: 0;
+    opacity: 0;
+  }
+}
+@keyframes app-all-chip-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.96);
+  }
+}
+@keyframes app-all-chip-out {
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-all-dh .tp-dh-tools,
+  .app-all-dh .tp-chip {
+    animation-name: tp-veil-in;
+    animation-duration: 120ms;
+  }
+  .app-all-dh.app-all-closing .tp-dh-tools,
+  .app-all-dh .app-all-out .tp-chip {
+    animation-name: tp-veil-out;
+    animation-duration: 120ms;
+  }
+}

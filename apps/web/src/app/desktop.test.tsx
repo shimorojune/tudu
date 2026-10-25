@@ -278,7 +278,7 @@ describe('C11-U06 the chrome and the dock badge', () => {
     expect(inboxTotal({ spaces: [space('me', 'personal')] }, true)).toBe(1);
     expect(inboxTotal({ spaces: [space('me', 'personal'), space('nw', 'team')] }, false)).toBe(0);
     // The switcher keeps each space's own count, without the version.
-    expect(switchSpaces(spaces).map((s) => s.count)).toEqual([undefined, 3, 1]);
+    expect(switchSpaces(spaces).map((s) => s.count)).toEqual([undefined, undefined, 3, 1]);
   });
 });
 

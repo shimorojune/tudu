@@ -70,7 +70,13 @@ export function settingsHref(
 /** Spaces this tab is leaving or deleting itself: their space.gone needs no second toast. */
 const goingHere = new Set<string>();
 
+/** A space this tab is leaving (or deleting) itself: true once, so its own event says nothing more. */
+export function leftHere(spaceId: string): boolean {
+  return goingHere.delete(spaceId);
+}
+
 /** Someone else ended your place in a space (or another tab did): leave it if you are in it, and say why. */
+
 export function onSpaceGone(
   e: SpaceGoneEvent,
   current: SpaceSummary | null,

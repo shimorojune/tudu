@@ -466,6 +466,32 @@ export const jiraViews = pgTable(
 );
 
 /** Every mutation the server has applied, by its id, so a retry never applies twice. */
+/**
+ * All spaces' own order (chunk 21), one person's: where they put a task among the tasks of every space. A row only
+ * counts while its `day` is still the task's day, so a task moved elsewhere falls back to "no place" by itself.
+ */
+export const allSpacesPlaces = pgTable(
+  'all_spaces_places',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    taskId: text('task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'cascade' }),
+    /** The day the place was given on; null is the Backlog. */
+    day: date('day', { mode: 'string' }),
+    position: doublePrecision('position').notNull(),
+    /** The client's clock of the last place (last write wins). */
+    clock: timestamp('clock', { withTimezone: true }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.taskId] }),
+    index('all_spaces_places_user_day').on(t.userId, t.day),
+  ],
+);
+
 export const appliedMutations = pgTable('applied_mutations', {
   id: text('id').primaryKey(),
   userId: text('user_id')

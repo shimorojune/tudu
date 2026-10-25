@@ -15,10 +15,10 @@ import {
   weekFirstOpen,
   weekHeading,
   type IsoDate,
+  type Task,
   type TaskRefResponse,
 } from '@tudu/core';
 import {
-  Banner,
   DayHeader,
   EmptyState,
   Sheet,
@@ -32,12 +32,23 @@ import {
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { setPage, showWeek, useFlash, useShownWeek } from '../../app/dayView';
 import { api, meQuery } from '../../app/session';
-import { spacePath, useSpace } from '../../app/space';
+import {
+  cachedAll,
+  cachedOrder,
+  taskHref,
+  useAllFilters,
+  useAllMarks,
+  useAllProjects,
+  useAllScope,
+  useAllWeek,
+  type AllScope,
+} from '../../app/allSpaces';
+import { allPath, spacePath, useSpace } from '../../app/space';
 import { openInJira } from '../../app/jira';
 import { taskStore, useOnline } from '../../app/tasks';
 import { useViewport, type Viewport } from '../../app/viewport';
 import { useWorkingDay } from '../../app/workingDay';
-import { toItem } from '../today/TodayPage';
+import { AllBanners, FilterChips, OfflineBanner, openInSpace, toItem } from '../today/TodayPage';
 import { TaskPanel, type OpenTask } from '../today/TaskPanel';
 import { useFolds } from './folds';
 import { taskLink } from '../../app/links';
@@ -66,6 +77,8 @@ export function WeekPage() {
   const vp = useViewport();
   const me = useQuery(meQuery).data;
   const space = useSpace();
+  const all = useAllScope();
+  const filters = useAllFilters(all);
   const { today } = useWorkingDay();
   const online = useOnline();
   const thisMonday = mondayOf(today);
@@ -82,7 +95,10 @@ export function WeekPage() {
   const resolving = useRef<string | null>(null);
   const closed = useRef<string | null>(null);
   const spaceId = space.id;
-  const here = spacePath(space.slug, 'week');
+  const base = all ? allPath('week') : spacePath(space.slug, 'week');
+  const filterSlug = all?.filter?.slug ?? null;
+  const here = taskHref(base, null, filterSlug);
+  const hrefFor = (ref: string | null | undefined) => taskHref(base, ref, filterSlug);
   useEffect(() => {
     const ref = search.task;
     if (!ref || !spaceId || open || resolving.current === ref || closed.current === ref) return;
@@ -90,7 +106,7 @@ export function WeekPage() {
     void api.get<TaskRefResponse>(`/api/tasks/ref/${encodeURIComponent(ref)}`).then(
       (r) => {
         if (r.day) showWeek(mondayOf(r.day), thisMonday);
-        setOpen({ id: r.taskId, dir: 'next' });
+        setOpen({ id: r.taskId, spaceId: r.spaceId, dir: 'next' });
       },
       () => {
         resolving.current = null;
@@ -99,10 +115,10 @@ export function WeekPage() {
     );
   }, [search.task, spaceId, open, thisMonday, navigate, here]);
   const openTask = (id: string, ref: string | null | undefined, dir: 'next' | 'prev' = 'next') => {
-    setOpen({ id, dir });
+    setOpen({ id, dir, spaceId: taskStore.lastSeen(id)?.spaceId });
     closed.current = null;
     if (ref) resolving.current = ref;
-    void navigate({ href: ref ? `${here}?task=${encodeURIComponent(ref)}` : here, replace: true });
+    void navigate({ href: hrefFor(ref), replace: true });
   };
   const closeTask = () => {
     setOpen(null);
@@ -111,15 +127,22 @@ export function WeekPage() {
     if (search.task) void navigate({ href: here, replace: true });
   };
 
+  const week = useAllWeek(all, me?.user.id ?? '', monday, today);
   if (!me) return null;
+  const failed =
+    all && !week.error ? all.spaces.filter((s) => week.days.some((d) => d.failed.includes(s))) : [];
+  const openSpace = all
+    ? (all.spaces.find((x) => x.id === (open?.spaceId ?? taskStore.lastSeen(open?.id ?? '')?.spaceId)) ??
+      all.target)
+    : space;
   return (
     <div className="app-page app-week">
-      {!online ? (
-        <Banner tone="warning" title="You’re offline.">
-          Changes are saved here and sync when you’re back.
-        </Banner>
-      ) : null}
+      <OfflineBanner online={online} all={!!all} />
+      {all ? <AllBanners all={all} failed={failed} onRetry={week.refetch} /> : null}
       <WeekSheet
+        all={all}
+        filters={filters}
+        meId={me.user.id}
         spaceId={space.id}
         monday={monday}
         today={today}
@@ -129,7 +152,8 @@ export function WeekPage() {
         openKey={open?.id}
       />
       <TaskPanel
-        spaceId={space.id}
+        spaceId={openSpace.id}
+        space={all ? openSpace : undefined}
         open={open}
         today={today}
         vp={vp}
@@ -137,17 +161,22 @@ export function WeekPage() {
         onClose={closeTask}
         onStep={(id, dir) => openTask(id, taskStore.lastSeen(id)?.ref, dir)}
         onRef={(ref) => {
-          if (search.task !== ref)
-            void navigate({ href: `${here}?task=${encodeURIComponent(ref)}`, replace: true });
+          if (search.task !== ref) void navigate({ href: hrefFor(ref), replace: true });
         }}
         linkFor={taskLink}
         backFor={(day) => (day ? 'Week' : 'Backlog')}
+        neighbours={all ? (d) => cachedAll(all, me.user.id, d).map((t) => t.id) : undefined}
+        onOpenSpace={all ? (s, ref) => openInSpace(navigate, s, ref, open?.id) : undefined}
       />
     </div>
   );
 }
 
 interface WeekSheetProps {
+  /** All spaces: every space's week, gathered; null on a space's own week. */
+  all: AllScope | null;
+  filters: ReturnType<typeof useAllFilters>;
+  meId: string;
   spaceId: string;
   monday: IsoDate;
   today: IsoDate;
@@ -158,20 +187,57 @@ interface WeekSheetProps {
 }
 
 /** The sheet: the week's header, then the tiles (desk) or the folding days (tablets and phones). */
-function WeekSheet({ spaceId, monday, today, vp, onWeek, onOpenTask, openKey }: WeekSheetProps) {
+function WeekSheet({
+  all,
+  filters,
+  meId,
+  spaceId,
+  monday,
+  today,
+  vp,
+  onWeek,
+  onOpenTask,
+  openKey,
+}: WeekSheetProps) {
   const desk = vp === 'desktop';
   const compact = vp === 'phone';
   const narrow = useNarrow();
   const days = weekDays(monday);
-  const week = useQuery(taskStore.weekQuery(spaceId, monday, today));
+  const week = useQuery({ ...taskStore.weekQuery(spaceId, monday, today), enabled: !all });
   const ready = !week.isPending;
   // The tiles read the day caches the week read filled; they ask the server for nothing on their own.
   const lists = useQueries({
-    queries: days.map((d) => ({ ...taskStore.dayQuery(spaceId, d, today), enabled: ready })),
+    queries: days.map((d) => ({ ...taskStore.dayQuery(spaceId, d, today), enabled: ready && !all })),
   });
-  const backlog = useQuery({ ...taskStore.backlogQuery(spaceId), enabled: ready });
-  const projects = useQuery(taskStore.projectsQuery(spaceId)).data ?? [];
-  const marks = useQuery(taskStore.marksQuery(spaceId, addDays(monday, -42), addDays(monday, 19))).data ?? {};
+  const backlog = useQuery({ ...taskStore.backlogQuery(spaceId), enabled: ready && !all });
+  const gathered = useAllWeek(all, meId, monday, today);
+  const spaceProjects = useQuery({ ...taskStore.projectsQuery(spaceId), enabled: !all }).data ?? [];
+  const projectsOf = useAllProjects(all);
+  const marksFrom = addDays(monday, -42);
+  const marksTo = addDays(monday, 19);
+  const spaceMarks =
+    useQuery({ ...taskStore.marksQuery(spaceId, marksFrom, marksTo), enabled: !all }).data ?? {};
+  const allMarks = useAllMarks(all, marksFrom, marksTo);
+  const marks = all ? allMarks : spaceMarks;
+  const spaceOf = (id: string) => all?.spaces.find((s) => s.id === id);
+  const itemOf = (t: Task) =>
+    all ? toItem(t, today, projectsOf(t.spaceId), spaceOf(t.spaceId)) : toItem(t, today, spaceProjects);
+  // In All spaces a tile shows what the space filter leaves, a beat behind the header (as the list narrows).
+  const narrowed = (tasks: Task[] | undefined) =>
+    all && filters.lagSpace ? tasks?.filter((t) => t.spaceId === filters.lagSpace) : tasks;
+  const tasksOf = (day: IsoDate | null): Task[] | undefined => {
+    if (all) {
+      const l = day === null ? gathered.backlog : gathered.days[days.indexOf(day)];
+      return l && !l.pending ? l.tasks : undefined;
+    }
+    return day === null ? backlog.data?.tasks : lists[days.indexOf(day)]?.data?.tasks;
+  };
+  const orderOf = (day: IsoDate | null) => {
+    if (!all) return [];
+    const l = day === null ? gathered.backlog : gathered.days[days.indexOf(day)];
+    return l ? l.order : cachedOrder(all, meId, day);
+  };
+  const spaceIdOf = (key: string) => taskStore.lastSeen(key)?.spaceId ?? spaceId;
   const flash = useFlash();
   const folds = useFolds();
 
@@ -187,6 +253,12 @@ function WeekSheet({ spaceId, monday, today, vp, onWeek, onOpenTask, openKey }: 
     latest.current = monday;
   });
 
+  function isOpen(key: IsoDate | 'b'): boolean {
+    const kept = folds?.get(key);
+    if (kept !== undefined) return kept;
+    return key !== 'b' && key === weekFirstOpen(monday, today);
+  }
+
   // A task that just landed in a folded day opens that day.
   useEffect(() => {
     if (!flash || !folds) return;
@@ -195,17 +267,11 @@ function WeekSheet({ spaceId, monday, today, vp, onWeek, onOpenTask, openKey }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new flash opens a day
   }, [flash?.nonce]);
 
-  function isOpen(key: IsoDate | 'b'): boolean {
-    const kept = folds?.get(key);
-    if (kept !== undefined) return kept;
-    return key !== 'b' && key === weekFirstOpen(monday, today);
-  }
-
   const h = weekHeading(monday, today);
   let total = 0;
   let done = 0;
-  for (const q of lists)
-    for (const t of q.data?.tasks ?? []) {
+  for (const d of days)
+    for (const t of narrowed(tasksOf(d)) ?? []) {
       total += 1;
       if (t.done) done += 1;
     }
@@ -214,12 +280,15 @@ function WeekSheet({ spaceId, monday, today, vp, onWeek, onOpenTask, openKey }: 
   function listFor(day: IsoDate | null, tasks: TaskItem[] | undefined, pending: boolean): ReactNode {
     if (!tasks) return pending ? <TaskListSkeleton rows={3} compact /> : null;
     const past = day !== null && compareIso(day, today) < 0;
-    const raw = day === null ? backlog.data?.tasks : lists[days.indexOf(day)]?.data?.tasks;
+    const raw = tasksOf(day);
+    const order = orderOf(day);
     return (
       <TaskList
         onSignal={(t, k) => {
-          if (k === 'jira' && t.jira) openInJira(spaceId, t.jira);
+          if (k === 'jira' && t.jira) openInJira(spaceIdOf(t.key), t.jira);
+          else if (all) filters.onSignal(t, k, false);
         }}
+        filterSpace={all ? filters.lagSpace : undefined}
         tasks={tasks}
         label={day === null ? 'Tasks in the Backlog' : `Tasks for ${formatLong(day)}`}
         compact
@@ -233,9 +302,19 @@ function WeekSheet({ spaceId, monday, today, vp, onWeek, onOpenTask, openKey }: 
         flashKey={flash && flash.day === day ? flash.id : undefined}
         selectedKey={openKey}
         onToggleTask={(t, v) => taskStore.cross(t.key, v)}
-        onReorder={(_, moved) => taskStore.place(moved.key, day, moved.to)}
-        onReceive={(key, at) => taskStore.place(key, day, at)}
-        onMoveTask={(t, to, _from, at) => taskStore.place(t.key, to, at)}
+        onReorder={(_, moved) =>
+          all
+            ? taskStore.placeInAll(moved.key, day, moved.to, order)
+            : taskStore.place(moved.key, day, moved.to)
+        }
+        onReceive={(key, at) =>
+          all ? taskStore.moveInAll(key, day, at, order) : taskStore.place(key, day, at)
+        }
+        onMoveTask={(t, to, _from, at) =>
+          all && at !== undefined
+            ? taskStore.moveInAll(t.key, to, at, orderOf(to))
+            : taskStore.place(t.key, to, at)
+        }
         onKeepTask={(t) => taskStore.keep(t.key)}
         onDueChange={(t, due) => taskStore.due(t.key, due)}
         onOpenTask={(t) => onOpenTask(t.key, raw?.find((x) => x.id === t.key)?.ref ?? t.id)}
@@ -243,15 +322,16 @@ function WeekSheet({ spaceId, monday, today, vp, onWeek, onOpenTask, openKey }: 
     );
   }
 
-  const failed = week.isError && !week.data;
+  const failed = all ? gathered.error : week.isError && !week.data;
+  const pending = all ? gathered.pending : week.isPending;
   const error = (
     <EmptyState
       tone="error"
-      title="Couldn’t load this week."
+      title={all ? 'Your spaces didn’t load.' : 'Couldn’t load this week.'}
       action="Try again"
-      loading={week.isFetching}
+      loading={all ? gathered.fetching : week.isFetching}
       loadingLabel="Trying again"
-      onAction={() => void week.refetch()}
+      onAction={() => (all ? gathered.refetch() : void week.refetch())}
     >
       Check your connection. Anything you already see stays as it is.
     </EmptyState>
@@ -276,13 +356,15 @@ function WeekSheet({ spaceId, monday, today, vp, onWeek, onOpenTask, openKey }: 
       doneNote="That’s the week"
       bare={desk}
       compact={compact}
-    />
+    >
+      {all ? <FilterChips all={all} filters={filters} /> : null}
+    </DayHeader>
   );
 
-  const dayTiles = days.map((d, i) => {
-    const q = lists[i]!;
-    const tasks = q.data?.tasks;
-    const items = tasks?.map((t) => toItem(t, today, projects));
+  const dayTiles = days.map((d) => {
+    const all_ = tasksOf(d);
+    const tasks = narrowed(all_);
+    const items = all_?.map(itemOf);
     const openTitles = tasks?.filter((t) => !t.done).map((t) => t.title) ?? [];
     return {
       day: d,
@@ -290,19 +372,26 @@ function WeekSheet({ spaceId, monday, today, vp, onWeek, onOpenTask, openKey }: 
       count: tasks ? tileCount(tasks.length, tasks.filter((t) => t.done).length) : '',
       empty: !!tasks && tasks.length === 0,
       preview: tasks ? tilePreview(openTitles, tasks.length) : '',
-      body: listFor(d, items, week.isPending),
+      body: listFor(d, items, pending),
     };
   });
-  const backlogTasks = backlog.data?.tasks;
-  const backlogItems = backlogTasks?.map((t) => toItem(t, today, projects));
-  const backlogBody = listFor(null, backlogItems, week.isPending);
+  const backlogAll = tasksOf(null);
+  const backlogTasks = narrowed(backlogAll);
+  const backlogItems = backlogAll?.map(itemOf);
+  const backlogBody = listFor(null, backlogItems, pending);
   const backlogCount = backlogTasks ? tileCount(backlogTasks.length, 0) : '';
   const backlogEmpty = !!backlogTasks && backlogTasks.length === 0;
 
   if (desk) {
     return (
-      <Sheet label="The week" plain fill turnKey={monday} turnDir={dir}>
-        {header}
+      <Sheet
+        label={all ? 'The week, every space' : 'The week'}
+        plain
+        fill
+        turnKey={all ? `${monday}:${filters.lagSpace ?? ''}` : monday}
+        turnDir={dir}
+      >
+        {all ? <div className={filters.headerClass}>{header}</div> : header}
         {failed ? (
           <div className="app-week-error">{error}</div>
         ) : (
@@ -342,8 +431,14 @@ function WeekSheet({ spaceId, monday, today, vp, onWeek, onOpenTask, openKey }: 
   }
 
   return (
-    <Sheet label="The week" fill minHeight={MIN_HEIGHT[vp]} turnKey={monday} turnDir={dir}>
-      {header}
+    <Sheet
+      label={all ? 'The week, every space' : 'The week'}
+      fill
+      minHeight={MIN_HEIGHT[vp]}
+      turnKey={all ? `${monday}:${filters.lagSpace ?? ''}` : monday}
+      turnDir={dir}
+    >
+      {all ? <div className={filters.headerClass}>{header}</div> : header}
       <SheetBody>
         {failed
           ? error

@@ -1,6 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
-import { addDays, inboxBadge, membersWords, spaceInitials, weekdayName, type SpaceSummary } from '@tudu/core';
+import {
+  addDays,
+  ALL_SLUG,
+  hasAllSpaces,
+  inboxBadge,
+  membersWords,
+  spaceInitials,
+  switcherOrder,
+  weekdayName,
+  type SpaceSummary,
+} from '@tudu/core';
 import {
   Avatar,
   BottomTabs,
@@ -13,7 +23,7 @@ import {
   type SidebarItem,
   type SwitchSpace,
 } from '@tudu/ui';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { MeResponse } from '@tudu/client';
 import { cx } from '@tudu/ui';
 import {
@@ -36,7 +46,8 @@ import { initialsOf, photoSrc, signOut } from './session';
 import { SettingsHost, settingsHref } from './settings';
 import { inApp } from './desktop';
 import { inboxTotal, useUpdate } from './updates';
-import { INBOX_PATH, spacePath, switchPath, viewOf, type View } from './space';
+import { useAllMarks, useAllScope } from './allSpaces';
+import { ALL_VIEWS, INBOX_PATH, pagePath, switchPath, viewOf, type View } from './space';
 import { CreateSpaceHost, MembersHost } from './spaces';
 import { taskStore } from './tasks';
 import { useViewport } from './viewport';
@@ -56,10 +67,20 @@ const VIEWS: Array<{
   { value: 'people', label: 'People', icon: 'team', team: true },
 ];
 
-/** The sidebar's views: the space's own pages. The Inbox is across spaces, so it opens from the top bar. */
-export function sideItems(team: boolean): SidebarItem[] {
-  return VIEWS.filter((v) => team || !v.team).map((v) => ({ value: v.value, label: v.label, icon: v.icon }));
+/**
+ * The sidebar's views: the space's own pages. The Inbox is across spaces, so it opens from the top bar. All spaces
+ * has Today, Week and the Backlog only.
+ */
+export function sideItems(team: boolean, all = false): SidebarItem[] {
+  return VIEWS.filter((v) => (all ? ALL_VIEWS.includes(v.value) : team || !v.team)).map((v) => ({
+    value: v.value,
+    label: v.label,
+    icon: v.icon,
+  }));
 }
+
+/** How long the page fades out before the next space's page comes in. */
+export const PAGE_OUT_MS = 110;
 
 const SIDEBAR_KEY = 'tudu.sidebar';
 
@@ -90,17 +111,26 @@ export function phoneTab(at: { view: View; onToday: boolean; searchOpen: boolean
   return at.onToday ? 'today' : at.view;
 }
 
-/** The spaces as the switcher lists them: Personal first, each with its quiet line and its own Inbox count. */
+/**
+ * The spaces as the switcher lists them: All spaces first (with two spaces or more, and no count of its own), then
+ * Personal, each with its quiet line and its own Inbox count.
+ */
 export function switchSpaces(spaces: SpaceSummary[]): SwitchSpace[] {
-  return spaces.map((s) => ({
-    id: s.id,
-    name: s.name,
-    color: s.color ?? undefined,
-    personal: s.kind === 'personal',
-    initials: spaceInitials(s.name),
-    sub: membersWords(s.members),
-    count: inboxBadge(s.inbox) || undefined,
-  }));
+  const all: SwitchSpace[] = hasAllSpaces(spaces)
+    ? [{ id: ALL_SLUG, all: true, name: 'All spaces', sub: 'Everything that’s yours' }]
+    : [];
+  return [
+    ...all,
+    ...switcherOrder(spaces).map((s) => ({
+      id: s.id,
+      name: s.name,
+      color: s.color ?? undefined,
+      personal: s.kind === 'personal',
+      initials: spaceInitials(s.name),
+      sub: membersWords(s.members),
+      count: inboxBadge(s.inbox) || undefined,
+    })),
+  ];
 }
 
 /**
@@ -110,10 +140,13 @@ export function switchSpaces(spaces: SpaceSummary[]): SwitchSpace[] {
 export function AppShell({
   me,
   space,
+  all = false,
   children,
 }: {
   me: MeResponse;
   space: SpaceSummary;
+  /** All spaces: its own sidebar (Today, Week, Backlog), no Jira, and the dots of every space. */
+  all?: boolean;
   children: ReactNode;
 }) {
   const vp = useViewport();
@@ -135,10 +168,13 @@ export function AppShell({
   const view = useDayView();
   const days = [1, 2, 3, 4, 5].map((n) => addDays(today, n));
   // The sidebar's week: a dot for each day that has tasks.
-  const marks = useQuery({
+  const single = useQuery({
     ...taskStore.marksQuery(space.id, days[0]!, days[4]!),
-    enabled: vp === 'desktop',
+    enabled: vp === 'desktop' && !all,
   }).data;
+  const scope = useAllScope();
+  const allMarks = useAllMarks(all && vp === 'desktop' ? scope : null, days[0]!, days[4]!);
+  const marks = all ? allMarks : single;
   const week = days.map((d) => ({
     value: `day:${d}`,
     date: d.slice(8).replace(/^0/, ''),
@@ -169,15 +205,17 @@ export function AppShell({
   const onInbox = current === 'inbox';
   const openInbox = () => void navigate({ href: INBOX_PATH });
   const app = inApp();
-  const items = sideItems(team);
+  const items = sideItems(team, all);
 
   // Jira, once connected: the sidebar's Apps section, the top bar's button and a phone tab, each with the count.
-  const jira = useJira(space.id);
+  // All spaces has none: Jira is a space's.
+  const spaceJira = useJira(space.id);
+  const jira = all ? { ...spaceJira, conn: null, count: null } : spaceJira;
   const jiraFresh = useJiraFresh();
   const jiraOpen = jiraParam(loc.searchStr).open;
   const toggleJira = () => void navigate({ href: withJira(loc, jiraOpen ? false : null) });
 
-  const go = (v: View) => void navigate({ href: spacePath(space.slug, v) });
+  const go = (v: View) => void navigate({ href: pagePath(space.slug, all, v) });
   const onSelect = (value: string) => {
     if (value === 'app:Jira') {
       toggleJira();
@@ -201,22 +239,38 @@ export function AppShell({
     onFeedback: openFeedback,
     onSignOut: () => void signOut().then(() => navigate({ to: '/sign-in', replace: true })),
   };
+  // Switching: the page fades out, the address changes behind it, the next page rises in.
+  const [leaving, setLeaving] = useState(false);
+  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => void (leaveTimer.current && clearTimeout(leaveTimer.current)), []);
+  const switchTo = (href: string) => {
+    if (leaveTimer.current) return;
+    setLeaving(true);
+    leaveTimer.current = setTimeout(() => {
+      leaveTimer.current = null;
+      setLeaving(false);
+      void navigate({ href });
+    }, PAGE_OUT_MS);
+  };
+  const here = all ? ALL_SLUG : space.id;
   const switcher = (variant: 'menu' | 'sheet', rail = false) => (
     <SpaceSwitch
       variant={variant}
       rail={rail}
       spaces={switchSpaces(me.spaces)}
-      active={space.id}
+      active={here}
       onPick={(s) => {
+        if (s.id === here) return;
+        if (s.id === ALL_SLUG) return switchTo(switchPath(path, ALL_SLUG));
         const next = me.spaces.find((x) => x.id === s.id);
-        if (next) void navigate({ href: switchPath(path, next.slug) });
+        if (next) switchTo(switchPath(path, next.slug));
       }}
       onCreate={openCreateSpace}
     />
   );
   // Switching spaces fades the new page in; the shell around it never moves.
   const page = (
-    <div key={space.id} className="app-page-in">
+    <div key={here} className={cx('app-page-in', leaving && 'app-page-out')}>
       {children}
     </div>
   );
@@ -227,8 +281,8 @@ export function AppShell({
       <CreateSpaceHost />
       <MembersHost me={me} space={space} />
       <SettingsHost me={me} space={space} />
-      <JiraHost space={space} />
-      <AppsHost space={space} />
+      {all ? null : <JiraHost space={space} />}
+      {all ? null : <AppsHost space={space} />}
       <GettingStartedHost me={me} space={space} vp={vp} />
       <FeedbackHost space={space} vp={vp} />
     </>
@@ -312,7 +366,7 @@ export function AppShell({
           week={rail ? [] : week}
           head={switcher('menu', rail || collapsed)}
           connected={jira.conn ? [{ label: 'Jira', count: jira.count, fresh: jiraFresh }] : []}
-          onAddApp={openApps}
+          onAddApp={all ? undefined : openApps}
           active={active}
           onSelect={onSelect}
           rail={rail}

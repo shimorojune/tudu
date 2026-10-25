@@ -196,6 +196,7 @@ const jiraKey = z
  * | me.rename     | your name (the last word stands)  |
  * | space.update  | a team space's name or colour, by an admin |
  * | project.restore | a deleted project, back on the tasks it was taken off (Undo) |
+ * | all.place     | your place for a task in All spaces' own order (yours alone; the task is untouched) |
  */
 export const taskMutationSchema = z.discriminatedUnion('type', [
   z.object({
@@ -308,6 +309,14 @@ export const taskMutationSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('inbox.clear'), payload: z.object({ id, ids: z.array(id).min(1).max(500) }) }),
   /** Undo a delete or a Clear all. */
   z.object({ type: z.literal('inbox.restore'), payload: z.object({ id, ids: z.array(id).min(1).max(500) }) }),
+  /**
+   * All spaces' own order (chunk 21): where you put a task among every space's tasks on its day. `id` is the task;
+   * only your place changes, never the task's position in its space. `day` must be the task's day.
+   */
+  z.object({
+    type: z.literal('all.place'),
+    payload: z.object({ id, day: isoDay.nullable(), position }),
+  }),
 ]);
 
 /** The task a mutation is about, whatever it names; a project change names its project instead. */
@@ -320,6 +329,13 @@ export function isInboxMutation(
   m: TaskMutationBody,
 ): m is Extract<TaskMutationBody, { type: `request.${string}` | `inbox.${string}` }> {
   return m.type.startsWith('request.') || m.type.startsWith('inbox.');
+}
+
+/** A change to All spaces' order: yours alone, no task or list of a space changes. */
+export function isAllMutation(
+  m: TaskMutationBody,
+): m is Extract<TaskMutationBody, { type: `all.${string}` }> {
+  return m.type.startsWith('all.');
 }
 
 export function isProjectMutation(
@@ -377,6 +393,24 @@ export interface TasksChangedEvent {
 }
 
 export const TASKS_CHANGED = 'tasks.changed';
+
+/** Your All spaces order changed (in another tab of yours): read the places of these days again. */
+export interface AllSpacesChangedEvent {
+  days: Array<IsoDate | null>;
+  clientId: string | null;
+}
+export const ALL_SPACES_CHANGED = 'all-spaces.changed';
+
+/** Where you put a task in All spaces, on its day (null is the Backlog). */
+export interface AllSpacesPlace {
+  taskId: string;
+  day: IsoDate | null;
+  position: number;
+}
+
+export interface AllSpacesPlacesResponse {
+  places: AllSpacesPlace[];
+}
 
 /** A space's projects changed: read them again. */
 export interface ProjectsChangedEvent {

@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { searchWhere, type Project, type SearchHit, type SearchResponse } from '@tudu/core';
 import { SearchPanel, SP_LEAVE_MS, SP_LEAVE_PHONE_MS, type SearchItem } from '@tudu/ui';
@@ -7,6 +7,7 @@ import type { MeResponse } from '@tudu/client';
 import { closeSearch, openQuickAdd, useSearchOpen } from './dayView';
 import { addRecentTask, addSearch, clearSearches, goToTask, useRecentTasks, useSearches } from './search';
 import { api } from './session';
+import { useAllScope } from './allSpaces';
 import { useSpace } from './space';
 import { taskStore } from './tasks';
 import { useViewport } from './viewport';
@@ -36,7 +37,10 @@ export function toSearchItem(
   };
 }
 
-/** The space a close match carries, for its row, when it is not the one you are in. */
+/**
+ * The space a hit carries, for its row, when it is not the one you are in. In All spaces you are in none (`hereId`
+ * empty), so every hit carries one.
+ */
 export function spaceOfHit(h: SearchHit, spaces: MeResponse['spaces'], hereId: string) {
   if (!h.spaceId || h.spaceId === hereId) return null;
   const s = spaces.find((x) => x.id === h.spaceId);
@@ -55,9 +59,10 @@ function useSettled(value: string, ms: number): string {
 }
 
 /**
- * Search over the app: the panel on the desk and tablets, the sheet on phones. The server answers every key
- * (a moment after it); the rows stay while the next answer comes. A pick turns the page to the task and glows
- * its row; Create opens Quick Add with the words.
+ * Search over the app: the panel on the desk and tablets, the sheet on phones. It finds every task you can see in
+ * every space you are in, from any page; the space you are in only wins ties. The server answers every key (a
+ * moment after it); the rows stay while the next answer comes. A pick turns the page to the task (in its own
+ * space) and glows its row; Create opens Quick Add with the words.
  */
 export function SearchHost({ me }: { me: MeResponse }) {
   const vp = useViewport();
@@ -65,19 +70,28 @@ export function SearchHost({ me }: { me: MeResponse }) {
   const { today } = useWorkingDay();
   const navigate = useNavigate();
   const space = useSpace();
-  const spaceId = space.id;
+  const all = useAllScope();
+  // The space you are in, for ties and labels; in All spaces, none.
+  const spaceId = all ? '' : space.id;
   const [q, setQ] = useState('');
   const qd = useSettled(q, SEARCH_AFTER_MS);
-  const projects = useQuery({ ...taskStore.projectsQuery(spaceId), enabled: !!spaceId && open }).data ?? [];
+  // A hit's project is its own space's.
+  const projectLists = useQueries({
+    queries: me.spaces.map((s) => ({ ...taskStore.projectsQuery(s.id), enabled: open })),
+  });
+  const projectsOf = (h: SearchHit): Project[] =>
+    projectLists[me.spaces.findIndex((s) => s.id === (h.spaceId ?? space.id))]?.data ?? [];
+  const item = (h: SearchHit) => toSearchItem(h, today, projectsOf(h), spaceOfHit(h, me.spaces, spaceId));
   const hits = useQuery({
     queryKey: ['search', spaceId, qd, today],
     queryFn: async () => {
+      const here = spaceId ? `&here=${spaceId}` : '';
       const r = await api.get<SearchResponse>(
-        `/api/spaces/${spaceId}/search?q=${encodeURIComponent(qd)}&today=${today}`,
+        `/api/search?q=${encodeURIComponent(qd)}&today=${today}${here}`,
       );
       return { query: qd, hits: r.hits };
     },
-    enabled: !!spaceId && !!qd,
+    enabled: !!qd,
     placeholderData: keepPreviousData,
     staleTime: 0,
     gcTime: 60_000,
@@ -85,21 +99,20 @@ export function SearchHost({ me }: { me: MeResponse }) {
     // Offline, the search fails at once (the quiet line) rather than waiting for the connection.
     networkMode: 'always',
   });
-  const recentIds = useRecentTasks(spaceId);
+  const recentIds = useRecentTasks();
   const recent = useQuery({
-    queryKey: ['search-recent', spaceId, recentIds.join(',')],
+    queryKey: ['search-recent', recentIds.join(',')],
     queryFn: async () => {
-      const r = await api.get<SearchResponse>(
-        `/api/spaces/${spaceId}/search?ids=${encodeURIComponent(recentIds.join(','))}`,
-      );
-      return r.hits;
+      const r = await api.get<SearchResponse>(`/api/search?ids=${encodeURIComponent(recentIds.join(','))}`);
+      // In the order you opened them.
+      return recentIds.flatMap((id) => r.hits.filter((h) => h.id === id));
     },
-    enabled: !!spaceId && open && recentIds.length > 0,
+    enabled: open && recentIds.length > 0,
     staleTime: 0,
     retry: false,
     networkMode: 'always',
   });
-  const history = useSearches(spaceId);
+  const history = useSearches();
   const leaveMs = vp === 'phone' ? SP_LEAVE_PHONE_MS : SP_LEAVE_MS;
 
   // Close matches, by meaning, from every space you are in: asked by the panel a moment after the words settle,
@@ -116,7 +129,7 @@ export function SearchHost({ me }: { me: MeResponse }) {
       `/api/search/meaning?q=${encodeURIComponent(q)}${exclude ? `&exclude=${exclude}` : ''}`,
     );
     for (const h of r.hits) similarHits.current.set(h.id, h);
-    return r.hits.map((h) => toSearchItem(h, today, projects, spaceOfHit(h, me.spaces, spaceId)));
+    return r.hits.map(item);
   };
 
   const pick = (item: SearchItem) => {
@@ -125,9 +138,9 @@ export function SearchHost({ me }: { me: MeResponse }) {
       similarHits.current.get(item.key);
     if (!h) return;
     closeSearch();
-    // A close match from another space: the page turns to that space, and the task joins its recently opened.
+    // A hit from another space (any hit, in All spaces): the page turns to that space.
     const target = h.spaceId && h.spaceId !== spaceId ? me.spaces.find((x) => x.id === h.spaceId) : null;
-    addRecentTask(target ? target.id : spaceId, h.id);
+    addRecentTask(h.id);
     setTimeout(
       () => goToTask(h, today, (to) => void navigate({ href: to }), target ? target.slug : space.slug),
       leaveMs + 20,
@@ -146,19 +159,19 @@ export function SearchHost({ me }: { me: MeResponse }) {
         hits.data && !hits.isError && q.trim().toLowerCase()
           ? {
               query: hits.data.query.toLowerCase(),
-              hits: hits.data.hits.map((h) => toSearchItem(h, today, projects)),
+              hits: hits.data.hits.map(item),
             }
           : null
       }
       loading={!!qd && hits.isPending && !hits.data}
       error={hits.isError && !hits.isFetching}
       onRetry={() => void hits.refetch()}
-      recent={recentIds.length && recent.data ? recent.data.map((h) => toSearchItem(h, today, projects)) : []}
+      recent={recentIds.length && recent.data ? recent.data.map(item) : []}
       history={history}
-      onClearHistory={() => clearSearches(spaceId)}
+      onClearHistory={clearSearches}
       onQuery={setQ}
       similar={similar}
-      onSearched={(words) => addSearch(spaceId, words)}
+      onSearched={addSearch}
       onPick={pick}
       onCreate={create}
       onClose={closeSearch}

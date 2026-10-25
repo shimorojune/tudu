@@ -33,7 +33,8 @@ import { ProjectMenu, type ProjectOption } from './ProjectMenu';
 import { RichTextContent, RichTextEditor, toHtml } from './RichTextEditor';
 import { Skeleton } from './Skeleton';
 import { SubtaskList, type SubtaskItem } from './SubtaskList';
-import { COPY_FLASH_MS, CopyMark, type TaskCarried } from './TaskRow';
+import { SpaceTile } from './SpaceTile';
+import { COPY_FLASH_MS, CopyMark, type TaskCarried, type TaskSpace } from './TaskRow';
 import { showToast } from './Toast';
 
 export interface DetailComment {
@@ -110,6 +111,10 @@ export interface TaskDetailProps {
   readOnly?: boolean;
   owner?: { name: string; initials: string; color?: string | null };
   ownerLine?: string;
+  /** All spaces: the space the task lives in, a read-only fact first. A task never changes space. */
+  inSpace?: TaskSpace;
+  /** Clicking the Space fact: open the task in its own space. */
+  onOpenSpace?: () => void;
   /** Over the Inbox: "Go to Fri 16 Oct" in the top bar turns the page to the task's day. */
   onLocate?: () => void;
   locateLabel?: string;
@@ -470,6 +475,26 @@ export function TaskDetail(p: TaskDetailProps) {
 
   const facts = (
     <dl className="tp-td-props">
+      {p.inSpace ? (
+        <div className="tp-td-prop">
+          <dt>
+            <Icon name="layers" size={15} />
+            <span>Space</span>
+          </dt>
+          <dd>
+            <button
+              type="button"
+              className="tp-td-val tp-td-space"
+              title={`Open in ${p.inSpace.name}`}
+              aria-label={`Space: ${p.inSpace.name}. Open in ${p.inSpace.name}`}
+              onClick={p.onOpenSpace}
+            >
+              <SpaceTile space={p.inSpace} size={18} />
+              <span>{p.inSpace.name}</span>
+            </button>
+          </dd>
+        </div>
+      ) : null}
       <Fact
         icon="day"
         label="Planned"

@@ -22,6 +22,8 @@ export interface SpaceFilterProps {
   /** The chosen space's id, or null for every space. */
   value: string | null;
   onChange?: (id: string | null) => void;
+  /** All spaces' own pages: "All spaces" wears its ink tile instead of the Inbox's icon. */
+  allTile?: boolean;
   className?: string;
 }
 
@@ -29,7 +31,7 @@ export interface SpaceFilterProps {
  * The Inbox's one filter: by space. A quiet pill ("All spaces", or the space with its tile) that opens a short menu
  * with every space you are in and what waits there. Picking swaps the list in place; the pill eases to its new width.
  */
-export function SpaceFilter({ spaces, total, value, onChange, className }: SpaceFilterProps) {
+export function SpaceFilter({ spaces, total, value, onChange, allTile, className }: SpaceFilterProps) {
   const [open, setOpen] = useState(false);
   const btn = useRef<HTMLButtonElement | null>(null);
   const cur = value ? spaces.find((s) => s.id === value) : undefined;
@@ -54,7 +56,11 @@ export function SpaceFilter({ spaces, total, value, onChange, className }: Space
           {
             label: (
               <span className="tp-td-mi">
-                <Icon name="inbox" size={14} />
+                {allTile ? (
+                  <SpaceTile space={{ all: true, name: 'All spaces' }} size={18} />
+                ) : (
+                  <Icon name="inbox" size={14} />
+                )}
                 All spaces
               </span>
             ),
@@ -79,7 +85,13 @@ export function SpaceFilter({ spaces, total, value, onChange, className }: Space
           className={cx('tp-sf-pill', cur && 'tp-set')}
           aria-label={`Space: ${cur ? cur.name : 'all spaces'}`}
         >
-          {cur ? tile(cur, 16) : <Icon name="inbox" size={14} />}
+          {cur ? (
+            tile(cur, 16)
+          ) : allTile ? (
+            <SpaceTile space={{ all: true, name: 'All spaces' }} size={16} />
+          ) : (
+            <Icon name="inbox" size={14} />
+          )}
           <span>{label}</span>
           <Icon name="caret" size={12} className="tp-sf-caret" />
         </button>
