@@ -1,6 +1,6 @@
 # CI: more shards, so a PR check takes ~7 minutes instead of ~12
 
-Status: proposal, awaiting Rohit's approval. Canvas: not applicable (CI config only, no visible change); skipping it
+Status: declined by Rohit 25 Oct 2026 (gain too small for the change); see ci-path-filters.md. Canvas: not applicable; skipping it
 needs Rohit's OK.
 
 ## Where the time goes today
