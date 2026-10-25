@@ -3,6 +3,7 @@ import { isIsoDate, type IsoDate } from './dates';
 import { COMMENT_MAX, NOTES_MAX } from './notes';
 import { DECLINE_REASON_MAX, REQUEST_NOTE_MAX } from './inbox';
 import { projectColorSchema, projectNameSchema } from './projects';
+import { CONNECTOR_PROVIDERS, LINK_KEY_MAX, parseLinkKey, type TaskLink } from './connectors';
 import { JIRA_KEY_MAX, JIRA_KEY_PATTERN } from './jira';
 import { personNameSchema, spaceColorSchema, spaceNameSchema } from './spaces';
 
@@ -27,7 +28,12 @@ export interface Task {
   visibility: TaskVisibility;
   /** The project it belongs to, if any (the coloured dot). */
   projectId: string | null;
-  /** The Jira issue it is linked to ("TUDU-212"), if any. */
+  /** The outside issues it is linked to, one per app ("TUDU-212" in Jira). */
+  links: TaskLink[];
+  /**
+   * Its Jira link's key, the same as in `links`. Kept for one release for clients from before connectors, which
+   * read only this; new code reads `links`.
+   */
   jira: string | null;
   /** Whose list it is on. In a team space every page shows your own; People shows everyone's. */
   ownerId: string | null;
@@ -92,7 +98,14 @@ export interface Comment {
 
 /** What the server records as a task changes hands and days, for the History fold. */
 export type HistoryEvent =
-  | { id: number; at: string; kind: 'created'; source?: 'quick-add' | 'jira' | null; key?: string }
+  | {
+      id: number;
+      at: string;
+      kind: 'created';
+      source?: 'quick-add' | 'connector' | null;
+      provider?: TaskLink['provider'];
+      key?: string;
+    }
   | { id: number; at: string; kind: 'due.set'; due: IsoDate }
   | { id: number; at: string; kind: 'due.cleared' }
   | { id: number; at: string; kind: 'moved'; from: IsoDate | null; to: IsoDate | null }
@@ -103,8 +116,8 @@ export type HistoryEvent =
   /** The task came as a request: "Sent by Meera, accepted"; or it came back: "Sent to Meera, taken back". */
   | { id: number; at: string; kind: 'accepted'; from: string }
   | { id: number; at: string; kind: 'withdrawn'; to: string }
-  | { id: number; at: string; kind: 'jira.linked'; key: string }
-  | { id: number; at: string; kind: 'jira.unlinked'; key: string };
+  | { id: number; at: string; kind: 'link.added'; provider: TaskLink['provider']; key: string }
+  | { id: number; at: string; kind: 'link.removed'; provider: TaskLink['provider']; key: string };
 
 export type HistoryKind = HistoryEvent['kind'];
 
@@ -173,6 +186,28 @@ const jiraKey = z
   .max(JIRA_KEY_MAX)
   .transform((k) => k.trim().toUpperCase())
   .refine((k) => JIRA_KEY_PATTERN.test(k), 'That isn’t a Jira issue key.');
+const provider = z.enum(CONNECTOR_PROVIDERS);
+/** A link: the app, and its key in that app's form ("tudu-212 " is TUDU-212 for Jira). */
+const link = z.object({ provider, key: z.string().max(LINK_KEY_MAX) }).transform((l, ctx) => {
+  const key = parseLinkKey(l.provider, l.key);
+  if (!key) {
+    ctx.addIssue({ code: 'custom', message: 'That isn’t an issue key.' });
+    return z.NEVER;
+  }
+  return { provider: l.provider, key };
+});
+/** A link set or taken off (a null key), on one task. */
+const taskLink = z
+  .object({ id, provider, key: z.string().max(LINK_KEY_MAX).nullable() })
+  .transform((l, ctx) => {
+    if (l.key === null) return { id: l.id, provider: l.provider, key: null };
+    const key = parseLinkKey(l.provider, l.key);
+    if (!key) {
+      ctx.addIssue({ code: 'custom', message: 'That isn’t an issue key.' });
+      return z.NEVER;
+    }
+    return { id: l.id, provider: l.provider, key };
+  });
 
 /**
  * The changes a client sends. Each one names the fields it writes; the server keeps, per field, the clock of the
@@ -190,7 +225,8 @@ const jiraKey = z
  * | task.due      | due                      |
  * | task.notes    | notes                    |
  * | task.visibility | visibility             |
- * | task.jira     | the linked Jira key (link, unlink) |
+ * | task.link     | the task's link in one app (link, unlink); one clock per app |
+ * | task.jira     | the same for Jira, from clients before connectors (one release) |
  * | subtask.*     | one subtask's title, done, position or deleted (its own clocks) |
  * | comment.*     | one comment, by its author (no clocks: the author's last word stands) |
  * | me.rename     | your name (the last word stands)  |
@@ -214,9 +250,12 @@ export const taskMutationSchema = z.discriminatedUnion('type', [
       notes: notes.optional(),
       /** Ids of files uploaded before the task existed; they become its attachments. */
       attachments: z.array(id).max(20).optional(),
-      /** Made from a Jira issue: linked to its key, "Created from KEY" in its history. */
+      /** Made from an issue: linked to its key, "Created from KEY" in its history. */
+      link: link.optional(),
+      /** The same for Jira, from clients before connectors (one release). */
       jira: jiraKey.optional(),
-      source: z.enum(['quick-add', 'jira']).optional(),
+      /** 'jira' is a client before connectors saying 'connector'. */
+      source: z.enum(['quick-add', 'connector', 'jira']).optional(),
     }),
   }),
   z.object({ type: z.literal('task.rename'), payload: z.object({ id, title }) }),
@@ -232,6 +271,7 @@ export const taskMutationSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('task.notes'), payload: z.object({ id, notes }) }),
   z.object({ type: z.literal('task.visibility'), payload: z.object({ id, visibility }) }),
   z.object({ type: z.literal('task.project'), payload: z.object({ id, projectId }) }),
+  z.object({ type: z.literal('task.link'), payload: taskLink }),
   z.object({ type: z.literal('task.jira'), payload: z.object({ id, jira: jiraKey.nullable() }) }),
   z.object({
     type: z.literal('project.create'),

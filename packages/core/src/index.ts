@@ -15,6 +15,7 @@ export * from './spaces';
 export * from './people';
 export * from './inbox';
 export * from './jira';
+export * from './connectors';
 export * from './versions';
 export * from './firstRun';
 export * from './feedback';

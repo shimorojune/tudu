@@ -38,7 +38,7 @@ import { scrollToProjects, settingsClosed } from './editProjects';
 import { api, initialsOf, photoSrc, queryClient, refreshMe, signOut } from './session';
 import { forgetSpace, spacePath, useSpace as useSpaceFromShell } from './space';
 import { invitedWords } from './spaces';
-import { hostOf, jiraClient, useJira } from './jira';
+import { askJiraReconnect, hostOf, jiraClient, useJira } from './jira';
 import { taskStore, useOnline } from './tasks';
 import { useViewport } from './viewport';
 
@@ -230,12 +230,23 @@ export function SettingsView({
   const [asking, setAsking] = useState<Asking | null>(null);
   const online = useOnline();
   const jira = useJira(space.id);
+  const jiraSpaces = useQuery({ ...jiraClient.spacesQuery(), enabled: !!jira.connected });
   const loc = useRouterState({ select: (s) => s.location });
   const data: MembersResponse = members.data ?? { members: [], invites: [] };
   const rules = spaceRules(space, data.members, me.user.id);
   const refreshMembers = () => {
     void queryClient.invalidateQueries({ queryKey: ['members', space.id] });
     void queryClient.invalidateQueries({ queryKey: ['me'] });
+  };
+  // The Jira panel's form, beside the page (a page of its own on phones).
+  const openJira = () => {
+    if (layout === 'phone') void navigate({ href: spacePath(space.slug, 'jira') });
+    else {
+      const q = new URLSearchParams(loc.searchStr);
+      q.delete('settings');
+      q.set('jira', '');
+      void navigate({ href: `${loc.pathname}?${q.toString().replace(/(^|&)jira=(&|$)/, '$1jira$2')}` });
+    }
   };
   const toPersonal = () => {
     forgetSpace();
@@ -444,26 +455,55 @@ export function SettingsView({
         }
         onRemove={remove}
         jira={
-          jira.conn
-            ? { connected: true, who: jira.conn.who.email || jira.conn.who.name, site: hostOf(jira.conn) }
+          jira.connected
+            ? {
+                connected: true,
+                who: jira.connected.who.email || jira.connected.who.name,
+                site: hostOf(jira.connected),
+                state: jira.connected.state,
+                loading: jiraSpaces.isPending,
+                error: jiraSpaces.isError,
+                spaces: jiraSpaces.data?.spaces.map((x) => ({
+                  id: x.id,
+                  name: x.name,
+                  color: x.color ?? undefined,
+                  personal: x.kind === 'personal',
+                  on: x.on,
+                  linked: x.linked,
+                  current: x.id === space.id,
+                })),
+              }
             : { connected: false }
         }
+        onJiraSpace={(x, on) =>
+          jiraClient.setOn(x.id, on).then(
+            () => undefined,
+            (err: unknown) => ({
+              error: errText(err, on ? 'Couldn’t turn Jira on there.' : 'Couldn’t turn Jira off there.'),
+            }),
+          )
+        }
+        onRetry={() => void jiraSpaces.refetch()}
+        onJiraReconnect={() => {
+          askJiraReconnect();
+          openJira();
+        }}
         onJira={() => {
-          if (jira.conn) {
-            void jiraClient.disconnect(space.id).then(
-              () => showToast('Jira disconnected. Your tasks keep their Jira keys.'),
-              () => showToast('Couldn’t disconnect Jira. Try again.'),
-            );
+          if (jira.connected) {
+            setAsking({
+              ask: {
+                title: 'Disconnect Jira?',
+                body: 'Jira goes from every space you turned it on in, with your saved views. Your tasks keep their Jira keys.',
+                confirm: 'Disconnect Jira',
+              },
+              run: async () => {
+                await jiraClient.disconnect();
+                showToast('Jira disconnected from all your spaces. Your tasks keep their Jira keys.');
+              },
+            });
             return;
           }
-          // Connect: the Jira panel's form, beside the page (a page of its own on phones).
-          if (layout === 'phone') void navigate({ href: spacePath(space.slug, 'jira') });
-          else {
-            const q = new URLSearchParams(loc.searchStr);
-            q.delete('settings');
-            q.set('jira', '');
-            void navigate({ href: `${loc.pathname}?${q.toString().replace(/(^|&)jira=(&|$)/, '$1jira$2')}` });
-          }
+          openJira();
         }}
       />
       <ConfirmDialog

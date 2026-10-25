@@ -11,7 +11,7 @@ import {
   type JiraLink,
   type SpaceSummary,
 } from '@tudu/core';
-import { jiraError, type JiraListAsk } from '@tudu/client';
+import { jiraConnectionKey, jiraError, jiraLinksKey, type JiraListAsk } from '@tudu/client';
 import {
   AppsPanel,
   Drawer,
@@ -41,10 +41,11 @@ import {
   useFromApps,
   useJira,
   useJiraPick,
+  takeJiraReconnect,
   withJira,
   type JiraPick,
 } from './jira';
-import { initialsOf, queryClient } from './session';
+import { initialsOf, meQuery, queryClient } from './session';
 import { spacePath } from './space';
 import { taskStore, useOnline } from './tasks';
 import { useViewport } from './viewport';
@@ -53,23 +54,55 @@ import { useWorkingDay } from './workingDay';
 /** The spinner on an issue's calendar button shows at least this long, so adding reads as a step. */
 const ADD_BEAT_MS = 450;
 
-const toPanelLink = (l: JiraLink): JiraPanelLink => ({
-  taskId: l.taskId,
-  id: l.ref,
-  title: l.title,
-  day: l.day,
-  done: l.done,
-});
+/** Which space a link's task lives in, when it is not the one you are in: the chip names it. */
+export type SpaceOf = (spaceId: string) => SpaceSummary | undefined;
 
-/** An issue as the panel's row, with the tasks of yours linked to it. */
-export function toPanelIssue(i: JiraIssue, links: Map<string, JiraLink[]>): JiraPanelIssue {
+export const toPanelLink = (l: JiraLink, here?: string, spaceOf?: SpaceOf): JiraPanelLink => {
+  const s = here && l.spaceId !== here ? spaceOf?.(l.spaceId) : undefined;
+  return {
+    taskId: l.taskId,
+    id: l.ref,
+    title: l.title,
+    day: l.day,
+    done: l.done,
+    ...(s ? { space: { name: s.name, color: s.color ?? undefined, personal: s.kind === 'personal' } } : {}),
+  };
+};
+
+/** An issue as the panel's row, with the tasks of yours linked to it, in any of your spaces. */
+export function toPanelIssue(
+  i: JiraIssue,
+  links: Map<string, JiraLink[]>,
+  here?: string,
+  spaceOf?: SpaceOf,
+): JiraPanelIssue {
   return {
     key: i.key,
     summary: i.summary,
     status: i.status || undefined,
     due: i.due,
-    linked: (links.get(i.key) ?? []).map(toPanelLink),
+    linked: (links.get(i.key) ?? []).map((l) => toPanelLink(l, here, spaceOf)),
   };
+}
+
+/** Turn on here, from an Apps card: the button spins while the server answers, and Jira fades in. */
+export function useTurnOnHere(spaceId: string, after?: () => void): { busy: boolean; enable: () => void } {
+  const [busy, setBusy] = useState(false);
+  const enable = () => {
+    setBusy(true);
+    void jiraClient.setOn(spaceId, true).then(
+      () => {
+        setBusy(false);
+        after?.();
+        markJiraFresh();
+      },
+      () => {
+        setBusy(false);
+        showToast('Couldn’t turn Jira on here. Try again.');
+      },
+    );
+  };
+  return { busy, enable };
 }
 
 /** Which list a pick reads. */
@@ -124,9 +157,12 @@ export function JiraView({
   const shownDay = useShownDay() ?? today;
   const online = useOnline();
   const fromApps = useFromApps();
-  const { conn, known, links } = useJira(space.id);
-  const pick = useJiraPick(space.id);
-  const [reconnecting, setReconnecting] = useState(false);
+  const { conn, connected, onHere, known, links } = useJira(space.id);
+  const pick = useJiraPick();
+  const me = useQuery(meQuery).data;
+  const spaceOf: SpaceOf = (id) => me?.spaces.find((x) => x.id === id);
+  const here = useTurnOnHere(space.id);
+  const [reconnecting, setReconnecting] = useState(takeJiraReconnect);
   // A fresh connect keeps the form up for its Connected tick, then the list.
   const [holding, setHolding] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -153,10 +189,10 @@ export function JiraView({
   // A token that stopped working shows at once everywhere: the connection reads expired too.
   useEffect(() => {
     if (errorCode === 'expired' && conn?.state === 'ok')
-      void queryClient.invalidateQueries({ queryKey: ['jira', space.id, 'connection'] });
-  }, [errorCode, conn?.state, space.id]);
+      void queryClient.invalidateQueries({ queryKey: jiraConnectionKey() });
+  }, [errorCode, conn?.state]);
   const state = panelState({
-    connected: !!conn && !holding,
+    connected: (!!conn || (reconnecting && !!connected)) && !holding,
     reconnecting,
     expired: conn?.state === 'expired',
     online,
@@ -164,7 +200,7 @@ export function JiraView({
     pending: list.isPending,
     errorCode,
   });
-  const issues = (list.data?.issues ?? []).map((i) => toPanelIssue(i, byKey));
+  const issues = (list.data?.issues ?? []).map((i) => toPanelIssue(i, byKey, space.id, spaceOf));
   const synced = syncedWords(list.data?.syncedAt ?? conn?.syncedAt ?? null, now);
   const refreshing = list.isFetching && !list.isPending;
 
@@ -194,7 +230,7 @@ export function JiraView({
             when: c.at ? whenWords(c.at, now) : '',
             html: c.html,
           })),
-          linked: (byKey.get(d.key) ?? []).map(toPanelLink),
+          linked: (byKey.get(d.key) ?? []).map((l) => toPanelLink(l, space.id, spaceOf)),
         }
       : null;
 
@@ -205,21 +241,30 @@ export function JiraView({
     return withJira({ pathname: path, searchStr: '' }, j.issue);
   };
 
-  /** Show a linked task where it lives: the day turns to it and it glows, or the Backlog opens on it. */
+  /**
+   * Show a linked task where it lives: the day turns to it and it glows, or the Backlog opens on it. A task in
+   * another of your spaces takes you to that space.
+   */
   const showTask = (l: JiraPanelLink) => {
     if (compact) onIssue(null);
+    const there = links.find((x) => x.taskId === l.taskId);
+    const slug =
+      (there && there.spaceId !== space.id ? spaceOf(there.spaceId)?.slug : undefined) ?? space.slug;
     if (l.day) {
       showDay(l.day, today);
-      void navigate({ href: keepJira(spacePath(space.slug, 'today')) });
+      void navigate({ href: keepJira(spacePath(slug, 'today')) });
     } else {
       askBacklogView(l.done ? 'done' : 'open');
-      void navigate({ href: keepJira(spacePath(space.slug, 'backlog')) });
+      void navigate({ href: keepJira(spacePath(slug, 'backlog')) });
     }
     locateTask(l.taskId, l.day);
   };
 
   const add = async (it: JiraPanelIssue, day: IsoDate | null) => {
-    const id = taskStore.create(space.id, day, it.summary, undefined, { jira: it.key, source: 'jira' });
+    const id = taskStore.create(space.id, day, it.summary, undefined, {
+      link: { provider: 'jira', key: it.key },
+      source: 'connector',
+    });
     // The task opens its gap on the day in view (and the Backlog, when that is where it went).
     if (day === shownDay || day === null || day === addDays(shownDay, 1)) flashTask(id, day);
     await new Promise((r) => setTimeout(r, ADD_BEAT_MS));
@@ -231,7 +276,8 @@ export function JiraView({
   }): Promise<{ error?: JiraConnectError } | void> => {
     try {
       if (!conn) setHolding(true);
-      await jiraClient.connect(space.id, input.site, input.token);
+      // A new token for an expired connection keeps the switches as they were; a first connect turns Jira on here.
+      await jiraClient.connect(input.site, input.token, reconnecting ? undefined : space.id);
     } catch (e) {
       setHolding(false);
       const je = jiraError(e);
@@ -252,21 +298,21 @@ export function JiraView({
       const je = jiraError(e);
       return { error: je?.code === 'jql' ? je.error : (je?.error ?? 'Jira didn’t answer. Try again.') };
     }
-    setJiraPick(space.id, { view: 'custom', jql });
+    setJiraPick({ view: 'custom', jql });
   };
 
   const removeView = (value: string) => {
     const index = views.findIndex((v) => v.id === value);
     const was = views[index];
     if (!was) return;
-    setJiraPick(space.id, { view: JIRA_ASSIGNED_VIEW });
-    void jiraClient.removeView(space.id, value).then(
+    setJiraPick({ view: JIRA_ASSIGNED_VIEW });
+    void jiraClient.removeView(value).then(
       () =>
         showToast(`Removed “${was.name}”`, {
           action: 'Undo',
           onAction: () =>
-            void jiraClient.restoreView(space.id, was, index).then(
-              (back) => setJiraPick(space.id, { view: back.id }),
+            void jiraClient.restoreView(was, index).then(
+              (back) => setJiraPick({ view: back.id }),
               () => showToast('Couldn’t put the view back.'),
             ),
         }),
@@ -275,13 +321,27 @@ export function JiraView({
   };
 
   if (!known && !compact) return null;
+  // Connected for your account but off here: the Apps card's Turn on here, never a second token.
+  if (connected && !onHere && known && !reconnecting)
+    return (
+      <AppsList
+        space={space}
+        compact={compact}
+        connected={{ who: connected.who.email || connected.who.name, site: hostOf(connected)! }}
+        off
+        busy={here.busy}
+        onClose={onClose}
+        onEnable={here.enable}
+        onJira={() => {}}
+      />
+    );
   return (
     <JiraPanel
       state={state}
       issues={issues}
       today={today}
       site={hostOf(conn)}
-      siteUrl={conn?.site}
+      siteUrl={(conn ?? connected)?.site}
       synced={state === 'connect' ? null : synced}
       refreshing={refreshing}
       views={panelViews}
@@ -291,18 +351,18 @@ export function JiraView({
       preview={preview}
       previewLoading={detail.isPending && !!issue}
       compact={compact}
-      onView={(v) => setJiraPick(space.id, { view: v })}
+      onView={(v) => setJiraPick({ view: v })}
       onApplyJql={applyJql}
       onSaveView={(name, jql) =>
-        void jiraClient.saveView(space.id, name, jql).then(
-          (v) => setJiraPick(space.id, { view: v.id }),
+        void jiraClient.saveView(name, jql).then(
+          (v) => setJiraPick({ view: v.id }),
           (e: unknown) => showToast(jiraError(e)?.error ?? 'Couldn’t save the view. Try again.'),
         )
       }
       onRemoveView={removeView}
       onSearch={async (q) => {
         const r = await queryClient.fetchQuery(jiraClient.searchQuery(space.id, q));
-        return r.issues.map((i) => toPanelIssue(i, linksByKey(links)));
+        return r.issues.map((i) => toPanelIssue(i, linksByKey(links), space.id, spaceOf));
       }}
       onAdd={add}
       onShowTask={(_it, l) => showTask(l)}
@@ -310,20 +370,18 @@ export function JiraView({
       onOpenInJira={(key) => void openInJira(space.id, key)}
       onRefresh={() => {
         void list.refetch();
-        void queryClient.invalidateQueries({
-          queryKey: ['jira', space.id],
-          predicate: (q) => q.queryKey[2] !== 'issues',
-        });
+        void queryClient.invalidateQueries({ queryKey: jiraConnectionKey() });
+        void queryClient.invalidateQueries({ queryKey: jiraLinksKey() });
       }}
       onRetry={() => void list.refetch()}
       onReconnect={() => setReconnecting(true)}
       onCancelReconnect={() => setReconnecting(false)}
       onDisconnect={() =>
-        void jiraClient.disconnect(space.id).then(
+        void jiraClient.disconnect().then(
           () => {
             onClose?.();
             if (compact) void navigate({ href: spacePath(space.slug, 'more') });
-            showToast('Jira disconnected. Your tasks keep their Jira keys.');
+            showToast('Jira disconnected from all your spaces. Your tasks keep their Jira keys.');
           },
           () => showToast('Couldn’t disconnect Jira. Try again.'),
         )
@@ -334,7 +392,7 @@ export function JiraView({
         setReconnecting(false);
         setFromApps(false);
         markJiraFresh();
-        void queryClient.invalidateQueries({ queryKey: ['jira', space.id] });
+        void queryClient.invalidateQueries({ queryKey: ['jira'] });
       }}
       onClose={onClose}
       onBack={
@@ -350,6 +408,7 @@ export function JiraView({
           : undefined
       }
       backLabel="Apps"
+      spaceName={space.name}
       className={vp === 'tablet' ? 'app-jira-tablet' : undefined}
     />
   );
@@ -399,17 +458,23 @@ export function AppsHost({ space }: { space: SpaceSummary }) {
   const open = useAppsOpen();
   const navigate = useNavigate();
   const loc = useRouterState({ select: (s) => s.location });
-  const { conn } = useJira(space.id);
+  const { connected, onHere } = useJira(space.id);
+  const here = useTurnOnHere(space.id, closeApps);
   if (vp === 'phone') return null;
   return (
     <Drawer open={open} onClose={closeApps} label="Apps" width={480}>
       <AppsList
         space={space}
-        connected={conn ? { who: conn.who.email || conn.who.name, site: hostOf(conn)! } : null}
+        connected={
+          connected ? { who: connected.who.email || connected.who.name, site: hostOf(connected)! } : null
+        }
+        off={!!connected && !onHere}
+        busy={here.busy}
         onClose={closeApps}
+        onEnable={here.enable}
         onJira={() => {
           closeApps();
-          setFromApps(!conn);
+          setFromApps(!connected);
           void navigate({ href: withJira(loc, null) });
         }}
       />
@@ -417,16 +482,24 @@ export function AppsHost({ space }: { space: SpaceSummary }) {
   );
 }
 
-/** The list of apps: Jira, with Connect, or Connected and Open. */
+/** The list of apps: Jira, with Connect; Connected and Open; or connected, off here, and Turn on here. */
 export function AppsList({
+  space,
   connected,
+  off,
+  busy,
   onJira,
+  onEnable,
   onClose,
   compact,
 }: {
   space: SpaceSummary;
   connected: { who: string; site: string } | null;
+  /** Connected for your account, but off in this space. */
+  off?: boolean;
+  busy?: boolean;
   onJira: () => void;
+  onEnable?: () => void;
   onClose?: () => void;
   compact?: boolean;
 }) {
@@ -434,6 +507,8 @@ export function AppsList({
     <AppsPanel
       compact={compact}
       onClose={onClose}
+      spaceName={space.name}
+      onEnable={onEnable}
       apps={[
         {
           id: 'jira',
@@ -441,6 +516,8 @@ export function AppsList({
           blurb: 'Your Jira issues beside your day. Add one to a day and it becomes a linked task.',
           connected: !!connected,
           status: connected ? `As ${connected.who} on ${connected.site}.` : undefined,
+          off: !!connected && !!off,
+          busy,
         },
       ]}
       onConnect={onJira}

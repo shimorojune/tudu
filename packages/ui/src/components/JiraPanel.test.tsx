@@ -5,6 +5,7 @@ import {
   JiraPanel,
   JiraPreview,
   JPConnect,
+  JPLinked,
   JP_CONNECTED_MS,
   JP_SEARCH_AFTER_MS,
   type JiraPanelIssue,
@@ -501,5 +502,32 @@ describe('the Jira panel (chunk 10)', () => {
     const esc2 = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
     act(() => void document.body.dispatchEvent(esc2));
     expect(esc2.defaultPrevented).toBe(false);
+  });
+
+  it('C10-U15 a task in another of your spaces names it; the connect words are your account’s', () => {
+    const l = { taskId: 't1', id: 'NW-52', title: 'Run the migration', day: SUN, done: false };
+    const { rerender } = render(
+      <JPLinked link={{ ...l, space: { name: 'Northwind', color: '#3d5a80' } }} today={SUN} />,
+    );
+    const chip = screen.getByRole('button');
+    expect(chip).toHaveTextContent('NW-52· Today· N');
+    expect(chip.querySelector('.tp-jp-lk-sp')).toHaveTextContent('Northwind');
+    rerender(<JPLinked link={l} today={SUN} />);
+    expect(screen.getByRole('button').querySelector('.tp-jp-lk-sp')).toBeNull();
+
+    rerender(<JPConnect spaceName="Northwind" />);
+    expect(
+      screen.getByText(
+        'Connect once for your account with a personal access token. Jira turns on in Northwind; turn it on in your other spaces from Settings › Apps.',
+      ),
+    ).toBeInTheDocument();
+    rerender(<JPConnect reconnect site="https://jira.northwind.io" />);
+    expect(
+      screen.getByText(
+        'Your token for jira.northwind.io stopped working. Paste a new one; Jira comes back in every space it was on, with your views and linked tasks.',
+      ),
+    ).toBeInTheDocument();
+    rerender(<JPConnect account={false} />);
+    expect(screen.getByText(/^Connect with a personal access token\./)).toBeInTheDocument();
   });
 });

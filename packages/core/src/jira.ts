@@ -59,10 +59,12 @@ export interface JiraIssueDetail extends JiraIssue {
   commentTotal: number;
 }
 
-/** A task of yours linked to an issue, from Tudu's own database. */
+/** A task of yours linked to an issue, from Tudu's own database, in any of your spaces. */
 export interface JiraLink {
   key: string;
   taskId: string;
+  /** The space the task lives in; the panel names it when it is not the one you are in. */
+  spaceId: string;
   ref: string | null;
   title: string;
   day: IsoDate | null;
@@ -77,7 +79,7 @@ export interface JiraView {
 
 export type JiraState = 'ok' | 'expired';
 
-/** Your Jira in a space, as the shell reads it. */
+/** Your Jira, for your account, as the shell and Settings read it. */
 export type JiraConnectionResponse =
   | { connected: false }
   | {
@@ -90,8 +92,10 @@ export type JiraConnectionResponse =
       views: JiraView[];
       /** The keys of the issues assigned to you (the first page); null when Jira did not answer. */
       assigned: string[] | null;
-      /** Of those, the ones with no open task of yours in this space. */
+      /** Of those, the ones with no open task of yours in any space. */
       count: number | null;
+      /** How many of your spaces have Jira on. */
+      onIn: number;
     };
 
 export interface JiraIssuesResponse {
@@ -116,6 +120,7 @@ export type JiraErrorCode =
   | 'jql'
   | 'not-found'
   | 'not-connected'
+  | 'off-here'
   | 'name-taken';
 
 export interface JiraErrorBody {
@@ -123,12 +128,6 @@ export interface JiraErrorBody {
   code: JiraErrorCode;
   /** The connect form's field the words belong under. */
   field?: 'site' | 'token';
-}
-
-/** The live event: your Jira in a space changed (connected, disconnected, a view saved). */
-export const JIRA_CHANGED = 'jira.changed';
-export interface JiraChangedEvent {
-  spaceId: string;
 }
 
 /** The address as a person types it, checked before anything is sent. Null when it is fine. */

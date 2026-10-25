@@ -1,4 +1,11 @@
-import { closeMatches, embeddingText, MEANING_FLOOR, MEANING_LIMIT, type SearchHit } from '@tudu/core';
+import {
+  closeMatches,
+  embeddingText,
+  linkKeyOf,
+  MEANING_FLOOR,
+  MEANING_LIMIT,
+  type SearchHit,
+} from '@tudu/core';
 import {
   and,
   asc,
@@ -15,6 +22,7 @@ import {
   type Db,
 } from '@tudu/db';
 import type { Embedder } from './embeddings';
+import { linksColumn } from './taskLinks';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type Executor = Db | Tx;
@@ -56,7 +64,7 @@ const hitColumns = {
   day: schema.tasks.day,
   doneAt: schema.tasks.doneAt,
   projectId: schema.tasks.projectId,
-  jiraKey: schema.tasks.jiraKey,
+  links: linksColumn,
 };
 
 /**
@@ -205,7 +213,7 @@ export async function searchByMeaning(
       day: r.day,
       done: r.doneAt !== null,
       projectId: r.projectId,
-      jira: r.jiraKey,
+      jira: linkKeyOf(r.links, 'jira'),
       snippet: null,
     } satisfies SearchHit,
     similarity: 1 - Number(r.distance),

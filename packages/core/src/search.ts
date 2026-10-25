@@ -28,8 +28,8 @@ export interface Searchable {
   day: IsoDate | null;
   done: boolean;
   notes?: string | null;
-  /** The linked Jira key: typed in full it is the top hit, and its parts match as words. */
-  jira?: string | null;
+  /** The keys of its links (one per app): typed in full one is the top hit, and its parts match as words. */
+  keys?: readonly string[];
 }
 
 /** The words you type, split on spaces. Every word has to be found somewhere in the task. */
@@ -50,13 +50,13 @@ function escapeRe(s: string): string {
 export const SCORE_REF = 100;
 
 /**
- * How well a task matches: the task ID or Jira key typed in full beats everything, then a title that starts with
- * the words, then titles with every word at the start of a word, then anywhere in the title, then the ID or the
- * Jira key, then the note.
+ * How well a task matches: the task ID or a link's key typed in full beats everything, then a title that starts with
+ * the words, then titles with every word at the start of a word, then anywhere in the title, then the ID or a
+ * link's key, then the note.
  * Crossed-off tasks sit a step below open ones with the same match. Null when a word is found nowhere.
  */
 export function matchScore(
-  it: Pick<Searchable, 'ref' | 'title' | 'notes' | 'done' | 'jira'>,
+  it: Pick<Searchable, 'ref' | 'title' | 'notes' | 'done' | 'keys'>,
   q: string,
 ): { score: number; inNotes: boolean } | null {
   const ql = q.trim().toLowerCase();
@@ -65,8 +65,9 @@ export function matchScore(
   const t = it.title.toLowerCase();
   const id = it.ref.toLowerCase();
   const nt = (it.notes ?? '').toLowerCase();
-  const jr = (it.jira ?? '').toLowerCase();
-  if (id === ql || (jr && jr === ql)) return { score: SCORE_REF, inNotes: false };
+  const keys = (it.keys ?? []).map((k) => k.toLowerCase());
+  const jr = keys.join(' ');
+  if (id === ql || keys.includes(ql)) return { score: SCORE_REF, inNotes: false };
   const hay = `${t} ${id} ${jr} ${nt}`;
   for (const k of toks) if (!hay.includes(k)) return null;
   const inTitle = toks.every((k) => t.includes(k));

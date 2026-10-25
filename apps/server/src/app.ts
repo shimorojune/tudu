@@ -16,9 +16,9 @@ import type { IssueTracker } from './feedback/github';
 import { fileRoutes } from './routes/files';
 import { meRoutes } from './routes/me';
 import { inboxRoutes } from './routes/inbox';
-import { jiraRoutes } from './routes/jira';
-import { fakeJira } from './jira/fake';
-import { TokenSeal } from './jira/seal';
+import { connectorRoutes } from './routes/connectors';
+import { fakeJira } from './connectors/jira/fake';
+import { TokenSeal } from './connectors/seal';
 import { spaceRoutes } from './routes/spaces';
 import { taskRoutes } from './routes/tasks';
 import { testRoutes } from './routes/test';
@@ -130,7 +130,7 @@ export function createApp(deps: AppDeps) {
   app.route('/api', feedbackRoutes(db, storage, mailer, env.FEEDBACK_TO, deps.issues ?? null));
   app.route(
     '/api',
-    jiraRoutes(db, hub, {
+    connectorRoutes(db, hub, {
       seal: new TokenSeal(env.AUTH_SECRET),
       http: { production: env.NODE_ENV === 'production', fetch: deps.jiraFetch },
     }),

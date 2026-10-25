@@ -43,6 +43,7 @@ export {
   jiraError,
   listName,
   jiraConnectionKey,
+  jiraSpacesKey,
   jiraIssuesKey,
   jiraIssueKey,
   jiraSearchKey,

@@ -41,7 +41,7 @@ describe('Apps (chunk 10)', () => {
     await user.click(screen.getByRole('button', { name: 'Open Jira' }));
     expect(onOpen).toHaveBeenCalledWith('jira');
 
-    // Settings › Apps: the row in the space's group, the section's words, Connect and Disconnect.
+    // Settings › Apps: under You (yours, not the space's), the section's words, Connect and Disconnect.
     const onJira = vi.fn();
     rerender(
       <Settings me={ME} space={NW} still section="apps" onJira={onJira} jira={{ connected: false }} />,
@@ -50,14 +50,17 @@ describe('Apps (chunk 10)', () => {
     expect(within(nav).getByRole('button', { name: /^Apps/ })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Apps');
     expect(
-      screen.getByText('What you’ve connected in Northwind. Each person connects their own.'),
+      screen.getByText('Connected once, for you. Pick the spaces each one shows in.'),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Bring your Jira issues next to your day. Connect with a personal access token.'),
+      screen.getByText(
+        'Bring your Jira issues next to your day. Connect once with a personal access token, then pick the spaces it shows in.',
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByText('More apps are on the way. Everything here is optional; Tudu works fine on its own.'),
     ).toBeInTheDocument();
+    expect(screen.queryByText('Use Jira in')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Connect' }));
     expect(onJira).toHaveBeenCalledTimes(1);
 
@@ -80,7 +83,48 @@ describe('Apps (chunk 10)', () => {
     await user.click(screen.getByRole('button', { name: 'Disconnect' }));
     expect(onJira).toHaveBeenCalledTimes(2);
 
-    rerender(<Settings me={ME} space={PERSONAL} still section="apps" jira={{ connected: false }} />);
+    // The old per-space Apps, kept for history boards.
+    rerender(
+      <Settings
+        me={ME}
+        space={PERSONAL}
+        still
+        section="apps"
+        appsScope="space"
+        jira={{ connected: false }}
+      />,
+    );
     expect(screen.getByText('What you’ve connected in Personal.')).toBeInTheDocument();
+  });
+
+  it('C10-U14 connected but off here: Turn on here, Turning on…, and the account Connect words', async () => {
+    const user = userEvent.setup();
+    const onEnable = vi.fn();
+    const { rerender } = render(
+      <AppsPanel
+        apps={[{ ...JIRA, connected: true, off: true }]}
+        spaceName="Northwind"
+        onEnable={onEnable}
+      />,
+    );
+    expect(screen.getByText('Connected · off here')).toBeInTheDocument();
+    expect(
+      screen.getByText('Connected to your account. Turn it on to use it in Northwind.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open Jira' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Turn on Jira here' }));
+    expect(onEnable).toHaveBeenCalledWith('jira');
+
+    rerender(
+      <AppsPanel
+        apps={[{ ...JIRA, connected: true, off: true, busy: true }]}
+        spaceName="Northwind"
+        onEnable={onEnable}
+      />,
+    );
+    const busy = screen.getByRole('button', { name: 'Turn on Jira here' });
+    expect(busy).toHaveTextContent('Turning on…');
+    await user.click(busy);
+    expect(onEnable).toHaveBeenCalledTimes(1);
   });
 });

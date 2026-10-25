@@ -2427,3 +2427,18 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 .tp-sswl-it.tp-picked .tp-stile { animation: tp-ssw-press 150ms var(--ease-change); }
 @keyframes tp-ssw-press { 50% { transform: scale(.94); } }
 @media (prefers-reduced-motion: reduce) { .tp-ssw-id.tp-ssw-swap { animation: tp-veil-in 120ms linear both; } .tp-sswl-it.tp-picked .tp-sswl-ok path { animation: none; stroke-dashoffset: 0; } .tp-sswl-it.tp-picked .tp-stile { animation: none; } }
+
+/* Jira per account, turned on per space (Settings › Apps), 25 Oct */
+.tp-set-sprow { border-radius: 10px; transition: background-color 180ms var(--ease-change); }
+.tp-set-sprow.tp-set-hl { animation: tp-row-wash 1900ms var(--ease-change) both; }
+.tp-set-sprow > .tp-setrow { animation: tp-set-in 260ms var(--ease-arrive) both; }
+.tp-set-spsub { display: inline-flex; align-items: center; gap: 6px; animation: tp-label-in 160ms linear both; }
+.tp-set-spsub.tp-busy { color: var(--foreground-2); }
+.tp-set-sperr { margin: -4px 0 10px 32px; animation: tp-banner-in 200ms var(--ease-arrive) both; }
+.tp-set-here { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-foreground); padding: 2px 6px; border-radius: 6px; background: var(--accent); }
+.tp-set-skl { display: flex; align-items: center; gap: 10px; }
+.tp-set-skl .tp-setrow-t { flex: 1; }
+.tp-set-apps > .tp-banner-wrap { margin-bottom: 14px; }
+.tp-jp-lk-sp { display: inline-flex; align-items: center; gap: 4px; color: var(--muted-foreground); font-weight: 400; }
+.tp-jp-lk-sp .tp-stile { flex: none; }
+@media (prefers-reduced-motion: reduce) { .tp-set-sprow.tp-set-hl, .tp-set-sprow > .tp-setrow, .tp-set-spsub, .tp-set-sperr { animation: none; } }

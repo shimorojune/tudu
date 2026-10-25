@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { checkSite, isPrivateAddress } from './guard';
 import { JiraFailure, JiraHttp, cleanJiraHtml, jiraInstant } from './http';
-import { TokenSeal } from './seal';
+import { TokenSeal } from '../seal';
 
 const SITE = 'https://jira.northwind.io';
 
