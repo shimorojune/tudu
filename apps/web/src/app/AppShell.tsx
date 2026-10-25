@@ -297,7 +297,7 @@ export function AppShell({
           <div className="app-phone-tools">
             <button
               type="button"
-              className={cx('app-phone-inbox app-phone-bug tp-tb-bug', feedbackOpen && 'tp-on')}
+              className={cx('app-phone-bug tp-tb-bug', feedbackOpen && 'tp-on')}
               aria-label="Report a bug or idea"
               aria-haspopup="dialog"
               onClick={openFeedback}

@@ -219,7 +219,8 @@
   align-items: center;
   gap: 6px;
 }
-.app-phone-inbox {
+.app-phone-inbox,
+.app-phone-bug {
   position: relative;
   width: 38px;
   height: 38px;
@@ -235,7 +236,7 @@
 .app-phone-inbox.tp-on {
   color: var(--brand);
 }
-/* Report a bug or idea, left of the Inbox: the pressed wash while the form is open, as on the top bar. */
+/* Report a bug or idea, left of the Inbox, shaped like it: the pressed wash while the form is open, as on the top bar. */
 .app-phone-bug.tp-on {
   background: var(--accent);
   color: var(--foreground);
