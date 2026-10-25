@@ -37,7 +37,7 @@ Status column is kept by `pnpm test:status` in [STATUS.md](STATUS.md). Run this 
 | C20-D01 | A left click shows the sheet under the tick; a second click hides it; a right click shows it too; no native menu appears |
 | C20-D02 | With the window hidden: tick a task in the sheet; Open Tudu; the desk shows it ticked                                    |
 | C20-D03 | A title click brings the window forward on that task with the panel open, and the sheet is hidden                        |
-| C20-D04 | With Tudu in front, clicking another app hides the sheet; Esc hides it                                                   |
+| C20-D04 | With Tudu in front, clicking another app hides the sheet; Esc hides it. Finder is checked to be in front (lsappinfo)     |
 | C20-D05 | ⋯ › Quit Tudu ends the process, signed in and signed out                                                                 |
-| C20-D06 | With another app in front (Tudu not active), another app coming forward hides the sheet                                  |
+| C20-D06 | With another app in front (Tudu not active), another app coming forward hides the sheet. Both apps checked in front      |
 | C20-D07 | With another app in front, a click in it hides the sheet; after the grace a click on the tick opens it again             |

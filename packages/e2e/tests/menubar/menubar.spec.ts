@@ -284,6 +284,8 @@ test.describe('menubar', () => {
     ).toBeVisible();
 
     await updaterSays(m, { lastResult: 'ready', ready: READY });
+    // The ⋯ only opens again once the last one has finished leaving: a click during its 120 ms exit is dropped.
+    await expect(m.getByRole('menu')).toHaveCount(0);
     await m.getByRole('button', { name: 'More' }).click();
     const first = m.getByRole('menuitem').first();
     await expect(first).toContainText('Restart to update');

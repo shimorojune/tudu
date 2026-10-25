@@ -1,7 +1,7 @@
 # CI flakes: why master keeps going red, and the fix
 
-Status: proposal, awaiting Rohit's approval. Canvas: proposed as not applicable (test and CI only, no visible change),
-awaiting Rohit's OK to skip it.
+Status: Rohit gave the go-ahead on 25 Oct 2026 ("you can do what you need now"); implemented on
+`claude/project-thread-c951b0`. Canvas: not applicable (test and CI only, no visible change).
 
 ## What failed, and how often
 
@@ -58,21 +58,21 @@ app.log) can't be downloaded from this environment. The change below makes the n
 
 A smaller app-side weakness: `ours = NSRunningApplication::currentApplication().isActive()` reads global state when the
 notification arrives, instead of reading which app the notification names. Reading the notification's
-`NSWorkspaceApplicationKey` and comparing its pid to ours is exact and costs nothing.
+`NSWorkspaceApplicationKey` and comparing it with our own `NSRunningApplication` is exact and costs nothing.
 
 ### Change
 
 1. `packages/e2e/mac/tests/desktop.spec.ts`: replace `clickAnotherApp()` with `bringForward(name)`. It runs
-   `open -a <name>`, then polls `lsappinfo info -only bundleid $(lsappinfo front)` (no Accessibility permission needed)
-   for up to 5 s until that app is in front, and throws `"<name> never came forward (front: <x>)"` otherwise. If the
-   first try doesn't take, it retries the activation once.
+   `open -b <bundle id>`, then polls `lsappinfo info -only bundleid $(lsappinfo front)` (no Accessibility permission
+   needed) for up to 3 s until that app is in front. If it isn't, it tries `osascript … activate` and waits 3 s more,
+   then throws `"<name> never came forward (in front: <x>)"`.
 2. C20-D06: `bringForward('Calculator')`, which waits until Calculator is actually in front, before opening the sheet.
    C20-D04: the same helper for Finder.
-3. App (`windows.rs`, `control` feature): the control state gains
+3. App (`windows.rs`; shown by the `control` feature's state): the control state gains
    `outside: { last: "blur" | "click" | "activate" | null, app: string | null, hid: boolean, at: string | null }`,
    set inside `outside()`. A failure dump then shows whether the app heard the event and what it decided.
-4. App (`windows.rs`): `ours` comes from the notification's `NSWorkspaceApplicationKey` (pid equals our own pid), not
-   `isActive()`.
+4. App (`windows.rs`): `ours` comes from the notification's `NSWorkspaceApplicationKey` (equal to
+   `NSRunningApplication::currentApplication()`), not `isActive()`.
 
 ## 2. The web ⋯ menu (C11-E15)
 
@@ -81,27 +81,29 @@ Shard 1, desktop project. After the test sets "ready" through the fake and click
 (run 64: `click` waits 30 s for an element that no longer exists). Something closes or remounts the Radix menu a moment
 after it opens.
 
-Not reproduced locally. I ran it 40 times in isolation, 30 times with 4 workers and the CPU pinned, and once as the
-full shard 1 at CI's 2 workers. All passed, and a probe saw no window `blur` on either page.
+Root cause, confirmed from the run 63 and 64 traces (downloaded on Rohit's Mac) and then reproduced on purpose:
 
-Ways the menu can close by itself, from the code:
+- Choosing "Check for updates…" closes the menu, and Radix keeps its content mounted for the 120 ms exit animation
+  (`.tp-menu-pop[data-state='closed']`; 120 ms under reduced motion, 130 ms otherwise).
+- The test sets the update to ready and clicks More again about 110 ms later (run 63: the select at 270058, the
+  second click at 270166). The trace's snapshots show the old menu still there in `data-state="closed"`, already
+  showing "Restart to update".
+- A click on the trigger while that exit is running doesn't open the menu. The leaving content goes away and the trigger
+  stays `aria-expanded="false"`. In run 64 the `toContainText` checks matched the leaving menu, and then the click found
+  nothing.
+- Forced: "select, then click More straight away" fails 10 of 10 locally, and "select, wait for the menu to be gone,
+  then click More" passes 10 of 10. On a fast machine the steps in between take longer than 120 ms, which is why it
+  only showed up on a loaded runner.
 
-- Radix `DropdownMenu` closes on window `blur` (`@radix-ui/react-menu`, `handleBlur`). The sheet and the desk are two
-  tabs in one context. If the desk's Settings dialog (opened a moment earlier by `emit(page, 'go', 'updates')`) takes
-  focus late, the sheet's window can blur.
-- `MenuBarPage` returns `null` while any day query has no data (`if (!ready) return null`). That unmounts the menu if a
-  space is added to `me` or the working day changes.
-- Pointer-down or focus outside the menu.
+It's a timing problem in the test, not a broken menu. A person reopening ⋯ within 120 ms of it closing would see the
+same thing, but that is an edge case, and fixing it means changing how every Radix menu animates out (a design
+change). It's not in this change.
 
 ### Change
 
-1. Get the trace before changing app code. The run 63/64 artifacts (`playwright-report-1`) hold `trace.zip` for this
-   test. Either Rohit downloads one and drops it in the project, or the environment's network policy allows
-   `*.blob.core.windows.net` so I can fetch it.
-2. Then fix whatever it shows. If the cause is the desk taking focus in the test, the test waits for the desk's
-   Settings to settle (or does the desk part last), and the app needs no change. If the sheet really unmounts or loses
-   focus, that would hit a real user too, and the fix goes in the app with its own unit test.
-3. No retry wrapper (`toPass`) around the menu: it would hide a real app bug.
+1. C11-E15 waits for the closed menu to be gone (`expect(m.getByRole('menu')).toHaveCount(0)`) before it clicks More
+   again. After the fix: 60 of 60 runs (C11-E15 and E16, 30 each, 4 workers).
+2. No retry wrapper (`toPass`).
 
 ## 3. CI hygiene
 
@@ -120,14 +122,16 @@ Ways the menu can close by itself, from the code:
 
 Updated or new (rows go in `docs/tests/chunk-20.md` and `chunk-11.md`):
 
-| ID      | Kind    | Case                                                                                                              |
-| ------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
-| C20-U07 | Rust    | `ours` from the notification: activation of our own pid → not outside; another pid → outside; no app key → ignore |
-| C20-D04 | Mac E2E | (updated) Tudu in front, sheet open, `bringForward('Finder')` confirms Finder is front → sheet hidden; Esc too     |
-| C20-D06 | Mac E2E | (updated) `bringForward('Calculator')` confirmed front before the sheet opens; `bringForward('Finder')` → hidden  |
-| C20-D08 | Mac E2E | The control state's `outside` says `activate`, Finder's bundle id and `hid: true` after D06's switch              |
+| ID      | Kind    | Case                                                                                                             |
+| ------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
+| C20-D04 | Mac E2E | (updated) Tudu in front, sheet open, `bringForward('Finder')` confirms Finder is front → sheet hidden; Esc too   |
+| C20-D06 | Mac E2E | (updated) `bringForward('Calculator')` confirmed front before the sheet opens; `bringForward('Finder')` → hidden |
 | H-01    | Harness | `bringForward` throws a "never came forward" error naming the app in front when the target can't be activated    |
-| C11-E15 | Web E2E | Unchanged until the trace shows the cause; then updated with that cause as its own assertion                      |
+| C11-E15 | Web E2E | (updated) the ⋯ is reopened only once the last one has left (`menu` count 0)                                     |
+
+Dropped from the first draft: a Rust unit test for the notification check (it needs real AppKit objects; CI's Mac run
+covers it), and a D case asserting `outside` (the order of the blur and the activation isn't fixed). `outside` is in
+every failure dump instead.
 
 Regression: C20-D01..D07, C16-D01..D07, MB-D01..D04, C11-E14..E16 unchanged.
 
