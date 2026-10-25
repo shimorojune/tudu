@@ -93,6 +93,7 @@ export function spacePrefix(name: string, taken: string[] = []): string {
 /** Parts of the address that are never a space's slug. */
 export const RESERVED_SLUGS = new Set([
   'me',
+  'all',
   't',
   'kit',
   'quick-add',
