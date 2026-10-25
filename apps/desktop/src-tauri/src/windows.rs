@@ -28,6 +28,28 @@ pub const MENUBAR: &str = "menubar";
 static SHEET_BLURRED: Mutex<Option<Instant>> = Mutex::new(None);
 const BLUR_GRACE: Duration = Duration::from_millis(300);
 
+/// The last thing outside the sheet that could put it away, and what came of it. The test channel shows it, so a
+/// sheet left open says whether the app heard the blur, the click or the other app coming forward.
+#[derive(Clone, Default, serde::Serialize)]
+pub struct Outside {
+    pub last: Option<&'static str>,
+    /// The app that came forward (its bundle identifier), for `activate`.
+    pub app: Option<String>,
+    pub hid: bool,
+    pub at: Option<String>,
+}
+
+static OUTSIDE: Mutex<Outside> = Mutex::new(Outside {
+    last: None,
+    app: None,
+    hid: false,
+    at: None,
+});
+
+pub fn last_outside() -> Outside {
+    OUTSIDE.lock().map(|o| o.clone()).unwrap_or_default()
+}
+
 /// Where this build's windows find Tudu on the web.
 pub fn web(app: &AppHandle) -> Url {
     #[cfg(feature = "control")]
@@ -167,7 +189,7 @@ pub fn create(app: &AppHandle, at_login: bool) -> tauri::Result<()> {
     let a = app.clone();
     sheet.on_window_event(move |e| match e {
         // Hiding the sheet also takes its focus; only a blur while it shows counts.
-        WindowEvent::Focused(false) => outside(&a, false),
+        WindowEvent::Focused(false) => outside(&a, "blur", None, false),
         WindowEvent::CloseRequested { api, .. } => {
             api.prevent_close();
             hide_menubar(&a);
@@ -186,12 +208,23 @@ fn outside_hides(visible: bool, ours: bool) -> bool {
 
 /// The sheet lost its focus, a click landed in another app, or another app came forward. The sheet never makes Tudu
 /// the active app, so a click into the app already in front takes no focus from it: losing focus alone misses that.
-pub fn outside(app: &AppHandle, ours: bool) {
+pub fn outside(app: &AppHandle, why: &'static str, who: Option<String>, ours: bool) {
     let visible = app
         .get_webview_window(MENUBAR)
         .and_then(|w| w.is_visible().ok())
         .unwrap_or(false);
-    if !outside_hides(visible, ours) {
+    let hides = outside_hides(visible, ours);
+    if let Ok(mut o) = OUTSIDE.lock() {
+        *o = Outside {
+            last: Some(why),
+            app: who,
+            hid: hides,
+            at: time::OffsetDateTime::now_utc()
+                .format(&time::format_description::well_known::Rfc3339)
+                .ok(),
+        };
+    }
+    if !hides {
         return;
     }
     if let Ok(mut t) = SHEET_BLURRED.lock() {
@@ -408,7 +441,8 @@ mod panel {
     use objc2::{define_class, ClassType, MainThreadOnly};
     use objc2_app_kit::{
         NSEvent, NSEventMask, NSPanel, NSRunningApplication, NSWindow, NSWindowCollectionBehavior,
-        NSWindowStyleMask, NSWorkspace, NSWorkspaceDidActivateApplicationNotification,
+        NSWindowStyleMask, NSWorkspace, NSWorkspaceApplicationKey,
+        NSWorkspaceDidActivateApplicationNotification,
     };
     use objc2_foundation::{NSNotification, NSOperationQueue};
     use tauri::{AppHandle, WebviewWindow};
@@ -463,7 +497,9 @@ mod panel {
         let a = app.clone();
         let _ = app.run_on_main_thread(move || {
             let click = a.clone();
-            let on_click = RcBlock::new(move |_: NonNull<NSEvent>| super::outside(&click, false));
+            let on_click = RcBlock::new(move |_: NonNull<NSEvent>| {
+                super::outside(&click, "click", None, false)
+            });
             let mask = NSEventMask::LeftMouseDown
                 | NSEventMask::RightMouseDown
                 | NSEventMask::OtherMouseDown;
@@ -472,10 +508,16 @@ mod panel {
                 std::mem::forget(m);
             }
             let front = a.clone();
-            let on_front = RcBlock::new(move |_: NonNull<NSNotification>| {
-                // Tudu itself coming forward (the desk) is not outside.
-                let ours = NSRunningApplication::currentApplication().isActive();
-                super::outside(&front, ours);
+            let on_front = RcBlock::new(move |n: NonNull<NSNotification>| {
+                // The app the notification names, not who is active by the time it is read: Tudu itself coming
+                // forward (the desk) is not outside.
+                let n = unsafe { n.as_ref() };
+                let Some(came) = activated(n) else {
+                    return;
+                };
+                let ours = came == NSRunningApplication::currentApplication();
+                let who = came.bundleIdentifier().map(|b| b.to_string());
+                super::outside(&front, "activate", who, ours);
             });
             let center = NSWorkspace::sharedWorkspace().notificationCenter();
             let o = unsafe {
@@ -488,6 +530,14 @@ mod panel {
             };
             std::mem::forget(o);
         });
+    }
+
+    /// The app a did-activate notification is about.
+    fn activated(n: &NSNotification) -> Option<Retained<NSRunningApplication>> {
+        let info = n.userInfo()?;
+        let key: &AnyObject = unsafe { NSWorkspaceApplicationKey };
+        let app = info.objectForKey(key)?;
+        app.downcast::<NSRunningApplication>().ok()
     }
 
     pub fn make_key(w: &WebviewWindow) {

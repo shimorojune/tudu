@@ -63,10 +63,35 @@ async function quitFromSheet(app: App): Promise<void> {
   await app.eval(`const q = T.get('button', /^Quit Tudu Test/); setTimeout(() => T.click(q), 50)`, 'menubar');
 }
 
-/** Another app comes forward, as a click on it would bring it. */
-function clickAnotherApp(name = 'Finder'): void {
-  const r = spawnSync('osascript', ['-e', `tell application "${name}" to activate`], { encoding: 'utf8' });
-  if (r.status !== 0) throw new Error(`could not bring ${name} forward: ${r.stderr || r.error}`);
+const BUNDLES: Record<string, string> = { Finder: 'com.apple.finder', Calculator: 'com.apple.calculator' };
+
+/** The bundle identifier of the app macOS has in front (lsappinfo needs no Accessibility permission). */
+function frontApp(): string {
+  const asn = spawnSync('lsappinfo', ['front'], { encoding: 'utf8' }).stdout.trim();
+  const info = spawnSync('lsappinfo', ['info', '-only', 'bundleid', asn], { encoding: 'utf8' }).stdout;
+  return /"CFBundleIdentifier"="([^"]+)"/.exec(info)?.[1] ?? `none (${asn || 'no front app'})`;
+}
+
+/**
+ * Another app comes forward, as a click on it would bring it, and is in front before this returns. An activation
+ * asked for from the background can be turned down by macOS while the command still succeeds, so this checks.
+ */
+async function bringForward(name = 'Finder'): Promise<void> {
+  const id = BUNDLES[name] ?? name;
+  const tries: Array<[string, string[]]> = [
+    ['open', ['-b', id]],
+    ['osascript', ['-e', `tell application "${name}" to activate`]],
+  ];
+  for (const [cmd, args] of tries) {
+    const r = spawnSync(cmd, args, { encoding: 'utf8' });
+    if (r.status !== 0) continue;
+    const until = Date.now() + 3000;
+    while (Date.now() < until) {
+      if (frontApp() === id) return;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
+  throw new Error(`${name} never came forward (in front: ${frontApp()})`);
 }
 
 function quitApp(name: string): void {
@@ -645,7 +670,7 @@ test.describe('desktop', () => {
     await app.act('reopen');
     await app.waitState((x) => x.windows.main.focused);
     await openSheet(app);
-    clickAnotherApp();
+    await bringForward('Finder');
     await sheetHidden(app);
     // Past the grace that keeps the blurring click on the tick from reopening it.
     await new Promise((r) => setTimeout(r, 400));
@@ -658,12 +683,12 @@ test.describe('desktop', () => {
     app,
   }) => {
     await signIn(app);
-    // Calculator in front, so Tudu is not the active app and the sheet never takes focus from anything.
-    clickAnotherApp('Calculator');
+    // Confirmed in front, so Tudu is not the active app and the sheet never takes focus from anything.
+    await bringForward('Calculator');
     await app.waitState((x) => !x.windows.main.focused);
     try {
       await openSheet(app);
-      clickAnotherApp('Finder');
+      await bringForward('Finder');
       await sheetHidden(app);
     } finally {
       quitApp('Calculator');
@@ -674,7 +699,7 @@ test.describe('desktop', () => {
     app,
   }) => {
     await signIn(app);
-    clickAnotherApp('Finder');
+    await bringForward('Finder');
     await app.waitState((x) => !x.windows.main.focused);
     await openSheet(app);
     // What the global mouse monitor hears for a click in Finder; CI cannot post a real one into another app.

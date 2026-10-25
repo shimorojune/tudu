@@ -6,7 +6,8 @@
 //!   shows it, the updater's last check, download and error, every outside link or file the app was handed, and the
 //!   background (chunk 16): the activation policy, the Dock choice, the count beside the tick, the login item, the
 //!   App Nap opt-out and each webview's inactive scheduling policy; and the tick's place as macOS keeps it (its
-//!   autosave name and saved position) and whether it is hidden.
+//!   autosave name and saved position) and whether it is hidden; and the last blur, click or app coming forward that
+//!   could put the sheet away, with whether it did (`outside`).
 //! - `POST /act {"do": …}`: what a person does outside the page: `summon`, `tray` (a click on the tick, with
 //!   `button`: left or right), `reopen` (the dock icon), `close` (with `window`), `outside-click` (a click in another
 //!   app), `check-update` (`auto`: only past the floor, as focus would), `wake`, `age-check` (with `minutes`), `quit`,
@@ -286,6 +287,7 @@ fn state(app: &AppHandle) -> Value {
         "background": background,
         "updater": updater,
         "seen": seen,
+        "outside": windows::last_outside(),
     })
 }
 
@@ -305,7 +307,7 @@ fn act(app: &AppHandle, input: &Value) -> (u16, Value) {
                     "tray" => windows::toggle_menubar(&a, crate::tray_icon(&a)),
                     "reopen" => windows::show_main(&a, None),
                     // A click in another app, as the global mouse monitor hears it (CI cannot post one).
-                    "outside-click" => windows::outside(&a, false),
+                    "outside-click" => windows::outside(&a, "click", None, false),
                     "close" => {
                         let label = input
                             .get("window")

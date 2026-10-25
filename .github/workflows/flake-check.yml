@@ -1,0 +1,122 @@
+name: Flake check
+
+# Runs one test (or a group) many times on the same kind of runner CI uses, to prove a flake is gone before calling
+# it fixed. Started by hand (Actions › Flake check › Run workflow) on the branch with the fix.
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: 'mac (the desktop group on macOS) or web (Playwright on Ubuntu)'
+        type: choice
+        options: [mac, web]
+        default: web
+      grep:
+        description: 'Playwright -g pattern, e.g. C11-E15 or C20-D0'
+        required: true
+      repeat:
+        description: 'Times to run each matching test'
+        default: '20'
+      project:
+        description: 'web only: the Playwright project'
+        default: desktop
+
+env:
+  PNPM_VERSION: 9.15.9
+
+jobs:
+  web:
+    if: inputs.suite == 'web'
+    name: Web × ${{ inputs.repeat }} (${{ inputs.grep }})
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: tudu
+          POSTGRES_PASSWORD: tudu
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U tudu -d postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TUDU_CI_DATABASE_URL: postgres://tudu:tudu@127.0.0.1:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: The close-matches model (cached)
+        uses: actions/cache@v4
+        with:
+          path: .local/models
+          key: embeddings-all-MiniLM-L6-v2-q8
+      - run: EMBEDDINGS_MODEL_DIR=$PWD/.local/models pnpm --filter @tudu/server exec node --import tsx src/embeddings/fetch-model.ts
+      - run: pnpm --filter e2e exec playwright install --with-deps chromium webkit
+      - run: pnpm e2e -g "$GREP" --project="$PROJECT" --repeat-each="$REPEAT"
+        env:
+          CI: 'true'
+          GREP: ${{ inputs.grep }}
+          PROJECT: ${{ inputs.project }}
+          REPEAT: ${{ inputs.repeat }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: flake-check-web
+          path: |
+            reports/playwright.json
+            reports/playwright-html
+          if-no-files-found: ignore
+
+  mac:
+    if: inputs.suite == 'mac'
+    name: Mac × ${{ inputs.repeat }} (${{ inputs.grep }})
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - uses: ankane/setup-postgres@v1
+        with:
+          postgres-version: 17
+      - run: echo "TUDU_CI_DATABASE_URL=postgres://$(whoami)@127.0.0.1:5432/postgres" >> "$GITHUB_ENV"
+      - name: pgvector
+        run: |
+          git clone --depth 1 --branch v0.8.7 https://github.com/pgvector/pgvector.git /tmp/pgvector
+          make -C /tmp/pgvector -s
+          make -C /tmp/pgvector -s install
+      - run: pnpm install --frozen-lockfile
+      - name: The close-matches model (cached)
+        uses: actions/cache@v4
+        with:
+          path: .local/models
+          key: embeddings-all-MiniLM-L6-v2-q8
+      - run: EMBEDDINGS_MODEL_DIR=$PWD/.local/models pnpm --filter @tudu/server exec node --import tsx src/embeddings/fetch-model.ts
+      - run: pnpm e2e:mac -g "$GREP" --repeat-each="$REPEAT"
+        env:
+          CI: 'true'
+          GREP: ${{ inputs.grep }}
+          REPEAT: ${{ inputs.repeat }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: flake-check-mac
+          path: |
+            reports/playwright-mac.json
+            reports/playwright-mac-html
+            reports/mac-results
+          if-no-files-found: ignore
