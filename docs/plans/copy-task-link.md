@@ -67,13 +67,13 @@ Unit (Vitest, `packages/ui`):
 
 E2E (Playwright, `packages/e2e`):
 
-| ID               | Where         | Scenario                                                                                                                |
-| ---------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| C02-E09 (update) | today.spec    | Clicking the row's ID says "Link copied" and the clipboard holds `<origin>/t/ME-1`; opening that address opens the task |
-| C03-E10 (extend) | detail.spec   | The panel's ID chip copies `<origin>/t/ME-1` with "Link copied"; ⋯ › Copy task ID still copies `ME-1`                   |
-| C03-E17 (new)    | detail.spec   | Clipboard permission denied: the error toast shows and no "Link copied"                                                 |
-| detail.spec:58   | detail.spec   | Update the locator from "Copy task ID ME-2" to "Copy link to ME-2"                                                      |
-| week / backlog   | week, backlog | One check each that the row chip is "Copy link to …" (the `linkFor` wiring on those pages)                              |
+| ID               | Where         | Scenario                                                                                                                                                                                          |
+| ---------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C02-E09 (update) | today.spec    | Clicking the row's ID says "Link copied" and the clipboard holds `<origin>/t/ME-1`; opening that address opens the task                                                                           |
+| C03-E18 (new)    | detail.spec   | The panel's ID chip copies `<origin>/t/ME-1` with "Link copied"; ⋯ › Copy task ID still copies `ME-1` (first drafted as an extension of C03-E10, split out so C03-E10 stays inside its 30s on CI) |
+| C03-E17 (new)    | detail.spec   | Clipboard permission denied: the error toast shows and no "Link copied"                                                                                                                           |
+| detail.spec:58   | detail.spec   | Update the locator from "Copy task ID ME-2" to "Copy link to ME-2"                                                                                                                                |
+| week / backlog   | week, backlog | One check each that the row chip is "Copy link to …" (the `linkFor` wiring on those pages)                                                                                                        |
 
 `docs/tests/chunk-02.md` and `chunk-03.md` get the new and changed rows.
 

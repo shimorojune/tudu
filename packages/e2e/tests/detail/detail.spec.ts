@@ -318,7 +318,7 @@ test.describe('detail', () => {
     ]);
   });
 
-  test('C03-E10 the address: a reload with ?task= reopens it, /t/ME-1 opens it on its day, and the link copies that address', async ({
+  test('C03-E10 the address: a reload with ?task= reopens it, /t/ME-1 opens it on its day, and Copy link copies that address', async ({
     page,
     context,
   }) => {
@@ -343,8 +343,25 @@ test.describe('detail', () => {
     const origin = new URL(page.url()).origin;
     const copied = await page.evaluate(() => navigator.clipboard.readText()).catch(() => null);
     if (copied !== null) expect(copied).toBe(`${origin}/t/ME-1`);
-    // the ID at the top copies the same link; ⋯ › Copy task ID still gives the bare ID
-    await panel(page).getByRole('button', { name: 'Copy link to ME-1' }).click();
+    // a link to a task that is not there goes back to the day
+    await page.goto('/t/ME-9');
+    await expect(page).toHaveURL(/\/me$/);
+    await expect(panel(page)).toHaveCount(0);
+  });
+
+  // Its own test: with sign-in and three page loads C03-E10 already used most of its 30s on a loaded CI runner.
+  test('C03-E18 the ID chip copies the task’s link; ⋯ › Copy task ID still copies the bare ID', async ({
+    page,
+    context,
+  }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
+    await signInFresh(page);
+    await writeTasks(page, ['Pay the electricity bill']);
+    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
+    await openTask(page, 'Pay the electricity bill');
+    const origin = new URL(page.url()).origin;
+    const chip = panel(page).getByRole('button', { name: 'Copy link to ME-1' });
+    await chip.click();
     await expect(page.getByRole('status').filter({ hasText: 'Link copied' })).toBeVisible();
     const fromChip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => null);
     if (fromChip !== null) expect(fromChip).toBe(`${origin}/t/ME-1`);
@@ -353,10 +370,6 @@ test.describe('detail', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Copied ME-1' })).toBeVisible();
     const bare = await page.evaluate(() => navigator.clipboard.readText()).catch(() => null);
     if (bare !== null) expect(bare).toBe('ME-1');
-    // a link to a task that is not there goes back to the day
-    await page.goto('/t/ME-9');
-    await expect(page).toHaveURL(/\/me$/);
-    await expect(panel(page)).toHaveCount(0);
   });
 
   test('C03-E17 when the clipboard says no, the ID chip says it could not copy and nothing claims it did', async ({
