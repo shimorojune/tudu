@@ -137,5 +137,6 @@ Regression: C20-D01..D07, C16-D01..D07, MB-D01..D04, C11-E14..E16 unchanged.
 
 Done means:
 
-- `flake-check` runs the C20 group 20 times on macOS and C11-E15 30 times on Ubuntu, all green.
+- `flake-check` runs the C20 group 20 times on macOS and C11-E15 30 times on Ubuntu, all green. Done on PR #17
+  (25 Oct): C20-D04/D06/D07 60 of 60, C11-E15 30 of 30.
 - Then 5 master pushes in a row with a green `Desktop (macOS)` and `End-to-end (1/4)`.

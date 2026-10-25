@@ -4,8 +4,6 @@ name: Flake check
 # it fixed. Started by hand (Actions › Flake check › Run workflow) on the branch with the fix.
 
 on:
-  # TEMP (PR for docs/plans/ci-flakes.md): prove the fix on the PR; removed before merge.
-  pull_request:
   workflow_dispatch:
     inputs:
       suite:
@@ -28,8 +26,8 @@ env:
 
 jobs:
   web:
-    if: inputs.suite == 'web' || github.event_name == 'pull_request'
-    name: Web × ${{ inputs.repeat || '30' }} (${{ inputs.grep || 'C11-E15' }})
+    if: inputs.suite == 'web'
+    name: Web × ${{ inputs.repeat }} (${{ inputs.grep }})
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -63,9 +61,9 @@ jobs:
       - run: pnpm e2e -g "$GREP" --project="$PROJECT" --repeat-each="$REPEAT"
         env:
           CI: 'true'
-          GREP: ${{ inputs.grep || 'C11-E15' }}
-          PROJECT: ${{ inputs.project || 'desktop' }}
-          REPEAT: ${{ inputs.repeat || '30' }}
+          GREP: ${{ inputs.grep }}
+          PROJECT: ${{ inputs.project }}
+          REPEAT: ${{ inputs.repeat }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -76,8 +74,8 @@ jobs:
           if-no-files-found: ignore
 
   mac:
-    if: inputs.suite == 'mac' || github.event_name == 'pull_request'
-    name: Mac × ${{ inputs.repeat || '20' }} (${{ inputs.grep || 'C20-D0[467]' }})
+    if: inputs.suite == 'mac'
+    name: Mac × ${{ inputs.repeat }} (${{ inputs.grep }})
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -111,8 +109,8 @@ jobs:
       - run: pnpm e2e:mac -g "$GREP" --repeat-each="$REPEAT"
         env:
           CI: 'true'
-          GREP: ${{ inputs.grep || 'C20-D0[467]' }}
-          REPEAT: ${{ inputs.repeat || '20' }}
+          GREP: ${{ inputs.grep }}
+          REPEAT: ${{ inputs.repeat }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
