@@ -100,6 +100,7 @@ export function bootstrap(
         token: env.FEEDBACK_GITHUB_TOKEN,
         repo: env.FEEDBACK_GITHUB_REPO,
         api: env.FEEDBACK_GITHUB_API,
+        perHour: env.FEEDBACK_GITHUB_PER_HOUR,
         fetch: options.githubFetch,
       })
     : null;

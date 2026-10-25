@@ -49,7 +49,7 @@ export async function fileReport(
   opts: { now?: Date; quiet?: boolean } = {},
 ): Promise<FileOutcome> {
   const now = opts.now ?? new Date();
-  if ((await filedThisHour(db, now)) >= ISSUES_PER_HOUR) return { state: 'pending' };
+  if ((await filedThisHour(db, now)) >= (tracker.perHour ?? ISSUES_PER_HOUR)) return { state: 'pending' };
   const [row] = await db
     .update(schema.feedback)
     .set({ issueClaimedAt: now, issueAttempts: sql`${schema.feedback.issueAttempts} + 1` })
@@ -122,7 +122,7 @@ export async function sweepIssues(
   for (const { id } of waiting) {
     const out = await fileReport(db, tracker, id, opts);
     if (out.state === 'filed') filed += 1;
-    if ((await filedThisHour(db, now)) >= ISSUES_PER_HOUR) break;
+    if ((await filedThisHour(db, now)) >= (tracker.perHour ?? ISSUES_PER_HOUR)) break;
   }
   return filed;
 }

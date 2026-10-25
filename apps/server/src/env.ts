@@ -25,6 +25,8 @@ const schema = z.object({
   FEEDBACK_GITHUB_REPO: z.string().default('shimorojune/tudu'),
   /** GitHub's API; tests point it at the fake under /__test/github-issues. */
   FEEDBACK_GITHUB_API: z.string().url().default('https://api.github.com'),
+  /** Issues the whole app files in an hour; past it, reports wait for the sweep. End-to-end runs raise it. */
+  FEEDBACK_GITHUB_PER_HOUR: z.coerce.number().int().positive().default(30),
   /** `1` exposes /__test/* (the outbox) for end-to-end tests. Never on in production. */
   TEST_ROUTES: z.string().optional(),
   /** `1` serves the fake Jira at /demo-jira, so staging can be reviewed without a real Jira. Fixed data only. */

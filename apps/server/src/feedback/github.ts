@@ -10,6 +10,8 @@ export interface IssueDraft {
 /** Where reports become public issues. GitHub in production; tests point it at the fake. */
 export interface IssueTracker {
   file(draft: IssueDraft): Promise<FeedbackIssue>;
+  /** Issues the whole app may file in an hour; ISSUES_PER_HOUR when left out. */
+  perHour?: number;
 }
 
 /**
@@ -37,8 +39,13 @@ export class GithubIssues implements IssueTracker {
       api: string;
       fetch?: typeof fetch;
       timeoutMs?: number;
+      perHour?: number;
     },
-  ) {}
+  ) {
+    this.perHour = opts.perHour;
+  }
+
+  readonly perHour?: number;
 
   async file(draft: IssueDraft): Promise<FeedbackIssue> {
     const go = this.opts.fetch ?? fetch;
