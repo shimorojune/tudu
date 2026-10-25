@@ -46,6 +46,10 @@ export interface TopBarProps {
   leading?: ReactNode;
   /** A Segmented at the left of the bar: the day page uses it for "Day | 2 days". */
   views?: TopBarViews;
+  /** Report a bug or idea: the bug, first in the bar, opens Send feedback. Leave it out and there is none. */
+  onFeedback?: () => void;
+  /** Holds the bug in its open look while the form is open. */
+  feedbackOpen?: boolean;
   /** Opens the search panel. */
   onSearch?: () => void;
   /** Holds the search icon in its open look while the panel is open. */
@@ -74,6 +78,8 @@ export interface TopBarProps {
 export function TopBar({
   leading,
   views,
+  onFeedback,
+  feedbackOpen,
   onSearch,
   searchOpen,
   searchLabel = 'Search tasks',
@@ -103,6 +109,17 @@ export function TopBar({
         />
       ) : null}
       <span className="tp-tb-sp" {...drag} />
+      {onFeedback ? (
+        <IconButton
+          label="Report a bug or idea"
+          tipSide="bottom"
+          className={cx('tp-tb-bug', feedbackOpen && 'tp-on')}
+          aria-haspopup="dialog"
+          onClick={onFeedback}
+        >
+          <Icon name="bug" size={17} />
+        </IconButton>
+      ) : null}
       <IconButton
         label={searchLabel}
         tipSide="bottom"

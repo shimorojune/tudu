@@ -151,4 +151,27 @@ describe('C08-U14 TopBar inbox', () => {
       within(bar).getByRole('button', { name: 'Inbox, 140 new' }).querySelector('.tp-tb-pip'),
     ).toHaveTextContent('99+');
   });
+
+  it('C19-U14 the bug comes first, named Report a bug or idea, pressed while the form is open; none without onFeedback', async () => {
+    const onFeedback = vi.fn();
+    const { user, bar } = setup({ onFeedback, inbox: { count: 2, onInbox: () => {} } });
+    const buttons = within(bar).getAllByRole('button');
+    expect(buttons[0]).toHaveAccessibleName('Report a bug or idea');
+    expect(buttons[1]).toHaveAccessibleName('Search tasks');
+    expect(buttons[0]).toHaveClass('tp-tb-bug');
+    expect(buttons[0]).not.toHaveClass('tp-on');
+    expect(buttons[0]).toHaveAttribute('aria-haspopup', 'dialog');
+    await user.click(buttons[0]!);
+    expect(onFeedback).toHaveBeenCalledTimes(1);
+  });
+
+  it('C19-U14 the bug holds its pressed wash while feedbackOpen, and is left out without onFeedback', () => {
+    const { bar } = setup({ onFeedback: () => {}, feedbackOpen: true });
+    expect(within(bar).getByRole('button', { name: 'Report a bug or idea' })).toHaveClass('tp-on');
+  });
+
+  it('C19-U14 no bug without onFeedback', () => {
+    const { bar } = setup();
+    expect(within(bar).queryByRole('button', { name: 'Report a bug or idea' })).toBeNull();
+  });
 });

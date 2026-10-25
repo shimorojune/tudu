@@ -427,6 +427,11 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 .tp-tb-inbox { position: relative; }
 .tp-tb-pip { position: absolute; top: 2px; right: 1px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px; background: var(--foreground); color: var(--background); font-family: var(--font-mono); font-size: 10px; line-height: 16px; text-align: center; box-shadow: 0 0 0 2px var(--background); pointer-events: none; animation: tp-pip-in 220ms var(--ease-arrive) both; }
 @keyframes tp-pip-in { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+/* The top bar's bug (Report a bug or idea): one small wiggle on hover. */
+.tp-tb-bug svg { transform-origin: 50% 60%; }
+.tp-tb-bug:hover svg { animation: tp-bug-wiggle 360ms var(--ease-change) 1; }
+@keyframes tp-bug-wiggle { 0% { transform: rotate(0); } 30% { transform: rotate(-10deg); } 65% { transform: rotate(8deg); } 100% { transform: rotate(0); } }
+@media (prefers-reduced-motion: reduce) { .tp-tb-bug:hover svg { animation: none; } }
 .tp-search { display: inline-flex; align-items: center; gap: 9px; width: 280px; height: var(--control-height); padding: 0 14px; border: 0; border-radius: var(--radius-lg); background: var(--secondary); color: var(--muted-foreground); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer;
   box-shadow: inset 0 0 0 1px transparent; transition: background var(--dur-arrive) var(--ease-change), box-shadow var(--dur-arrive) var(--ease-change), color var(--dur-arrive) var(--ease-change); }
 /* A button that opens the search panel. It never changes size, so nothing in the top bar moves. */

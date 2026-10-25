@@ -32,6 +32,9 @@
 :root[data-motion='less'] .tp-skel {
   animation: none;
 }
+:root[data-motion='less'] .tp-tb-bug:hover svg {
+  animation: none;
+}
 :root[data-motion='less'] .tp-pop-leaving,
 :root[data-motion='less'] .tp-pop-leaving:is(.tp-qa-pop-up,
 :root[data-motion='less'] .tp-up) {
@@ -222,6 +225,29 @@
 :root[data-motion='less'] .tp-fb-drop {
   transition: none;
   animation: none;
+}
+:root[data-motion='less'] .tp-root .tp-fb-wait svg,
+:root[data-motion='less'] .tp-root .tp-fbr-shim,
+:root[data-motion='less'] .tp-root .tp-fbr-skel {
+  animation: none;
+}
+:root[data-motion='less'] .tp-root
+    :is(.tp-fb-done,
+:root[data-motion='less'] .tp-fb-num,
+:root[data-motion='less'] .tp-fb-err,
+:root[data-motion='less'] .tp-fb-tick,
+:root[data-motion='less'] .tp-fb-wait,
+:root[data-motion='less'] .tp-fbr-empty,
+:root[data-motion='less'] .tp-fbr-list > li),
+:root[data-motion='less'] .tp-root.tp-fb-pop {
+  animation-name: tp-fb-fade;
+}
+:root[data-motion='less'] .tp-root .tp-fb-tick path {
+  animation-duration: 1ms;
+  animation-delay: 0ms;
+}
+:root[data-motion='less'] .tp-root .tp-issue-ic svg {
+  transform: none !important;
 }
 :root[data-motion='less'] .tp-root.tp-mb {
   animation: none;
