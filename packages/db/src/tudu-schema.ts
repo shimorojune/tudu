@@ -517,9 +517,22 @@ export const feedback = pgTable(
     details: jsonb('details').$type<Record<string, unknown>>(),
     screenshotKey: text('screenshot_key'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Its public GitHub issue: `none` (not filed: no token, or sent before issues), `pending` (waiting for GitHub;
+     * the sweep retries), `filed` (number and url set) or `failed` (gave up; the mail has it).
+     */
+    issueState: text('issue_state', { enum: ['none', 'pending', 'filed', 'failed'] })
+      .notNull()
+      .default('none'),
+    issueNumber: integer('issue_number'),
+    issueUrl: text('issue_url'),
+    issueAttempts: integer('issue_attempts').notNull().default(0),
+    /** When a request or the sweep last took it to file, so two never file it at once. */
+    issueClaimedAt: timestamp('issue_claimed_at', { withTimezone: true }),
   },
   (t) => [
     uniqueIndex('feedback_report').on(t.userId, t.reportId),
     index('feedback_user_created').on(t.userId, t.createdAt),
+    index('feedback_issue_pending').on(t.issueState, t.issueClaimedAt),
   ],
 );

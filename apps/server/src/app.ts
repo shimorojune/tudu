@@ -10,6 +10,9 @@ import { OutboxMailer, type Mailer } from './email';
 import { sessionMiddleware, type SessionVars } from './middleware/session';
 import { eventRoutes } from './routes/events';
 import { feedbackRoutes } from './routes/feedback';
+import { fakeGithubIssues } from './feedback/fake';
+import { sweepIssues } from './feedback/filing';
+import type { IssueTracker } from './feedback/github';
 import { fileRoutes } from './routes/files';
 import { meRoutes } from './routes/me';
 import { inboxRoutes } from './routes/inbox';
@@ -38,6 +41,8 @@ export interface AppDeps {
   githubFetch?: typeof fetch;
   /** Close matches: the vectors and the meaning search (chunk 13). */
   embeddings: Embeddings;
+  /** Send feedback's public GitHub issues; null when no token is set. */
+  issues?: IssueTracker | null;
   /** For the live stream heartbeat in tests. */
   heartbeatMs?: number;
   quiet?: boolean;
@@ -122,7 +127,7 @@ export function createApp(deps: AppDeps) {
   app.route('/api', spaceRoutes(db, hub, mailer, env.WEB_URL!, storage));
   app.route('/api', inboxRoutes(db));
   app.route('/api', fileRoutes(db, storage));
-  app.route('/api', feedbackRoutes(db, storage, mailer, env.FEEDBACK_TO));
+  app.route('/api', feedbackRoutes(db, storage, mailer, env.FEEDBACK_TO, deps.issues ?? null));
   app.route(
     '/api',
     jiraRoutes(db, hub, {
@@ -136,6 +141,14 @@ export function createApp(deps: AppDeps) {
     app.route('/__test', testRoutes(mailer, db, deps.embeddings));
     app.route('/__test/jira', fakeJira());
     app.route('/__test/github', fakeGithub());
+    app.route('/__test/github-issues', fakeGithubIssues());
+    // The issue sweep on demand: the server runs it every five minutes, tests can't wait that long.
+    app.post('/__test/feedback/sweep', async (c) => {
+      const filed = deps.issues
+        ? await sweepIssues(db, deps.issues, { quiet: true, now: new Date(Date.now() + 10 * 60 * 1000) })
+        : 0;
+      return c.json({ filed });
+    });
     app.post('/__test/updates/reset', (c) => {
       feed?.reset();
       return c.json({ ok: true });

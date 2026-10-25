@@ -129,3 +129,90 @@ export function feedbackDetailsLines(d: FeedbackDetails): string[] {
     `Window: ${d.window}, ${d.theme}`,
   ];
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// The public GitHub issue a report becomes. Built only from the report's kind, words and listed details: never the
+// person, their email, ids, spaces or the screenshot. The repository is public.
+
+/** An issue title is the first line, cut at a word past this many characters. */
+export const ISSUE_TITLE_MAX = 70;
+
+/** A title with nothing but spaces or symbols in its first line still needs words. */
+function firstLine(text: string): string {
+  return text.trim().split('\n')[0]!.trim().replace(/\s+/g, ' ');
+}
+
+/** "Dragging a task from Monday to Tuesday puts it back on Monday after…": cut at a word, with an ellipsis. */
+export function issueTitle(text: string): string {
+  const line = firstLine(text);
+  if (line.length <= ISSUE_TITLE_MAX) return line;
+  const cut = line.slice(0, ISSUE_TITLE_MAX - 1);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > ISSUE_TITLE_MAX / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+
+/** "@name" pings that person on GitHub: a zero-width joiner after the @ keeps the words and drops the ping. */
+export function noMentions(text: string): string {
+  return text.replace(/(^|[\s([{,;:!?"'])@(?=[A-Za-z0-9-])/gm, '$1@\u200d');
+}
+
+/** The labels: what kind, and that it came from the app. */
+export function issueLabels(kind: FeedbackKind): string[] {
+  return [kind === 'bug' ? 'bug' : 'enhancement', 'from-app'];
+}
+
+/** The issue's body: the words, the app details (or that there are none), and the short reference to the report. */
+export function issueBody(x: {
+  kind: FeedbackKind;
+  text: string;
+  details: FeedbackDetails | null;
+  ref: string;
+}): string {
+  const details = x.details
+    ? feedbackDetailsLines(x.details).map((l) => `- ${l}`)
+    : ['_App details were switched off._'];
+  return [
+    noMentions(x.text.trim()),
+    '',
+    '---',
+    `**${x.kind === 'bug' ? 'Something’s wrong' : 'An idea'}**, sent from the Tudu app.`,
+    '',
+    ...details,
+    '',
+    `<sub>Filed from the Tudu app · ref ${x.ref}</sub>`,
+  ].join('\n');
+}
+
+/** The report's short reference on its issue: the start of the saved row's id, enough for the team to find it. */
+export function feedbackRef(id: string): string {
+  return id.replace(/-/g, '').slice(0, 8);
+}
+
+/** A filed report's issue, as the API answers it. */
+export interface FeedbackIssue {
+  number: number;
+  url: string;
+}
+
+/** What POST /api/feedback answers: the report, its issue once filed, and whether one is still to come. */
+export interface FeedbackSent {
+  id: string;
+  issue: FeedbackIssue | null;
+  pending: boolean;
+}
+
+/** One of your reports in Your reports. */
+export interface MyReport {
+  id: string;
+  kind: FeedbackKind;
+  title: string;
+  createdAt: string;
+  state: 'none' | 'pending' | 'filed' | 'failed';
+  issue: FeedbackIssue | null;
+}
+
+/** GET /api/feedback/mine: where reports go (GitHub, or email only) and your last ones. */
+export interface MyReports {
+  filing: 'github' | 'email';
+  reports: MyReport[];
+}

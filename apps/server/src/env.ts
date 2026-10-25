@@ -17,6 +17,14 @@ const schema = z.object({
   EMAIL_FROM: z.string().default('Tudu <sign-in@mail.tudu.ezdev.net>'),
   /** Where Send feedback mails each report (chunk 19). Left out, reports are saved but not mailed. */
   FEEDBACK_TO: z.preprocess((v) => (v === '' ? undefined : v), z.string().email().optional()),
+  /**
+   * Send feedback files each report as a public GitHub issue with this token: a fine-grained one that can only
+   * write this repository's issues. Left out, reports are saved and mailed only, as before.
+   */
+  FEEDBACK_GITHUB_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  FEEDBACK_GITHUB_REPO: z.string().default('shimorojune/tudu'),
+  /** GitHub's API; tests point it at the fake under /__test/github-issues. */
+  FEEDBACK_GITHUB_API: z.string().url().default('https://api.github.com'),
   /** `1` exposes /__test/* (the outbox) for end-to-end tests. Never on in production. */
   TEST_ROUTES: z.string().optional(),
   /** `1` serves the fake Jira at /demo-jira, so staging can be reviewed without a real Jira. Fixed data only. */
