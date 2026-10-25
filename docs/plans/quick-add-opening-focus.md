@@ -1,6 +1,6 @@
 # Quick Add's opening focus never takes the caret back
 
-Status: proposal, awaiting Rohit's approval. Canvas: not applicable (no visible change; asked Rohit to confirm the skip).
+Status: approved by Rohit 25 Oct 2026 (canvas skipped: no visible change); implemented.
 
 ## What failed
 
@@ -29,12 +29,12 @@ the name card stays empty, and "Platform is already here." never shows.
 
 Proof: with the delay raised to simulate a late timer, the file fails every time, and the victim moves with the timing:
 
-| Delay   | Failing tests                    |
-| ------- | -------------------------------- |
-| 10, 50  | none                             |
-| 80 ms   | C18-U16, C18-U17, C04-U28        |
-| 120 ms  | C04-U04, C04-U28                 |
-| 160, 200| C04-U04                          |
+| Delay    | Failing tests             |
+| -------- | ------------------------- |
+| 10, 50   | none                      |
+| 80 ms    | C18-U16, C18-U17, C04-U28 |
+| 120 ms   | C04-U04, C04-U28          |
+| 160, 200 | C04-U04                   |
 
 So this is a race in the component, not a broken assertion, and three more Quick Add tests are exposed to it.
 
@@ -47,14 +47,17 @@ a field the person already chose.
 One guard in the opening-focus timer: focus the title line only if the caret is not already inside the bar.
 
 ```tsx
-const t = setTimeout(() => {
-  const now = document.activeElement;
-  if (now && now !== document.body && panel.current?.contains(now)) return; // the person got there first
-  input.current?.focus({ preventScroll: true });
-}, overlay ? 30 : 0);
+const t = setTimeout(
+  () => {
+    const now = document.activeElement;
+    if (now && now !== document.body && panel.current?.contains(now)) return; // the person got there first
+    input.current?.focus({ preventScroll: true });
+  },
+  overlay ? 30 : 0,
+);
 ```
 
-`panel` is a ref on the bar's root (the `Quick Add` dialog, or the window root without a layer). Nothing else changes:
+`panel` is the ref on the bar's `<section>` (named `sheet` in the code), which holds the chips and their pickers in place. Nothing else changes:
 opening still lands the caret on the title line when nothing else has it (C04-U01). No retries, no waits added to tests,
 no test loosened.
 

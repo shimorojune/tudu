@@ -292,6 +292,7 @@ export function QuickAdd(p: QuickAddProps) {
   const [leaving, setLeaving] = useState(false);
   const [noteOpen, setNoteOpen] = useState(!!p.initial?.note);
   const input = useRef<HTMLInputElement | null>(null);
+  const sheet = useRef<HTMLElement | null>(null);
   // A new key loads a fresh note into the editor (after a task is added and the draft starts again).
   const [noteKey, setNoteKey] = useState(0);
   // The note takes the caret when you open it, not when a kept draft opens with it showing.
@@ -396,7 +397,15 @@ export function QuickAdd(p: QuickAddProps) {
   }, [leaving, phone]);
   useEffect(() => {
     if (!mounted || !open || p.initial?.noFocus) return;
-    const t = setTimeout(() => input.current?.focus({ preventScroll: true }), overlay ? 30 : 0);
+    const t = setTimeout(
+      () => {
+        // Someone who already clicked into the bar (a chip, a picker, the note) keeps the caret where they put it.
+        const now = document.activeElement;
+        if (now && now !== document.body && sheet.current?.contains(now)) return;
+        input.current?.focus({ preventScroll: true });
+      },
+      overlay ? 30 : 0,
+    );
     return () => clearTimeout(t);
   }, [mounted, open, overlay, p.initial?.noFocus]);
   // Without a layer (the macOS app's floating window) Esc still closes the bar when there is somewhere to go.
@@ -815,6 +824,7 @@ export function QuickAdd(p: QuickAddProps) {
 
   const panel = (
     <section
+      ref={sheet}
       className={cx(
         'tp-qa tp-sheet',
         phone ? 'tp-qa-phone' : 'tp-qa-desk',

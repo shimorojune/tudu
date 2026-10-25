@@ -270,6 +270,35 @@ describe('QuickAdd', () => {
     expect(note.textContent).toBe('See the map');
   });
 
+  it('C04-U29 the opening focus waits its turn: a chip that already has the caret keeps it', () => {
+    vi.useFakeTimers();
+    render(<Bar />);
+    const line = screen.getByRole('textbox', { name: 'Task title' });
+    const project = chip('Choose a project');
+    act(() => project.focus());
+    act(() => vi.advanceTimersByTime(50));
+    expect(project).toHaveFocus();
+    expect(line).not.toHaveFocus();
+  });
+
+  it('C04-U29 the opening focus waits its turn: the New project name keeps the caret', () => {
+    vi.useFakeTimers();
+    render(<Bar onNewProject={() => 'new-1'} />);
+    fireEvent.click(chip('Choose a project'));
+    fireEvent.click(
+      within(document.querySelector('.tp-qa-pop') as HTMLElement).getByRole('menuitem', {
+        name: 'New project…',
+      }),
+    );
+    const name = within(screen.getByRole('group', { name: 'New project' })).getByRole('textbox', {
+      name: 'Project name',
+    });
+    act(() => name.focus());
+    act(() => vi.advanceTimersByTime(50));
+    expect(name).toHaveFocus();
+    expect(screen.getByRole('textbox', { name: 'Task title' })).not.toHaveFocus();
+  });
+
   it('C04-U06 files: the attach button, a paste and a drop add chips with their size; dropping shows the outline; × removes one', async () => {
     const user = userEvent.setup();
     const onUpload = vi.fn((file: File) =>
