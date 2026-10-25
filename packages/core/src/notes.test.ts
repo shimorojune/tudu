@@ -52,11 +52,11 @@ describe('C03-U24 cleaning notes', () => {
 });
 
 describe('C04-U13 attachment chips survive the cleaner', () => {
-  it('C04-U13 keeps the chip with its id, name and size, and nothing else', () => {
+  it('C04-U13 keeps the chip with its id, name, size and title, and nothing else', () => {
     const chip =
       '<a class="tp-att" href="/api/files/abc-123" data-id="abc-123" data-name="spec.pdf" data-size="248000" onclick="x()" title="t"><span class="tp-att-i"></span>spec.pdf<span class="tp-att-s">242 KB</span></a>';
     expect(cleanHtml(`<p>See ${chip}</p>`)).toBe(
-      '<p>See <a class="tp-att" data-type="attachment" contenteditable="false" href="/api/files/abc-123" target="_blank" data-id="abc-123" data-name="spec.pdf" data-size="248000"><span class="tp-att-i"></span>spec.pdf<span class="tp-att-s">242 KB</span></a></p>',
+      '<p>See <a class="tp-att" data-type="attachment" contenteditable="false" href="/api/files/abc-123" target="_blank" data-id="abc-123" data-name="spec.pdf" data-size="248000" title="t"><span class="tp-att-i"></span>spec.pdf<span class="tp-att-s">242 KB</span></a></p>',
     );
     expect(cleanHtml('<a class="tp-att" href="https://evil/x" data-id="../x">bad</a>')).toBe(
       '<a class="tp-att" data-type="attachment" contenteditable="false" href="https://evil/x" rel="noopener noreferrer" target="_blank">bad</a>',

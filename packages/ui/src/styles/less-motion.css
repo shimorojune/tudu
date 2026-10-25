@@ -72,6 +72,9 @@
 :root[data-motion='less'] .tp-copy-ic svg {
   transform: none !important;
 }
+:root[data-motion='less'] .tp-prose .tp-att-in {
+  animation-name: tp-att-fade;
+}
 :root[data-motion='less'] .tp-td-cmt.tp-fresh {
   animation: none;
 }

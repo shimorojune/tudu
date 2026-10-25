@@ -12,6 +12,7 @@ import type {
   TaskDetail,
   TasksChangedEvent,
 } from '@tudu/core';
+import { chipHtml, cleanHtml } from '@tudu/core';
 import { eq, schema, sql } from '@tudu/db';
 import { sweepAttachments } from './files';
 import type { MemoryStorage } from './storage';
@@ -751,7 +752,7 @@ describe('projects and Quick Add (chunk 04)', () => {
     const d = await detail(p, t);
     expect(d).toMatchObject({ due: '2026-10-22', projectId: a });
     expect(d.notes).toBe(
-      `<p>Keep it to one page.</p><p><a class="tp-att" data-type="attachment" contenteditable="false" href="/api/files/${up.id}" target="_blank" data-id="${up.id}" data-name="spec.pdf" data-size="1200"><span class="tp-att-i"></span>spec.pdf<span class="tp-att-s">1 KB</span></a></p>`,
+      `<p>Keep it to one page.</p><p><a class="tp-att" data-type="attachment" contenteditable="false" href="/api/files/${up.id}" target="_blank" data-id="${up.id}" data-name="spec.pdf" data-size="1200" title="spec.pdf"><span class="tp-att-i"></span><span class="tp-att-n"><span class="tp-att-stem">spec</span><span class="tp-att-ext">.pdf</span></span><span class="tp-att-s">1 KB</span></a></p>`,
     );
     expect(d.history.map((e) => [e.kind, (e as { source?: string }).source ?? null])).toEqual([
       ['created', 'quick-add'],
@@ -774,6 +775,33 @@ describe('projects and Quick Add (chunk 04)', () => {
       }),
     ]);
     expect(foreign.results[1]).toMatchObject({ status: 'rejected', code: 400 });
+  });
+
+  it('C04-A10 Quick Add files land as chips in the editor’s own markup, a long name split before its extension', async () => {
+    const p = await person();
+    const t = randomUUID();
+    const long = 'WhatsApp Image 2026-08-05 at 4.29.27 PM.jpeg';
+    const one = await upload(p, long, 'image/jpeg', 248_000);
+    const two = await upload(p, 'README', 'text/plain', 10);
+    await sync(p, [
+      m('task.create', {
+        id: t,
+        spaceId: p.spaceId,
+        title: 'Share the venue photos',
+        day: SUN,
+        position: 1024,
+        notes: '<ul><li><p>Hall</p></li></ul>',
+        attachments: [one.id, two.id],
+        source: 'quick-add',
+      }),
+    ]);
+    const d = await detail(p, t);
+    const chips = [one, two].map((f) => cleanHtml(chipHtml({ id: f.id, name: f.name, size: f.size })));
+    expect(d.notes).toBe(`<ul><li><p>Hall</p></li></ul><p>${chips.join(' ')}</p>`);
+    expect(d.notes).toContain(
+      '<span class="tp-att-n"><span class="tp-att-stem">WhatsApp Image 2026-08-05 at 4.29.27 PM</span><span class="tp-att-ext">.jpeg</span></span><span class="tp-att-s">242 KB</span>',
+    );
+    expect(d.notes).toContain(`title="${long}"`);
   });
 
   it('C04-A04 upload: a file lands in the bucket under the space; over 25 MB is refused; no file is 400', async () => {

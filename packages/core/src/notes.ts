@@ -69,7 +69,9 @@ function cleanAttrs(tag: string, raw: string): string {
       out.push(`data-name="${esc(v.slice(0, 255))}"`);
     } else if (tag === 'a' && name === 'data-size' && /^\d{1,12}$/.test(v)) {
       out.push(`data-size="${v}"`);
-    } else if (tag === 'span' && name === 'class' && (v === 'tp-att-i' || v === 'tp-att-s')) {
+    } else if (tag === 'a' && name === 'title') {
+      out.push(`title="${esc(v.slice(0, 255))}"`);
+    } else if (tag === 'span' && name === 'class' && /^tp-att-(i|s|n|stem|ext)$/.test(v)) {
       out.push(`class="${v}"`);
     } else if ((tag === 'ul' || tag === 'li') && name === 'data-type' && /^(taskList|taskItem)$/.test(v)) {
       out.push(`data-type="${v}"`);
@@ -105,6 +107,7 @@ export function cleanHtml(html: string): string {
   const open: string[] = [];
   let last = 0;
   let dropUntil: string | null = null;
+  let depth = 0;
   let m: RegExpExecArray | null;
   TAG_RE.lastIndex = 0;
   while ((m = TAG_RE.exec(html))) {
@@ -115,11 +118,19 @@ export function cleanHtml(html: string): string {
     if (!name) continue; // a comment or junk: gone
     const closing = m[0].startsWith('</');
     if (dropUntil) {
-      if (closing && name === dropUntil) dropUntil = null;
+      if (name === dropUntil) depth += closing ? -1 : 1;
+      if (depth === 0) dropUntil = null;
       continue;
     }
-    if (DROP_WITH_CONTENT.has(name)) {
-      if (!closing) dropUntil = name;
+    // A chip still uploading in the editor is never stored, nor anything inside it.
+    if (
+      DROP_WITH_CONTENT.has(name) ||
+      (name === 'span' && !closing && /\sdata-tp-upload\b/i.test(m[2] ?? ''))
+    ) {
+      if (!closing) {
+        dropUntil = name;
+        depth = 1;
+      }
       continue;
     }
     if (!BLOCKS.has(name) && !INLINE.has(name)) continue;
@@ -140,6 +151,26 @@ export function cleanHtml(html: string): string {
   if (!dropUntil) out.push(esc(html.slice(last)));
   while (open.length) out.push(`</${open.pop()}>`);
   return out.join('');
+}
+
+/** Plain words become paragraphs; HTML stays HTML. Older notes (and request notes before 0.39) are plain words. */
+export function toHtml(v: string | undefined | null): string {
+  if (!v) return '';
+  if (/<\/?[a-z][\s\S]*>/i.test(v)) return v;
+  return v
+    .split(/\n{2,}/)
+    .map(
+      (p) =>
+        `<p>${p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</p>`,
+    )
+    .join('');
+}
+
+/** A note as stored: cleaned HTML, or nothing when it holds no words. */
+export function noteHtml(v: string | undefined | null): string {
+  // The editor keeps an empty paragraph after a list (so there is a line to write on); it is not part of the note.
+  const h = cleanHtml(toHtml(v?.trim())).replace(/(<p><\/p>)+$/, '');
+  return isEmptyHtml(h) ? '' : h;
 }
 
 /** True when the HTML holds no words and nothing to look at (an empty paragraph is empty). */

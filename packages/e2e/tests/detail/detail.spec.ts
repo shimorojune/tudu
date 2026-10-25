@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
 import { dayList, fixClock, idle, row, titlesOf, writeTasks } from '../../fixtures/today';
+import { expectListMarkers } from '../../fixtures/visual';
 
 const THREE = ['Pay the electricity bill', 'Review Quick Add PR', 'Book flights for the offsite'];
 
@@ -154,6 +155,74 @@ test.describe('detail', () => {
     const again = panel(page).getByRole('textbox', { name: 'Notes' });
     await expect(again.locator('strong')).toHaveText('yes or no');
     await expect(again.locator('ul.tp-checks')).toContainText('Pull the branch');
+  });
+
+  test('C03-E19 lists you can see: bullets, a nested bullet, numbers and a checklist show their markers, after a reload and in dark', async ({
+    page,
+  }) => {
+    await signInFresh(page);
+    await writeTasks(page, ['Plan the offsite']);
+    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
+    const p = await openTask(page, 'Plan the offsite');
+    const notes = p.getByRole('textbox', { name: 'Notes' });
+    await notes.click();
+    await page.keyboard.type('- Venue');
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Tab');
+    await page.keyboard.type('Hall A on the second floor');
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.type('Food');
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('1. Book the room');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('Pay the deposit');
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('[ ] Pack the banner');
+    await expect(notes.locator('ul ul > li')).toHaveText('Hall A on the second floor');
+    await expect(notes.locator('ol > li')).toHaveCount(2);
+    await expect(notes.locator('ul.tp-checks > li')).toHaveCount(1);
+    await expectListMarkers(notes);
+    await p.getByRole('textbox', { name: 'Task title' }).click();
+    await idle(page);
+    expect((await serverTask(page, 'ME-1')).notes).toContain('<ol><li><p>Book the room</p></li>');
+    await page.reload();
+    const again = panel(page).getByRole('textbox', { name: 'Notes' });
+    await expect(again.locator('ol > li')).toHaveCount(2);
+    await expectListMarkers(again);
+    // dark: the markers keep their contrast
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await expectListMarkers(again);
+  });
+
+  test('C03-E20 lists in comments: the box and the posted comment show bullets and numbers, in light and dark', async ({
+    page,
+  }) => {
+    await signInFresh(page);
+    await writeTasks(page, ['Plan the offsite']);
+    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
+    const p = await openTask(page, 'Plan the offsite');
+    const box = p.getByRole('textbox', { name: 'Write a comment' });
+    await box.click();
+    await page.keyboard.type('- Venue');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('Food');
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('1. Book');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('Pay');
+    await expectListMarkers(box);
+    await p.getByRole('button', { name: 'Comment' }).click();
+    const comment = p.locator('.tp-td-cmt').first();
+    await expect(comment.locator('ol > li')).toHaveCount(2);
+    await expectListMarkers(comment);
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await expectListMarkers(comment);
   });
 
   test('C03-E05 subtasks in the panel and the fold on the row', async ({ page }) => {

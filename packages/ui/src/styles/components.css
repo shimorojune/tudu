@@ -783,11 +783,19 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 .tp-prose h3 { margin-top: .8em; font-size: 15px; line-height: 1.4; font-weight: 600; color: var(--foreground); }
 .tp-prose > :first-child { margin-top: 0; }
 .tp-prose b, .tp-prose strong { font-weight: 600; color: var(--foreground); }
+/* Tailwind's preflight drops list markers; prose puts them back (disc, circle, square; 1, a). */
 .tp-prose :is(ul, ol) { padding-left: 1.4em; }
+.tp-prose ul { list-style: disc; }
+.tp-prose ul ul { list-style: circle; }
+.tp-prose ul ul ul { list-style: square; }
+.tp-prose ol { list-style: decimal; }
+.tp-prose ol ol { list-style: lower-alpha; }
+.tp-prose li { padding-left: 2px; }
 .tp-prose li + li { margin-top: .2em; }
-.tp-prose ul > li::marker { color: var(--ghost); }
+.tp-prose ul > li::marker { color: var(--muted-foreground); }
 .tp-prose ol > li::marker { color: var(--muted-foreground); font-variant-numeric: tabular-nums; font-size: .92em; }
 .tp-prose ul.tp-checks { list-style: none; padding-left: 0; }
+.tp-prose ul.tp-checks ul:not(.tp-checks) { list-style: disc; }
 .tp-prose ul.tp-checks > li { position: relative; padding-left: 27px; }
 .tp-prose ul.tp-checks > li::before { content: ""; position: absolute; left: 1px; top: .3em; width: 15px; height: 15px; box-sizing: border-box; border: 1.5px solid var(--check-border); border-radius: 5px; background: var(--card); cursor: pointer; transition: border-color var(--dur-menu) var(--ease-change); }
 .tp-prose ul.tp-checks > li:hover::before { border-color: var(--foreground); }
@@ -800,10 +808,28 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 .tp-prose a { color: var(--jira); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--jira) 40%, transparent); text-underline-offset: 2px; }
 .tp-prose mark { background: var(--warning-soft); color: inherit; padding: 0 .12em; border-radius: 3px; }
 .tp-prose hr { border: 0; border-top: 1px solid var(--line); margin: 1em 0; }
-.tp-prose .tp-att { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px 0 7px; margin: 1px 0; border-radius: 7px; background: var(--accent); color: var(--foreground); font-size: 12.5px; text-decoration: none; vertical-align: middle; box-shadow: inset 0 0 0 1px var(--border); }
-.tp-prose .tp-att-i { width: 14px; height: 14px; background: var(--muted-foreground); -webkit-mask: var(--tp-clip) center / 14px no-repeat; mask: var(--tp-clip) center / 14px no-repeat; }
-.tp-prose .tp-att-s { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted-foreground); }
-.tp-prose { --tp-clip: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48'/%3E%3C/svg%3E"); }
+.tp-prose .tp-att, .tp-prose a.tp-att { position: relative; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; max-width: min(100%, 340px); height: 26px; padding: 0 9px 0 7px; margin: 1px 0; border-radius: 7px; background: var(--accent); color: var(--foreground); font-size: 12.5px; line-height: 1; text-decoration: none; vertical-align: middle; white-space: nowrap; overflow-wrap: normal; box-shadow: inset 0 0 0 1px var(--border);
+  transition: background-color var(--dur-menu) var(--ease-change), box-shadow var(--dur-menu) var(--ease-change), color var(--dur-menu) var(--ease-change); }
+.tp-prose a.tp-att:hover { background: color-mix(in srgb, var(--foreground) 7%, var(--accent)); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.tp-prose .tp-att-i { flex: none; width: 14px; height: 14px; background: var(--muted-foreground); -webkit-mask: var(--tp-clip) center / 14px no-repeat; mask: var(--tp-clip) center / 14px no-repeat; }
+.tp-prose .tp-att:is([data-name$=".png" i], [data-name$=".jpg" i], [data-name$=".jpeg" i], [data-name$=".gif" i], [data-name$=".webp" i], [data-name$=".heic" i], [data-name$=".svg" i]) .tp-att-i { -webkit-mask-image: var(--tp-pic); mask-image: var(--tp-pic); }
+.tp-prose .tp-att-n { display: flex; min-width: 0; }
+.tp-prose .tp-att-stem { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tp-prose .tp-att-ext { flex: none; }
+.tp-prose .tp-att-s { flex: none; font-family: var(--font-mono); font-size: 10.5px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.tp-prose .tp-att.tp-att-up { color: var(--foreground-2); background: linear-gradient(to right, var(--selection) calc(var(--tp-up, 0) * 100%), transparent 0), var(--accent); }
+.tp-prose .tp-att.tp-att-err { background: var(--destructive-soft); box-shadow: inset 0 0 0 1px var(--destructive-edge); color: var(--destructive); padding-right: 3px; }
+.tp-prose .tp-att.tp-att-err :is(.tp-att-i, .tp-att-s) { color: var(--destructive); }
+.tp-prose .tp-att.tp-att-err .tp-att-i { background: var(--destructive); }
+.tp-prose .tp-att-btn { flex: none; height: 20px; padding: 0 6px; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--destructive); transition: background-color var(--dur-menu) var(--ease-change); }
+.tp-prose .tp-att-btn:hover { background: color-mix(in srgb, var(--destructive) 10%, transparent); }
+.tp-prose .tp-att-x { flex: none; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: var(--muted-foreground); transition: background-color var(--dur-menu) var(--ease-change), color var(--dur-menu) var(--ease-change); }
+.tp-prose .tp-att-x:hover { background: color-mix(in srgb, var(--destructive) 10%, transparent); color: var(--destructive); }
+.tp-prose .tp-att-in { animation: tp-att-rise 160ms var(--ease-arrive) both; }
+@keyframes tp-att-rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .tp-prose .tp-att-in { animation-name: tp-att-fade; } }
+@keyframes tp-att-fade { from { opacity: 0; } to { opacity: 1; } }
+.tp-prose { --tp-pic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3Cpath d='m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21'/%3E%3C/svg%3E"); --tp-clip: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48'/%3E%3C/svg%3E"); }
 
 /* RichTextEditor: no frame until you write. Notes get a slim floating toolbar above them while you write;
    the comment box grows and shows its toolbar along its bottom edge with the Comment button. */
@@ -847,6 +873,20 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 .tp-rte-comment .tp-rte-bar { display: none; padding: 2px 6px 6px; }
 .tp-rte-comment.tp-on .tp-rte-bar { display: flex; animation: tp-label-in var(--dur-menu) var(--ease-arrive) both; }
 .tp-rte-comment .tp-rte-pop { top: auto; bottom: calc(100% + 8px); transform-origin: bottom left; }
+/* A file dragged over notes or a comment: the field washes and says where it goes. */
+.tp-rte-drop { position: absolute; inset: 0; z-index: 3; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: var(--radius-md); background: var(--accent); box-shadow: inset 0 0 0 1.5px var(--border-strong); outline: 1.5px dashed var(--muted-foreground); outline-offset: -6px; font-size: 13px; color: var(--foreground-2); opacity: 0; pointer-events: none; transition: opacity 110ms var(--ease-change); }
+.tp-rte-drop svg { flex: none; color: var(--muted-foreground); }
+.tp-rte-notes .tp-rte-drop { inset: 0 -12px; }
+.tp-rte-comment .tp-rte-drop { border-radius: var(--radius-lg); }
+.tp-rte-dropping .tp-rte-drop { opacity: 1; transition: opacity 160ms var(--ease-arrive); }
+/* Quick Add's note: a few lines of the same prose, and its formatting row under it while it has focus. */
+.tp-rte-quick .tp-rte-area { max-height: 12em; overflow-y: auto; font-size: 14px; line-height: 1.5; }
+.tp-rte-quick.tp-rte-blank .tp-rte-area::before { top: 0; left: 0; }
+.tp-rte-quick .tp-rte-bar { display: none; height: 32px; margin: 6px 0 0 -6px; }
+.tp-rte-quick.tp-on .tp-rte-bar { display: flex; animation: tp-label-in var(--dur-menu) var(--ease-arrive) both; }
+.tp-rte-quick .tp-rte-pop { top: auto; bottom: calc(100% + 8px); transform-origin: bottom left; }
+.tp-rte-quick.tp-compact .tp-rte-b { height: 36px; min-width: 36px; }
+.tp-rte-quick.tp-compact .tp-rte-bar { height: 40px; gap: 4px; }
 .tp-rte .tp-rte-send, .tp-rte .tp-rte-cancel { height: 30px; padding: 0 12px; font-size: 12.5px; }
 .tp-rte .tp-rte-cancel { order: 9; margin-left: 4px; }
 .tp-rte .tp-rte-send { order: 10; margin-left: 4px; }
@@ -1645,7 +1685,7 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 .tp-ix-more > div { min-height: 0; overflow: hidden; }
 .tp-ix-more:not(.tp-on) > div { opacity: 0; transition: opacity 120ms var(--ease-change); }
 .tp-ix-more.tp-on > div { opacity: 1; transition: opacity 200ms 60ms var(--ease-change); }
-.tp-ix-note { margin: -2px 24px 12px 62px; padding: 10px 12px; border-radius: var(--radius-md); background: var(--secondary); font-size: 13.5px; line-height: 1.5; color: var(--foreground-2); }
+.tp-ix-note { margin: -2px 24px 12px 62px; padding: 10px 12px; border-radius: var(--radius-md); background: var(--secondary); font-size: 13.5px; line-height: 1.5; color: var(--foreground-2); white-space: pre-line; }
 .tp-ix-full .tp-ix-note { margin: 4px 0 16px; }
 .tp-ix-list .tp-ix-head { padding: 12px 18px 12px 16px; }
 .tp-ix-list .tp-ix-line { font-size: 13px; }

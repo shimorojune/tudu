@@ -45,17 +45,6 @@ import { taskStore, useOnline } from './tasks';
 import { useViewport } from './viewport';
 import { useWorkingDay } from './workingDay';
 
-/** Plain words from the note line become paragraphs. */
-export function noteToHtml(note: string): string {
-  const t = note.trim();
-  if (!t) return '';
-  const esc = (x: string) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return t
-    .split(/\n{2,}/)
-    .map((para) => `<p>${esc(para).replace(/\n/g, '<br>')}</p>`)
-    .join('');
-}
-
 /** The phone keyboard's height, from the visual viewport, so the sheet can sit on it. */
 export function useKeyboardHeight(on: boolean): number {
   const [h, setH] = useState(0);
@@ -90,7 +79,7 @@ export function useQuickAddActions(spaceId: string | undefined) {
     return taskStore.create(spaceId, t.planned, t.title, undefined, {
       due: t.due,
       projectId: t.projectId,
-      notes: noteToHtml(t.note),
+      notes: t.note,
       attachments: t.attachments,
       source: 'quick-add',
     });

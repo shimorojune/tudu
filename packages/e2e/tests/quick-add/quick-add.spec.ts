@@ -1,7 +1,9 @@
 import type { Locator, Page } from '@playwright/test';
 import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
-import { createSpace, switchTo } from '../../fixtures/spaces';
-import { dayList, fixClock, idle, row, titlesOf, writeTasks } from '../../fixtures/today';
+import { goInbox, pane, rows, section } from '../../fixtures/inbox';
+import { createSpace, joinLink, secondPerson, switchTo } from '../../fixtures/spaces';
+import { dayList, fixClock, idle, row, SUNDAY, titlesOf, writeTasks } from '../../fixtures/today';
+import { expectListMarkers, expectOneLineChip } from '../../fixtures/visual';
 
 /** The bar (or the sheet on phones). */
 function bar(page: Page): Locator {
@@ -43,6 +45,41 @@ async function serverTask(page: Page, ref: string) {
     notes: string;
     history: Array<{ kind: string; source?: string }>;
   };
+}
+
+/** A real-world name: long, with spaces and dots. */
+const LONG = 'WhatsApp Image 2026-08-05 at 4.29.27 PM.jpeg';
+const jpeg = (name = LONG) => ({ name, mimeType: 'image/jpeg', buffer: Buffer.alloc(248_000, 1) });
+
+/** A task's panel, opened from its row on today. */
+async function openPanel(page: Page, title: string): Promise<Locator> {
+  await row(dayList(page), title).getByRole('button', { name: title }).click();
+  const p = page.getByRole('dialog', { name: 'Task details' });
+  await expect(p.getByRole('textbox', { name: 'Task title' })).toHaveValue(title);
+  return p;
+}
+
+/** Paste files into an editor the way the browser does with a screenshot on the clipboard. */
+async function pasteFile(field: Locator, name: string, type: string, size: number): Promise<void> {
+  await field.evaluate(
+    (el, f) => {
+      const dt = new DataTransfer();
+      dt.items.add(new File([new Uint8Array(f.size)], f.name, { type: f.type }));
+      el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    },
+    { name, type, size },
+  );
+}
+
+/** Hold uploads back so the uploading chip can be seen, until `release` is called. */
+async function holdUploads(page: Page): Promise<() => void> {
+  let release!: () => void;
+  const gate = new Promise<void>((r) => (release = r));
+  await page.route('**/api/spaces/*/files', async (route) => {
+    await gate;
+    await route.continue();
+  });
+  return release;
 }
 
 test.describe('quick-add', () => {
@@ -218,19 +255,24 @@ test.describe('quick-add', () => {
     expect(((await again.json()) as { projects: unknown[] }).projects).toHaveLength(1);
   });
 
-  test('C04-E06 a note becomes the task’s notes; a file attached shows as a chip in the notes and opens', async ({
+  test('C04-E06 a note becomes the task’s notes; a long-named file shows as a one-line chip in the notes and opens', async ({
     page,
   }) => {
     await signInFresh(page);
     await quickAdd(page, 'Send the offsite agenda', async (b) => {
       await b.getByRole('button', { name: 'Add a note' }).click();
       await b.getByRole('textbox', { name: 'Note' }).fill('Keep it to one page.');
-      await b.locator('input[type=file]').setInputFiles({
-        name: 'offsite-agenda-v3.pdf',
-        mimeType: 'application/pdf',
-        buffer: Buffer.alloc(248_000, 1),
-      });
-      await expect(b.locator('.tp-qa-file')).toHaveText(['offsite-agenda-v3.pdf242 KB']);
+      await b
+        .locator('input[type=file]')
+        .first()
+        .setInputFiles({
+          name: 'Offsite agenda v3 (final, with the venue map and the travel plan).pdf',
+          mimeType: 'application/pdf',
+          buffer: Buffer.alloc(248_000, 1),
+        });
+      await expect(b.locator('.tp-qa-file')).toHaveText([
+        'Offsite agenda v3 (final, with the venue map and the travel plan).pdf242 KB',
+      ]);
       await expect(b.locator('.tp-qa-file')).not.toHaveClass(/tp-qa-file-up/);
       if (test.info().project.name !== 'phone')
         await expect(foot(b)).toHaveText('Lands on Today · note · 1 file');
@@ -245,7 +287,12 @@ test.describe('quick-add', () => {
     const notes = page.getByRole('dialog', { name: 'Task details' }).getByRole('textbox', { name: 'Notes' });
     await expect(notes).toContainText('Keep it to one page.');
     const chip = notes.locator('a.tp-att');
-    await expect(chip).toContainText('offsite-agenda-v3.pdf');
+    await expect(chip).toHaveAttribute(
+      'title',
+      'Offsite agenda v3 (final, with the venue map and the travel plan).pdf',
+    );
+    await expect(chip.locator('.tp-att-ext')).toHaveText('.pdf');
+    expect((await expectOneLineChip(chip, notes)).cut).toBe(true);
     const href = (await chip.getAttribute('href'))!;
     expect(href).toMatch(/\/api\/files\//);
     const file = await page.request.get(href);
@@ -407,7 +454,7 @@ test.describe('quick-add', () => {
     await floating.close();
   });
 
-  test('C04-E14 attach a file from the notes editor in the panel; the chip is there after a reload and opens', async ({
+  test('C04-E14 attach a long-named file from the notes editor in the panel; one line, there after a reload, and it opens', async ({
     page,
   }) => {
     await signInFresh(page);
@@ -420,15 +467,22 @@ test.describe('quick-add', () => {
     const notes = panel.getByRole('textbox', { name: 'Notes' });
     await notes.click();
     await page.keyboard.type('Spec: ');
-    await panel
-      .locator('.tp-rte-notes input[type=file]')
-      .setInputFiles({ name: 'quick-add-spec.md', mimeType: 'text/markdown', buffer: Buffer.from('# Spec') });
-    await expect(notes.locator('a.tp-att')).toContainText('quick-add-spec.md');
+    await panel.locator('.tp-rte-notes input[type=file]').setInputFiles({
+      name: 'Quick Add spec, rich notes and files, second draft.md',
+      mimeType: 'text/markdown',
+      buffer: Buffer.from('# Spec'),
+    });
+    await expect(notes.locator('a.tp-att')).toHaveAttribute(
+      'title',
+      'Quick Add spec, rich notes and files, second draft.md',
+    );
+    await expectOneLineChip(notes.locator('a.tp-att'), notes);
     await panel.getByRole('textbox', { name: 'Task title' }).click();
     await idle(page);
     await page.reload();
     const again = page.getByRole('dialog', { name: 'Task details' }).getByRole('textbox', { name: 'Notes' });
-    await expect(again.locator('a.tp-att')).toContainText('quick-add-spec.md');
+    await expect(again.locator('a.tp-att .tp-att-ext')).toHaveText('.md');
+    await expectOneLineChip(again.locator('a.tp-att'), again);
     const href = (await again.locator('a.tp-att').getAttribute('href'))!;
     const file = await page.request.get(href);
     expect(file.status()).toBe(200);
@@ -451,6 +505,271 @@ test.describe('quick-add', () => {
     await idle(page);
     await page.reload();
     await expect.poll(() => titlesOf(dayList(page))).toEqual(['In the dark']);
+  });
+
+  test('C04-E16 a long-named file in notes: in a list item and after a line it stays one line, cut before .jpeg, the full name on hover', async ({
+    page,
+  }) => {
+    await signInFresh(page);
+    await writeTasks(page, ['Share the venue photos']);
+    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
+    const panel = await openPanel(page, 'Share the venue photos');
+    const notes = panel.getByRole('textbox', { name: 'Notes' });
+    const input = panel.locator('.tp-rte-notes input[type=file]');
+    await notes.click();
+    await page.keyboard.type('- Photos: ');
+    await input.setInputFiles(jpeg());
+    await expect(notes.locator('li a.tp-att')).toHaveCount(1);
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('The hall from the stage, before the chairs went in, is in this one: ');
+    await input.setInputFiles(jpeg());
+    await expect(notes.locator('a.tp-att')).toHaveCount(2);
+    for (const chip of await notes.locator('a.tp-att').all()) {
+      await expect(chip).toHaveAttribute('title', LONG);
+      await expect(chip.locator('.tp-att-ext')).toHaveText('.jpeg');
+      expect((await expectOneLineChip(chip, notes)).cut).toBe(true);
+    }
+    await expectListMarkers(notes);
+    await panel.getByRole('textbox', { name: 'Task title' }).click();
+    await idle(page);
+    await page.reload();
+    const again = page.getByRole('dialog', { name: 'Task details' }).getByRole('textbox', { name: 'Notes' });
+    await expect(again.locator('a.tp-att')).toHaveCount(2);
+    for (const chip of await again.locator('a.tp-att').all()) await expectOneLineChip(chip, again);
+  });
+
+  test('C04-E17 paste a screenshot into notes: the uploading chip at once, then "Pasted image" with its size; after a reload it opens as a PNG', async ({
+    page,
+  }) => {
+    await signInFresh(page);
+    await writeTasks(page, ['Fix the header']);
+    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
+    const panel = await openPanel(page, 'Fix the header');
+    const notes = panel.getByRole('textbox', { name: 'Notes' });
+    await notes.click();
+    await page.keyboard.type('What it looks like: ');
+    const release = await holdUploads(page);
+    await pasteFile(notes, 'image.png', 'image/png', 1_260_000);
+    const up = notes.locator('[data-tp-upload]');
+    await expect(up).toHaveClass(/tp-att-up/);
+    await expect(up.locator('.tp-att-stem')).toHaveText('Pasted image 18 Oct 10.00');
+    await expect(up.locator('.tp-att-ext')).toHaveText('.png');
+    await expectOneLineChip(up, notes);
+    release();
+    const chip = notes.locator('a.tp-att');
+    await expect(chip).toHaveAttribute('title', 'Pasted image 18 Oct 10.00.png');
+    await expect(chip.locator('.tp-att-s')).toHaveText('1.2 MB');
+    await expect(up).toHaveCount(0);
+    await panel.getByRole('textbox', { name: 'Task title' }).click();
+    await idle(page);
+    const saved = (await serverTask(page, 'ME-1')).notes;
+    expect(saved).toContain('data-name="Pasted image 18 Oct 10.00.png"');
+    expect(saved).not.toContain('data-tp-upload');
+    await page.reload();
+    const again = page.getByRole('dialog', { name: 'Task details' }).getByRole('textbox', { name: 'Notes' });
+    const href = (await again.locator('a.tp-att').getAttribute('href'))!;
+    const file = await page.request.get(href);
+    expect(file.status()).toBe(200);
+    expect(file.headers()['content-type']).toBe('image/png');
+  });
+
+  test('C04-E18 paste into a comment: Comment waits for the file; the posted comment shows it on one line and it opens', async ({
+    page,
+  }) => {
+    await signInFresh(page);
+    await writeTasks(page, ['Fix the header']);
+    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
+    const panel = await openPanel(page, 'Fix the header');
+    const box = panel.getByRole('textbox', { name: 'Write a comment' });
+    await box.click();
+    await page.keyboard.type('Here it is ');
+    const release = await holdUploads(page);
+    await pasteFile(box, 'image.png', 'image/png', 64_000);
+    const send = panel.getByRole('button', { name: 'Comment' });
+    await expect(box.locator('[data-tp-upload]')).toBeVisible();
+    await expect(send).toBeDisabled();
+    release();
+    await expect(box.locator('a.tp-att')).toBeVisible();
+    await expect(send).toBeEnabled();
+    await send.click();
+    const comment = panel.locator('.tp-td-cmt').first();
+    const chip = comment.locator('a.tp-att');
+    await expect(chip).toHaveAttribute('title', 'Pasted image 18 Oct 10.00.png');
+    await expectOneLineChip(chip, comment);
+    const file = await page.request.get((await chip.getAttribute('href'))!);
+    expect(file.status()).toBe(200);
+  });
+
+  test('C04-E19 drop a file on the notes: the outline shows and the chip lands where it was dropped', async ({
+    page,
+  }) => {
+    test.skip(test.info().project.name === 'phone', 'dropping is a pointer thing');
+    await signInFresh(page);
+    await writeTasks(page, ['Expense the team lunch']);
+    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
+    const panel = await openPanel(page, 'Expense the team lunch');
+    const notes = panel.getByRole('textbox', { name: 'Notes' });
+    await notes.click();
+    await page.keyboard.type('Receipt:');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('Paid by card.');
+    await panel.getByRole('textbox', { name: 'Task title' }).click();
+    const dt = await page.evaluateHandle(() => {
+      const d = new DataTransfer();
+      d.items.add(new File([new Uint8Array(90_000)], 'lunch-receipt.pdf', { type: 'application/pdf' }));
+      return d;
+    });
+    await notes.dispatchEvent('dragenter', { dataTransfer: dt });
+    await expect(panel.locator('.tp-rte-notes')).toHaveClass(/tp-rte-dropping/);
+    await expect(
+      panel.locator('.tp-rte-notes').getByText('Drop to attach · it goes where the caret is'),
+    ).toBeVisible();
+    // dropped at the end of the first line
+    const at = await notes
+      .locator('p')
+      .first()
+      .evaluate((p) => {
+        const r = document.createRange();
+        r.selectNodeContents(p);
+        const box = r.getBoundingClientRect();
+        return { x: box.right - 1, y: box.top + box.height / 2 };
+      });
+    await notes.dispatchEvent('drop', { dataTransfer: dt, clientX: at.x, clientY: at.y });
+    await expect(panel.locator('.tp-rte-notes')).not.toHaveClass(/tp-rte-dropping/);
+    await expect(notes.locator('p').first().locator('a.tp-att')).toHaveAttribute(
+      'title',
+      'lunch-receipt.pdf',
+    );
+    await expectOneLineChip(notes.locator('a.tp-att'), notes);
+  });
+
+  test('C04-E20 a failed paste: the red chip and the toast; Retry once the route recovers lands it; a reload never shows a broken chip', async ({
+    page,
+  }) => {
+    await signInFresh(page);
+    await writeTasks(page, ['Fix the header']);
+    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
+    const panel = await openPanel(page, 'Fix the header');
+    const notes = panel.getByRole('textbox', { name: 'Notes' });
+    await notes.click();
+    await page.keyboard.type('Before: ');
+    await page.route('**/api/spaces/*/files', (route) => route.fulfill({ status: 500, body: 'down' }));
+    await pasteFile(notes, 'image.png', 'image/png', 64_000);
+    const bad = notes.locator('.tp-att-err');
+    await expect(bad).toBeVisible();
+    await expect(page.locator('.tp-toast')).toContainText(
+      'Couldn’t attach the file. Check your connection and retry.',
+    );
+    await expectOneLineChip(bad, notes);
+    // leaving now saves the words without the broken chip
+    await panel.getByRole('textbox', { name: 'Task title' }).click();
+    await idle(page);
+    const saved = (await serverTask(page, 'ME-1')).notes;
+    expect(saved).toContain('Before:');
+    expect(saved).not.toContain('tp-att');
+    await page.unroute('**/api/spaces/*/files');
+    await bad.getByRole('button', { name: 'Retry' }).click();
+    await expect(notes.locator('a.tp-att')).toHaveAttribute('title', 'Pasted image 18 Oct 10.00.png');
+    await expect(bad).toHaveCount(0);
+    // it saves on its own once it lands, the field already left
+    await idle(page);
+    await expect
+      .poll(async () => (await serverTask(page, 'ME-1')).notes)
+      .toContain('Pasted image 18 Oct 10.00.png');
+    await page.reload();
+    const again = page.getByRole('dialog', { name: 'Task details' }).getByRole('textbox', { name: 'Notes' });
+    await expect(again.locator('a.tp-att')).toHaveCount(1);
+    await expect(again.locator('.tp-att-err, [data-tp-upload]')).toHaveCount(0);
+  });
+
+  test('C04-E21 Quick Add with a rich note and a long-named file: the task’s notes show the list and the chip on one line', async ({
+    page,
+  }) => {
+    await signInFresh(page);
+    await quickAdd(page, 'Plan the offsite', async (b) => {
+      await b.getByRole('button', { name: 'Add a note' }).click();
+      const note = b.getByRole('textbox', { name: 'Note' });
+      await expect(note).toBeFocused();
+      const tools = b.getByRole('toolbar', { name: 'Note formatting' });
+      await expect(tools).toBeVisible();
+      await tools.getByRole('button', { name: 'Bulleted list' }).click();
+      await page.keyboard.type('Venue');
+      await page.keyboard.press('Enter');
+      await page.keyboard.type('Food');
+      await expect(note.locator('ul > li')).toHaveCount(2);
+      await expectListMarkers(note);
+      await b.locator('input[type=file]').first().setInputFiles(jpeg());
+      await expect(b.locator('.tp-qa-file')).not.toHaveClass(/tp-qa-file-up/);
+      // leaving a note with words keeps its row, so Add stays under the pointer
+      const before = await addButton(b).boundingBox();
+      await b.getByRole('textbox', { name: 'Task title' }).click();
+      await expect(tools).toBeVisible();
+      expect(await addButton(b).boundingBox()).toEqual(before);
+    });
+    await idle(page);
+    const saved = (await serverTask(page, 'ME-1')).notes;
+    expect(saved).toContain('<ul><li><p>Venue</p></li><li><p>Food</p></li></ul>');
+    const panel = await openPanel(page, 'Plan the offsite');
+    const notes = panel.getByRole('textbox', { name: 'Notes' });
+    await expectListMarkers(notes);
+    expect((await expectOneLineChip(notes.locator('a.tp-att'), notes)).cut).toBe(true);
+  });
+
+  test('C04-E22 a rich note to someone else: their Inbox reads the words; accepted, the task’s notes have the list', async ({
+    page,
+    browser,
+  }) => {
+    test.skip(test.info().project.name === 'phone', 'the two-pane flow is the desk’s and the tablet’s');
+    await signInFresh(page);
+    const other = await secondPerson(browser);
+    await fixClock(other.page, new Date(SUNDAY.getTime() - 60_000));
+    const slug = await createSpace(page, 'Northwind', [other.email]);
+    await other.page.goto(await joinLink(page, other.email));
+    await other.page.getByRole('button', { name: 'Join Northwind' }).click();
+    await expect(other.page).toHaveURL(new RegExp(`/${slug}$`), { timeout: 10_000 });
+    await page.getByRole('button', { name: 'New task' }).first().click();
+    const qa = page.getByRole('dialog', { name: 'New task' });
+    await qa.getByRole('textbox', { name: 'Task title' }).fill('Get the visitor pass');
+    await qa.getByRole('button', { name: 'Who it’s for' }).click();
+    await page
+      .getByRole('menu', { name: 'Who it’s for' })
+      .getByRole('menuitemradio', { name: new RegExp(other.email) })
+      .click();
+    await qa.getByRole('button', { name: 'Add a note' }).click();
+    await expect(qa.getByRole('textbox', { name: 'Note' })).toBeFocused();
+    await page.keyboard.type('1. Bring the badge');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('Sign the form');
+    await qa.getByRole('button', { name: 'Send' }).click();
+    await expect(page.locator('.tp-toast')).toContainText(/^Sent to /);
+    await idle(page);
+    await goInbox(other.page);
+    await rows(section(other.page, 'To answer')).first().locator('.tp-ix-head').click();
+    const note = pane(other.page).locator('.tp-ix-note');
+    await expect(note).toHaveText('Bring the badge\nSign the form');
+    await expect(note).not.toContainText('<');
+    await pane(other.page).getByRole('button', { name: 'Accept' }).click();
+    await other.page
+      .getByRole('dialog', { name: 'Accept it onto…' })
+      .getByRole('button', { name: 'Tomorrow' })
+      .click();
+    await idle(other.page);
+    await other.page
+      .getByRole('navigation', { name: 'Main' })
+      .getByRole('button', { name: /^Today/ })
+      .first()
+      .click();
+    await other.page.getByRole('button', { name: 'Next day' }).click();
+    await row(dayList(other.page), 'Get the visitor pass')
+      .getByRole('button', { name: 'Get the visitor pass' })
+      .click();
+    const notes = other.page
+      .getByRole('dialog', { name: 'Task details' })
+      .getByRole('textbox', { name: 'Notes' });
+    await expect(notes.locator('ol > li')).toHaveCount(2);
+    await expectListMarkers(notes);
+    await other.context.close();
   });
 
   test('C17-E01 Personal alone: Quick Add opens on "In Personal for Me" and neither chip opens', async ({

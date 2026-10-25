@@ -35,8 +35,9 @@ const chip = (name: RegExp | string) => screen.getByRole('button', { name });
 /** A drag or paste with files, as the browser hands them over. */
 function withFiles(type: string, files: File[]) {
   const ev = new Event(type, { bubbles: true, cancelable: true });
-  Object.defineProperty(ev, 'dataTransfer', { value: { types: ['Files'], files } });
-  Object.defineProperty(ev, 'clipboardData', { value: { files } });
+  const data = { types: ['Files'], files, getData: () => '' };
+  Object.defineProperty(ev, 'dataTransfer', { value: data });
+  Object.defineProperty(ev, 'clipboardData', { value: data });
   return ev;
 }
 
@@ -163,24 +164,110 @@ describe('QuickAdd', () => {
     expect(foot()).toBe('Lands on Today · Home');
   });
 
-  it('C04-U05 the note line fades up on the note button, keeps three lines, folds away when left empty', async () => {
+  it('C04-U27 the note is rich text: the formatting row shows while it has focus, "- " makes a list, Cmd+Enter adds, onSave gets clean HTML', async () => {
     const user = userEvent.setup();
-    render(<Bar />);
+    const onSave = vi.fn();
+    render(<Bar onSave={onSave} />);
     await waitFor(() => expect(screen.getByRole('textbox', { name: 'Task title' })).toHaveFocus());
     expect(screen.queryByRole('textbox', { name: 'Note' })).toBeNull();
+    await user.keyboard('Plan the offsite');
     await user.click(screen.getByRole('button', { name: 'Add a note' }));
     const note = screen.getByRole('textbox', { name: 'Note' });
     await waitFor(() => expect(note).toHaveFocus());
+    expect(note).toHaveAttribute('data-placeholder', 'Add a note');
     expect(screen.getByRole('button', { name: 'Add a note' })).toHaveAttribute('aria-pressed', 'true');
-    await user.keyboard('One{Enter}Two{Enter}Three{Enter}Four');
-    // a fourth line never opens: the words join the third
-    expect(note).toHaveValue('One\nTwo\nThreeFour');
-    expect(note).toHaveAttribute('rows', '3');
+    const wrap = note.closest('.tp-rte')!;
+    expect(wrap).toHaveClass('tp-rte-quick', 'tp-on');
+    const bar = screen.getByRole('toolbar', { name: 'Note formatting' });
+    expect(
+      within(bar)
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('aria-label')),
+    ).toEqual(['Bold', 'Italic', 'Bulleted list', 'Numbered list', 'Checklist', 'Link', 'Code']);
+    await user.keyboard('- Venue{Enter}Food');
+    expect(note.querySelector('ul > li')).not.toBeNull();
+    expect(note.querySelectorAll('ul > li')).toHaveLength(2);
     expect(foot()).toBe('Lands on Today · note');
-    await user.clear(note);
+    // no limit of three lines any more
+    await user.keyboard('{Enter}Travel{Enter}Budget');
+    expect(note.querySelectorAll('ul > li')).toHaveLength(4);
+    fireEvent.keyDown(note, { key: 'Enter', metaKey: true });
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    const sent = (onSave.mock.calls[0] as unknown as [{ note: string }])[0].note;
+    expect(sent).toBe(
+      '<ul><li><p>Venue</p></li><li><p>Food</p></li><li><p>Travel</p></li><li><p>Budget</p></li></ul>',
+    );
+  });
+
+  it('C04-U27 an empty note folds away when left; a note with words keeps its row (Add never moves); an old plain draft opens as paragraphs', async () => {
+    const user = userEvent.setup();
+    render(<Bar />);
+    await user.click(screen.getByRole('button', { name: 'Add a note' }));
+    const note = screen.getByRole('textbox', { name: 'Note' });
+    await waitFor(() => expect(note).toHaveFocus());
     act(() => note.blur());
-    expect(screen.queryByRole('textbox', { name: 'Note' })).toBeNull();
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Note' })).toBeNull());
     expect(foot()).toBe('Lands on Today');
+    // a draft kept before notes were rich: plain lines
+    const kept = render(
+      <QuickAdd
+        open
+        today={TODAY}
+        projects={PROJECTS}
+        initial={{ note: 'Bring the badge\n\nAnd the laptop' }}
+      />,
+    );
+    const old = within(kept.container.ownerDocument.body).getAllByRole('textbox', { name: 'Note' }).at(-1)!;
+    expect(old.innerHTML).toBe('<p>Bring the badge</p><p>And the laptop</p>');
+    // words in it: the row stays put, so leaving the note for Add moves nothing
+    expect(old).not.toHaveFocus();
+    expect(old.closest('.tp-rte')).toHaveClass('tp-on');
+  });
+
+  it('C04-U27 phone: the row has Bold, the lists, Checklist and Link', async () => {
+    const user = userEvent.setup();
+    render(<Bar variant="sheet" />);
+    await user.click(screen.getByRole('button', { name: 'Add a note' }));
+    const note = screen.getByRole('textbox', { name: 'Note' });
+    await waitFor(() => expect(note).toHaveFocus());
+    const bar = screen.getByRole('toolbar', { name: 'Note formatting' });
+    expect(
+      within(bar)
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('aria-label')),
+    ).toEqual(['Bold', 'Bulleted list', 'Numbered list', 'Checklist', 'Link']);
+    expect(note.closest('.tp-rte')).toHaveClass('tp-compact');
+  });
+
+  it('C04-U28 a file pasted or dropped on the note joins the files row, not the note', async () => {
+    const user = userEvent.setup();
+    const onUpload = vi.fn((file: File) =>
+      Promise.resolve({ id: `att-${file.name}`, name: file.name, size: file.size }),
+    );
+    render(<Bar onUpload={onUpload} />);
+    const dialog = screen.getByRole('dialog', { name: 'Quick Add' });
+    await user.click(screen.getByRole('button', { name: 'Add a note' }));
+    const note = screen.getByRole('textbox', { name: 'Note' });
+    await waitFor(() => expect(note).toHaveFocus());
+    await user.keyboard('See the map');
+    const paste = withFiles('paste', [new File(['x'], 'venue-map.png', { type: 'image/png' })]);
+    act(() => {
+      note.dispatchEvent(paste);
+    });
+    await waitFor(() => expect(onUpload).toHaveBeenCalledTimes(1));
+    const chips = () =>
+      Array.from(dialog.querySelectorAll('.tp-qa-file')).map(
+        (c) => c.querySelector('.tp-qa-fname')!.textContent,
+      );
+    await waitFor(() => expect(chips()).toEqual(['venue-map.png']));
+    expect(note.querySelector('.tp-att, [data-tp-upload]')).toBeNull();
+    expect(note.textContent).toBe('See the map');
+    const drop = withFiles('drop', [new File(['y'], 'agenda.pdf')]);
+    act(() => {
+      note.dispatchEvent(drop);
+    });
+    await waitFor(() => expect(chips()).toEqual(['venue-map.png', 'agenda.pdf']));
+    expect(note.textContent).toBe('See the map');
   });
 
   it('C04-U06 files: the attach button, a paste and a drop add chips with their size; dropping shows the outline; × removes one', async () => {
