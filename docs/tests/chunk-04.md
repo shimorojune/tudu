@@ -37,6 +37,7 @@ laptop without Docker and in a RustFS service container in CI (`TUDU_CI_S3_*`).
 | C04-U26 | Comments wait             | Comment and Cmd+Enter do nothing while a file uploads or has failed, and post once it lands                                                                                                                                                                |
 | C04-U27 | The rich note             | The note is rich text: the formatting row while it has focus or words (fewer on phones), so leaving it never moves Add, `- ` makes a list, no line limit, Cmd+Enter adds, onSave gets clean HTML; an old plain draft opens as paragraphs; empty folds away |
 | C04-U28 | Files on the note         | A file pasted or dropped on the note joins the files row, not the note                                                                                                                                                                                     |
+| C04-U29 | The opening focus waits   | A chip or the New project name that already has the caret when the opening focus fires keeps it; the title line only takes the caret when nothing in the bar has it                                                                                        |
 
 ## API (`apps/server`)
 
