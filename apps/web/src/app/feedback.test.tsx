@@ -2,8 +2,8 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ApiError } from '@tudu/client';
-import type { FeedbackReport } from '@tudu/core';
-import { ToastHost } from '@tudu/ui';
+import type { FeedbackReport, FeedbackSent, MyReports } from '@tudu/core';
+import { dismissToast, ToastHost } from '@tudu/ui';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   clearFeedbackDraft,
@@ -22,6 +22,25 @@ vi.mock('@tanstack/react-router', async (orig) => ({
   useRouterState: ({ select }: { select: (s: { location: typeof location }) => unknown }) =>
     select({ location }),
 }));
+
+// Your reports, as GET /api/feedback/mine answers; each test sets what the server says.
+const mine = vi.hoisted(() => ({
+  answer: { filing: 'email', reports: [] } as MyReports | Error,
+  calls: 0,
+}));
+vi.mock('./session', () => ({
+  api: {
+    get: vi.fn(async () => {
+      mine.calls++;
+      if (mine.answer instanceof Error) throw mine.answer;
+      return mine.answer;
+    }),
+  },
+}));
+const opened = vi.hoisted(() => [] as string[]);
+vi.mock('./links', () => ({ openOutside: (url: string) => opened.push(url) }));
+
+const ISSUE = { number: 142, url: 'https://github.com/shimorojune/tudu/issues/142' };
 
 const report = (text = 'The tick came back'): FeedbackReport => ({
   id: crypto.randomUUID(),
@@ -51,12 +70,12 @@ describe('C19-U05 the queue', () => {
     });
     const q = new FeedbackQueue(store, send);
     const one = queued();
-    expect(await q.submit(one, false)).toBe('queued');
+    expect((await q.submit(one, false)).how).toBe('queued');
     expect(send).not.toHaveBeenCalled();
     expect((await store.all())[0]!.shot!.name).toBe('Screenshot.png');
     // Online but the request fails on the way: kept too.
     const two = queued(report('Second'), false);
-    expect(await q.submit(two, true)).toBe('queued');
+    expect((await q.submit(two, true)).how).toBe('queued');
     expect(await store.all()).toHaveLength(2);
     // A flush while still down sends nothing and keeps both.
     await q.flush();
@@ -75,7 +94,7 @@ describe('C19-U05 the queue', () => {
     expect(sent.at(-1)!.report.text).toBe('Third');
   });
 
-  it('C19-U05 a refusal for good (400) is not queued when sending, and is dropped from the queue; 429 and 500 wait', async () => {
+  it('C19-U05 a refusal for good (400) or too many this hour (429) is said, not queued; a queued one waits on 429 and 500', async () => {
     const store = new MemoryFeedbackStore();
     let status = 400;
     const send = vi.fn(async () => {
@@ -84,8 +103,11 @@ describe('C19-U05 the queue', () => {
     const q = new FeedbackQueue(store, send);
     await expect(q.submit(queued(), true)).rejects.toThrow('That is too long.');
     expect(await store.all()).toHaveLength(0);
+    status = 429;
+    await expect(q.submit(queued(), true)).rejects.toThrow();
+    expect(await store.all()).toHaveLength(0);
     status = 503;
-    expect(await q.submit(queued(), true)).toBe('queued');
+    expect((await q.submit(queued(), true)).how).toBe('queued');
     status = 429;
     await q.flush();
     expect(await store.all()).toHaveLength(1);
@@ -93,13 +115,51 @@ describe('C19-U05 the queue', () => {
     await q.flush();
     expect(await store.all()).toHaveLength(0);
   });
+
+  it('C19-U05 the answer’s issue comes back from submit; a queued report that lands later tells its issue once', async () => {
+    const store = new MemoryFeedbackStore();
+    let up = true;
+    let n = 142;
+    const send = vi.fn(async (): Promise<FeedbackSent> => {
+      if (!up) throw new TypeError('Network request failed');
+      return {
+        id: 'x',
+        issue: { number: n, url: `https://github.com/shimorojune/tudu/issues/${n}` },
+        pending: false,
+      };
+    });
+    const q = new FeedbackQueue(store, send);
+    expect(await q.submit(queued(), true)).toEqual({
+      how: 'sent',
+      issue: { number: 142, url: 'https://github.com/shimorojune/tudu/issues/142' },
+      pending: false,
+    });
+    const landed = vi.fn();
+    const off = q.onLanded(landed);
+    up = false;
+    expect(await q.submit(queued(), true)).toEqual({ how: 'queued', issue: null, pending: false });
+    up = true;
+    n = 143;
+    await Promise.all([q.flush(), q.flush()]);
+    expect(landed).toHaveBeenCalledTimes(1);
+    expect(landed).toHaveBeenCalledWith({
+      number: 143,
+      url: 'https://github.com/shimorojune/tudu/issues/143',
+    });
+    await q.flush();
+    expect(landed).toHaveBeenCalledTimes(1);
+    off();
+  });
 });
 
 describe('C19-U06 the draft and the details switch', () => {
-  let send: ReturnType<typeof vi.fn<(q: QueuedReport) => Promise<void>>>;
+  let send: ReturnType<typeof vi.fn<(q: QueuedReport) => Promise<FeedbackSent | void>>>;
   beforeEach(() => {
     localStorage.clear();
-    send = vi.fn(async (_q: QueuedReport) => {});
+    mine.answer = { filing: 'email', reports: [] };
+    mine.calls = 0;
+    opened.length = 0;
+    send = vi.fn(async (_q: QueuedReport): Promise<FeedbackSent | void> => {});
     setFeedbackQueue(new FeedbackQueue(new MemoryFeedbackStore(), send));
   });
   afterEach(() => {
@@ -107,6 +167,7 @@ describe('C19-U06 the draft and the details switch', () => {
     act(() => {
       closeFeedback();
       clearFeedbackDraft();
+      dismissToast();
     });
     setFeedbackQueue(null);
   });
@@ -119,10 +180,11 @@ describe('C19-U06 the draft and the details switch', () => {
     );
   const box = () => screen.getByRole('textbox', { name: /^What (happened|would help)\?$/ });
 
-  it('C19-U06 the draft survives closing and reopening; Send clears it and says thanks', async () => {
+  it('C19-U06 the draft survives closing and reopening; Send (email only) clears it and says thanks', async () => {
     const user = userEvent.setup();
     mount();
     act(() => openFeedback());
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Public on GitHub/ })).toBeNull());
     await user.click(screen.getByRole('button', { name: 'An idea' }));
     await user.type(box(), 'Snooze to a time');
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -159,5 +221,114 @@ describe('C19-U06 the draft and the details switch', () => {
     await user.click(screen.getByRole('button', { name: 'Send' }));
     await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
     expect((send.mock.calls[0]![0] as QueuedReport).report.details).toBeNull();
+  });
+
+  it('C19-U06 Send with GitHub on shows Filed and stays; Done clears the draft and toasts the number with Copy link', async () => {
+    const user = userEvent.setup();
+    mine.answer = { filing: 'github', reports: [] };
+    send.mockResolvedValue({ id: 'x', issue: ISSUE, pending: false });
+    mount();
+    act(() => openFeedback());
+    expect(
+      await screen.findByRole('button', { name: 'Public on GitHub: what’s shared' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/, the Backlog page\. Shown on the issue\. Never your tasks\.$/),
+    ).toBeInTheDocument();
+    await user.type(box(), 'Drag puts it back');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    expect(await screen.findByRole('dialog', { name: 'Thanks, it’s filed' })).toBeInTheDocument();
+    expect(document.querySelector('.tp-fb-num')).toHaveTextContent('#142');
+    // It stays until you choose.
+    await new Promise((r) => setTimeout(r, 900));
+    expect(screen.getByRole('dialog', { name: 'Thanks, it’s filed' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Open on GitHub' }));
+    expect(opened).toEqual([ISSUE.url]);
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    expect(await screen.findByText('Filed as #142 on GitHub')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy link' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    act(() => openFeedback());
+    expect(box()).toHaveValue('');
+  });
+
+  it('C19-U15 a pending answer shows Sent with the issue to follow; a refusal shows its line and keeps the words', async () => {
+    const user = userEvent.setup();
+    mine.answer = { filing: 'github', reports: [] };
+    send.mockResolvedValueOnce({ id: 'x', issue: null, pending: true });
+    mount();
+    act(() => openFeedback());
+    await user.type(box(), 'Badge says 2');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    expect(await screen.findByRole('dialog', { name: 'Thanks, it’s sent' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.queryByText(/Filed as/)).toBeNull();
+
+    send.mockRejectedValueOnce(
+      new ApiError(429, 'That’s a lot of reports in an hour. Your words are kept; send it a little later.'),
+    );
+    act(() => openFeedback());
+    await user.type(box(), 'Another one');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('That’s a lot of reports in an hour.');
+    expect(box()).toHaveValue('Another one');
+    expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled();
+  });
+
+  it('C19-U16 Your reports is fetched on first open and after each send; Back returns to the view it came from', async () => {
+    const user = userEvent.setup();
+    mine.answer = {
+      filing: 'github',
+      reports: [
+        {
+          id: 'a',
+          kind: 'bug',
+          title: 'Older one',
+          createdAt: new Date().toISOString(),
+          state: 'filed',
+          issue: { number: 7, url: 'https://github.com/shimorojune/tudu/issues/7' },
+        },
+      ],
+    };
+    send.mockResolvedValue({ id: 'x', issue: ISSUE, pending: false });
+    mount();
+    expect(mine.calls).toBe(0);
+    act(() => openFeedback());
+    await waitFor(() => expect(mine.calls).toBe(1));
+    await user.click(await screen.findByRole('button', { name: /^Your reports · 1/ }));
+    expect(screen.getByRole('dialog', { name: 'Your reports' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Issue #7: Older one/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByRole('dialog', { name: 'Send feedback' })).toBeInTheDocument();
+    // Closing and opening again does not fetch again.
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    act(() => openFeedback());
+    expect(mine.calls).toBe(1);
+    await user.type(box(), 'New one');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await screen.findByRole('dialog', { name: 'Thanks, it’s filed' });
+    expect(mine.calls).toBe(2);
+    await user.click(screen.getByRole('button', { name: 'Your reports' }));
+    expect(screen.getByRole('dialog', { name: 'Your reports' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByRole('dialog', { name: 'Thanks, it’s filed' })).toBeInTheDocument();
+  });
+
+  it('C19-U16 Your reports that could not load says so, and Try again fetches again', async () => {
+    const user = userEvent.setup();
+    mine.answer = new Error('offline');
+    mount();
+    act(() => openFeedback());
+    await waitFor(() => expect(mine.calls).toBe(1));
+    // Unknown filing: the form still says public.
+    expect(screen.getByRole('button', { name: 'Public on GitHub: what’s shared' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Your reports/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t load your reports');
+    mine.answer = { filing: 'github', reports: [] };
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByText('Nothing sent yet')).toBeInTheDocument();
+    expect(mine.calls).toBe(2);
   });
 });

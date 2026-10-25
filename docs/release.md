@@ -41,10 +41,17 @@ Project Tudu › environment production › Create Service › Compose.
    AUTH_SECRET=<openssl rand -base64 48, not staging's>
    RESEND_API_KEY=<the Resend key; mail.tudu.ezdev.net is already verified>
    FEEDBACK_TO=<where feedback reports go, or leave empty>
+   FEEDBACK_GITHUB_TOKEN=<fine-grained, Issues: read and write on shimorojune/tudu only; empty = email only>
    S3_ACCESS_KEY_ID=<from step 2>
    S3_SECRET_ACCESS_KEY=<from step 2>
    UPDATES_GITHUB_TOKEN=<fine-grained, Contents: read on shimorojune/tudu; staging's works>
    ```
+
+   `FEEDBACK_GITHUB_TOKEN` makes each Send feedback report a public issue on shimorojune/tudu (labels `bug` or
+   `enhancement`, plus `from-app`). Create it at github.com › Settings › Developer settings › Fine-grained tokens with
+   repository access to shimorojune/tudu only and **Issues: Read and write**; expiry one year (calendar the renewal:
+   an expired token is logged and reports go by email only). Staging can set `FEEDBACK_GITHUB_REPO` to a scratch
+   repository so test reports stay off the real one.
 
 4. **Domains** tab:
    - `tudu.ezdev.net` → service `web`, port 80, HTTPS on, Let's Encrypt.

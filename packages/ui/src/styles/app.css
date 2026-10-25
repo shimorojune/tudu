@@ -866,6 +866,488 @@
   }
 }
 
+/* Feedback as public GitHub issues (K-FeedbackIssue): the quiet public notice and its popover, the private
+   screenshot hint, the error line, Filed (the tick draws, the number rises, the link copies) and Sent with the issue
+   to follow (the clock turns slowly), and Your reports with its skeleton, empty and error states. */
+.tp-root .tp-fb.tp-busy {
+  opacity: 0.72;
+  pointer-events: none;
+  transition: opacity var(--dur-menu) var(--ease-change);
+}
+.tp-root .tp-fb-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.tp-root .tp-fb-mine {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  height: 26px;
+  margin: -4px 0 0 -6px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-menu) var(--ease-change),
+    color var(--dur-menu) var(--ease-change);
+}
+.tp-root .tp-fb-mine:hover {
+  background: var(--accent);
+  color: var(--foreground);
+}
+.tp-root .tp-fb-mine:focus-visible,
+.tp-root .tp-fb-pub:focus-visible,
+.tp-root .tp-issue-copy:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ring);
+}
+.tp-root .tp-fb-pub {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  margin-left: -6px;
+  padding: 0 8px 0 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-menu) var(--ease-change),
+    color var(--dur-menu) var(--ease-change);
+}
+.tp-root .tp-fb-pub span {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--border-strong);
+}
+.tp-root .tp-fb-pub:hover,
+.tp-root .tp-fb-pub.tp-on {
+  background: var(--accent);
+  color: var(--foreground);
+}
+.tp-root.tp-fb-pop {
+  z-index: 60;
+  width: 300px;
+  max-width: calc(100vw - 16px);
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--popover);
+  box-shadow:
+    var(--shadow-pop),
+    0 0 0 1px var(--line);
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--foreground);
+  transform-origin: var(--radix-popover-content-transform-origin);
+  animation: tp-fb-pop-in 180ms var(--ease-arrive) both;
+}
+.tp-root.tp-fb-pop h4 {
+  margin: 0 0 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.tp-root.tp-fb-pop ul {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+.tp-root.tp-fb-pop li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.tp-root.tp-fb-pop li::before {
+  content: '';
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--foreground-2);
+  transform: translateY(-2px);
+}
+.tp-root.tp-fb-pop .tp-fb-priv li::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--muted-foreground);
+}
+.tp-root.tp-fb-pop p {
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--muted-foreground);
+}
+@keyframes tp-fb-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+  }
+}
+.tp-root .tp-fb-err {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--warning) 12%, var(--card));
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 19px;
+  animation: tp-fb-rise 220ms var(--ease-arrive) both;
+}
+.tp-root .tp-fb-err svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--warning);
+}
+.tp-root .tp-fb-done {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 4px 0 2px;
+  animation: tp-fb-rise 260ms var(--ease-arrive) both;
+}
+.tp-root .tp-fb-tick,
+.tp-root .tp-fb-wait {
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  animation: tp-fb-pop 280ms var(--ease-arrive) both;
+}
+.tp-root .tp-fb-tick {
+  background: var(--accent);
+  color: var(--brand-text);
+}
+.tp-root .tp-fb-tick path {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: tp-fb-draw 320ms var(--ease-arrive) 140ms forwards;
+}
+.tp-root .tp-fb-wait {
+  background: var(--muted);
+  color: var(--foreground-2);
+}
+.tp-root .tp-fb-wait svg {
+  animation: tp-fb-turn 2.4s linear infinite;
+}
+.tp-root .tp-fb-num {
+  font-family: var(--font-serif);
+  font-size: 34px;
+  line-height: 1;
+  color: var(--foreground);
+  animation: tp-fb-rise 240ms var(--ease-arrive) 200ms both;
+}
+.tp-root .tp-fb-num small {
+  margin-left: 8px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+.tp-root .tp-fb-gist {
+  margin: 0;
+  font-size: 14px;
+  line-height: 21px;
+  color: var(--foreground-2);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.tp-root .tp-fb-small {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--muted-foreground);
+}
+@keyframes tp-fb-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes tp-fb-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+@keyframes tp-fb-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes tp-fb-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.tp-root .tp-issue-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+  height: 36px;
+  padding: 0 4px 0 12px;
+  border-radius: var(--radius-md);
+  background: var(--muted);
+}
+.tp-root .tp-issue-url {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--foreground-2);
+}
+.tp-root .tp-issue-copy {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--foreground-2);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-menu) var(--ease-change),
+    color var(--dur-menu) var(--ease-change);
+}
+.tp-root .tp-issue-copy:hover,
+.tp-root .tp-issue-copy.tp-ok {
+  background: var(--card);
+  color: var(--foreground);
+}
+.tp-root .tp-issue-ic {
+  position: relative;
+  width: 13px;
+  height: 13px;
+}
+.tp-root .tp-issue-ic svg {
+  position: absolute;
+  inset: 0;
+  transition:
+    opacity 120ms var(--ease-change),
+    transform 160ms var(--ease-arrive);
+}
+.tp-root .tp-issue-ic .tp-issue-ok {
+  opacity: 0;
+  transform: scale(0.6);
+  color: var(--brand-text);
+}
+.tp-root .tp-issue-copy.tp-ok .tp-issue-ln {
+  opacity: 0;
+  transform: scale(0.6);
+}
+.tp-root .tp-issue-copy.tp-ok .tp-issue-ok {
+  opacity: 1;
+  transform: none;
+}
+.tp-root .tp-fbr-list {
+  display: flex;
+  flex-direction: column;
+  margin: -4px -8px 0;
+  padding: 0;
+  list-style: none;
+}
+.tp-root .tp-fbr-list > li + li,
+.tp-root .tp-fbr-list > .tp-fbr-row + .tp-fbr-row {
+  box-shadow: 0 -1px 0 var(--line);
+}
+.tp-root .tp-fbr-list > li {
+  animation: tp-fb-rise 220ms var(--ease-arrive) both;
+}
+.tp-root .tp-fbr-list > li:nth-child(2) {
+  animation-delay: 30ms;
+}
+.tp-root .tp-fbr-list > li:nth-child(3) {
+  animation-delay: 60ms;
+}
+.tp-root .tp-fbr-list > li:nth-child(n + 4) {
+  animation-delay: 90ms;
+}
+.tp-root .tp-fbr-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 8px;
+  border-radius: 9px;
+  text-decoration: none;
+  color: inherit;
+  transition: background-color var(--dur-menu) var(--ease-change);
+}
+.tp-root a.tp-fbr-row:hover {
+  background: color-mix(in srgb, var(--foreground) 4%, var(--card));
+}
+.tp-root a.tp-fbr-row:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ring);
+}
+.tp-root .tp-fbr-kind {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--muted);
+  color: var(--foreground-2);
+}
+.tp-root .tp-fbr-t {
+  flex: 1;
+  min-width: 0;
+}
+.tp-root .tp-fbr-a {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  font-size: 13.5px;
+  line-height: 19px;
+  color: var(--foreground);
+}
+.tp-root .tp-fbr-a b {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--foreground-2);
+}
+.tp-root .tp-fbr-a span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tp-root .tp-fbr-m {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.tp-root .tp-fbr-x {
+  flex: none;
+  align-self: center;
+  display: inline-flex;
+  color: var(--ghost);
+}
+.tp-root .tp-fbr-shim,
+.tp-root .tp-fbr-skel {
+  background: linear-gradient(
+    90deg,
+    var(--skeleton) 0%,
+    color-mix(in srgb, var(--skeleton) 40%, var(--card)) 50%,
+    var(--skeleton) 100%
+  );
+  background-size: 200% 100%;
+  animation: tp-fbr-shimmer 1.1s linear infinite;
+}
+.tp-root .tp-fbr-shim {
+  flex: none;
+  width: 34px;
+  height: 12px;
+  border-radius: 6px;
+  align-self: center;
+}
+.tp-root .tp-fbr-skels {
+  display: grid;
+  gap: 7px;
+  padding-top: 3px;
+}
+.tp-root .tp-fbr-skel {
+  display: block;
+  height: 10px;
+  border-radius: 5px;
+}
+.tp-root .tp-fbr-skel.tp-sm {
+  height: 8px;
+}
+@keyframes tp-fbr-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+.tp-root .tp-fbr-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 8px 10px;
+  text-align: center;
+  animation: tp-fb-rise 220ms var(--ease-arrive) both;
+}
+.tp-root .tp-fbr-empty b {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.tp-root .tp-fbr-empty > span:not(.tp-fbr-kind) {
+  max-width: 280px;
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--muted-foreground);
+}
+.tp-root .tp-fbr-empty .tp-fbr-kind {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tp-root .tp-fb-wait svg,
+  .tp-root .tp-fbr-shim,
+  .tp-root .tp-fbr-skel {
+    animation: none;
+  }
+  .tp-root
+    :is(.tp-fb-done, .tp-fb-num, .tp-fb-err, .tp-fb-tick, .tp-fb-wait, .tp-fbr-empty, .tp-fbr-list > li),
+  .tp-root.tp-fb-pop {
+    animation-name: tp-fb-fade;
+  }
+  .tp-root .tp-fb-tick path {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
+  }
+  .tp-root .tp-issue-ic svg {
+    transform: none !important;
+  }
+}
+@keyframes tp-fb-fade {
+  from {
+    opacity: 0;
+  }
+}
+
 /* Today from the menu bar (chunk 20), as K-MenuBar draws it: the day and its ring, the spaces' tasks, and the foot
    with New task, Open Tudu and ⋯. It drops in from the menu bar each time it opens. */
 .tp-root.tp-mb {

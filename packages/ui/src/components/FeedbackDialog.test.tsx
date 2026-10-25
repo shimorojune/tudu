@@ -4,10 +4,14 @@ import type { FeedbackKind } from '@tudu/core';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { AccountMenu } from './AccountMenu';
-import { FeedbackDialog, type FeedbackPhase } from './FeedbackDialog';
+import { FeedbackDialog, type FeedbackDialogProps, type FeedbackPhase } from './FeedbackDialog';
 
 /** The dialog with its draft held, as the app holds it. */
-function Form({ onSend, phase = 'idle' }: { onSend?: () => void; phase?: FeedbackPhase }) {
+function Form({
+  onSend,
+  phase = 'idle',
+  ...more
+}: { onSend?: () => void; phase?: FeedbackPhase } & Partial<FeedbackDialogProps>) {
   const [kind, setKind] = useState<FeedbackKind>('bug');
   const [text, setText] = useState('');
   const [shot, setShot] = useState<File | null>(null);
@@ -26,9 +30,12 @@ function Form({ onSend, phase = 'idle' }: { onSend?: () => void; phase?: Feedbac
       detailsLine="Tudu 0.38.0, macOS, the Today page. Never your tasks."
       phase={phase}
       onSend={onSend}
+      {...more}
     />
   );
 }
+
+const ISSUE = { number: 142, url: 'https://github.com/shimorojune/tudu/issues/142' };
 
 /** A drag or paste with files, as the browser hands them over. */
 function withFiles(type: string, files: File[]) {
@@ -70,6 +77,122 @@ describe('FeedbackDialog (chunk 19)', () => {
     expect(screen.getByRole('button', { name: /Sending…/ })).toBeInTheDocument();
     rerender(<Form onSend={onSend} phase="sent" />);
     expect(screen.getByRole('button', { name: /Sent/ })).toBeInTheDocument();
+    // Email only: no public notice anywhere.
+    expect(screen.queryByRole('button', { name: /Public on GitHub/ })).toBeNull();
+
+    // Filed as GitHub issues: the sub line says public, Send reads Filing…, the hints say what stays private.
+    rerender(<Form onSend={onSend} filing="github" />);
+    expect(
+      screen.getAllByText('It’s filed as a public issue on GitHub, so you can follow it.')[0],
+    ).toBeVisible();
+    expect(screen.queryByText('It goes straight to the people who make Tudu.')).toBeNull();
+    expect(box()).toHaveAttribute(
+      'placeholder',
+      'What you’d like Tudu to do, and what it would save you. Leave out anything private.',
+    );
+    expect(screen.getByText('Only the Tudu team sees it')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Public on GitHub: what’s shared' })).toBeInTheDocument();
+    rerender(<Form onSend={onSend} filing="github" phase="sending" />);
+    expect(screen.getByRole('button', { name: /Filing…/ })).toBeInTheDocument();
+    expect(document.querySelector('.tp-fb')).toHaveClass('tp-busy');
+  });
+
+  it('C19-U10 Public on GitHub opens what’s shared; Esc and a click outside close it and keep the draft', async () => {
+    const user = userEvent.setup();
+    render(<Form filing="github" />);
+    await user.type(box(), 'Drag puts it back');
+    const pub = screen.getByRole('button', { name: 'Public on GitHub: what’s shared' });
+    await user.click(pub);
+    const pop = await screen.findByRole('dialog', { name: 'What’s shared' });
+    expect(pub).toHaveAttribute('aria-expanded', 'true');
+    expect(pop).toHaveTextContent('What you write');
+    expect(pop).toHaveTextContent('App details, when switched on: version, system, page, window, theme');
+    expect(pop).toHaveTextContent('Your name and email (so we can reply)');
+    expect(pop).toHaveTextContent('The screenshot');
+    expect(pop).toHaveTextContent('Never sent anywhere: your tasks, notes, people or space names.');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'What’s shared' })).toBeNull());
+    expect(screen.getByRole('dialog', { name: 'Send feedback' })).toBeInTheDocument();
+    await user.click(pub);
+    await screen.findByRole('dialog', { name: 'What’s shared' });
+    await user.click(box());
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'What’s shared' })).toBeNull());
+    expect(box()).toHaveValue('Drag puts it back');
+  });
+
+  it('C19-U11 Filed: the number, the gist and the link; Copy copies and ticks; Open on GitHub and Done', async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const onOpenIssue = vi.fn();
+    const onClose = vi.fn();
+    const onReports = vi.fn();
+    function Filed() {
+      const [, setText] = useState('');
+      return (
+        <FeedbackDialog
+          open
+          kind="bug"
+          text={'Dragging a task puts it back\nTwice now.'}
+          onText={setText}
+          shot={null}
+          details
+          detailsLine=""
+          filing="github"
+          phase="filed"
+          issue={ISSUE}
+          onOpenIssue={onOpenIssue}
+          onClose={onClose}
+          onReports={onReports}
+        />
+      );
+    }
+    render(<Filed />);
+    expect(screen.getByRole('dialog', { name: 'Thanks, it’s filed' })).toBeInTheDocument();
+    expect(document.querySelector('.tp-fb-num')).toHaveTextContent('#142Something’s wrong');
+    expect(document.querySelector('.tp-fb-gist')).toHaveTextContent('Dragging a task puts it back');
+    expect(screen.getByText('github.com/shimorojune/tudu/issues/142')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Copy the issue link' }));
+    expect(writeText).toHaveBeenCalledWith(ISSUE.url);
+    expect(await screen.findByRole('button', { name: 'Copied the issue link' })).toHaveClass('tp-ok');
+    await waitFor(
+      () => expect(screen.getByRole('button', { name: 'Copy the issue link' })).not.toHaveClass('tp-ok'),
+      {
+        timeout: 2000,
+      },
+    );
+    await user.click(screen.getByRole('button', { name: 'Open on GitHub' }));
+    expect(onOpenIssue).toHaveBeenCalledWith(ISSUE.url);
+    await user.click(screen.getByRole('button', { name: 'Your reports' }));
+    expect(onReports).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('C19-U12 Pending says the issue follows; an error line keeps the words and Send comes back', async () => {
+    const user = userEvent.setup();
+    const onSend = vi.fn();
+    const { rerender } = render(<Form filing="github" phase="pending" />);
+    expect(screen.getByRole('dialog', { name: 'Thanks, it’s sent' })).toBeInTheDocument();
+    expect(screen.getAllByText('The GitHub issue follows in a few minutes.')[0]).toBeVisible();
+    expect(screen.getByText(/GitHub didn’t answer just now/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+
+    rerender(<Form filing="github" onSend={onSend} />);
+    await user.type(box(), 'The dock badge says 2');
+    rerender(
+      <Form
+        filing="github"
+        onSend={onSend}
+        error="That’s a lot of reports in an hour. Your words are kept; send it a little later."
+      />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('That’s a lot of reports in an hour.');
+    expect(box()).toHaveValue('The dock badge says 2');
+    const send = screen.getByRole('button', { name: 'Send' });
+    expect(send).toBeEnabled();
+    await user.click(send);
+    expect(onSend).toHaveBeenCalledTimes(1);
   });
 
   it('C19-U02 a screenshot by picker, by paste and by drop: the slot opens with name and size; × removes it; another replaces it', async () => {

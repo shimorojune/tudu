@@ -15,6 +15,8 @@ import { EMBED_EVERY_MS, Embeddings } from './closeMatches';
 import { LocalEmbedder, type Embedder } from './embeddings';
 import { MemoryStorage, S3Storage, type Storage } from './storage';
 import { sweepCleared } from './inbox';
+import { ISSUE_SWEEP_EVERY_MS, sweepIssues } from './feedback/filing';
+import { GithubIssues } from './feedback/github';
 
 export interface Server {
   app: App;
@@ -92,8 +94,27 @@ export function bootstrap(
       .catch((err) => {
         if (!options.quiet) console.error('embeddings: the model did not load', err);
       });
+  // Send feedback's public issues: filed as reports come in; what waits for GitHub goes every five minutes.
+  const issues = env.FEEDBACK_GITHUB_TOKEN
+    ? new GithubIssues({
+        token: env.FEEDBACK_GITHUB_TOKEN,
+        repo: env.FEEDBACK_GITHUB_REPO,
+        api: env.FEEDBACK_GITHUB_API,
+        perHour: env.FEEDBACK_GITHUB_PER_HOUR,
+        fetch: options.githubFetch,
+      })
+    : null;
+  const issueTick =
+    env.NODE_ENV === 'test' || !issues
+      ? null
+      : setInterval(() => {
+          void sweepIssues(db, issues, { quiet: options.quiet }).catch((err) => {
+            if (!options.quiet) console.error('feedback: the issue sweep failed', err);
+          });
+        }, ISSUE_SWEEP_EVERY_MS);
   const close = async () => {
     if (sweeper) clearInterval(sweeper);
+    if (issueTick) clearInterval(issueTick);
     if (embedTick) clearInterval(embedTick);
     await closeDb();
   };
@@ -139,6 +160,7 @@ export function bootstrap(
     jiraFetch: options.jiraFetch,
     githubFetch: options.githubFetch,
     embeddings,
+    issues,
   });
   return { app, db, auth, hub, mailer, storage, embeddings, close };
 }

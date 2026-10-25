@@ -3,6 +3,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   Bell,
+  Bug,
   Check,
   Calendar,
   ChevronLeft,
@@ -15,10 +16,12 @@ import {
   Clock,
   CornerDownRight,
   Ellipsis,
+  Globe,
   House,
   Inbox,
   Laptop,
   Layers,
+  Lightbulb,
   Link2,
   List,
   Lock,
@@ -92,6 +95,12 @@ export const ICONS = {
   check: Check,
   /** All spaces: the sheets of every space stacked. */
   layers: Layers,
+  /** Report a bug or idea, in the top bar. */
+  bug: Bug,
+  /** Public on GitHub, in the feedback form. */
+  globe: Globe,
+  /** An idea, in Your reports. */
+  idea: Lightbulb,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

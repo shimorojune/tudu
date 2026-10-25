@@ -17,6 +17,9 @@ services:
       EMAIL_FROM: Tudu <sign-in@mail.tudu.ezdev.net>
       # Send feedback mails each report here (set in Dokploy's environment); empty saves reports without mail.
       FEEDBACK_TO: ${FEEDBACK_TO:-}
+      # Each report also becomes a public issue with this fine-grained token; empty means email only.
+      FEEDBACK_GITHUB_TOKEN: ${FEEDBACK_GITHUB_TOKEN:-}
+      FEEDBACK_GITHUB_REPO: ${FEEDBACK_GITHUB_REPO:-shimorojune/tudu}
       STORAGE_DRIVER: s3
       S3_ENDPOINT: http://tudu-production-minio:9000
       S3_BUCKET: tudu

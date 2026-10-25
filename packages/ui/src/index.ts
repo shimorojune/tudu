@@ -326,6 +326,14 @@ export {
 } from './components/GettingStarted';
 export { FeedbackDialog, type FeedbackDialogProps, type FeedbackPhase } from './components/FeedbackDialog';
 export {
+  FeedbackReports,
+  reportDay,
+  reportMeta,
+  type FeedbackReportsProps,
+  type FeedbackReportsState,
+} from './components/FeedbackReports';
+export { IssueLink, ISSUE_COPIED_MS, type IssueLinkProps } from './components/IssueLink';
+export {
   MenuBarSheet,
   MenuBarRow,
   type MenuBarSheetProps,

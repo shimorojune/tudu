@@ -33,6 +33,11 @@ const api = spawn('node', ['--import', 'tsx', 'src/index.ts'], {
     TEST_ROUTES: '1',
     // Send feedback mails each report here; the tests read it from the outbox.
     FEEDBACK_TO: 'reports@tudu.test',
+    // Each report becomes an issue on the fake GitHub the API serves itself; the tests read what it filed.
+    FEEDBACK_GITHUB_TOKEN: 'e2e-token',
+    FEEDBACK_GITHUB_API: `http://localhost:${port}/__test/github-issues`,
+    // Parallel runs file far more than the app's 30 an hour.
+    FEEDBACK_GITHUB_PER_HOUR: '10000',
     // Attachments: the CI runner has a RustFS bucket; a laptop without Docker keeps them in memory.
     ...(process.env.TUDU_CI_S3_ENDPOINT
       ? {
