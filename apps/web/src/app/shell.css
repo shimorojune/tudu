@@ -235,6 +235,11 @@
 .app-phone-inbox.tp-on {
   color: var(--brand);
 }
+/* Report a bug or idea, left of the Inbox: the pressed wash while the form is open, as on the top bar. */
+.app-phone-bug.tp-on {
+  background: var(--accent);
+  color: var(--foreground);
+}
 .app-phone-pip {
   position: absolute;
   top: 4px;

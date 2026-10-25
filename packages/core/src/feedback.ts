@@ -114,10 +114,13 @@ export function feedbackDetails(x: FeedbackDetailsInput): FeedbackDetails {
   };
 }
 
-/** The switch's helper line: "Tudu 0.38.0, macOS, the Today page. Never your tasks." */
-export function feedbackDetailsLine(d: FeedbackDetails): string {
+/**
+ * The switch's helper line: "Tudu 0.38.0, macOS, the Today page. Never your tasks." When reports become public
+ * GitHub issues it says the details show there: "…, the Today page. Shown on the issue. Never your tasks."
+ */
+export function feedbackDetailsLine(d: FeedbackDetails, onIssue = false): string {
   const app = d.track === 'web' ? `Tudu ${d.version} on the web` : `${d.app} ${d.version}`;
-  return `${app}, ${d.os}, the ${d.page} page. Never your tasks.`;
+  return `${app}, ${d.os}, the ${d.page} page.${onIssue ? ' Shown on the issue.' : ''} Never your tasks.`;
 }
 
 /** The details as lines for the mail: "App: Tudu 0.38.0 (production)". */

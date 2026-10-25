@@ -44,6 +44,9 @@ describe('C19-U04 the app details', () => {
       theme: 'dark',
     });
     expect(feedbackDetailsLine(web)).toBe('Tudu 0.38.0 on the web, macOS, the Today page. Never your tasks.');
+    expect(feedbackDetailsLine(web, true)).toBe(
+      'Tudu 0.38.0 on the web, macOS, the Today page. Shown on the issue. Never your tasks.',
+    );
 
     const mac = feedbackDetails({
       app: { name: 'Tudu Staging', track: 'staging' },

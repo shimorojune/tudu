@@ -36,7 +36,7 @@ import {
   useSearchOpen,
   useShownDay,
 } from './dayView';
-import { FeedbackHost, openFeedback } from './feedback';
+import { FeedbackHost, openFeedback, useFeedback } from './feedback';
 import { GettingStartedHost } from './firstRun';
 import { SearchHost } from './SearchHost';
 import { AppsHost, JiraHost } from './JiraHost';
@@ -232,6 +232,7 @@ export function AppShell({
   // New task opens Quick Add over whatever you are doing; the search icon (the Search tab on phones) the panel.
   const newTask = () => openQuickAdd();
   const searchOpen = useSearchOpen();
+  const feedbackOpen = useFeedback().open;
   const account = {
     theme: choice,
     onTheme: setTheme,
@@ -294,6 +295,15 @@ export function AppShell({
         <header className="app-phone-head">
           {switcher('sheet')}
           <div className="app-phone-tools">
+            <button
+              type="button"
+              className={cx('app-phone-inbox app-phone-bug tp-tb-bug', feedbackOpen && 'tp-on')}
+              aria-label="Report a bug or idea"
+              aria-haspopup="dialog"
+              onClick={openFeedback}
+            >
+              <Icon name="bug" size={20} />
+            </button>
             <button
               type="button"
               className={cx('app-phone-inbox', onInbox && 'tp-on')}
@@ -388,6 +398,8 @@ export function AppShell({
             inbox={{ count: inboxCount, open: onInbox, onInbox: openInbox }}
             onSearch={openSearch}
             searchOpen={searchOpen}
+            onFeedback={openFeedback}
+            feedbackOpen={feedbackOpen}
             onNewTask={newTask}
             views={
               onToday && vp === 'desktop'

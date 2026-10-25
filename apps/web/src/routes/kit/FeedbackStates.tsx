@@ -1,9 +1,46 @@
-import { FeedbackDialog, type FeedbackPhase } from '@tudu/ui';
-import type { FeedbackKind } from '@tudu/core';
+import { FeedbackDialog, type FeedbackDialogProps, type FeedbackPhase } from '@tudu/ui';
+import type { FeedbackKind, MyReport } from '@tudu/core';
 import { useState } from 'react';
 import { Pair, Section } from './Pair';
 
 const LINE = 'Tudu 0.38.0, macOS, the Today page. Never your tasks.';
+const LINE_ISSUE = 'Tudu 0.38.0, macOS, the Today page. Shown on the issue. Never your tasks.';
+const ISSUE = { number: 142, url: 'https://github.com/shimorojune/tudu/issues/142' };
+const day = (ago: number) => new Date(Date.now() - ago * 86_400_000).toISOString();
+const REPORTS: MyReport[] = [
+  {
+    id: 'k1',
+    kind: 'bug',
+    title: 'Dragging a task from Monday to Tuesday puts it back',
+    createdAt: day(0),
+    state: 'filed',
+    issue: ISSUE,
+  },
+  {
+    id: 'k2',
+    kind: 'bug',
+    title: 'The dock badge still says 2 after answering everything',
+    createdAt: day(0),
+    state: 'pending',
+    issue: null,
+  },
+  {
+    id: 'k3',
+    kind: 'idea',
+    title: 'Let me pin a task to the top of Today',
+    createdAt: day(3),
+    state: 'filed',
+    issue: { number: 139, url: 'https://github.com/shimorojune/tudu/issues/139' },
+  },
+  {
+    id: 'k4',
+    kind: 'idea',
+    title: 'A weekly summary email on Fridays',
+    createdAt: day(9),
+    state: 'none',
+    issue: null,
+  },
+];
 
 /** A stand-in screenshot: a small drawing of a Today sheet, as a file the dialog reads like a real one. */
 function kitShot(): File {
@@ -23,11 +60,12 @@ function Form({
   phase = 'idle',
   text = '',
   shot = false,
+  ...more
 }: {
   phase?: FeedbackPhase;
   text?: string;
   shot?: boolean;
-}) {
+} & Partial<Omit<FeedbackDialogProps, 'shot' | 'phase' | 'text'>>) {
   const [kind, setKind] = useState<FeedbackKind>('bug');
   const [words, setWords] = useState(text);
   const [file, setFile] = useState<File | null>(() => (shot ? kitShot() : null));
@@ -44,8 +82,9 @@ function Form({
       onShot={setFile}
       details={details}
       onDetails={setDetails}
-      detailsLine={LINE}
+      detailsLine={more.filing === 'github' ? LINE_ISSUE : LINE}
       phase={phase}
+      {...more}
     />
   );
 }
@@ -58,12 +97,66 @@ export function FeedbackStates() {
     <Section
       id="send-feedback"
       title="Send feedback"
-      lead="One small form for a bug or an idea: the words, one screenshot (picked, pasted or dropped) and the app details. Offline, it saves and says so in a toast."
+      lead="One small form for a bug or an idea: the words, one screenshot (picked, pasted or dropped) and the app details. Each report becomes a public GitHub issue and its number comes back; Your reports keeps them. Offline, it saves and says so in a toast."
     >
       <Pair title="Send feedback, empty" render={() => <Form />} />
       <Pair title="Send feedback, with a screenshot" render={() => <Form text={WORDS} shot />} />
       <Pair title="Send feedback, sending" render={() => <Form text={WORDS} phase="sending" />} />
       <Pair title="Send feedback, sent" render={() => <Form text={WORDS} phase="sent" />} />
+      <Pair
+        title="Send feedback, public on GitHub"
+        note="Filed as public issues: the sub line, the footer's notice and the screenshot hint say so, quietly."
+        render={() => (
+          <Form filing="github" text={WORDS} onReports={() => {}} reports={REPORTS} reportsState="ready" />
+        )}
+      />
+      <Pair
+        title="Send feedback, filing"
+        render={() => <Form filing="github" text={WORDS} phase="sending" />}
+      />
+      <Pair
+        title="Send feedback, filed"
+        render={() => (
+          <Form
+            filing="github"
+            text={WORDS}
+            phase="filed"
+            issue={ISSUE}
+            onReports={() => {}}
+            onOpenIssue={() => {}}
+          />
+        )}
+      />
+      <Pair
+        title="Send feedback, issue to follow"
+        render={() => <Form filing="github" text={WORDS} phase="pending" onReports={() => {}} />}
+      />
+      <Pair
+        title="Send feedback, couldn’t send"
+        render={() => (
+          <Form
+            filing="github"
+            text={WORDS}
+            error="That’s a lot of reports in an hour. Your words are kept; send it a little later."
+          />
+        )}
+      />
+      <Pair
+        title="Your reports"
+        render={() => <Form filing="github" view="reports" reports={REPORTS} reportsState="ready" />}
+      />
+      <Pair
+        title="Your reports, loading"
+        render={() => <Form filing="github" view="reports" reportsState="loading" />}
+      />
+      <Pair
+        title="Your reports, empty"
+        render={() => <Form filing="github" view="reports" reports={[]} reportsState="ready" />}
+      />
+      <Pair
+        title="Your reports, couldn’t load"
+        render={() => <Form filing="github" view="reports" reportsState="error" onRetryReports={() => {}} />}
+      />
     </Section>
   );
 }

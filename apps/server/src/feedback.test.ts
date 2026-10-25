@@ -201,7 +201,7 @@ describe('POST /api/feedback (chunk 19)', () => {
     const eleventh = await send(jar, report());
     expect(eleventh.status).toBe(429);
     expect(((await eleventh.json()) as { error: string }).error).toBe(
-      'That’s a lot of reports in an hour. Try again a little later.',
+      'That’s a lot of reports in an hour. Your words are kept; send it a little later.',
     );
     // Someone else is not held up by it.
     const other = await signIn(server);
