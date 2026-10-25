@@ -121,9 +121,12 @@ test.describe('close matches', () => {
     await page.goto(`/${nw.slug}`);
     await expect(switcher(page)).toContainText('Northwind');
     await openSearch(page);
-    // by word: the shared task of the second person, never the quiet one
+    // by word: the shared task of the second person, never the quiet one; search spans every space you are in
+    // (chunk 21), so your own Personal dentist shows beside it
     await search(page, 'dentist');
-    await expect.poll(() => hitTitles(page)).toEqual(['Dentist appointment for the kids']);
+    await expect
+      .poll(async () => (await hitTitles(page)).sort())
+      .toEqual(['Dentist appointment', 'Dentist appointment for the kids']);
     // by meaning: the same rule
     await box(page).fill('');
     await searchClose(page, 'tooth doctor visit');
