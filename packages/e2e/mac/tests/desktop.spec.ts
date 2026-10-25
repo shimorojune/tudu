@@ -537,9 +537,10 @@ test.describe('desktop', () => {
     await signIn(app);
     const space = await personal(app);
     // Open in Jira: connected to the fake Jira, from the issue's preview.
-    await asPage(app, 'POST', `/api/spaces/${space.id}/jira`, {
+    await asPage(app, 'POST', '/api/connectors/jira', {
       site: `${API}/__test/jira`,
       token: `good-${crypto.randomUUID()}`,
+      spaceId: space.id,
     });
     await go(app, `/${space.slug}?jira=TUDU-212`);
     await app.until(`return T.all('button', 'Open TUDU-212 in Jira').length > 0`, 'main', 15_000);
