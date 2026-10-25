@@ -1,7 +1,8 @@
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
-import { POSITION_STEP, addDays } from '@tudu/core';
+import { ALL_SPACES_CHANGED, POSITION_STEP, addDays } from '@tudu/core';
 import type {
+  AllSpacesPlace,
   DayResponse,
   Project,
   SyncMutation,
@@ -12,7 +13,16 @@ import type {
 } from '@tudu/core';
 import { createApi } from './api';
 import { MemoryOutboxStore, type OutboxStore } from './outbox';
-import { TaskStore, applyToDay, applyToProjects, dayKey, projectsKey, taskKey, type DayData } from './tasks';
+import {
+  TaskStore,
+  allPlacesKey,
+  applyToDay,
+  applyToProjects,
+  dayKey,
+  projectsKey,
+  taskKey,
+  type DayData,
+} from './tasks';
 
 const SPACE = 'space-1';
 const SUN = '2026-10-18';
@@ -739,5 +749,158 @@ describe('C06-U07 the Backlog in the store', () => {
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ type: 'task.place', payload: { id: 'b2', day: null } });
     expect(sent[0]!.payload.position).toBeLessThan(1024);
+  });
+});
+
+describe('C21 All spaces in the store', () => {
+  const HOME = 'space-home';
+  const WORK = 'space-work';
+
+  /** Two spaces on one day, places held by the pretend server, every sync recorded. */
+  function two(places: Array<{ taskId: string; day: string | null; position: number }> = []) {
+    const days: Record<string, Task[]> = {
+      [HOME]: [task('h1', 'Home one', SUN, 1024, { spaceId: HOME })],
+      [WORK]: [
+        task('w1', 'Work one', SUN, 1024, { spaceId: WORK }),
+        task('w2', 'Work two', SUN, 2048, { spaceId: WORK }),
+      ],
+    };
+    const calls: string[] = [];
+    const sent: Array<{ type: string; payload: Record<string, unknown> }> = [];
+    const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      const u = new URL(url);
+      calls.push(`${init?.method ?? 'GET'} ${u.pathname}${u.search}`);
+      if (u.pathname === '/api/sync') {
+        const body = JSON.parse(String(init!.body)) as {
+          mutations: Array<{ id: string; type: string; payload: Record<string, unknown> }>;
+        };
+        sent.push(...body.mutations.map((m) => ({ type: m.type, payload: m.payload })));
+        const res: SyncResponse = {
+          results: body.mutations.map((m) => ({ id: m.id, status: 'ok' })),
+          tasks: [],
+          deleted: [],
+        };
+        return new Response(JSON.stringify(res), { status: 200 });
+      }
+      if (u.pathname === '/api/all-spaces/places')
+        return new Response(JSON.stringify({ places }), { status: 200 });
+      const m = /\/spaces\/([^/]+)\/days\/([^/]+)$/.exec(u.pathname)!;
+      const body: DayResponse = { day: m[2]!, tasks: days[m[1]!] ?? [], counts: { total: 0, done: 0 } };
+      return new Response(JSON.stringify(body), { status: 200 });
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    });
+    const store = new TaskStore({
+      api: createApi({ baseUrl: 'http://api.test', fetch: fetch as unknown as typeof globalThis.fetch }),
+      queryClient,
+      store: new MemoryOutboxStore(),
+      clientId: 'tab-a',
+      me: () => ({ id: 'me', name: 'Rohit Raj', email: 'rohit@test.tudu' }),
+      newId: () => 'new-1',
+    });
+    const load = async () => {
+      for (const o of [store.dayQuery(HOME, SUN), store.dayQuery(WORK, SUN)]) {
+        await queryClient.fetchQuery(o);
+        new QueryObserver(queryClient, o).subscribe(() => {});
+      }
+      const p = store.allPlacesQuery(SUN, SUN);
+      await queryClient.fetchQuery(p);
+      new QueryObserver(queryClient, p).subscribe(() => {});
+    };
+    const read = (s: string) => queryClient.getQueryData<DayData>(dayKey(s, SUN))?.tasks ?? [];
+    const readPlaces = () => queryClient.getQueryData(allPlacesKey(SUN, SUN)) as AllSpacesPlace[];
+    const settle = async () => {
+      for (let i = 0; i < 50 && !(await store.idle()); i++) await new Promise((r) => setTimeout(r, 5));
+      await new Promise((r) => setTimeout(r, 0));
+    };
+    return { store, queryClient, calls, sent, load, read, readPlaces, settle };
+  }
+
+  it('C21-U06 placeInAll sends only all.place and leaves every space position alone; tight neighbours renumber the day in one batch', async () => {
+    const t = two([
+      { taskId: 'h1', day: SUN, position: 1024 },
+      { taskId: 'w1', day: SUN, position: 2048 },
+      { taskId: 'w2', day: SUN, position: 3072 },
+    ]);
+    await t.load();
+    t.store.placeInAll('w2', SUN, 0, [
+      { id: 'h1', position: 1024 },
+      { id: 'w1', position: 2048 },
+      { id: 'w2', position: 3072 },
+    ]);
+    // At once: the place shows, no space list moved.
+    expect(t.readPlaces().find((p) => p.taskId === 'w2')!.position).toBeLessThan(1024);
+    expect(t.read(WORK).map((x) => [x.id, x.position])).toEqual([
+      ['w1', 1024],
+      ['w2', 2048],
+    ]);
+    await t.settle();
+    expect(t.sent.map((m) => m.type)).toEqual(['all.place']);
+    expect(t.sent[0]!.payload).toMatchObject({ id: 'w2', day: SUN });
+
+    // Neighbours one apart: the whole day is numbered afresh, sent together.
+    t.sent.length = 0;
+    t.store.placeInAll('h1', SUN, 1, [
+      { id: 'w2', position: 1 },
+      { id: 'w1', position: 1 + 1e-7 },
+      { id: 'h1', position: 3 },
+    ]);
+    await t.settle();
+    expect(t.sent.map((m) => [m.type, m.payload.id])).toEqual([
+      ['all.place', 'w2'],
+      ['all.place', 'h1'],
+      ['all.place', 'w1'],
+    ]);
+    const pos = t.sent.map((m) => m.payload.position as number);
+    expect(pos).toEqual([...pos].sort((a, b) => a - b));
+    expect(t.sent.every((m) => m.type === 'all.place')).toBe(true);
+  });
+
+  it('C21-U07 moveInAll sends task.place (day, position null) then all.place, in order, for the task’s own space', async () => {
+    const t = two();
+    await t.load();
+    t.store.moveInAll('w1', MON, 0, [{ id: 'x1', position: 1024 }]);
+    expect(t.read(WORK).map((x) => x.id)).toEqual(['w2']);
+    await t.settle();
+    expect(t.sent.map((m) => m.type)).toEqual(['task.place', 'all.place']);
+    expect(t.sent[0]!.payload).toEqual({ id: 'w1', day: MON, position: null });
+    expect(t.sent[1]!.payload).toMatchObject({ id: 'w1', day: MON });
+    // Not in the space's Sunday list any more, and Home's list never moved.
+    expect(t.read(HOME).map((x) => x.id)).toEqual(['h1']);
+  });
+
+  it('C21-U08 writes from All spaces change the task’s own space only; create goes to the space it is given', async () => {
+    const t = two();
+    await t.load();
+    t.store.cross('w1', true);
+    t.store.rename('h1', 'Home renamed');
+    expect(t.read(WORK).find((x) => x.id === 'w1')!.done).toBe(true);
+    expect(t.read(HOME).find((x) => x.id === 'h1')!.title).toBe('Home renamed');
+    expect(t.read(HOME).some((x) => x.id === 'w1')).toBe(false);
+    expect(t.read(WORK).some((x) => x.id === 'h1')).toBe(false);
+    // The writing line in All spaces passes Personal (or the filtered space): the task lands there and nowhere else.
+    t.store.create(HOME, SUN, 'From All spaces');
+    expect(t.read(HOME).map((x) => x.title)).toContain('From All spaces');
+    expect(t.read(WORK).map((x) => x.title)).not.toContain('From All spaces');
+    await t.settle();
+    expect(t.sent.find((m) => m.type === 'task.create')!.payload).toMatchObject({ spaceId: HOME, day: SUN });
+  });
+
+  it('C21-U09 ALL_SPACES_CHANGED from another tab reads the places again, from this tab it does nothing; forgetSpace drops only that space', async () => {
+    const t = two();
+    await t.load();
+    t.calls.length = 0;
+    t.store.onEvent({ id: '1', type: ALL_SPACES_CHANGED, data: { days: [SUN], clientId: 'tab-a' } });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(t.calls).toEqual([]);
+    t.store.onEvent({ id: '2', type: ALL_SPACES_CHANGED, data: { days: [SUN], clientId: 'tab-b' } });
+    await vi.waitFor(() => expect(t.calls).toEqual([`GET /api/all-spaces/places?from=${SUN}&to=${SUN}`]));
+
+    t.store.forgetSpace(WORK);
+    expect(t.queryClient.getQueryData(dayKey(WORK, SUN))).toBeUndefined();
+    expect(t.read(HOME).map((x) => x.id)).toEqual(['h1']);
+    expect(t.store.lastSeen('w1')).toBeUndefined();
+    expect(t.store.lastSeen('h1')).toBeDefined();
   });
 });
