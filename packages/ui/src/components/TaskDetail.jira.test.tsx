@@ -76,7 +76,7 @@ describe('the Jira fact (chunk 10)', () => {
     expect(onJira).toHaveBeenLastCalledWith(null);
     expect(document.querySelector('.tp-toast')).toHaveTextContent('Unlinked TUDU-219');
 
-    // Without a connection the key reads as words: no Open in Jira, no status.
+    // A key kept without a connection: the key alone, Unlink only (no Open in Jira, no status).
     rerender(
       <TaskDetail
         task={{ ...TASK, jira: 'TUDU-219' }}
@@ -95,5 +95,21 @@ describe('the Jira fact (chunk 10)', () => {
     rerender(<TaskRow title="Fix the date picker on Safari" jira="TUDU-219" onSignal={onSignal} />);
     await user.click(screen.getByRole('button', { name: 'Linked to Jira · TUDU-219. Open in Jira' }));
     expect(onSignal).toHaveBeenCalledWith('jira');
+  });
+
+  it('C10-U12 without Jira in the space: no Jira fact, four facts; someone else’s linked task shows its key', () => {
+    const { rerender } = render(
+      <TaskDetail task={TASK} today={TODAY} me={ME} visibility={[]} projects={[]} onProject={vi.fn()} />,
+    );
+    expect(screen.queryByRole('button', { name: 'Jira' })).toBeNull();
+    expect(screen.queryByText('Link a Jira issue')).toBeNull();
+    const facts = Array.from(document.querySelectorAll('.tp-td-prop dt')).map((dt) => dt.textContent);
+    expect(facts).toEqual(['Planned', 'Due', 'Project', 'Visible to']);
+
+    rerender(
+      <TaskDetail task={{ ...TASK, jira: 'TUDU-219' }} today={TODAY} me={ME} visibility={[]} readOnly />,
+    );
+    expect(screen.queryByRole('button', { name: 'Jira' })).toBeNull();
+    expect(screen.getByLabelText('Jira')).toHaveTextContent('TUDU-219');
   });
 });

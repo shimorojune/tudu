@@ -122,7 +122,10 @@ export interface TaskDetailProps {
   onDue?: (day: IsoDate | null) => void;
   onVisibility?: (v: TaskVisibility) => void;
   onProject?: (projectId: string | null) => void;
-  /** The Jira fact: link the task to an issue by its key, or unlink it (null). Without it the fact stays out. */
+  /**
+   * The Jira fact: link the task to an issue by its key, or unlink it (null). Without it the fact stays out. The page
+   * leaves it out where Jira isn't connected in the space, unless the task kept a key.
+   */
   onJira?: (key: string | null) => void;
   /** "Open TUDU-212 in Jira": only while Jira is connected; otherwise the key reads as words. */
   onOpenJira?: (key: string) => void;

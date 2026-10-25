@@ -238,7 +238,8 @@ export function TaskPanel(p: TaskPanelProps) {
         onDue={(due) => taskStore.due(d.id, due)}
         onVisibility={(v) => taskStore.visibility(d.id, v)}
         onProject={(projectId) => taskStore.setProject(d.id, projectId)}
-        onJira={(key) => taskStore.linkJira(d.id, key)}
+        // Only where Jira is connected in this space, or to unlink a key the task kept from before.
+        onJira={conn || d.jira ? (key) => taskStore.linkJira(d.id, key) : undefined}
         onOpenJira={conn ? (key) => void openInJira(spaceId, key) : undefined}
         onNewProject={(name, color) => taskStore.createProject(spaceId, name, color)}
         onEditProjects={() =>

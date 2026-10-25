@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
 import {
   addAnApp,
@@ -17,7 +17,7 @@ import {
   sideJira,
 } from '../../fixtures/jira';
 import { hit, openSearch, search } from '../../fixtures/search';
-import { me } from '../../fixtures/spaces';
+import { createSpace, me, seedTasks, switchTo } from '../../fixtures/spaces';
 import { dayList, fixClock, idle, row, writeTasks } from '../../fixtures/today';
 
 const phone = () => test.info().project.name === 'phone';
@@ -47,6 +47,27 @@ async function connected(page: Page): Promise<string> {
   return token;
 }
 
+/** Open a task's panel from its row on Sunday's sheet and wait for it to show the task. */
+async function openTask(page: Page, title: string): Promise<Locator> {
+  await row(dayList(page, 'Tasks for Sunday 18 October'), title).getByRole('button', { name: title }).click();
+  const detail = page.getByRole('dialog', { name: 'Task details' });
+  await expect(detail.getByRole('textbox', { name: 'Task title' })).toHaveValue(title);
+  return detail;
+}
+
+/** Close the task panel (on phones, its back control). */
+async function closeTask(page: Page): Promise<void> {
+  const detail = page.getByRole('dialog', { name: 'Task details' });
+  if (phone()) await detail.getByRole('button', { name: /^(Today|Sunday)$/ }).click();
+  else await detail.getByRole('button', { name: 'Close' }).click();
+  await expect(detail).toHaveCount(0);
+}
+
+/** The panel's facts, by their labels, top to bottom. */
+async function factsOf(detail: Locator): Promise<string[]> {
+  return detail.locator('.tp-td-prop dt').allTextContents();
+}
+
 /** The connect form: the address and the token, then Connect. */
 async function fillConnect(page: Page, site: string, token: string): Promise<void> {
   const form = jiraPanel(page);
@@ -65,6 +86,14 @@ test.describe('jira', () => {
     await expect(addAnApp(page)).toBeVisible();
     await expect(sideJira(page)).toHaveCount(0);
     await expect(jiraButton(page)).toHaveCount(0);
+    // The task panel too: no Jira fact while Jira isn't connected here.
+    await writeTasks(page, ['Tidy the buckets']);
+    await idle(page);
+    const detail = await openTask(page, 'Tidy the buckets');
+    await expect(detail.getByRole('button', { name: 'Jira' })).toHaveCount(0);
+    await expect(detail.getByText('Link a Jira issue')).toHaveCount(0);
+    expect(await factsOf(detail)).toEqual(['Planned', 'Due', 'Project', 'Visible to']);
+    await closeTask(page);
     await addAnApp(page).click();
     const apps = page.getByRole('dialog', { name: 'Apps' });
     await expect(apps.getByRole('heading', { name: 'Apps' })).toBeVisible();
@@ -377,6 +406,75 @@ test.describe('jira', () => {
     await expect(
       row(list, SUMMARY['TUDU-224']!).getByRole('button', { name: /Linked to Jira · TUDU-224/ }),
     ).toBeVisible();
+    // Its panel: the key alone, no status, and no Open in Jira.
+    const kept = await openTask(page, SUMMARY['TUDU-224']!);
+    await expect(kept.getByRole('button', { name: 'Jira' })).toHaveText('TUDU-224');
+    await kept.getByRole('button', { name: 'Jira' }).click();
+    await expect(kept.getByRole('menuitem', { name: /Open TUDU-224 in Jira/ })).toHaveCount(0);
+    await expect(kept.getByRole('menuitem', { name: 'Unlink the issue' })).toBeVisible();
+  });
+
+  test('C10-E14 the Jira fact lives with the connection: none without Jira; Link once connected; a kept key alone after Disconnect; Unlink takes it away', async ({
+    page,
+  }) => {
+    await fixClock(page);
+    await signInFresh(page);
+    await writeTasks(page, ['Tidy the buckets']);
+    await idle(page);
+    let detail = await openTask(page, 'Tidy the buckets');
+    await expect(detail.getByRole('button', { name: 'Jira' })).toHaveCount(0);
+    await expect(detail.getByText('Link a Jira issue')).toHaveCount(0);
+    await closeTask(page);
+
+    await connectByApi(page);
+    await page.reload();
+    detail = await openTask(page, 'Tidy the buckets');
+    const fact = detail.getByRole('button', { name: 'Jira' });
+    await expect(fact).toHaveText('Link a Jira issue');
+    await fact.click();
+    await detail.getByRole('textbox', { name: 'Jira issue key' }).fill('TUDU-226');
+    await detail.getByRole('textbox', { name: 'Jira issue key' }).press('Enter');
+    await expect(fact).toContainText('TUDU-226');
+    await expect(fact).toContainText('Backlog');
+    await idle(page);
+    await closeTask(page);
+
+    const res = await page.request.delete(`${API_URL}/api/spaces/${await personalId(page)}/jira`);
+    expect(res.ok()).toBe(true);
+    await page.reload();
+    detail = await openTask(page, 'Tidy the buckets');
+    await expect(fact).toHaveText('TUDU-226');
+    await fact.click();
+    await expect(detail.getByRole('menuitem', { name: /Open TUDU-226 in Jira/ })).toHaveCount(0);
+    await detail.getByRole('menuitem', { name: 'Unlink the issue' }).click();
+    await expect(page.locator('.tp-toast')).toContainText('Unlinked TUDU-226');
+    await expect(fact).toHaveCount(0);
+    expect(await factsOf(detail)).toEqual(['Planned', 'Due', 'Project', 'Visible to']);
+  });
+
+  test('C10-E15 per space: Jira in Personal, none in Northwind; Northwind’s task panel has no Jira fact', async ({
+    page,
+  }) => {
+    test.skip(phone() || tablet(), 'the same panel on every size (E14)');
+    await fixClock(page);
+    await signInFresh(page);
+    await connectByApi(page);
+    await page.reload();
+    const slug = await createSpace(page, 'Northwind');
+    const nw = (await me(page)).spaces.find((s) => s.slug === slug)!;
+    // A new team space opens on its welcome (Invite people), so the task goes in through sync.
+    await seedTasks(page, nw.id, [{ title: 'Draft the offsite agenda', day: '2026-10-18' }]);
+    await page.reload();
+    let detail = await openTask(page, 'Draft the offsite agenda');
+    await expect(detail.getByRole('button', { name: 'Jira' })).toHaveCount(0);
+    await expect(detail.getByText('Link a Jira issue')).toHaveCount(0);
+    await closeTask(page);
+
+    await switchTo(page, 'Personal');
+    await writeTasks(page, ['Tidy the buckets']);
+    await idle(page);
+    detail = await openTask(page, 'Tidy the buckets');
+    await expect(detail.getByRole('button', { name: 'Jira' })).toHaveText('Link a Jira issue');
   });
 
   test('C10-E11 phone: More › Apps › Connect pushes the form in; ‹ Apps back; the Jira tab with its count; a sheet; Add to Today; Show', async ({
