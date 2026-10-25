@@ -1,4 +1,14 @@
-import { addDays, dueDistance, fileSize, formatDay, landsWords, type IsoDate } from '@tudu/core';
+import {
+  addDays,
+  dueDistance,
+  fileSize,
+  formatDay,
+  isEmptyHtml,
+  landsWords,
+  noteHtml,
+  toHtml,
+  type IsoDate,
+} from '@tudu/core';
 import {
   useEffect,
   useLayoutEffect,
@@ -20,6 +30,7 @@ import { PersonDot, type PersonDotPerson } from './PersonDot';
 import { PersonPick, type PickPerson } from './PersonPick';
 import { ProjectMenu, type ProjectOption } from './ProjectMenu';
 import { SpaceTile, type SpaceTileSpace } from './SpaceTile';
+import { RichTextEditor } from './RichTextEditor';
 import { showToast } from './Toast';
 
 export interface QuickAddFile {
@@ -40,6 +51,7 @@ export interface QuickAddDraft {
   planned: IsoDate | null;
   due: IsoDate | null;
   projectId: string | null;
+  /** Rich text, as HTML (a draft kept before notes were rich may be plain words). */
   note: string;
   files: QuickAddFile[];
 }
@@ -50,6 +62,7 @@ export interface QuickAddResult {
   planned: IsoDate | null;
   due: IsoDate | null;
   projectId: string | null;
+  /** Cleaned HTML; empty when the note has no words. */
   note: string;
   attachments: string[];
   /** The space it goes to (the top line's "In …"), when there is a choice. */
@@ -167,7 +180,7 @@ function fresh(p: QuickAddProps): QuickAddDraft {
     planned: i.planned !== undefined ? i.planned : p.planned !== undefined ? p.planned : p.today,
     due: i.due ?? null,
     projectId: i.projectId ?? null,
-    note: i.note ?? '',
+    note: toHtml(i.note ?? ''),
     files: i.files ?? [],
   };
 }
@@ -279,7 +292,10 @@ export function QuickAdd(p: QuickAddProps) {
   const [leaving, setLeaving] = useState(false);
   const [noteOpen, setNoteOpen] = useState(!!p.initial?.note);
   const input = useRef<HTMLInputElement | null>(null);
-  const noteEl = useRef<HTMLTextAreaElement | null>(null);
+  // A new key loads a fresh note into the editor (after a task is added and the draft starts again).
+  const [noteKey, setNoteKey] = useState(0);
+  // The note takes the caret when you open it, not when a kept draft opens with it showing.
+  const [focusNote, setFocusNote] = useState(false);
   const fileEl = useRef<HTMLInputElement | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seq = useRef(0);
@@ -432,7 +448,7 @@ export function QuickAdd(p: QuickAddProps) {
         planned: f.planned,
         due: f.due,
         projectId: f.projectId,
-        note: f.note.trim(),
+        note: noteHtml(f.note),
         attachments: files.filter((x) => x.id).map((x) => x.id!),
         spaceId: p.send?.spaceId,
         toId: p.send ? (p.send.to?.id ?? null) : undefined,
@@ -451,6 +467,7 @@ export function QuickAdd(p: QuickAddProps) {
           note: '',
           files: [],
         });
+        setNoteKey((k) => k + 1);
         if (overlay) now.onClose?.();
         else {
           setAdded(false);
@@ -646,10 +663,11 @@ export function QuickAdd(p: QuickAddProps) {
       title="Add a note"
       aria-pressed={noteOpen ? 'true' : 'false'}
       onClick={() => {
-        if (noteOpen && !f.note.trim()) {
+        if (noteOpen && isEmptyHtml(f.note)) {
           setNoteOpen(false);
           return;
         }
+        setFocusNote(true);
         setNoteOpen(true);
       }}
     >
@@ -942,17 +960,19 @@ export function QuickAdd(p: QuickAddProps) {
         </div>
       ) : null}
       {noteOpen ? (
-        <textarea
-          ref={noteEl}
-          autoFocus
+        <RichTextEditor
+          variant="quick"
           className="tp-qa-note"
-          rows={Math.min(3, Math.max(1, f.note.split('\n').length))}
-          value={f.note}
+          label="Note"
           placeholder="Add a note"
-          aria-label="Note"
-          onChange={(e) => set({ note: e.target.value.split('\n').slice(0, 3).join('\n') })}
-          onBlur={() => {
-            if (!f.note.trim()) setNoteOpen(false);
+          value={f.note}
+          resetKey={noteKey}
+          compact={phone}
+          autoFocus={focusNote}
+          onInput={(html, empty) => set({ note: empty ? '' : html })}
+          onSubmit={() => void add()}
+          onBlur={(_html, empty) => {
+            if (empty) setNoteOpen(false);
           }}
         />
       ) : null}

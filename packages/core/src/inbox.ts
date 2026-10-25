@@ -1,5 +1,6 @@
 import { formatDay, type IsoDate } from './dates';
 import { dayWord } from './carried';
+import { textOf, toHtml } from './notes';
 
 /** Someone on an Inbox item: the sender, the receiver, a comment's author. */
 export interface InboxPerson {
@@ -19,7 +20,7 @@ export interface TaskRequest {
   from: InboxPerson;
   to: InboxPerson;
   title: string;
-  /** The sender's note, plain words. */
+  /** The sender's note: cleaned HTML (notes sent before rich notes are plain words; read them with `toHtml`). */
   note: string;
   /** The day the sender asked for; null for no day. */
   askedDay: IsoDate | null;
@@ -129,7 +130,7 @@ export interface InboxChangedEvent {
 }
 export const INBOX_CHANGED = 'inbox.changed';
 
-export const REQUEST_NOTE_MAX = 2000;
+export const REQUEST_NOTE_MAX = 8000;
 export const DECLINE_REASON_MAX = 500;
 
 /** The header's count: "2 to answer · 3 new", "All caught up". */
@@ -241,7 +242,7 @@ export function inboxText(item: InboxItem): string {
     r?.to.name,
     r?.to.email,
     r?.title,
-    r?.note,
+    r ? textOf(toHtml(r.note)) : '',
     r?.reason,
     c?.author.name,
     c?.author.email,
@@ -265,7 +266,10 @@ export function filterSent<T extends TaskRequest>(items: T[], q: string): T[] {
   const t = q.trim().toLowerCase();
   if (!t) return items;
   return items.filter((r) =>
-    [r.to.name, r.to.email, r.title, r.note, r.reason ?? ''].join(' ').toLowerCase().includes(t),
+    [r.to.name, r.to.email, r.title, textOf(toHtml(r.note)), r.reason ?? '']
+      .join(' ')
+      .toLowerCase()
+      .includes(t),
   );
 }
 

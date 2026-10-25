@@ -2,8 +2,8 @@ import { applyRequest, noteComment } from './requests';
 import { moveSlug } from './settings';
 import {
   addDays,
+  chipHtml,
   cleanHtml,
-  fileSize,
   isEmptyHtml,
   isInboxMutation,
   isProjectMutation,
@@ -709,12 +709,6 @@ export interface Applied {
   me?: boolean;
 }
 
-/** An attachment chip as the editor makes it, for notes written by the server. */
-function attachmentChip(f: { id: string; name: string; size: number }): string {
-  const esc = (x: string) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-  return `<a class="tp-att" href="/api/files/${f.id}" data-id="${f.id}" data-name="${esc(f.name)}" data-size="${f.size}"><span class="tp-att-i"></span>${esc(f.name)}<span class="tp-att-s">${fileSize(f.size)}</span></a>`;
-}
-
 /** Apply one mutation for `userId`, once. Throws Rejected for a change that will never apply. */
 export async function applyMutation(db: Db, userId: string, raw: unknown): Promise<Applied | null> {
   const parsed = syncMutationSchema.safeParse(raw);
@@ -813,7 +807,7 @@ async function create(
           ),
         )
     : [];
-  const notes = (p.notes ?? '') + (files.length ? `<p>${files.map(attachmentChip).join(' ')}</p>` : '');
+  const notes = (p.notes ?? '') + (files.length ? `<p>${files.map(chipHtml).join(' ')}</p>` : '');
   const clocks: TaskClocks = { title: m.at, done: m.at, place: m.at, carried: m.at, deleted: m.at };
   if (p.due !== undefined) clocks.due = m.at;
   if (p.notes !== undefined) clocks.notes = m.at;

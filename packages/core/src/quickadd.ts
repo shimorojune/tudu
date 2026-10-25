@@ -1,6 +1,7 @@
 import { dayWord } from './carried';
 import { formatDay, type IsoDate } from './dates';
 import { weekPlannedDay } from './week';
+import { isEmptyHtml, toHtml } from './notes';
 
 /** The pages a new task can be written from. */
 export type AppPage = 'today' | 'week' | 'backlog';
@@ -28,7 +29,7 @@ export function landsWords(
   const extra: string[] = [];
   if (draft.projectName) extra.push(draft.projectName);
   if (draft.due) extra.push(`due ${formatDay(draft.due)}`);
-  if (draft.note?.trim()) extra.push('note');
+  if (draft.note && !isEmptyHtml(toHtml(draft.note))) extra.push('note');
   if (draft.files) extra.push(`${draft.files} ${draft.files === 1 ? 'file' : 'files'}`);
   const where = draft.planned ? dayWord(draft.planned, today) : 'Backlog';
   return { pre: draft.planned ? 'Lands on ' : 'Lands in ', where, extra: extra.join(' · ') };

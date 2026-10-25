@@ -33,6 +33,7 @@ empty) before reading the server.
 | C03-U22 | Delete, restore, live       | Delete takes the row off its day and restore puts it back in place; a live event naming a task reads that task again and nothing else                                                  |
 | C03-U23 | Due words                   | "Fri" within a week, "4 Nov" further out, "Was due Friday"; today, tomorrow, in 4 days, in 3 weeks, 1 day overdue, 2 weeks overdue                                                     |
 | C03-U24 | Cleaning notes              | Keeps the editor's tags, safe links and checklist attributes; strips scripts, styles, frames, handlers and unknown tags; balances what is left; keeps entities                         |
+| C03-U25 | List styles                 | The prose rules give bullets disc, circle, square and numbers decimal then letters, none for checklists, markers in the readable muted tone (read from the stylesheet)                 |
 | C03-U25 | The ID chip copies the link | Copies `/t/ME-52`, lights up with a tick for 700ms, "Link copied"; with no link it copies the ID                                                                                       |
 | C03-U26 | Copy refused                | Clipboard refuses or is missing: "Couldn’t copy the link. Try again.", no tick, nothing thrown                                                                                         |
 | C03-U27 | The link mark’s motion      | Slides 4px out and fades in on hover with dur-menu and the arrive ease; reduced motion keeps it still                                                                                  |
@@ -56,26 +57,28 @@ empty) before reading the server.
 
 ## End-to-end (`packages/e2e/tests/detail`, group `detail`)
 
-| ID      | What it checks           | Scenario                                                                                                                                |
-| ------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| C03-E01 | Open and rename          | A row click opens the task with `?task=ME-2` in the address; a new title shows on the row; close clears the address; a reload keeps it  |
-| C03-E02 | Due                      | Pick Wednesday: the panel reads "Wed 21 Oct · in 3 days", the row "Due Wed"; a reload keeps it; Remove due date clears it on the server |
-| C03-E03 | Planned                  | Tomorrow from the picker: the row leaves today, "Moved to Tomorrow", the panel follows; `/t/ME-2` opens it on Monday                    |
-| C03-E04 | Notes                    | Bold, a list and a checklist; leaving the field saves them; close, reload and reopen shows them                                         |
-| C03-E05 | Subtasks                 | Three added in the panel, one crossed off, one deleted; the row says "1 of 2 done"; after a reload the fold opens and ticks one more    |
-| C03-E06 | Comments                 | A comment appears with the wash and the row says "1 comment"; Edit saves with "edited"; Delete and Undo; the server has one comment     |
-| C03-E07 | Delete and Undo          | The row leaves, Undo puts it back in place and a reload agrees; deleted again and left, it is gone and its ref is 404                   |
-| C03-E08 | The arrows and Esc       | Next and previous step through the day with the address following; Esc closes and focus is back on the row's title (desktop, tablet)    |
-| C03-E09 | History                  | Created, Due date set to Wed 21 Oct, Moved from Today to Tomorrow                                                                       |
-| C03-E10 | The address              | A reload with `?task=` reopens it; `/t/ME-1` opens it; Copy link copies that address; a link to no task goes back to the day            |
-| C03-E11 | Phone                    | The detail is its own full page without ×; subtasks and a comment on the phone; ‹ Today goes back and the row shows the counts (phone)  |
-| C03-E12 | Two days                 | With two sheets open the panel sits over both and neither changes width (desktop)                                                       |
-| C03-E13 | Offline                  | The banner shows; a due date and a subtask still work; back online the server has both                                                  |
-| C03-E14 | Live                     | A due date and a subtask set in a second tab show in the open panel of the first, and the row's byline follows                          |
-| C03-E15 | Loading and error states | A slow task shows the skeleton column; a failed task says "This task didn’t load." and Try again recovers                               |
-| C03-E16 | Dark mode                | Open, rename, write notes and comment in the dark theme; a reload keeps them                                                            |
-| C03-E17 | Copy refused             | The clipboard says no: the ID chip says "Couldn’t copy the link. Try again." and never "Link copied"                                    |
-| C03-E18 | Copy from the ID chip    | The chip copies `<origin>/t/ME-1` and says "Link copied"; ⋯ › Copy task ID still copies ME-1                                            |
+| ID      | What it checks           | Scenario                                                                                                                                     |
+| ------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| C03-E01 | Open and rename          | A row click opens the task with `?task=ME-2` in the address; a new title shows on the row; close clears the address; a reload keeps it       |
+| C03-E02 | Due                      | Pick Wednesday: the panel reads "Wed 21 Oct · in 3 days", the row "Due Wed"; a reload keeps it; Remove due date clears it on the server      |
+| C03-E03 | Planned                  | Tomorrow from the picker: the row leaves today, "Moved to Tomorrow", the panel follows; `/t/ME-2` opens it on Monday                         |
+| C03-E04 | Notes                    | Bold, a list and a checklist; leaving the field saves them; close, reload and reopen shows them                                              |
+| C03-E05 | Subtasks                 | Three added in the panel, one crossed off, one deleted; the row says "1 of 2 done"; after a reload the fold opens and ticks one more         |
+| C03-E06 | Comments                 | A comment appears with the wash and the row says "1 comment"; Edit saves with "edited"; Delete and Undo; the server has one comment          |
+| C03-E07 | Delete and Undo          | The row leaves, Undo puts it back in place and a reload agrees; deleted again and left, it is gone and its ref is 404                        |
+| C03-E08 | The arrows and Esc       | Next and previous step through the day with the address following; Esc closes and focus is back on the row's title (desktop, tablet)         |
+| C03-E09 | History                  | Created, Due date set to Wed 21 Oct, Moved from Today to Tomorrow                                                                            |
+| C03-E10 | The address              | A reload with `?task=` reopens it; `/t/ME-1` opens it; Copy link copies that address; a link to no task goes back to the day                 |
+| C03-E11 | Phone                    | The detail is its own full page without ×; subtasks and a comment on the phone; ‹ Today goes back and the row shows the counts (phone)       |
+| C03-E12 | Two days                 | With two sheets open the panel sits over both and neither changes width (desktop)                                                            |
+| C03-E13 | Offline                  | The banner shows; a due date and a subtask still work; back online the server has both                                                       |
+| C03-E14 | Live                     | A due date and a subtask set in a second tab show in the open panel of the first, and the row's byline follows                               |
+| C03-E15 | Loading and error states | A slow task shows the skeleton column; a failed task says "This task didn’t load." and Try again recovers                                    |
+| C03-E16 | Dark mode                | Open, rename, write notes and comment in the dark theme; a reload keeps them                                                                 |
+| C03-E17 | Copy refused             | The clipboard says no: the ID chip says "Couldn’t copy the link. Try again." and never "Link copied"                                         |
+| C03-E18 | Copy from the ID chip    | The chip copies `<origin>/t/ME-1` and says "Link copied"; ⋯ › Copy task ID still copies ME-1                                                 |
+| C03-E19 | Lists you can see        | Bullets, a nested bullet, numbers and a checklist in notes: every marker shows with readable contrast, after a reload too, in light and dark |
+| C03-E20 | Lists in comments        | A comment with bullets and numbers: the posted comment and the box both show their markers, in light and dark                                |
 
 Not automated: the feel of the slide and the veil, the comment wash, the subtask fold and the pop easing out. Judge those on
 staging and on the kit page's Task detail section.

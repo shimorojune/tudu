@@ -1,6 +1,6 @@
 # Notes and comments: visible lists, one-line file chips, paste and drop, a rich Quick Add note
 
-Status: proposal, waiting for Rohit's approval. Canvas: approved 25 Oct 2026 (board `D-RichText` on the Task detail
+Status: approved by Rohit 25 Oct 2026; in progress. Canvas: approved 25 Oct 2026 (board `D-RichText` on the Task detail
 page of the canvas). Covers items 1, 2 and 6 of Rohit's list of 24 Oct.
 
 ## What Rohit reported
@@ -61,7 +61,8 @@ class="tp-att-ext">.ext</span></span><span class="tp-att-s">243 KB</span></a>` w
 - **CSS.** `.tp-att`: `max-width: min(100%, 340px)`, `white-space: nowrap`, `overflow-wrap: normal`,
   `box-sizing: border-box`; the stem `overflow: hidden; text-overflow: ellipsis; min-width: 0`; the icon, extension
   and size `flex: none`. Hover deepens the wash and edge (160ms, ease-change). An image file (by extension: png, jpg,
-  jpeg, gif, webp, heic, svg) gets the picture mark instead of the clip (`tp-att-img` class from the node).
+  jpeg, gif, webp, heic, svg) gets the picture mark instead of the clip (a CSS match on `data-name`, so old chips
+  get it too without a new class).
 - **Links inside prose.** `.tp-prose a.tp-att` keeps the foreground colour and no underline. Today it inherits the
   Jira-blue link style when the chip is not the first rule to match.
 
@@ -146,7 +147,7 @@ Ids continue each chunk's list; they may shift by one or two if another open bra
 | ------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | C04-U18 | File names split              | `splitFileName`: `WhatsApp Image 2026-08-05 at 4.29.27 PM.jpeg` → stem and `.jpeg`; `archive.tar.gz` → `.gz`; `.env` and `README` stay whole; an extension over 8 characters stays in the stem                                                        |
 | C04-U19 | Pasted names                  | `pastedFileName`: `image.png` at 24 Oct 14:32 → `Pasted image 24 Oct 14.32.png`; an empty name with type `image/jpeg` → `.jpeg`; a real name (`spec.pdf`) is kept                                                                                     |
-| C04-U20 | The chip's markup             | The `Attachment` node and the shared server chip write the same markup (stem, extension, size, title); an old chip with a bare name parses and re-renders with the new markup; an image extension gets `tp-att-img`                                   |
+| C04-U20 | The chip's markup             | The `Attachment` node and the shared server chip write the same markup (stem, extension, size, title); an old chip with a bare name parses and re-renders with the new markup; an image extension gets the picture mark                               |
 | C04-U21 | The cleaner and new chips     | The cleaner keeps `tp-att-n`, `tp-att-stem`, `tp-att-ext` and `title` on chips and nothing else new; `<span data-tp-upload>` is dropped with its text                                                                                                 |
 | C04-U22 | Paste a file into notes       | A paste with one image file calls `onAttach` once, puts an uploading chip at the caret, reports progress, then a finished chip; the stored HTML has the chip and no upload span; text pastes don't call `onAttach`                                    |
 | C04-U23 | Drop a file into notes        | A drop with files shows "Drop to attach", inserts at the drop point and uploads; a drop of text does not                                                                                                                                              |
@@ -165,8 +166,8 @@ Every case below runs on desktop and phone unless it says otherwise; the light/d
 
 | Id      | Case                                             | Scenario                                                                                                                                                                                                                                                         |
 | ------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C03-E17 | Lists you can see                                | Write a bulleted list, a nested bullet, a numbered list and a checklist in notes; `expectListMarkers` passes; reload and it still passes; in dark as well                                                                                                        |
-| C03-E18 | Lists in comments                                | Post a comment with a bulleted and a numbered list; the posted comment and the comment box both pass `expectListMarkers`; in dark as well                                                                                                                        |
+| C03-E19 | Lists you can see                                | Write a bulleted list, a nested bullet, a numbered list and a checklist in notes; `expectListMarkers` passes; reload and it still passes; in dark as well                                                                                                        |
+| C03-E20 | Lists in comments                                | Post a comment with a bulleted and a numbered list; the posted comment and the comment box both pass `expectListMarkers`; in dark as well                                                                                                                        |
 | C04-E16 | A long-named file in notes                       | Attach `WhatsApp Image 2026-08-05 at 4.29.27 PM.jpeg` from the Attach button inside a list item and after a line of text; `expectOneLineChip` passes; the visible stem ends with "…" and the extension `.jpeg` shows; hovering shows the full name; on phone too |
 | C04-E17 | Paste a screenshot into notes                    | Dispatch a paste with a PNG in the clipboard; the uploading chip shows at once, then `Pasted image … .png` with its size; after a reload it's there and opens as `image/png`                                                                                     |
 | C04-E18 | Paste into a comment                             | Paste a file into the comment box; Comment is disabled until it lands; the posted comment shows the chip on one line and it opens                                                                                                                                |
@@ -176,8 +177,8 @@ Every case below runs on desktop and phone unless it says otherwise; the light/d
 | C04-E22 | A rich note to someone else                      | In a team space, send a task with a numbered list in the note; their Inbox preview reads the words; when they accept, the task's notes have the list                                                                                                             |
 
 Existing cases that change: `C04-U05` (the note line is now C04-U27; its "three lines at most" goes),
-`C04-E06` (uses the long name and `expectOneLineChip` as well as `toContainText`), `C04-E14` (same), and
-`C03-E04` (adds `expectListMarkers` after the reload).
+`C04-E06` (uses the long name and `expectOneLineChip` as well as `toContainText`) and `C04-E14` (same).
+`C03-E04` stays as it was: its list turns into the checklist, so it has no bullets left to look at; C03-E19 covers them.
 
 ## Not in this change
 

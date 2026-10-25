@@ -8,6 +8,7 @@ import type {
   SyncResponse,
   TaskDetail,
 } from '@tudu/core';
+import { eq, schema } from '@tudu/db';
 import { get, post, signIn, startServer, type Jar } from '../test/harness';
 
 let server: ReturnType<typeof startServer>;
@@ -140,7 +141,7 @@ describe('requests and the Inbox', () => {
     expect(item.readAt).toBeNull();
     expect(item.request).toMatchObject({
       title: 'Draft the onboarding copy',
-      note: 'Keep it short.\n\nTwo paragraphs at most.',
+      note: '<p>Keep it short.</p><p>Two paragraphs at most.</p>',
       askedDay: '2026-10-20',
       due: '2026-10-23',
       attachments: [file.id],
@@ -169,6 +170,53 @@ describe('requests and the Inbox', () => {
     ]);
     const stranger = await sync(c, [send(space.id, b.userId, 'From outside')]);
     expect(stranger.results[0]).toMatchObject({ status: 'rejected', code: 403 });
+  });
+
+  it('C04-A09 a rich note: stored cleaned, read as words in the Inbox, kept as a list in the accepted task; old plain notes still work; over 8,000 is 400', async () => {
+    const { a, b, space } = await team();
+    const reqId = randomUUID();
+    const note =
+      '<ol><li><p>Venue</p></li><li><p>Food</p><ol><li><p>Vegan</p></li></ol></li></ol><script>x()</script><p></p>';
+    const out = await sync(a, [send(space.id, b.userId, 'Plan the offsite', { note }, reqId)]);
+    expect(out.results[0]!.status).toBe('ok');
+    const bx = await inbox(b, space.id);
+    expect(bx.toAnswer[0]!.request!.note).toBe(
+      '<ol><li><p>Venue</p></li><li><p>Food</p><ol><li><p>Vegan</p></li></ol></li></ol>',
+    );
+    // the Inbox narrows on the words, not the markup
+    expect((await inbox(b, space.id, 'inbox', 'vegan')).toAnswer).toHaveLength(1);
+    expect((await inbox(b, space.id, 'inbox', '<ol>')).toAnswer).toHaveLength(0);
+    expect((await inbox(a, space.id, 'sent', 'venue')).sent).toHaveLength(1);
+    expect((await inbox(a, space.id, 'sent', 'li>')).sent).toHaveLength(0);
+    const taskId = randomUUID();
+    await sync(b, [m('request.accept', { id: reqId, taskId, day: '2026-10-21' })]);
+    const detail = (await (
+      await get(server.app, `/api/spaces/${space.id}/tasks/${taskId}`, b.jar)
+    ).json()) as TaskDetail;
+    expect(detail.notes).toBe(
+      '<ol><li><p>Venue</p></li><li><p>Food</p><ol><li><p>Vegan</p></li></ol></li></ol>',
+    );
+    // a request sent before notes were rich keeps plain words: they still become paragraphs
+    const oldId = randomUUID();
+    await sync(a, [send(space.id, b.userId, 'Book the room', {}, oldId)]);
+    await server.db
+      .update(schema.requests)
+      .set({ note: 'Room 4 if free.\n\nElse the big one & the bar.' })
+      .where(eq(schema.requests.id, oldId));
+    const oldTask = randomUUID();
+    await sync(b, [m('request.accept', { id: oldId, taskId: oldTask, day: '2026-10-21' })]);
+    const oldDetail = (await (
+      await get(server.app, `/api/spaces/${space.id}/tasks/${oldTask}`, b.jar)
+    ).json()) as TaskDetail;
+    expect(oldDetail.notes).toBe('<p>Room 4 if free.</p><p>Else the big one &amp; the bar.</p>');
+    // room for markup, not for a book
+    const long = `<p>${'x'.repeat(7990)}</p>`;
+    const fits = await sync(a, [send(space.id, b.userId, 'Long note', { note: long })]);
+    expect(fits.results[0]!.status).toBe('ok');
+    const tooLong = await sync(a, [
+      send(space.id, b.userId, 'Too long', { note: `<p>${'x'.repeat(8000)}</p>` }),
+    ]);
+    expect(tooLong.results[0]).toMatchObject({ status: 'rejected', code: 400 });
   });
 
   it('C08-A07 accept makes the task on the picked day with the note, files and history; the sender hears; decline needs a reason', async () => {

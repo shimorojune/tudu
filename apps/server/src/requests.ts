@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import {
+  chipHtml,
   cleanHtml,
   initialsOf,
+  noteHtml,
   POSITION_STEP,
   textOf,
   type InboxPerson,
@@ -37,24 +39,6 @@ async function userById(tx: Executor, id: string) {
     .from(schema.user)
     .where(eq(schema.user.id, id));
   return u ?? null;
-}
-
-/** Plain words from the note line become paragraphs of notes. */
-function noteHtml(note: string): string {
-  const t = note.trim();
-  if (!t) return '';
-  const esc = (x: string) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return t
-    .split(/\n{2,}/)
-    .map((para) => `<p>${esc(para).replace(/\n/g, '<br>')}</p>`)
-    .join('');
-}
-
-function attachmentChip(f: { id: string; name: string; size: number }): string {
-  const esc = (x: string) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-  const k = Math.max(1, Math.round(f.size / 1024));
-  const size = k > 1024 ? `${(k / 1024).toFixed(1)} MB` : `${k} KB`;
-  return `<a class="tp-att" href="/api/files/${f.id}" data-id="${f.id}" data-name="${esc(f.name)}" data-size="${f.size}"><span class="tp-att-i"></span>${esc(f.name)}<span class="tp-att-s">${size}</span></a>`;
 }
 
 async function endOf(tx: Executor, spaceId: string, ownerId: string, day: IsoDate | null): Promise<number> {
@@ -101,7 +85,7 @@ async function taskFromRequest(
         .from(schema.attachments)
         .where(and(inArray(schema.attachments.id, r.attachments), eq(schema.attachments.spaceId, r.spaceId)))
     : [];
-  const notes = noteHtml(r.note) + (files.length ? `<p>${files.map(attachmentChip).join(' ')}</p>` : '');
+  const notes = noteHtml(r.note) + (files.length ? `<p>${files.map(chipHtml).join(' ')}</p>` : '');
   const iso = at.toISOString();
   const clocks: TaskClocks = { title: iso, done: iso, place: iso, carried: iso, deleted: iso, notes: iso };
   if (r.dueDay) clocks.due = iso;
@@ -186,7 +170,7 @@ export async function applyRequest(tx: Tx, userId: string, m: RequestMutation): 
         fromId: userId,
         toId: p.toId,
         title: p.title,
-        note: p.note?.trim() ?? '',
+        note: noteHtml(p.note),
         askedDay: p.askedDay,
         dueDay: p.due ?? null,
         projectId: p.projectId ?? null,

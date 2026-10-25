@@ -1,6 +1,14 @@
-import { cleanHtml, isEmptyHtml as htmlIsEmpty } from '@tudu/core';
-import { Attachment, withFileBase, withoutFileBase } from './attachment';
-import { showToast } from './Toast';
+import {
+  cleanHtml,
+  FILE_MAX_BYTES,
+  isEmptyHtml as htmlIsEmpty,
+  pastedFileName,
+  toHtml,
+  upgradeChips,
+} from '@tudu/core';
+import type { Node as PmNode } from '@tiptap/pm/model';
+import { Attachment, AttachmentUpload, withFileBase, withoutFileBase, withoutUploads } from './attachment';
+import { showToast, TOAST_WITH_ACTION_MS } from './Toast';
 import Highlight from '@tiptap/extension-highlight';
 import Subscript from '@tiptap/extension-subscript';
 import Superscript from '@tiptap/extension-superscript';
@@ -24,8 +32,11 @@ import { Button } from './Button';
 import { MenuList } from './Menu';
 
 export interface RichTextEditorProps {
-  /** Notes sit in the paper with a toolbar that rises over them; a comment is a box that grows as you write. */
-  variant: 'notes' | 'comment';
+  /**
+   * Notes sit in the paper with a toolbar that rises over them; a comment is a box that grows as you write; Quick Add's
+   * note is a few lines with a slim formatting row under it while it has focus.
+   */
+  variant: 'notes' | 'comment' | 'quick';
   /** The accessible name: "Notes", "Write a comment". */
   label: string;
   /** HTML (or plain text, which becomes paragraphs). */
@@ -41,32 +52,42 @@ export interface RichTextEditorProps {
   /** Leaving the field: the HTML as it is now, and whether it says anything. */
   onBlur?: (html: string, isEmpty: boolean) => void;
   onInput?: (html: string, isEmpty: boolean) => void;
-  /** Comments: the button at the end of the toolbar, or Cmd/Ctrl with Enter. */
+  /** Comments: the button at the end of the toolbar, or Cmd/Ctrl with Enter. Quick Add: Cmd/Ctrl with Enter adds. */
   onSubmit?: (html: string) => void;
   submitLabel?: string;
   onCancel?: () => void;
-  /** "Attach a file": upload it and get back what the chip needs. Without it the button stays out. */
+  /**
+   * "Attach a file", and files pasted or dropped on the words: upload it and get back what the chip needs. Without it
+   * the button stays out and files are left to whatever holds the editor (Quick Add's files row).
+   */
   onAttach?: (
     file: File,
     onProgress?: (ratio: number) => void,
   ) => Promise<{ id: string; name: string; size: number }>;
   /** Where attachment chips link: the API's origin. */
   fileBase?: string;
+  /** No connection: a file would never arrive, so none is taken. */
+  offline?: boolean;
   className?: string;
 }
 
-/** Plain words become paragraphs; HTML stays HTML. */
-export function toHtml(v: string | undefined): string {
-  if (!v) return '';
-  if (/<\/?[a-z][\s\S]*>/i.test(v)) return v;
-  return v
-    .split(/\n{2,}/)
-    .map(
-      (p) =>
-        `<p>${p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</p>`,
-    )
-    .join('');
+export { toHtml };
+
+const ATTACH_FAILED = 'Couldn’t attach the file. Check your connection and retry.';
+const TOO_BIG = 'That file is too big. Files can be up to 25 MB.';
+const OFFLINE = 'You’re offline. Files need a connection.';
+
+/** What the editor hands on: the API's origin off its chips, and no chip that is still on its way. */
+function storedHtml(html: string, base: string | undefined): string {
+  return withoutUploads(withoutFileBase(html, base));
 }
+
+/** The same file under the name it should have (a pasted screenshot's "image.png" becomes "Pasted image …"). */
+function renamed(f: File, name: string): File {
+  return name === f.name ? f : new File([f], name, { type: f.type, lastModified: f.lastModified });
+}
+
+const hasFiles = (dt: DataTransfer | null | undefined) => Array.from(dt?.types ?? []).includes('Files');
 
 const I = {
   bold: <path d="M6 4h8a4 4 0 0 1 0 8H6zM6 12h9a4 4 0 0 1 0 8H6z" />,
@@ -159,10 +180,11 @@ const STYLES = [
   { v: 'pre', label: 'Code block' },
 ] as const;
 
-/** The editor's extensions: exactly what the cleaner keeps. */
+/** The editor's extensions: exactly what the cleaner keeps, and the chip of a file on its way up. */
 export function editorExtensions(fileBase = '') {
   return [
     Attachment.configure({ base: fileBase }),
+    AttachmentUpload,
     StarterKit.configure({
       heading: { levels: [2, 3] },
       link: {
@@ -187,10 +209,11 @@ export function editorExtensions(fileBase = '') {
  * Notes and comments are rich text on Tiptap. The editor reads as part of the paper: no frame until you write,
  * then a slim toolbar of the few marks people use (text style, bold, italic, underline, lists, checklist, link,
  * highlight, code), the rest under More. When the toolbar would overflow, the least used marks fold into More.
- * Attaching a file arrives with chunk 04.
+ * A file from the Attach button, a paste or a drop goes in at once as a chip that fills while it uploads.
  */
 export function RichTextEditor(p: RichTextEditorProps) {
   const comment = p.variant === 'comment';
+  const quick = p.variant === 'quick';
   const wrap = useRef<HTMLDivElement | null>(null);
   const barEl = useRef<HTMLDivElement | null>(null);
   const lastW = useRef(0);
@@ -199,8 +222,19 @@ export function RichTextEditor(p: RichTextEditorProps) {
   const [empty, setEmpty] = useState(() => htmlIsEmpty(toHtml(p.value)));
   const [menu, setMenu] = useState<null | 'style' | 'link' | 'more'>(null);
   const [link, setLink] = useState('');
-  const [attaching, setAttaching] = useState(false);
+  // Chips still uploading or failed: a comment waits for them.
+  const [uploading, setUploading] = useState(0);
+  const [dragging, setDragging] = useState(0);
   const fileEl = useRef<HTMLInputElement | null>(null);
+  /** The files behind chips that are uploading or failed, by key, so Retry sends the same file. Never in the words. */
+  const pending = useRef(new Map<string, File>());
+  const seq = useRef(0);
+  const edRef = useRef<Editor | null>(null);
+  const submitNow = useRef(() => {});
+  const chipActs = useRef<{ retry: (key: string) => void; remove: (key: string) => void }>({
+    retry: () => {},
+    remove: () => {},
+  });
   const cb = useRef(p);
   useLayoutEffect(() => {
     cb.current = p;
@@ -221,20 +255,57 @@ export function RichTextEditor(p: RichTextEditorProps) {
           'data-placeholder': p.placeholder ?? '',
           spellcheck: 'true',
         },
+        // Cmd/Ctrl with Enter posts the comment (adds the Quick Add task) before the editor's own keys make a line.
+        handleKeyDown: (_view, e) => {
+          if (cb.current.variant === 'notes' || e.key !== 'Enter' || !(e.metaKey || e.ctrlKey)) return false;
+          submitNow.current();
+          return true;
+        },
+        // A file on the clipboard is attached, and nothing else of that paste goes in (text pastes are untouched).
+        handlePaste: (_view, e) => {
+          const files = Array.from(e.clipboardData?.files ?? []);
+          if (!files.length) return false;
+          if (cb.current.onAttach) {
+            const now = new Date();
+            attachFiles(files.map((f) => renamed(f, pastedFileName(f.name, f.type, now))));
+          }
+          return true;
+        },
+        // A dropped file goes in where it lands. Without onAttach the drop is left to the field around the editor.
+        handleDrop: (view, e, _slice, moved) => {
+          if (moved || !e.dataTransfer?.files.length) return false;
+          setDragging(0);
+          if (cb.current.onAttach) {
+            const at = view.posAtCoords({ left: e.clientX, top: e.clientY });
+            attachFiles(Array.from(e.dataTransfer.files), at?.pos);
+          }
+          return true;
+        },
       },
       onUpdate: ({ editor: e }) => {
-        const em = e.isEmpty;
-        setEmpty(em);
-        cb.current.onInput?.(withoutFileBase(e.getHTML(), cb.current.fileBase), em);
+        let n = 0;
+        e.state.doc.descendants((node) => {
+          if (node.type.name === 'attachmentUpload') n++;
+        });
+        setUploading(n);
+        const html = storedHtml(e.getHTML(), cb.current.fileBase);
+        const em = htmlIsEmpty(html);
+        setEmpty(e.isEmpty);
+        cb.current.onInput?.(html, em);
       },
       onFocus: () => setFocused(true),
       onBlur: ({ editor: e }) => {
         setFocused(false);
-        cb.current.onBlur?.(e.isEmpty ? '' : withoutFileBase(e.getHTML(), cb.current.fileBase), e.isEmpty);
+        const html = storedHtml(e.getHTML(), cb.current.fileBase);
+        const em = htmlIsEmpty(html);
+        cb.current.onBlur?.(em ? '' : html, em);
       },
     },
     [p.resetKey],
   );
+  useLayoutEffect(() => {
+    edRef.current = editor;
+  });
   // A reset loads other words: the blank state follows them.
   const [seenReset, setSeenReset] = useState(p.resetKey);
   if (p.resetKey !== seenReset) {
@@ -271,12 +342,12 @@ export function RichTextEditor(p: RichTextEditorProps) {
 
   // Fit the toolbar to its width: when it would overflow, the least used marks move into More, one step at a time.
   const compact = !!p.compact;
-  const lvl = Math.max(fit, compact ? 2 : 0);
+  const lvl = quick ? 0 : Math.max(fit, compact ? 2 : 0);
   // Measured after every render, since what the bar shows changes its width; it settles within three steps.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     const b = barEl.current;
-    if (b && fit < 3 && b.clientWidth > 0 && b.scrollWidth > b.clientWidth + 1) setFit(fit + 1);
+    if (!quick && b && fit < 3 && b.clientWidth > 0 && b.scrollWidth > b.clientWidth + 1) setFit(fit + 1);
   });
   useEffect(() => {
     if (!window.ResizeObserver || !wrap.current) return;
@@ -325,29 +396,136 @@ export function RichTextEditor(p: RichTextEditorProps) {
 
   function submit() {
     if (!editor || editor.isEmpty || !p.onSubmit) return;
-    p.onSubmit(cleanHtml(withoutFileBase(editor.getHTML(), p.fileBase)));
+    if (quick) {
+      p.onSubmit(cleanHtml(storedHtml(editor.getHTML(), p.fileBase)));
+      return;
+    }
+    // A comment waits until its files have landed (or the failed ones are dealt with).
+    if (uploading) return;
+    p.onSubmit(cleanHtml(storedHtml(editor.getHTML(), p.fileBase)));
     // The box empties and keeps the caret, ready for the next comment.
     editor.chain().clearContent(true).focus().run();
     setEmpty(true);
   }
 
-  async function attach(file: File | undefined) {
-    if (!file || !editor || !p.onAttach || attaching) return;
-    setAttaching(true);
+  useLayoutEffect(() => {
+    submitNow.current = submit;
+    chipActs.current = { retry: (key) => void upload(key), remove: dropUpload };
+  });
+  // Retry and × on a failed chip.
+  useEffect(() => {
+    const el = wrap.current;
+    if (!el) return;
+    const retry = (e: Event) => chipActs.current.retry((e as CustomEvent<string>).detail);
+    const remove = (e: Event) => chipActs.current.remove((e as CustomEvent<string>).detail);
+    el.addEventListener('tp-att-retry', retry);
+    el.addEventListener('tp-att-remove', remove);
+    return () => {
+      el.removeEventListener('tp-att-retry', retry);
+      el.removeEventListener('tp-att-remove', remove);
+    };
+  }, []);
+
+  /** Take a chip that is uploading or failed out of the words, and forget its file. */
+  function dropUpload(key: string) {
+    pending.current.delete(key);
+    const e = edRef.current;
+    const at = findUpload(key);
+    if (e && at) e.view.dispatch(e.state.tr.delete(at.pos, at.pos + 1));
+  }
+
+  /** Where the chip for `key` is now, if it is still there. */
+  function findUpload(key: string): { pos: number; node: PmNode } | null {
+    const e = edRef.current;
+    if (!e || e.isDestroyed) return null;
+    let found: { pos: number; node: PmNode } | null = null;
+    e.state.doc.descendants((node, pos) => {
+      if (found) return false;
+      if (node.type.name === 'attachmentUpload' && node.attrs.key === key) found = { pos, node };
+      return true;
+    });
+    return found;
+  }
+
+  function patchUpload(key: string, attrs: Record<string, unknown>) {
+    const e = edRef.current;
+    const at = findUpload(key);
+    if (!e || !at) return;
+    e.view.dispatch(
+      e.state.tr
+        .setNodeMarkup(at.pos, undefined, { ...at.node.attrs, ...attrs })
+        .setMeta('addToHistory', false),
+    );
+  }
+
+  /** Each file goes in at once as an uploading chip (at `pos`, or the caret), then uploads. */
+  function attachFiles(files: File[], pos?: number) {
+    const e = edRef.current;
+    if (!files.length || !e || !cb.current.onAttach) return;
+    if (cb.current.offline || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+      showToast(OFFLINE);
+      return;
+    }
+    const ok = files.filter((f) => f.size <= FILE_MAX_BYTES);
+    if (ok.length < files.length) showToast(TOO_BIG);
+    if (!ok.length) return;
+    const keys = ok.map((f) => {
+      const key = `u${Date.now().toString(36)}${seq.current++}`;
+      pending.current.set(key, f);
+      return key;
+    });
+    const content = ok.flatMap((f, i) => [
+      {
+        type: 'attachmentUpload',
+        attrs: { key: keys[i], name: f.name, size: f.size, progress: 0, error: false },
+      },
+      { type: 'text', text: ' ' },
+    ]);
+    const c = e.chain().focus();
+    (pos === undefined ? c.insertContent(content) : c.insertContentAt(pos, content)).run();
+    for (const k of keys) void upload(k);
+  }
+
+  async function upload(key: string) {
+    const file = pending.current.get(key);
+    const send = cb.current.onAttach;
+    if (!file || !send) return;
+    if (cb.current.offline || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+      showToast(OFFLINE);
+      return;
+    }
+    patchUpload(key, { error: false, progress: 0 });
     try {
-      const saved = await p.onAttach(file);
-      editor
-        .chain()
-        .focus()
-        .insertContent([
-          { type: 'attachment', attrs: { id: saved.id, name: saved.name, size: saved.size } },
-          { type: 'text', text: ' ' },
-        ])
-        .run();
+      const saved = await send(file, (ratio) =>
+        patchUpload(key, { progress: Math.min(1, Math.max(0, ratio)) }),
+      );
+      pending.current.delete(key);
+      const e = edRef.current;
+      const at = findUpload(key);
+      if (!e || !at) return;
+      e.view.dispatch(
+        e.state.tr.replaceWith(
+          at.pos,
+          at.pos + 1,
+          e.schema.nodes.attachment!.create({ id: saved.id, name: saved.name, size: saved.size }),
+        ),
+      );
+      // Notes save when the field is left; a file that lands after that saves on its own.
+      if (!e.isFocused) {
+        const html = storedHtml(e.getHTML(), cb.current.fileBase);
+        const em = htmlIsEmpty(html);
+        cb.current.onBlur?.(em ? '' : html, em);
+      }
     } catch (err) {
-      showToast((err as { message?: string })?.message || 'Couldn’t attach the file.');
-    } finally {
-      setAttaching(false);
+      const r = err as { status?: number; message?: string };
+      // The server said no (too big, not allowed): retrying would not help, so the chip goes and the reason shows.
+      if (typeof r?.status === 'number' && r.status >= 400 && r.status < 500 && r.message) {
+        dropUpload(key);
+        showToast(r.message);
+        return;
+      }
+      patchUpload(key, { error: true });
+      showToast(ATTACH_FAILED, { duration: TOAST_WITH_ACTION_MS });
     }
   }
 
@@ -361,18 +539,17 @@ export function RichTextEditor(p: RichTextEditorProps) {
       } else (e.target as HTMLElement).blur?.();
       return;
     }
-    if (comment && e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      submit();
-    }
   }
 
   const styleLabel = (STYLES.find((x) => x.v === act.block) ?? STYLES[0]).label;
-  const onNow = focused || !!menu || (comment && !empty) || !!p.alwaysOpen;
+  // A comment box or a Quick Add note with words in it keeps its bar, so leaving it never moves Comment or Add from
+  // under the pointer.
+  const lean = comment || quick;
+  const onNow = focused || !!menu || (lean && !empty) || !!p.alwaysOpen;
 
   const bar = (
     <div ref={barEl} className="tp-rte-bar" role="toolbar" aria-label={`${p.label} formatting`}>
-      {comment ? null : (
+      {lean ? null : (
         <div className="tp-rte-dd">
           <RTB
             label="Text style"
@@ -396,19 +573,21 @@ export function RichTextEditor(p: RichTextEditorProps) {
           ) : null}
         </div>
       )}
-      {comment ? null : <i className="tp-rte-sep" />}
+      {lean ? null : <i className="tp-rte-sep" />}
       <RTB label="Bold" toggle on={act.bold} onClick={() => exec((c) => c.toggleBold())}>
         <Ic name="bold" />
       </RTB>
-      <RTB label="Italic" toggle on={act.italic} onClick={() => exec((c) => c.toggleItalic())}>
-        <Ic name="italic" />
-      </RTB>
-      {lvl >= 1 || comment ? null : (
+      {quick && compact ? null : (
+        <RTB label="Italic" toggle on={act.italic} onClick={() => exec((c) => c.toggleItalic())}>
+          <Ic name="italic" />
+        </RTB>
+      )}
+      {lvl >= 1 || lean ? null : (
         <RTB label="Underline" toggle on={act.underline} onClick={() => exec((c) => c.toggleUnderline())}>
           <Ic name="underline" />
         </RTB>
       )}
-      <i className="tp-rte-sep" />
+      {quick && compact ? null : <i className="tp-rte-sep" />}
       <RTB label="Bulleted list" toggle on={act.ul} onClick={() => exec((c) => c.toggleBulletList())}>
         <Ic name="ul" />
       </RTB>
@@ -422,7 +601,7 @@ export function RichTextEditor(p: RichTextEditorProps) {
           <Ic name="check" />
         </RTB>
       )}
-      <i className="tp-rte-sep" />
+      {quick && compact ? null : <i className="tp-rte-sep" />}
       <div className="tp-rte-dd">
         <RTB label="Link" expanded={menu === 'link'} onClick={() => setMenu(menu === 'link' ? null : 'link')}>
           <Ic name="link" />
@@ -455,18 +634,18 @@ export function RichTextEditor(p: RichTextEditorProps) {
           </div>
         ) : null}
       </div>
-      {lvl >= 1 || comment ? null : (
+      {lvl >= 1 || lean ? null : (
         <RTB label="Highlight" onClick={() => exec((c) => c.toggleHighlight())}>
           <Ic name="mark" />
         </RTB>
       )}
-      {lvl >= 2 ? null : (
+      {lvl >= 2 || (quick && compact) ? null : (
         <RTB label="Code" onClick={() => exec((c) => c.toggleCode())}>
           <Ic name="code" />
         </RTB>
       )}
       {p.onAttach && (lvl < 3 || comment) ? (
-        <RTB label={attaching ? 'Attaching…' : 'Attach a file'} onClick={() => fileEl.current?.click()}>
+        <RTB label="Attach a file" onClick={() => fileEl.current?.click()}>
           <Ic name="attach" />
         </RTB>
       ) : null}
@@ -476,15 +655,16 @@ export function RichTextEditor(p: RichTextEditorProps) {
           type="file"
           hidden
           tabIndex={-1}
+          multiple
           aria-label="Choose a file to attach"
           onChange={(e) => {
-            void attach(e.target.files?.[0]);
+            attachFiles(Array.from(e.target.files ?? []));
             e.target.value = '';
           }}
         />
       ) : null}
-      <span className="tp-rte-sp" />
-      {comment ? null : (
+      {quick ? null : <span className="tp-rte-sp" />}
+      {lean ? null : (
         <div className="tp-rte-dd">
           <RTB
             label="More formatting"
@@ -527,7 +707,7 @@ export function RichTextEditor(p: RichTextEditorProps) {
         </div>
       )}
       {comment && p.onSubmit ? (
-        <Button variant="primary" className="tp-rte-send" disabled={empty} onClick={submit}>
+        <Button variant="primary" className="tp-rte-send" disabled={empty || uploading > 0} onClick={submit}>
           {p.submitLabel ?? 'Comment'}
         </Button>
       ) : null}
@@ -549,17 +729,41 @@ export function RichTextEditor(p: RichTextEditorProps) {
       ref={wrap}
       className={cx(
         'tp-root tp-rte',
-        comment ? 'tp-rte-comment' : 'tp-rte-notes',
+        comment ? 'tp-rte-comment' : quick ? 'tp-rte-quick' : 'tp-rte-notes',
         onNow && 'tp-on',
         empty && 'tp-rte-blank',
         compact && 'tp-compact',
+        dragging > 0 && 'tp-rte-dropping',
         p.className,
       )}
       onKeyDown={onKeyDown}
+      onDragEnter={(e) => {
+        if (p.onAttach && hasFiles(e.dataTransfer)) setDragging((d) => d + 1);
+      }}
+      onDragLeave={(e) => {
+        if (p.onAttach && hasFiles(e.dataTransfer)) setDragging((d) => Math.max(0, d - 1));
+      }}
+      onDragOver={(e) => {
+        // Files may land anywhere on the field, not only on its words.
+        if (p.onAttach && hasFiles(e.dataTransfer)) e.preventDefault();
+      }}
+      onDrop={(e) => {
+        setDragging(0);
+        // Off the words (the padding, below the last line) the editor has no place for it: it goes at the caret.
+        if (e.defaultPrevented || !p.onAttach || !e.dataTransfer?.files.length) return;
+        e.preventDefault();
+        attachFiles(Array.from(e.dataTransfer.files));
+      }}
     >
-      {comment ? null : bar}
+      {lean ? null : bar}
       <EditorContent editor={editor} className="tp-rte-host" />
-      {comment ? bar : null}
+      {p.onAttach ? (
+        <div className="tp-rte-drop" aria-hidden="true">
+          <Ic name="attach" />
+          <span>Drop to attach · it goes where the caret is</span>
+        </div>
+      ) : null}
+      {lean ? bar : null}
     </div>
   );
 }
@@ -577,7 +781,7 @@ export function RichTextContent({ html, compact, fileBase, className }: RichText
   return (
     <div
       className={cx('tp-root tp-prose', compact && 'tp-compact', className)}
-      dangerouslySetInnerHTML={{ __html: withFileBase(cleanHtml(toHtml(html)), fileBase) }}
+      dangerouslySetInnerHTML={{ __html: withFileBase(upgradeChips(cleanHtml(toHtml(html))), fileBase) }}
     />
   );
 }
