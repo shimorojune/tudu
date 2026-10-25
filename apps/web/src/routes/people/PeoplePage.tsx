@@ -48,6 +48,7 @@ import { useViewport, type Viewport } from '../../app/viewport';
 import { useWorkingDay } from '../../app/workingDay';
 import { TaskPanel, type OpenTask } from '../today/TaskPanel';
 import './people.css';
+import { taskLink } from '../../app/links';
 
 const MIN_HEIGHT: Record<Viewport, number> = { desktop: 560, tablet: 640, phone: 520 };
 const RANGES: Array<{ value: PeopleRange; label: string }> = [
@@ -194,7 +195,7 @@ export function PeoplePage() {
       me={{ id: me.user.id, name: me.user.name, email: me.user.email }}
       onClose={closeTask}
       onStep={() => {}}
-      linkFor={(ref) => `${window.location.origin}/t/${ref}`}
+      linkFor={taskLink}
       backFor={() => 'People'}
     />
   );

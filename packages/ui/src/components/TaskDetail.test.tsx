@@ -136,7 +136,7 @@ afterEach(() => vi.useRealTimers());
 describe('TaskDetail', () => {
   it('C03-U01 one calm column: ID, title, Planned, Due, Visible to, Notes, Subtasks, History, Comments; a fresh task invites you in', () => {
     const { container } = render(<Panel />);
-    expect(screen.getByRole('button', { name: 'Copy task ID ME-52' })).toHaveTextContent('ME-52');
+    expect(screen.getByRole('button', { name: 'Copy link to ME-52' })).toHaveTextContent('ME-52');
     expect(screen.getByRole('textbox', { name: 'Task title' })).toHaveValue('Review Quick Add PR');
     const facts = container.querySelectorAll('.tp-td-prop dt span');
     expect(Array.from(facts).map((e) => e.textContent)).toEqual(['Planned', 'Due', 'Visible to']);
@@ -308,19 +308,19 @@ describe('TaskDetail', () => {
     ).toEqual(['Copy link to task', 'Copy task IDME-52', 'Delete task']);
     await user.click(within(menu).getByRole('menuitem', { name: 'Copy link to task' }));
     expect(write).toHaveBeenCalledWith('https://tudu.test/t/ME-52');
-    expect(screen.getByRole('status')).toHaveTextContent('Link copied');
+    expect(await screen.findByRole('status')).toHaveTextContent('Link copied');
     await user.click(screen.getByRole('button', { name: 'More' }));
     await user.click(screen.getByRole('menuitem', { name: /Copy task ID/ }));
     expect(write).toHaveBeenLastCalledWith('ME-52');
-    expect(screen.getByRole('status')).toHaveTextContent('Copied ME-52');
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Copied ME-52'));
     await user.click(screen.getByRole('button', { name: 'More' }));
     const del = screen.getByRole('menuitem', { name: 'Delete task' });
     expect(del).toHaveClass('tp-mi-danger');
     await user.click(del);
     expect(onDelete).toHaveBeenCalledTimes(1);
-    // the ID at the top copies too
-    await user.click(screen.getByRole('button', { name: 'Copy task ID ME-52' }));
-    expect(write).toHaveBeenLastCalledWith('ME-52');
+    // the ID at the top copies the link (C03-U25)
+    await user.click(screen.getByRole('button', { name: 'Copy link to ME-52' }));
+    expect(write).toHaveBeenLastCalledWith('https://tudu.test/t/ME-52');
   });
 
   it('C03-U09 switching tasks resets every field, picker and fold', async () => {
@@ -595,5 +595,71 @@ describe('TaskDetail, someone else’s task (chunk 08)', () => {
     expect(within(menu).getByRole('menuitem', { name: 'Copy link to task' })).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(screen.getByRole('textbox', { name: 'Write a comment' })).toBeInTheDocument();
+  });
+  it('C03-U25 the ID at the top copies the task link, lights up with a tick and says "Link copied"; with no link it copies the ID', async () => {
+    const write = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: write }, configurable: true });
+    const { unmount } = render(<Panel />);
+    const chip = screen.getByRole('button', { name: 'Copy link to ME-52' });
+    expect(chip).toHaveAttribute('title', 'Copy link');
+    expect(chip.querySelector('.tp-copy-ic')).toHaveAttribute('aria-hidden', 'true');
+    fireEvent.click(chip);
+    await waitFor(() => expect(chip).toHaveClass('tp-flash'));
+    expect(write).toHaveBeenCalledWith('https://tudu.test/t/ME-52');
+    expect(screen.getByRole('status')).toHaveTextContent('Link copied');
+    await waitFor(() => expect(chip).not.toHaveClass('tp-flash'), { timeout: 2000 });
+    unmount();
+    render(<Panel link={undefined} />);
+    const bare = screen.getByRole('button', { name: 'Copy task ID ME-52' });
+    expect(bare.querySelector('.tp-copy-ic')).toBeNull();
+    fireEvent.click(bare);
+    await waitFor(() => expect(write).toHaveBeenLastCalledWith('ME-52'));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Copied ME-52'));
+  });
+
+  it('C03-U26 when the clipboard says no (or is missing) the chip stays quiet and the toast says so', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: vi.fn(() => Promise.reject(new Error('denied'))) },
+      configurable: true,
+    });
+    const { unmount } = render(<Panel />);
+    const chip = screen.getByRole('button', { name: 'Copy link to ME-52' });
+    fireEvent.click(chip);
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Couldn’t copy the link. Try again.'),
+    );
+    expect(chip).not.toHaveClass('tp-flash');
+    unmount();
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+    render(<Panel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link to ME-52' }));
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Couldn’t copy the link. Try again.'),
+    );
+  });
+
+  it('C03-U27 the link mark slides out on hover with the menu timing; less motion keeps it still', () => {
+    const slot = rulesWhere(rules, (s) => s === '.tp-copy-ic')[0]!.declarations;
+    expect(slot.width).toBe('0');
+    expect(slot.opacity).toBe('0');
+    expect(slot.transform).toBe('translateX(-4px)');
+    expect(slot.transition).toMatch(/width var\(--dur-menu\) var\(--ease-arrive\)/);
+    expect(slot.transition).toMatch(/transform var\(--dur-menu\) var\(--ease-arrive\)/);
+    const shown = rules.find(
+      (r) =>
+        !r.context.length &&
+        r.selector.includes('.tp-td-id') &&
+        r.selector.includes(':hover') &&
+        r.selector.includes('.tp-copy-ic'),
+    )!.declarations;
+    expect(shown).toMatchObject({ width: '13px', opacity: '1', transform: 'none' });
+    expect(rulesWhere(rules, (s) => s === '.tp-flash .tp-copy-ic .tp-copy-ok')[0]!.declarations.opacity).toBe(
+      '1',
+    );
+    const still = rules.find(
+      (r) =>
+        r.selector.includes('.tp-copy-ic svg') && r.context.some((c) => c.includes('prefers-reduced-motion')),
+    )!;
+    expect(still.declarations.transform).toBe('none !important');
   });
 });

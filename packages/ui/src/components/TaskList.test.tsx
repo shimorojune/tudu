@@ -442,4 +442,9 @@ describe('TaskList', () => {
     await user.type(screen.getByRole('textbox', { name: 'New task' }), 'Renew passport{Enter}');
     expect(onAdd).toHaveBeenCalledWith('Renew passport');
   });
+  it('C02-U27 linkFor gives each row its link: the ID chip copies that task’s page', () => {
+    render(<TaskList tasks={THREE} linkFor={(t) => (t.id ? `https://tudu.test/t/${t.id}` : undefined)} />);
+    expect(screen.getByRole('button', { name: 'Copy link to ME-2' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Copy task ID/ })).toBeNull();
+  });
 });

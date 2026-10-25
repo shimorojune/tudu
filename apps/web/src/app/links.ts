@@ -19,6 +19,14 @@ export function linkKind(href: string, page: string, api: string = API_URL): Lin
   return 'outside';
 }
 
+/** A task's own page, the address people share: /t/ME-41 on whichever Tudu this is (production or staging). */
+export function taskLink(ref: string, origin: string = window.location.origin): string {
+  return `${origin}/t/${ref}`;
+}
+
+/** A row's link, once the task has its ID. */
+export const rowLink = (t: { id?: string | null }): string | undefined => (t.id ? taskLink(t.id) : undefined);
+
 export const SAVED_WORDS = 'Saved to Downloads.';
 
 /** An attachment, fetched with your session and saved to Downloads. */

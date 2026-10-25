@@ -40,6 +40,7 @@ import { useWorkingDay } from '../../app/workingDay';
 import { toItem } from '../today/TodayPage';
 import { TaskPanel, type OpenTask } from '../today/TaskPanel';
 import { useFolds } from './folds';
+import { taskLink } from '../../app/links';
 
 const MIN_HEIGHT: Record<Viewport, number> = { desktop: 560, tablet: 640, phone: 520 };
 /** Under this width the desk's tiles go two across. */
@@ -139,7 +140,7 @@ export function WeekPage() {
           if (search.task !== ref)
             void navigate({ href: `${here}?task=${encodeURIComponent(ref)}`, replace: true });
         }}
-        linkFor={(ref) => `${window.location.origin}/t/${ref}`}
+        linkFor={taskLink}
         backFor={(day) => (day ? 'Week' : 'Backlog')}
       />
     </div>

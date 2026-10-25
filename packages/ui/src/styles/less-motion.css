@@ -68,6 +68,10 @@
 :root[data-motion='less'] .tp-drawer-wrap.tp-leaving .tp-drawer {
   animation: tp-veil-out 120ms linear both !important;
 }
+:root[data-motion='less'] .tp-copy-ic,
+:root[data-motion='less'] .tp-copy-ic svg {
+  transform: none !important;
+}
 :root[data-motion='less'] .tp-td-cmt.tp-fresh {
   animation: none;
 }

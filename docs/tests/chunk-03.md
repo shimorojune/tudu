@@ -7,32 +7,36 @@ empty) before reading the server.
 
 ## Unit (`packages/ui`, `packages/client`, `packages/core`)
 
-| ID      | What it checks          | Scenario                                                                                                                                                            |
-| ------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C03-U01 | One calm column         | ID, title, Planned, Due, Visible to, Notes, Subtasks, History and Comments in that order; a fresh task shows "Add a due date", the notes prompt, "No comments yet." |
-| C03-U02 | The title in place      | Enter and blur save a changed title, Esc and a blank put the old words back, a pasted newline becomes a space                                                       |
-| C03-U03 | Crossing off            | The panel's checkbox crosses off; the panel takes the crossed-off look (the title struck through)                                                                   |
-| C03-U04 | Planned                 | The calendar opens under the fact with Today, Tomorrow and Move to the Backlog; a pick moves it and closes; "carried from Sat" beside it, red when slipping         |
-| C03-U05 | Due                     | Pick a day; the hover hint reads "Wed 21 Oct · in 3 days"; the value reads the distance; Remove due date clears it                                                  |
-| C03-U06 | Esc steps out           | Esc in a picker closes the picker, eases it out and gives focus back to its fact; the panel stays                                                                   |
-| C03-U07 | Next and previous       | The content slides in from the side you are heading to; an arrow shows only where there is a neighbour                                                              |
-| C03-U08 | The ⋯ menu              | Copy link to task copies the link with "Link copied"; Copy task ID copies it; Delete task (red) asks the page; the ID at the top copies too                         |
-| C03-U09 | Switching tasks         | Another task resets the title, the open picker, the History fold and the notes                                                                                      |
-| C03-U10 | Notes                   | The toolbar rises on focus; bold, lists, a checklist, a link and code make the expected HTML; leaving the field reports it once                                     |
-| C03-U11 | The comment box         | The box grows on focus, Comment is off while empty, Comment and Cmd+Enter post and clear it, Esc leaves the field                                                   |
-| C03-U12 | Reading rich text       | Stored HTML renders with prose styles and checklist ticks; scripts, event handlers and script links never render                                                    |
-| C03-U13 | Subtasks: writing       | Add subtask: Enter adds and keeps writing, Esc stops, blank adds nothing; a title edits in place; delete folds away with Undo; folded rows have no tab stops        |
-| C03-U14 | Subtasks: ticking, drag | Crossing off reports the change; a pointer drag reorders and reports from and to; on touch a swipe scrolls and a press and hold lifts                               |
-| C03-U15 | The row's fold          | The byline says "1 of 2 done ›" and opens the fold under the title (the design's indent and guide line); Add subtask writes one; crossed off keeps it folded        |
-| C03-U16 | Due on the row          | Due replaces the carried pill; "Overdue since Fri" reads in red; "Due Fri" otherwise                                                                                |
-| C03-U17 | History                 | Folded by default with its count; opens with the events in order and their day words; a task with no history shows no fold; the words for every event kind          |
-| C03-U18 | Comments                | A new comment slides in with the wash and the panel scrolls to it; Edit saves with "edited" from the caret at the end; Delete removes it and Undo brings it back    |
-| C03-U19 | Many comments           | More than five fold behind "Show N earlier comments"                                                                                                                |
-| C03-U20 | The phone page          | Fullscreen drawer, no veil, no ×, a back button with the day's name; the stylesheet fades it under reduced motion                                                   |
-| C03-U21 | Changes apply at once   | Due, notes, visibility, subtasks and comments show in the task and on its row before the save lands; a refused change rolls back and toasts                         |
-| C03-U22 | Delete, restore, live   | Delete takes the row off its day and restore puts it back in place; a live event naming a task reads that task again and nothing else                               |
-| C03-U23 | Due words               | "Fri" within a week, "4 Nov" further out, "Was due Friday"; today, tomorrow, in 4 days, in 3 weeks, 1 day overdue, 2 weeks overdue                                  |
-| C03-U24 | Cleaning notes          | Keeps the editor's tags, safe links and checklist attributes; strips scripts, styles, frames, handlers and unknown tags; balances what is left; keeps entities      |
+| ID      | What it checks              | Scenario                                                                                                                                                                               |
+| ------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C03-U01 | One calm column             | ID, title, Planned, Due, Visible to, Notes, Subtasks, History and Comments in that order; a fresh task shows "Add a due date", the notes prompt, "No comments yet."                    |
+| C03-U02 | The title in place          | Enter and blur save a changed title, Esc and a blank put the old words back, a pasted newline becomes a space                                                                          |
+| C03-U03 | Crossing off                | The panel's checkbox crosses off; the panel takes the crossed-off look (the title struck through)                                                                                      |
+| C03-U04 | Planned                     | The calendar opens under the fact with Today, Tomorrow and Move to the Backlog; a pick moves it and closes; "carried from Sat" beside it, red when slipping                            |
+| C03-U05 | Due                         | Pick a day; the hover hint reads "Wed 21 Oct · in 3 days"; the value reads the distance; Remove due date clears it                                                                     |
+| C03-U06 | Esc steps out               | Esc in a picker closes the picker, eases it out and gives focus back to its fact; the panel stays                                                                                      |
+| C03-U07 | Next and previous           | The content slides in from the side you are heading to; an arrow shows only where there is a neighbour                                                                                 |
+| C03-U08 | The ⋯ menu                  | Copy link to task copies the link with "Link copied"; Copy task ID copies it; both toast once the clipboard has it; Delete task (red) asks the page; the ID at the top copies the link |
+| C03-U09 | Switching tasks             | Another task resets the title, the open picker, the History fold and the notes                                                                                                         |
+| C03-U10 | Notes                       | The toolbar rises on focus; bold, lists, a checklist, a link and code make the expected HTML; leaving the field reports it once                                                        |
+| C03-U11 | The comment box             | The box grows on focus, Comment is off while empty, Comment and Cmd+Enter post and clear it, Esc leaves the field                                                                      |
+| C03-U12 | Reading rich text           | Stored HTML renders with prose styles and checklist ticks; scripts, event handlers and script links never render                                                                       |
+| C03-U13 | Subtasks: writing           | Add subtask: Enter adds and keeps writing, Esc stops, blank adds nothing; a title edits in place; delete folds away with Undo; folded rows have no tab stops                           |
+| C03-U14 | Subtasks: ticking, drag     | Crossing off reports the change; a pointer drag reorders and reports from and to; on touch a swipe scrolls and a press and hold lifts                                                  |
+| C03-U15 | The row's fold              | The byline says "1 of 2 done ›" and opens the fold under the title (the design's indent and guide line); Add subtask writes one; crossed off keeps it folded                           |
+| C03-U16 | Due on the row              | Due replaces the carried pill; "Overdue since Fri" reads in red; "Due Fri" otherwise                                                                                                   |
+| C03-U17 | History                     | Folded by default with its count; opens with the events in order and their day words; a task with no history shows no fold; the words for every event kind                             |
+| C03-U18 | Comments                    | A new comment slides in with the wash and the panel scrolls to it; Edit saves with "edited" from the caret at the end; Delete removes it and Undo brings it back                       |
+| C03-U19 | Many comments               | More than five fold behind "Show N earlier comments"                                                                                                                                   |
+| C03-U20 | The phone page              | Fullscreen drawer, no veil, no ×, a back button with the day's name; the stylesheet fades it under reduced motion                                                                      |
+| C03-U21 | Changes apply at once       | Due, notes, visibility, subtasks and comments show in the task and on its row before the save lands; a refused change rolls back and toasts                                            |
+| C03-U22 | Delete, restore, live       | Delete takes the row off its day and restore puts it back in place; a live event naming a task reads that task again and nothing else                                                  |
+| C03-U23 | Due words                   | "Fri" within a week, "4 Nov" further out, "Was due Friday"; today, tomorrow, in 4 days, in 3 weeks, 1 day overdue, 2 weeks overdue                                                     |
+| C03-U24 | Cleaning notes              | Keeps the editor's tags, safe links and checklist attributes; strips scripts, styles, frames, handlers and unknown tags; balances what is left; keeps entities                         |
+| C03-U25 | The ID chip copies the link | Copies `/t/ME-52`, lights up with a tick for 700ms, "Link copied"; with no link it copies the ID                                                                                       |
+| C03-U26 | Copy refused                | Clipboard refuses or is missing: "Couldn’t copy the link. Try again.", no tick, nothing thrown                                                                                         |
+| C03-U27 | The link mark’s motion      | Slides 4px out and fades in on hover with dur-menu and the arrive ease; reduced motion keeps it still                                                                                  |
+| C03-U28 | Task links                  | `/t/<ID>` on whichever Tudu is running (production or staging); a row with no ID has none                                                                                              |
 
 ## API (`apps/server`)
 
@@ -70,6 +74,8 @@ empty) before reading the server.
 | C03-E14 | Live                     | A due date and a subtask set in a second tab show in the open panel of the first, and the row's byline follows                          |
 | C03-E15 | Loading and error states | A slow task shows the skeleton column; a failed task says "This task didn’t load." and Try again recovers                               |
 | C03-E16 | Dark mode                | Open, rename, write notes and comment in the dark theme; a reload keeps them                                                            |
+| C03-E17 | Copy refused             | The clipboard says no: the ID chip says "Couldn’t copy the link. Try again." and never "Link copied"                                    |
+| C03-E18 | Copy from the ID chip    | The chip copies `<origin>/t/ME-1` and says "Link copied"; ⋯ › Copy task ID still copies ME-1                                            |
 
 Not automated: the feel of the slide and the veil, the comment wash, the subtask fold and the pop easing out. Judge those on
 staging and on the kit page's Task detail section.

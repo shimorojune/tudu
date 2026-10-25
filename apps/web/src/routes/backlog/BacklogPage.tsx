@@ -39,6 +39,7 @@ import { useWorkingDay } from '../../app/workingDay';
 import { monthAround, toItem } from '../today/TodayPage';
 import { TaskPanel, type OpenTask } from '../today/TaskPanel';
 import { setBacklogFilter, useBacklogFilter } from './filter';
+import { taskLink, rowLink } from '../../app/links';
 
 const MIN_HEIGHT: Record<Viewport, number> = { desktop: 560, tablet: 640, phone: 520 };
 const VIEWS: Array<{ value: BacklogView; label: string }> = [
@@ -117,7 +118,7 @@ export function BacklogPage() {
           if (search.task !== ref)
             void navigate({ href: `${here}?task=${encodeURIComponent(ref)}`, replace: true });
         }}
-        linkFor={(ref) => `${window.location.origin}/t/${ref}`}
+        linkFor={taskLink}
         backFor={() => 'Backlog'}
       />
     </div>
@@ -228,6 +229,7 @@ function BacklogSheet({ spaceId, today, vp, onOpenTask, openKey }: BacklogSheetP
   else if (view === 'done')
     body = (
       <TaskList
+        linkFor={rowLink}
         onSignal={(t, k) => {
           if (k === 'jira' && t.jira) openInJira(spaceId, t.jira);
         }}
@@ -249,6 +251,7 @@ function BacklogSheet({ spaceId, today, vp, onOpenTask, openKey }: BacklogSheetP
   else
     body = (
       <TaskList
+        linkFor={rowLink}
         onSignal={(t, k) => {
           if (k === 'jira' && t.jira) openInJira(spaceId, t.jira);
         }}

@@ -101,28 +101,85 @@ describe('TaskRow', () => {
     expect(container.querySelector('.tp-row')).toHaveClass('tp-openable');
   });
 
-  it('C02-U04 clicking the ID copies it, flashes in place and says "Copied ME-58"', () => {
+  it('C02-U04 clicking the ID copies the task link, lights up in place and says "Link copied"', async () => {
     vi.useFakeTimers();
     const writeText = vi.fn(() => Promise.resolve());
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     const onOpen = vi.fn();
     render(
       <>
-        <Row onOpen={onOpen} />
+        <Row onOpen={onOpen} link="https://tudu.test/t/ME-58" />
         <ToastHost />
       </>,
     );
-    const id = screen.getByRole('button', { name: 'Copy task ID ME-58' });
-    fireEvent.click(id);
-    expect(writeText).toHaveBeenCalledWith('ME-58');
+    const id = screen.getByRole('button', { name: 'Copy link to ME-58' });
+    await act(async () => {
+      fireEvent.click(id);
+    });
+    expect(writeText).toHaveBeenCalledWith('https://tudu.test/t/ME-58');
     expect(id).toHaveClass('tp-flash');
     expect(id).toHaveTextContent('ME-58'); // the words never change, so nothing shifts
-    expect(screen.getByText('Copied ME-58')).toBeInTheDocument();
+    expect(screen.getByText('Link copied')).toBeInTheDocument();
     expect(onOpen).not.toHaveBeenCalled();
     act(() => {
       vi.advanceTimersByTime(COPY_FLASH_MS);
     });
     expect(id).not.toHaveClass('tp-flash');
+  });
+
+  it('C02-U24 with no link (the kit pages) the ID copies itself, "Copied ME-58"', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    render(
+      <>
+        <Row />
+        <ToastHost />
+      </>,
+    );
+    const id = screen.getByRole('button', { name: 'Copy task ID ME-58' });
+    expect(id).toHaveAttribute('title', 'Copy task ID');
+    expect(id.querySelector('.tp-copy-ic')).toBeNull();
+    await act(async () => {
+      fireEvent.click(id);
+    });
+    expect(writeText).toHaveBeenCalledWith('ME-58');
+    expect(id).toHaveClass('tp-flash');
+    expect(screen.getByText('Copied ME-58')).toBeInTheDocument();
+  });
+
+  it('C02-U25 when the clipboard says no, nothing lights up and the toast says it could not copy', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: vi.fn(() => Promise.reject(new Error('denied'))) },
+      configurable: true,
+    });
+    render(
+      <>
+        <Row link="https://tudu.test/t/ME-58" />
+        <ToastHost />
+      </>,
+    );
+    const id = screen.getByRole('button', { name: 'Copy link to ME-58' });
+    await act(async () => {
+      fireEvent.click(id);
+    });
+    expect(id).not.toHaveClass('tp-flash');
+    expect(screen.getByText('Couldn’t copy the link. Try again.')).toBeInTheDocument();
+    expect(screen.queryByText('Link copied')).toBeNull();
+  });
+
+  it('C02-U26 the chip says what it copies: "Copy link", named for its ID, the link mark and tick hidden from readers', () => {
+    render(<Row link="https://tudu.test/t/ME-58" />);
+    const id = screen.getByRole('button', { name: 'Copy link to ME-58' });
+    expect(id).toHaveAttribute('title', 'Copy link');
+    const mark = id.querySelector('.tp-copy-ic')!;
+    expect(mark).toHaveAttribute('aria-hidden', 'true');
+    expect(mark.querySelector('.tp-copy-ln')).not.toBeNull();
+    expect(mark.querySelector('.tp-copy-ok')).not.toBeNull();
+    // the slot carries its own gap, so a resting chip is exactly as wide as before
+    expect(
+      rulesWhere(rules, (s) => s === '.tp-byline .tp-sg-id').find((r) => r.declarations.gap)!.declarations
+        .gap,
+    ).toBe('0');
   });
 
   it('C02-U05 the carried pill reads "From Sat", turns red when slipping, and its picker keeps or moves the task', async () => {

@@ -12,7 +12,7 @@ empty) before reading the server.
 | C02-U01 | The row                     | Checkbox, title and the byline with the ID last ("From Sat · ME-41"); a task not numbered yet with nothing else to say has no byline     |
 | C02-U02 | Crossing off                | aria-checked, the strike fades in 120ms after the tick, the sparkle once; uncrossing plays nothing                                       |
 | C02-U03 | Opening the row             | A click anywhere on the row opens it, and Enter on the title; the checkbox and byline items keep their own job                           |
-| C02-U04 | Copying the ID              | Writes ME-58 to the clipboard, flashes in place (the words never change), "Copied ME-58"                                                 |
+| C02-U04 | Copying the link            | With a link, the ID writes the task link, lights up with a tick (the words never change), "Link copied"; the row does not open           |
 | C02-U05 | The carried pill            | "From Sat", red when slipping; its picker keeps it (Today, the day it is on) or moves it (Tomorrow); crossed off, it opens nothing       |
 | C02-U06 | Long titles                 | Two lines (three on phones), full text in the title attribute                                                                            |
 | C02-U07 | Order and the keyboard      | Rows in order; Alt with an arrow key moves the focused row, keeps focus and says "Moved to place 2 of 3"                                 |
@@ -32,6 +32,11 @@ empty) before reading the server.
 | C02-U21 | Positions                   | Between, first, last, alone; renumbering the whole list when two neighbours get too close                                                |
 | C02-U22 | Carried labels              | "From Sat" within a week, "From 4 Oct" further back, slipping after two days; "Moved to Tomorrow" words                                  |
 | C02-U23 | The working day after 00:00 | The list stays and the page asks once in the small hours; from 04:00, or after more than a day, it moves on by itself                    |
+| C02-U24 | No link                     | Without a link (the kit pages) the ID copies itself, "Copied ME-58"                                                                      |
+| C02-U25 | Copy refused                | The clipboard says no: nothing lights up, "Couldn’t copy the link. Try again."                                                           |
+| C02-U26 | What the chip says          | Named "Copy link to ME-58", tooltip "Copy link"; link mark and tick hidden from readers; the resting chip is no wider                    |
+| C02-U27 | Links for a list            | `linkFor` reaches every row: each ID copies its task’s page                                                                              |
+| C02-U28 | copyText                    | True once the clipboard has it; false when it refuses, throws or is missing                                                              |
 
 ## API (`apps/server`)
 
@@ -62,7 +67,7 @@ empty) before reading the server.
 | C02-E06 | Turning the day          | Arrows and the calendar; each day keeps its tasks; Back to today                                                     |
 | C02-E07 | Two days                 | Open the second sheet, drag a task onto Monday, it is there after a reload; back to one day (desktop)                |
 | C02-E08 | Carried over             | Saturday's open tasks show on Sunday with "From Sat" (the crossed-off one stays); keep one; move another to tomorrow |
-| C02-E09 | Copying the ID           | "Copied ME-1" and the clipboard holds it                                                                             |
+| C02-E09 | Copying the link         | The row’s ID says "Link copied", the clipboard holds `<origin>/t/ME-1` and that address opens the task               |
 | C02-E10 | Offline                  | The banner shows; add and cross off still work; back online, the server has both with their numbers                  |
 | C02-E11 | Live                     | A task added and one crossed off in a second tab show in the first without a reload                                  |
 | C02-E12 | Phone                    | Write, cross off, swipe to the next day and back (phone)                                                             |
