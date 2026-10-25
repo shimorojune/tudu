@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseRules, readStylesheet, rulesWhere } from '../test-utils/stylesheet';
+import { Chip } from './Chip';
+import { SpaceFilter } from './SpaceFilter';
 import { TaskList, type TaskItem, type TaskListProps } from './TaskList';
 import { ToastHost } from './Toast';
 
@@ -446,5 +448,36 @@ describe('TaskList', () => {
     render(<TaskList tasks={THREE} linkFor={(t) => (t.id ? `https://tudu.test/t/${t.id}` : undefined)} />);
     expect(screen.getByRole('button', { name: 'Copy link to ME-2' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Copy task ID/ })).toBeNull();
+  });
+
+  it('C21-U10 filterSpace shows one space and turns off the "+" and trading rows; Chip and SpaceFilter wear the tiles', async () => {
+    const user = userEvent.setup();
+    const NW = { id: 'nw', name: 'Northwind', color: '#3d5a80', initials: 'N' };
+    const ME = { id: 'me', name: 'Personal', personal: true };
+    const tasks = [
+      { key: 'a', title: 'Call the bank', inSpace: ME },
+      { key: 'b', title: 'Ship the pilot', inSpace: NW },
+      { key: 'c', title: 'Review the deck', inSpace: NW },
+    ];
+    const onSignal = vi.fn();
+    const { rerender } = render(<TaskList tasks={tasks} onSignal={onSignal} onAdd={() => undefined} />);
+    expect(screen.getAllByRole('button', { name: /^Space · / })).toHaveLength(3);
+    await user.click(screen.getAllByRole('button', { name: 'Space · Northwind. Show only Northwind' })[0]!);
+    expect(onSignal).toHaveBeenCalledWith(tasks[1], 'space');
+    rerender(<TaskList tasks={tasks} filterSpace="nw" onAdd={() => undefined} />);
+    expect(screen.queryByText('Call the bank')).toBeNull();
+    expect(screen.getByText('Ship the pilot')).toBeInTheDocument();
+    expect(screen.getByText('Review the deck')).toBeInTheDocument();
+    expect(document.querySelector('.tp-ins')).toBeNull();
+
+    rerender(<Chip label="Northwind" space={NW} onClear={() => {}} />);
+    const chip = document.querySelector('.tp-chip')!;
+    expect(chip).toHaveClass('tp-chip-space');
+    expect(chip.querySelector('.tp-dot')).toBeNull();
+    expect(chip.querySelector('span > .tp-chip-tile')).not.toBeNull();
+    rerender(<SpaceFilter spaces={[{ ...NW }]} value={null} allTile />);
+    expect(
+      screen.getByRole('button', { name: 'Space: all spaces' }).querySelector('.tp-stile-all'),
+    ).not.toBeNull();
   });
 });

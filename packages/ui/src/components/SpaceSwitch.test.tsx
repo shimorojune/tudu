@@ -2,7 +2,9 @@ import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { POP_LEAVE_MS } from '../lib/linger';
-import { SpaceSwitch, SSW_SHEET_LEAVE_MS, type SwitchSpace } from './SpaceSwitch';
+import { SpaceSwitch, SSW_PICK_MS, SSW_SHEET_LEAVE_MS, type SwitchSpace } from './SpaceSwitch';
+
+const picked = () => act(() => new Promise((r) => setTimeout(r, SSW_PICK_MS + 20)));
 
 const SPACES: SwitchSpace[] = [
   { id: 'me', name: 'Personal', personal: true, sub: 'Just you' },
@@ -36,8 +38,10 @@ describe('SpaceSwitch', () => {
     expect(items[1]!.querySelector('.tp-stile')).toHaveStyle({ backgroundColor: 'rgb(61, 90, 128)' });
     expect(items[0]!.querySelector('.tp-stile')).toHaveClass('tp-stile-me');
     expect(within(menu).getByRole('menuitem', { name: 'Create a space' })).toBeInTheDocument();
-    // picking reports and closes; the one you are in reports nothing
+    // picking reports and closes, after the picked row's check has drawn; the one you are in reports nothing
     await user.click(items[1]!);
+    expect(onPick).not.toHaveBeenCalled();
+    await picked();
     expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ id: 'nw' }));
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     await user.click(trigger);
@@ -87,6 +91,7 @@ describe('SpaceSwitch', () => {
     expect(sheet.querySelector('.tp-sswsheet-veil')).not.toBeNull();
     expect(sheet.querySelector('.tp-sswsheet-p .tp-qa-grabber')).not.toBeNull();
     await user.click(within(sheet).getByRole('menuitemradio', { name: /Home/ }));
+    await picked();
     expect(sheet).toHaveClass('tp-leaving');
     expect(onPick).not.toHaveBeenCalled();
     await settle();
@@ -97,5 +102,38 @@ describe('SpaceSwitch', () => {
     await settle();
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(onPick).toHaveBeenCalledTimes(1);
+  });
+
+  it('C21-U11 All spaces is first with a line under it; picking marks the row before onPick, then the name swaps in', async () => {
+    const user = userEvent.setup();
+    const onPick = vi.fn();
+    const all: SwitchSpace = { id: 'all', all: true, name: 'All spaces', sub: 'Everything that’s yours' };
+    const { rerender } = render(<SpaceSwitch spaces={[all, ...SPACES]} active="me" onPick={onPick} />);
+    const trigger = screen.getByRole('button', { name: /Personal/ });
+    // first paint: no swap animation
+    expect(trigger.querySelector('.tp-ssw-id')).not.toHaveClass('tp-ssw-swap');
+    await user.click(trigger);
+    const menu = screen.getByRole('menu', { name: 'Spaces' });
+    const items = within(menu).getAllByRole('menuitemradio');
+    expect(items[0]).toHaveTextContent('All spaces');
+    expect(items[0]!.querySelector('.tp-stile')).toHaveClass('tp-stile-all');
+    // the separator sits between All spaces and the spaces
+    const sep = within(menu).getByRole('separator');
+    expect(sep).toHaveClass('tp-sswl-sep');
+    expect(items[0]!.nextElementSibling).toBe(sep);
+    await user.click(items[0]!);
+    expect(items[0]).toHaveClass('tp-picked');
+    expect(items[0]).toHaveAttribute('aria-checked', 'true');
+    expect(items[1]).toHaveAttribute('aria-checked', 'false');
+    expect(onPick).not.toHaveBeenCalled();
+    // a second click while it draws does nothing more
+    await user.click(items[2]!);
+    await picked();
+    expect(onPick).toHaveBeenCalledTimes(1);
+    expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ id: 'all' }));
+    rerender(<SpaceSwitch spaces={[all, ...SPACES]} active="all" onPick={onPick} />);
+    expect(screen.getByRole('button', { name: /All spaces/ }).querySelector('.tp-ssw-id')).toHaveClass(
+      'tp-ssw-swap',
+    );
   });
 });

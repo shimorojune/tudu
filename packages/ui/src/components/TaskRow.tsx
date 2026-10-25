@@ -10,6 +10,7 @@ import { JiraMark } from './JiraMark';
 import { MiniCalendar, type MiniCalendarProps } from './MiniCalendar';
 import { SubtaskList, type SubtaskItem } from './SubtaskList';
 import { showToast } from './Toast';
+import { SpaceTile, type SpaceTileSpace } from './SpaceTile';
 import { Tooltip } from './Tooltip';
 
 export interface TaskDue {
@@ -36,7 +37,13 @@ export interface TaskProject {
   color: string;
 }
 
-export type TaskSignal = 'due' | 'carried' | 'subtasks' | 'comments' | 'jira' | 'project';
+export type TaskSignal = 'due' | 'carried' | 'subtasks' | 'comments' | 'jira' | 'space' | 'project';
+
+/** The space a task lives in, as All spaces shows it on the row. */
+export interface TaskSpace extends SpaceTileSpace {
+  id: string;
+  name: string;
+}
 
 export interface TaskRowProps {
   title: string;
@@ -55,6 +62,9 @@ export interface TaskRowProps {
   comments?: number;
   jira?: string;
   project?: TaskProject;
+  /** All spaces: the space the task lives in, a small tile and its name before the project (the tile alone when
+   * brief or compact). Clicking it is `onSignal('space')`. */
+  inSpace?: TaskSpace;
   /** Phones: the byline may wrap, titles wrap to three lines. */
   compact?: boolean;
   /** Three lines of title instead of two. */
@@ -93,6 +103,8 @@ interface Sig {
   label: string;
   act: string;
   mono?: boolean;
+  /** The tile alone, its name in the tooltip. */
+  bare?: boolean;
 }
 
 function signals(p: TaskRowProps): Sig[] {
@@ -149,6 +161,16 @@ function signals(p: TaskRowProps): Sig[] {
       act: 'Open in Jira',
     });
   }
+  if (p.inSpace) {
+    out.push({
+      k: 'space',
+      bare: !!(p.brief || p.compact),
+      icon: <SpaceTile space={p.inSpace} size={13} className="tp-sg-tile" />,
+      long: p.inSpace.name,
+      label: `Space · ${p.inSpace.name}`,
+      act: `Show only ${p.inSpace.name}`,
+    });
+  }
   if (p.project) {
     out.push({
       k: 'project',
@@ -159,7 +181,9 @@ function signals(p: TaskRowProps): Sig[] {
     });
   }
   return p.brief
-    ? out.filter((x) => x.k === 'due' || x.k === 'carried' || x.k === 'jira' || x.k === 'project')
+    ? out.filter(
+        (x) => x.k === 'due' || x.k === 'carried' || x.k === 'jira' || x.k === 'space' || x.k === 'project',
+      )
     : out;
 }
 
@@ -254,6 +278,7 @@ export function TaskRow(p: TaskRowProps) {
         className={cx(
           'tp-sg',
           `tp-sg-${x.k}`,
+          x.bare && 'tp-sg-bare',
           x.od && 'tp-od',
           x.mono && 'tp-mono',
           pop?.k === x.k && 'tp-on',
@@ -277,8 +302,19 @@ export function TaskRow(p: TaskRowProps) {
           p.onSignal?.(x.k);
         }}
       >
-        {x.icon}
-        <span>{x.long}</span>
+        {x.k === 'space' ? (
+          // The tile sits inside the name's text line, so it hangs off the text baseline (see .tp-sg-tile) and
+          // meets the name's capitals whatever line box the browser builds for the font.
+          <span>
+            {x.icon}
+            {x.bare ? null : x.long}
+          </span>
+        ) : (
+          <>
+            {x.icon}
+            <span>{x.long}</span>
+          </>
+        )}
         {isSubs ? (
           <span className="tp-sg-caret" aria-hidden="true">
             <Icon name="caret" size={11} />

@@ -2392,3 +2392,33 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 .tp-auth-fine .tp-auth-link { font-size: 12.5px; }
 /* narrower screens (tablet): the form alone, centred */
 @media (max-width: 900px) { .tp-auth-split .tp-auth-main { flex: 1; } .tp-auth-art { display: none; } }
+
+/* All spaces (chunk 21): the ink tile, the switcher's line under it, the space in a row's byline and the chip, the
+   panel's Space fact, the switcher's pick. */
+.tp-stile-all { background: var(--foreground-2); color: var(--card); box-shadow: none; }
+.dark .tp-stile-all { background: var(--foreground); color: var(--background); }
+.tp-stile-txt { display: block; overflow: visible; }
+.tp-stile-txt text { fill: currentColor; font: inherit; letter-spacing: inherit; text-rendering: geometricPrecision; }
+.tp-sswl-sep { height: 1px; margin: 4px 8px; background: var(--line); }
+.tp-sg .tp-sg-tile { border-radius: 4px !important; font-size: 7.5px !important; letter-spacing: 0; box-shadow: none; }
+.tp-sg .tp-sg-tile.tp-stile-me { box-shadow: inset 0 0 0 1px var(--border-strong); }
+/* Small space tiles sit in the name's text line and hang off its baseline: centre = baseline - half the cap height
+   (Geist caps are .71em; text is 12.5px). Browsers place the line box differently; the baseline relation holds. */
+.tp-sg .tp-sg-tile { vertical-align: calc(12.5px * .355 - 6.5px); margin-right: 5px; }
+.tp-sg-bare .tp-sg-tile { margin-right: 0; }
+.tp-byline-wrap .tp-sg-space > span { max-width: 140px; }
+/* A tight byline gives up the space's name first (its tile stays), then the others share what is left. */
+.tp-byline .tp-sg-space { flex-shrink: 12; min-width: 23px; }
+.tp-byline .tp-sg-space.tp-sg-bare { flex-shrink: 0; min-width: 0; padding: 0 4px; margin: 0 -3px 0 1px; }
+.tp-td-val.tp-td-space { gap: 8px; }
+.tp-chip .tp-chip-tile { border-radius: 4px !important; font-size: 8px !important; letter-spacing: 0; box-shadow: none; vertical-align: calc(12.5px * .355 - 7px); margin-right: 7px; }
+.tp-chip .tp-chip-tile.tp-stile-me { box-shadow: inset 0 0 0 1px var(--border-strong); }
+.tp-chip.tp-chip-space { padding-left: 6px; }
+/* The switcher: the chosen row's check draws in, then the list goes; the trigger's tile and name rise into place. */
+.tp-ssw-id { display: inline-flex; align-items: center; gap: 9px; min-width: 0; }
+.tp-ssw-id.tp-ssw-swap { animation: tp-ssw-swap 240ms var(--ease-arrive) both; }
+@keyframes tp-ssw-swap { from { opacity: 0; transform: translateY(4px); } }
+.tp-sswl-it.tp-picked .tp-sswl-ok path { stroke-dasharray: 22; stroke-dashoffset: 22; animation: tp-draw 150ms var(--ease-arrive) forwards; }
+.tp-sswl-it.tp-picked .tp-stile { animation: tp-ssw-press 150ms var(--ease-change); }
+@keyframes tp-ssw-press { 50% { transform: scale(.94); } }
+@media (prefers-reduced-motion: reduce) { .tp-ssw-id.tp-ssw-swap { animation: tp-veil-in 120ms linear both; } .tp-sswl-it.tp-picked .tp-sswl-ok path { animation: none; stroke-dashoffset: 0; } .tp-sswl-it.tp-picked .tp-stile { animation: none; } }

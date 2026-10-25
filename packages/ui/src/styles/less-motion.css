@@ -195,6 +195,16 @@
 :root[data-motion='less'] .tp-auth-sheet {
   animation: tp-label-in 160ms linear both;
 }
+:root[data-motion='less'] .tp-ssw-id.tp-ssw-swap {
+  animation: tp-veil-in 120ms linear both;
+}
+:root[data-motion='less'] .tp-sswl-it.tp-picked .tp-sswl-ok path {
+  animation: none;
+  stroke-dashoffset: 0;
+}
+:root[data-motion='less'] .tp-sswl-it.tp-picked .tp-stile {
+  animation: none;
+}
 
 /* app.css */
 :root[data-motion='less'] .tp-tip-pop,

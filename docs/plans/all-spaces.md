@@ -1,6 +1,6 @@
 # All spaces: everything you have to do, in one list
 
-Status: proposal, waiting for Rohit's approval. No code until then.
+Status: approved by Rohit 25 Oct 2026; in progress.
 Design: canvas page "All spaces", draft 2, approved by Rohit on 25 Oct 2026 (v88). Boards: A-Desktop, A-Week,
 A-Backlog and A-Phone (each with a Dark twin), A-States(-Dark), A-Pieces and A-Motion.
 

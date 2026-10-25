@@ -341,4 +341,48 @@ describe('TaskRow project (chunk 04)', () => {
     );
     expect(container.querySelector('.tp-byline')!.textContent).toBe('Platform');
   });
+
+  it('C21-U10 the space pill: tile and name before the project, the tile alone when brief or compact; a press filters, never opens', async () => {
+    const user = userEvent.setup();
+    const onSignal = vi.fn();
+    const onOpen = vi.fn();
+    const NW = { id: 'nw', name: 'Northwind', color: '#3d5a80', initials: 'N' };
+    const { container, rerender } = render(
+      <TaskRow
+        title="Ship the pilot"
+        id="NW-12"
+        jira="TUDU-9"
+        project={{ name: 'Pilot', color: '#5b7553' }}
+        inSpace={NW}
+        onSignal={onSignal}
+        onOpen={onOpen}
+      />,
+    );
+    const pill = screen.getByRole('button', { name: 'Space · Northwind. Show only Northwind' });
+    expect(pill).toHaveClass('tp-sg-space');
+    expect(pill).not.toHaveClass('tp-sg-bare');
+    expect(pill).toHaveTextContent('Northwind');
+    // the tile is inside the name's text span, so it hangs off the text baseline
+    expect(pill.querySelector('span > .tp-sg-tile')).not.toBeNull();
+    // order: Jira, then the space, then the project
+    const kinds = [...container.querySelectorAll('.tp-sg')].map((b) =>
+      [...b.classList].find((c) => c.startsWith('tp-sg-') && c !== 'tp-sg-bare'),
+    );
+    expect(kinds.slice(0, 3)).toEqual(['tp-sg-jira', 'tp-sg-space', 'tp-sg-project']);
+    await user.click(pill);
+    expect(onSignal).toHaveBeenCalledWith('space');
+    expect(onOpen).not.toHaveBeenCalled();
+
+    rerender(<TaskRow title="Ship the pilot" id="NW-12" inSpace={NW} brief onSignal={onSignal} />);
+    const bare = screen.getByRole('button', { name: /Space · Northwind/ });
+    expect(bare).toHaveClass('tp-sg-bare');
+    expect(bare).not.toHaveTextContent('Northwind');
+    expect(bare).toHaveAttribute('title', 'Northwind');
+    rerender(<TaskRow title="Ship the pilot" id="NW-12" inSpace={NW} compact onSignal={onSignal} />);
+    expect(screen.getByRole('button', { name: /Space · Northwind/ })).toHaveClass('tp-sg-bare');
+    // a tight byline gives up the space's name first
+    expect(rulesWhere(rules, (x) => x === '.tp-byline .tp-sg-space')[0]!.declarations['flex-shrink']).toBe(
+      '12',
+    );
+  });
 });
