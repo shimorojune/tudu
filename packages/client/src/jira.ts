@@ -191,9 +191,11 @@ export class JiraClient {
       token,
       ...(spaceId ? { spaceId } : {}),
     });
+    // The switches first, so the connection never shows without knowing where it is on (the panel would go blank
+    // between the two reads).
+    await this.qc.fetchQuery({ ...this.spacesQuery(), staleTime: 0 }).catch(() => undefined);
     this.qc.setQueryData(jiraConnectionKey(), res);
     tickGettingStarted(this.qc, 'jira');
-    void this.qc.invalidateQueries({ queryKey: jiraSpacesKey() });
     void this.qc.invalidateQueries({ queryKey: ['jira'], predicate: (q) => q.queryKey[2] === 'issues' });
     return res;
   }

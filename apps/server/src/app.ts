@@ -68,7 +68,7 @@ export function createApp(deps: AppDeps) {
       origin: (origin) => (origins.includes(origin) ? origin : null),
       credentials: true,
       allowHeaders: ['content-type', 'authorization', 'last-event-id'],
-      allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       maxAge: 600,
     }),
   );

@@ -28,14 +28,23 @@ export function issueRow(page: Page, key: string): Locator {
   return jiraPanel(page).getByRole('button', { name: new RegExp(`^${key}: .*Open preview$`) });
 }
 
-/** Connect Jira in a space through the API (the form is tested on its own). Returns the token. */
+/**
+ * Connect Jira through the API (the form is tested on its own): once for the account, turned on in a space (Personal
+ * unless named). Returns the token.
+ */
 export async function connectByApi(page: Page, spaceId?: string, token = goodToken()): Promise<string> {
   const id = spaceId ?? (await me(page)).spaces.find((s) => s.kind === 'personal')!.id;
-  const res = await page.request.post(`${API_URL}/api/spaces/${id}/jira`, {
-    data: { site: JIRA_SITE, token },
+  const res = await page.request.post(`${API_URL}/api/connectors/jira`, {
+    data: { site: JIRA_SITE, token, spaceId: id },
   });
   expect(res.status()).toBe(200);
   return token;
+}
+
+/** Your switch for Jira in a space, through the API. */
+export async function switchByApi(page: Page, spaceId: string, on: boolean): Promise<void> {
+  const res = await page.request.put(`${API_URL}/api/spaces/${spaceId}/connectors/jira`, { data: { on } });
+  expect(res.status()).toBe(204);
 }
 
 /** Make a token stop working in the fake Jira. */

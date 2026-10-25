@@ -436,4 +436,51 @@ test.describe('search', () => {
     await expect(panel(page).locator('.tp-sp-head')).toHaveText(['Recent searchesClear', 'Recently opened']);
     await expect(options(page)).toHaveText(['passport', /^Renew passport/]);
   });
+
+  test('C10-E21 search after the move to links: a key finds its task first; off in a space, its task is still found by key', async ({
+    page,
+  }) => {
+    test.skip(phone() || tablet(), 'the same search on every size');
+    await fixClock(page);
+    await signInFresh(page);
+    const mine = (await (await page.request.get(`${API_URL}/api/me`)).json()) as {
+      spaces: Array<{ id: string; kind: string }>;
+    };
+    const spaceId = mine.spaces.find((x) => x.kind === 'personal')!.id;
+    const at = '2026-10-18T09:00:00.000Z';
+    const a = crypto.randomUUID();
+    const b = crypto.randomUUID();
+    const res = await page.request.post(`${API_URL}/api/sync`, {
+      data: {
+        clientId: 'seed',
+        mutations: [
+          {
+            id: crypto.randomUUID(),
+            type: 'task.create',
+            at,
+            payload: { id: a, spaceId, title: 'TUDU-226 notes for later', day: TODAY, position: 1024 },
+          },
+          {
+            id: crypto.randomUUID(),
+            type: 'task.create',
+            at,
+            payload: { id: b, spaceId, title: 'Fix the picker', day: TODAY, position: 2048 },
+          },
+          {
+            id: crypto.randomUUID(),
+            type: 'task.link',
+            at: '2026-10-18T09:01:00.000Z',
+            payload: { id: b, provider: 'jira', key: 'TUDU-226' },
+          },
+        ],
+      },
+    });
+    expect(res.status()).toBe(200);
+    // Jira is not connected at all: the key is the task's own, so search finds it by key all the same.
+    await page.reload();
+    await openSearch(page);
+    await search(page, 'tudu-226');
+    await expect.poll(() => hitTitles(page)).toEqual(['Fix the picker', 'TUDU-226 notes for later']);
+    await expect(hit(page, 'Fix the picker').locator('.tp-sh-jira')).toHaveText('TUDU-226');
+  });
 });

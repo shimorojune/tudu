@@ -15,9 +15,10 @@ import {
   jiraPanel,
   openJira,
   sideJira,
+  switchByApi,
 } from '../../fixtures/jira';
 import { hit, openSearch, search } from '../../fixtures/search';
-import { createSpace, me, seedTasks, switchTo } from '../../fixtures/spaces';
+import { createSpace, joinLink, me, secondPerson, seedTasks, switchTo } from '../../fixtures/spaces';
 import { dayList, fixClock, idle, row, writeTasks } from '../../fixtures/today';
 
 const phone = () => test.info().project.name === 'phone';
@@ -109,7 +110,7 @@ test.describe('jira', () => {
       page.getByRole('dialog', { name: 'Apps' }).getByRole('button', { name: 'Connect Jira' }),
     ).toBeVisible();
     await expect(page).not.toHaveURL(/jira/);
-    const read = await page.request.get(`${API_URL}/api/spaces/${await personalId(page)}/jira`);
+    const read = await page.request.get(`${API_URL}/api/connectors/jira`);
     expect(await read.json()).toEqual({ connected: false });
   });
 
@@ -398,7 +399,7 @@ test.describe('jira', () => {
     await jiraPanel(page).getByRole('button', { name: 'More' }).click();
     await jiraPanel(page).getByRole('menuitem', { name: 'Disconnect Jira' }).click();
     await expect(page.locator('.tp-toast')).toContainText(
-      'Jira disconnected. Your tasks keep their Jira keys.',
+      'Jira disconnected from all your spaces. Your tasks keep their Jira keys.',
     );
     await expect(jiraPanel(page)).toHaveCount(0);
     await expect(jiraButton(page)).toHaveCount(0);
@@ -439,7 +440,7 @@ test.describe('jira', () => {
     await idle(page);
     await closeTask(page);
 
-    const res = await page.request.delete(`${API_URL}/api/spaces/${await personalId(page)}/jira`);
+    const res = await page.request.delete(`${API_URL}/api/connectors/jira`);
     expect(res.ok()).toBe(true);
     await page.reload();
     detail = await openTask(page, 'Tidy the buckets');
@@ -452,16 +453,18 @@ test.describe('jira', () => {
     expect(await factsOf(detail)).toEqual(['Planned', 'Due', 'Project', 'Visible to']);
   });
 
-  test('C10-E15 per space: Jira in Personal, none in Northwind; Northwind’s task panel has no Jira fact', async ({
+  test('C10-E15 per space: on in Personal, off in Northwind; Northwind’s task panel has no Jira fact', async ({
     page,
   }) => {
     test.skip(phone() || tablet(), 'the same panel on every size (E14)');
     await fixClock(page);
     await signInFresh(page);
-    await connectByApi(page);
-    await page.reload();
     const slug = await createSpace(page, 'Northwind');
     const nw = (await me(page)).spaces.find((s) => s.slug === slug)!;
+    // Connected once, on in both, then switched off in Northwind.
+    await connectByApi(page, nw.id);
+    await switchByApi(page, await personalId(page), true);
+    await switchByApi(page, nw.id, false);
     // A new team space opens on its welcome (Invite people), so the task goes in through sync.
     await seedTasks(page, nw.id, [{ title: 'Draft the offsite agenda', day: '2026-10-18' }]);
     await page.reload();
@@ -590,5 +593,243 @@ test.describe('jira', () => {
       jiraPanel(page).getByRole('heading', { name: 'Your Jira issues, next to your day' }),
     ).toBeVisible();
     await expect.poll(() => dark('section.tp-jp')).toBeLessThan(0.25);
+  });
+
+  test('C10-E16 connect once in Personal; a new space has no Jira until Turn on here, with no token asked for', async ({
+    page,
+  }) => {
+    test.skip(phone() || tablet(), 'the same Apps card on every size (E17 on phones)');
+    await fixClock(page);
+    await signInFresh(page);
+    await addAnApp(page).click();
+    await page.getByRole('dialog', { name: 'Apps' }).getByRole('button', { name: 'Connect Jira' }).click();
+    await expect(jiraPanel(page)).toContainText(
+      'Connect once for your account with a personal access token. Jira turns on in Personal',
+    );
+    await fillConnect(page, JIRA_SITE, goodToken());
+    await expect.poll(() => issueKeys(page)).toEqual(ASSIGNED);
+    await jiraPanel(page).getByRole('button', { name: 'Close Jira' }).click();
+
+    await createSpace(page, 'Northwind');
+    await expect(sideJira(page)).toHaveCount(0);
+    await expect(jiraButton(page)).toHaveCount(0);
+    await addAnApp(page).click();
+    const apps = page.getByRole('dialog', { name: 'Apps' });
+    await expect(apps).toContainText('Connected · off here');
+    await expect(apps).toContainText('Connected to your account. Turn it on to use it in Northwind.');
+    await apps.getByRole('button', { name: 'Turn on Jira here' }).click();
+    await expect(apps).toHaveCount(0);
+    await expect(sideJira(page)).toBeVisible();
+    await openJira(page);
+    await expect(jiraPanel(page).getByLabel('Personal access token')).toHaveCount(0);
+    await expect.poll(() => issueKeys(page)).toEqual(ASSIGNED);
+  });
+
+  test('C10-E17 Settings › Apps under You: flip Northwind off, its line and its panel; on again; phones push it in', async ({
+    page,
+  }) => {
+    await fixClock(page);
+    await signInFresh(page);
+    const slug = await createSpace(page, 'Northwind');
+    const nw = (await me(page)).spaces.find((s) => s.slug === slug)!;
+    await connectByApi(page, nw.id);
+    await seedTasks(page, nw.id, [{ title: 'Draft the offsite agenda', day: '2026-10-18' }]);
+    const ids = await seedTasks(page, nw.id, [{ title: 'Ship the picker', day: '2026-10-18' }]);
+    const link = await page.request.post(`${API_URL}/api/sync`, {
+      data: {
+        clientId: 'seed',
+        mutations: [
+          {
+            id: crypto.randomUUID(),
+            type: 'task.link',
+            payload: { id: ids['Ship the picker'], provider: 'jira', key: 'TUDU-226' },
+            at: '2026-10-18T09:30:00.000Z',
+          },
+        ],
+      },
+    });
+    expect(link.status()).toBe(200);
+    await page.reload();
+
+    const settings = phone() ? page : page.getByRole('dialog', { name: 'Settings' });
+    if (phone()) {
+      const tabs = page.getByRole('navigation', { name: 'Main' });
+      await tabs.getByRole('button', { name: 'More' }).click();
+      await page.getByRole('button', { name: 'Settings', exact: true }).click();
+      await page.getByRole('navigation', { name: 'Settings' }).getByRole('button', { name: /^Apps/ }).click();
+    } else {
+      await page.getByRole('button', { name: /^You: / }).click();
+      await page.getByRole('menuitem', { name: 'Settings' }).click();
+      const nav = settings.getByRole('navigation', { name: 'Settings' });
+      await expect(nav.getByRole('button').nth(2)).toHaveText(/^Apps/);
+      await nav.getByRole('button', { name: /^Apps/ }).click();
+    }
+    await expect(settings.getByText('Use Jira in')).toBeVisible();
+    await expect(settings.getByText('1 of 2 on')).toBeVisible();
+    const sw = settings.getByRole('switch', { name: 'Jira in Northwind' });
+    await expect(sw).toHaveAttribute('aria-checked', 'true');
+    await sw.click();
+    const nwRow = settings.locator('.tp-set-sprow').filter({ hasText: 'Northwind' });
+    await expect(nwRow).toContainText('Off · 1 task keeps its key');
+    await expect(settings.getByText('0 of 2 on')).toBeVisible();
+    const read = await page.request.get(`${API_URL}/api/connectors/jira/spaces`);
+    const body = (await read.json()) as { spaces: Array<{ id: string; on: boolean }> };
+    expect(body.spaces.find((x) => x.id === nw.id)!.on).toBe(false);
+
+    // Northwind: no Jira entries; the linked task shows its key alone, with Unlink only.
+    await page.goto(`/${slug}`);
+    await expect(sideJira(page)).toHaveCount(0);
+    await expect(jiraButton(page)).toHaveCount(0);
+    const detail = await openTask(page, 'Ship the picker');
+    const fact = detail.getByRole('button', { name: 'Jira' });
+    await expect(fact).toHaveText('TUDU-226');
+    await fact.click();
+    await expect(detail.getByRole('menuitem', { name: /Open TUDU-226 in Jira/ })).toHaveCount(0);
+    await expect(detail.getByRole('menuitem', { name: 'Unlink the issue' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await closeTask(page);
+
+    // On again: the entries come back.
+    await switchByApi(page, nw.id, true);
+    await page.reload();
+    if (phone())
+      await expect(
+        page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: /Jira$/ }),
+      ).toBeVisible();
+    else await expect(sideJira(page)).toBeVisible();
+  });
+
+  test('C10-E18 two people in Northwind: Ada’s Jira is hers; Ben sees the key as words, and Ada’s switch changes nothing for him', async ({
+    page,
+    browser,
+  }) => {
+    test.skip(phone() || tablet(), 'the same rules on every size');
+    await fixClock(page);
+    await signInFresh(page);
+    const b = await secondPerson(browser);
+    const slug = await createSpace(page, 'Northwind', [b.email]);
+    await b.page.goto(await joinLink(page, b.email));
+    await b.page.getByRole('button', { name: 'Join Northwind' }).click();
+    await expect(b.page).toHaveURL(new RegExp(`/${slug}$`), { timeout: 10_000 });
+    const nw = (await me(page)).spaces.find((s) => s.slug === slug)!;
+    await connectByApi(page, nw.id);
+    const ids = await seedTasks(page, nw.id, [{ title: 'Ship the picker', day: '2026-10-18' }]);
+    const res = await page.request.post(`${API_URL}/api/sync`, {
+      data: {
+        clientId: 'seed',
+        mutations: [
+          {
+            id: crypto.randomUUID(),
+            type: 'task.link',
+            payload: { id: ids['Ship the picker'], provider: 'jira', key: 'TUDU-226' },
+            at: '2026-10-18T09:30:00.000Z',
+          },
+        ],
+      },
+    });
+    expect(res.status()).toBe(200);
+
+    const day = await page.request.get(`${API_URL}/api/spaces/${nw.id}/days/2026-10-18`);
+    const ref = ((await day.json()) as { tasks: Array<{ title: string; ref: string }> }).tasks.find(
+      (t) => t.title === 'Ship the picker',
+    )!.ref;
+    // Ben opens Ada's task by its address (his Today holds his own tasks).
+    await b.page.goto(`/${slug}?task=${ref}`);
+    await expect(sideJira(b.page)).toHaveCount(0);
+    await expect(jiraButton(b.page)).toHaveCount(0);
+    expect(await (await b.page.request.get(`${API_URL}/api/connectors/jira`)).json()).toEqual({
+      connected: false,
+    });
+    const issues = await b.page.request.get(`${API_URL}/api/spaces/${nw.id}/connectors/jira/issues`);
+    expect(issues.status()).toBe(404);
+    const detail = b.page.getByRole('dialog', { name: 'Task details' });
+    // A colleague's task: read, not edited; the key as words, no status.
+    await expect(detail).toContainText('Ship the picker');
+    await expect(detail.locator('.tp-td-prop').filter({ hasText: 'Jira' })).toContainText('TUDU-226');
+
+    // Ada flips her switch: Ben reads nothing new.
+    const asked: string[] = [];
+    b.page.on('request', (r) => {
+      if (r.url().includes('/connectors/')) asked.push(r.url());
+    });
+    await switchByApi(page, nw.id, false);
+    await switchByApi(page, nw.id, true);
+    await b.page.waitForTimeout(800);
+    expect(asked).toEqual([]);
+    await expect(sideJira(b.page)).toHaveCount(0);
+    await b.context.close();
+  });
+
+  test('C10-E19 linked across spaces: a task in Personal shows in Northwind’s panel with its space; the count leaves it out; Show goes there', async ({
+    page,
+  }) => {
+    test.skip(phone() || tablet(), 'the same chip on every size');
+    await fixClock(page);
+    await signInFresh(page);
+    const slug = await createSpace(page, 'Northwind');
+    const nw = (await me(page)).spaces.find((s) => s.slug === slug)!;
+    await connectByApi(page, nw.id);
+    await switchByApi(page, await personalId(page), true);
+    await page.goto('/me');
+    await writeTasks(page, ['Tidy the buckets']);
+    await idle(page);
+    const detail = await openTask(page, 'Tidy the buckets');
+    await detail.getByRole('button', { name: 'Jira' }).click();
+    await detail.getByRole('textbox', { name: 'Jira issue key' }).fill('TUDU-226');
+    await detail.getByRole('textbox', { name: 'Jira issue key' }).press('Enter');
+    await expect(detail.getByRole('button', { name: 'Jira' })).toContainText('TUDU-226');
+    await idle(page);
+    await closeTask(page);
+
+    await page.goto(`/${slug}`);
+    await expect(sideJira(page)).toContainText('6');
+    await openJira(page);
+    await expect.poll(() => issueKeys(page)).toEqual(ASSIGNED);
+    await expect(chipOf(page, 'TUDU-226').locator('.tp-jp-lk-sp')).toHaveText('· Personal');
+    await chipOf(page, 'TUDU-226').click();
+    await expect(page).toHaveURL(/\/me(\?|$)/);
+    await expect(row(dayList(page, 'Tasks for Sunday 18 October'), 'Tidy the buckets')).toBeVisible();
+  });
+
+  test('C10-E20 expired once, fixed once: two spaces on both show the banner; a new token from Settings › Apps clears both', async ({
+    page,
+  }) => {
+    test.skip(phone() || tablet(), 'the same banner on every size (E09)');
+    await fixClock(page);
+    await signInFresh(page);
+    const slug = await createSpace(page, 'Northwind');
+    const nw = (await me(page)).spaces.find((s) => s.slug === slug)!;
+    const token = await connectByApi(page, nw.id);
+    await switchByApi(page, await personalId(page), true);
+    await expire(page, token);
+    await page.reload();
+    await openJira(page);
+    await expect(jiraPanel(page).locator('.tp-jp-banner')).toContainText('Your Jira token has expired');
+    await jiraPanel(page).getByRole('button', { name: 'Close Jira' }).click();
+    await switchTo(page, 'Personal');
+    await openJira(page);
+    await expect(jiraPanel(page).locator('.tp-jp-banner')).toContainText('Your Jira token has expired');
+    await jiraPanel(page).getByRole('button', { name: 'Close Jira' }).click();
+
+    await page.getByRole('button', { name: /^You: / }).click();
+    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    const settings = page.getByRole('dialog', { name: 'Settings' });
+    await settings
+      .getByRole('navigation', { name: 'Settings' })
+      .getByRole('button', { name: /^Apps/ })
+      .click();
+    await expect(settings).toContainText('Jira is paused in every space');
+    await settings.getByRole('button', { name: 'Add a new token' }).click();
+    await expect(jiraPanel(page).getByRole('heading', { name: 'Add a new token' })).toBeVisible();
+    await expect(jiraPanel(page).getByLabel('Jira address')).toHaveValue(/__test\/jira$/);
+    await jiraPanel(page).getByLabel('Personal access token').fill(goodToken());
+    await jiraPanel(page).getByRole('button', { name: 'Reconnect' }).click();
+    await expect.poll(() => issueKeys(page)).toEqual(ASSIGNED);
+    await expect(jiraPanel(page).locator('.tp-jp-banner')).toHaveCount(0);
+    await jiraPanel(page).getByRole('button', { name: 'Close Jira' }).click();
+    await page.goto(`/${slug}`);
+    await openJira(page);
+    await expect.poll(() => issueKeys(page)).toEqual(ASSIGNED);
+    await expect(jiraPanel(page).locator('.tp-jp-banner')).toHaveCount(0);
   });
 });

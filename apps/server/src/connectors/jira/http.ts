@@ -1,11 +1,4 @@
-import {
-  cleanHtml,
-  isEmptyHtml,
-  type JiraComment,
-  type JiraErrorCode,
-  type JiraIssue,
-  type JiraIssueDetail,
-} from '@tudu/core';
+import { cleanHtml, isEmptyHtml, type JiraComment, type JiraIssue, type JiraIssueDetail } from '@tudu/core';
 import { ConnectorFailure as JiraFailure } from '../failure';
 import { checkSite } from './guard';
 

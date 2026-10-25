@@ -81,6 +81,20 @@ step 3.5. The other release secrets (`DOKPLOY_URL`, `DOKPLOY_API_KEY`, `TAURI_SI
    right-click › Open (macOS 15: System Settings › Privacy & Security › Open Anyway). Later versions install
    themselves through the updater.
 
+### A release whose migration drops something
+
+Most migrations only add, and rolling the app back is enough. When the release notes or the PR say a migration
+drops tables or columns (0015, connectors: it removes `jira_connections`, `jira_views` and `tasks.jira_key` after
+copying them over), take a backup of production's database before step 2, because rolling back then means restoring
+it:
+
+- Dokploy › production › `tudu-production-postgres` › Backups › Run backup now (or, in the database's terminal,
+  `pg_dump -U postgres -Fc tudu > /tmp/tudu-before-X.Y.Z.dump` and copy it off the server).
+- Check the backup is there and not empty before you run the release.
+
+Staging runs the same migration first on every master push, so a migration that fails shows there before it reaches
+production.
+
 If the deploy or the smoke test fails, the GitHub release stays a draft and the feed keeps offering the previous
 version. Fix, then run again: semantic-release has already tagged, so delete the draft release and its tag first
 (`git push --delete origin tudu-X.Y.Z`) and revert the `chore(release)` commit, or let the next run release the

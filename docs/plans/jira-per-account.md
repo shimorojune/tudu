@@ -1,6 +1,7 @@
 # Connectors once per account, turned on per space (Jira first)
 
-Status: proposal, awaiting Rohit's approval. Revised 25 Oct after Rohit's "yes, we need to generalize": the
+Status: approved by Rohit 25 Oct ("let's go ahead") and implemented; see **As built** for where the code differs from
+this proposal. Revised 25 Oct after Rohit's "yes, we need to generalize": the
 schema no longer names Jira; Jira is the first connector of a general model. Canvas: approved by Rohit 25 Oct 2026 on the Jira page (boards
 `J-Acct-Settings`, `J-Acct-Settings-Dark`, `J-Acct-Space`, `J-Acct-Space-Dark`, `J-Acct-Motion`, sticky
 `p04-acct-draft`), with the Settings boards on the G-, N-, R-C- and U- pages updated to match. Kit: Tudu Paper v23
@@ -25,6 +26,34 @@ After this change:
 
 What the person sees is exactly the approved canvas: there is one connector, so the generalisation is invisible in
 the UI.
+
+## As built (25 Oct)
+
+Where the implementation differs from the sections below:
+
+- **One migration, `0015_connectors.sql`.** drizzle-kit's two generated steps were merged by hand. `history_kind` is
+  recreated (rename the old type, create the new one, cast through text, rewrite the Jira kinds, drop the old type)
+  instead of `ADD VALUE`, because the migrator runs every pending migration in one transaction and a value added that
+  way can't be used in the same transaction. `jira_state` is dropped and `connection_state` created fresh.
+- **Old clients keep working for one release.** The Task keeps `jira` (filled from its Jira link) next to `links`; the
+  server still takes `task.jira` and `task.create` with `jira` / `source: 'jira'` and stores them as links. So the
+  offline-queue rewrite (C10-U19) is not needed and was not written; the client test C10-U11 covers both mutations.
+- **No `GET /api/connectors`.** The routes are per provider: `/api/connectors/:provider` (read, connect, disconnect),
+  `/spaces`, `/links`, `/views`, `PUT /api/spaces/:id/connectors/:provider {on}`, and Jira's reads under
+  `/api/spaces/:id/connectors/jira/…`. An unknown provider is 404 on all of them.
+- **Query keys keep the `jira` prefix** (`['jira', 'connection']`, `['jira', 'spaces']`, `['jira', 'links']`, and
+  `['jira', spaceId, …]` for issues); `connector.changed {provider}` invalidates by the provider name.
+- **C10-A17 (a second fake provider) was dropped.** A provider is a value of a Postgres enum and of a zod enum, so a
+  test-only provider would need a test-only migration. Its checks that still apply (unknown provider 404, one link per
+  provider per task) are in C10-A12 and C10-U18.
+- **Search has no Jira section.** Searching Jira itself stays in the Jira panel (E08); C10-E21 checks the task search
+  finds a task by its link key, connected or not.
+- **Disconnect asks first** in Settings › Apps ("Disconnect Jira?": it goes from every space; tasks keep their keys).
+  From the Jira panel's More menu it is still one step, as before.
+- **Add a new token from Settings › Apps** opens the Jira panel on the reconnect form in the space you're in; a
+  reconnect never changes the switches.
+- The CORS allow-list gained `PUT` (the switch is the first PUT route).
+- A pre-release backup step for migrations that drop data is in `docs/release.md`.
 
 ## Decisions (Rohit, 25 Oct)
 

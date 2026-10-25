@@ -320,7 +320,8 @@ export function JiraView({
     );
   };
 
-  if (!known && !compact) return null;
+  // Mid-connect the form stays up whatever the reads say, so its Connected tick can finish.
+  if (!known && !compact && !holding) return null;
   // Connected for your account but off here: the Apps card's Turn on here, never a second token.
   if (connected && !onHere && known && !reconnecting)
     return (
