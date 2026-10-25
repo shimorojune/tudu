@@ -64,8 +64,13 @@ async function quitFromSheet(app: App): Promise<void> {
 }
 
 /** Another app comes forward, as a click on it would bring it. */
-function clickAnotherApp(): void {
-  spawnSync('osascript', ['-e', 'tell application "Finder" to activate']);
+function clickAnotherApp(name = 'Finder'): void {
+  const r = spawnSync('osascript', ['-e', `tell application "${name}" to activate`], { encoding: 'utf8' });
+  if (r.status !== 0) throw new Error(`could not bring ${name} forward: ${r.stderr || r.error}`);
+}
+
+function quitApp(name: string): void {
+  spawnSync('osascript', ['-e', `tell application "${name}" to quit`]);
 }
 
 /** Your Personal space, as the page's person. */
@@ -636,6 +641,9 @@ test.describe('desktop', () => {
 
   test('C20-D04 clicking another app hides the sheet; so does Esc', async ({ app }) => {
     await signIn(app);
+    // Tudu in front first, so this is the path where the sheet loses its focus.
+    await app.act('reopen');
+    await app.waitState((x) => x.windows.main.focused);
     await openSheet(app);
     clickAnotherApp();
     await sheetHidden(app);
@@ -643,6 +651,38 @@ test.describe('desktop', () => {
     await new Promise((r) => setTimeout(r, 400));
     await openSheet(app);
     await app.eval(`T.press('Escape')`, 'menubar');
+    await sheetHidden(app);
+  });
+
+  test('C20-D06 with another app already in front: another app coming forward hides the sheet', async ({
+    app,
+  }) => {
+    await signIn(app);
+    // Calculator in front, so Tudu is not the active app and the sheet never takes focus from anything.
+    clickAnotherApp('Calculator');
+    await app.waitState((x) => !x.windows.main.focused);
+    try {
+      await openSheet(app);
+      clickAnotherApp('Finder');
+      await sheetHidden(app);
+    } finally {
+      quitApp('Calculator');
+    }
+  });
+
+  test('C20-D07 with another app already in front: a click in it hides the sheet; the tick opens it again after the grace', async ({
+    app,
+  }) => {
+    await signIn(app);
+    clickAnotherApp('Finder');
+    await app.waitState((x) => !x.windows.main.focused);
+    await openSheet(app);
+    // What the global mouse monitor hears for a click in Finder; CI cannot post a real one into another app.
+    await app.act('outside-click');
+    await sheetHidden(app);
+    await new Promise((r) => setTimeout(r, 400));
+    await openSheet(app);
+    await app.act('tray');
     await sheetHidden(app);
   });
 

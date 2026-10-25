@@ -3,7 +3,8 @@
 //!
 //! The desk has no title bar: the traffic lights sit over the sidebar and the top bar drags the window. Closing it
 //! hides it and Tudu carries on in the menu bar (chunk 16). The floating window and the menu bar's sheet are non-activating panels: they take the keyboard without
-//! bringing Tudu (and its desk) forward, float over every app and space, and hide when they lose focus.
+//! bringing Tudu (and its desk) forward, float over every app and space, and hide when they lose focus. The sheet
+//! also hides on a click in another app, or when another app comes forward.
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -166,25 +167,37 @@ pub fn create(app: &AppHandle, at_login: bool) -> tauri::Result<()> {
     let a = app.clone();
     sheet.on_window_event(move |e| match e {
         // Hiding the sheet also takes its focus; only a blur while it shows counts.
-        WindowEvent::Focused(false) => {
-            let shown = a
-                .get_webview_window(MENUBAR)
-                .and_then(|w| w.is_visible().ok())
-                .unwrap_or(false);
-            if shown {
-                if let Ok(mut t) = SHEET_BLURRED.lock() {
-                    *t = Some(Instant::now());
-                }
-                hide_menubar(&a);
-            }
-        }
+        WindowEvent::Focused(false) => outside(&a, false),
         WindowEvent::CloseRequested { api, .. } => {
             api.prevent_close();
             hide_menubar(&a);
         }
         _ => {}
     });
+    #[cfg(target_os = "macos")]
+    panel::watch_outside(app);
     Ok(())
+}
+
+/// Whether something outside the sheet puts it away: it shows, and the click or the app coming forward is not Tudu's.
+fn outside_hides(visible: bool, ours: bool) -> bool {
+    visible && !ours
+}
+
+/// The sheet lost its focus, a click landed in another app, or another app came forward. The sheet never makes Tudu
+/// the active app, so a click into the app already in front takes no focus from it: losing focus alone misses that.
+pub fn outside(app: &AppHandle, ours: bool) {
+    let visible = app
+        .get_webview_window(MENUBAR)
+        .and_then(|w| w.is_visible().ok())
+        .unwrap_or(false);
+    if !outside_hides(visible, ours) {
+        return;
+    }
+    if let Ok(mut t) = SHEET_BLURRED.lock() {
+        *t = Some(Instant::now());
+    }
+    hide_menubar(app);
 }
 
 /// The desk, shown and focused; `go` takes it to a page first (Sign in from the floating window, a task from the
@@ -375,15 +388,30 @@ mod tests {
         assert!(!opens(false, Some(Duration::from_millis(40))));
         assert!(opens(false, Some(Duration::from_millis(900))));
     }
+
+    #[test]
+    fn c20_u06_a_click_or_an_app_outside_tudu_puts_the_shown_sheet_away() {
+        assert!(outside_hides(true, false));
+        assert!(!outside_hides(false, false));
+        assert!(!outside_hides(true, true));
+        assert!(!outside_hides(false, true));
+    }
 }
 
 #[cfg(target_os = "macos")]
 mod panel {
+    use std::ptr::NonNull;
+
+    use block2::RcBlock;
     use objc2::rc::Retained;
     use objc2::runtime::{AnyClass, AnyObject};
     use objc2::{define_class, ClassType, MainThreadOnly};
-    use objc2_app_kit::{NSPanel, NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask};
-    use tauri::WebviewWindow;
+    use objc2_app_kit::{
+        NSEvent, NSEventMask, NSPanel, NSRunningApplication, NSWindow, NSWindowCollectionBehavior,
+        NSWindowStyleMask, NSWorkspace, NSWorkspaceDidActivateApplicationNotification,
+    };
+    use objc2_foundation::{NSNotification, NSOperationQueue};
+    use tauri::{AppHandle, WebviewWindow};
 
     define_class!(
         // A panel that can take the keyboard but never becomes the app's main window, so showing it leaves the desk
@@ -425,6 +453,40 @@ mod panel {
                     | NSWindowCollectionBehavior::FullScreenAuxiliary,
             );
             win.setHidesOnDeactivate(false);
+        });
+    }
+
+    /// For the process's life, as the sheet is: a mouse down in another app (a global monitor sees only clicks
+    /// sent to other apps, so the tick and the sheet's own clicks never come here, and mouse monitors need no
+    /// Accessibility permission), and another app becoming the active one (⌘Tab, a Dock click).
+    pub fn watch_outside(app: &AppHandle) {
+        let a = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            let click = a.clone();
+            let on_click = RcBlock::new(move |_: NonNull<NSEvent>| super::outside(&click, false));
+            let mask = NSEventMask::LeftMouseDown
+                | NSEventMask::RightMouseDown
+                | NSEventMask::OtherMouseDown;
+            if let Some(m) = NSEvent::addGlobalMonitorForEventsMatchingMask_handler(mask, &on_click)
+            {
+                std::mem::forget(m);
+            }
+            let front = a.clone();
+            let on_front = RcBlock::new(move |_: NonNull<NSNotification>| {
+                // Tudu itself coming forward (the desk) is not outside.
+                let ours = NSRunningApplication::currentApplication().isActive();
+                super::outside(&front, ours);
+            });
+            let center = NSWorkspace::sharedWorkspace().notificationCenter();
+            let o = unsafe {
+                center.addObserverForName_object_queue_usingBlock(
+                    Some(NSWorkspaceDidActivateApplicationNotification),
+                    None,
+                    Some(&NSOperationQueue::mainQueue()),
+                    &on_front,
+                )
+            };
+            std::mem::forget(o);
         });
     }
 

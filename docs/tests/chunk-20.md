@@ -14,6 +14,7 @@ Status column is kept by `pnpm test:status` in [STATUS.md](STATUS.md). Run this 
 | C20-U03 | MenuBarSheet | The empty state's lines appear only when true; the offline line; a row's byline matches Today's for the same task                                      |
 | C20-U04 | web          | A tick writes to the outbox once and the row stays in place; a title click asks the bridge to open the task; the stream opens on show, closes on hide  |
 | C20-U05 | desktop      | Rust: the sheet's position from the tray rectangle on each screen edge; left and right click both toggle; the click that blurred it does not reopen it |
+| C20-U06 | desktop      | Rust: a click or an app coming forward outside Tudu puts the shown sheet away; Tudu's own, or a hidden sheet, does nothing                             |
 
 ## End-to-end (`packages/e2e/tests/menubar`, desktop size)
 
@@ -36,5 +37,7 @@ Status column is kept by `pnpm test:status` in [STATUS.md](STATUS.md). Run this 
 | C20-D01 | A left click shows the sheet under the tick; a second click hides it; a right click shows it too; no native menu appears |
 | C20-D02 | With the window hidden: tick a task in the sheet; Open Tudu; the desk shows it ticked                                    |
 | C20-D03 | A title click brings the window forward on that task with the panel open, and the sheet is hidden                        |
-| C20-D04 | Clicking another app hides the sheet; Esc hides it                                                                       |
+| C20-D04 | With Tudu in front, clicking another app hides the sheet; Esc hides it                                                   |
 | C20-D05 | ⋯ › Quit Tudu ends the process, signed in and signed out                                                                 |
+| C20-D06 | With another app in front (Tudu not active), another app coming forward hides the sheet                                  |
+| C20-D07 | With another app in front, a click in it hides the sheet; after the grace a click on the tick opens it again             |

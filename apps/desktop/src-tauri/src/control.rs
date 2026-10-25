@@ -8,8 +8,8 @@
 //!   App Nap opt-out and each webview's inactive scheduling policy; and the tick's place as macOS keeps it (its
 //!   autosave name and saved position) and whether it is hidden.
 //! - `POST /act {"do": …}`: what a person does outside the page: `summon`, `tray` (a click on the tick, with
-//!   `button`: left or right), `reopen` (the dock icon), `close` (with `window`), `check-update` (`auto`: only past
-//!   the floor, as focus would), `wake`, `age-check` (with `minutes`), `quit`,
+//!   `button`: left or right), `reopen` (the dock icon), `close` (with `window`), `outside-click` (a click in another
+//!   app), `check-update` (`auto`: only past the floor, as focus would), `wake`, `age-check` (with `minutes`), `quit`,
 //!   `tick` (with `hidden`: true or false says macOS hides or shows the tick, null hands the answer back to macOS).
 //! - `POST /eval {"window", "script"}`: runs the script (an async function body) in that window's WKWebView and
 //!   answers its result, so the tests drive the real page.
@@ -295,7 +295,7 @@ fn act(app: &AppHandle, input: &Value) -> (u16, Value) {
     let a = app.clone();
     let input = input.clone();
     match what {
-        "summon" | "tray" | "reopen" | "close" => {
+        "summon" | "tray" | "reopen" | "close" | "outside-click" => {
             // On the main thread, as a key press, a click in the menu or the Dock would be.
             let w = what.to_string();
             let _ = app.run_on_main_thread(move || {
@@ -304,6 +304,8 @@ fn act(app: &AppHandle, input: &Value) -> (u16, Value) {
                     // Either button toggles the sheet; the click comes from where the tick is.
                     "tray" => windows::toggle_menubar(&a, crate::tray_icon(&a)),
                     "reopen" => windows::show_main(&a, None),
+                    // A click in another app, as the global mouse monitor hears it (CI cannot post one).
+                    "outside-click" => windows::outside(&a, false),
                     "close" => {
                         let label = input
                             .get("window")
