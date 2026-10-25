@@ -34,7 +34,7 @@ spaces. Today you open each space in turn to see your day. The menu bar already 
 6. **Moving between days** (Week drag, Move to, Backlog to a day) changes the task's day in its own space, at the
    end of that space's day, and gives it a place in All spaces' order where you dropped it.
 7. **Writing a task.** The writing line says where it goes: "in Personal", or "in Northwind" while filtered to
-   Northwind. Quick Add opens on the same space. _Open question 1._
+   Northwind. Quick Add opens on the same space. Personal is the default (Rohit, 25 Oct).
 8. **Every other change is the task's own.** Cross off, rename, due, notes, subtasks, comments, project, Jira and
    visibility all write to the task's space, exactly as they would from the space page. The project picker lists
    that space's projects.
@@ -51,6 +51,19 @@ spaces. Today you open each space in turn to see your day. The menu bar already 
     - The filter chip row opens and closes (180ms).
     - Reduced motion makes all of these 1ms.
 13. **Home.** If All spaces was the last place you were, `/` opens it, the way it opens the last space now.
+14. **Search always spans every space** (Rohit, 25 Oct), from any page, not only All spaces.
+    - It finds every task you can see in every space you're in, including a colleague's tasks that are shared
+      with the space.
+    - It leaves out a colleague's "only me" task, which is private to them here as everywhere else, and every
+      space you have left.
+    - A hit from another space carries its space label, the way close matches already do today. In All spaces,
+      every hit carries one.
+    - Hits keep today's ranking (at most 30). Ties go to the space you're in, then the switcher's order.
+    - Opening a hit from another space opens it in its own space.
+    - Recently opened and past searches become one list across spaces. The per-space lists in this browser are
+      merged into it, newest first.
+    - The Quick Add look-alike check ("Already in Northwind") stays per space, since it is about where the new
+      task is going.
 
 ## Data (packages/db, migration `0013_all-spaces.sql`)
 
@@ -87,6 +100,14 @@ spaces. Today you open each space in turn to see your day. The menu bar already 
   - The mutation is classified like `me.*`: no task list changes, so `announce` isn't called.
 - **New live event `ALL_SPACES_CHANGED { days, clientId }`**, published to you only, so your other tabs refresh
   their order.
+- **Search.** New `GET /api/search?q=&today=` and `GET /api/search?ids=`:
+  - They use the same `readableBy(userId)` rule that close matches already use (`apps/server/src/closeMatches.ts`):
+    spaces you're a member of now, and tasks that are yours, ownerless, or shared with the space. `searchTasks` and
+    `hitsById` drop their `spaceId` argument and take that rule instead.
+  - `?here=<spaceId>` only breaks ties. It is never a filter, so a forged id can't widen anything.
+  - Each `SearchHit` already has `spaceId`. The panel looks up the name and colour from `me.spaces`.
+  - `GET /spaces/:spaceId/search` stays for one release for the Mac app on 0.37, then goes. Its `for=lookalike` mode
+    stays as it is.
 - **Leaving.** `leaveSpace`, `removeMember` and `deleteSpace` delete the leaver's `all_spaces_places` rows for that
   space's tasks, in the same transaction. The read filter already hides them; this keeps the table clean and
   makes "put back" (`restoreMember`) start with no stale order.
@@ -145,7 +166,14 @@ These are the kit changes drafted on the canvas. They go in the kit and are mirr
   page components already take a list and callbacks.
 - `?space=` is parsed like the Inbox's filter. A slug you aren't in is dropped, along with its chip.
 - `rememberSpace('all')`, so `homePath` can return `/all`.
-- **Search from All spaces**: _open question 2_.
+- **Search** (`app/SearchHost.tsx`, `app/search.ts`):
+  - It reads `/api/search`, whatever page you're on.
+  - `spaceOfHit` labels any hit outside the open space. In All spaces there is no open space, so every hit is
+    labelled.
+  - Projects for hits come from each hit's own space.
+  - `useRecentTasks` and `useSearches` move to one per-browser key, and the old per-space keys are merged into it
+    once.
+  - `goToTask` already opens a task in its own space.
 - Record the deviations in `docs/rewrite/design-deviations.md` if any remain at the end. None are planned.
 
 ## Performance
@@ -182,6 +210,7 @@ New chunk 21 (`docs/tests/chunk-21.md`, added in the same PR). Each ID is in its
 | C21-U13 | ui `TaskDetail.test.tsx`  | The Space fact is first, read-only, and calls `onOpenSpace`                                                                                                            |
 | C21-U14 | web `shell.test.ts`       | In All spaces: the sidebar has Today, Week and Backlog only; no Jira button; the Inbox count is unchanged; the All spaces row has no badge                             |
 | C21-U15 | web `space.test.ts`       | `/all?space=northwind` keeps the filter; an unknown slug drops it; `/all` with one space goes to `/me`; `homePath` returns `/all` when it was last                     |
+| C21-U16 | web `search.test.ts`      | Hits outside the open space are labelled; in All spaces all are; old per-space recent and history lists merge into one, newest first, without repeats                  |
 
 ### API (apps/server, against the test database)
 
@@ -195,6 +224,9 @@ New chunk 21 (`docs/tests/chunk-21.md`, added in the same PR). Each ID is in its
 | C21-A06 | Leaving: `leaveSpace`, `removeMember` and `deleteSpace` delete the leaver's rows for that space and no one else's; `restoreMember` brings no order back |
 | C21-A07 | `all.place` publishes `ALL_SPACES_CHANGED` to you only; Meera, in the same space, gets nothing                                                          |
 | C21-A08 | Migration: a space slugged `all` becomes `all-2`, its `space_slugs` row for `all` is gone, and creating a space named "All" gets `all-2` (or `all-3`)   |
+| C21-A09 | `GET /api/search?q=` finds your tasks and Meera's shared tasks in Northwind and Pilot Farm in one list, each with its `spaceId`                         |
+| C21-A10 | Search auth: Meera's "only me" task, a task in a space you aren't in, a space you've left and deleted tasks never appear, by words or by `?ids=`        |
+| C21-A11 | `?here=` only breaks ties: a space you aren't in adds nothing; the cap of 30 holds across spaces; the old per-space route still answers                 |
 
 ### End to end (`packages/e2e/tests/all-spaces`, group `all-spaces`, desktop unless noted)
 
@@ -220,18 +252,18 @@ Every spec makes its own users and spaces. The multi-user specs use two browser 
 | C21-E16 | Phone: the switcher row, tile-only pills, the filter chip and the writing line's "in Personal"; tapping a pill filters                                                          |
 | C21-E17 | Dark: E01's list in dark; the All spaces tile is cream, and the pills and chip match A-Desktop-Dark                                                                             |
 | C21-E18 | Requests: one day read per space and one places read on opening All spaces Today; going back to Northwind's Today makes no new day read                                         |
+| C21-E19 | Search from Northwind's Today finds a Personal task and Meera's shared Pilot Farm task, each labelled; opening one lands in its own space                                       |
+| C21-E20 | Search never shows Meera's "only me" task, and after Meera removes you from Pilot Farm its tasks drop out of the next search                                                    |
+| C21-E21 | Search from All spaces labels every hit; Recently opened lists tasks from two spaces after opening one in each                                                                  |
 
 The group runs three times locally before the PR, as AGENTS.md asks. Existing Today, Week and Backlog specs keep
-their IDs and are not changed, since space pages behave as before.
+their IDs and are not changed, since space pages behave as before. Chunk 07's Search specs keep their IDs. Any that
+assume one space's results are updated for the wider search, and none are dropped.
 
-## Open questions
+## Decided
 
-1. **Where a task written in All spaces goes.** The draft says Personal, or the filtered space. The other choice is
-   the space you last used. I recommend Personal: it's predictable, and the line always says where. "Last used"
-   changes under you without the line looking any different.
-2. **Search from All spaces.** I recommend searching every space you're in, with each hit carrying its space pill.
-   The client fans out over the existing per-space search, so the server's checks stay as they are. The other
-   choice is searching Personal only, which would be surprising on a page that shows everything.
+1. A task written in All spaces goes to Personal by default, or to the filtered space (Rohit, 25 Oct).
+2. Search always spans every space, and covers every task visible to you (Rohit, 25 Oct). See item 14.
 
 ## Out of scope
 
