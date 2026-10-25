@@ -441,7 +441,8 @@ mod panel {
     use objc2::{define_class, ClassType, MainThreadOnly};
     use objc2_app_kit::{
         NSEvent, NSEventMask, NSPanel, NSRunningApplication, NSWindow, NSWindowCollectionBehavior,
-        NSWindowStyleMask, NSWorkspace, NSWorkspaceDidActivateApplicationNotification,
+        NSWindowStyleMask, NSWorkspace, NSWorkspaceApplicationKey,
+        NSWorkspaceDidActivateApplicationNotification,
     };
     use objc2_foundation::{NSNotification, NSOperationQueue};
     use tauri::{AppHandle, WebviewWindow};
