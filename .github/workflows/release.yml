@@ -1,4 +1,4 @@
-name: Release
+name: 'Production: release'
 
 # A release, by hand: the next version from the conventional commits (semantic-release: tag tudu-X, the changelog,
 # a draft GitHub release), Tudu for macOS built against production and signed for the updater, its dmg, update bundle
@@ -95,7 +95,7 @@ jobs:
           echo "### Tudu $VERSION" >> "$GITHUB_STEP_SUMMARY"
 
   macos:
-    name: Tudu for macOS
+    name: Mac app
     needs: version
     runs-on: macos-latest
     steps:
@@ -135,7 +135,7 @@ jobs:
         run: gh release upload "tudu-${{ needs.version.outputs.version }}" dist/*.dmg dist/Tudu.app.tar.gz dist/Tudu.app.tar.gz.sig --clobber
 
   production:
-    name: Production images and deploy
+    name: 'Web + API: build and deploy'
     needs: version
     runs-on: [self-hosted, dokploy-deploy]
     steps:

@@ -1,6 +1,6 @@
 # Releasing Tudu to production
 
-The Release workflow (`.github/workflows/release.yml`) does the release itself: the version and changelog from the
+The Production: release workflow (`.github/workflows/release.yml`) does the release itself: the version and changelog from the
 conventional commits (semantic-release, tag `tudu-X.Y.Z`), Tudu for macOS built against production and signed for
 the updater, the production images built on the Dokploy host, the deploy of `infra/production/compose.yaml`, a smoke
 test against production, then the GitHub release published (only then does the update feed offer it).
@@ -31,7 +31,7 @@ Migrations need nothing by hand: the API runs `pnpm migrate` before it starts, o
 
 Project Tudu › environment production › Create Service › Compose.
 
-1. Name `tudu-production-app`. Source: **Raw** (the Release workflow writes `infra/production/compose.yaml` into it
+1. Name `tudu-production-app`. Source: **Raw** (the Production: release workflow writes `infra/production/compose.yaml` into it
    on each release; staging's Git source is not needed here). Paste the file once so the services exist.
 2. Turn **Autodeploy off** (the workflow deploys; a second build would race it).
 3. **Environment** tab, the secret values (the rest is in the compose file):
@@ -67,7 +67,7 @@ step 3.5. The other release secrets (`DOKPLOY_URL`, `DOKPLOY_API_KEY`, `TAURI_SI
 
 ## Each release
 
-1. Actions › Release › Run workflow, branch `master`, **Rehearse only** ticked. Green means the version, the signed
+1. Actions › Production: release › Run workflow, branch `master`, **Rehearse only** ticked. Green means the version, the signed
    app and the images all build. The version is in the run's summary.
 2. Run it again with **Rehearse only** unticked. It tags, deploys, smoke-tests production and publishes.
 3. Download the dmg from the GitHub release. The app is signed ad hoc (no Apple Developer ID): the first open needs

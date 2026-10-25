@@ -1,7 +1,7 @@
 # GitHub Actions: names that say what each workflow does
 
-Status: proposal, awaiting Rohit's approval. Canvas: not applicable (CI names only, nothing in the app changes);
-skipping it needs Rohit's OK.
+Status: approved by Rohit 25 Oct 2026; implemented. Canvas: not applicable (CI names only, nothing in the app
+changes); skipping it approved by Rohit 25 Oct 2026.
 
 ## The problem
 
@@ -11,13 +11,13 @@ every push to master, and nothing in the names says which environment or which h
 
 ## What each workflow does today
 
-| File                  | Name today       | Runs on                                       | What it does                                                                                                                  |
-| --------------------- | ---------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `ci.yml`              | CI               | every PR, every push to master, by hand       | Lint and typecheck, unit tests, web end-to-end (4 shards), the API Docker image builds and answers, the Mac app suite on macOS |
-| `deploy-staging.yml`  | Deploy staging   | every push to master, by hand                 | Builds the web and API images on the Dokploy host, deploys `infra/staging`, waits until ready, smoke-tests staging            |
-| `desktop-staging.yml` | Tudu Staging     | every push to master, by hand                 | Builds and signs the **Tudu Staging Mac app** and replaces the rolling `staging` pre-release (the staging updater feed)       |
-| `release.yml`         | Release          | by hand; rehearsal on PRs touching the release path | semantic-release version and notes, the production Mac app, production images, deploy, smoke test, publish             |
-| `flake-check.yml`     | Flake check      | by hand only                                  | Repeats one test N times on the CI runner type to prove a flake fix                                                           |
+| File                  | Name today     | Runs on                                             | What it does                                                                                                                   |
+| --------------------- | -------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `ci.yml`              | CI             | every PR, every push to master, by hand             | Lint and typecheck, unit tests, web end-to-end (4 shards), the API Docker image builds and answers, the Mac app suite on macOS |
+| `deploy-staging.yml`  | Deploy staging | every push to master, by hand                       | Builds the web and API images on the Dokploy host, deploys `infra/staging`, waits until ready, smoke-tests staging             |
+| `desktop-staging.yml` | Tudu Staging   | every push to master, by hand                       | Builds and signs the **Tudu Staging Mac app** and replaces the rolling `staging` pre-release (the staging updater feed)        |
+| `release.yml`         | Release        | by hand; rehearsal on PRs touching the release path | semantic-release version and notes, the production Mac app, production images, deploy, smoke test, publish                     |
+| `flake-check.yml`     | Flake check    | by hand only                                        | Repeats one test N times on the CI runner type to prove a flake fix                                                            |
 
 So `Tudu Staging` is not a leftover: it is the staging **Mac app**, while `Deploy staging` is the staging **web and
 API**. Both are needed. They stay separate (different runners: macOS on GitHub vs the self-hosted Dokploy runner;
@@ -40,16 +40,16 @@ Tests: flake check · Tests: PR + master.
 
 ### Job names (only where unclear)
 
-| Workflow   | Old job name                         | New job name                 | Why                                                                  |
-| ---------- | ------------------------------------ | ---------------------------- | -------------------------------------------------------------------- |
-| Tests      | `End-to-end (n/4)`                   | `Web end-to-end (n/4)`       | Says it is the web app, not the Mac app                              |
-| Tests      | `Desktop (macOS)`                    | `Mac app (macOS)`            | "desktop" is also the Playwright project name for the 1440px browser |
-| Tests      | `API image`                          | `API Docker image`           | Clearer                                                              |
-| Staging web| `Build images on the host and deploy`| `Build and deploy`           | Shorter; the workflow name already says where                        |
-| Staging web| `Smoke test staging`                 | `Smoke test`                 | Same                                                                 |
-| Staging Mac| `Build Tudu Staging`                 | `Build, sign and publish`    | Says it also replaces the `staging` pre-release                      |
-| Production | `Tudu for macOS`                     | `Mac app`                    | Same words as everywhere else                                        |
-| Production | `Production images and deploy`       | `Web + API: build and deploy`| Same words as staging                                                |
+| Workflow    | Old job name                          | New job name                  | Why                                                                  |
+| ----------- | ------------------------------------- | ----------------------------- | -------------------------------------------------------------------- |
+| Tests       | `End-to-end (n/4)`                    | `Web end-to-end (n/4)`        | Says it is the web app, not the Mac app                              |
+| Tests       | `Desktop (macOS)`                     | `Mac app (macOS)`             | "desktop" is also the Playwright project name for the 1440px browser |
+| Tests       | `API image`                           | `API Docker image`            | Clearer                                                              |
+| Staging web | `Build images on the host and deploy` | `Build and deploy`            | Shorter; the workflow name already says where                        |
+| Staging web | `Smoke test staging`                  | `Smoke test`                  | Same                                                                 |
+| Staging Mac | `Build Tudu Staging`                  | `Build, sign and publish`     | Says it also replaces the `staging` pre-release                      |
+| Production  | `Tudu for macOS`                      | `Mac app`                     | Same words as everywhere else                                        |
+| Production  | `Production images and deploy`        | `Web + API: build and deploy` | Same words as staging                                                |
 
 Unchanged: `Lint and typecheck`, `Unit tests`, `Version and notes`, `Publish the release`, the flake check jobs.
 

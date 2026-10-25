@@ -1,7 +1,7 @@
-name: Flake check
+name: 'Tests: flake check'
 
 # Runs one test (or a group) many times on the same kind of runner CI uses, to prove a flake is gone before calling
-# it fixed. Started by hand (Actions › Flake check › Run workflow) on the branch with the fix.
+# it fixed. Started by hand (Actions › Tests: flake check › Run workflow) on the branch with the fix.
 
 on:
   workflow_dispatch:
