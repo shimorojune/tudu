@@ -4,6 +4,7 @@ export { cx } from './lib/cx';
 export { Icon, ICONS, type IconName, type IconProps } from './lib/icons';
 export { InkTick, PlainTick, TickSvg, INK_SHAPE, INK_PATH, TICK_PATH } from './lib/ink';
 export { Sparkle, useSpark } from './lib/spark';
+export { copyText } from './lib/clipboard';
 export {
   useControllable,
   useOutside,

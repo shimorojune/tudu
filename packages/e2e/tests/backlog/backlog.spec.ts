@@ -80,6 +80,8 @@ test.describe('backlog', () => {
     await expect(sheet(page).getByRole('group', { name: 'View' })).toBeVisible();
     // the same rows as Today: the ID in the byline, no date
     await expect(rowsOf(todoList(page)).locator('.tp-sg-id')).toHaveText(['ME-1', 'ME-2', 'ME-3']);
+    // the ID copies the task's link, as on Today
+    await expect(todoList(page).getByRole('button', { name: 'Copy link to ME-2' })).toBeVisible();
     await expect(rowsOf(todoList(page)).locator('.tp-sg-due')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Add to the Backlog…' })).toBeVisible();
     // no arrows, no ring

@@ -16,6 +16,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
+import { copyText, COPY_FAILED_WORDS, COPY_ID_FAILED_WORDS } from '../lib/clipboard';
 import { cx } from '../lib/cx';
 import { JiraMark } from './JiraMark';
 import { useOutside } from '../lib/hooks';
@@ -32,7 +33,7 @@ import { ProjectMenu, type ProjectOption } from './ProjectMenu';
 import { RichTextContent, RichTextEditor, toHtml } from './RichTextEditor';
 import { Skeleton } from './Skeleton';
 import { SubtaskList, type SubtaskItem } from './SubtaskList';
-import type { TaskCarried } from './TaskRow';
+import { COPY_FLASH_MS, CopyMark, type TaskCarried } from './TaskRow';
 import { showToast } from './Toast';
 
 export interface DetailComment {
@@ -361,13 +362,29 @@ export function TaskDetail(p: TaskDetailProps) {
     return () => clearTimeout(tm);
   }, [fresh]);
 
-  function copy(text: string, msg: string) {
-    try {
-      void navigator.clipboard?.writeText(text).catch(() => {});
-    } catch {
-      /* no clipboard here; the toast still confirms */
-    }
-    showToast(msg);
+  async function copy(text: string, msg: string, failed: string): Promise<boolean> {
+    const ok = await copyText(text);
+    showToast(ok ? msg : failed);
+    return ok;
+  }
+
+  const [idCopied, setIdCopied] = useState(false);
+  const idTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (idTimer.current) clearTimeout(idTimer.current);
+    },
+    [],
+  );
+  /** The ID chip: the task's link when there is one, else the ID. The tick and wash wait for the clipboard. */
+  async function copyFromChip() {
+    const ok = p.link
+      ? await copy(p.link, 'Link copied', COPY_FAILED_WORDS)
+      : await copy(t.id!, `Copied ${t.id}`, COPY_ID_FAILED_WORDS);
+    if (!ok) return;
+    setIdCopied(true);
+    if (idTimer.current) clearTimeout(idTimer.current);
+    idTimer.current = setTimeout(() => setIdCopied(false), COPY_FLASH_MS);
   }
 
   const tomorrow = addDays(today, 1);
@@ -390,12 +407,13 @@ export function TaskDetail(p: TaskDetailProps) {
       {t.id ? (
         <button
           type="button"
-          className="tp-td-id"
-          title="Copy task ID"
-          aria-label={`Copy task ID ${t.id}`}
-          onClick={() => copy(t.id!, `Copied ${t.id}`)}
+          className={cx('tp-td-id', idCopied && 'tp-flash')}
+          title={p.link ? 'Copy link' : 'Copy task ID'}
+          aria-label={p.link ? `Copy link to ${t.id}` : `Copy task ID ${t.id}`}
+          onClick={() => void copyFromChip()}
         >
-          {t.id}
+          <span>{t.id}</span>
+          {p.link ? <CopyMark /> : null}
         </button>
       ) : null}
       <span className="tp-td-sp" />
@@ -418,9 +436,18 @@ export function TaskDetail(p: TaskDetailProps) {
         <Menu
           label="More"
           items={[
-            p.link ? { label: 'Copy link to task', onSelect: () => copy(p.link!, 'Link copied') } : null,
+            p.link
+              ? {
+                  label: 'Copy link to task',
+                  onSelect: () => void copy(p.link!, 'Link copied', COPY_FAILED_WORDS),
+                }
+              : null,
             t.id
-              ? { label: 'Copy task ID', hint: t.id, onSelect: () => copy(t.id!, `Copied ${t.id}`) }
+              ? {
+                  label: 'Copy task ID',
+                  hint: t.id,
+                  onSelect: () => void copy(t.id!, `Copied ${t.id}`, COPY_ID_FAILED_WORDS),
+                }
               : null,
             p.onDelete && !readOnly ? { label: 'Delete task', danger: true, onSelect: p.onDelete } : null,
           ]}

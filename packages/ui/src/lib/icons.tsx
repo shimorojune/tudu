@@ -3,6 +3,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   Bell,
+  Check,
   Calendar,
   ChevronLeft,
   ChevronRight,
@@ -17,6 +18,7 @@ import {
   House,
   Inbox,
   Laptop,
+  Link2,
   List,
   Lock,
   LogOut,
@@ -83,6 +85,10 @@ export const ICONS = {
   unread: CircleDot,
   /** Mark as read: the empty ring. */
   read: Circle,
+  /** Copy a task's link (the ID chip). */
+  link: Link2,
+  /** Copied. */
+  check: Check,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

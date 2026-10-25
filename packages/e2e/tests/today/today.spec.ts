@@ -208,14 +208,20 @@ test.describe('today', () => {
       .toEqual(['Water the plants']);
   });
 
-  test('C02-E09 copying a task ID says so and puts it on the clipboard', async ({ page, context }) => {
+  test('C02-E09 the row’s ID copies the task’s link: it says so, the clipboard holds it, and the link opens the task', async ({
+    page,
+    context,
+  }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await signInFresh(page);
     await writeTasks(page, ['Pay the electricity bill']);
     await idle(page);
-    await page.getByRole('button', { name: 'Copy task ID ME-1' }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Copied ME-1' })).toBeVisible();
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('ME-1');
+    await page.getByRole('button', { name: 'Copy link to ME-1' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Link copied' })).toBeVisible();
+    const link = await page.evaluate(() => navigator.clipboard.readText());
+    expect(link).toBe(`${new URL(page.url()).origin}/t/ME-1`);
+    await page.goto(link);
+    await expect(page.getByRole('textbox', { name: 'Task title' })).toHaveValue('Pay the electricity bill');
   });
 
   test('C02-E10 offline: changes keep working, the banner says so, and they sync when back', async ({

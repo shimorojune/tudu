@@ -1,5 +1,6 @@
 import { addDays, formatDay, isoToday, type IsoDate } from '@tudu/core';
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import { copyText, COPY_FAILED_WORDS, COPY_ID_FAILED_WORDS } from '../lib/clipboard';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
 import { InkTick, PlainTick } from '../lib/ink';
@@ -41,6 +42,8 @@ export interface TaskRowProps {
   title: string;
   /** The task ID people see ("ME-41"), last in the byline; click it to copy. Missing until the server numbers it. */
   id?: string | null;
+  /** The task's own page; clicking the ID copies this. Without it the ID copies itself. */
+  link?: string;
   done?: boolean;
   onToggle?: (done: boolean) => void;
   /** Click anywhere on the row (not the checkbox, byline items or a drag) to open the task. */
@@ -175,6 +178,16 @@ function Grip() {
   );
 }
 
+/** The ID chip's link mark, which turns into a tick once copied. Both drawn, CSS shows one. */
+export function CopyMark() {
+  return (
+    <span className="tp-copy-ic" aria-hidden="true">
+      <Icon name="link" size={13} className="tp-copy-ln" />
+      <Icon name="check" size={13} stroke={2.4} className="tp-copy-ok" />
+    </span>
+  );
+}
+
 /** How long the copied ID stays lit. */
 export const COPY_FLASH_MS = 700;
 
@@ -210,19 +223,19 @@ export function TaskRow(p: TaskRowProps) {
     p.onToggle?.(next);
   }
 
-  function copyId(e: MouseEvent) {
+  async function copyId(e: MouseEvent) {
     e.stopPropagation();
     if (!id) return;
-    try {
-      void navigator.clipboard?.writeText(id).catch(() => {});
-    } catch {
-      /* no clipboard here; the toast still confirms */
+    const link = p.link;
+    if (!(await copyText(link ?? id))) {
+      showToast(link ? COPY_FAILED_WORDS : COPY_ID_FAILED_WORDS);
+      return;
     }
-    // The ID itself never changes (nothing shifts): it flashes softly and a toast confirms.
+    // The ID itself never changes (nothing shifts): the link mark turns to a tick and a toast confirms.
     setCopied(true);
     if (copyTimer.current) clearTimeout(copyTimer.current);
     copyTimer.current = setTimeout(() => setCopied(false), COPY_FLASH_MS);
-    showToast(`Copied ${id}`);
+    showToast(link ? 'Link copied' : `Copied ${id}`);
   }
 
   function pick(k: 'carried' | 'due' | 'plan', el: HTMLElement) {
@@ -287,11 +300,12 @@ export function TaskRow(p: TaskRowProps) {
         key="id"
         type="button"
         className={cx('tp-sg tp-sg-id tp-mono', copied && 'tp-flash')}
-        title="Copy task ID"
-        aria-label={`Copy task ID ${id}`}
-        onClick={copyId}
+        title={p.link ? 'Copy link' : 'Copy task ID'}
+        aria-label={p.link ? `Copy link to ${id}` : `Copy task ID ${id}`}
+        onClick={(e) => void copyId(e)}
       >
         <span>{id}</span>
+        {p.link ? <CopyMark /> : null}
       </button>,
     );
   }

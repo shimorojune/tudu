@@ -1,6 +1,6 @@
 # The task ID chip copies the task's link
 
-Status: proposal, waiting for Rohit's approval. Canvas: approved 24 Oct 2026 (board `D-CopyLink` on the Task detail page, v67),
+Status: approved by Rohit 25 Oct 2026; implemented. Canvas: approved 24 Oct 2026 (board `D-CopyLink` on the Task detail page, v67),
 light and dark.
 
 ## What Rohit asked for
@@ -12,7 +12,7 @@ others." The link is what gets sent to people; the bare ID is the rarer need.
 
 - **The ID chip in the task panel** (top left, `LM-1`) copies the task's link, `<origin>/t/LM-1`, the same address
   "Copy link to task" in ⋯ copies today. Tooltip "Copy link", accessible name "Copy link to LM-1".
-- **The ID in a row's byline** (Today, Week, Backlog, every `TaskList`) does the same.
+- **The ID in a row's byline** (Today and Backlog; Week's tiles show no ID) does the same.
 - On hover or keyboard focus a small link mark fades in and slides 4px out beside the ID (dur-menu 160ms,
   ease-arrive). The chip grows only to the right, into empty space, so nothing else moves.
 - On a successful copy the mark scales into a tick (160ms), the chip keeps its wash for `COPY_FLASH_MS` (700ms) and a
@@ -38,7 +38,7 @@ others." The link is what gets sent to people; the bare ID is the rarer need.
    lands after a successful write.
 5. `TaskList`: new `linkFor?: (t: TaskItem) => string | undefined` prop, passed to each row as `link`.
 6. `apps/web`: one `taskLink(ref)` in `app/links.ts` (`${window.location.origin}/t/${ref}`) replaces the five inline
-   `linkFor` lambdas (Today, Week, Backlog, Inbox, People) and is passed to `TaskList` on Today, Week and Backlog.
+   `linkFor` lambdas (Today, Week, Backlog, Inbox, People) and is passed to `TaskList` on Today and Backlog (Week's brief rows have no ID chip).
    On the Mac app the window's origin is the hosted app (`tudu.ezdev.net`, or staging), so the link is shareable there
    too.
 7. CSS in `components.css`: the icon slot (`width 0 → 13px`, opacity, `translateX(-4px) → 0`), the tick swap and the
@@ -52,28 +52,28 @@ others." The link is what gets sent to people; the bare ID is the rarer need.
 
 Unit (Vitest, `packages/ui`):
 
-| ID                | Where             | Scenario                                                                                                                               |
-| ----------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| C02-U04 (update)  | TaskRow.test      | With `link`, clicking the ID writes the link, flashes in place, toast "Link copied", the row does not open; flash clears after 700ms   |
-| C02-U24 (new)     | TaskRow.test      | Without `link`, the ID chip keeps copying the ID ("Copy task ID ME-58", "Copied ME-58")                                                |
-| C02-U25 (new)     | TaskRow.test      | Clipboard rejects: no `tp-flash`, toast "Couldn’t copy the link. Try again."                                                         |
-| C02-U26 (new)     | TaskRow.test      | Accessible name "Copy link to ME-58", tooltip "Copy link"; the link and tick icons are `aria-hidden`                                  |
-| C03-U08 (update)  | TaskDetail.test   | ⋯ still lists Copy link to task, Copy task ID · ME-52, Delete task; the copies toast only after the write resolves                    |
-| C03-U25 (new)     | TaskDetail.test   | The top ID chip copies `https://tudu.test/t/ME-52`, gets `tp-flash`, toast "Link copied"; without `link` it copies the ID           |
-| C03-U26 (new)     | TaskDetail.test   | Clipboard missing or rejecting: error toast, no flash, nothing thrown                                                                  |
-| C03-U27 (new)     | TaskDetail.test   | CSS: the icon slot animates width/opacity/transform with `--dur-menu` `--ease-arrive`; reduced motion drops the transform              |
-| new               | clipboard.test    | `copyText` true on resolve, false on reject, false when `navigator.clipboard` is absent or `writeText` throws synchronously           |
-| new               | TaskList.test     | `linkFor` reaches each row: the byline chip of the second task is named "Copy link to" its ID                                         |
+| ID               | Where           | Scenario                                                                                                                             |
+| ---------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| C02-U04 (update) | TaskRow.test    | With `link`, clicking the ID writes the link, flashes in place, toast "Link copied", the row does not open; flash clears after 700ms |
+| C02-U24 (new)    | TaskRow.test    | Without `link`, the ID chip keeps copying the ID ("Copy task ID ME-58", "Copied ME-58")                                              |
+| C02-U25 (new)    | TaskRow.test    | Clipboard rejects: no `tp-flash`, toast "Couldn’t copy the link. Try again."                                                         |
+| C02-U26 (new)    | TaskRow.test    | Accessible name "Copy link to ME-58", tooltip "Copy link"; the link and tick icons are `aria-hidden`                                 |
+| C03-U08 (update) | TaskDetail.test | ⋯ still lists Copy link to task, Copy task ID · ME-52, Delete task; the copies toast only after the write resolves                   |
+| C03-U25 (new)    | TaskDetail.test | The top ID chip copies `https://tudu.test/t/ME-52`, gets `tp-flash`, toast "Link copied"; without `link` it copies the ID            |
+| C03-U26 (new)    | TaskDetail.test | Clipboard missing or rejecting: error toast, no flash, nothing thrown                                                                |
+| C03-U27 (new)    | TaskDetail.test | CSS: the icon slot animates width/opacity/transform with `--dur-menu` `--ease-arrive`; reduced motion drops the transform            |
+| new              | clipboard.test  | `copyText` true on resolve, false on reject, false when `navigator.clipboard` is absent or `writeText` throws synchronously          |
+| new              | TaskList.test   | `linkFor` reaches each row: the byline chip of the second task is named "Copy link to" its ID                                        |
 
 E2E (Playwright, `packages/e2e`):
 
-| ID                | Where            | Scenario                                                                                                                 |
-| ----------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| C02-E09 (update)  | today.spec       | Clicking the row's ID says "Link copied" and the clipboard holds `<origin>/t/ME-1`; opening that address opens the task |
-| C03-E10 (extend)  | detail.spec      | The panel's ID chip copies `<origin>/t/ME-1` with "Link copied"; ⋯ › Copy task ID still copies `ME-1`                   |
-| C03-E17 (new)     | detail.spec      | Clipboard permission denied: the error toast shows and no "Link copied"                                                  |
-| detail.spec:58    | detail.spec      | Update the locator from "Copy task ID ME-2" to "Copy link to ME-2"                                                       |
-| week / backlog    | week, backlog    | One check each that the row chip is "Copy link to …" (the `linkFor` wiring on those pages)                               |
+| ID               | Where         | Scenario                                                                                                                |
+| ---------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| C02-E09 (update) | today.spec    | Clicking the row's ID says "Link copied" and the clipboard holds `<origin>/t/ME-1`; opening that address opens the task |
+| C03-E10 (extend) | detail.spec   | The panel's ID chip copies `<origin>/t/ME-1` with "Link copied"; ⋯ › Copy task ID still copies `ME-1`                   |
+| C03-E17 (new)    | detail.spec   | Clipboard permission denied: the error toast shows and no "Link copied"                                                 |
+| detail.spec:58   | detail.spec   | Update the locator from "Copy task ID ME-2" to "Copy link to ME-2"                                                      |
+| week / backlog   | week, backlog | One check each that the row chip is "Copy link to …" (the `linkFor` wiring on those pages)                              |
 
 `docs/tests/chunk-02.md` and `chunk-03.md` get the new and changed rows.
 

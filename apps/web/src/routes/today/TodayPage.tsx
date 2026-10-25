@@ -46,6 +46,7 @@ import { taskStore, useOnline } from '../../app/tasks';
 import { useViewport, type Viewport } from '../../app/viewport';
 import { useWorkingDay } from '../../app/workingDay';
 import { TaskPanel, type OpenTask } from './TaskPanel';
+import { taskLink, rowLink } from '../../app/links';
 
 /** A swipe this wide (and wider than it is tall) turns the day on phones. */
 const SWIPE_PX = 60;
@@ -240,7 +241,7 @@ export function TodayPage() {
         if (search.task !== ref)
           void navigate({ href: `${here}?task=${encodeURIComponent(ref)}`, replace: true });
       }}
-      linkFor={(ref) => `${window.location.origin}/t/${ref}`}
+      linkFor={taskLink}
     />
   );
   return (
@@ -401,6 +402,7 @@ function DaySheet({
   else
     body = (
       <TaskList
+        linkFor={rowLink}
         onSignal={(t, k) => {
           if (k === 'jira' && t.jira) openInJira(spaceId, t.jira);
         }}

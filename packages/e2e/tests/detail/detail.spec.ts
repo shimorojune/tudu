@@ -55,7 +55,7 @@ test.describe('detail', () => {
     await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const p = await openTask(page, 'Review Quick Add PR');
     await expect(page).toHaveURL(/\?task=ME-2$/);
-    await expect(p.getByRole('button', { name: 'Copy task ID ME-2' })).toBeVisible();
+    await expect(p.getByRole('button', { name: 'Copy link to ME-2' })).toBeVisible();
     const title = p.getByRole('textbox', { name: 'Task title' });
     await title.fill('Review Quick Add PR before Monday');
     await title.press('Enter');
@@ -343,10 +343,42 @@ test.describe('detail', () => {
     const origin = new URL(page.url()).origin;
     const copied = await page.evaluate(() => navigator.clipboard.readText()).catch(() => null);
     if (copied !== null) expect(copied).toBe(`${origin}/t/ME-1`);
+    // the ID at the top copies the same link; ⋯ › Copy task ID still gives the bare ID
+    await panel(page).getByRole('button', { name: 'Copy link to ME-1' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Link copied' })).toBeVisible();
+    const fromChip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => null);
+    if (fromChip !== null) expect(fromChip).toBe(`${origin}/t/ME-1`);
+    await panel(page).getByRole('button', { name: 'More', exact: true }).click();
+    await page.getByRole('menuitem', { name: /Copy task ID/ }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Copied ME-1' })).toBeVisible();
+    const bare = await page.evaluate(() => navigator.clipboard.readText()).catch(() => null);
+    if (bare !== null) expect(bare).toBe('ME-1');
     // a link to a task that is not there goes back to the day
     await page.goto('/t/ME-9');
     await expect(page).toHaveURL(/\/me$/);
     await expect(panel(page)).toHaveCount(0);
+  });
+
+  test('C03-E17 when the clipboard says no, the ID chip says it could not copy and nothing claims it did', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: () => Promise.reject(new DOMException('denied', 'NotAllowedError')) },
+        configurable: true,
+      });
+    });
+    await signInFresh(page);
+    await writeTasks(page, ['Pay the electricity bill']);
+    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
+    await openTask(page, 'Pay the electricity bill');
+    const chip = panel(page).getByRole('button', { name: 'Copy link to ME-1' });
+    await chip.click();
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Couldn’t copy the link. Try again.' }),
+    ).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Link copied' })).toHaveCount(0);
+    await expect(chip).not.toHaveClass(/tp-flash/);
   });
 
   test('C03-E11 phone: the detail is its own page; ‹ Today goes back; subtasks and a comment on the phone', async ({

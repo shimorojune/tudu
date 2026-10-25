@@ -42,6 +42,8 @@ export interface TaskListProps {
   onToggleTask?: (task: TaskItem, done: boolean) => void;
   /** Click anywhere on a row to open it. */
   onOpenTask?: (task: TaskItem) => void;
+  /** A task's own page: clicking a row's ID copies it. */
+  linkFor?: (task: TaskItem) => string | undefined;
   onSignal?: (task: TaskItem, kind: TaskSignal) => void;
   /**
    * Write a new task: at the end, or slotted in above `before` (the "+" between rows). Return the new row's key so
@@ -417,6 +419,7 @@ export function TaskList(p: TaskListProps) {
               <TaskRow
                 title={t.title}
                 id={t.id}
+                link={p.linkFor?.(t)}
                 done={leaving[t.key] ?? !!t.done}
                 due={t.due}
                 carried={t.carried}
