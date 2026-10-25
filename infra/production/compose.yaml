@@ -1,6 +1,6 @@
 # Production, as deployed by Dokploy (project Tudu, environment production, service tudu-production-app), with the
-# domains tudu.ezdev.net (web) and api.tudu.ezdev.net (api). The Release workflow builds the images on the Dokploy
-# host (no registry) and deploys this file (.github/workflows/release.yml). Secret values live in Dokploy's env.
+# domains tudu.ezdev.net (web) and api.tudu.ezdev.net (api). The Production: release workflow builds the images on the
+# Dokploy host (no registry) and deploys this file (.github/workflows/release.yml). Secret values live in Dokploy's env.
 services:
   api:
     image: tudu-api:production

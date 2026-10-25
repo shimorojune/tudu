@@ -1,6 +1,6 @@
-name: Tudu Staging
+name: 'Staging: build Mac app'
 
-# Every merge to master: Tudu Staging (the app against the staging API) built and signed for the updater, and put on
+# Every merge to master: the Tudu Staging Mac app (the app against the staging API) built and signed for the updater, and put on
 # the rolling `staging` pre-release. Its version is the next patch after the latest release plus this run's number
 # (0.37.1-staging.132), so each build is newer than the last and older than the next release. Tudu Staging updates
 # itself from it through the staging API's feed.
@@ -22,7 +22,7 @@ env:
 
 jobs:
   build:
-    name: Build Tudu Staging
+    name: Build, sign and publish
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4

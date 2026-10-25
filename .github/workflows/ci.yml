@@ -1,4 +1,4 @@
-name: CI
+name: 'Tests: PR + master'
 
 on:
   pull_request:
@@ -75,7 +75,7 @@ jobs:
           if-no-files-found: ignore
 
   e2e:
-    name: End-to-end (${{ matrix.shard }}/4)
+    name: Web end-to-end (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -138,7 +138,7 @@ jobs:
   # The API image builds and starts (chunk 13 bundles the close-matches model into it, on a Debian base): proved
   # here on a GitHub runner, since staging builds it on the Dokploy host only after a merge.
   api-image:
-    name: API image
+    name: API Docker image
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -160,7 +160,7 @@ jobs:
   # for the run) and driven over its control channel; plus the Rust unit tests. GitHub's macOS runner has no
   # service containers, so Postgres runs on the runner itself; attachments stay in memory.
   desktop:
-    name: Desktop (macOS)
+    name: Mac app (macOS)
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4

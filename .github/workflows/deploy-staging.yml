@@ -1,4 +1,4 @@
-name: Deploy staging
+name: 'Staging: deploy web + API'
 
 on:
   push:
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build-and-deploy:
-    name: Build images on the host and deploy
+    name: Build and deploy
     runs-on: [self-hosted, dokploy-deploy]
     steps:
       - uses: actions/checkout@v4
@@ -43,7 +43,7 @@ jobs:
         run: node scripts/wait-ready.mjs https://staging.tudu.ezdev.net https://api.staging.tudu.ezdev.net
 
   smoke:
-    name: Smoke test staging
+    name: Smoke test
     needs: build-and-deploy
     runs-on: [self-hosted, dokploy-deploy]
     steps:
