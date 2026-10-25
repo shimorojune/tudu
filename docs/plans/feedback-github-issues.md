@@ -1,6 +1,6 @@
 # Report from the top bar, follow it on GitHub
 
-Status: proposal, awaiting Rohit's approval. Canvas: approved 25 Oct 2026 (boards `K-FeedbackIssue` and
+Status: approved by Rohit 25 Oct 2026 (17:03); implemented on this branch. Canvas: approved 25 Oct 2026 (boards `K-FeedbackIssue` and
 `K-FeedbackIssue-Dark` on the Send feedback page, v80), light and dark. Token: a fine-grained token on Rohit's
 account for now (Rohit, 25 Oct); a bot account can replace it later without code changes.
 
@@ -62,7 +62,7 @@ first 8 characters of the feedback row id), so the team can find the private row
 1. **Env** (`env.ts`): `FEEDBACK_GITHUB_TOKEN` (optional), `FEEDBACK_GITHUB_REPO` (default `shimorojune/tudu`),
    `FEEDBACK_GITHUB_API` (default `https://api.github.com`; tests point it at the fake). No token: no issues, the
    form behaves as today (email only, "Thanks. That’s with the Tudu team now."), and the client is told so (below).
-2. **Migration `0013_feedback-issues.sql`**: on `feedback`, add `issue_number int`, `issue_url text`,
+2. **Migration `0014_feedback-issues.sql`**: on `feedback`, add `issue_number int`, `issue_url text`,
    `issue_state text` (`'none' | 'pending' | 'filed' | 'failed'`, default `'none'`), `issue_attempts int default 0`,
    `issue_claimed_at timestamptz`. Rows from before stay `'none'` ("Sent by email").
 3. **`feedback/github.ts`** (new): `IssueTracker` with `file(report): Promise<{ number, url }>`;
@@ -154,7 +154,7 @@ Server (`apps/server/src/feedback.test.ts`, against the fake tracker):
 | C19-A09 (new)    | No token: no issue, `issue: null, pending: false`, state stays `none`; `/mine` says `filing: 'email'`                          |
 | C19-A10 (new)    | `GET /api/feedback/mine`: only my reports, newest first, 20 at most, with issue and state; signed out is 401                   |
 | C19-A11 (new)    | The issue body never holds the user's name, email, id, a space name or the screenshot key (asserted on what the fake received) |
-| C19-A04 (update) | Migration 0013 adds the issue columns with their defaults; old rows read as `none`                                             |
+| C19-A04 (update) | Migration 0014 adds the issue columns with their defaults; old rows read as `none`                                             |
 
 Unit, UI (`packages/ui`):
 
@@ -199,3 +199,13 @@ C19-A03, C19-E02 to C19-E04, C19-E06, C19-E08. Their behaviour checks stay the s
 - Issue author: Rohit's account for now; switching to a bot account later is only a new token.
 - No open/closed status in Your reports for now. Showing it would need a GitHub read per row, cached. It could come
   later.
+
+## Notes from building it
+
+- The migration is `0014` (`0013_all-spaces` landed first).
+- The app-wide cap is `FEEDBACK_GITHUB_PER_HOUR` (default 30), so the end-to-end runs can raise it; production
+  leaves it unset.
+- Too many this hour (429) is no longer queued on the device: the form says it on the error line and keeps the words.
+  A report already waiting offline still waits on 429.
+- Until `/api/feedback/mine` answers, the form says it is public: a notice too many is better than one too few.
+- Your reports says the weekday for the five days before today, then the date, so "Thu" never means last week.
