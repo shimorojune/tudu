@@ -1,6 +1,6 @@
 # The task panel's Jira fact only where Jira is connected
 
-Status: draft for Rohit, 24 Oct 2026. Canvas: draft on the Jira page (boards `J-NoJira` and `J-NoJira-Dark`, sticky
+Status: proposal awaiting Rohit. Canvas: approved by Rohit 25 Oct 2026 on the Jira page (boards `J-NoJira` and `J-NoJira-Dark`, sticky
 `p04-nojira`), and "Jira is optional" (`J-Optional`) now passes the new mode to the panel. Kit: `TaskDetail` takes
 `jira={false}` (Tudu Paper v14/v15).
 
