@@ -325,7 +325,10 @@ export function taskRoutes(db: Db, hub: EventHub, embeddings: Embeddings) {
     // All spaces' own order: yours alone, so only your other tabs hear.
     const placed = applied.filter((a) => a.allPlace);
     if (placed.length) {
-      const event: AllSpacesChangedEvent = { days: [...new Set(placed.map((a) => a.allPlace!.day))], clientId };
+      const event: AllSpacesChangedEvent = {
+        days: [...new Set(placed.map((a) => a.allPlace!.day))],
+        clientId,
+      };
       hub.publish(userId, ALL_SPACES_CHANGED, event);
     }
     // New or changed words get their vector after the answer goes out (chunk 13).

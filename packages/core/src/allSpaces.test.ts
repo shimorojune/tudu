@@ -114,7 +114,7 @@ describe('All spaces (chunk 21)', () => {
     expect(spaceSlug('All', ['all-2'])).toBe('all-3');
   });
 
-  it('C21-U06 placing: between placed neighbours only the moved task is written; otherwise the day is numbered afresh', () => {
+  it('C21-U17 placing: between placed neighbours only the moved task is written; otherwise the day is numbered afresh', () => {
     const order = [
       { id: 'a', position: 1024 },
       { id: 'b', position: 2048 },

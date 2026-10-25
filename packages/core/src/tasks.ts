@@ -332,7 +332,9 @@ export function isInboxMutation(
 }
 
 /** A change to All spaces' order: yours alone, no task or list of a space changes. */
-export function isAllMutation(m: TaskMutationBody): m is Extract<TaskMutationBody, { type: `all.${string}` }> {
+export function isAllMutation(
+  m: TaskMutationBody,
+): m is Extract<TaskMutationBody, { type: `all.${string}` }> {
   return m.type.startsWith('all.');
 }
 

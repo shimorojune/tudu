@@ -404,7 +404,7 @@ test.describe('search', () => {
     await start(page);
     let release!: () => void;
     const held = new Promise<void>((r) => (release = r));
-    await page.route('**/api/spaces/*/search?q=*', async (route) => {
+    await page.route('**/api/search?q=*', async (route) => {
       await held;
       await route.continue();
     });

@@ -34,7 +34,22 @@ import {
   type Task,
   type TaskDetail,
 } from '@tudu/core';
-import { and, asc, count, eq, gte, inArray, isNotNull, isNull, lt, lte, or, schema, sql, type Db } from '@tudu/db';
+import {
+  and,
+  asc,
+  count,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  or,
+  schema,
+  sql,
+  type Db,
+} from '@tudu/db';
 import { readableBy } from './closeMatches';
 import type { SubtaskClocks, TaskClocks } from '@tudu/db/schema';
 
@@ -747,7 +762,8 @@ export async function applyMutation(db: Db, userId: string, raw: unknown): Promi
       .returning({ id: schema.appliedMutations.id });
     if (!claimed.length) {
       // Already applied: nothing changes, and the client gets the row as it is.
-      if (isProjectMutation(m) || isInboxMutation(m) || isSettingsMutation(m) || isAllMutation(m)) return null;
+      if (isProjectMutation(m) || isInboxMutation(m) || isSettingsMutation(m) || isAllMutation(m))
+        return null;
       const taskId = taskIdOf(m);
       const [t] = await tx
         .select({ spaceId: schema.tasks.spaceId, day: schema.tasks.day })

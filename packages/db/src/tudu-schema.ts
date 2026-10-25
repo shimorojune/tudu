@@ -486,7 +486,10 @@ export const allSpacesPlaces = pgTable(
     clock: timestamp('clock', { withTimezone: true }).notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.taskId] }), index('all_spaces_places_user_day').on(t.userId, t.day)],
+  (t) => [
+    primaryKey({ columns: [t.userId, t.taskId] }),
+    index('all_spaces_places_user_day').on(t.userId, t.day),
+  ],
 );
 
 export const appliedMutations = pgTable('applied_mutations', {
