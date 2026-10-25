@@ -19,3 +19,4 @@ export * from './versions';
 export * from './firstRun';
 export * from './feedback';
 export * from './menubar';
+export * from './allSpaces';
