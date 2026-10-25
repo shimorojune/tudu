@@ -3,7 +3,8 @@ import type { SpaceSummary } from '@tudu/core';
 import { Icon, Sheet, SheetBody, type IconName } from '@tudu/ui';
 import { openFeedback } from '../../app/feedback';
 import { useJira } from '../../app/jira';
-import { spacePath, useSpace, type View } from '../../app/space';
+import { useAllScope } from '../../app/allSpaces';
+import { pagePath, useSpace, type View } from '../../app/space';
 
 export interface MoreItem {
   value: View;
@@ -12,11 +13,28 @@ export interface MoreItem {
   hint: string;
 }
 
-/** What More keeps on phones: the Backlog, People in a team space, Apps and Settings (the Inbox is in the header). */
-export function moreItems(space: Pick<SpaceSummary, 'kind' | 'name'>, jira = false): MoreItem[] {
+/**
+ * What More keeps on phones: the Backlog, People in a team space, Apps and Settings (the Inbox is in the header).
+ * All spaces has no People or Apps of its own.
+ */
+export function moreItems(space: Pick<SpaceSummary, 'kind' | 'name'>, jira = false, all = false): MoreItem[] {
   const items: MoreItem[] = [
-    { value: 'backlog', label: 'Backlog', icon: 'backlog', hint: 'Tasks without a day' },
+    {
+      value: 'backlog',
+      label: 'Backlog',
+      icon: 'backlog',
+      hint: all ? 'Tasks without a day, in every space' : 'Tasks without a day',
+    },
   ];
+  if (all) {
+    items.push({
+      value: 'settings',
+      label: 'Settings',
+      icon: 'settings',
+      hint: 'You, your spaces, how Tudu looks',
+    });
+    return items;
+  }
   if (space.kind === 'team')
     items.push({ value: 'people', label: 'People', icon: 'team', hint: `Everyone in ${space.name}` });
   items.push({ value: 'apps', label: 'Apps', icon: 'plug', hint: jira ? 'Jira' : 'None yet' });
@@ -33,6 +51,7 @@ export function moreItems(space: Pick<SpaceSummary, 'kind' | 'name'>, jira = fal
 export function MorePage() {
   const navigate = useNavigate();
   const space = useSpace();
+  const all = !!useAllScope();
   const { conn } = useJira(space.id);
   return (
     <div className="app-page app-more">
@@ -48,12 +67,12 @@ export function MorePage() {
         </div>
         <SheetBody>
           <nav className="app-more-list" aria-label="More">
-            {moreItems(space, !!conn).map((it) => (
+            {moreItems(space, !!conn, all).map((it) => (
               <button
                 key={it.value}
                 type="button"
                 className="app-more-item"
-                onClick={() => void navigate({ href: spacePath(space.slug, it.value) })}
+                onClick={() => void navigate({ href: pagePath(space.slug, all, it.value) })}
               >
                 <span className="app-more-icon" aria-hidden="true">
                   <Icon name={it.icon} size={18} />

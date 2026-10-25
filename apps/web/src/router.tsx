@@ -6,19 +6,30 @@ import {
   redirect,
 } from '@tanstack/react-router';
 import { useQuery, type QueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
-import { PERSONAL_SLUG, spaceForSlug, type SpaceSummary, type TaskRefResponse } from '@tudu/core';
+import {
+  ALL_SLUG,
+  hasAllSpaces,
+  PERSONAL_SLUG,
+  spaceForSlug,
+  switcherOrder,
+  type SpaceSummary,
+  type TaskRefResponse,
+} from '@tudu/core';
 import type { MeResponse } from '@tudu/client';
 import { ToastHost } from '@tudu/ui';
 import { AppShell } from './app/AppShell';
 import { DesktopHost } from './app/DesktopHost';
 import { useLiveEvents } from './app/live';
-import { onSpaceGone, SettingsPage } from './app/settings';
-import { setSpaceGoneHandler } from './app/tasks';
+import { leftHere, onSpaceGone, SettingsPage } from './app/settings';
+import { setSpaceGoneHandler, taskStore } from './app/tasks';
 import { WorkingDayProvider } from './app/workingDay';
 import { api, loadMe, meQuery, queryClient, refreshMe } from './app/session';
+import { AllProvider, filterOf, targetOf, type AllScope } from './app/allSpaces';
 import {
+  ALL_VIEWS,
+  allPath,
   homePath,
   lastSpace,
   rememberSpace,
@@ -125,6 +136,11 @@ function legacy(path: string, view: View) {
     beforeLoad: ({ context, search }) => {
       const slug = lastSpace(context.me.spaces) ?? PERSONAL_SLUG;
       const q = search.task ? `?task=${encodeURIComponent(search.task)}` : '';
+      if (slug === ALL_SLUG)
+        throw redirect({
+          href: (ALL_VIEWS.includes(view) ? allPath(view) : spacePath(PERSONAL_SLUG, view)) + q,
+          replace: true,
+        });
       throw redirect({ href: spacePath(slug, view) + q, replace: true });
     },
   });
@@ -144,7 +160,8 @@ const taskLinkRoute = createRoute({
     const hit = await api
       .get<TaskRefResponse>(`/api/tasks/ref/${encodeURIComponent(params.ref)}`)
       .catch(() => null);
-    const slug = hit?.slug ?? lastSpace(context.me.spaces) ?? PERSONAL_SLUG;
+    const last = lastSpace(context.me.spaces);
+    const slug = hit?.slug ?? (last === ALL_SLUG ? null : last) ?? PERSONAL_SLUG;
     const view: View = hit && hit.day === null ? 'backlog' : 'today';
     throw redirect({
       href: `${spacePath(slug, view)}?task=${encodeURIComponent(params.ref)}`,
@@ -318,7 +335,8 @@ const inboxLayoutRoute = createRoute({
   beforeLoad: ({ context }) => {
     const me = context.me;
     const slug = lastSpace(me.spaces) ?? PERSONAL_SLUG;
-    const space = spaceBySlug(me.spaces, slug) ?? me.spaces[0]!;
+    const space =
+      spaceBySlug(me.spaces, slug) ?? me.spaces.find((s) => s.kind === 'personal') ?? me.spaces[0]!;
     return { space, me };
   },
   component: function InboxLayout() {
@@ -362,6 +380,119 @@ const oldInboxItemRoute = createRoute({
   validateSearch: inboxSearch,
   beforeLoad: oldInbox,
 });
+/** All spaces' address may name a space it is narrowed to: /all?space=northwind. */
+const allSearch = (s: Record<string, unknown>): { task?: string; space?: string } => ({
+  ...taskSearch(s),
+  ...(typeof s.space === 'string' && s.space ? { space: s.space } : {}),
+});
+
+/**
+ * All spaces, at /all: your own tasks from every space, in one list. A static path, so it wins over a space's
+ * `/$space` (the slug `all` is reserved for this). With fewer than two spaces there is nothing to gather: Personal.
+ */
+const allRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/all',
+  beforeLoad: ({ context }) => {
+    if (!hasAllSpaces(context.me.spaces)) throw redirect({ href: spacePath(PERSONAL_SLUG), replace: true });
+    rememberSpace(ALL_SLUG);
+    return { me: context.me };
+  },
+  component: function AllRoute() {
+    const ctx = allRoute.useRouteContext();
+    return <AllLayout me={ctx.me} />;
+  },
+});
+
+/**
+ * The shell around All spaces: the shell of the space a task written here goes to (Personal, or the filtered
+ * space), with All spaces' own sidebar. A space you stop being in while you look leaves the page, with a banner.
+ */
+function AllLayout({ me: ctxMe }: { me: MeResponse }) {
+  const navigate = useNavigate();
+  const loc = useRouterState({ select: (s) => s.location });
+  const { data: liveMe } = useQuery({ ...meQuery, initialData: ctxMe });
+  const me = liveMe ?? ctxMe;
+  const spaces = switcherOrder(me.spaces);
+  const slug = new URLSearchParams(loc.searchStr).get('space') ?? undefined;
+  const filter = filterOf(spaces, slug);
+  const target = targetOf(spaces, filter);
+  const [gone, setGone] = useState<{ name: string } | null>(null);
+  useLiveEvents(true);
+
+  // Back to one space: nothing to gather any more, so Personal.
+  const few = !hasAllSpaces(me.spaces);
+  useEffect(() => {
+    if (few) void navigate({ href: spacePath(PERSONAL_SLUG), replace: true });
+  }, [few, navigate]);
+  // A slug you are not in (a stale link, a space you left): the filter and its chip go.
+  useEffect(() => {
+    if (slug && !filter) {
+      const q = new URLSearchParams(loc.searchStr);
+      q.delete('space');
+      const qs = q.toString();
+      void navigate({ href: loc.pathname + (qs ? `?${qs}` : ''), replace: true });
+    }
+  }, [slug, filter, loc.pathname, loc.searchStr, navigate]);
+  useEffect(() => {
+    setSpaceGoneHandler((e) => {
+      taskStore.forgetSpace(e.spaceId);
+      // Left from Settings here: Settings says so itself.
+      if (!leftHere(e.spaceId)) setGone({ name: e.name });
+    });
+    return () => setSpaceGoneHandler(null);
+  }, []);
+
+  const scope: AllScope = {
+    spaces,
+    filter,
+    target,
+    setFilter: (id) => {
+      const next = id ? spaces.find((s) => s.id === id) : null;
+      const q = new URLSearchParams(loc.searchStr);
+      if (next) q.set('space', next.slug);
+      else q.delete('space');
+      const qs = q.toString();
+      void navigate({ href: loc.pathname + (qs ? `?${qs}` : ''), replace: true });
+    },
+    gone,
+    dismissGone: () => setGone(null),
+  };
+  if (few) return null;
+  return (
+    <WorkingDayProvider>
+      <SpaceProvider space={target}>
+        <AllProvider value={scope}>
+          <AppShell me={me} space={target} all>
+            <Outlet />
+          </AppShell>
+        </AllProvider>
+      </SpaceProvider>
+    </WorkingDayProvider>
+  );
+}
+
+const allTodayRoute = createRoute({
+  getParentRoute: () => allRoute,
+  path: '/',
+  validateSearch: allSearch,
+  component: TodayPage,
+});
+const allWeekRoute = createRoute({
+  getParentRoute: () => allRoute,
+  path: '/week',
+  validateSearch: allSearch,
+  component: WeekPage,
+});
+const allBacklogRoute = createRoute({
+  getParentRoute: () => allRoute,
+  path: '/backlog',
+  validateSearch: allSearch,
+  component: BacklogPage,
+});
+
+const allMoreRoute = createRoute({ getParentRoute: () => allRoute, path: '/more', component: MorePage });
+
 const kitRoute = createRoute({ getParentRoute: () => rootRoute, path: '/kit', component: KitPage });
 /**
  * The floating bar alone: the page the macOS app's floating window holds (the summon shows it). In the app it never
@@ -418,6 +549,7 @@ export const router = createRouter({
       ...legacyRoutes,
       taskLinkRoute,
       inboxLayoutRoute.addChildren([inboxRoute, inboxItemRoute]),
+      allRoute.addChildren([allTodayRoute, allWeekRoute, allBacklogRoute, allMoreRoute]),
       spaceRoute.addChildren([
         todayRoute,
         weekRoute,

@@ -40,7 +40,8 @@ import {
 import { editProjects, editProjectsHref } from './editProjects';
 import { goToTask } from './search';
 import { api } from './session';
-import { inboxPath, spacePath, useSpace } from './space';
+import { useAllScope } from './allSpaces';
+import { inboxPath, pagePath, spacePath, useSpace } from './space';
 import { taskStore, useOnline } from './tasks';
 import { useViewport } from './viewport';
 import { useWorkingDay } from './workingDay';
@@ -154,6 +155,7 @@ export function QuickAddHost({ me }: { me: MeResponse }) {
   const vp = useViewport();
   const open = useQuickAddOpen();
   const space = useSpace();
+  const all = useAllScope();
   const seed = useQuickAddSeed();
   // The top line: which space it goes to (this one unless the seed says otherwise), and for whom (you by default).
   const [sendTo, setSendTo] = useState<SendTo>({
@@ -182,9 +184,10 @@ export function QuickAddHost({ me }: { me: MeResponse }) {
   const loc = useRouterState({ select: (s) => s.location });
   // Tasks that read like the title, from the same search as the panel's, so "Looks like a task you have" can open one.
   const alike = useRef(new Map<string, SearchHit>());
+  // "Already in Northwind": about where the new task is going, so that space's tasks only.
   const similar = async (title: string): Promise<SimilarItem[]> => {
     const r = await api.get<SearchResponse>(
-      `/api/spaces/${space.id}/search?for=lookalike&q=${encodeURIComponent(title)}`,
+      `/api/spaces/${target.id}/search?for=lookalike&q=${encodeURIComponent(title)}`,
     );
     for (const h of r.hits) alike.current.set(h.id, h);
     return r.hits.map((h) => ({ key: h.id, title: h.title, where: searchWhere(h.day, h.done, a.today) }));
@@ -198,7 +201,7 @@ export function QuickAddHost({ me }: { me: MeResponse }) {
         const h = alike.current.get(it.key);
         if (!h) return;
         closeQuickAdd();
-        setTimeout(() => goToTask(h, a.today, (to) => void navigate({ href: to }), space.slug), 200);
+        setTimeout(() => goToTask(h, a.today, (to) => void navigate({ href: to }), target.slug), 200);
       }}
       variant={vp === 'phone' ? 'sheet' : 'bar'}
       today={a.today}
@@ -241,13 +244,15 @@ export function QuickAddHost({ me }: { me: MeResponse }) {
         if (t.toId) {
           // Sent: it waits in their Inbox, and in your Sent.
           const first = (to?.name ?? 'them').trim().split(/\s+/)[0]!;
-          showToast(sentToWords(first, target.id !== space.id ? target.name : undefined), {
+          showToast(sentToWords(first, all || target.id !== space.id ? target.name : undefined), {
             action: 'Show',
             onAction: () => void navigate({ href: inboxPath({ view: 'sent' }) }),
           });
           return;
         }
-        if (target.id !== space.id) {
+        // In All spaces a task of any space shows (of the filtered space, while filtered).
+        const inPage = all ? !all.filter || all.filter.id === target.id : target.id === space.id;
+        if (!inPage) {
           showToast(`${addedWords(t.planned, a.today)} in ${target.name}`, {
             action: 'Show',
             onAction: () => void navigate({ href: spacePath(target.slug, t.planned ? 'today' : 'backlog') }),
@@ -280,7 +285,7 @@ export function QuickAddHost({ me }: { me: MeResponse }) {
             action: 'Show',
             onAction: () => {
               showDay(t.planned, a.today);
-              void navigate({ href: `/${space.slug}` });
+              void navigate({ href: pagePath(space.slug, !!all) });
               setTimeout(() => flashTask(id, t.planned), 60);
             },
           });
@@ -295,7 +300,7 @@ export function QuickAddHost({ me }: { me: MeResponse }) {
           showToast(addedWords(null, a.today), {
             action: 'Show',
             onAction: () => {
-              void navigate({ href: `/${space.slug}/backlog` });
+              void navigate({ href: pagePath(space.slug, !!all, 'backlog') });
               setTimeout(() => flashTask(id, null), 60);
             },
           });
