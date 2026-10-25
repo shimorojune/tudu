@@ -151,7 +151,10 @@ export function feedbackRoutes(
         ),
       );
     if ((recent?.n ?? 0) >= FEEDBACK_PER_HOUR)
-      return c.json({ error: 'That’s a lot of reports in an hour. Your words are kept; send it a little later.' }, 429);
+      return c.json(
+        { error: 'That’s a lot of reports in an hour. Your words are kept; send it a little later.' },
+        429,
+      );
 
     const id = randomUUID();
     let shot: { name: string; type: string; body: Uint8Array; key: string } | null = null;
