@@ -340,12 +340,15 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 .tp-addtask { position: relative; display: flex; align-items: center; gap: 14px; min-height: var(--row-min-height); padding: 0 24px 0 26px; } /* the empty box sits exactly under the rows' checkboxes */
 .tp-addtask-box { flex: none; width: var(--checkbox); height: var(--checkbox); border-radius: var(--radius-xs); box-shadow: inset 0 0 0 1.5px var(--line); transition: box-shadow var(--dur-menu) var(--ease-change); }
 .tp-addtask:hover .tp-addtask-box, .tp-addtask.tp-adding .tp-addtask-box { box-shadow: inset 0 0 0 1.5px var(--check-border); }
-.tp-addtask-btn, .tp-addtask-input { flex: 1; min-width: 0; height: var(--row-min-height); font-family: var(--font-serif); font-style: italic; font-size: 21px; color: var(--ghost); text-align: left; transition: color var(--dur-menu) var(--ease-change); }
+.tp-addtask-btn, .tp-addtask-input { flex: 1; min-width: 0; height: var(--row-min-height); line-height: normal; font-family: var(--font-serif); font-style: italic; font-size: 21px; color: var(--ghost); text-align: left; transition: color var(--dur-menu) var(--ease-change); }
 .tp-addtask-btn:hover { color: var(--muted-foreground); }
 .tp-root .tp-addtask-input { border: 0; outline: none; background: transparent; padding: 0; font-family: var(--font-sans); font-style: normal; font-size: 16px; color: var(--foreground); caret-color: var(--brand); }
 .tp-addtask-input::placeholder { font-family: var(--font-serif); font-style: italic; font-size: 21px; color: var(--ghost); }
 .tp-addtask.tp-compact { padding: 0 16px 0 26px; }
 .tp-addtask.tp-compact .tp-addtask-btn, .tp-addtask.tp-compact .tp-addtask-input::placeholder { font-size: 19px; }
+/* line-height: normal on both: the button and the input then centre the same font box the same way, so the words do
+   not drop a pixel when the line opens (a 1.5 line box leaves a fractional gap the two round apart). Not the row's
+   height: WebKit would draw the caret that tall. */
 /* While the line is empty the input itself is set in the placeholder's serif, so the caret has the placeholder's
    height and baseline and sits right at its first letter; typing switches it to Geist. */
 .tp-root .tp-addtask-input:placeholder-shown { font-family: var(--font-serif); font-style: italic; font-size: 21px; }
