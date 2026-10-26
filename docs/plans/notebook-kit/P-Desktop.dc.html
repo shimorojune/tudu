@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Notebook, desktop</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/tudupaper/tokens.css">
+<link rel="stylesheet" href="ds/tudupaper/components/bundle.css">
+<script src="ds/tudupaper/components/bundle.js"></script>
+<link rel="stylesheet" href="kit/scratchpad.css">
+<script src="kit/scratchpad.js"></script>
+<script src="kit/scratchpad-data.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<x-import component-from-global-scope="TuduPaper.Desk" theme="light" gutter="{{ no }}">
+<style>
+.pd :is(x-import, sc-if) { display: contents; }
+.pd-tb { padding: 0 32px 0 8px; }
+.pd-tb .tp-ib.pd-padbtn.tp-on { color: var(--foreground); }
+.pd-split { display: flex; height: 100%; }
+.pd-l { flex: 0 0 300px; min-width: 0; border-right: 1px solid var(--line); }
+.pd-r { flex: 1; min-width: 0; }
+</style>
+<div class="pd" style="height: 100%; display: flex; align-items: stretch; background: var(--background); color: var(--foreground); font-family: var(--font-sans);">
+<div style="flex: 0 0 auto; min-width: 0; height: 100%;">
+<x-import component-from-global-scope="TuduPaper.Sidebar" head="{{ shHead }}" items="{{ nav }}" week="{{ week }}" spaces="{{ none }}" connected="{{ none }}" active="none"></x-import>
+</div>
+<main style="flex: 1 1 560px; min-width: 0; height: 100%; display: flex; flex-direction: column;">
+<header class="tp-root tp-topbar pd-tb"><span class="tp-tb-sp"></span><x-import component-from-global-scope="TuduPaper.IconButton" label="Report a bug or idea" tip-side="bottom" class-name="tp-tb-bug"><x-import component-from-global-scope="TuduPaper.Icon" name="bug" size="{{ 17 }}"></x-import></x-import><x-import component-from-global-scope="TuduPaper.IconButton" label="Search tasks and notes" tip-side="bottom"><x-import component-from-global-scope="TuduPaper.Icon" name="search" size="{{ 17 }}"></x-import></x-import><x-import component-from-global-scope="TuduPaper.IconButton" label="Notebook" tip-side="bottom" class-name="pd-padbtn tp-on"><x-import component-from-global-scope="TuduPaper.PadIcon" name="pad" size="{{ 17 }}"></x-import></x-import><x-import component-from-global-scope="TuduPaper.IconButton" label="Inbox" tip-side="bottom"><x-import component-from-global-scope="TuduPaper.Icon" name="inbox" size="{{ 17 }}"></x-import></x-import><x-import component-from-global-scope="TuduPaper.Button" variant="primary" icon="{{ plus }}">New task</x-import><x-import component-from-global-scope="TuduPaper.Avatar" initials="RR" name="Rohit Raj"></x-import></header>
+<div class="tp-scroll" style="flex: 1; min-height: 0; padding: 8px 20px 20px 8px; box-sizing: border-box;">
+<div class="tp-sheet" style="height: 100%; overflow: hidden;"><div class="pd-split">
+<div class="pd-l"><x-import component-from-global-scope="TuduPaper.PadTree" folders="{{ tree }}" pads="{{ looseNow }}" active="{{ treeActive }}" default-open="{{ openIds }}" trash-count="{{ trashCount }}" on-pick="{{ pick }}" on-new-pad="{{ newPad }}" on-new-folder="{{ newFolder }}" on-trash="{{ trash }}"></x-import></div>
+<div class="pd-r"><sc-if value="{{ inTrash }}" hint-placeholder-val="{{ false }}"><x-import component-from-global-scope="TuduPaper.PadTrash" items="{{ trashItems }}" on-restore="{{ restore }}" on-purge="{{ purge }}" on-empty="{{ empty }}"></x-import></sc-if><sc-if value="{{ inNote }}" hint-placeholder-val="{{ true }}"><x-import component-from-global-scope="TuduPaper.PadEditor" pad="{{ pad }}" save="{{ save }}" tasks="{{ tasks }}" folders="{{ tree }}" on-move="{{ move }}" on-delete="{{ del }}" on-edit="{{ edited }}" on-pop="{{ pop }}" on-link="{{ link }}" on-unlink="{{ unlink }}"></x-import></sc-if></div>
+</div></div>
+</div>
+</main>
+</div>
+</x-import>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+// The Notebook page, opened from the note button in the top bar (beside Search and Inbox: it is yours, not a space's).
+// Working: open folders, pick a note, type (a tick when it saves), link a task from any space, unlink one, ⋯ Move (pick a
+// folder; it moves in the tree too) and Delete (asks, then the note leaves and the next one opens; Undo brings it back).
+// Trash (bottom of the tree): what you deleted, Put back, Delete now and Empty Trash (both ask first).
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { openId: 'interviews', save: 'saved', extra: {}, moved: {}, gone: {}, view: 'note', old: ['t1', 't2', 't3'], binned: [] }; }
+  renderVals() {
+    var R = window.React, TP = window.TuduPaper, D = window.PadDemo, self = this;
+    var st = this.state;
+    // The tree as it stands after this visit's moves and deletes.
+    function cut(fs) { return fs.map(function (f) { return Object.assign({}, f, { folders: cut(f.folders || []), pads: (f.pads || []).filter(function (x) { return !st.gone[x.id] && !st.moved[x.id]; }) }); }); }
+    var tree = cut(D.FOLDERS), looseNow = D.LOOSE.filter(function (x) { return !st.gone[x.id] && !st.moved[x.id]; });
+    function at(fs, path) { var f = null; path.forEach(function (n) { f = (f ? f.folders : fs).filter(function (x) { return x.name === n; })[0] || f; }); return f; }
+    function placed(x) { var path = st.moved[x.id]; return Object.assign({}, x, { path: path, where: path.join(' / ') }); }
+    Object.keys(st.moved).forEach(function (id) { if (st.gone[id]) return; var x = placed(D.PADS[id]), f = x.path.length ? at(tree, x.path) : null; if (f) f.pads = [x].concat(f.pads); else looseNow = [x].concat(looseNow); });
+    var pad = Object.assign({}, D.PADS[st.openId] || D.PADS.interviews);
+    // Trash: three older notes, then whatever you delete here (newest first). A note "deleted for good" leaves both lists.
+    var OLD = { t1: { id: 't1', title: 'Gift ideas', where: 'Home', left: '29 days left' }, t2: { id: 't2', title: 'Old offsite ideas', where: 'Northwind / Planning', left: '12 days left' }, t3: { id: 't3', title: '', first: 'asdf', left: '2 days left' } };
+    var trashItems = st.binned.map(function (id) { var x = D.PADS[id]; return Object.assign({}, x, st.moved[id] ? { where: st.moved[id].join(' / ') } : {}, { left: '30 days left' }); })
+      .concat(st.old.map(function (id) { return OLD[id]; }));
+    if (st.moved[pad.id]) pad = placed(pad);
+    var ex = this.state.extra[pad.id];
+    if (ex) pad.linked = ex;
+    return { no: false, none: [], plus: R.createElement(TP.Icon, { name: 'plus', size: 15 }),
+      shHead: R.createElement(TP.SpaceSwitch, { spaces: D.SPACES, active: 'nw' }), nav: D.nav, week: D.week,
+      folders: D.FOLDERS, loose: D.LOOSE, tree: tree, looseNow: looseNow,
+      inTrash: st.view === 'trash', inNote: st.view !== 'trash', treeActive: st.view === 'trash' ? 'trash' : pad.id,
+      trashItems: trashItems, trashCount: trashItems.length,
+      restore: function (x) {
+        if (OLD[x.id]) self.setState({ old: self.state.old.filter(function (i) { return i !== x.id; }) });
+        else { var g = Object.assign({}, self.state.gone); delete g[x.id]; self.setState({ gone: g, binned: self.state.binned.filter(function (i) { return i !== x.id; }) }); }
+        TP.showToast('Put back' + (x.where ? ' in ' + x.where.split(' / ').pop() : '') + '.', { action: 'Open', onAction: function () { if (!OLD[x.id]) self.setState({ view: 'note', openId: x.id }); } });
+      },
+      purge: function (x) {
+        if (OLD[x.id]) self.setState({ old: self.state.old.filter(function (i) { return i !== x.id; }) });
+        else self.setState({ binned: self.state.binned.filter(function (i) { return i !== x.id; }) });
+        TP.showToast('Deleted for good.');
+      },
+      empty: function () { self.setState({ old: [], binned: [] }); TP.showToast('Trash is empty.'); }, openIds: D.OPEN, openId: pad.id, pad: pad, save: this.state.save, tasks: D.TASKS,
+      move: function (x, path) {
+        var was = st.moved[x.id] || x.path || [], m = Object.assign({}, st.moved); m[x.id] = path; self.setState({ moved: m });
+        TP.showToast(path.length ? 'Moved to ' + path[path.length - 1] + '.' : 'Moved out of its folder.', { action: 'Undo', onAction: function () { var b = Object.assign({}, self.state.moved); b[x.id] = was; self.setState({ moved: b }); } });
+      },
+      del: function (x) {
+        var next = ['interviews', 'demo', 'braindump', 'agenda', 'venues', 'sunday'].filter(function (id) { return id !== x.id && !st.gone[id]; })[0];
+        var g = Object.assign({}, st.gone); g[x.id] = true; self.setState({ gone: g, openId: next, save: 'saved', binned: [x.id].concat(st.binned.filter(function (i) { return i !== x.id; })) });
+        TP.showToast('Moved to Trash. It stays there for 30 days.', { action: 'Undo', onAction: function () { var b = Object.assign({}, self.state.gone); delete b[x.id]; self.setState({ gone: b, openId: x.id, view: 'note', binned: self.state.binned.filter(function (i) { return i !== x.id; }) }); } });
+      },
+      pick: function (x) { self.setState({ openId: x.id, save: 'saved', view: 'note' }); },
+      newPad: function (f) { TP.showToast(f ? 'A new note opens in ' + f.name + ', ready to type.' : 'A new note opens, ready to type.'); },
+      newFolder: function (f) { TP.showToast(f ? 'New folder inside ' + f.name + '. Name it in place.' : 'New folder. Name it in place.'); },
+      trash: function () { self.setState({ view: 'trash' }); },
+      pop: function () { TP.showToast('Opens this note in its own window, over every app.'); },
+      edited: function () { self.setState({ save: 'saving' }); clearTimeout(self._t); self._t = setTimeout(function () { self.setState({ save: 'saved' }); }, 900); },
+      link: function (t) { var cur = (self.state.extra[pad.id] || pad.linked || []).filter(function (x) { return x.id !== t.id; }); var e = Object.assign({}, self.state.extra); e[pad.id] = cur.concat([t]); self.setState({ extra: e }); },
+      unlink: function (t) { var cur = (self.state.extra[pad.id] || pad.linked || []).filter(function (x) { return x.id !== t.id; }); var e = Object.assign({}, self.state.extra); e[pad.id] = cur; self.setState({ extra: e }); TP.showToast('Unlinked from ' + t.id + '. The task is unchanged.', { action: 'Undo' }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

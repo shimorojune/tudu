@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Notebook, floating window on the Mac</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/tudupaper/tokens.css">
+<link rel="stylesheet" href="ds/tudupaper/components/bundle.css">
+<script src="ds/tudupaper/components/bundle.js"></script>
+<link rel="stylesheet" href="kit/scratchpad.css">
+<script src="kit/scratchpad.js"></script>
+<script src="kit/scratchpad-data.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<x-import component-from-global-scope="TuduPaper.Desk" theme="light" gutter="{{ no }}">
+<style>
+.pf :is(x-import, sc-if) { display: contents; }
+.pf-win { position: absolute; transition: left var(--dur-panel-in) var(--ease-settle), top var(--dur-panel-in) var(--ease-settle), width var(--dur-panel-in) var(--ease-settle), height var(--dur-panel-in) var(--ease-settle), opacity 220ms var(--ease-arrive), transform 220ms var(--ease-arrive); }
+.pf-win.pf-live { transition: opacity 220ms var(--ease-arrive), transform 220ms var(--ease-arrive); }
+/* Opening fades up with a hair of scale (220ms, arrive); closing sinks back the same way, a touch quicker (180ms, leave). */
+.pf-win.pf-gone { opacity: 0; transform: scale(.97) translateY(6px); pointer-events: none; transition: opacity 180ms var(--ease-leave), transform 180ms var(--ease-leave); }
+.pf-win.pf-arrive { animation: pf-in 220ms var(--ease-arrive) both; }
+@keyframes pf-in { from { opacity: 0; transform: scale(.97) translateY(6px); } }
+.pf-menubar { position: absolute; left: 0; right: 0; top: 0; height: 28px; display: flex; align-items: center; gap: 18px; padding: 0 16px; font-size: 13px; color: var(--foreground-2); background: color-mix(in srgb, var(--card) 55%, transparent); backdrop-filter: blur(16px); }
+.pf-key { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px; border: 0; border-radius: var(--radius-full); background: var(--card); color: var(--foreground); box-shadow: var(--shadow-pop); font: inherit; font-size: 13px; cursor: pointer; }
+.pf-key kbd { font-family: var(--font-mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { .pf-win, .pf-win.pf-gone { transition-duration: 1ms; } .pf-win.pf-arrive { animation-duration: 1ms; } }
+</style>
+<div class="pf" style="position: relative; width: 1440px; height: 900px; overflow: hidden; font-family: var(--font-sans); color: var(--foreground);
+  background: radial-gradient(1200px 700px at 18% 12%, color-mix(in srgb, var(--ember-200, #ffdcd5) 55%, transparent), transparent 60%), radial-gradient(900px 700px at 85% 90%, color-mix(in srgb, var(--jira-200, #bed3f2) 60%, transparent), transparent 60%), var(--background);">
+<div class="pf-menubar" aria-hidden="true"><b style="font-weight: 600;">Slack</b><span>File</span><span>Edit</span><span>View</span><span style="flex: 1;"></span><span>Sun 25 Oct 18:40</span></div>
+<div aria-hidden="true" style="position: absolute; left: 90px; top: 90px; width: 760px; height: 560px; border-radius: 14px; background: color-mix(in srgb, var(--card) 70%, transparent); box-shadow: var(--shadow-sheet); opacity: .75;">
+<div style="height: 34px; border-bottom: 1px solid var(--hair); display: flex; gap: 7px; align-items: center; padding: 0 14px;"><i style="width: 10px; height: 10px; border-radius: 50%; background: var(--border-strong);"></i><i style="width: 10px; height: 10px; border-radius: 50%; background: var(--border-strong);"></i><i style="width: 10px; height: 10px; border-radius: 50%; background: var(--border-strong);"></i></div>
+<div style="padding: 26px 28px; display: grid; gap: 14px;"><i style="height: 12px; width: 62%; border-radius: 6px; background: var(--skeleton);"></i><i style="height: 12px; width: 84%; border-radius: 6px; background: var(--skeleton);"></i><i style="height: 12px; width: 48%; border-radius: 6px; background: var(--skeleton);"></i><i style="height: 12px; width: 70%; border-radius: 6px; background: var(--skeleton);"></i><i style="height: 12px; width: 56%; border-radius: 6px; background: var(--skeleton);"></i></div>
+</div>
+<div class="{{ winClass }}" style="{{ winStyle }}">
+<x-import component-from-global-scope="TuduPaper.PadWindow" notebook="{{ nb }}" recent="{{ recent }}" tasks="{{ tasks }}" pinned="{{ pinned }}" expanded="{{ expanded }}" no-focus="{{ yes }}" on-pin="{{ pin }}" on-expand="{{ expand }}" on-close="{{ close }}" on-open-app="{{ openApp }}" on-drag-start="{{ dragStart }}" on-resize-start="{{ resizeStart }}"></x-import>
+</div>
+<sc-if value="{{ closed }}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 0; right: 0; bottom: 84px; display: flex; justify-content: center;"><button type="button" class="pf-key" onClick="{{ reopen }}"><span>Open a note again</span></button></div>
+</sc-if>
+<p style="position: absolute; left: 0; right: 0; bottom: 30px; margin: 0; text-align: center; font-size: 13px; color: var(--muted-foreground);">The note window floats over any app without bringing Tudu forward (opened with ↗ on any note for now; summoning it from anywhere comes later). Drag it by its bar, resize from the corner, double-click the bar or use the arrows to fill the screen. It stays put when you click away.</p>
+</div>
+</x-import>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+// The note window on the Mac: its own Tauri window, like Quick Add, so the desk never has to open. Unlike Quick Add it does
+// not hide when you click into another app (you write while reading something else). Pin keeps it above other windows; it
+// starts unpinned. Working: drag the bar, resize from the corner, pin, fill the screen (and back), pick a recent note
+// hide the recent list, close and open again.
+var STAGE = { w: 1440, h: 900, top: 28 };
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { x: 520, y: 140, w: 780, h: 560, pinned: false, expanded: false, closed: false, live: false, n: 0 }; }
+  renderVals() {
+    var s = this.state, self = this, D = window.PadDemo, TP = window.TuduPaper;
+    var box = s.expanded ? { x: 8, y: STAGE.top + 8, w: STAGE.w - 16, h: STAGE.h - STAGE.top - 16 } : { x: s.x, y: s.y, w: s.w, h: s.h };
+    function track(e, mode) {
+      if (s.expanded || (e.button !== undefined && e.button !== 0)) return;
+      if (mode === 'move' && e.target.closest && e.target.closest('button')) return;
+      e.preventDefault();
+      var sx = e.clientX, sy = e.clientY, o = { x: s.x, y: s.y, w: s.w, h: s.h };
+      var scale = (e.currentTarget && e.currentTarget.getBoundingClientRect && e.currentTarget.offsetWidth) ? e.currentTarget.getBoundingClientRect().width / e.currentTarget.offsetWidth : 1;
+      self.setState({ live: true });
+      function mv(ev) {
+        var dx = (ev.clientX - sx) / scale, dy = (ev.clientY - sy) / scale;
+        if (mode === 'move') self.setState({ x: Math.max(-o.w + 120, Math.min(STAGE.w - 120, o.x + dx)), y: Math.max(STAGE.top, Math.min(STAGE.h - 60, o.y + dy)) });
+        else self.setState({ w: Math.max(420, Math.min(STAGE.w - o.x, o.w + dx)), h: Math.max(300, Math.min(STAGE.h - o.y, o.h + dy)) });
+      }
+      function up() { document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); self.setState({ live: false }); }
+      document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up);
+    }
+    return { no: false, yes: true, recent: D.RECENT, nb: D.NOTEBOOK, tasks: D.TASKS, pinned: s.pinned, expanded: s.expanded, closed: s.closed,
+      winClass: 'pf-win' + (s.live ? ' pf-live' : '') + (s.closed ? ' pf-gone' : '') + '',
+      winStyle: 'left: ' + box.x + 'px; top: ' + box.y + 'px; width: ' + box.w + 'px; height: ' + box.h + 'px;',
+      pin: function () { self.setState({ pinned: !s.pinned }); TP.showToast(s.pinned ? 'Unpinned: other windows can cover it.' : 'Pinned: it stays above other windows.'); },
+      expand: function () { self.setState({ expanded: !s.expanded }); },
+      close: function () { self.setState({ closed: true }); },
+      reopen: function () { self.setState({ closed: false, n: s.n + 1 }); },
+      openApp: function () { TP.showToast('Opens this note on the Notebook page in Tudu.'); },
+      dragStart: function (e) { track(e, 'move'); },
+      resizeStart: function (e) { e.stopPropagation(); track(e, 'size'); }
+    };
+  }
+}
+</script>
+</body>
+</html>

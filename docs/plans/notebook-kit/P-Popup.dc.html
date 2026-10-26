@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A note popped out of the browser</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/tudupaper/tokens.css">
+<link rel="stylesheet" href="ds/tudupaper/components/bundle.css">
+<script src="ds/tudupaper/components/bundle.js"></script>
+<link rel="stylesheet" href="kit/scratchpad.css">
+<script src="kit/scratchpad.js"></script>
+<script src="kit/scratchpad-data.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<x-import component-from-global-scope="TuduPaper.Desk" theme="light" gutter="{{ no }}">
+<style>
+.pp :is(x-import, sc-if) { display: contents; }
+.pp-frame { position: absolute; left: 60px; top: 56px; width: 780px; height: 540px; display: flex; flex-direction: column; border-radius: 12px; overflow: hidden; background: var(--background); box-shadow: var(--shadow-pop), 0 40px 80px -30px rgba(40, 30, 10, .35); }
+.pp-chrome { flex: none; height: 34px; display: flex; align-items: center; gap: 7px; padding: 0 12px; border-bottom: 1px solid var(--hair); background: var(--muted); }
+.pp-chrome i { width: 10px; height: 10px; border-radius: 50%; background: var(--border-strong); }
+.pp-url { flex: 1; margin-left: 10px; height: 22px; display: flex; align-items: center; padding: 0 10px; border-radius: 6px; background: var(--card); font-family: var(--font-mono); font-size: 11.5px; color: var(--muted-foreground); }
+.pp-body { flex: 1; min-height: 0; }
+.pp-body .tp-pd-win.tp-root { border-radius: 0; box-shadow: none; }
+</style>
+<div class="pp" style="position: relative; width: 900px; height: 640px; overflow: hidden; font-family: var(--font-sans); color: var(--foreground); background: radial-gradient(900px 600px at 80% 90%, color-mix(in srgb, var(--jira-200, #bed3f2) 55%, transparent), transparent 60%), var(--background);">
+<div class="pp-frame"><div class="pp-chrome" aria-hidden="true"><i></i><i></i><i></i><span class="pp-url">tudu.app/note/onboarding-interview-notes</span></div>
+<div class="pp-body"><x-import component-from-global-scope="TuduPaper.PadWindow" notebook="{{ nb }}" variant="web" rail="{{ no }}" recent="{{ recent }}" active="interviews" tasks="{{ tasks }}" no-focus="{{ yes }}" open-label="Open in Tudu" on-open-app="{{ back }}" on-close="{{ close }}"></x-import></div></div>
+<p style="position: absolute; left: 0; right: 0; bottom: 14px; margin: 0; text-align: center; font-size: 12.5px; color: var(--muted-foreground);">↗ in the browser opens the note in a popup of its own (a new tab if popups are blocked). It is the same note page, so the recent list is one click away.</p>
+</div>
+</x-import>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":900,"height":640}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var D = window.PadDemo, TP = window.TuduPaper;
+    return { no: false, yes: true, recent: D.RECENT, nb: D.NOTEBOOK, tasks: D.TASKS,
+      back: function () { TP.showToast('Opens the Notebook page in your Tudu tab.'); },
+      close: function () { TP.showToast('Closes the popup. The note is saved.'); } };
+  }
+}
+</script>
+</body>
+</html>

@@ -77,7 +77,7 @@ number of tasks in any space, and a small window to write in without opening the
     - Every message reflows at any width, and nothing is ever squeezed.
 15. **No keyboard shortcuts** in this chunk: none are added and none are shown. They come later.
 
-## Decide before building (my recommendation first)
+## Decided (Rohit approved the proposal 26 Oct 02:55Z; all three recommendations taken)
 
 1. **What the web top-bar button does.** P-Web draws it toggling the floating panel. P-Desktop draws the same button
    opening the Notebook page in the Mac app. Recommendation: the button opens the Notebook page in both, and the

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Notebook, states</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/tudupaper/tokens.css">
+<link rel="stylesheet" href="ds/tudupaper/components/bundle.css">
+<script src="ds/tudupaper/components/bundle.js"></script>
+<link rel="stylesheet" href="kit/scratchpad.css">
+<script src="kit/scratchpad.js"></script>
+<script src="kit/scratchpad-data.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<x-import component-from-global-scope="TuduPaper.Desk" theme="light">
+<style>
+.st :is(x-import, sc-if) { display: contents; }
+.st-h { margin: 0; font-family: var(--font-mono); font-size: 11px; font-weight: 400; letter-spacing: .12em; text-transform: uppercase; color: var(--muted-foreground); }
+.st-sec { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.st-two { display: flex; height: 420px; overflow: hidden; }
+.st-two > .st-l { flex: 0 0 240px; min-width: 0; border-right: 1px solid var(--line); }
+.st-two > .st-r { flex: 1; min-width: 0; }
+.st-p { margin: 0; font-size: 13px; line-height: 19px; color: var(--muted-foreground); }
+.st-win { height: 420px; }
+.st-pick { position: relative; height: 330px; }
+.st-panel { padding: 4px 26px 22px; }
+.st-trash-row { display: flex; align-items: center; gap: 4px; }
+.st-trash-row > :first-child { flex: 1; min-width: 0; }
+.st-trash-row .tp-ib.st-trash-act { width: 30px; height: 30px; }
+.st-trash-row .st-trash-act { opacity: .55; transition: opacity var(--dur-menu) var(--ease-change); }
+.st-trash-row:hover .st-trash-act, .st-trash-row:focus-within .st-trash-act { opacity: 1; }
+@media (hover: none) { .st-trash-row .st-trash-act { opacity: 1; } }
+.st-fake-hover .tp-pd-fadd { opacity: 1; }
+.st-fake-hover .tp-pd-fcount { opacity: 0; }
+.st-fake-hover > .tp-pd-frow { background: color-mix(in srgb, var(--foreground) 4%, transparent); }
+.st-toasts { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+</style>
+<div class="st" style="box-sizing: border-box; padding: 48px 56px 72px; background: var(--background); color: var(--foreground); font-family: var(--font-sans);">
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px 32px; align-items: start;">
+
+<section class="st-sec"><h2 class="st-h">Loading · the folders and the note shimmer, nothing jumps when they land</h2>
+<div class="tp-sheet st-two"><div class="st-l"><x-import component-from-global-scope="TuduPaper.PadTree" loading="{{ yes }}"></x-import></div><div class="st-r"><x-import component-from-global-scope="TuduPaper.PadEditor" loading="{{ yes }}"></x-import></div></div></section>
+
+<section class="st-sec"><h2 class="st-h">Empty · your first visit</h2>
+<div class="tp-sheet st-two"><div class="st-l"><x-import component-from-global-scope="TuduPaper.PadTree" folders="{{ none }}" pads="{{ none }}"></x-import></div><div class="st-r" style="display: flex; align-items: center; justify-content: center;"><x-import component-from-global-scope="TuduPaper.EmptyState" title="Somewhere to think out loud." action="New note" on-action="{{ noop }}">Notes, lists, half-ideas. Link a note to any task, in any space. On your Mac, a note can float over whatever you’re doing.</x-import></div></div></section>
+
+<section class="st-sec"><h2 class="st-h">Error · your notes didn’t load</h2>
+<div class="tp-sheet st-two"><div class="st-l"><x-import component-from-global-scope="TuduPaper.PadTree" error="{{ yes }}" on-retry="{{ noop }}"></x-import></div><div class="st-r"></div></div></section>
+
+<section class="st-sec"><h2 class="st-h">Error · one note didn’t open, the rest are fine</h2>
+<div class="tp-sheet st-two"><div class="st-l"><x-import component-from-global-scope="TuduPaper.PadTree" folders="{{ folders }}" pads="{{ loose }}" active="demo" default-open="{{ openNw }}"></x-import></div><div class="st-r"><x-import component-from-global-scope="TuduPaper.PadEditor" error="{{ yes }}" on-retry="{{ noop }}"></x-import></div></div></section>
+
+<section class="st-sec"><h2 class="st-h">Offline · you keep writing, it saves when you’re back</h2>
+<div class="tp-sheet st-two" style="height: 440px;"><div class="st-l"><x-import component-from-global-scope="TuduPaper.PadTree" folders="{{ folders }}" pads="{{ loose }}" active="interviews" default-open="{{ openNw }}"></x-import></div><div class="st-r"><x-import component-from-global-scope="TuduPaper.PadEditor" pad="{{ interviews }}" save="offline" banner="{{ offlineBanner }}"></x-import></div></div></section>
+
+<section class="st-sec"><h2 class="st-h">Changed in another window · nothing is overwritten quietly</h2>
+<div class="tp-sheet st-two" style="height: 440px;"><div class="st-l"><x-import component-from-global-scope="TuduPaper.PadTree" folders="{{ folders }}" pads="{{ loose }}" active="agenda" default-open="{{ openAll }}"></x-import></div><div class="st-r"><x-import component-from-global-scope="TuduPaper.PadEditor" pad="{{ agenda }}" save="conflict" banner="{{ conflictBanner }}"></x-import></div></div></section>
+
+<section class="st-sec"><h2 class="st-h">Find a note · nothing matches</h2>
+<div class="tp-sheet" style="height: 300px; overflow: hidden;"><x-import component-from-global-scope="TuduPaper.PadTree" folders="{{ folders }}" pads="{{ loose }}" initial-query="teapots"></x-import></div>
+<p class="st-p">Typing in Find a note narrows the tree with no animation, opening any folder that holds a match. With no match: “No note matches “teapots”.” Search in the top bar looks inside every note too.</p></section>
+
+<section class="st-sec"><h2 class="st-h">Three levels deep · the third level only offers New note</h2>
+<div class="tp-sheet" style="padding: 8px;"><div class="tp-pd-f st-fake-hover"><div class="tp-pd-frow tp-open" style="--pd-depth: 2;"><button type="button" class="tp-pd-ftog" aria-expanded="true"><span class="tp-pd-chev"><x-import component-from-global-scope="TuduPaper.PadIcon" name="chev" size="{{ 13 }}"></x-import></span><span class="tp-pd-row-ic"><x-import component-from-global-scope="TuduPaper.PadIcon" name="folder" size="{{ 14 }}"></x-import></span><span class="tp-pd-fname">Offsite</span><span class="tp-pd-fcount">2</span></button><span class="tp-pd-fadd"><x-import component-from-global-scope="TuduPaper.IconButton" label="New note in Offsite" tip-side="bottom"><x-import component-from-global-scope="TuduPaper.Icon" name="plus" size="{{ 14 }}"></x-import></x-import></span></div></div></div>
+<p class="st-p">Northwind / Planning / Offsite is as deep as folders go. Dragging a folder that would land deeper than three levels shows “Folders go three levels deep” and puts it back.</p></section>
+
+<section class="st-sec"><h2 class="st-h">Trash · kept 30 days, then gone</h2>
+<div class="tp-sheet st-panel">
+<div style="display: flex; align-items: baseline; gap: 10px; padding: 18px 0 8px;"><h3 style="margin: 0; font-family: var(--font-serif); font-weight: 400; font-size: 28px;">Trash</h3><span class="st-p">3 notes · each one is deleted 30 days after you trash it</span></div>
+<sc-for list="{{ trash }}" as="t" hint-placeholder-count="3"><div class="st-trash-row"><x-import component-from-global-scope="TuduPaper.PadRow" pad="{{ t }}"></x-import><x-import component-from-global-scope="TuduPaper.IconButton" label="Put back" tip-side="bottom" class-name="st-trash-act"><x-import component-from-global-scope="TuduPaper.PadIcon" name="putBack" size="{{ 15 }}"></x-import></x-import><x-import component-from-global-scope="TuduPaper.IconButton" label="Delete now" tip-side="bottom-end" class-name="st-trash-act"><x-import component-from-global-scope="TuduPaper.Icon" name="trash" size="{{ 15 }}"></x-import></x-import></div></sc-for>
+</div></section>
+
+<section class="st-sec"><h2 class="st-h">Delete now · the only step that can’t be undone asks first</h2>
+<x-import component-from-global-scope="TuduPaper.ConfirmDialog" open="{{ yes }}" inline="{{ yes }}" title="Delete “Gift ideas” now?" confirm-label="Delete now" on-close="{{ noop }}" on-confirm="{{ noop }}">It goes for good, with its links to tasks. The tasks themselves stay as they are.</x-import>
+<p class="st-p">Delete asks first (a note, or a folder with what’s in it). Then it goes to Trash for 30 days and a toast says “Moved to Trash” with Undo. An empty Trash says “Nothing in Trash.”</p></section>
+
+<section class="st-sec"><h2 class="st-h">Task panel · no notes yet, still loading, didn’t load</h2>
+<div class="tp-sheet st-panel"><x-import component-from-global-scope="TuduPaper.PadLinks" pads="{{ none }}" all="{{ allPads }}"></x-import></div>
+<div class="tp-sheet st-panel"><x-import component-from-global-scope="TuduPaper.PadLinks" loading="{{ yes }}"></x-import></div>
+<div class="tp-sheet st-panel"><x-import component-from-global-scope="TuduPaper.PadLinks" error="{{ yes }}" on-retry="{{ noop }}"></x-import></div></section>
+
+<section class="st-sec"><h2 class="st-h">Task panel · a note linked to three tasks in two spaces</h2>
+<div class="tp-sheet st-panel"><x-import component-from-global-scope="TuduPaper.PadLinks" pads="{{ manyLinked }}" all="{{ allPads }}"></x-import></div>
+<p class="st-p">The same note shows on each task it’s linked to. Unlink only takes it off this task. A colleague who opens a shared task never sees your notebook section at all.</p></section>
+
+<section class="st-sec"><h2 class="st-h">Link a task · your tasks from every space, already-linked ones say so</h2>
+<div class="st-pick"><x-import component-from-global-scope="TuduPaper.PadPicker" label="Link a task" placeholder="Find a task in any space" items="{{ pickTasks }}" no-focus="{{ yes }}" foot="Tasks you can see in any space. Linking never changes the task."></x-import></div></section>
+
+<section class="st-sec"><h2 class="st-h">Link a note · no notes yet, and no match</h2>
+<div style="display: flex; gap: 16px; align-items: flex-start;"><x-import component-from-global-scope="TuduPaper.PadPicker" label="Link a note" placeholder="Find a note" items="{{ none }}" no-focus="{{ yes }}" empty="You have no notes yet. New note makes one linked to this task."></x-import></div>
+<p class="st-p">Typing with no match reads “Nothing matches “…”.”, the same words as everywhere else.</p></section>
+
+<section class="st-sec"><h2 class="st-h">Floating note · first time, nothing recent yet</h2>
+<div class="st-win"><x-import component-from-global-scope="TuduPaper.PadWindow" notebook="{{ nb }}" recent="{{ none }}" no-focus="{{ yes }}"></x-import></div></section>
+
+<section class="st-sec"><h2 class="st-h">Floating note · offline, words kept on this Mac</h2>
+<div class="st-win"><x-import component-from-global-scope="TuduPaper.PadWindow" notebook="{{ nb }}" recent="{{ recent }}" active="interviews" save="offline" pinned="{{ yes }}" no-focus="{{ yes }}"></x-import></div>
+<p class="st-p">Pinned here: the window keeps a slightly stronger edge so you can tell it won’t go behind other apps.</p></section>
+
+<section class="st-sec"><h2 class="st-h">Toasts · what changed, with a way back</h2>
+<div class="st-toasts"><div class="tp-toast" style="position: static;"><span>Moved to Trash. It stays there for 30 days.</span><button type="button">Undo</button></div><div class="tp-toast" style="position: static;"><span>NW-74 “Ask Meera for the venue shortlist” is on Today.</span><button type="button">Open</button></div><div class="tp-toast" style="position: static;"><span>Unlinked from NW-41. The task is unchanged.</span><button type="button">Undo</button></div></div></section>
+
+<section class="st-sec"><h2 class="st-h">An empty new note · gone when you close it</h2>
+<p class="st-p" style="max-width: 560px;">The note window always starts on a blank note. If you close it without writing anything, it isn’t kept: no “Untitled” notes pile up, and there is no toast. A note with only a title is kept. Untitled notes show their first line (in grey) wherever they’re listed.</p></section>
+
+</div>
+</div>
+</x-import>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":3600}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var R = window.React, TP = window.TuduPaper, D = window.PadDemo;
+    var b = function (tone, title, body, actions) { return R.createElement(TP.Banner, { tone: tone, title: title, actions: actions }, body); };
+    return { yes: true, no: false, none: [], noop: function () {},
+      folders: D.FOLDERS, loose: D.LOOSE, openNw: { 'f-nw': true }, openAll: D.OPEN, recent: D.RECENT, nb: D.NOTEBOOK,
+      interviews: D.PADS.interviews, agenda: D.PADS.agenda,
+      offlineBanner: b('warning', 'You’re offline.', 'This note is kept on this device and saves when you’re back.'),
+      conflictBanner: b('warning', 'This note changed in another window.', 'Your last edits are kept here until you choose.', [{ label: 'Show the newer one', primary: true, onClick: function () {} }, { label: 'Keep mine', onClick: function () {} }]),
+      trash: [Object.assign({}, D.PADS.gifts, { edited: '29 days left' }), { id: 't2', title: 'Old offsite ideas', edited: '12 days left' }, { id: 't3', title: '', first: 'asdf', edited: '2 days left' }],
+      allPads: D.ALLPADS,
+      manyLinked: [Object.assign({}, D.PADS.interviews, { links: 3 }), D.PADS.demo],
+      pickTasks: D.TASKS.map(function (t, i) { return Object.assign({}, t, { linked: i < 2 }); })
+    };
+  }
+}
+</script>
+</body>
+</html>
