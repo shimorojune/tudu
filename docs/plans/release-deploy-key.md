@@ -1,7 +1,7 @@
 # Release: push the release commit with a deploy key, so the master ruleset doesn't block it
 
-Status: proposal, awaiting Rohit's approval. Canvas: not applicable (release tooling only, no visible change);
-skipping it needs Rohit's OK.
+Status: approved by Rohit 26 Oct 2026; implemented. Canvas: not applicable (release tooling only, no visible change);
+skipping it approved by Rohit 26 Oct 2026.
 
 ## Why
 

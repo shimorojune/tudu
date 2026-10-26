@@ -72,6 +72,19 @@ step 3.5. The other release secrets (`DOKPLOY_URL`, `DOKPLOY_API_KEY`, `TAURI_SI
 
 `tudu.ezdev.net` and `api.tudu.ezdev.net` resolve to the Dokploy host (as `staging.` and `api.staging.` do).
 
+### 6. GitHub: the release push past the master ruleset
+
+`master` has a ruleset that requires the `CI passed` check, and that blocks direct pushes. semantic-release pushes
+its `chore(release): X.Y.Z` commit straight to master, so the release job checks out over SSH with a deploy key
+that the ruleset lets through (docs/plans/release-deploy-key.md):
+
+- Settings › Deploy keys: `Release push`, with write access (the public half of an ed25519 key made for this).
+- Settings › Secrets and variables › Actions: `RELEASE_DEPLOY_KEY` = the private half.
+- Settings › Rules › the `master` ruleset › Bypass list: Deploy keys, and Repository admin for an emergency push.
+
+If a release fails in "Version and notes" with "push declined due to repository rule violations", one of these three
+is missing.
+
 ## Each release
 
 1. Actions › Production: release › Run workflow, branch `master`, **Rehearse only** ticked. Green means the version, the signed

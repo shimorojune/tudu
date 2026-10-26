@@ -45,10 +45,14 @@ jobs:
       version: ${{ steps.v.outputs.version }}
       sha: ${{ steps.v.outputs.sha }}
     steps:
+      # Over SSH with the release deploy key: the master ruleset requires CI passed, and only the deploy key may push
+      # semantic-release's chore(release) commit past it (docs/release.md).
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
+          persist-credentials: true
       - uses: pnpm/action-setup@v4
         with:
           version: ${{ env.PNPM_VERSION }}
