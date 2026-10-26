@@ -196,6 +196,8 @@ function Today({
       onToggle={(row, done) => taskStore.cross(row.key, done)}
       onOpen={open}
       onNew={() => app?.summon()}
+      // The note window on a blank note, over whatever app you are in; the sheet hides first, the desk stays put.
+      onNewNote={app ? () => app.openNote(null) : undefined}
       onOpenApp={onOpenApp}
       onFeedback={() => app?.feedback()}
       onQuit={onQuit}

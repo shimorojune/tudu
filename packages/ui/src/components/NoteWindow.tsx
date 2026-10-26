@@ -1,4 +1,12 @@
-import { useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
+import { Dialog as RadixDialog } from 'radix-ui';
+import {
+  useEffect,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactNode,
+} from 'react';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
 import { IconButton } from './IconButton';
@@ -15,6 +23,8 @@ export interface NoteWindowProps {
   rail?: boolean;
   /** The open note's id, or `new` for the blank note it opens on. */
   active: string;
+  /** The open note is the blank one it opened on (New note in the bar and the list), even once it has an id. */
+  blank?: boolean;
   /** The open note's title (or first line) for the bar. */
   title?: string;
   recent?: NoteItem[];
@@ -65,7 +75,8 @@ export function NoteWindow(p: NoteWindowProps) {
       else p.onPick?.(id);
     }
   };
-  const barTitle = p.active === 'new' ? 'New note' : p.title || 'Untitled';
+  const blank = p.blank ?? p.active === 'new';
+  const barTitle = blank && !p.title ? 'New note' : p.title || 'Untitled';
   return (
     <section
       className={cx(
@@ -174,12 +185,8 @@ export function NoteWindow(p: NoteWindowProps) {
                   role="option"
                   id="nbw-o0"
                   tabIndex={-1}
-                  aria-selected={p.active === 'new' ? 'true' : 'false'}
-                  className={cx(
-                    'tp-root tp-nb-row tp-nb-newrow',
-                    p.active === 'new' && 'tp-on',
-                    cur === 0 && 'tp-cur',
-                  )}
+                  aria-selected={blank ? 'true' : 'false'}
+                  className={cx('tp-root tp-nb-row tp-nb-newrow', blank && 'tp-on', cur === 0 && 'tp-cur')}
                   onMouseMove={() => setCur(0)}
                   onClick={p.onNew}
                 >
@@ -206,7 +213,7 @@ export function NoteWindow(p: NoteWindowProps) {
                         id={`nbw-o${i + 1}`}
                         role="option"
                         note={n}
-                        active={p.active === n.id}
+                        active={!blank && p.active === n.id}
                         className={cur === i + 1 ? 'tp-cur' : undefined}
                         onHover={() => cur !== i + 1 && setCur(i + 1)}
                         onPick={() => p.onPick?.(n.id)}
@@ -228,5 +235,62 @@ export function NoteWindow(p: NoteWindowProps) {
       </div>
       {web ? null : <span className="tp-nb-grip" aria-hidden="true" onPointerDown={p.onResizeStart} />}
     </section>
+  );
+}
+
+/** The floating note window leaves this long (it sinks back a touch quicker than it rose). */
+export const FLOAT_LEAVE_MS = 180;
+
+/**
+ * The note window floating over the page (the browser): a layer of its own above everything, even an open task
+ * panel, that never traps the keyboard, never closes on a click outside or on Esc, and fades up with a hair of
+ * scale (220ms) and sinks back as it closes (180ms).
+ */
+export function NoteFloat({
+  open,
+  style,
+  className,
+  children,
+}: {
+  open: boolean;
+  style?: CSSProperties;
+  className?: string;
+  children: ReactNode;
+}) {
+  const [mounted, setMounted] = useState(open);
+  const [leaving, setLeaving] = useState(false);
+  if (open && (!mounted || leaving)) {
+    setMounted(true);
+    setLeaving(false);
+  }
+  if (!open && mounted && !leaving) setLeaving(true);
+  useEffect(() => {
+    if (!leaving) return;
+    const t = setTimeout(() => {
+      setMounted(false);
+      setLeaving(false);
+    }, FLOAT_LEAVE_MS);
+    return () => clearTimeout(t);
+  }, [leaving]);
+  if (!mounted) return null;
+  return (
+    <RadixDialog.Root open modal={false}>
+      <RadixDialog.Portal>
+        <RadixDialog.Content
+          asChild
+          aria-label="Notebook"
+          aria-describedby={undefined}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onCloseAutoFocus={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
+          <div className={cx('tp-root tp-nb-float', leaving && 'tp-nb-float-out', className)} style={style}>
+            <RadixDialog.Title className="sr-only">Notebook</RadixDialog.Title>
+            {children}
+          </div>
+        </RadixDialog.Content>
+      </RadixDialog.Portal>
+    </RadixDialog.Root>
   );
 }

@@ -51,7 +51,7 @@ describe('C10-U09 Jira in the web app', () => {
     expect(phoneTab({ view: 'jira', onToday: false, searchOpen: false, jira: false })).toBe('more');
     expect(phoneTab({ view: 'apps', onToday: false, searchOpen: false })).toBe('more');
     const nw = { kind: 'team' as const, name: 'Northwind' };
-    expect(moreItems(nw).map((i) => i.value)).toEqual(['backlog', 'people', 'apps', 'settings']);
+    expect(moreItems(nw).map((i) => i.value)).toEqual(['backlog', 'people', 'notebook', 'apps', 'settings']);
     expect(moreItems(nw, true).find((i) => i.value === 'apps')!.hint).toBe('Jira');
     expect(sectionFor('apps', nw)).toBe('apps');
 

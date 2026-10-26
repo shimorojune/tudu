@@ -1,0 +1,123 @@
+/* The Notebook page (chunk 22): the tree and the note side by side in one sheet that fills the column. */
+.app-page.app-notebook > .app-nb-sheet {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-width: none;
+  overflow: hidden;
+}
+.app-nb-split {
+  display: flex;
+  height: 100%;
+}
+.app-nb-l {
+  flex: 0 0 300px;
+  min-width: 0;
+  border-right: 1px solid var(--line);
+}
+.app-desk[data-viewport='tablet'] .app-nb-l {
+  flex-basis: 248px;
+}
+.app-nb-r {
+  flex: 1;
+  min-width: 0;
+  container-type: inline-size;
+}
+.app-nb-blank {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Phones: the list is its own page, and a note turns in over it like a day; ‹ Notebook turns back. */
+.app-notebook-phone .app-nb-top {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 44px;
+  margin: -4px 0 4px;
+}
+.app-nb-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 44px;
+  padding: 0 10px 0 4px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--foreground-2);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background-color var(--dur-menu) var(--ease-change);
+}
+.app-nb-back:active {
+  background: var(--accent);
+}
+.app-page.app-notebook-phone > .app-nb-sheet {
+  height: max(420px, calc(100dvh - 230px));
+}
+.app-nb-turn-in,
+.app-nb-turn-back {
+  height: 100%;
+}
+.app-nb-turn-in {
+  animation: app-nb-in var(--dur-day-turn) var(--ease-arrive) both;
+}
+.app-nb-turn-back {
+  animation: app-nb-back var(--dur-day-turn) var(--ease-arrive) both;
+}
+@keyframes app-nb-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+}
+@keyframes app-nb-back {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+}
+.app-notebook-phone .tp-nb-tree-h h2 {
+  font-size: 30px;
+}
+.app-notebook-phone .tp-nb-row.tp-root,
+.app-notebook-phone .tp-nb-ftog {
+  min-height: 44px;
+  font-size: 15px;
+}
+.app-notebook-phone .tp-nb-fadd {
+  display: none;
+}
+.app-notebook-phone .tp-nb-frow .tp-nb-fcount {
+  opacity: 1;
+}
+.app-notebook-phone .tp-nb-ed.tp-compact .tp-nb-ed-in {
+  padding: 6px 18px 18px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-nb-turn-in,
+  .app-nb-turn-back {
+    animation: tp-veil-in 120ms linear both;
+  }
+}
+:root[data-motion='less'] .app-nb-turn-in,
+:root[data-motion='less'] .app-nb-turn-back {
+  animation: tp-veil-in 120ms linear both;
+}
+
+/* The bare note window: the popup in the browser, and the Mac's own window (which draws its shadow itself). */
+.app-note-window {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+}
+.app-note-window.app-note-popup .tp-nb-win.tp-root {
+  border-radius: 0;
+  box-shadow: none;
+}
+.app-note-window.app-note-mac {
+  padding: 10px;
+}

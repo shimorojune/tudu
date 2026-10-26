@@ -49,6 +49,8 @@ import { AppsPage, JiraPage } from './routes/jira/JiraPage';
 import { PeoplePage } from './routes/people/PeoplePage';
 import { FloatingQuickAdd, QuickAddPage } from './routes/quick-add/QuickAddPage';
 import { MenuBarPage } from './routes/menubar/MenuBarPage';
+import { NotebookPage } from './routes/notebook/NotebookPage';
+import { NoteWindowPage } from './routes/notebook/NoteWindowPage';
 import { desktop } from './app/desktop';
 import { SignInPage } from './routes/sign-in/SignInPage';
 import { TodayPage } from './routes/today/TodayPage';
@@ -356,6 +358,43 @@ const inboxItemRoute = createRoute({
   validateSearch: inboxSearch,
   component: InboxPage,
 });
+/**
+ * Your Notebook, at /notebook (a note at /notebook/<id>, Trash at /notebook/trash). It is yours, not a space's, so
+ * the shell around it is the last space you were in, as for the Inbox.
+ */
+const notebookLayoutRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/notebook',
+  beforeLoad: ({ context }) => {
+    const me = context.me;
+    const slug = lastSpace(me.spaces) ?? PERSONAL_SLUG;
+    const space =
+      spaceBySlug(me.spaces, slug) ?? me.spaces.find((s) => s.kind === 'personal') ?? me.spaces[0]!;
+    return { space, me };
+  },
+  component: function NotebookLayout() {
+    const ctx = notebookLayoutRoute.useRouteContext();
+    return <SpaceLayout me={ctx.me} space={ctx.space} />;
+  },
+});
+const notebookRoute = createRoute({
+  getParentRoute: () => notebookLayoutRoute,
+  path: '/',
+  validateSearch: taskSearch,
+  component: NotebookPage,
+});
+const notebookTrashRoute = createRoute({
+  getParentRoute: () => notebookLayoutRoute,
+  path: '/trash',
+  validateSearch: taskSearch,
+  component: NotebookPage,
+});
+const notebookNoteRoute = createRoute({
+  getParentRoute: () => notebookLayoutRoute,
+  path: '/$noteId',
+  validateSearch: taskSearch,
+  component: NotebookPage,
+});
 /** Before the one Inbox, each space had its own: /northwind/inbox lands on the Inbox narrowed to Northwind. */
 const oldInbox = ({
   context,
@@ -531,6 +570,43 @@ const menuBarRoute = createRoute({
   },
 });
 
+/**
+ * The note window alone: the page the macOS app's note window holds, and the browser's popup (↗ on a note). In the
+ * app it never turns into Sign in; the desk does that.
+ */
+const noteWindowSearch = (s: Record<string, unknown>) => s;
+async function noteWindowLoad({
+  context,
+  location,
+}: {
+  context: RouterContext;
+  location: { pathname: string };
+}) {
+  const me = await loadMe(context.queryClient);
+  if (!me && !desktop())
+    throw redirect({ to: '/sign-in', search: { next: location.pathname }, replace: true });
+  return { me };
+}
+const noteWindowRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/note-window',
+  validateSearch: noteWindowSearch,
+  beforeLoad: noteWindowLoad,
+  component: function NoteWindowRoute() {
+    return <NoteWindowPage />;
+  },
+});
+const noteWindowNoteRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/note-window/$noteId',
+  validateSearch: noteWindowSearch,
+  beforeLoad: noteWindowLoad,
+  component: function NoteWindowNoteRoute() {
+    const { noteId } = noteWindowNoteRoute.useParams();
+    return <NoteWindowPage noteId={noteId} />;
+  },
+});
+
 function WebQuickAdd({ me }: { me: MeResponse }) {
   useLiveEvents(true);
   return (
@@ -549,6 +625,7 @@ export const router = createRouter({
       ...legacyRoutes,
       taskLinkRoute,
       inboxLayoutRoute.addChildren([inboxRoute, inboxItemRoute]),
+      notebookLayoutRoute.addChildren([notebookRoute, notebookTrashRoute, notebookNoteRoute]),
       allRoute.addChildren([allTodayRoute, allWeekRoute, allBacklogRoute, allMoreRoute]),
       spaceRoute.addChildren([
         todayRoute,
@@ -568,6 +645,8 @@ export const router = createRouter({
     kitRoute,
     quickAddRoute,
     menuBarRoute,
+    noteWindowRoute,
+    noteWindowNoteRoute,
   ]),
   context: { queryClient },
   defaultPreload: 'intent',

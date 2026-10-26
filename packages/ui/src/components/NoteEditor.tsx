@@ -59,6 +59,8 @@ export interface NoteEditorProps {
   /** Your tasks from every space, for Link a task. */
   tasks?: PickItem[];
   tasksLoading?: boolean;
+  /** The words typed in Link a task, for the app to find tasks by. */
+  onTaskQuery?: (q: string) => void;
   onTitle?: (title: string) => void;
   onBody?: (html: string) => void;
   /** Leaving the words or the title: save what's waiting. */
@@ -384,6 +386,7 @@ export function NoteEditor(p: NoteEditorProps) {
                   placeholder="Find a task in any space"
                   items={tasks}
                   loading={p.tasksLoading}
+                  onQuery={p.onTaskQuery}
                   empty="Your tasks from every space show here."
                   onClose={() => setPicking(false)}
                   onPick={(t) => {

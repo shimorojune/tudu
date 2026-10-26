@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { moreItems } from '../routes/more/MorePage';
 import { phoneTab, sideItems, switchSpaces } from './AppShell';
 import { inboxTotal } from './updates';
+import { spacePath, switchPath, viewOf } from './space';
 
 const space = (id: string, kind: 'personal' | 'team', toAnswer = 0, unread = 0): SpaceSummary => ({
   id,
@@ -43,6 +44,7 @@ describe('C21-U14 the shell in All spaces', () => {
     expect(sideItems(true, true).map((i) => i.value)).toEqual(['today', 'week', 'backlog']);
     expect(moreItems({ kind: 'personal', name: 'Personal' }, true, true).map((i) => i.value)).toEqual([
       'backlog',
+      'notebook',
       'settings',
     ]);
     const spaces = [space('nw', 'team', 2, 1), space('me', 'personal', 0, 1)];
@@ -53,5 +55,24 @@ describe('C21-U14 the shell in All spaces', () => {
     expect(rows[0]!.count).toBeUndefined();
     // With one space there is nothing to gather: no All spaces row.
     expect(switchSpaces([space('me', 'personal')]).map((s) => s.id)).toEqual(['me']);
+  });
+});
+
+describe('C22-U21 where the Notebook lives', () => {
+  it('C22-U21 on phones More has a Notebook row in every space and in All spaces, and it lights More', () => {
+    for (const items of [
+      moreItems({ kind: 'personal', name: 'Personal' }),
+      moreItems({ kind: 'team', name: 'Northwind' }, true),
+      moreItems({ kind: 'personal', name: 'Personal' }, false, true),
+    ])
+      expect(items.find((i) => i.value === 'notebook')).toMatchObject({ label: 'Notebook' });
+    expect(phoneTab({ view: 'notebook', onToday: false, searchOpen: false })).toBe('more');
+  });
+
+  it('C22-U21 its address is /notebook, outside any space; switching space from it opens that space’s Today', () => {
+    expect(viewOf('/notebook')).toBe('notebook');
+    expect(viewOf('/notebook/n1')).toBe('notebook');
+    expect(spacePath('northwind', 'notebook')).toBe('/notebook');
+    expect(switchPath('/notebook/n1', 'northwind')).toBe('/northwind');
   });
 });

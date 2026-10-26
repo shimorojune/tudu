@@ -422,6 +422,8 @@ export interface NotePickerProps {
   noFocus?: boolean;
   foot?: ReactNode;
   className?: string;
+  /** The app finds the items for the words (your tasks from every space): the list is shown as it comes. */
+  onQuery?: (q: string) => void;
   onPick?: (item: PickItem) => void;
   onClose?: () => void;
 }
@@ -478,7 +480,7 @@ export function NotePicker(p: NotePickerProps) {
   }, []);
   const ql = q.trim().toLowerCase();
   const list = p.items
-    .filter((x) => !ql || `${x.title} ${x.id ?? ''} ${x.sub ?? ''}`.toLowerCase().includes(ql))
+    .filter((x) => p.onQuery || !ql || `${x.title} ${x.id ?? ''} ${x.sub ?? ''}`.toLowerCase().includes(ql))
     .slice(0, p.max ?? 6);
   const cur = Math.min(act, Math.max(0, list.length - 1));
   const pick = (x: PickItem | undefined) => {
@@ -508,6 +510,7 @@ export function NotePicker(p: NotePickerProps) {
           onChange={(e) => {
             setQ(e.target.value);
             setAct(0);
+            p.onQuery?.(e.target.value.trim());
           }}
           onKeyDown={key}
         />

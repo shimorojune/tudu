@@ -6,11 +6,16 @@ import { api, meQuery, queryClient } from './session';
 
 /** One id per open tab (kept across a reload of that tab), so a tab can tell its own changes on the live stream. */
 function tabId(): string {
+  // A note's popup starts with a copy of its opener's session: it keeps an id of its own, so each hears the other.
+  const key =
+    typeof location !== 'undefined' && location.pathname.startsWith('/note-window')
+      ? 'tudu.client.note'
+      : 'tudu.client';
   try {
-    const have = sessionStorage.getItem('tudu.client');
+    const have = sessionStorage.getItem(key);
     if (have) return have;
     const id = crypto.randomUUID();
-    sessionStorage.setItem('tudu.client', id);
+    sessionStorage.setItem(key, id);
     return id;
   } catch {
     return crypto.randomUUID();

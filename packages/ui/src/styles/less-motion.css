@@ -259,6 +259,10 @@
 :root[data-motion='less'] .tp-nb-pop.tp-nb-pop-leaving {
   animation: tp-nb-fade-out 1ms linear both;
 }
+:root[data-motion='less'] .tp-nb-float,
+:root[data-motion='less'] .tp-nb-float.tp-nb-float-out {
+  animation-duration: 1ms;
+}
 
 /* app.css */
 :root[data-motion='less'] .tp-tip-pop,

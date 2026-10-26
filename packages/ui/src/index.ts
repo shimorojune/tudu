@@ -377,7 +377,7 @@ export {
   type NoteEditorProps,
   type NoteEditorNote,
 } from './components/NoteEditor';
-export { NoteWindow, type NoteWindowProps } from './components/NoteWindow';
+export { NoteWindow, NoteFloat, FLOAT_LEAVE_MS, type NoteWindowProps } from './components/NoteWindow';
 export { NoteLinks, ROW_OUT_MS, type NoteLinksProps } from './components/NoteLinks';
 export { NoteTrash, TRASH_ROW_OUT_MS, type NoteTrashProps, type NoteTrashItem } from './components/NoteTrash';
 export { NoteHit, type NoteHitProps, type NoteHitItem } from './components/NoteHit';

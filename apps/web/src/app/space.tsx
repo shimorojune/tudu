@@ -7,7 +7,8 @@ import { createContext, useContext, type ReactNode } from 'react';
  */
 const KEY = 'tudu.space';
 
-export type View = 'today' | 'week' | 'backlog' | 'people' | 'inbox' | 'more' | 'settings' | 'jira' | 'apps';
+export type View =
+  'today' | 'week' | 'backlog' | 'people' | 'inbox' | 'notebook' | 'more' | 'settings' | 'jira' | 'apps';
 
 export const VIEW_PATHS: Record<View, string> = {
   today: '',
@@ -15,6 +16,7 @@ export const VIEW_PATHS: Record<View, string> = {
   backlog: '/backlog',
   people: '/people',
   inbox: '/inbox',
+  notebook: '/notebook',
   more: '/more',
   settings: '/settings',
   jira: '/jira',
@@ -34,11 +36,14 @@ export function withSlug(pathname: string, slug: string): string {
 /** The path of a view in a space: `/northwind`, `/northwind/week`. The Inbox is every space's: `/inbox`. */
 export function spacePath(slug: string, view: View = 'today'): string {
   if (view === 'inbox') return INBOX_PATH;
+  if (view === 'notebook') return NOTEBOOK_PATH;
   return `/${slug}${VIEW_PATHS[view]}`;
 }
 
 /** The one Inbox, across every space. */
 export const INBOX_PATH = '/inbox';
+/** Your Notebook (chunk 22): yours, not a space's. A note is `/notebook/<id>`, Trash `/notebook/trash`. */
+export const NOTEBOOK_PATH = '/notebook';
 
 /**
  * The Inbox's address: `/inbox`, an item `/inbox/<id>`, narrowed to a space `?space=northwind`, on a view
@@ -69,6 +74,7 @@ export function oldInboxPath(
 /** Which view a path inside a space shows: `/northwind/week` is the week; `/inbox` is the Inbox. */
 export function viewOf(pathname: string): View {
   if (pathname === INBOX_PATH || pathname.startsWith(`${INBOX_PATH}/`)) return 'inbox';
+  if (pathname === NOTEBOOK_PATH || pathname.startsWith(`${NOTEBOOK_PATH}/`)) return 'notebook';
   const rest = pathname.replace(/^\/[^/]+/, '').replace(/\/$/, '');
   if (rest === '') return 'today';
   const seg = rest.split('/')[1] ?? '';
@@ -98,7 +104,7 @@ export function inAllPath(pathname: string): boolean {
 export function switchPath(pathname: string, slug: string): string {
   const view = viewOf(pathname);
   if (slug === ALL_SLUG) return allPath(view);
-  return spacePath(slug, view === 'inbox' ? 'today' : view);
+  return spacePath(slug, view === 'inbox' || view === 'notebook' ? 'today' : view);
 }
 
 export function rememberSpace(slug: string): void {

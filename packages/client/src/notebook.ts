@@ -221,8 +221,15 @@ export class NotebookStore {
 
   constructor(private readonly o: NotebookStoreOptions) {
     this.quiet = o.quietMs ?? SAVE_QUIET_MS;
-    o.tasks.onAnswered((results) => this.answered(results));
-    o.tasks.onReachableChange(() => this.notify());
+  }
+
+  private hooked = false;
+  /** Hear the task store's answers and the connection, from the first change or the first listener on. */
+  private hook(): void {
+    if (this.hooked) return;
+    this.hooked = true;
+    this.o.tasks.onAnswered((results) => this.answered(results));
+    this.o.tasks.onReachableChange(() => this.notify());
   }
 
   private get qc(): QueryClient {
@@ -325,15 +332,17 @@ export class NotebookStore {
       w.bodyDirty = true;
     }
     const view = this.qc.getQueryData<NoteView>(noteKey(id));
+    const kept = w.created || !isBlankNote(w.title, w.html);
     if (view)
       this.qc.setQueryData<NoteView>(noteKey(id), {
         ...view,
         title: w.title,
         html: w.html,
         words: wordCount(w.html),
+        ...(kept ? { draft: false, updatedAt: (this.o.now?.() ?? new Date()).toISOString() } : {}),
       });
     if (!w.created) {
-      if (isBlankNote(w.title, w.html)) return;
+      if (!kept) return;
       w.created = true;
       // The note is kept from its first word: made at once with its title, the words follow as a body save.
       this.send(id, {
@@ -372,6 +381,11 @@ export class NotebookStore {
       w.rev += 1;
       this.send(id, { type: 'note.body', payload: { id, html: w.html, baseRev } });
     }
+  }
+
+  /** Save every note's waiting words now (the page is going away). */
+  flushAll(): void {
+    for (const id of this.writing.keys()) this.flush(id);
   }
 
   /**
@@ -447,6 +461,7 @@ export class NotebookStore {
 
   /** For useSyncExternalStore: the save states and drafts changed. */
   subscribe(fn: () => void): () => void {
+    this.hook();
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
   }
@@ -673,8 +688,10 @@ export class NotebookStore {
 
   /** Queue a change, show it at once, and keep count of it for the note's save state. */
   private send(noteId: string | null, body: NB): void {
+    this.hook();
     const mid = this.o.tasks.enqueue(body);
     this.sent.set(mid, body.type);
+    if (body.type.startsWith('note.')) this.about.set(mid, body.payload.id);
     const at = (this.o.now?.() ?? new Date()).toISOString();
     const m = { ...body, id: mid, at } as Change;
     const tree = this.cachedTree();
@@ -706,6 +723,11 @@ export class NotebookStore {
     for (const r of ours) {
       const type = this.sent.get(r.id)!;
       this.sent.delete(r.id);
+      // A link or a move: the note reads again for what the server knows (the task's ID, the folder's path).
+      const about = this.about.get(r.id);
+      this.about.delete(r.id);
+      if (about && /^note\.(link|unlink|move|restore)$/.test(type))
+        void this.qc.invalidateQueries({ queryKey: noteKey(about), exact: true });
       // What comes back from Trash, and where, is the server's word.
       if (/\.(restore|purge)$|^trash\./.test(type)) refresh = true;
       const noteId = this.changes.get(r.id);
@@ -735,8 +757,9 @@ export class NotebookStore {
     this.notify();
   }
 
-  /** Notebook changes this tab sent that the server hasn't answered, by their type. */
+  /** Notebook changes this tab sent that the server hasn't answered, by their type, and the note each is about. */
   private readonly sent = new Map<string, string>();
+  private readonly about = new Map<string, string>();
 
   private waitingChanges(): Change[] {
     return this.o.tasks.pendingChanges().filter((m) => isNotebookMutation(m)) as Change[];

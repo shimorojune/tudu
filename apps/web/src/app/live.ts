@@ -3,6 +3,7 @@ import { connectEvents } from '@tudu/client';
 import {
   INBOX_CHANGED,
   MEMBERS_CHANGED,
+  NOTEBOOK_CHANGED,
   PROJECTS_CHANGED,
   SPACE_CHANGED,
   SPACE_GONE,
@@ -10,6 +11,7 @@ import {
 } from '@tudu/core';
 import { API_URL } from './config';
 import { queryClient } from './session';
+import { notebookStore } from './notebook';
 import { taskStore } from './tasks';
 
 /**
@@ -24,6 +26,8 @@ export function useLiveEvents(enabled: boolean): void {
       url: `${API_URL}/api/events`,
       onEvent: (e) => {
         if (e.type === 'hello') return;
+        // Your Notebook: only what another window or device changed reads again.
+        if (e.type === NOTEBOOK_CHANGED) return notebookStore.onEvent(e);
         if (
           [
             TASKS_CHANGED,
@@ -42,6 +46,7 @@ export function useLiveEvents(enabled: boolean): void {
         if (s === 'open' && dropped) {
           dropped = false;
           taskStore.refreshAll();
+          notebookStore.refreshAll();
         }
       },
     });
