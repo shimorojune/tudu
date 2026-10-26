@@ -38,7 +38,7 @@ import { scrollToProjects, settingsClosed } from './editProjects';
 import { api, initialsOf, photoSrc, queryClient, refreshMe, signOut } from './session';
 import { forgetSpace, spacePath, useSpace as useSpaceFromShell } from './space';
 import { invitedWords } from './spaces';
-import { askJiraReconnect, hostOf, jiraClient, useJira } from './jira';
+import { askJiraReconnect, clearJiraGlow, hostOf, jiraClient, peekJiraGlow, useJira } from './jira';
 import { taskStore, useOnline } from './tasks';
 import { useViewport } from './viewport';
 
@@ -231,6 +231,9 @@ export function SettingsView({
   const online = useOnline();
   const jira = useJira(space.id);
   const jiraSpaces = useQuery({ ...jiraClient.spacesQuery(), enabled: !!jira.connected });
+  // Manage spaces… from a space's Jira panel: that space's row glows, once.
+  const [glow] = useState(peekJiraGlow);
+  useEffect(() => clearJiraGlow(), []);
   const loc = useRouterState({ select: (s) => s.location });
   const data: MembersResponse = members.data ?? { members: [], invites: [] };
   const rules = spaceRules(space, data.members, me.user.id);
@@ -471,6 +474,7 @@ export function SettingsView({
                   on: x.on,
                   linked: x.linked,
                   current: x.id === space.id,
+                  highlight: x.id === glow,
                 })),
               }
             : { connected: false }

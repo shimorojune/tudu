@@ -77,6 +77,41 @@ async function fillConnect(page: Page, site: string, token: string): Promise<voi
   await form.getByRole('button', { name: /^(Connect Jira|Reconnect)$/ }).click();
 }
 
+/** Disconnect from the panel asks first: confirm it. */
+async function confirmDisconnect(page: Page): Promise<void> {
+  await page.getByRole('dialog', { name: 'Disconnect Jira?' }).getByRole('button', { name: 'Disconnect Jira' }).click();
+}
+
+/** Northwind, made by you, with Jira connected and on in it and in Personal; you are in Northwind. */
+async function onInBoth(page: Page): Promise<{ slug: string; nw: string }> {
+  await fixClock(page);
+  await signInFresh(page);
+  const slug = await createSpace(page, 'Northwind');
+  const nw = (await me(page)).spaces.find((s) => s.slug === slug)!.id;
+  await connectByApi(page, nw);
+  await switchByApi(page, await personalId(page), true);
+  await page.reload();
+  await expect(sideJira(page).or(page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: /Jira$/ }))).toBeVisible();
+  return { slug, nw };
+}
+
+/** Your switches, as the server has them. */
+async function switches(page: Page): Promise<Record<string, boolean>> {
+  const body = (await (await page.request.get(`${API_URL}/api/connectors/jira/spaces`)).json()) as {
+    spaces: Array<{ id: string; on: boolean }>;
+  };
+  return Object.fromEntries(body.spaces.map((x) => [x.id, x.on]));
+}
+
+/** Every PUT of Northwind's switch fails, until the returned function is called. */
+async function failSwitch(page: Page, spaceId: string): Promise<() => Promise<void>> {
+  const url = `**/api/spaces/${spaceId}/connectors/jira`;
+  await page.route(url, (route) =>
+    route.request().method() === 'PUT' ? route.fulfill({ status: 500, body: '{}' }) : route.continue(),
+  );
+  return () => page.unroute(url);
+}
+
 test.describe('jira', () => {
   test('C10-E01 no apps: no Jira anywhere; Add an app opens Apps; Connect opens the form; ‹ Apps goes back, nothing saved', async ({
     page,
@@ -398,6 +433,7 @@ test.describe('jira', () => {
     await idle(page);
     await jiraPanel(page).getByRole('button', { name: 'More' }).click();
     await jiraPanel(page).getByRole('menuitem', { name: 'Disconnect Jira' }).click();
+    await confirmDisconnect(page);
     await expect(page.locator('.tp-toast')).toContainText(
       'Jira disconnected from all your spaces. Your tasks keep their Jira keys.',
     );
@@ -587,6 +623,7 @@ test.describe('jira', () => {
     await context.setOffline(false);
     await jiraPanel(page).getByRole('button', { name: 'More' }).click();
     await jiraPanel(page).getByRole('menuitem', { name: 'Disconnect Jira' }).click();
+    await confirmDisconnect(page);
     await addAnApp(page).click();
     await page.getByRole('dialog', { name: 'Apps' }).getByRole('button', { name: 'Connect Jira' }).click();
     await expect(
@@ -831,5 +868,150 @@ test.describe('jira', () => {
     await openJira(page);
     await expect.poll(() => issueKeys(page)).toEqual(ASSIGNED);
     await expect(jiraPanel(page).locator('.tp-jp-banner')).toHaveCount(0);
+  });
+
+  test('C10-E22 Turn off in Northwind from the panel: Jira leaves Northwind only, stays connected, Undo brings it back; a refusal puts it back', async ({
+    page,
+  }) => {
+    test.skip(phone() || tablet(), 'phones in E26; tablets share the panel');
+    const { nw } = await onInBoth(page);
+    const personal = await personalId(page);
+    await openJira(page);
+    await expect.poll(() => issueKeys(page)).toEqual(ASSIGNED);
+    await jiraPanel(page).getByRole('button', { name: 'More' }).click();
+    await jiraPanel(page).getByRole('menuitem', { name: 'Turn off in Northwind' }).click();
+    await expect(jiraPanel(page)).toHaveCount(0);
+    await expect(jiraButton(page)).toHaveCount(0);
+    await expect(sideJira(page)).toHaveCount(0);
+    const toast = page.locator('.tp-toast');
+    await expect(toast).toContainText('Jira is off in Northwind.');
+    await expect.poll(() => switches(page)).toEqual({ [personal]: true, [nw]: false });
+    const conn = (await (await page.request.get(`${API_URL}/api/connectors/jira`)).json()) as { connected: boolean };
+    expect(conn.connected).toBe(true);
+
+    // Undo: Jira comes back, no token asked for, the same issues.
+    await toast.getByRole('button', { name: 'Undo' }).click();
+    await expect(sideJira(page)).toBeVisible();
+    await expect.poll(() => switches(page)).toEqual({ [personal]: true, [nw]: true });
+    await openJira(page);
+    await expect(jiraPanel(page).getByLabel('Personal access token')).toHaveCount(0);
+    await expect.poll(() => issueKeys(page)).toEqual(ASSIGNED);
+
+    // The server says no: Jira goes, then comes back where it was, and the toast offers Try again.
+    const heal = await failSwitch(page, nw);
+    await jiraPanel(page).getByRole('button', { name: 'More' }).click();
+    await jiraPanel(page).getByRole('menuitem', { name: 'Turn off in Northwind' }).click();
+    await expect(toast).toContainText('Couldn’t turn Jira off here.');
+    await expect(sideJira(page)).toBeVisible();
+    expect((await switches(page))[nw]).toBe(true);
+    await heal();
+    await toast.getByRole('button', { name: 'Try again' }).click();
+    await expect(sideJira(page)).toHaveCount(0);
+    await expect.poll(() => switches(page)).toEqual({ [personal]: true, [nw]: false });
+
+    // Personal keeps Jira all along.
+    await page.goto('/me');
+    await expect(sideJira(page)).toBeVisible();
+  });
+
+  test('C10-E23 Add an app in Northwind: Turn off here, Turning off…, off here with Turn on here; a refusal says so under the card', async ({
+    page,
+  }) => {
+    test.skip(phone() || tablet(), 'the same card on every size');
+    const { nw } = await onInBoth(page);
+    const apps = page.getByRole('dialog', { name: 'Apps' });
+
+    // Refused first: the reason under the card, Jira stays on.
+    const heal = await failSwitch(page, nw);
+    await addAnApp(page).click();
+    await expect(apps).toContainText('Connected');
+    await apps.getByRole('button', { name: 'Turn off Jira in Northwind' }).click();
+    await expect(apps.getByRole('alert')).toContainText('Couldn’t turn Jira off here.');
+    await expect(apps.getByRole('button', { name: 'Turn off Jira in Northwind' })).toBeEnabled();
+    await expect(sideJira(page)).toBeVisible();
+    await heal();
+
+    // Slowed down so Turning off… shows, then off here.
+    await page.route(`**/api/spaces/${nw}/connectors/jira`, async (route) => {
+      if (route.request().method() === 'PUT') await new Promise((r) => setTimeout(r, 600));
+      await route.continue();
+    });
+    await apps.getByRole('button', { name: 'Turn off Jira in Northwind' }).click();
+    await expect(apps.getByRole('button', { name: 'Turn off Jira in Northwind' })).toHaveText('Turning off…');
+    await expect(apps).toContainText('Connected · off here');
+    await expect(apps.getByRole('alert')).toHaveCount(0);
+    await expect(page.locator('.tp-toast')).toContainText('Jira is off in Northwind.');
+    await expect(sideJira(page)).toHaveCount(0);
+    expect((await switches(page))[nw]).toBe(false);
+
+    await apps.getByRole('button', { name: 'Turn on Jira here' }).click();
+    await expect(apps).toHaveCount(0);
+    await expect(sideJira(page)).toBeVisible();
+  });
+
+  test('C10-E24 Manage spaces…: Settings opens on Apps with Northwind’s row glowing, once', async ({ page }) => {
+    test.skip(phone() || tablet(), 'the same Settings on every size');
+    await onInBoth(page);
+    await openJira(page);
+    await jiraPanel(page).getByRole('button', { name: 'More' }).click();
+    await jiraPanel(page).getByRole('menuitem', { name: 'Manage spaces…' }).click();
+    await expect(jiraPanel(page)).toHaveCount(0);
+    const settings = page.getByRole('dialog', { name: 'Settings' });
+    await expect(settings.getByText('Use Jira in')).toBeVisible();
+    await expect(page).toHaveURL(/[?&]settings=apps/);
+    await expect(page).not.toHaveURL(/[?&]jira/);
+    const rows = settings.locator('.tp-set-sprow');
+    await expect(rows.filter({ hasText: 'Northwind' })).toHaveClass(/tp-set-hl/);
+    await expect(rows.filter({ hasText: 'Personal' })).not.toHaveClass(/tp-set-hl/);
+    // Opened again some other way, nothing glows.
+    await page.reload();
+    await expect(settings.getByText('Use Jira in')).toBeVisible();
+    await expect(settings.locator('.tp-set-hl')).toHaveCount(0);
+  });
+
+  test('C10-E25 Disconnect Jira from the panel asks first and points at Turn off here; Cancel keeps it; confirm takes it from every space', async ({
+    page,
+  }) => {
+    test.skip(phone() || tablet(), 'the same dialog on every size');
+    const { nw } = await onInBoth(page);
+    await openJira(page);
+    await jiraPanel(page).getByRole('button', { name: 'More' }).click();
+    await jiraPanel(page).getByRole('menuitem', { name: 'Disconnect Jira' }).click();
+    const ask = page.getByRole('dialog', { name: 'Disconnect Jira?' });
+    await expect(ask).toContainText('To hide it only in Northwind, use Turn off in Northwind instead.');
+    await ask.getByRole('button', { name: 'Cancel' }).click();
+    await expect(ask).toHaveCount(0);
+    await expect(sideJira(page)).toBeVisible();
+    expect((await switches(page))[nw]).toBe(true);
+
+    await jiraPanel(page).getByRole('button', { name: 'More' }).click();
+    await jiraPanel(page).getByRole('menuitem', { name: 'Disconnect Jira' }).click();
+    await confirmDisconnect(page);
+    await expect(page.locator('.tp-toast')).toContainText('Jira disconnected from all your spaces.');
+    await expect(sideJira(page)).toHaveCount(0);
+    await page.goto('/me');
+    await expect(sideJira(page)).toHaveCount(0);
+    await page.getByRole('button', { name: /^You: / }).click();
+    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    const settings = page.getByRole('dialog', { name: 'Settings' });
+    await settings.getByRole('navigation', { name: 'Settings' }).getByRole('button', { name: /^Apps/ }).click();
+    await expect(settings.getByRole('button', { name: 'Connect' })).toBeVisible();
+  });
+
+  test('C10-E26 phone: the Jira tab › More › Turn off in Northwind; back on More, the tab fades out; Undo brings it back', async ({
+    page,
+  }) => {
+    test.skip(!phone(), 'phone only');
+    const { slug } = await onInBoth(page);
+    const tabs = page.getByRole('navigation', { name: 'Main' });
+    await openJira(page);
+    await jiraPanel(page).getByRole('button', { name: 'More' }).click();
+    await jiraPanel(page).getByRole('menuitem', { name: 'Turn off in Northwind' }).click();
+    await expect(page).toHaveURL(new RegExp(`/${slug}/more$`));
+    await expect(tabs.getByRole('button', { name: /Jira$/ })).toHaveCount(0);
+    const toast = page.locator('.tp-toast');
+    await expect(toast).toContainText('Jira is off in Northwind.');
+    await toast.getByRole('button', { name: 'Undo' }).click();
+    await expect(tabs.getByRole('button', { name: /Jira$/ })).toBeVisible();
   });
 });

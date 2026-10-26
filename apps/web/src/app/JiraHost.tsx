@@ -14,6 +14,7 @@ import {
 import { jiraConnectionKey, jiraError, jiraLinksKey, type JiraListAsk } from '@tudu/client';
 import {
   AppsPanel,
+  ConfirmDialog,
   Drawer,
   JiraPanel,
   showToast,
@@ -28,6 +29,7 @@ import { useEffect, useState } from 'react';
 import { askBacklogView, flashTask, locateTask, showDay, useShownDay } from './dayView';
 import {
   closeApps,
+  glowJiraSpace,
   hostOf,
   jiraClient,
   jiraParam,
@@ -42,10 +44,12 @@ import {
   useJira,
   useJiraPick,
   takeJiraReconnect,
+  turnOffHere,
   withJira,
   type JiraPick,
 } from './jira';
 import { initialsOf, meQuery, queryClient } from './session';
+import { settingsHref } from './settings';
 import { spacePath } from './space';
 import { taskStore, useOnline } from './tasks';
 import { useViewport } from './viewport';
@@ -83,6 +87,29 @@ export function toPanelIssue(
     due: i.due,
     linked: (links.get(i.key) ?? []).map((l) => toPanelLink(l, here, spaceOf)),
   };
+}
+
+/**
+ * Turn off here, from an Apps card: the card keeps showing on, with Turning off…, until the server answers; then it
+ * reads off here and the toast offers Undo. A refusal says why under the card and Jira stays on.
+ */
+export function useTurnOffHere(space: SpaceSummary): {
+  busy: boolean;
+  error: string | null;
+  disable: () => void;
+} {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const disable = () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    void turnOffHere(space, { quiet: true }).then((ok) => {
+      setBusy(false);
+      if (!ok) setError('Couldn’t turn Jira off here. Check your connection and try again.');
+    });
+  };
+  return { busy, error, disable };
 }
 
 /** Turn on here, from an Apps card: the button spins while the server answers, and Jira fades in. */
@@ -162,6 +189,8 @@ export function JiraView({
   const me = useQuery(meQuery).data;
   const spaceOf: SpaceOf = (id) => me?.spaces.find((x) => x.id === id);
   const here = useTurnOnHere(space.id);
+  const loc = useRouterState({ select: (s) => s.location });
+  const [askDisconnect, setAskDisconnect] = useState(false);
   const [reconnecting, setReconnecting] = useState(takeJiraReconnect);
   // A fresh connect keeps the form up for its Connected tick, then the list.
   const [holding, setHolding] = useState(false);
@@ -336,7 +365,13 @@ export function JiraView({
         onJira={() => {}}
       />
     );
+  // Off here or disconnected, the panel has nothing to show: it goes (on phones, back to More).
+  const leave = () => {
+    onClose?.();
+    if (compact) void navigate({ href: spacePath(space.slug, 'more') });
+  };
   return (
+    <>
     <JiraPanel
       state={state}
       issues={issues}
@@ -377,16 +412,24 @@ export function JiraView({
       onRetry={() => void list.refetch()}
       onReconnect={() => setReconnecting(true)}
       onCancelReconnect={() => setReconnecting(false)}
-      onDisconnect={() =>
-        void jiraClient.disconnect().then(
-          () => {
-            onClose?.();
-            if (compact) void navigate({ href: spacePath(space.slug, 'more') });
-            showToast('Jira disconnected from all your spaces. Your tasks keep their Jira keys.');
-          },
-          () => showToast('Couldn’t disconnect Jira. Try again.'),
-        )
-      }
+      onDisconnect={() => setAskDisconnect(true)}
+      onTurnOff={() => {
+        leave();
+        void turnOffHere(space);
+      }}
+      onManage={() => {
+        glowJiraSpace(space.id);
+        setFromApps(false);
+        if (compact) {
+          void navigate({ href: settingsHref(loc, space.slug, 'apps', true) });
+          return;
+        }
+        const q = new URLSearchParams(loc.searchStr);
+        q.delete('jira');
+        void navigate({
+          href: settingsHref({ pathname: loc.pathname, searchStr: q.toString() }, space.slug, 'apps', false),
+        });
+      }}
       onConnect={connect}
       onConnected={() => {
         setHolding(false);
@@ -412,6 +455,28 @@ export function JiraView({
       spaceName={space.name}
       className={vp === 'tablet' ? 'app-jira-tablet' : undefined}
     />
+    <ConfirmDialog
+      open={askDisconnect}
+      variant={compact ? 'sheet' : 'dialog'}
+      title="Disconnect Jira?"
+      confirmLabel="Disconnect Jira"
+      onClose={() => setAskDisconnect(false)}
+      onConfirm={async () => {
+        try {
+          await jiraClient.disconnect();
+        } catch (err) {
+          showToast('Couldn’t disconnect Jira. Try again.');
+          throw err;
+        }
+        setAskDisconnect(false);
+        leave();
+        showToast('Jira disconnected from all your spaces. Your tasks keep their Jira keys.');
+      }}
+    >
+      Jira goes from every space you turned it on in, with your saved views. Your tasks keep their Jira keys. To hide
+      it only in {space.name}, use Turn off in {space.name} instead.
+    </ConfirmDialog>
+    </>
   );
 }
 
@@ -461,6 +526,7 @@ export function AppsHost({ space }: { space: SpaceSummary }) {
   const loc = useRouterState({ select: (s) => s.location });
   const { connected, onHere } = useJira(space.id);
   const here = useTurnOnHere(space.id, closeApps);
+  const off = useTurnOffHere(space);
   if (vp === 'phone') return null;
   return (
     <Drawer open={open} onClose={closeApps} label="Apps" width={480}>
@@ -469,10 +535,12 @@ export function AppsHost({ space }: { space: SpaceSummary }) {
         connected={
           connected ? { who: connected.who.email || connected.who.name, site: hostOf(connected)! } : null
         }
-        off={!!connected && !onHere}
-        busy={here.busy}
+        off={!!connected && !onHere && !off.busy}
+        busy={here.busy || off.busy}
+        error={off.error}
         onClose={closeApps}
         onEnable={here.enable}
+        onDisable={off.disable}
         onJira={() => {
           closeApps();
           setFromApps(!connected);
@@ -489,8 +557,10 @@ export function AppsList({
   connected,
   off,
   busy,
+  error,
   onJira,
   onEnable,
+  onDisable,
   onClose,
   compact,
 }: {
@@ -499,8 +569,11 @@ export function AppsList({
   /** Connected for your account, but off in this space. */
   off?: boolean;
   busy?: boolean;
+  /** Why it couldn't be turned off here. */
+  error?: string | null;
   onJira: () => void;
   onEnable?: () => void;
+  onDisable?: () => void;
   onClose?: () => void;
   compact?: boolean;
 }) {
@@ -510,6 +583,7 @@ export function AppsList({
       onClose={onClose}
       spaceName={space.name}
       onEnable={onEnable}
+      onDisable={onDisable}
       apps={[
         {
           id: 'jira',
@@ -519,6 +593,7 @@ export function AppsList({
           status: connected ? `As ${connected.who} on ${connected.site}.` : undefined,
           off: !!connected && !!off,
           busy,
+          error: error ?? undefined,
         },
       ]}
       onConnect={onJira}

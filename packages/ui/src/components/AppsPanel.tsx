@@ -15,8 +15,10 @@ export interface AppsPanelApp {
   status?: string;
   /** Connected for your account, but off in this space: Turn on here, no second token. */
   off?: boolean;
-  /** Turning on here: the button spins "Turning on…". */
+  /** Turning on here (off) or off here (on): the button spins "Turning on…" / "Turning off…". */
   busy?: boolean;
+  /** Why it couldn't be turned off here; shown under the row, and the app stays on. */
+  error?: string;
   mark?: ReactNode;
 }
 
@@ -27,6 +29,8 @@ export interface AppsPanelProps {
   /** The space you are in, for "Turn it on to use it in Acme Studio." */
   spaceName?: string;
   onEnable?: (id: string) => void;
+  /** Connected and on here: a quiet Turn off here under the status line. */
+  onDisable?: (id: string) => void;
   onConnect?: (id: string) => void;
   onOpen?: (id: string) => void;
   onClose?: () => void;
@@ -51,6 +55,15 @@ function TickMark() {
   );
 }
 
+function Spin() {
+  return (
+    <svg className="tp-spin" width={13} height={13} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx={12} cy={12} r={9} stroke="currentColor" strokeWidth={2.5} opacity={0.25} />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" />
+    </svg>
+  );
+}
+
 /**
  * The optional apps Tudu can connect to. Tudu works on its own; an app shows up in the sidebar, the top bar and
  * the phone's tabs only once it is connected. Today the list holds Jira.
@@ -61,6 +74,7 @@ export function AppsPanel({
   compact,
   spaceName,
   onEnable,
+  onDisable,
   onConnect,
   onOpen,
   onClose,
@@ -103,6 +117,23 @@ export function AppsPanel({
                     ? a.status
                     : a.blurb}
               </p>
+              {a.connected && !a.off ? (
+                <button
+                  type="button"
+                  className={cx('tp-app-off', a.busy && 'tp-busy')}
+                  disabled={!!a.busy}
+                  aria-label={`Turn off ${a.name} in ${spaceName || 'this space'}`}
+                  onClick={() => onDisable?.(a.id)}
+                >
+                  {a.busy ? <Spin /> : null}
+                  {a.busy ? 'Turning off…' : 'Turn off here'}
+                </button>
+              ) : null}
+              {a.error ? (
+                <p className="tp-app-err" role="alert">
+                  {a.error}
+                </p>
+              ) : null}
             </div>
             {a.connected && a.off ? (
               <Button

@@ -1,8 +1,20 @@
 # Turn Jira off in one space, from inside it
 
-Status: proposal, awaiting Rohit's approval. Canvas: approved by Rohit 26 Oct 2026 on the Jira page (boards
+Status: approved by Rohit 26 Oct 2026; implemented (see As built). Canvas: approved by Rohit 26 Oct 2026 on the Jira page (boards
 `J-OffHere` and `J-OffHere-Dark`, the "Turning it off" card on `J-Acct-Motion`, sticky `p04-offhere-draft`). Kit:
 Tudu Paper v26/v27 (`JiraPanel` More menu, `AppsPanel` Turn off here).
+
+## As built (26 Oct)
+
+- **The glow is a one-shot in memory, not a `highlight` search param.** `glowJiraSpace(id)` in `apps/web/src/app/jira.ts`
+  is set by Manage spaces…; Settings reads it while it mounts (`peekJiraGlow`) and clears it once drawn
+  (`clearJiraGlow`). Same effect (one glow, none on a reload) without threading a param through the phone redirect
+  between `?settings=` and `/settings/apps`. C10-U23 therefore tests the store, and C10-E24 the glow on screen.
+- `JiraClient.setOn` was already optimistic with rollback, so the panel path is `turnOffHere(space)` (toasts only).
+  The Apps card keeps drawing "on" with Turning off… while the PUT is out (`useTurnOffHere`, `off && !busy`), so it
+  is not optimistic on screen, as proposed.
+- The More menu items are `display: block` inside `.tp-jp-morepop` so a long space name can ellipsize (a flex item's
+  text can't); the canvas and Tudu Paper got the same line.
 
 ## The report
 
