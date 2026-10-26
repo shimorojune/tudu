@@ -142,3 +142,6 @@ describe('All spaces (chunk 21)', () => {
     expect(placesFor(tight, 'c', 1).map((x) => x.id)).toEqual(['a', 'c', 'b']);
   });
 });
+
+import { test as ciFilterTest, expect as ciFilterExpect } from 'vitest';
+ciFilterTest('CI filter test: fails on purpose', () => ciFilterExpect(1).toBe(2));
