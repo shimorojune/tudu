@@ -79,3 +79,5 @@ then drop them before merge:
 - **V6 master push** after merge: every job runs, and `CI passed` is green.
 - **V7 auto-merge waits**: on the next real PR after protection is on, auto-merge only merges after `CI passed` is
   green.
+
+Throwaway line for the filter test.
