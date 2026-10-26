@@ -46,10 +46,11 @@ Status column is kept by `pnpm test:status` in [STATUS.md](STATUS.md). Run this 
 
 ## End-to-end (`packages/e2e/tests/kit`, group `kit`)
 
-| ID      | What it checks      | Scenario                                                           |
-| ------- | ------------------- | ------------------------------------------------------------------ |
-| C00-E01 | Kit in light        | The page loads in light with every section and no console errors   |
-| C00-E02 | Kit in dark         | The page loads in dark, the window is painted the dark desk colour |
-| C00-E03 | Phone width         | No horizontal scroll at 390px                                      |
-| C00-E04 | Menu flips          | A menu opened near the bottom of the window opens upward           |
-| C00-E05 | Theme is remembered | Picking Dark paints dark, survives a reload                        |
+| ID      | What it checks        | Scenario                                                                                           |
+| ------- | --------------------- | -------------------------------------------------------------------------------------------------- |
+| C00-E01 | Kit in light          | The page loads in light with every section and no console errors                                   |
+| C00-E02 | Kit in dark           | The page loads in dark, the window is painted the dark desk colour                                 |
+| C00-E03 | Phone width           | No horizontal scroll at 390px                                                                      |
+| C00-E04 | Menu flips            | A menu opened near the bottom of the window opens upward                                           |
+| C00-E05 | Theme is remembered   | Picking Dark paints dark, survives a reload                                                        |
+| C00-E06 | The suite runs in UTC | A local date in the test is the same instant in UTC, and the page's offset is 0 and its zone `UTC` |
