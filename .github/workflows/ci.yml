@@ -17,6 +17,76 @@ env:
   PNPM_VERSION: 9.15.9
 
 jobs:
+  # On a PR, run only the jobs its changes can affect; pushes to master and manual runs always run everything.
+  # `CI passed` at the end is the one required check, so skipped jobs never leave a PR waiting.
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      unit: ${{ github.event_name != 'pull_request' || steps.code.outputs.code == 'true' }}
+      web: ${{ github.event_name != 'pull_request' || steps.paths.outputs.web == 'true' }}
+      api: ${{ github.event_name != 'pull_request' || steps.paths.outputs.api == 'true' }}
+      mac: ${{ github.event_name != 'pull_request' || steps.paths.outputs.mac == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'pull_request'
+      # Anything but docs, infra and the other workflows is code.
+      - id: code
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          predicate-quantifier: every
+          filters: |
+            code:
+              - '**'
+              - '!docs/**'
+              - '!**/*.md'
+              - '!infra/**'
+              - '!.github/workflows/deploy-staging.yml'
+              - '!.github/workflows/desktop-staging.yml'
+              - '!.github/workflows/flake-check.yml'
+              - '!.github/workflows/release.yml'
+      # The Mac app loads the web app and talks to the API, so web, server and package changes run it too.
+      - id: paths
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            shared: &shared
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'tsconfig.base.json'
+              - '.npmrc'
+              - '.github/workflows/ci.yml'
+            packages: &packages
+              - 'apps/web/**'
+              - 'apps/server/**'
+              - 'packages/core/**'
+              - 'packages/ui/**'
+              - 'packages/client/**'
+              - 'packages/db/**'
+            web:
+              - *shared
+              - *packages
+              - 'packages/e2e/**'
+              - 'scripts/e2e.mjs'
+            api:
+              - *shared
+              - 'apps/server/**'
+              - 'packages/core/**'
+              - 'packages/db/**'
+            mac:
+              - *shared
+              - *packages
+              - 'apps/desktop/**'
+              - 'packages/e2e/mac/**'
+              - 'packages/e2e/scripts/**'
+              - 'scripts/e2e-mac.mjs'
+
   static:
     name: Lint and typecheck
     runs-on: ubuntu-latest
@@ -37,6 +107,8 @@ jobs:
   # so test load stays off the Dokploy host. Tests create and drop their own databases on the server they are given.
   unit:
     name: Unit tests
+    needs: changes
+    if: needs.changes.outputs.unit == 'true'
     runs-on: ubuntu-latest
     services:
       postgres: &postgres
@@ -76,6 +148,8 @@ jobs:
 
   e2e:
     name: Web end-to-end (${{ matrix.shard }}/4)
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -139,6 +213,8 @@ jobs:
   # here on a GitHub runner, since staging builds it on the Dokploy host only after a merge.
   api-image:
     name: API Docker image
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -161,6 +237,8 @@ jobs:
   # service containers, so Postgres runs on the runner itself; attachments stay in memory.
   desktop:
     name: Mac app (macOS)
+    needs: changes
+    if: needs.changes.outputs.mac == 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -208,3 +286,17 @@ jobs:
             reports/playwright-mac-html
             reports/mac-results
           if-no-files-found: ignore
+
+  # The one required check on master: red if any job failed or was cancelled, green when each passed or was skipped.
+  passed:
+    name: CI passed
+    runs-on: ubuntu-latest
+    needs: [changes, static, unit, e2e, api-image, desktop]
+    if: always()
+    steps:
+      - name: Every job passed or was skipped
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo '${{ toJSON(needs) }}'
+          exit 1
+      - run: echo "All good"

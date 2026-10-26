@@ -7,12 +7,12 @@ needs Rohit's OK.
 
 `Tests: PR + master` (`.github/workflows/ci.yml`), four recent green runs (25 Oct 2026):
 
-| Run | Total | Mac app (macOS) | Web e2e 1/4 | 2/4 | 3/4 | 4/4 | Unit | Lint+types | API image |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 40214213111 (master) | 11m27s | **11m26s** | 9m10s | 7m15s | 7m05s | 6m42s | 2m34s | 1m22s | 0m43s |
-| 40213018963 (PR) | 12m13s | **12m12s** | 9m19s | 7m41s | 7m01s | 6m17s | 1m59s | 1m20s | 0m36s |
-| 40198246620 (master) | 11m33s | **11m33s** | 9m30s | 6m16s | 5m29s | 6m08s | 2m25s | 1m20s | 0m36s |
-| 40194721651 (PR) | 10m15s | 9m51s | **10m15s** | 7m11s | 6m14s | 6m17s | 2m27s | 1m16s | 0m38s |
+| Run                  | Total  | Mac app (macOS) | Web e2e 1/4 | 2/4   | 3/4   | 4/4   | Unit  | Lint+types | API image |
+| -------------------- | ------ | --------------- | ----------- | ----- | ----- | ----- | ----- | ---------- | --------- |
+| 40214213111 (master) | 11m27s | **11m26s**      | 9m10s       | 7m15s | 7m05s | 6m42s | 2m34s | 1m22s      | 0m43s     |
+| 40213018963 (PR)     | 12m13s | **12m12s**      | 9m19s       | 7m41s | 7m01s | 6m17s | 1m59s | 1m20s      | 0m36s     |
+| 40198246620 (master) | 11m33s | **11m33s**      | 9m30s       | 6m16s | 5m29s | 6m08s | 2m25s | 1m20s      | 0m36s     |
+| 40194721651 (PR)     | 10m15s | 9m51s           | **10m15s**  | 7m11s | 6m14s | 6m17s | 2m27s | 1m16s      | 0m38s     |
 
 The whole run takes as long as its slowest job. That is the **Mac job** in three of four runs, and web shard 1 in the
 fourth.

@@ -1,7 +1,7 @@
 # CI: run only the jobs a PR's changes can affect
 
-Status: proposal, awaiting Rohit's approval. Canvas: not applicable (CI config only, no visible change); skipping it
-needs Rohit's OK. Replaces the sharding proposal (ci-shards.md), which Rohit declined on 25 Oct 2026.
+Status: approved by Rohit 26 Oct 2026; implemented. Canvas: not applicable (CI config only, no visible change); skipping
+it approved by Rohit 26 Oct 2026. Replaces the sharding proposal (ci-shards.md), which Rohit declined on 25 Oct 2026.
 
 ## Why
 
@@ -18,17 +18,19 @@ proposal adds one required check, and that check is what makes auto-merge wait f
 Pushes to master and manual runs (`workflow_dispatch`) **always run everything**, as today. Filters apply only to
 `pull_request`.
 
-| Job | Runs on a PR when these change |
-| --- | --- |
-| Lint and typecheck | always (it's ~1.3 min, and Prettier covers the docs too) |
-| Unit tests | `code` (below) |
-| Web end-to-end (1–4/4) | `apps/web/**`, `apps/server/**`, `packages/{core,ui,client,db}/**`, `packages/e2e/**` except `packages/e2e/mac/**`, `scripts/e2e.mjs`, `shared` |
-| API Docker image | `apps/server/**`, `packages/{core,db}/**`, `shared` |
-| Mac app (macOS) | `apps/desktop/**`, `apps/web/**`, `apps/server/**`, `packages/{core,ui,client,db}/**`, `packages/e2e/mac/**`, `packages/e2e/scripts/**`, `scripts/e2e-mac.mjs`, `shared` |
+| Job                    | Runs on a PR when these change                                                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Lint and typecheck     | always (it's ~1.3 min, and Prettier covers the docs too)                                                                                                                 |
+| Unit tests             | `code` (below)                                                                                                                                                           |
+| Web end-to-end (1–4/4) | `apps/web/**`, `apps/server/**`, `packages/{core,ui,client,db}/**`, `packages/e2e/**`, `scripts/e2e.mjs`, `shared`                                                       |
+| API Docker image       | `apps/server/**`, `packages/{core,db}/**`, `shared`                                                                                                                      |
+| Mac app (macOS)        | `apps/desktop/**`, `apps/web/**`, `apps/server/**`, `packages/{core,ui,client,db}/**`, `packages/e2e/mac/**`, `packages/e2e/scripts/**`, `scripts/e2e-mac.mjs`, `shared` |
 
 - `shared` = `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `.npmrc`,
   `.github/workflows/ci.yml`. A change to any of these runs every job.
-- `code` = anything that isn't `docs/**`, `**/*.md`, `infra/**` or another workflow file.
+- `code` = anything that isn't `docs/**`, `**/*.md`, `infra/**` or one of the other four workflow files.
+- A Mac-only test change also runs web e2e (`packages/e2e/**`). That costs no wait, since the Mac job is slower, and
+  keeps the filter simple.
 - The Mac job also runs for web, server and package changes, because the Mac app loads the web app and talks to the
   API. Skipping it there would be exactly the "break without noticing" risk.
 
