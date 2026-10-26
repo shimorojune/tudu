@@ -3,6 +3,7 @@ import { isRefLike, searchTokens } from '@tudu/core';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
 import { IconButton } from './IconButton';
+import { NoteHit, type NoteHitItem } from './NoteHit';
 import { SearchHit, type SearchItem } from './SearchHit';
 import { Skeleton } from './Skeleton';
 
@@ -45,6 +46,14 @@ export interface SearchPanelProps {
   /** How long after the last key the close matches are asked for (260ms). */
   similarDelay?: number;
   similarLabel?: string;
+  /**
+   * Your notes that hold the words (chunk 22), under their own heading after the tasks. Only ever for the words
+   * they answer (`notesFor`), so a slow answer never lists notes for other words.
+   */
+  notes?: NoteHitItem[];
+  notesFor?: string;
+  notesLabel?: string;
+  onPickNote?: (note: NoteHitItem) => void;
   /** Reopening brings the last search back, selected (on by default). */
   keepLast?: boolean;
   placeholder?: string;
@@ -83,7 +92,8 @@ type Opt =
   | { kind: 'query'; q: string }
   | { kind: 'create' }
   | { kind: 'task'; it: SearchItem }
-  | { kind: 'similar'; it: SearchItem };
+  | { kind: 'similar'; it: SearchItem }
+  | { kind: 'note'; it: NoteHitItem };
 
 function optKey(o: Opt): string {
   return o.kind === 'create'
@@ -92,7 +102,9 @@ function optKey(o: Opt): string {
       ? `q:${o.q}`
       : o.kind === 'similar'
         ? `s:${o.it.key}`
-        : o.it.key;
+        : o.kind === 'note'
+          ? `n:${o.it.key}`
+          : o.it.key;
 }
 
 /**
@@ -272,6 +284,9 @@ export function SearchPanel(p: SearchPanelProps) {
   const simOn = !!ql && !isRefLike(ql) && sim.state !== 'off' && sim.q === ql;
   const simItems = simOn ? sim.items.filter((it) => !hits.some((h) => h.key === it.key)) : [];
   if (simOn && sim.state === 'done') for (const it of simItems) opts.push({ kind: 'similar', it });
+  // Your notes for these very words, last.
+  const notes = ql && (p.notesFor ?? ql).trim().toLowerCase() === ql ? (p.notes ?? []) : [];
+  for (const it of notes) opts.push({ kind: 'note', it });
   const cur = Math.min(act, Math.max(0, opts.length - 1));
 
   // A search that led somewhere is kept: the box remembers it for the next opening, and the app adds it to the history.
@@ -289,6 +304,7 @@ export function SearchPanel(p: SearchPanelProps) {
       p.onSearched?.(t);
     }
     if (o.kind === 'create') p.onCreate?.(t);
+    else if (o.kind === 'note') p.onPickNote?.(o.it);
     else p.onPick?.(o.it);
   };
   const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -321,6 +337,8 @@ export function SearchPanel(p: SearchPanelProps) {
           <SearchHit {...props} create={q.trim()} />
         ) : o.kind === 'similar' ? (
           <SearchHit {...props} item={o.it} />
+        ) : o.kind === 'note' ? (
+          <NoteHit {...props} item={o.it} tokens={toks} />
         ) : (
           <SearchHit {...props} item={o.it} tokens={toks} />
         )}
@@ -426,6 +444,14 @@ export function SearchPanel(p: SearchPanelProps) {
           </p>,
         );
       else for (const _ of simItems) body.push(row(opts[n]!, n++));
+    }
+    if (notes.length) {
+      body.push(
+        <div key="nh" className="tp-sp-head tp-sp-head-sim">
+          {p.notesLabel ?? 'Notes'}
+        </div>,
+      );
+      for (const _ of notes) body.push(row(opts[n]!, n++));
     }
   }
 

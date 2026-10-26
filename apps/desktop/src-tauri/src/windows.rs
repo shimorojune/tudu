@@ -1,5 +1,5 @@
-//! The three windows: the desk (`main`), the floating Quick Add (`floating`) and today from the menu bar
-//! (`menubar`).
+//! The four windows: the desk (`main`), the floating Quick Add (`floating`), today from the menu bar (`menubar`)
+//! and the note window (`note`, chunk 22; see notes.rs).
 //!
 //! The desk has no title bar: the traffic lights sit over the sidebar and the top bar drags the window. Closing it
 //! hides it and Tudu carries on in the menu bar (chunk 16). The floating window and the menu bar's sheet are non-activating panels: they take the keyboard without
@@ -15,13 +15,15 @@ use tauri::{
 };
 
 use crate::place::{
-    self, Icon, Screen, FLOATING_HEIGHT, FLOATING_WIDTH, SHEET_HEIGHT, SHEET_WIDTH,
+    self, Icon, Screen, FLOATING_HEIGHT, FLOATING_WIDTH, NOTE_HEIGHT, NOTE_MIN_HEIGHT,
+    NOTE_MIN_WIDTH, NOTE_WIDTH, SHEET_HEIGHT, SHEET_WIDTH,
 };
 use crate::{background, App};
 
 pub const MAIN: &str = "main";
 pub const FLOATING: &str = "floating";
 pub const MENUBAR: &str = "menubar";
+pub const NOTE: &str = "note";
 
 /// When the sheet last hid because it lost focus. A click on the tick takes the focus first, so a click that comes
 /// this soon after is the one that closed it, and must not open it again.
@@ -198,6 +200,37 @@ pub fn create(app: &AppHandle, at_login: bool) -> tauri::Result<()> {
     });
     #[cfg(target_os = "macos")]
     panel::watch_outside(app);
+
+    // The note window: a panel like Quick Add (the keyboard without the desk), but resizable, not on top to start,
+    // and it stays when you click into another app.
+    crate::notes::load(app);
+    let note = builder(app, NOTE, "note.html", "/note-window")
+        .title("Note")
+        .inner_size(NOTE_WIDTH, NOTE_HEIGHT)
+        .min_inner_size(NOTE_MIN_WIDTH, NOTE_MIN_HEIGHT)
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .resizable(true)
+        .always_on_top(false)
+        .visible_on_all_workspaces(true)
+        .skip_taskbar(true)
+        .focused(false)
+        .visible(false)
+        .build()?;
+    background::keep_awake(&note);
+    #[cfg(target_os = "macos")]
+    panel::make_panel(&note);
+    let n = note.clone();
+    let a = app.clone();
+    note.on_window_event(move |e| match e {
+        WindowEvent::CloseRequested { api, .. } => {
+            api.prevent_close();
+            crate::notes::hide(&a);
+        }
+        WindowEvent::Moved(_) | WindowEvent::Resized(_) => crate::notes::remember(&a, &n),
+        _ => {}
+    });
     Ok(())
 }
 
@@ -340,7 +373,7 @@ pub fn hide_menubar(app: &AppHandle) {
     }
 }
 
-fn screens(w: &WebviewWindow) -> Vec<Screen> {
+pub(crate) fn screens(w: &WebviewWindow) -> Vec<Screen> {
     w.available_monitors()
         .unwrap_or_default()
         .iter()
@@ -362,6 +395,11 @@ fn place_floating(app: &AppHandle, w: &WebviewWindow) {
         let _ = w.set_size(tauri::LogicalSize::new(FLOATING_WIDTH, FLOATING_HEIGHT));
         let _ = w.set_position(PhysicalPosition::new(x as i32, y as i32));
     }
+}
+
+/// The note window takes the keyboard the same way.
+pub(crate) fn focus_panel(w: &WebviewWindow) {
+    focus_floating(w);
 }
 
 /// Key window without activating the app, so the desk stays where it is (the floating bar and the sheet).

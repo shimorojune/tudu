@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-hide-note"
+description = "Enables the hide_note command without any pre-configured scope."
+commands.allow = ["hide_note"]
+
+[[permission]]
+identifier = "deny-hide-note"
+description = "Denies the hide_note command without any pre-configured scope."
+commands.deny = ["hide_note"]

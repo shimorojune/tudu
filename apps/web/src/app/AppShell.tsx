@@ -47,7 +47,8 @@ import { SettingsHost, settingsHref } from './settings';
 import { inApp } from './desktop';
 import { inboxTotal, useUpdate } from './updates';
 import { useAllMarks, useAllScope } from './allSpaces';
-import { ALL_VIEWS, INBOX_PATH, pagePath, switchPath, viewOf, type View } from './space';
+import { ALL_VIEWS, INBOX_PATH, NOTEBOOK_PATH, pagePath, switchPath, viewOf, type View } from './space';
+import { NoteWindowHost } from './NoteWindowHost';
 import { CreateSpaceHost, MembersHost } from './spaces';
 import { taskStore } from './tasks';
 import { useViewport } from './viewport';
@@ -102,6 +103,7 @@ export function phoneTab(at: { view: View; onToday: boolean; searchOpen: boolean
   if (at.view === 'jira') return at.jira ? 'jira' : 'more';
   if (
     at.view === 'apps' ||
+    at.view === 'notebook' ||
     at.view === 'backlog' ||
     at.view === 'people' ||
     at.view === 'more' ||
@@ -204,6 +206,7 @@ export function AppShell({
   const inboxCount = inboxTotal(me, update);
   const onInbox = current === 'inbox';
   const openInbox = () => void navigate({ href: INBOX_PATH });
+  const onNotebook = current === 'notebook';
   const app = inApp();
   const items = sideItems(team, all);
 
@@ -286,6 +289,7 @@ export function AppShell({
       {all ? null : <AppsHost space={space} />}
       <GettingStartedHost me={me} space={space} vp={vp} />
       <FeedbackHost space={space} vp={vp} />
+      <NoteWindowHost />
     </>
   );
 
@@ -396,6 +400,8 @@ export function AppShell({
                 : false
             }
             inbox={{ count: inboxCount, open: onInbox, onInbox: openInbox }}
+            notebook={{ open: onNotebook, onNotebook: () => void navigate({ href: NOTEBOOK_PATH }) }}
+            searchLabel="Search tasks and notes"
             onSearch={openSearch}
             searchOpen={searchOpen}
             onFeedback={openFeedback}

@@ -51,3 +51,17 @@ export {
   type JiraListAsk,
 } from './jira';
 export { tickGettingStarted } from './firstRun';
+export {
+  NotebookStore,
+  applyToNotebook,
+  notebookKey,
+  noteKey,
+  recentKey,
+  trashKey,
+  taskNotesKey,
+  SAVE_QUIET_MS,
+  SLOW_SAVE_MS,
+  type NoteView,
+  type SaveState,
+  type NotebookStoreOptions,
+} from './notebook';

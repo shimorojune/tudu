@@ -1,5 +1,6 @@
-//! Where the floating Quick Add appears (top centre of the screen the pointer is on), and where the menu bar's sheet
-//! drops (under the tick). Physical pixels throughout, as the monitors, the pointer and the tray report them.
+//! Where the floating Quick Add appears (top centre of the screen the pointer is on), where the menu bar's sheet
+//! drops (under the tick), and where the note window sits (where you left it, kept on a screen). Physical pixels
+//! throughout, as the monitors, the pointer and the tray report them.
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Screen {
@@ -68,6 +69,81 @@ pub fn sheet_origin(icon: Icon, screen: Screen) -> (f64, f64) {
         x.round(),
         (icon.y + icon.height + SHEET_GAP * screen.scale).round(),
     )
+}
+
+/// The note window's first size in points (P-Floating), and the least it can be resized to.
+pub const NOTE_WIDTH: f64 = 780.0;
+pub const NOTE_HEIGHT: f64 = 560.0;
+pub const NOTE_MIN_WIDTH: f64 = 420.0;
+pub const NOTE_MIN_HEIGHT: f64 = 320.0;
+/// Filling the screen keeps this much room at its edges, in points.
+pub const NOTE_FILL_MARGIN: f64 = 8.0;
+/// At least this much of the window's bar stays on a screen, in points, so it can always be dragged back.
+pub const NOTE_KEEP: f64 = 120.0;
+
+/// A window's place and size, in physical pixels.
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Frame {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+/// The note window the first time: its own size, centred across the screen, a little way down from the top.
+pub fn note_default(screen: Screen) -> Frame {
+    let width = (NOTE_WIDTH * screen.scale).min(screen.width);
+    let height = (NOTE_HEIGHT * screen.scale).min(screen.height);
+    Frame {
+        x: screen.x + ((screen.width - width) / 2.0).round(),
+        y: screen.y
+            + (FLOATING_TOP * screen.scale)
+                .min(screen.height - height)
+                .max(0.0)
+                .round(),
+        width,
+        height,
+    }
+}
+
+/// Where you left it, if a screen still shows enough of it (displays come and go); else on the screen it was mostly
+/// on, or the first one, pulled in so its bar is on that screen, never bigger than the screen.
+pub fn keep_on_screen(f: Frame, screens: &[Screen]) -> Option<Frame> {
+    let centre = (f.x + f.width / 2.0, f.y + 20.0);
+    let s = screens
+        .iter()
+        .find(|s| s.contains(centre.0, centre.1))
+        .or_else(|| screens.iter().find(|s| s.contains(f.x + 20.0, f.y + 20.0)))
+        .or_else(|| screens.first())
+        .copied()?;
+    let width = f
+        .width
+        .min(s.width)
+        .max((NOTE_MIN_WIDTH * s.scale).min(s.width));
+    let height = f
+        .height
+        .min(s.height)
+        .max((NOTE_MIN_HEIGHT * s.scale).min(s.height));
+    let keep = NOTE_KEEP * s.scale;
+    let x = f.x.max(s.x - width + keep).min(s.x + s.width - keep);
+    let y = f.y.max(s.y).min(s.y + s.height - 40.0 * s.scale);
+    Some(Frame {
+        x: x.round(),
+        y: y.round(),
+        width: width.round(),
+        height: height.round(),
+    })
+}
+
+/// Fill the screen: its whole work area (without the menu bar and the Dock) but a small margin.
+pub fn fill(area: Screen) -> Frame {
+    let m = NOTE_FILL_MARGIN * area.scale;
+    Frame {
+        x: (area.x + m).round(),
+        y: (area.y + m).round(),
+        width: (area.width - 2.0 * m).round(),
+        height: (area.height - 2.0 * m).round(),
+    }
 }
 
 #[cfg(test)]
@@ -150,6 +226,60 @@ mod tests {
         assert_eq!(
             screen_for(Some((i.x + 11.0, i.y + 12.0)), &[LEFT, RIGHT]),
             Some(RIGHT)
+        );
+    }
+
+    #[test]
+    fn c22_d02_the_note_window_opens_where_it_was_and_stays_on_a_screen() {
+        let first = note_default(LEFT);
+        assert_eq!(first.width, 1560.0);
+        assert_eq!(first.x, ((3024.0 - 1560.0) / 2.0_f64).round());
+        assert_eq!(first.y, 280.0);
+        // Left on the right screen: it stays exactly there.
+        let there = Frame {
+            x: 3400.0,
+            y: 200.0,
+            width: 780.0,
+            height: 560.0,
+        };
+        assert_eq!(keep_on_screen(there, &[LEFT, RIGHT]), Some(there));
+        // The right screen unplugged: it comes back onto the left one, its bar in reach, never bigger than it.
+        let back = keep_on_screen(there, &[LEFT]).unwrap();
+        assert!(back.x + NOTE_KEEP * 2.0 <= 3024.0);
+        assert!(back.width <= 3024.0 && back.height <= 1964.0);
+        // Dragged mostly off the top-left: its bar comes back on.
+        let off = keep_on_screen(
+            Frame {
+                x: -5000.0,
+                y: -300.0,
+                width: 1560.0,
+                height: 1120.0,
+            },
+            &[LEFT],
+        )
+        .unwrap();
+        assert_eq!(off.y, 0.0);
+        assert_eq!(off.x, -1560.0 + NOTE_KEEP * 2.0);
+        assert_eq!(keep_on_screen(there, &[]), None);
+    }
+
+    #[test]
+    fn c22_d03_filling_the_screen_keeps_a_small_margin() {
+        let area = Screen {
+            x: 0.0,
+            y: 50.0,
+            width: 3024.0,
+            height: 1800.0,
+            scale: 2.0,
+        };
+        assert_eq!(
+            fill(area),
+            Frame {
+                x: 16.0,
+                y: 66.0,
+                width: 2992.0,
+                height: 1768.0
+            }
         );
     }
 }

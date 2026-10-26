@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  check,
   date,
   doublePrecision,
   index,
@@ -16,6 +17,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { CONNECTOR_PROVIDERS, type ConnectorProvider } from '@tudu/core';
 import { user } from './auth-schema';
+import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 
 /** How many numbers the embedding model answers with (all-MiniLM-L6-v2). A model of another width is a migration. */
 export const EMBEDDING_DIMENSIONS = 384;
@@ -316,15 +318,18 @@ export const taskEvents = pgTable(
   (t) => [index('task_events_task').on(t.taskId, t.id)],
 );
 
-/** A file in object storage. Uploaded before or after its task exists; swept when nothing refers to it. */
+/**
+ * A file in object storage. Uploaded before or after its task exists; swept when nothing refers to it. A file in
+ * your Notebook (chunk 22) has no space: it is its owner's alone (`owner_id`), kept while a note refers to it.
+ */
 export const attachments = pgTable(
   'attachments',
   {
     id: text('id').primaryKey(),
-    spaceId: text('space_id')
-      .notNull()
-      .references(() => spaces.id, { onDelete: 'cascade' }),
+    spaceId: text('space_id').references(() => spaces.id, { onDelete: 'cascade' }),
     taskId: text('task_id').references(() => tasks.id, { onDelete: 'set null' }),
+    ownerId: text('owner_id').references(() => user.id, { onDelete: 'cascade' }),
+    noteId: text('note_id').references((): AnyPgColumn => notes.id, { onDelete: 'set null' }),
     /** The object key in the bucket. */
     key: text('key').notNull(),
     name: text('name').notNull(),
@@ -336,6 +341,8 @@ export const attachments = pgTable(
   (t) => [
     index('attachments_task').on(t.taskId),
     index('attachments_space_created').on(t.spaceId, t.createdAt),
+    index('attachments_note').on(t.noteId),
+    check('attachments_one_home', sql`(${t.spaceId} is null) <> (${t.ownerId} is null)`),
   ],
 );
 
@@ -586,4 +593,82 @@ export const feedback = pgTable(
     index('feedback_user_created').on(t.userId, t.createdAt),
     index('feedback_issue_pending').on(t.issueState, t.issueClaimedAt),
   ],
+);
+
+/** The clock of the last write to each field of a folder or a note (last write wins per field). */
+export type NotebookClocks = Partial<Record<'name' | 'title' | 'place' | 'deleted', string>>;
+
+/**
+ * Your Notebook's folders (chunk 22): yours alone, three levels deep at most (checked on the server). A folder in
+ * Trash has `deleted_at`; what went with it carries its id in `deleted_with`, so putting it back brings exactly that.
+ */
+export const notebookFolders = pgTable(
+  'notebook_folders',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    parentId: text('parent_id').references((): AnyPgColumn => notebookFolders.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    position: doublePrecision('position').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    deletedWith: text('deleted_with'),
+    clocks: jsonb('clocks').$type<NotebookClocks>().notNull().default({}),
+  },
+  (t) => [
+    index('notebook_folders_user_parent').on(t.userId, t.parentId, t.position),
+    // Two live folders in one place never share a name, whatever the case.
+    uniqueIndex('notebook_folders_name')
+      .on(t.userId, sql`coalesce(${t.parentId}, '')`, sql`lower(${t.name})`)
+      .where(sql`deleted_at is null`),
+  ],
+);
+
+/** A note: its title, its words as cleaned HTML and as text (search, the first line), and its body's rev. */
+export const notes = pgTable(
+  'notes',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    folderId: text('folder_id').references(() => notebookFolders.id, { onDelete: 'set null' }),
+    title: text('title').notNull().default(''),
+    html: text('html').notNull().default(''),
+    text: text('text').notNull().default(''),
+    position: doublePrecision('position').notNull(),
+    /** +1 for every body save; a save written on an older rev is turned down (stale), never merged. */
+    rev: integer('rev').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    deletedWith: text('deleted_with'),
+    clocks: jsonb('clocks').$type<NotebookClocks>().notNull().default({}),
+  },
+  (t) => [
+    index('notes_user_folder').on(t.userId, t.folderId, t.position),
+    index('notes_user_updated').on(t.userId, t.updatedAt.desc()),
+    index('notes_user_deleted').on(t.userId, t.deletedAt),
+  ],
+);
+
+/**
+ * A note linked to a task. No user here: the link is the note's, and the note its owner's. Read only through the
+ * owner's routes, and only for tasks the owner can still read.
+ */
+export const noteLinks = pgTable(
+  'note_links',
+  {
+    noteId: text('note_id')
+      .notNull()
+      .references(() => notes.id, { onDelete: 'cascade' }),
+    taskId: text('task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'cascade' }),
+    linkedAt: timestamp('linked_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.noteId, t.taskId] }), index('note_links_task').on(t.taskId)],
 );

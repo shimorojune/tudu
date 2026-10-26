@@ -214,6 +214,55 @@
 :root[data-motion='less'] .tp-set-sperr {
   animation: none;
 }
+:root[data-motion='less'] .tp-nb-kids,
+:root[data-motion='less'] .tp-nb-rail,
+:root[data-motion='less'] .tp-nb-win.tp-root,
+:root[data-motion='less'] .tp-nb-chev {
+  transition-duration: 1ms;
+}
+:root[data-motion='less'] .tp-nb-turn,
+:root[data-motion='less'] .tp-nb-pop,
+:root[data-motion='less'] .tp-nb-tchip.tp-root,
+:root[data-motion='less'] .tp-nb-save-l {
+  animation-duration: 1ms;
+}
+:root[data-motion='less'] .tp-nb-save-saving .tp-nb-save-dot {
+  animation: none;
+}
+:root[data-motion='less'] .tp-nb-landed > .tp-nb-row.tp-root,
+:root[data-motion='less'] .tp-nb-frow.tp-nb-landed {
+  animation-duration: 1ms;
+}
+:root[data-motion='less'] .tp-nb-save-ring {
+  animation-duration: 1600ms, 1ms;
+}
+:root[data-motion='less'] .tp-nb-save-tick,
+:root[data-motion='less'] .tp-nb-save-tick path,
+:root[data-motion='less'] .tp-nb-leaving .tp-nb-tchip.tp-root,
+:root[data-motion='less'] .tp-nb-bubble {
+  animation-duration: 1ms;
+}
+:root[data-motion='less'] .tp-nb-li-new,
+:root[data-motion='less'] .tp-nb-li-out,
+:root[data-motion='less'] .tp-nb-rail-all {
+  animation-duration: 1ms;
+}
+:root[data-motion='less'] .tp-nb-ed > .tp-nb-ed-top,
+:root[data-motion='less'] .tp-nb-ed > .tp-nb-ed-in,
+:root[data-motion='less'] .tp-nb-ed > .tp-nb-ed-foot {
+  transition: none;
+}
+:root[data-motion='less'] .tp-nb-rail-all.tp-nb-rail-from-r,
+:root[data-motion='less'] .tp-nb-rail-list.tp-nb-rail-from-l {
+  animation: tp-nb-fade 120ms linear both;
+}
+:root[data-motion='less'] .tp-nb-pop.tp-nb-pop-leaving {
+  animation: tp-nb-fade-out 1ms linear both;
+}
+:root[data-motion='less'] .tp-nb-float,
+:root[data-motion='less'] .tp-nb-float.tp-nb-float-out {
+  animation-duration: 1ms;
+}
 
 /* app.css */
 :root[data-motion='less'] .tp-tip-pop,

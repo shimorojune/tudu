@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router';
 import type { SpaceSummary } from '@tudu/core';
-import { Icon, Sheet, SheetBody, type IconName } from '@tudu/ui';
+import { Icon, NoteIcon, Sheet, SheetBody, type IconName } from '@tudu/ui';
 import { openFeedback } from '../../app/feedback';
 import { useJira } from '../../app/jira';
 import { useAllScope } from '../../app/allSpaces';
@@ -9,13 +9,13 @@ import { pagePath, useSpace, type View } from '../../app/space';
 export interface MoreItem {
   value: View;
   label: string;
-  icon: IconName;
+  icon: IconName | 'note';
   hint: string;
 }
 
 /**
- * What More keeps on phones: the Backlog, People in a team space, Apps and Settings (the Inbox is in the header).
- * All spaces has no People or Apps of its own.
+ * What More keeps on phones: the Backlog, People in a team space, your Notebook, Apps and Settings (the Inbox is in
+ * the header). All spaces has no People or Apps of its own.
  */
 export function moreItems(space: Pick<SpaceSummary, 'kind' | 'name'>, jira = false, all = false): MoreItem[] {
   const items: MoreItem[] = [
@@ -26,7 +26,15 @@ export function moreItems(space: Pick<SpaceSummary, 'kind' | 'name'>, jira = fal
       hint: all ? 'Tasks without a day, in every space' : 'Tasks without a day',
     },
   ];
+  // Your Notebook (chunk 22): yours, not a space's, and there is no room for it in the header on a phone.
+  const notebook: MoreItem = {
+    value: 'notebook',
+    label: 'Notebook',
+    icon: 'note',
+    hint: 'Your notes, only you see them',
+  };
   if (all) {
+    items.push(notebook);
     items.push({
       value: 'settings',
       label: 'Settings',
@@ -37,6 +45,7 @@ export function moreItems(space: Pick<SpaceSummary, 'kind' | 'name'>, jira = fal
   }
   if (space.kind === 'team')
     items.push({ value: 'people', label: 'People', icon: 'team', hint: `Everyone in ${space.name}` });
+  items.push(notebook);
   items.push({ value: 'apps', label: 'Apps', icon: 'plug', hint: jira ? 'Jira' : 'None yet' });
   items.push({
     value: 'settings',
@@ -75,7 +84,11 @@ export function MorePage() {
                 onClick={() => void navigate({ href: pagePath(space.slug, all, it.value) })}
               >
                 <span className="app-more-icon" aria-hidden="true">
-                  <Icon name={it.icon} size={18} />
+                  {it.icon === 'note' ? (
+                    <NoteIcon name="note" size={18} />
+                  ) : (
+                    <Icon name={it.icon} size={18} />
+                  )}
                 </span>
                 <span className="app-more-words">
                   <span className="app-more-label">{it.label}</span>

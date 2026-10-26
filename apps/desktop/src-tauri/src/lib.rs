@@ -6,6 +6,7 @@ mod background;
 mod bridge;
 #[cfg(feature = "control")]
 mod control;
+mod notes;
 mod place;
 mod track;
 mod updates;
@@ -45,6 +46,12 @@ macro_rules! handlers {
             background::set_open_at_login,
             background::open_login_items,
             background::set_dock,
+            notes::open_note,
+            notes::note_state,
+            notes::set_note_pinned,
+            notes::set_note_expanded,
+            notes::open_in_notebook,
+            notes::hide_note,
             $($extra),*
         ]
     };
@@ -65,7 +72,8 @@ pub fn run() {
                 .build(),
         )
         .manage(updates::Updates::default())
-        // Any of the three windows coming to the front checks for a new version, once the last check is old enough.
+        .manage(notes::Notes::default())
+        // Any of the windows coming to the front checks for a new version, once the last check is old enough.
         .on_window_event(|w, e| {
             if let WindowEvent::Focused(true) = e {
                 updates::auto_check(w.app_handle());

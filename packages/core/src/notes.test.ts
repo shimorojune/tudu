@@ -63,3 +63,20 @@ describe('C04-U13 attachment chips survive the cleaner', () => {
     );
   });
 });
+
+describe('C22-U06 a note body is cleaned like task notes', () => {
+  it('C22-U06 keeps checklists, files and links and drops scripts, handlers and unknown tags', () => {
+    const body =
+      '<h2>Five interviews</h2><ul data-type="taskList" class="tp-checks"><li data-type="taskItem" data-checked="false"><p>Draft it</p></li></ul>' +
+      '<p><a class="tp-att" data-id="f1" data-name="notes.pdf" data-size="2048" href="/api/files/f1">notes.pdf</a> ' +
+      '<a href="https://tudu.app" onclick="x()">site</a></p><script>steal()</script><img src=x onerror="alert(1)"><marquee>hi</marquee>';
+    const out = cleanHtml(body);
+    expect(out).toContain('data-type="taskList"');
+    expect(out).toContain('data-checked="false"');
+    expect(out).toContain('href="/api/files/f1"');
+    expect(out).toContain('data-id="f1"');
+    expect(out).toContain('href="https://tudu.app" rel="noopener noreferrer" target="_blank"');
+    expect(out).not.toMatch(/script|onerror|onclick|<img|marquee|steal/);
+    expect(out).toContain('hi');
+  });
+});

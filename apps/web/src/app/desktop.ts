@@ -34,7 +34,15 @@ export interface AppInfo {
   shortcut: string;
 }
 
-export type DesktopWindow = 'main' | 'floating' | 'menubar';
+export type DesktopWindow = 'main' | 'floating' | 'menubar' | 'note';
+
+/** The note window (chunk 22): what it was last asked to show, and whether it is pinned or fills the screen. */
+export interface NoteWindowState {
+  pinned: boolean;
+  expanded: boolean;
+  /** A note (or a blank one, linked to a task); every ask has its own nonce. */
+  ask: { id: string | null; linkTo: string | null; nonce: number } | null;
+}
 
 /** Open at login, as macOS has it: `approval` waits for your OK in Login Items, `refused` is macOS saying no. */
 export type LoginState = 'off' | 'on' | 'approval' | 'refused';
@@ -67,6 +75,18 @@ export interface DesktopBridge {
   summon(): void;
   hideMenubar(): void;
   quit(): void;
+  /** The note window on a note, or on a blank one (linked to a task): it floats over every app, the desk stays put. */
+  openNote(id: string | null, linkTo?: string | null): void;
+  /** From the note window: what it should show, and how it sits. */
+  noteState(): Promise<NoteWindowState>;
+  setNotePinned(on: boolean): Promise<boolean>;
+  setNoteExpanded(on: boolean): Promise<boolean>;
+  /** Open in your Notebook: the desk on the note (or the Notebook), and the note window hides. */
+  openInNotebook(id: string | null): void;
+  hideNote(): void;
+  /** The note window follows the pointer: by its bar, or from its corner. */
+  startDragging(): void;
+  startResizing(): void;
   /**
    * Checks the feed; a newer version is downloaded and verified before it is answered. `manual`: Check now, so a
    * failure shows.
@@ -92,7 +112,13 @@ export interface DesktopBridge {
 }
 
 export type DesktopEvent =
-  'go' | 'floating:shown' | 'menubar:shown' | 'menubar:hidden' | 'update:ready' | 'update:status';
+  | 'go'
+  | 'floating:shown'
+  | 'menubar:shown'
+  | 'menubar:hidden'
+  | 'update:ready'
+  | 'update:status'
+  | 'note:open';
 
 /** What the sheet asks the desk to show for Send feedback, in place of a page. */
 export const FEEDBACK_GO = 'feedback';
@@ -116,6 +142,8 @@ export interface DesktopFake {
   /** Settings › This Mac as the fake app has it; the switch answers `loginAnswer` when set. */
   thisMac?: Partial<ThisMac>;
   loginAnswer?: LoginState;
+  /** The note window as the fake app has it. */
+  note?: Partial<NoteWindowState>;
   calls: Array<{ name: string; args: unknown[] }>;
   listeners?: Record<string, Array<(payload: unknown) => void>>;
 }
@@ -171,6 +199,22 @@ function fakeBridge(f: DesktopFake): DesktopBridge {
     summon: () => call('summon'),
     hideMenubar: () => call('hideMenubar'),
     quit: () => call('quit'),
+    openNote: (id, linkTo) => call('openNote', id, linkTo ?? null),
+    noteState: async () => ({ pinned: false, expanded: false, ask: null, ...f.note }),
+    setNotePinned: async (on) => {
+      call('setNotePinned', on);
+      f.note = { ...f.note, pinned: on };
+      return on;
+    },
+    setNoteExpanded: async (on) => {
+      call('setNoteExpanded', on);
+      f.note = { ...f.note, expanded: on };
+      return on;
+    },
+    openInNotebook: (id) => call('openInNotebook', id),
+    hideNote: () => call('hideNote'),
+    startDragging: () => call('startDragging'),
+    startResizing: () => call('startResizing'),
     checkUpdate: async (manual) => {
       call('checkUpdate', ...(manual ? [true] : []));
       // A fake app old or new: the status steps through as the real one's do, then the answer.
@@ -240,7 +284,8 @@ function tauriBridge(t: NonNullable<Window['__TAURI_INTERNALS__']>): DesktopBrid
   const invoke = <T>(cmd: string, args?: Record<string, unknown>) => t.invoke(cmd, args) as Promise<T>;
   const quiet = (p: Promise<unknown>) => void p.catch(() => {});
   const at = t.metadata?.currentWindow?.label;
-  const label: DesktopWindow = at === 'floating' || at === 'menubar' ? at : 'main';
+  const label: DesktopWindow = at === 'floating' || at === 'menubar' || at === 'note' ? at : 'main';
+  const win = () => import('@tauri-apps/api/window').then((w) => w.getCurrentWindow());
   return {
     window: label,
     info: () => invoke<AppInfo>('app_info'),
@@ -258,6 +303,14 @@ function tauriBridge(t: NonNullable<Window['__TAURI_INTERNALS__']>): DesktopBrid
     summon: () => quiet(invoke('summon')),
     hideMenubar: () => quiet(invoke('hide_menubar')),
     quit: () => quiet(invoke('quit')),
+    openNote: (id, linkTo) => quiet(invoke('open_note', { id, linkTo: linkTo ?? null })),
+    noteState: () => invoke<NoteWindowState>('note_state'),
+    setNotePinned: (on) => invoke<boolean>('set_note_pinned', { on }),
+    setNoteExpanded: (on) => invoke<boolean>('set_note_expanded', { on }),
+    openInNotebook: (id) => quiet(invoke('open_in_notebook', { id })),
+    hideNote: () => quiet(invoke('hide_note')),
+    startDragging: () => quiet(win().then((w) => w.startDragging())),
+    startResizing: () => quiet(win().then((w) => w.startResizeDragging('SouthEast'))),
     // Not asked for: the page's own check, which keeps to the app's 30-minute floor (an older app ignores `auto`).
     checkUpdate: (manual) => invoke<UpdateReady | null>('update_check', { manual: !!manual, auto: !manual }),
     // An app before this command refuses it: no Check now there.

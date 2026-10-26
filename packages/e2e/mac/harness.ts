@@ -50,7 +50,16 @@ export interface AppState {
   identifier: string;
   version: string;
   pid: number;
-  windows: { main: WindowState; floating: WindowState; menubar: WindowState };
+  windows: { main: WindowState; floating: WindowState; menubar: WindowState; note: WindowState };
+  /** The note window (chunk 22): pinned, filling the screen, what it was last asked to show, where it is kept. */
+  note: {
+    state: {
+      pinned: boolean;
+      expanded: boolean;
+      ask: { id: string | null; linkTo: string | null; nonce: number } | null;
+    };
+    frame: { x: number; y: number; width: number; height: number } | null;
+  };
   /** The tick: no native menu any more (items is empty); a click opens the menu bar's sheet under `rect`. */
   tray: {
     tooltip: string;
@@ -90,7 +99,7 @@ export interface AppState {
     tickHidden: boolean;
     loginItem: 'off' | 'on' | 'approval' | 'refused';
     /** Each page's inactive scheduling policy: 0 suspend, 1 throttle, 2 none. */
-    webviews: { main: number | null; floating: number | null; menubar: number | null };
+    webviews: { main: number | null; floating: number | null; menubar: number | null; note: number | null };
   };
 }
 
@@ -153,6 +162,9 @@ const T = {
   text: (sel = 'body') => (document.querySelector(sel) || document.body).innerText,
 };
 `;
+
+/** The app's windows: the desk, Quick Add, the menu bar's sheet and the note window. */
+export type AppWindow = 'main' | 'floating' | 'menubar' | 'note';
 
 export class TuduApp {
   child: ChildProcess | null = null;
@@ -220,19 +232,15 @@ export class TuduApp {
   }
 
   /**
-   * What a person does outside the page: summon, tray (a click on the tick), reopen, close (window), check-update,
-   * quit; and tick (hidden: true or false stands in for macOS hiding or showing the tick, null gives it back).
+   * What a person does outside the page: summon, tray (a click on the tick), reopen, close (window), frame (a window
+   * dragged and resized to x, y, width, height, in points), check-update, quit; and tick (hidden: true or false stands in for macOS hiding or showing the tick, null gives it back).
    */
   async act(what: string, extra: Record<string, unknown> = {}): Promise<unknown> {
     return this.call('/act', { do: what, ...extra });
   }
 
   /** Run `script` (an async function body with T, the page helpers) in a window's page; answers its result. */
-  async eval<R = unknown>(
-    script: string,
-    window: 'main' | 'floating' | 'menubar' = 'main',
-    timeoutMs = 10_000,
-  ): Promise<R> {
+  async eval<R = unknown>(script: string, window: AppWindow = 'main', timeoutMs = 10_000): Promise<R> {
     const r = (await this.call('/eval', { window, script: `${LIB}\n${script}`, timeoutMs })) as {
       ok: boolean;
       value?: R;
@@ -246,11 +254,7 @@ export class TuduApp {
    * Wait until the script answers something truthy (no sleeping: it asks again until then).
    * Each ask is short: one injected while the page is navigating never replies, and it must not eat the whole wait.
    */
-  async until<R>(
-    script: string,
-    window: 'main' | 'floating' | 'menubar' = 'main',
-    timeout = 10_000,
-  ): Promise<R> {
+  async until<R>(script: string, window: AppWindow = 'main', timeout = 10_000): Promise<R> {
     const end = Date.now() + timeout;
     let last: unknown = null;
     while (Date.now() < end) {

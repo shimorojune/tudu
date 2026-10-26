@@ -17,6 +17,7 @@ import {
 import {
   Drawer,
   EmptyState,
+  NoteLinks,
   TaskDetail,
   TaskDetailSkeleton,
   showToast,
@@ -33,6 +34,7 @@ import { tileOf } from '../../app/allSpaces';
 import { useSpace } from '../../app/space';
 import { jiraClient, openInJira, useJira } from '../../app/jira';
 import { taskStore } from '../../app/tasks';
+import { noteItem, notebookStore, notePicks, openNote } from '../../app/notebook';
 import type { Viewport } from '../../app/viewport';
 
 export interface OpenTask {
@@ -129,6 +131,9 @@ export function TaskPanel(p: TaskPanelProps) {
     ...jiraClient.issueQuery(spaceId, detail?.jira ?? ''),
     enabled: !!shown && !!detail?.jira && conn?.state === 'ok',
   }).data;
+  // Your notes linked to this task (chunk 22): asked apart from the task, so a shared task never carries anyone's.
+  const nbNotes = useQuery({ ...notebookStore.taskNotesQuery(id), enabled: !!shown && !!detail });
+  const nbTree = useQuery({ ...notebookStore.treeQuery(), enabled: !!shown && !!detail });
   const ids = p.neighbours && detail ? p.neighbours(detail.day) : list?.map((t) => t.id);
   const at = ids?.indexOf(id) ?? -1;
   const prev = at > 0 ? { id: ids![at - 1]! } : undefined;
@@ -205,8 +210,37 @@ export function TaskPanel(p: TaskPanelProps) {
       })),
     };
     const subById = (s: SubtaskItem) => d.subtasks.find((x) => x.id === s.key);
+    const asTask = {
+      id: d.id,
+      ref: d.ref ?? '',
+      title: d.title,
+      spaceId: d.spaceId,
+      space: { name: space.name, color: space.color, personal: space.kind === 'personal' },
+    };
+    const go = (href: string) => void navigate({ href });
+    const notebook = (
+      <NoteLinks
+        notes={(nbNotes.data ?? []).map((n) => noteItem(n, now))}
+        all={notePicks(nbTree.data, now)}
+        allLoading={nbTree.isPending}
+        loading={nbNotes.isPending}
+        error={nbNotes.isError}
+        onRetry={() => void nbNotes.refetch()}
+        onOpen={(n) => openNote({ id: n.id }, compact, go)}
+        onNew={() => openNote({ linkTo: d.id }, compact, go)}
+        onLink={(x) => notebookStore.link(x.key, asTask)}
+        onUnlink={(n) => {
+          notebookStore.unlink(n.id, d.id);
+          showToast('Unlinked. The note is still in your Notebook.', {
+            action: 'Undo',
+            onAction: () => notebookStore.link(n.id, asTask),
+          });
+        }}
+      />
+    );
     return (
       <TaskDetail
+        notebook={notebook}
         task={task}
         today={today}
         me={{ initials: initialsOf(p.me.name, p.me.email), name: p.me.name || p.me.email }}

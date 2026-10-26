@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
+import { NoteIcon } from './NoteParts';
 import { AccountMenu, type AccountMenuProps } from './AccountMenu';
 import { Avatar } from './Avatar';
 import { Button } from './Button';
@@ -55,6 +56,8 @@ export interface TopBarProps {
   /** Holds the search icon in its open look while the panel is open. */
   searchOpen?: boolean;
   searchLabel?: string;
+  /** The Notebook (chunk 22): yours, not a space's, so it sits between Search and the Inbox. */
+  notebook?: { open?: boolean; onNotebook: () => void };
   /** The one Inbox, across every space: beside Search, in the same quiet button. */
   inbox?: TopBarInbox;
   /** The Jira button. Leave it out, or pass false, until Jira is connected. */
@@ -83,6 +86,7 @@ export function TopBar({
   onSearch,
   searchOpen,
   searchLabel = 'Search tasks',
+  notebook,
   inbox,
   jira,
   onNewTask,
@@ -128,6 +132,17 @@ export function TopBar({
       >
         <Icon name="search" size={17} />
       </IconButton>
+      {notebook ? (
+        <IconButton
+          label="Notebook"
+          tipSide="bottom"
+          className={cx('tp-tb-notebook', notebook.open && 'tp-on')}
+          aria-current={notebook.open ? 'page' : undefined}
+          onClick={notebook.onNotebook}
+        >
+          <NoteIcon name="note" size={17} />
+        </IconButton>
+      ) : null}
       {inbox ? (
         <IconButton
           label={inbox.count ? `Inbox, ${inbox.count} new` : 'Inbox'}

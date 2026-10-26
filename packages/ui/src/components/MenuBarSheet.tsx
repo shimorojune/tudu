@@ -1,5 +1,6 @@
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
+import { NoteIcon } from './NoteParts';
 import { Banner } from './Banner';
 import { Button } from './Button';
 import { Checkbox } from './Checkbox';
@@ -44,6 +45,8 @@ export interface MenuBarSheetProps {
   onToggle?: (row: MenuBarRowItem, done: boolean) => void;
   onOpen?: (row: MenuBarRowItem) => void;
   onNew?: () => void;
+  /** New note (chunk 22): the note window on a blank note, over whatever app you are in. */
+  onNewNote?: () => void;
   onOpenApp?: () => void;
   onFeedback?: () => void;
   onQuit?: () => void;
@@ -123,6 +126,7 @@ export function MenuBarSheet({
   onToggle,
   onOpen,
   onNew,
+  onNewNote,
   onOpenApp,
   onFeedback,
   onQuit,
@@ -222,6 +226,11 @@ export function MenuBarSheet({
         {state === 'day' ? (
           <Button variant="quiet" size="sm" icon={<Icon name="plus" size={14} />} onClick={onNew}>
             New task <span className="tp-mb-kbd">{shortcut}</span>
+          </Button>
+        ) : null}
+        {onNewNote ? (
+          <Button variant="quiet" size="sm" icon={<NoteIcon name="note" size={14} />} onClick={onNewNote}>
+            New note
           </Button>
         ) : null}
         <span className="tp-mb-sp" />

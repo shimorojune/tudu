@@ -1,5 +1,5 @@
-import { FILE_MAX_BYTES, type Attachment } from '@tudu/core';
-import { and, eq, isNull, lt, or, schema, type Db } from '@tudu/db';
+import { FILE_MAX_BYTES, type Attachment, type NoteFile } from '@tudu/core';
+import { and, eq, isNotNull, isNull, lt, or, schema, type Db } from '@tudu/db';
 import { randomUUID } from 'node:crypto';
 import type { Storage } from './storage';
 
@@ -11,7 +11,7 @@ export { FILE_MAX_BYTES };
 function toAttachment(r: typeof schema.attachments.$inferSelect): Attachment {
   return {
     id: r.id,
-    spaceId: r.spaceId,
+    spaceId: r.spaceId!,
     taskId: r.taskId,
     name: r.name,
     size: r.size,
@@ -68,6 +68,37 @@ export async function storeFile(
   return toAttachment(row!);
 }
 
+/** Put a file into your Notebook's own corner of the bucket (`notes/<you>/…`): no space, yours alone. */
+export async function storeNoteFile(
+  db: Db,
+  storage: Storage,
+  input: { userId: string; name: string; type: string; body: Uint8Array },
+): Promise<NoteFile> {
+  const id = randomUUID();
+  const key = `notes/${input.userId}/${id}`;
+  const type = input.type || 'application/octet-stream';
+  await storage.put(key, input.body, type);
+  const [row] = await db
+    .insert(schema.attachments)
+    .values({
+      id,
+      ownerId: input.userId,
+      key,
+      name: cleanFileName(input.name),
+      size: input.body.byteLength,
+      type,
+      uploadedBy: input.userId,
+    })
+    .returning();
+  return {
+    id: row!.id,
+    name: row!.name,
+    size: row!.size,
+    type: row!.type,
+    createdAt: row!.createdAt.toISOString(),
+  };
+}
+
 export async function attachmentById(db: Db, id: string) {
   const [row] = await db.select().from(schema.attachments).where(eq(schema.attachments.id, id));
   return row ?? null;
@@ -75,7 +106,7 @@ export async function attachmentById(db: Db, id: string) {
 
 /**
  * Files nobody refers to any more: uploaded for a task that never came (no task after a day), or whose task
- * was deleted more than a day ago. Returns how many went.
+ * was deleted more than a day ago; a Notebook file no note refers to after a day. Returns how many went.
  */
 export async function sweepAttachments(db: Db, storage: Storage, now = new Date()): Promise<number> {
   const cutoff = new Date(now.getTime() - ORPHAN_KEEP_MS);
@@ -85,8 +116,17 @@ export async function sweepAttachments(db: Db, storage: Storage, now = new Date(
     .leftJoin(schema.tasks, eq(schema.tasks.id, schema.attachments.taskId))
     .where(
       or(
-        and(isNull(schema.attachments.taskId), lt(schema.attachments.createdAt, cutoff)),
+        and(
+          isNotNull(schema.attachments.spaceId),
+          isNull(schema.attachments.taskId),
+          lt(schema.attachments.createdAt, cutoff),
+        ),
         lt(schema.tasks.deletedAt, cutoff),
+        and(
+          isNotNull(schema.attachments.ownerId),
+          isNull(schema.attachments.noteId),
+          lt(schema.attachments.createdAt, cutoff),
+        ),
       ),
     );
   for (const r of rows) {

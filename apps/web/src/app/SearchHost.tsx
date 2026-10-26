@@ -1,7 +1,8 @@
 import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { searchWhere, type Project, type SearchHit, type SearchResponse } from '@tudu/core';
-import { SearchPanel, SP_LEAVE_MS, SP_LEAVE_PHONE_MS, type SearchItem } from '@tudu/ui';
+import { SearchPanel, SP_LEAVE_MS, SP_LEAVE_PHONE_MS, type NoteHitItem, type SearchItem } from '@tudu/ui';
+import { hitItem, openNote } from './notebook';
 import { useEffect, useRef, useState } from 'react';
 import type { MeResponse } from '@tudu/client';
 import { closeSearch, openQuickAdd, useSearchOpen } from './dayView';
@@ -89,7 +90,7 @@ export function SearchHost({ me }: { me: MeResponse }) {
       const r = await api.get<SearchResponse>(
         `/api/search?q=${encodeURIComponent(qd)}&today=${today}${here}`,
       );
-      return { query: qd, hits: r.hits };
+      return { query: qd, hits: r.hits, notes: r.notes ?? [] };
     },
     enabled: !!qd,
     placeholderData: keepPreviousData,
@@ -146,6 +147,14 @@ export function SearchHost({ me }: { me: MeResponse }) {
       leaveMs + 20,
     );
   };
+  // A note opens in the note window, over whatever you were on (on a phone, the note's page).
+  const pickNote = (n: NoteHitItem) => {
+    closeSearch();
+    setTimeout(
+      () => openNote({ id: n.key }, vp === 'phone', (href) => void navigate({ href })),
+      leaveMs + 20,
+    );
+  };
   const create = (title: string) => {
     closeSearch();
     setTimeout(() => openQuickAdd({ title }), leaveMs + 20);
@@ -173,6 +182,11 @@ export function SearchHost({ me }: { me: MeResponse }) {
       similar={similar}
       onSearched={addSearch}
       onPick={pick}
+      notes={hits.data && !hits.isError ? hits.data.notes.map((n) => hitItem(n)) : []}
+      notesFor={hits.data?.query}
+      onPickNote={pickNote}
+      placeholder="Search tasks and notes"
+      hint="Search your tasks and notes by title, task ID, Jira key or the words inside."
       onCreate={create}
       onClose={closeSearch}
     />

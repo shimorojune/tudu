@@ -52,7 +52,11 @@ export function fileRoutes(db: Db, storage: Storage) {
     const userId = c.get('session')!.user.id;
     const row = await attachmentById(db, c.req.param('id'));
     if (!row) return c.json({ error: 'No such file.' }, 404);
-    if (!(await roleIn(db, userId, row.spaceId))) return c.json({ error: 'You’re not in that space.' }, 403);
+    // A Notebook file is its owner's alone: to anyone else it isn't there.
+    if (row.ownerId) {
+      if (row.ownerId !== userId) return c.json({ error: 'No such file.' }, 404);
+    } else if (!(await roleIn(db, userId, row.spaceId!)))
+      return c.json({ error: 'You’re not in that space.' }, 403);
     const obj = await storage.get(row.key);
     if (!obj) return c.json({ error: 'No such file.' }, 404);
     const inline =

@@ -113,9 +113,11 @@ export function Drawer({
                 e.preventDefault();
             }}
             onInteractOutside={(e) => {
-              // A toast (Undo on "Comment deleted") sits over the page but belongs to what the panel is doing.
+              // A toast (Undo on "Comment deleted") sits over the page but belongs to what the panel is doing, and
+              // the note window (chunk 22) floats over the panel without closing it.
               const target = e.detail.originalEvent.target as Element | null;
-              if (modeless || leaving || target?.closest?.('.tp-toast-host')) e.preventDefault();
+              if (modeless || leaving || target?.closest?.('.tp-toast-host, .tp-nb-float'))
+                e.preventDefault();
             }}
           >
             <section ref={panel} tabIndex={-1} className="tp-drawer tp-sheet" style={style}>
