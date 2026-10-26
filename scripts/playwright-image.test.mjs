@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { checkImages, checkRepo, lockedVersion } from './playwright-image.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname;
-const job = (tag) => `jobs:\n  e2e:\n    container:\n      image: mcr.microsoft.com/playwright:v${tag}-noble\n`;
+const job = (tag) =>
+  `jobs:\n  e2e:\n    container:\n      image: mcr.microsoft.com/playwright:v${tag}-noble\n`;
 
 describe('scripts/playwright-image', () => {
   it('C01-U16 the repo as it is: every Playwright image matches the lockfile', () => {

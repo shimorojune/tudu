@@ -9,7 +9,8 @@ import { localModelDir } from './modelDir';
  * files are whole.
  */
 const dir =
-  process.env.EMBEDDINGS_MODEL_DIR ?? localModelDir(resolve(fileURLToPath(import.meta.url), '../../../../..'));
+  process.env.EMBEDDINGS_MODEL_DIR ??
+  localModelDir(resolve(fileURLToPath(import.meta.url), '../../../../..'));
 const embedder = new LocalEmbedder({ modelDir: dir, offline: false, quiet: true });
 embedder
   .embed(['renew passport'])

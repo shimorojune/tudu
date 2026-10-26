@@ -82,7 +82,8 @@ export function bootstrap(
         : new LocalEmbedder({
             // Local work and tests share the main checkout's cache (worktrees too); the image sets its own folder.
             modelDir:
-              env.EMBEDDINGS_MODEL_DIR ?? localModelDir(resolve(fileURLToPath(import.meta.url), '../../../..')),
+              env.EMBEDDINGS_MODEL_DIR ??
+              localModelDir(resolve(fileURLToPath(import.meta.url), '../../../..')),
             offline: env.EMBEDDINGS_OFFLINE === '1',
             quiet: options.quiet,
           });

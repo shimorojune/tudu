@@ -22,10 +22,10 @@ one throwaway database per run; end-to-end tests read sign-in codes from the tes
 | C01-U13 | Readiness wait              | The API answering { ok: false } counts as a failure                                                                                                                                            |
 | C01-U14 | Readiness wait              | The API never comes up: gives up at the timeout and names the probe and its last status                                                                                                        |
 | C01-U15 | Readiness wait              | Connection refused on the web is a failure, not a crash, and is reported                                                                                                                       |
-| C01-U16 | Playwright image            | Every mcr.microsoft.com/playwright image tag in the workflows matches the lockfile's @playwright/test |
-| C01-U17 | Playwright image            | A stale tag is reported with the file and both versions |
-| C01-U18 | Playwright image            | No workflow using the image at all is a failure |
-| C01-U19 | Playwright image            | The version comes from the lockfile's resolved entry, not the package.json range |
+| C01-U16 | Playwright image            | Every mcr.microsoft.com/playwright image tag in the workflows matches the lockfile's @playwright/test                                                                                          |
+| C01-U17 | Playwright image            | A stale tag is reported with the file and both versions                                                                                                                                        |
+| C01-U18 | Playwright image            | No workflow using the image at all is a failure                                                                                                                                                |
+| C01-U19 | Playwright image            | The version comes from the lockfile's resolved entry, not the package.json range                                                                                                               |
 
 ## API (`apps/server`)
 

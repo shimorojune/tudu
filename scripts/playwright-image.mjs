@@ -21,7 +21,9 @@ export function checkImages(version, workflows) {
     for (const [, tag] of text.matchAll(IMAGE)) {
       used++;
       if (tag !== version)
-        problems.push(`${file}: image playwright:v${tag} but @playwright/test is ${version}; set the tag to v${version}`);
+        problems.push(
+          `${file}: image playwright:v${tag} but @playwright/test is ${version}; set the tag to v${version}`,
+        );
     }
   if (used === 0) problems.push('no workflow runs in the mcr.microsoft.com/playwright image');
   return problems;
