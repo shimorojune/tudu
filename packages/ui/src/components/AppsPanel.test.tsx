@@ -127,4 +127,53 @@ describe('Apps (chunk 10)', () => {
     await user.click(busy);
     expect(onEnable).toHaveBeenCalledTimes(1);
   });
+
+  it('C10-U21 connected and on here: a quiet Turn off here, Turning off…, and the reason it couldn’t', async () => {
+    const user = userEvent.setup();
+    const onDisable = vi.fn();
+    const onOpen = vi.fn();
+    const on = { ...JIRA, connected: true, status: 'As rohit@x.y on jira.northwind.io.' };
+    const { rerender } = render(
+      <AppsPanel apps={[on]} spaceName="Acme Studio" onDisable={onDisable} onOpen={onOpen} />,
+    );
+    const off = screen.getByRole('button', { name: 'Turn off Jira in Acme Studio' });
+    expect(off).toHaveTextContent('Turn off here');
+    await user.click(off);
+    expect(onDisable).toHaveBeenCalledWith('jira');
+    await user.click(screen.getByRole('button', { name: 'Open Jira' }));
+    expect(onOpen).toHaveBeenCalledWith('jira');
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    rerender(<AppsPanel apps={[{ ...on, busy: true }]} spaceName="Acme Studio" onDisable={onDisable} />);
+    const busy = screen.getByRole('button', { name: 'Turn off Jira in Acme Studio' });
+    expect(busy).toHaveTextContent('Turning off…');
+    expect(busy).toBeDisabled();
+    expect(busy.querySelector('.tp-spin')).not.toBeNull();
+    await user.click(busy);
+    expect(onDisable).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <AppsPanel
+        apps={[{ ...on, error: 'Couldn’t turn Jira off here.' }]}
+        spaceName="Acme Studio"
+        onDisable={onDisable}
+      />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Couldn’t turn Jira off here.');
+    expect(screen.getByRole('button', { name: 'Turn off Jira in Acme Studio' })).toBeEnabled();
+
+    rerender(
+      <AppsPanel
+        apps={[{ ...JIRA, connected: true, off: true }]}
+        spaceName="Acme Studio"
+        onDisable={onDisable}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Turn on Jira here' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Turn off/ })).toBeNull();
+
+    rerender(<AppsPanel apps={[JIRA]} spaceName="Acme Studio" onDisable={onDisable} />);
+    expect(screen.getByRole('button', { name: 'Connect Jira' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Turn off/ })).toBeNull();
+  });
 });

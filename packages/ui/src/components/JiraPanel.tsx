@@ -703,6 +703,10 @@ export interface JiraPanelProps {
   onReconnect?: () => void;
   onCancelReconnect?: () => void;
   onDisconnect?: () => void;
+  /** More › Turn off in {spaceName}: Jira goes from this space only; your token, views and other spaces stay. */
+  onTurnOff?: () => void;
+  /** More › Manage spaces…: Settings › Apps, with this space's row glowing. */
+  onManage?: () => void;
   onConnect?: JPConnectProps['onConnect'];
   onConnected?: JPConnectProps['onConnected'];
   onClose?: () => void;
@@ -1123,11 +1127,27 @@ export function JiraPanel(p: JiraPanelProps) {
             <Icon name="more" size={16} />
           </IconButton>
           <Linger open={moreOpen} className="tp-jp-morepop">
+            {/* Turn off here hides Jira in this space only; Disconnect is the account-wide one, so it reads red. */}
             <MenuList
               label="More"
               items={[
                 {
+                  label: p.spaceName ? `Turn off in ${p.spaceName}` : 'Turn off in this space',
+                  onSelect: () => {
+                    setMoreOpen(false);
+                    p.onTurnOff?.();
+                  },
+                },
+                {
+                  label: 'Manage spaces…',
+                  onSelect: () => {
+                    setMoreOpen(false);
+                    p.onManage?.();
+                  },
+                },
+                {
                   label: 'Disconnect Jira',
+                  danger: true,
                   onSelect: () => {
                     setMoreOpen(false);
                     p.onDisconnect?.();
