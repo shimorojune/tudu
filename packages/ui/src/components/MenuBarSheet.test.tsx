@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { MenuBarSheet, type MenuBarGroupItem } from './MenuBarSheet';
@@ -44,14 +44,30 @@ describe('C20-U02 MenuBarSheet', () => {
     expect(screen.getByRole('img', { name: /1 of 4/ })).toBeTruthy();
   });
 
-  it('C20-U02 the foot: New task, Open Tudu, and ⋯ with Send feedback… and Quit', async () => {
+  it('C20-U02 the foot: New task and New note icons, Open Tudu, and ⋯ with Send feedback… and Quit', async () => {
     const user = userEvent.setup();
-    const on = { onNew: vi.fn(), onOpenApp: vi.fn(), onFeedback: vi.fn(), onQuit: vi.fn() };
+    const on = {
+      onNew: vi.fn(),
+      onNewNote: vi.fn(),
+      onOpenApp: vi.fn(),
+      onFeedback: vi.fn(),
+      onQuit: vi.fn(),
+    };
     render(<MenuBarSheet state="day" heading={heading} groups={[personal]} appName="Tudu Staging" {...on} />);
-    await user.click(screen.getByRole('button', { name: /^New task/ }));
-    await user.click(screen.getByRole('button', { name: 'Open Tudu Staging' }));
+    const newTask = screen.getByRole('button', { name: 'New task' });
+    expect(newTask).toHaveAttribute('aria-keyshortcuts', 'Meta+Shift+N');
+    expect(newTask).toHaveClass('tp-ib');
+    expect(newTask.textContent).toBe('');
+    expect(screen.getByRole('button', { name: 'New note' })).toHaveClass('tp-ib');
+    const open = screen.getByRole('button', { name: 'Open Tudu Staging' });
+    expect(open).toHaveTextContent(/^Open Tudu$/);
+    await user.click(newTask);
+    await user.click(screen.getByRole('button', { name: 'New note' }));
+    await user.click(open);
     expect(on.onNew).toHaveBeenCalledOnce();
+    expect(on.onNewNote).toHaveBeenCalledOnce();
     expect(on.onOpenApp).toHaveBeenCalledOnce();
+    expect(screen.queryByText('⌘⇧N')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'More' }));
     const items = screen.getAllByRole('menuitem').map((m) => m.textContent);
     expect(items[0]).toContain('Send feedback…');
@@ -68,6 +84,7 @@ describe('C20-U02 MenuBarSheet', () => {
     expect(screen.getByText('Your tasks show here once you are signed in on this Mac.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Open Tudu' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /^New task/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'New note' })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'More' }));
     const items = screen.getAllByRole('menuitem');
     expect(items).toHaveLength(1);
@@ -158,5 +175,35 @@ describe('C11-U14 MenuBarSheet › updates', () => {
     expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual([
       expect.stringContaining('Quit'),
     ]);
+  });
+});
+
+describe('C20-U07 MenuBarSheet', () => {
+  it('C20-U07 the foot icons say what they do in a tooltip above: New task with its shortcut, New note', async () => {
+    const user = userEvent.setup();
+    render(
+      <MenuBarSheet state="day" heading={heading} groups={[personal]} shortcut="⌘⇧N" onNewNote={vi.fn()} />,
+    );
+    act(() => screen.getByRole('button', { name: 'New task' }).focus());
+    await waitFor(() => expect(screen.getByRole('tooltip')).toHaveTextContent('New task ⌘⇧N'));
+    const pop = document.querySelector('.tp-tip-pop');
+    expect(pop).toHaveAttribute('data-side', 'top');
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'New note' }));
+    await waitFor(() => expect(screen.getByRole('tooltip')).toHaveTextContent(/^New note$/));
+  });
+});
+
+describe('C20-U08 MenuBarSheet', () => {
+  it('C20-U08 empty: New task stays in the body, the foot has New note but no New task icon', () => {
+    const { rerender } = render(<MenuBarSheet state="empty" heading={heading} onNewNote={vi.fn()} />);
+    const newTask = screen.getAllByRole('button', { name: 'New task' });
+    expect(newTask).toHaveLength(1);
+    expect(newTask[0]).toHaveClass('tp-btn-primary');
+    expect(newTask[0]!.closest('.tp-mb-empty')).not.toBeNull();
+    const foot = document.querySelector('.tp-mb-f') as HTMLElement;
+    expect(within(foot).getByRole('button', { name: 'New note' })).toBeTruthy();
+    rerender(<MenuBarSheet state="empty" heading={heading} />);
+    expect(screen.queryByRole('button', { name: 'New note' })).toBeNull();
   });
 });
