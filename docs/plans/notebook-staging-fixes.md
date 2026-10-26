@@ -17,9 +17,16 @@ comes right after the last line. In a short note that is halfway down the pane. 
 **Fix (CSS only).**
 
 ```css
-.tp-nb-body { display: flex; flex-direction: column; }
-.tp-nb-body > .tp-rte-notes { flex: 1 0 auto; }
-.tp-nb-body .tp-rte-notes .tp-rte-area { flex: 1 0 auto; }
+.tp-nb-body {
+  display: flex;
+  flex-direction: column;
+}
+.tp-nb-body > .tp-rte-notes {
+  flex: 1 0 auto;
+}
+.tp-nb-body .tp-rte-notes .tp-rte-area {
+  flex: 1 0 auto;
+}
 ```
 
 The editor fills the scrolling body, and the text area fills the editor. That pushes the bar to the bottom of the pane,
@@ -59,21 +66,21 @@ it, and shows a toast.
 - **Add task:** the task is made as Quick Add makes it. If the pill is still there, `notebookStore.link(noteId, task)`
   runs right after (as today). The toast reads "‘{title}’ is on Today in Personal, linked to this note." with Open.
   Without the pill it is Quick Add's usual toast.
-- **Sent to someone:** the usual request flow and "Sent to …" toast. The note links to the request if you can still
-  read it (it shows in your Sent). If the server says it can't be read (404 `TASK_GONE`), the link is dropped quietly
-  and the toast doesn't claim it. Section 3 of the tests pins this down.
+- **Sent to someone:** a request isn't a task until they take it (`note.link` checks the tasks table, so it would
+  404), so the pill hides while a person is picked and the request doesn't link. Pick Me again and the pill is back.
+  Toast as usual ("Sent to …").
 - **Esc, ×, or a click outside:** nothing is made, and the note and its selection are untouched.
 - **Didn't save (offline, 5xx):** Quick Add's existing behaviour applies (the draft stays). The link is only made
   after the task is.
 
 ### Where New task opens
 
-| Note shown in | New task |
-| --- | --- |
-| Notebook page, browser's floating note panel | the Quick Add bar over the app (`openQuickAdd(seed)`) |
-| Phone Notebook | the Quick Add sheet |
+| Note shown in                                   | New task                                                               |
+| ----------------------------------------------- | ---------------------------------------------------------------------- |
+| Notebook page, browser's floating note panel    | the Quick Add bar over the app (`openQuickAdd(seed)`)                  |
+| Phone Notebook                                  | the Quick Add sheet                                                    |
 | Browser popup (`/note-window/:id`, not the Mac) | a `QuickAddHost` mounted in `NoteWindowPage`, the bar inside the popup |
-| Mac note window | the floating Quick Add window (the ⌘⇧N one), filled in |
+| Mac note window                                 | the floating Quick Add window (the ⌘⇧N one), filled in                 |
 
 ### Changes
 
@@ -82,7 +89,7 @@ it, and shows a toast.
 - `apps/web/src/app/dayView.ts`: the `openQuickAdd` seed gains `note?: string` and `from?: QuickAddFrom`. The seed
   stays the single source, so a second Make a task while it is open replaces the words and the pill (new nonce).
 - `packages/ui` `QuickAdd`: `seed.note` fills the note (it opens, its editor's `resetKey` bumps) and `seed.from` shows
-  the pill (`.tp-qa-from`, the same markup and CSS as the canvas bundle). `QuickAddDraft` gains `from`. `onSave` gets
+  the pill (`.tp-qa-from`, the same markup and CSS as the canvas bundle). `QuickAddResult` gains `from` (kept in its own state, not in the saved draft). `onSave` gets
   it, and the reset after Add clears it.
 - `QuickAddHost` (`apps/web/src/app/quickAdd.tsx`): after `a.save(t)` / `sendRequest`, if `t.from` is set, call
   `notebookStore.link(t.from.noteId, …)` with the new task, then show the linked toast.
@@ -112,7 +119,7 @@ Unit (Vitest, `packages/core` and `packages/ui`):
   blank editor drops the class. `onInput`'s `isEmpty` is still true for the empty list.
 - **C04-U30** `QuickAdd` seed: `seed.note` opens the note with those words; `seed.from` shows the pill with the note's
   name; × removes it after the shrink and `onSave` gets `from: null`; with the pill, `onSave` gets `from`; after Add
-  the next open has no pill.
+  the next open has no pill; with a person picked the pill hides and `onSave` gets `from: null`.
 - **C22-U24** `NoteEditor` Make a task calls `onMakeTask` with the raw selection (line breaks kept) and creates
   nothing itself.
 - **C22-U25** `noteEditing` `onMakeTask` calls the host's `makeTask` with `taskFromWords` output and
@@ -123,12 +130,6 @@ Unit (Vitest, `packages/core` and `packages/ui`):
   `quick_add_seed` once and opens Quick Add with it, and a second `floating:shown` with no seed opens a plain Quick
   Add.
 - Rust: **C22-D07** `summon_with` stores the seed and `quick_add_seed` returns it once, then `None`.
-
-API (server, real Postgres):
-
-- **C22-A17** `note.link` to a request you sent (a task in the other person's Inbox): it links if `readableBy` lets
-  you see it, else 404 `TASK_GONE`. This pins down the "sent to someone" behaviour; if it 404s, the UI drops the link
-  quietly as above.
 
 E2E (Playwright, on the Mac):
 

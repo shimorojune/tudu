@@ -2,6 +2,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { NotebookFolder } from '@tudu/core';
+import { readStylesheet } from '../test-utils/stylesheet';
 import { NoteEditor, type NoteEditorNote } from './NoteEditor';
 
 const FOLDERS: NotebookFolder[] = [
@@ -156,5 +157,30 @@ describe('C22-U16 popovers', () => {
     expect(within(link).getByRole('option', { name: /NW-38/ })).toHaveTextContent('Linked');
     await user.click(container.querySelector('.tp-rte-area')!);
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Link a task' })).toBeNull());
+  });
+});
+
+describe('C22-U24 Make a task opens New task, it makes nothing itself', () => {
+  it('C22-U24 the selection is handed over as selected; no link, move or delete happens', async () => {
+    const { user, onMakeTask, onLink, onMove, onDelete, container } = setup();
+    const text = await waitFor(() => {
+      const p = container.querySelector('.tp-rte-area p');
+      expect(p?.firstChild).toBeTruthy();
+      return p!.firstChild!;
+    });
+    select(text, 0, 21);
+    const words = window.getSelection()!.toString().trim();
+    await user.click(screen.getByRole('button', { name: 'Make a task' }));
+    expect(onMakeTask).toHaveBeenCalledWith(words);
+    expect(onLink).not.toHaveBeenCalled();
+    expect(onMove).not.toHaveBeenCalled();
+    expect(onDelete).not.toHaveBeenCalled();
+  });
+
+  it('C22-U24 the formatting bar sits at the foot of the note pane: the words fill it', () => {
+    const css = readStylesheet('components.css').replace(/\s+/g, ' ');
+    expect(css).toContain('.tp-nb-body { display: flex; flex-direction: column; }');
+    expect(css).toContain('.tp-nb-body > .tp-rte-notes { flex: 1 0 auto; }');
+    expect(css).toContain('.tp-nb-body .tp-rte-notes .tp-rte-area { flex: 1 0 auto; }');
   });
 });

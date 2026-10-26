@@ -178,3 +178,35 @@ describe('C11-U09 the floating window follows the theme picked on the desk', () 
     expect(document.documentElement.classList.contains('dark')).toBe(false);
   });
 });
+
+describe('C22-U27 the floating window opened by Make a task', () => {
+  it('C22-U27 takes the seed once on the summon: words, note pill and Personal; the next summon is plain', async () => {
+    localStorage.setItem('tudu.space', 'northwind');
+    const user = userEvent.setup();
+    mount(ME);
+    const title = () => screen.getByRole('textbox', { name: 'Task title' }) as HTMLInputElement;
+    expect(title().value).toBe('');
+    fake.seed = {
+      title: 'Call the venue',
+      spaceId: 'p',
+      from: { noteId: 'n1', name: 'Offsite agenda draft' },
+    };
+    emit('floating:shown');
+    await waitFor(() => expect(title().value).toBe('Call the venue'));
+    expect(document.querySelector('.tp-qa-from')).toHaveTextContent('Offsite agenda draft');
+    expect(usedSpace).toHaveBeenLastCalledWith('p');
+    expect(fake.seed).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Add task' }));
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Call the venue',
+        from: { noteId: 'n1', name: 'Offsite agenda draft' },
+      }),
+    );
+    await waitFor(() => expect(hides()).toBe(1), { timeout: 2000 });
+    emit('floating:shown');
+    await waitFor(() => expect(usedSpace).toHaveBeenLastCalledWith('n'));
+    expect(title().value).toBe('');
+    expect(document.querySelector('.tp-qa-from')).toBeNull();
+  });
+});

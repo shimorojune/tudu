@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-summon-with"
+description = "Enables the summon_with command without any pre-configured scope."
+commands.allow = ["summon_with"]
+
+[[permission]]
+identifier = "deny-summon-with"
+description = "Denies the summon_with command without any pre-configured scope."
+commands.deny = ["summon_with"]

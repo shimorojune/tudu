@@ -1,6 +1,7 @@
 import {
   cleanHtml,
   FILE_MAX_BYTES,
+  isBlankHtml,
   isEmptyHtml as htmlIsEmpty,
   pastedFileName,
   toHtml,
@@ -206,6 +207,16 @@ export function editorExtensions(fileBase = '') {
 }
 
 /**
+ * The placeholder's rule: one paragraph with nothing in it. Tiptap's own isEmpty also counts an empty list item,
+ * heading or quote, which left the placeholder drawn through a new bullet.
+ */
+export function blankDoc(doc: PmNode): boolean {
+  if (doc.childCount !== 1) return false;
+  const only = doc.firstChild!;
+  return only.type.name === 'paragraph' && only.content.size === 0;
+}
+
+/**
  * Notes and comments are rich text on Tiptap. The editor reads as part of the paper: no frame until you write,
  * then a slim toolbar of the few marks people use (text style, bold, italic, underline, lists, checklist, link,
  * highlight, code), the rest under More. When the toolbar would overflow, the least used marks fold into More.
@@ -219,7 +230,8 @@ export function RichTextEditor(p: RichTextEditorProps) {
   const lastW = useRef(0);
   const [fit, setFit] = useState(0);
   const [focused, setFocused] = useState(false);
-  const [empty, setEmpty] = useState(() => htmlIsEmpty(toHtml(p.value)));
+  // Blank (the placeholder shows) only on nothing or one empty line: an empty bullet is not blank, though it saves as empty.
+  const [empty, setEmpty] = useState(() => isBlankHtml(toHtml(p.value)));
   const [menu, setMenu] = useState<null | 'style' | 'link' | 'more'>(null);
   const [link, setLink] = useState('');
   // Chips still uploading or failed: a comment waits for them.
@@ -290,7 +302,7 @@ export function RichTextEditor(p: RichTextEditorProps) {
         setUploading(n);
         const html = storedHtml(e.getHTML(), cb.current.fileBase);
         const em = htmlIsEmpty(html);
-        setEmpty(e.isEmpty);
+        setEmpty(blankDoc(e.state.doc));
         cb.current.onInput?.(html, em);
       },
       onFocus: () => setFocused(true),
@@ -310,7 +322,7 @@ export function RichTextEditor(p: RichTextEditorProps) {
   const [seenReset, setSeenReset] = useState(p.resetKey);
   if (p.resetKey !== seenReset) {
     setSeenReset(p.resetKey);
-    setEmpty(htmlIsEmpty(toHtml(p.value)));
+    setEmpty(isBlankHtml(toHtml(p.value)));
   }
 
   // What is on under the caret, for the pressed state of each button.
