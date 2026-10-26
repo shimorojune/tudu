@@ -127,22 +127,21 @@ async function tileLift(el: Locator): Promise<number> {
 /** Half Geist's cap height at 12.5px: where the tiles' centres should sit above the baseline. */
 const LIFT = 12.5 * 0.355;
 
-/** Filters All spaces to Personal, then to Northwind, and reads each chip's tile lift. */
-async function chipLifts(page: Page) {
-  await page.reload();
-  await goAll(page);
-  await expect.poll(() => titlesOf(allDay(page))).toEqual(ALL_SUNDAY);
+/**
+ * Opens All spaces filtered to Personal, then to Northwind, by address, and reads each chip's tile lift. Going by the
+ * address (not the pill and the chip's ✕) keeps the measurement off a chip that is still re-rendering.
+ */
+async function chipLifts(page: Page, slugs: { personal: string; nw: string }) {
   const lifts = { Personal: 0, Northwind: 0 };
-  for (const [title, space] of [
-    ['Pay the electricity bill', 'Personal'],
-    ['Review the Northwind roadmap', 'Northwind'],
+  for (const [space, slug] of [
+    ['Personal', slugs.personal],
+    ['Northwind', slugs.nw],
   ] as const) {
-    await pill(allDay(page), title, space).click();
+    await page.goto(`/all?space=${slug}`);
+    await expect(page.getByRole('button', { name: `Clear filter ${space}` })).toBeVisible();
     const chip = page.locator('.tp-chip-space').filter({ hasText: space });
     await expect(chip).toBeVisible();
     lifts[space] = await tileLift(chip);
-    await page.getByRole('button', { name: `Clear filter ${space}` }).click();
-    await expect.poll(() => titlesOf(allDay(page))).toEqual(ALL_SUNDAY);
   }
   return lifts;
 }
@@ -759,8 +758,8 @@ test.describe('all spaces', () => {
     page,
     browser,
   }) => {
-    await world(page, browser);
-    const lifts = await chipLifts(page);
+    const w = await world(page, browser);
+    const lifts = await chipLifts(page, { personal: w.personal.slug, nw: w.nw.slug });
     expect(Math.abs(lifts.Personal - LIFT)).toBeLessThanOrEqual(0.5);
     expect(Math.abs(lifts.Personal - lifts.Northwind)).toBeLessThanOrEqual(0.25);
   });
@@ -782,8 +781,8 @@ test.describe('all spaces', () => {
 
   test('STB-E03 dark: the chip tiles line up the same in the dark theme', async ({ page, browser }) => {
     await page.emulateMedia({ colorScheme: 'dark' });
-    await world(page, browser);
-    const lifts = await chipLifts(page);
+    const w = await world(page, browser);
+    const lifts = await chipLifts(page, { personal: w.personal.slug, nw: w.nw.slug });
     await expect(page.locator('html')).toHaveClass(/dark/);
     expect(Math.abs(lifts.Personal - LIFT)).toBeLessThanOrEqual(0.5);
     expect(Math.abs(lifts.Personal - lifts.Northwind)).toBeLessThanOrEqual(0.25);
