@@ -774,11 +774,11 @@ test.describe('notebook', () => {
     await page.goto(`/t/${await refOf(page, sid, taskId)}`);
     const compose = page.locator('.tp-td-compose');
     await expect(compose).toBeVisible();
-    const pad = await compose.evaluate((el) => {
+    const sides = await compose.evaluate((el) => {
       const cs = getComputedStyle(el);
       return [cs.paddingLeft, cs.paddingRight];
     });
-    expect(pad[0]).toBe(pad[1]);
-    expect(pad[0]).toBe(phone() ? '20px' : '36px');
+    expect(sides[0]).toBe(sides[1]);
+    expect(sides[0]).toBe(phone() ? '20px' : '36px');
   });
 });
