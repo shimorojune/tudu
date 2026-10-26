@@ -79,7 +79,10 @@ async function fillConnect(page: Page, site: string, token: string): Promise<voi
 
 /** Disconnect from the panel asks first: confirm it. */
 async function confirmDisconnect(page: Page): Promise<void> {
-  await page.getByRole('dialog', { name: 'Disconnect Jira?' }).getByRole('button', { name: 'Disconnect Jira' }).click();
+  await page
+    .getByRole('dialog', { name: 'Disconnect Jira?' })
+    .getByRole('button', { name: 'Disconnect Jira' })
+    .click();
 }
 
 /** Northwind, made by you, with Jira connected and on in it and in Personal; you are in Northwind. */
@@ -91,7 +94,9 @@ async function onInBoth(page: Page): Promise<{ slug: string; nw: string }> {
   await connectByApi(page, nw);
   await switchByApi(page, await personalId(page), true);
   await page.reload();
-  await expect(sideJira(page).or(page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: /Jira$/ }))).toBeVisible();
+  await expect(
+    sideJira(page).or(page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: /Jira$/ })),
+  ).toBeVisible();
   return { slug, nw };
 }
 
@@ -886,7 +891,9 @@ test.describe('jira', () => {
     const toast = page.locator('.tp-toast');
     await expect(toast).toContainText('Jira is off in Northwind.');
     await expect.poll(() => switches(page)).toEqual({ [personal]: true, [nw]: false });
-    const conn = (await (await page.request.get(`${API_URL}/api/connectors/jira`)).json()) as { connected: boolean };
+    const conn = (await (await page.request.get(`${API_URL}/api/connectors/jira`)).json()) as {
+      connected: boolean;
+    };
     expect(conn.connected).toBe(true);
 
     // Undo: Jira comes back, no token asked for, the same issues.
@@ -949,7 +956,9 @@ test.describe('jira', () => {
     await expect(sideJira(page)).toBeVisible();
   });
 
-  test('C10-E24 Manage spaces…: Settings opens on Apps with Northwind’s row glowing, once', async ({ page }) => {
+  test('C10-E24 Manage spaces…: Settings opens on Apps with Northwind’s row glowing, once', async ({
+    page,
+  }) => {
     test.skip(phone() || tablet(), 'the same Settings on every size');
     await onInBoth(page);
     await openJira(page);
@@ -994,7 +1003,10 @@ test.describe('jira', () => {
     await page.getByRole('button', { name: /^You: / }).click();
     await page.getByRole('menuitem', { name: 'Settings' }).click();
     const settings = page.getByRole('dialog', { name: 'Settings' });
-    await settings.getByRole('navigation', { name: 'Settings' }).getByRole('button', { name: /^Apps/ }).click();
+    await settings
+      .getByRole('navigation', { name: 'Settings' })
+      .getByRole('button', { name: /^Apps/ })
+      .click();
     await expect(settings.getByRole('button', { name: 'Connect' })).toBeVisible();
   });
 

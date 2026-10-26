@@ -218,9 +218,9 @@ export async function turnOffHere(
   showToast(`Jira is off in ${space.name}.`, {
     action: 'Undo',
     onAction: () =>
-      void jiraClient.setOn(space.id, true).then(markJiraFresh, () =>
-        showToast('Couldn’t turn Jira back on. Try again from Settings › Apps.'),
-      ),
+      void jiraClient
+        .setOn(space.id, true)
+        .then(markJiraFresh, () => showToast('Couldn’t turn Jira back on. Try again from Settings › Apps.')),
   });
   return true;
 }

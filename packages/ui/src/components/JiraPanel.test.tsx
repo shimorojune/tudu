@@ -542,7 +542,11 @@ describe('the Jira panel (chunk 10)', () => {
     const more = screen.getByRole('button', { name: 'More' });
     await user.click(more);
     const items = within(screen.getByRole('menu', { name: 'More' })).getAllByRole('menuitem');
-    expect(items.map((x) => x.textContent)).toEqual(['Turn off in Northwind', 'Manage spaces…', 'Disconnect Jira']);
+    expect(items.map((x) => x.textContent)).toEqual([
+      'Turn off in Northwind',
+      'Manage spaces…',
+      'Disconnect Jira',
+    ]);
     expect(items[2]).toHaveClass('tp-mi-danger');
     expect(items[0]).not.toHaveClass('tp-mi-danger');
     expect(items[1]).not.toHaveClass('tp-mi-danger');

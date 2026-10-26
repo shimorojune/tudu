@@ -303,7 +303,10 @@ describe('C10-U22 Turn off here: one space, at once, with Undo', () => {
     expect(put).toHaveBeenCalledWith('/api/spaces/nw/connectors/jira', { on: false });
     answer();
     expect(await done).toBe(true);
-    expect(toast).toHaveBeenCalledWith('Jira is off in Northwind.', expect.objectContaining({ action: 'Undo' }));
+    expect(toast).toHaveBeenCalledWith(
+      'Jira is off in Northwind.',
+      expect.objectContaining({ action: 'Undo' }),
+    );
     toast.mock.calls[0]![1]!.onAction!();
     await waitFor(() => expect(put).toHaveBeenLastCalledWith('/api/spaces/nw/connectors/jira', { on: true }));
     await waitFor(() => expect(onIn('nw')).toBe(true));
@@ -314,7 +317,10 @@ describe('C10-U22 Turn off here: one space, at once, with Undo', () => {
     const put = vi.spyOn(api, 'put').mockRejectedValue(new Error('offline'));
     expect(await turnOffHere(NW)).toBe(false);
     expect(onIn('nw')).toBe(true);
-    expect(toast).toHaveBeenCalledWith('Couldn’t turn Jira off here.', expect.objectContaining({ action: 'Try again' }));
+    expect(toast).toHaveBeenCalledWith(
+      'Couldn’t turn Jira off here.',
+      expect.objectContaining({ action: 'Try again' }),
+    );
     toast.mock.calls[0]![1]!.onAction!();
     await waitFor(() => expect(put).toHaveBeenCalledTimes(2));
     toast.mockReset();

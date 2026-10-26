@@ -263,7 +263,6 @@ export function JiraView({
         }
       : null;
 
-  const loc = useRouterState({ select: (s) => s.location });
   const keepJira = (path: string) => {
     if (compact) return path;
     const j = jiraParam(loc.searchStr);
@@ -372,110 +371,115 @@ export function JiraView({
   };
   return (
     <>
-    <JiraPanel
-      state={state}
-      issues={issues}
-      today={today}
-      site={hostOf(conn)}
-      siteUrl={(conn ?? connected)?.site}
-      synced={state === 'connect' ? null : synced}
-      refreshing={refreshing}
-      views={panelViews}
-      view={view}
-      jql={pick.view === 'custom' ? pick.jql : undefined}
-      open={state === 'connect' || state === 'reconnect' ? null : issue}
-      preview={preview}
-      previewLoading={detail.isPending && !!issue}
-      compact={compact}
-      onView={(v) => setJiraPick({ view: v })}
-      onApplyJql={applyJql}
-      onSaveView={(name, jql) =>
-        void jiraClient.saveView(name, jql).then(
-          (v) => setJiraPick({ view: v.id }),
-          (e: unknown) => showToast(jiraError(e)?.error ?? 'Couldn’t save the view. Try again.'),
-        )
-      }
-      onRemoveView={removeView}
-      onSearch={async (q) => {
-        const r = await queryClient.fetchQuery(jiraClient.searchQuery(space.id, q));
-        return r.issues.map((i) => toPanelIssue(i, linksByKey(links), space.id, spaceOf));
-      }}
-      onAdd={add}
-      onShowTask={(_it, l) => showTask(l)}
-      onOpenIssue={onIssue}
-      onOpenInJira={(key) => void openInJira(space.id, key)}
-      onRefresh={() => {
-        void list.refetch();
-        void queryClient.invalidateQueries({ queryKey: jiraConnectionKey() });
-        void queryClient.invalidateQueries({ queryKey: jiraLinksKey() });
-      }}
-      onRetry={() => void list.refetch()}
-      onReconnect={() => setReconnecting(true)}
-      onCancelReconnect={() => setReconnecting(false)}
-      onDisconnect={() => setAskDisconnect(true)}
-      onTurnOff={() => {
-        leave();
-        void turnOffHere(space);
-      }}
-      onManage={() => {
-        glowJiraSpace(space.id);
-        setFromApps(false);
-        if (compact) {
-          void navigate({ href: settingsHref(loc, space.slug, 'apps', true) });
-          return;
+      <JiraPanel
+        state={state}
+        issues={issues}
+        today={today}
+        site={hostOf(conn)}
+        siteUrl={(conn ?? connected)?.site}
+        synced={state === 'connect' ? null : synced}
+        refreshing={refreshing}
+        views={panelViews}
+        view={view}
+        jql={pick.view === 'custom' ? pick.jql : undefined}
+        open={state === 'connect' || state === 'reconnect' ? null : issue}
+        preview={preview}
+        previewLoading={detail.isPending && !!issue}
+        compact={compact}
+        onView={(v) => setJiraPick({ view: v })}
+        onApplyJql={applyJql}
+        onSaveView={(name, jql) =>
+          void jiraClient.saveView(name, jql).then(
+            (v) => setJiraPick({ view: v.id }),
+            (e: unknown) => showToast(jiraError(e)?.error ?? 'Couldn’t save the view. Try again.'),
+          )
         }
-        const q = new URLSearchParams(loc.searchStr);
-        q.delete('jira');
-        void navigate({
-          href: settingsHref({ pathname: loc.pathname, searchStr: q.toString() }, space.slug, 'apps', false),
-        });
-      }}
-      onConnect={connect}
-      onConnected={() => {
-        setHolding(false);
-        setReconnecting(false);
-        setFromApps(false);
-        markJiraFresh();
-        void queryClient.invalidateQueries({ queryKey: ['jira'] });
-      }}
-      onClose={onClose}
-      onBack={
-        state === 'connect' && fromApps
-          ? () => {
-              setFromApps(false);
-              if (compact) void navigate({ href: spacePath(space.slug, 'apps') });
-              else {
-                onClose?.();
-                openApps();
+        onRemoveView={removeView}
+        onSearch={async (q) => {
+          const r = await queryClient.fetchQuery(jiraClient.searchQuery(space.id, q));
+          return r.issues.map((i) => toPanelIssue(i, linksByKey(links), space.id, spaceOf));
+        }}
+        onAdd={add}
+        onShowTask={(_it, l) => showTask(l)}
+        onOpenIssue={onIssue}
+        onOpenInJira={(key) => void openInJira(space.id, key)}
+        onRefresh={() => {
+          void list.refetch();
+          void queryClient.invalidateQueries({ queryKey: jiraConnectionKey() });
+          void queryClient.invalidateQueries({ queryKey: jiraLinksKey() });
+        }}
+        onRetry={() => void list.refetch()}
+        onReconnect={() => setReconnecting(true)}
+        onCancelReconnect={() => setReconnecting(false)}
+        onDisconnect={() => setAskDisconnect(true)}
+        onTurnOff={() => {
+          leave();
+          void turnOffHere(space);
+        }}
+        onManage={() => {
+          glowJiraSpace(space.id);
+          setFromApps(false);
+          if (compact) {
+            void navigate({ href: settingsHref(loc, space.slug, 'apps', true) });
+            return;
+          }
+          const q = new URLSearchParams(loc.searchStr);
+          q.delete('jira');
+          void navigate({
+            href: settingsHref(
+              { pathname: loc.pathname, searchStr: q.toString() },
+              space.slug,
+              'apps',
+              false,
+            ),
+          });
+        }}
+        onConnect={connect}
+        onConnected={() => {
+          setHolding(false);
+          setReconnecting(false);
+          setFromApps(false);
+          markJiraFresh();
+          void queryClient.invalidateQueries({ queryKey: ['jira'] });
+        }}
+        onClose={onClose}
+        onBack={
+          state === 'connect' && fromApps
+            ? () => {
+                setFromApps(false);
+                if (compact) void navigate({ href: spacePath(space.slug, 'apps') });
+                else {
+                  onClose?.();
+                  openApps();
+                }
               }
-            }
-          : undefined
-      }
-      backLabel="Apps"
-      spaceName={space.name}
-      className={vp === 'tablet' ? 'app-jira-tablet' : undefined}
-    />
-    <ConfirmDialog
-      open={askDisconnect}
-      variant={compact ? 'sheet' : 'dialog'}
-      title="Disconnect Jira?"
-      confirmLabel="Disconnect Jira"
-      onClose={() => setAskDisconnect(false)}
-      onConfirm={async () => {
-        try {
-          await jiraClient.disconnect();
-        } catch (err) {
-          showToast('Couldn’t disconnect Jira. Try again.');
-          throw err;
+            : undefined
         }
-        setAskDisconnect(false);
-        leave();
-        showToast('Jira disconnected from all your spaces. Your tasks keep their Jira keys.');
-      }}
-    >
-      Jira goes from every space you turned it on in, with your saved views. Your tasks keep their Jira keys. To hide
-      it only in {space.name}, use Turn off in {space.name} instead.
-    </ConfirmDialog>
+        backLabel="Apps"
+        spaceName={space.name}
+        className={vp === 'tablet' ? 'app-jira-tablet' : undefined}
+      />
+      <ConfirmDialog
+        open={askDisconnect}
+        variant={compact ? 'sheet' : 'dialog'}
+        title="Disconnect Jira?"
+        confirmLabel="Disconnect Jira"
+        onClose={() => setAskDisconnect(false)}
+        onConfirm={async () => {
+          try {
+            await jiraClient.disconnect();
+          } catch (err) {
+            showToast('Couldn’t disconnect Jira. Try again.');
+            throw err;
+          }
+          setAskDisconnect(false);
+          leave();
+          showToast('Jira disconnected from all your spaces. Your tasks keep their Jira keys.');
+        }}
+      >
+        Jira goes from every space you turned it on in, with your saved views. Your tasks keep their Jira
+        keys. To hide it only in {space.name}, use Turn off in {space.name} instead.
+      </ConfirmDialog>
     </>
   );
 }

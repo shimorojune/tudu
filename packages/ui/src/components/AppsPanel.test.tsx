@@ -153,12 +153,22 @@ describe('Apps (chunk 10)', () => {
     expect(onDisable).toHaveBeenCalledTimes(1);
 
     rerender(
-      <AppsPanel apps={[{ ...on, error: 'Couldn’t turn Jira off here.' }]} spaceName="Acme Studio" onDisable={onDisable} />,
+      <AppsPanel
+        apps={[{ ...on, error: 'Couldn’t turn Jira off here.' }]}
+        spaceName="Acme Studio"
+        onDisable={onDisable}
+      />,
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Couldn’t turn Jira off here.');
     expect(screen.getByRole('button', { name: 'Turn off Jira in Acme Studio' })).toBeEnabled();
 
-    rerender(<AppsPanel apps={[{ ...JIRA, connected: true, off: true }]} spaceName="Acme Studio" onDisable={onDisable} />);
+    rerender(
+      <AppsPanel
+        apps={[{ ...JIRA, connected: true, off: true }]}
+        spaceName="Acme Studio"
+        onDisable={onDisable}
+      />,
+    );
     expect(screen.getByRole('button', { name: 'Turn on Jira here' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Turn off/ })).toBeNull();
 
