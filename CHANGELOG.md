@@ -1,3 +1,37 @@
+## [0.39.0](https://github.com/shimorojune/tudu/compare/tudu-0.38.0...tudu-0.39.0) (2026-10-26)
+
+### Features
+
+* **client:** All spaces places, order writes and live refresh ([57e3f25](https://github.com/shimorojune/tudu/commit/57e3f25b70e74bab98a785b021ff8ccd3ad5cbf5))
+* **core:** gather All spaces lists and place tasks in its order ([a35ca39](https://github.com/shimorojune/tudu/commit/a35ca3900d0cfe7ce3da30eca7e7f0b8e3b6c2f1))
+* **feedback:** file each report as a public GitHub issue ([3155c3e](https://github.com/shimorojune/tudu/commit/3155c3e2ee1a6745e2dcf3da1d888e60b928a6a5))
+* **jira:** turn Jira off in one space from inside it ([802711d](https://github.com/shimorojune/tudu/commit/802711d49d507cfe49c4b719e81e31315e53eafb))
+* **notebook:** notes, folders and links on the server ([ecf4485](https://github.com/shimorojune/tudu/commit/ecf448531fa0d77ec83e4ea803ab5a494bdc21d0))
+* **notebook:** the client store for notes and folders ([6b8f12f](https://github.com/shimorojune/tudu/commit/6b8f12ff9e51b2d16d568c4602cb77bab04eef1c))
+* **notebook:** the note window in the Mac app ([fe64d22](https://github.com/shimorojune/tudu/commit/fe64d229e270f64948a4898e228ec744d411d501))
+* **notebook:** the Notebook in the web app ([c4a411d](https://github.com/shimorojune/tudu/commit/c4a411d32c622fad3d70d07ca0ed2c4067727297))
+* **notebook:** the Notebook's pieces in the design system ([65a9c65](https://github.com/shimorojune/tudu/commit/65a9c65f2162c5245461aafd8473bb2a5bb83f18))
+* **ui:** bug button, public notice, Filed, Sent and Your reports in Send feedback ([a962307](https://github.com/shimorojune/tudu/commit/a96230759754219f5f8df7ca354baa8bd05e25ff))
+* **ui:** the task ID chip copies the task's link ([04dc7bb](https://github.com/shimorojune/tudu/commit/04dc7bbee2a7a11c55f46b6101302d47915f0afd))
+* **web:** All spaces pages, switcher row and search across every space ([117c8b8](https://github.com/shimorojune/tudu/commit/117c8b85d32f989339e515c512885dd2d33322d3))
+* **web:** header bug button, Filed and Sent views, Your reports, landed-issue toasts ([1bbbe40](https://github.com/shimorojune/tudu/commit/1bbbe40e7bbd3d658d00c15b375b175aa87e63e3))
+
+### Bug Fixes
+
+* **deps:** pin drizzle-kit's esbuild to 0.25 for GHSA-67mh-4wv8-2f99 ([fc3ca2c](https://github.com/shimorojune/tudu/commit/fc3ca2c857e8a7384d1163ac752d37972de74d2b))
+* **desktop:** import NSWorkspaceApplicationKey and enable NSDictionary for the activation check ([eea23b5](https://github.com/shimorojune/tudu/commit/eea23b51279bd273d63cf69d1b33e338164b9072))
+* **desktop:** the menu bar sheet hides on a click in another app every time ([5593a18](https://github.com/shimorojune/tudu/commit/5593a183bbcff677e69d1dd952b8b0a4deaf0f68))
+* **desktop:** trust the key the updates are signed with ([438e9f2](https://github.com/shimorojune/tudu/commit/438e9f2054425490201a3c4a1580977487dc9e72))
+* **e2e:** C16-D01 expects the note window's webview awake too ([12e14d6](https://github.com/shimorojune/tudu/commit/12e14d69f385cce384d8d8a2f2360139fc489060))
+* **e2e:** the menu bar flakes: reopen ⋯ after it has left; prove the other app came forward ([d6d7813](https://github.com/shimorojune/tudu/commit/d6d78135ff03739158fad4e9aa2d2f9bd9cbd198))
+* **jira:** drop duplicate loc declaration in JiraHost; prettier ([90b00ff](https://github.com/shimorojune/tudu/commit/90b00ffafac83c78bf0b6b32b7830ea22292058d))
+* **notes:** visible list markers, one-line file chips, paste and drop files, rich Quick Add note ([688032a](https://github.com/shimorojune/tudu/commit/688032ac4ff235e7b7ad18428af56b36a3810945))
+* **quick add:** the opening focus never takes the caret back from the bar ([9992a9d](https://github.com/shimorojune/tudu/commit/9992a9d8f845ed3769fbfa4a05cb391f530580c0))
+* **task panel:** the Jira fact only where Jira is connected in the space ([80fadef](https://github.com/shimorojune/tudu/commit/80fadeff31b4e7670b22ed82984f63ee478fb2da))
+* **ui:** hang Personal and All spaces tiles off the text baseline ([424e417](https://github.com/shimorojune/tudu/commit/424e417525c937a075e8b4c9f4ad638f849d6ba9))
+* **ui:** writing line keeps still on focus; look-alikes fold away in Quick Add ([ce48073](https://github.com/shimorojune/tudu/commit/ce48073149452b5eb1c95ada34d357427df75402))
+* **web:** phone bug button gets its own class so Inbox lookups find the Inbox ([55053dd](https://github.com/shimorojune/tudu/commit/55053ddd472fb641cd8ce1619050ed0a6229b7cc))
+
 ## [0.38.0](https://github.com/shimorojune/tudu/compare/tudu-0.37.0...tudu-0.38.0) (2026-10-24)
 
 ### Features

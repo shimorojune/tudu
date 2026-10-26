@@ -1532,10 +1532,22 @@
 .tp-mb .tp-mb-sp {
   flex: 1;
 }
-.tp-mb .tp-mb-kbd {
-  margin-left: 4px;
-  font-size: 11px;
-  color: var(--muted-foreground);
+.tp-mb .tp-mb-f > * {
+  flex: none;
+}
+.tp-mb .tp-mb-f > .tp-mb-sp {
+  flex: 1;
+}
+.tp-mb .tp-mb-f .tp-btn {
+  white-space: nowrap;
+}
+.tp-mb .tp-mb-f .tp-mb-ib {
+  width: 32px;
+  height: 32px;
+  color: var(--foreground-2);
+}
+.tp-mb .tp-mb-f .tp-mb-ib:hover {
+  color: var(--foreground);
 }
 .tp-mb .tp-mb-empty {
   padding: 28px 22px 30px;

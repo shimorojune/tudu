@@ -22,6 +22,8 @@ jobs:
   changes:
     name: What changed
     runs-on: ubuntu-latest
+    # Every job has a ceiling a few times its usual length, so a hung step (an apt mirror, a download) fails in minutes instead of GitHub's 6 hours.
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read
@@ -90,6 +92,7 @@ jobs:
   static:
     name: Lint and typecheck
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -110,6 +113,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.unit == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres: &postgres
         image: pgvector/pgvector:pg17
@@ -151,6 +155,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -185,7 +190,9 @@ jobs:
           path: .local/models
           key: embeddings-all-MiniLM-L6-v2-q8
       - run: EMBEDDINGS_MODEL_DIR=$PWD/.local/models pnpm --filter @tudu/server exec node --import tsx src/embeddings/fetch-model.ts
+      # Usually under a minute; it once hung 45 minutes on the apt step (PR #35).
       - run: pnpm --filter e2e exec playwright install --with-deps chromium webkit
+        timeout-minutes: 10
       - name: Create the storage bucket
         env:
           AWS_ACCESS_KEY_ID: tudu-ci
@@ -216,6 +223,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - run: docker build -f apps/server/Dockerfile -t tudu-api:ci .
@@ -240,6 +248,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.mac == 'true'
     runs-on: macos-latest
+    # A cold Rust cache builds Tudu Test twice from scratch.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -293,6 +303,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [changes, static, unit, e2e, api-image, desktop]
     if: always()
+    timeout-minutes: 5
     steps:
       - name: Every job passed or was skipped
         if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
