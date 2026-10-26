@@ -1,7 +1,7 @@
 # esbuild dev-server CORS advisory (Dependabot)
 
-Status: awaiting Rohit's approval. Canvas: not applicable (dependency change only, nothing in the app changes);
-skipping it needs Rohit's OK.
+Status: approved by Rohit 26 Oct 2026. Canvas: not applicable (dependency change only, nothing in the app changes);
+skipping it approved by Rohit 26 Oct 2026.
 
 ## The alert
 
