@@ -4,7 +4,7 @@ Status: proposal, waiting for Rohit's approval. Nothing is built yet.
 Design: canvas page "Notebook", approved by Rohit on 26 Oct 2026 (v108), with the changes he asked for after that up
 to v117 (Move, Delete that asks first, Trash, folder Rename and Delete, popovers that animate out, row tooltips at the
 side). Boards: P-Desktop, P-Floating, P-Popup, P-Web, P-Task, P-Search and P-Phone (each with a Dark twin), P-States
-(and Dark), P-Motion, plus "New note" in the menu bar sheet (K-MenuBar, K-MenuBar-Dark). The canvas kit is
+(and Dark), P-Motion, plus "New note" in the menu bar sheet (P-MenuBar and Dark on the Notebook page, v118; K-MenuBar on the Menu bar page). The canvas kit is
 `kit/scratchpad.js` and `kit/scratchpad.css`; its components move into the Tudu Paper design system before any app
 code is written (see **Design system first**).
 
