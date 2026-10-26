@@ -580,7 +580,7 @@ test.describe('notebook', () => {
     await idle(page);
     await expect(page.locator('.tp-nb-tchip')).toHaveCount(0);
     await page.goto('/me');
-    expect(await titlesOf(dayList(page))).toEqual(['Fix the hall light']);
+    await expect.poll(() => titlesOf(dayList(page))).toEqual(['Fix the hall light']);
   });
 
   test('C22-E23 the space chip moved to a team space: the task lands there, still linked to the note', async ({
