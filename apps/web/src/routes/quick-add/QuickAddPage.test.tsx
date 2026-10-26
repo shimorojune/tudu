@@ -193,7 +193,7 @@ describe('C22-U27 the floating window opened by Make a task', () => {
     };
     emit('floating:shown');
     await waitFor(() => expect(title().value).toBe('Call the venue'));
-    expect(document.querySelector('.tp-qa-from')).toHaveTextContent('Offsite agenda draft');
+    expect(document.querySelector('.tp-qa-from')?.textContent).toContain('Offsite agenda draft');
     expect(usedSpace).toHaveBeenLastCalledWith('p');
     expect(fake.seed).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Add task' }));

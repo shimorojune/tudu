@@ -355,6 +355,7 @@ describe('QuickAdd', () => {
       projectId: null,
       note: '',
       attachments: [],
+      from: null,
     });
     expect(screen.getByRole('dialog', { name: 'Quick Add' })).toHaveClass('tp-qa-saving');
     expect(line).toHaveAttribute('readonly');

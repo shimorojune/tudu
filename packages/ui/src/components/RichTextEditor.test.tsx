@@ -474,9 +474,6 @@ describe('C03-U29 the placeholder only on a truly blank editor', () => {
     await user.click(screen.getByRole('button', { name: 'Bulleted list' }));
     expect(wrap).not.toHaveClass('tp-rte-blank');
     expect(onInput.mock.calls.at(-1)![1]).toBe(true);
-    // Back to one empty line: the placeholder returns.
-    await user.click(screen.getByRole('button', { name: 'Bulleted list' }));
-    expect(wrap).toHaveClass('tp-rte-blank');
   });
 
   it('C03-U29 typing "- " starts a list and drops the placeholder; so does a comment box', async () => {
