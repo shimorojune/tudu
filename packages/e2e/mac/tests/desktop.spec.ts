@@ -839,7 +839,7 @@ test.describe('background', () => {
       awake: true,
     });
     // The pages are never put to sleep while hidden.
-    expect(s.background.webviews).toEqual({ main: 2, floating: 2, menubar: 2 });
+    expect(s.background.webviews).toEqual({ main: 2, floating: 2, menubar: 2, note: 2 });
     const pid = s.pid;
 
     await app.act('close', { window: 'main' });
