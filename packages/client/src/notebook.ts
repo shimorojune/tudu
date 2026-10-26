@@ -385,7 +385,8 @@ export class NotebookStore {
 
   /** True while some note's words are still waiting for quiet (not in the outbox yet). Tests wait on it. */
   isBusy(): boolean {
-    for (const w of this.writing.values()) if (w.timer || ((w.titleDirty || w.bodyDirty) && w.created)) return true;
+    for (const w of this.writing.values())
+      if (w.timer || ((w.titleDirty || w.bodyDirty) && w.created)) return true;
     return false;
   }
 
