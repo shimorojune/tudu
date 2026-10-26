@@ -68,6 +68,11 @@ Settings › Secrets and variables › Actions › New repository secret: `DOKPL
 step 3.5. The other release secrets (`DOKPLOY_URL`, `DOKPLOY_API_KEY`, `TAURI_SIGNING_PRIVATE_KEY`,
 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) are already set.
 
+`TAURI_SIGNING_PRIVATE_KEY` must be the secret half of the key whose public half is `plugins.updater.pubkey` in
+apps/desktop/src-tauri/tauri.conf.json (now key id 7120FCBE917C11ED, `~/.tauri/tudu.key` on Rohit's Mac). If they
+differ, every installed app downloads each update and then refuses it ("The signature was created with a different key
+than the one provided"). That happened from 23 to 26 Oct 2026; apps from before the switch must be installed by hand once.
+
 ### 5. DNS
 
 `tudu.ezdev.net` and `api.tudu.ezdev.net` resolve to the Dokploy host (as `staging.` and `api.staging.` do).
