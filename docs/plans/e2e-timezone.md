@@ -24,10 +24,10 @@ Test bug, not an app bug. Two clocks in the fixtures disagree outside UTC:
 - The server is last-write-wins per field: `newer(at, clock)` in `apps/server/src/tasks.ts` drops a change older than
   the field's clock.
 
-| TZ            | Page "Sunday 10:00" | Seed  | Tick saved? |
-| ------------- | ------------------- | ----- | ----------- |
-| UTC (CI)      | 10:00Z              | 09:00Z | yes        |
-| Asia/Kolkata  | 04:30Z              | 09:00Z | no, dropped as older |
+| TZ           | Page "Sunday 10:00" | Seed   | Tick saved?          |
+| ------------ | ------------------- | ------ | -------------------- |
+| UTC (CI)     | 10:00Z              | 09:00Z | yes                  |
+| Asia/Kolkata | 04:30Z              | 09:00Z | no, dropped as older |
 
 So in India every tick on a seeded task is older than the task itself and the server ignores it. E08's API cross
 uses `SUNDAY + 5s` = 04:30:05Z, older than its seed, same result. The browser shows the tick optimistically, then the
@@ -59,9 +59,9 @@ places in six specs and still leaves the suite's results depending on the machin
 
 New (docs/tests/chunk-00.md, `packages/e2e/tests/kit/kit.spec.ts`):
 
-| Id      | What                         | Scenario |
-| ------- | ---------------------------- | -------- |
-| C00-E06 | The suite runs in UTC        | In the test process `new Date(2026, 9, 18, 10, 0).toISOString()` is `2026-10-18T10:00:00.000Z`, and in the page `new Date().getTimezoneOffset()` is 0 and `Intl.DateTimeFormat().resolvedOptions().timeZone` is `UTC`. Fails loudly if someone drops the pin, instead of leaving tick tests to fail mysteriously. |
+| Id      | What                  | Scenario                                                                                                                                                                                                                                                                                                          |
+| ------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C00-E06 | The suite runs in UTC | In the test process `new Date(2026, 9, 18, 10, 0).toISOString()` is `2026-10-18T10:00:00.000Z`, and in the page `new Date().getTimezoneOffset()` is 0 and `Intl.DateTimeFormat().resolvedOptions().timeZone` is `UTC`. Fails loudly if someone drops the pin, instead of leaving tick tests to fail mysteriously. |
 
 Unchanged cases that must go green on Rohit's Mac with its default timezone (no `TZ=` prefix):
 C21-E01, C21-E05, C21-E08, C20-E01, C20-E03, C20-E06, C20-E09, on desktop, tablet and phone.
