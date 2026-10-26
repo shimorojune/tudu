@@ -9,7 +9,8 @@
 //!   autosave name and saved position) and whether it is hidden; and the last blur, click or app coming forward that
 //!   could put the sheet away, with whether it did (`outside`).
 //! - `POST /act {"do": …}`: what a person does outside the page: `summon`, `tray` (a click on the tick, with
-//!   `button`: left or right), `reopen` (the dock icon), `close` (with `window`), `outside-click` (a click in another
+//!   `button`: left or right), `reopen` (the dock icon), `close` (with `window`), `frame` (a window dragged and
+//!   resized: `window`, `x`, `y`, `width`, `height` in points), `outside-click` (a click in another
 //!   app), `check-update` (`auto`: only past the floor, as focus would), `wake`, `age-check` (with `minutes`), `quit`,
 //!   `tick` (with `hidden`: true or false says macOS hides or shows the tick, null hands the answer back to macOS).
 //! - `POST /eval {"window", "script"}`: runs the script (an async function body) in that window's WKWebView and
@@ -268,8 +269,12 @@ fn state(app: &AppHandle) -> Value {
             "main": webview(windows::MAIN),
             "floating": webview(windows::FLOATING),
             "menubar": webview(windows::MENUBAR),
+            "note": webview(windows::NOTE),
         },
     });
+    // The note window (chunk 22): pinned, filling the screen, what it was last asked for, and where it is kept.
+    let notes = app.state::<crate::notes::Notes>();
+    let note = json!({ "state": notes.state(), "frame": notes.frame() });
     json!({
         "track": track,
         "name": track.name(),
@@ -280,7 +285,9 @@ fn state(app: &AppHandle) -> Value {
             "main": window_state(app.get_webview_window(windows::MAIN)),
             "floating": window_state(app.get_webview_window(windows::FLOATING)),
             "menubar": window_state(app.get_webview_window(windows::MENUBAR)),
+            "note": window_state(app.get_webview_window(windows::NOTE)),
         },
+        "note": note,
         "tray": tray,
         "shortcut": { "accelerator": SUMMON, "registered": registered },
         "badge": dock_badge(app),
@@ -325,6 +332,24 @@ fn act(app: &AppHandle, input: &Value) -> (u16, Value) {
                 Ok(v) => (200, v),
                 Err(_) => (504, json!({ "error": "the main thread did not answer" })),
             }
+        }
+        "frame" => {
+            // A window dragged and resized by hand (the note window by its bar and corner), in points.
+            let label = input
+                .get("window")
+                .and_then(Value::as_str)
+                .unwrap_or(windows::NOTE);
+            let n = |k: &str| input.get(k).and_then(Value::as_f64);
+            let Some(w) = app.get_webview_window(label) else {
+                return (404, json!({ "error": format!("no window {label}") }));
+            };
+            if let (Some(width), Some(height)) = (n("width"), n("height")) {
+                let _ = w.set_size(tauri::LogicalSize::new(width, height));
+            }
+            if let (Some(x), Some(y)) = (n("x"), n("y")) {
+                let _ = w.set_position(tauri::LogicalPosition::new(x, y));
+            }
+            (200, json!({ "ok": true }))
         }
         "tick" => {
             let hidden = input.get("hidden").and_then(Value::as_bool);

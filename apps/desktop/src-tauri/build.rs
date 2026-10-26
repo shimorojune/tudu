@@ -19,6 +19,12 @@ const COMMANDS: &[&str] = &[
     "set_open_at_login",
     "open_login_items",
     "set_dock",
+    "open_note",
+    "note_state",
+    "set_note_pinned",
+    "set_note_expanded",
+    "open_in_notebook",
+    "hide_note",
 ];
 const TEST_COMMANDS: &[&str] = &[
     "app_info",
@@ -38,6 +44,12 @@ const TEST_COMMANDS: &[&str] = &[
     "set_open_at_login",
     "open_login_items",
     "set_dock",
+    "open_note",
+    "note_state",
+    "set_note_pinned",
+    "set_note_expanded",
+    "open_in_notebook",
+    "hide_note",
     "control_reply",
 ];
 
