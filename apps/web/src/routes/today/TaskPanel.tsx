@@ -33,6 +33,7 @@ import { addRecentTask } from '../../app/search';
 import { tileOf } from '../../app/allSpaces';
 import { useSpace } from '../../app/space';
 import { jiraClient, openInJira, useJira } from '../../app/jira';
+import { useRefOnce } from '../../app/refOnce';
 import { taskStore } from '../../app/tasks';
 import { noteItem, notebookStore, notePicks, openNote } from '../../app/notebook';
 import type { Viewport } from '../../app/viewport';
@@ -139,10 +140,7 @@ export function TaskPanel(p: TaskPanelProps) {
   const prev = at > 0 ? { id: ids![at - 1]! } : undefined;
   const next = at >= 0 && ids && at < ids.length - 1 ? { id: ids[at + 1]! } : undefined;
 
-  const onRef = p.onRef;
-  useEffect(() => {
-    if (open && detail?.ref && detail.id === open.id) onRef?.(detail.ref);
-  }, [open, detail?.ref, detail?.id, onRef]);
+  useRefOnce(open, detail, p.onRef);
 
   const backLabel =
     detail && p.backFor

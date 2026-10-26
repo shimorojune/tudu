@@ -11,7 +11,17 @@ import {
   type Task,
 } from '@tudu/core';
 import type { TaskSpace } from '@tudu/ui';
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useRouter } from '@tanstack/react-router';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { queryClient } from './session';
 import { taskStore } from './tasks';
 
@@ -69,6 +79,44 @@ export function tileOf(s: SpaceSummary): TaskSpace {
 }
 
 export { switcherOrder };
+
+const NOTHING_GONE = () => {};
+
+/**
+ * All spaces' scope for the `?space=` slug: the same object while the spaces, the filter and the banner hold, so the
+ * pages under it do not re-render as the rest of the address changes (a task opening, a day turning). `setSearch`
+ * edits the address as it is when called, not as it was when the scope was made.
+ */
+export function useAllScopeValue(
+  spaces: SpaceSummary[],
+  slug: string | undefined,
+  setSearch: (edit: (q: URLSearchParams) => void) => void,
+  gone: { name: string } | null = null,
+  dismissGone: () => void = NOTHING_GONE,
+): AllScope {
+  const edit = useRef(setSearch);
+  useEffect(() => {
+    edit.current = setSearch;
+  });
+  const filter = filterOf(spaces, slug);
+  return useMemo(
+    () => ({
+      spaces,
+      filter,
+      target: targetOf(spaces, filter),
+      setFilter: (id: string | null) => {
+        const next = id ? spaces.find((s) => s.id === id) : null;
+        edit.current((q) => {
+          if (next) q.set('space', next.slug);
+          else q.delete('space');
+        });
+      },
+      gone,
+      dismissGone,
+    }),
+    [spaces, filter, gone, dismissGone],
+  );
+}
 
 /** One list of All spaces (a day, or the Backlog), as the page shows it. */
 export interface AllList {
@@ -380,6 +428,19 @@ export function cachedOrder(
   for (const [, data] of queryClient.getQueriesData<AllSpacesPlace[]>({ queryKey: ['all-places'] }))
     for (const p of data ?? []) if (p.day === day) byTask.set(p.taskId, p.position);
   return cachedAll(scope, meId, day, false).map((t) => ({ id: t.id, position: byTask.get(t.id) ?? null }));
+}
+
+/**
+ * A page's address with a task open (or none), keeping All spaces' filter as the address has it when called, not as
+ * at the last render: a task opened a moment after a pill press keeps the filter the press put there.
+ */
+export function useTaskHref(base: string, all: boolean): (ref: string | null | undefined) => string {
+  const router = useRouter();
+  return useCallback(
+    (ref: string | null | undefined) =>
+      taskHref(base, ref, all ? new URLSearchParams(router.history.location.search).get('space') : null),
+    [base, all, router],
+  );
 }
 
 /** A page's address with the open task (`?task=`), and in All spaces the filter (`?space=`) kept. */

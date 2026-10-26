@@ -1,6 +1,6 @@
 import type { Browser, Locator, Page } from '@playwright/test';
 import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
-import { backlogList, dragAcross, tileList } from '../../fixtures/week';
+import { backlogList, dragAcross, openDay, tile, tileList } from '../../fixtures/week';
 import { hit, hitTitles, openSearch, panel as searchPanel, search } from '../../fixtures/search';
 import {
   createSpace,
@@ -90,7 +90,7 @@ function pill(list: Locator, title: string, space: string): Locator {
 
 /** The panel for a task, opened from its row. */
 async function openTask(page: Page, list: Locator, title: string): Promise<Locator> {
-  await row(list, title).getByRole('button', { name: title }).click();
+  await row(list, title).getByRole('button', { name: title, exact: true }).click();
   const p = page.getByRole('dialog', { name: 'Task details' });
   await expect(p.getByRole('textbox', { name: 'Task title' })).toHaveValue(title);
   return p;
@@ -99,6 +99,66 @@ async function openTask(page: Page, list: Locator, title: string): Promise<Locat
 async function dayOf(page: Page, spaceId: string, day = SUN) {
   const res = await page.request.get(`${API_URL}/api/spaces/${spaceId}/days/${day}?today=${SUN}`);
   return ((await res.json()) as { tasks: Array<{ title: string; done: boolean; due: string | null }> }).tasks;
+}
+
+/** The page still answers: a tab caught in a render loop never runs this. */
+async function expectAlive(page: Page): Promise<void> {
+  const alive = await Promise.race([
+    page.evaluate(() => true),
+    new Promise<false>((r) => setTimeout(() => r(false), 5000)),
+  ]);
+  expect(alive, 'the tab froze').toBe(true);
+}
+
+/** Hold the server's answers back until `release()`: a task written now gets its ref later. */
+async function holdSync(page: Page): Promise<() => void> {
+  let release!: () => void;
+  const gate = new Promise<void>((r) => (release = r));
+  await page.route('**/api/sync', async (route) => {
+    await gate;
+    await route.continue();
+  });
+  return release;
+}
+
+/** Open a row's task, check the panel shows it and the address names it, then close it. */
+async function openAndClose(page: Page, list: Locator, title: string): Promise<void> {
+  const p = await openTask(page, list, title);
+  await expectAlive(page);
+  await expect(page).toHaveURL(/[?&]task=[A-Z]+-\d+/);
+  await page.keyboard.press('Escape');
+  await expect(p).toHaveCount(0);
+  // Closed when the address has let go of the task too.
+  await expect(page).not.toHaveURL(/[?&]task=/);
+}
+
+/** The Backlog of whatever is shown (a space or All spaces), from the sidebar, the rail or the phone's More. */
+async function goBacklog(page: Page): Promise<Locator> {
+  const more = page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'More' });
+  if (await more.count()) {
+    await more.click();
+    await page.getByRole('button', { name: /^Backlog/ }).click();
+  } else
+    await page
+      .getByRole('button', { name: /^Backlog(,|$)/ })
+      .first()
+      .click();
+  const list = page
+    .getByRole('region', { name: /^The Backlog/ })
+    .getByRole('list', { name: 'Tasks in the Backlog' });
+  await expect(list).toBeVisible();
+  return list;
+}
+
+/** The week of whatever is shown, Sunday's tile open. */
+async function goWeekShown(page: Page): Promise<Locator> {
+  await page
+    .getByRole('button', { name: /^Week(,|$)/ })
+    .first()
+    .click();
+  await expect(tile(page, /Sunday 18 October/)).toBeVisible();
+  if (phone() || tablet()) await openDay(page, /Sunday 18 October/);
+  return tileList(page, 'Sunday 18 October');
 }
 
 const ALL_SUNDAY = [
@@ -786,5 +846,99 @@ test.describe('all spaces', () => {
     await expect(page.locator('html')).toHaveClass(/dark/);
     expect(Math.abs(lifts.Personal - LIFT)).toBeLessThanOrEqual(0.5);
     expect(Math.abs(lifts.Personal - lifts.Northwind)).toBeLessThanOrEqual(0.25);
+  });
+
+  for (const where of ['every space', 'Personal', 'Northwind'] as const) {
+    test(`C21-E22 a task written in All spaces opens at once, before the server has its ref (${where})`, async ({
+      page,
+      browser,
+    }) => {
+      const w = await world(page, browser);
+      const filter = where === 'Personal' ? w.personal : where === 'Northwind' ? w.nw : null;
+      await page.goto(filter ? `/all?space=${filter.slug}` : '/all');
+      const list = allDay(page);
+      await expect(
+        row(list, where === 'Northwind' ? 'Review the Northwind roadmap' : 'Pay the electricity bill'),
+      ).toHaveCount(1);
+      const release = await holdSync(page);
+      await page
+        .getByRole('button', { name: `Write the next thing in ${filter?.name ?? 'Personal'}…` })
+        .click();
+      const field = page.getByRole('textbox', { name: 'New task' });
+      await field.fill('Water the plants');
+      await field.press('Enter');
+      await field.press('Escape');
+      await row(list, 'Water the plants').getByRole('button', { name: 'Water the plants' }).click();
+      const p = page.getByRole('dialog', { name: 'Task details' });
+      await expect(p).toBeVisible();
+      // The server answers now: the ref arrives while the panel is open.
+      release();
+      await idle(page);
+      await expectAlive(page);
+      await expect(p.getByRole('textbox', { name: 'Task title' })).toHaveValue('Water the plants');
+      await expect(page).toHaveURL(/[?&]task=[A-Z]+-\d+/);
+      if (filter) await expect(page).toHaveURL(new RegExp(`[?&]space=${filter.slug}`));
+      const target = filter ?? w.personal;
+      expect((await dayOf(page, target.id)).map((t) => t.title)).toContain('Water the plants');
+    });
+  }
+
+  test('C21-E23 a saved task opens, closes and opens again on All spaces Today (filtered too), Week and Backlog', async ({
+    page,
+    browser,
+  }) => {
+    const w = await world(page, browser);
+    await seedTasks(page, w.personal.id, [{ title: 'Sort the attic', day: null }]);
+    await page.reload();
+    await goAll(page);
+    await openAndClose(page, allDay(page), 'Pay the electricity bill');
+    // The second open finds the task's details cached, ref and all, before the address has caught up.
+    await openAndClose(page, allDay(page), 'Pay the electricity bill');
+    await pill(allDay(page), 'Pay the electricity bill', 'Personal').click();
+    await expect(page).toHaveURL(new RegExp(`[?&]space=${w.personal.slug}`));
+    await openAndClose(page, allDay(page), 'Pay the electricity bill');
+    await openAndClose(page, allDay(page), 'Pay the electricity bill');
+    await expect(page).toHaveURL(new RegExp(`[?&]space=${w.personal.slug}`));
+    const sunday = await goWeekShown(page);
+    await openAndClose(page, sunday, 'Review the Northwind roadmap');
+    await openAndClose(page, sunday, 'Review the Northwind roadmap');
+    const backlog = await goBacklog(page);
+    await openAndClose(page, backlog, 'Sort the attic');
+    await openAndClose(page, backlog, 'Sort the attic');
+  });
+
+  test('C21-E24 a space’s own Today, Week and Backlog: a just-written task opens at once, and a saved task opens twice', async ({
+    page,
+    browser,
+  }) => {
+    const w = await world(page, browser);
+    await seedTasks(page, w.personal.id, [{ title: 'Sort the attic', day: null }]);
+    await page.goto(`/${w.personal.slug}`);
+    const list = allDay(page);
+    await expect(row(list, 'Pay the electricity bill')).toHaveCount(1);
+    const release = await holdSync(page);
+    await page.getByRole('button', { name: 'Write the next thing…' }).click();
+    const field = page.getByRole('textbox', { name: 'New task' });
+    await field.fill('Water the plants');
+    await field.press('Enter');
+    await field.press('Escape');
+    await row(list, 'Water the plants').getByRole('button', { name: 'Water the plants' }).click();
+    const p = page.getByRole('dialog', { name: 'Task details' });
+    await expect(p).toBeVisible();
+    release();
+    await expect(p.getByRole('textbox', { name: 'Task title' })).toHaveValue('Water the plants');
+    await idle(page);
+    await expectAlive(page);
+    await expect(page).toHaveURL(/[?&]task=ME-\d+/);
+    await page.keyboard.press('Escape');
+    await expect(p).toHaveCount(0);
+    await openAndClose(page, list, 'Pay the electricity bill');
+    await openAndClose(page, list, 'Pay the electricity bill');
+    const sunday = await goWeekShown(page);
+    await openAndClose(page, sunday, 'Water the plants');
+    await openAndClose(page, sunday, 'Water the plants');
+    const backlog = await goBacklog(page);
+    await openAndClose(page, backlog, 'Sort the attic');
+    await openAndClose(page, backlog, 'Sort the attic');
   });
 });
