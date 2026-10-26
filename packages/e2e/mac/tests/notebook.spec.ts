@@ -253,9 +253,11 @@ test.describe('chunk 22 · the note window', () => {
        return { html: c(document.documentElement), body: c(document.body), note: c(document.querySelector('.tp-nb-win')) };`,
       'note',
     );
-    const clear = /^(transparent|rgba\(0, 0, 0, 0\))$/;
-    expect(bg.html).toMatch(clear);
-    expect(bg.body).toMatch(clear);
-    expect(bg.note).not.toMatch(clear);
+    // Clear means alpha 0, whatever colour WebKit reports with it (rgba(238, 236, 230, 0) is as clear as transparent).
+    const alpha = (c: string) =>
+      c === 'transparent' ? 0 : Number(/rgba\([^)]*,\s*([\d.]+)\)/.exec(c)?.[1] ?? 1);
+    expect(alpha(bg.html)).toBe(0);
+    expect(alpha(bg.body)).toBe(0);
+    expect(alpha(bg.note)).toBeGreaterThan(0);
   });
 });
