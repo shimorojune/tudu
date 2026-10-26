@@ -12,11 +12,11 @@ Measured from Rohit's screenshots: the tile's centre is ~1.5px below the centre 
 the chip's own centre. It is not the Geist font-rendering difference between Rohit's browser and headless Chromium.
 It reproduces in headless Chromium too, and only for some tiles:
 
-| Tile (14px chip tile) | baseline to tile centre, intended | measured today |
-| --- | --- | --- |
-| A team space (initials) | 4.44px | 4.44px |
-| Personal (person icon) | 4.44px | **2.44px** (2px low) |
-| All spaces (layers icon) | 4.44px | about 1.44px (3px low) |
+| Tile (14px chip tile)    | baseline to tile centre, intended | measured today         |
+| ------------------------ | --------------------------------- | ---------------------- |
+| A team space (initials)  | 4.44px                            | 4.44px                 |
+| Personal (person icon)   | 4.44px                            | **2.44px** (2px low)   |
+| All spaces (layers icon) | 4.44px                            | about 1.44px (3px low) |
 
 The 13px byline tile (`.tp-sg-tile`) has the same offsets.
 
@@ -40,7 +40,9 @@ One CSS rule, in `packages/ui/src/styles/components.css` next to `.tp-stile`:
 /* A tile's icon fills its height, so the tile's baseline is always its bottom edge (an inline flex box takes its
    baseline from the first item's bottom) and the small tiles hang off the text baseline like the initials do. The
    drawing stays the same size: the viewBox scales by width and centres. */
-.tp-stile > svg { height: 100%; }
+.tp-stile > svg {
+  height: 100%;
+}
 ```
 
 The icon looks the same: Lucide SVGs keep their width, the 24x24 viewBox is scaled by the width and centred
@@ -59,10 +61,12 @@ byline space pills in All spaces (Today, Week, Backlog, phone), in both themes.
 New and updated, all run on Rohit's Mac:
 
 Unit (packages/ui, vitest):
+
 - `SpaceTile.test.tsx` STB-U01: the personal and all tiles' icon SVG is a direct child of `.tp-stile` (guards the
   selector the rule relies on).
 
 E2E (packages/e2e, Playwright, group all-spaces):
+
 - STB-E01 chip: filter All spaces by Personal; the chip tile's centre is 4.44px (±0.5) above the label's text
   baseline (measured with a zero-size inline-block marker after the label), and equal (±0.25) to a team space chip's
   offset when filtered by a team space.

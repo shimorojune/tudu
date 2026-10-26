@@ -78,7 +78,10 @@ describe('SpaceTile', () => {
   });
 
   it('STB-U01 the personal and all icons fill the tile height, so a small tile hangs off the text baseline', () => {
-    for (const space of [{ name: 'Personal', personal: true }, { name: 'All spaces', all: true }]) {
+    for (const space of [
+      { name: 'Personal', personal: true },
+      { name: 'All spaces', all: true },
+    ]) {
       const { container, unmount } = render(<SpaceTile space={space} size={14} />);
       const icon = container.querySelector('.tp-stile > svg')!;
       expect(icon).not.toBeNull();
