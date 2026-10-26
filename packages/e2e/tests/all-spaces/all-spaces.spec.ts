@@ -107,6 +107,46 @@ const ALL_SUNDAY = [
   'Order seed for the north field',
 ];
 
+/**
+ * How far the centre of the small space tile inside `el` sits above the baseline of the text beside it, in px.
+ * A zero-size inline block after the tile's text line marks the baseline.
+ */
+async function tileLift(el: Locator): Promise<number> {
+  return el.evaluate((root) => {
+    const tile = root.querySelector('.tp-stile')!;
+    const mark = document.createElement('i');
+    mark.style.cssText = 'display:inline-block;width:0;height:0';
+    tile.parentElement!.append(mark);
+    const base = mark.getBoundingClientRect().top;
+    mark.remove();
+    const t = tile.getBoundingClientRect();
+    return base - (t.top + t.bottom) / 2;
+  });
+}
+
+/** Half Geist's cap height at 12.5px: where the tiles' centres should sit above the baseline. */
+const LIFT = 12.5 * 0.355;
+
+/** Filters All spaces to Personal, then to Northwind, and reads each chip's tile lift. */
+async function chipLifts(page: Page) {
+  await page.reload();
+  await goAll(page);
+  await expect.poll(() => titlesOf(allDay(page))).toEqual(ALL_SUNDAY);
+  const lifts: Record<string, number> = {};
+  for (const [title, space] of [
+    ['Pay the electricity bill', 'Personal'],
+    ['Review the Northwind roadmap', 'Northwind'],
+  ] as const) {
+    await pill(allDay(page), title, space).click();
+    const chip = page.locator('.tp-chip-space').filter({ hasText: space });
+    await expect(chip).toBeVisible();
+    lifts[space] = await tileLift(chip);
+    await page.getByRole('button', { name: `Clear filter ${space}` }).click();
+    await expect.poll(() => titlesOf(allDay(page))).toEqual(ALL_SUNDAY);
+  }
+  return lifts;
+}
+
 test.describe('all spaces', () => {
   test.beforeEach(async ({ page }) => {
     await fixClock(page);
@@ -713,5 +753,39 @@ test.describe('all spaces', () => {
       name: /^(Review the Northwind roadmap|Pay the electricity bill),/,
     });
     await expect(recent).toHaveCount(2);
+  });
+
+  test('STB-E01 chip: the Personal tile hangs off the label baseline like a team space’s tile', async ({
+    page,
+    browser,
+  }) => {
+    await world(page, browser);
+    const lifts = await chipLifts(page);
+    expect(Math.abs(lifts.Personal - LIFT)).toBeLessThanOrEqual(0.5);
+    expect(Math.abs(lifts.Personal - lifts.Northwind)).toBeLessThanOrEqual(0.25);
+  });
+
+  test('STB-E02 byline: Personal and team rows put their space tiles at the same height against the name', async ({
+    page,
+    browser,
+  }) => {
+    test.skip(phone(), 'phones show the tile only, with no name beside it');
+    await world(page, browser);
+    await page.reload();
+    await goAll(page);
+    await expect.poll(() => titlesOf(allDay(page))).toEqual(ALL_SUNDAY);
+    const personal = await tileLift(pill(allDay(page), 'Pay the electricity bill', 'Personal'));
+    const team = await tileLift(pill(allDay(page), 'Review the Northwind roadmap', 'Northwind'));
+    expect(Math.abs(personal - LIFT)).toBeLessThanOrEqual(0.5);
+    expect(Math.abs(personal - team)).toBeLessThanOrEqual(0.25);
+  });
+
+  test('STB-E03 dark: the chip tiles line up the same in the dark theme', async ({ page, browser }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await world(page, browser);
+    const lifts = await chipLifts(page);
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    expect(Math.abs(lifts.Personal - LIFT)).toBeLessThanOrEqual(0.5);
+    expect(Math.abs(lifts.Personal - lifts.Northwind)).toBeLessThanOrEqual(0.25);
   });
 });

@@ -1,7 +1,7 @@
 # Personal and All spaces tiles sit 2px low next to the space name
 
-Status: draft, awaiting Rohit's approval. Canvas: no visual change to draw (the fix makes the app match what the
-canvas already intends); before/after measurements below instead.
+Status: approved by Rohit 26 Oct 2026 (canvas step skipped: no visual change to draw; the fix makes the app match what the
+canvas already intends; before/after measurements below instead). Implemented.
 
 ## The bug
 
