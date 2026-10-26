@@ -1,6 +1,6 @@
 # Opening a task in All spaces can freeze the tab
 
-Status: proposal, awaiting Rohit's approval (canvas: not applicable, no visible change; asked 26 Oct 2026).
+Status: approved by Rohit 26 Oct 2026 (canvas skipped: no visible change); implemented.
 
 ## What happened
 
@@ -129,6 +129,26 @@ Proof before calling it fixed:
 - The un-gated race (click within one frame of Enter) 20 times in a row with two workers, which froze about 1 in 3
   before.
 - `pnpm verify` and `pnpm e2e all-spaces` (desktop, tablet, phone) on Rohit's Mac.
+
+## As built (26 Oct 2026)
+
+Differences from the approved text, none of them in behaviour:
+
+- `useRefOnce` lives in its own module (`apps/web/src/app/refOnce.ts`) rather than in `TaskPanel.tsx`, so its unit
+  test does not load the whole panel.
+- C21-U19 tests the new `useAllScopeValue` hook (`apps/web/src/app/allSpaces.tsx`) with `renderHook` and a stand-in
+  for the address, rather than under a memory router. It checks the same things: identity across a `?task=` change, a
+  new scope when `?space=` goes, and `setFilter` editing the address as it is when called.
+- The end-to-end cases are grouped into three IDs instead of four. **C21-E22** is a just-written task on All spaces
+  Today (every space, Personal, Northwind). **C21-E23** is a saved task opened twice on All spaces Today (unfiltered
+  and filtered), Week and Backlog. **C21-E24** covers both triggers on a space's own Today, Week and Backlog. A
+  just-written task on Week and Backlog is not a case of its own. Those pages share the panel and the guard, and the
+  reopen case already freezes them on master.
+
+Results here (the container, desktop, tablet and phone), before the full run on Rohit's Mac:
+
+- On master, C21-E22 (all three) and C21-E23 froze. C21-E24 passed, as expected: space pages do not loop.
+- With the change, 15 of 15 passed. The un-gated race (click within a frame of Enter, two workers) passed 20 of 20.
 
 ## Cleanup on staging
 

@@ -11,7 +11,7 @@ import {
   type Task,
 } from '@tudu/core';
 import type { TaskSpace } from '@tudu/ui';
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { queryClient } from './session';
 import { taskStore } from './tasks';
 
@@ -69,6 +69,44 @@ export function tileOf(s: SpaceSummary): TaskSpace {
 }
 
 export { switcherOrder };
+
+const NOTHING_GONE = () => {};
+
+/**
+ * All spaces' scope for the `?space=` slug: the same object while the spaces, the filter and the banner hold, so the
+ * pages under it do not re-render as the rest of the address changes (a task opening, a day turning). `setSearch`
+ * edits the address as it is when called, not as it was when the scope was made.
+ */
+export function useAllScopeValue(
+  spaces: SpaceSummary[],
+  slug: string | undefined,
+  setSearch: (edit: (q: URLSearchParams) => void) => void,
+  gone: { name: string } | null = null,
+  dismissGone: () => void = NOTHING_GONE,
+): AllScope {
+  const edit = useRef(setSearch);
+  useEffect(() => {
+    edit.current = setSearch;
+  });
+  const filter = filterOf(spaces, slug);
+  return useMemo(
+    () => ({
+      spaces,
+      filter,
+      target: targetOf(spaces, filter),
+      setFilter: (id: string | null) => {
+        const next = id ? spaces.find((s) => s.id === id) : null;
+        edit.current((q) => {
+          if (next) q.set('space', next.slug);
+          else q.delete('space');
+        });
+      },
+      gone,
+      dismissGone,
+    }),
+    [spaces, filter, gone, dismissGone],
+  );
+}
 
 /** One list of All spaces (a day, or the Backlog), as the page shows it. */
 export interface AllList {

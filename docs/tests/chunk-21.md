@@ -24,6 +24,8 @@ Status column is kept by `pnpm test:status` in [STATUS.md](STATUS.md). The featu
 | C21-U15 | web `space.test.ts`       | `/all?space=northwind` keeps the filter; an unknown slug drops it; `/all` with one space goes to `/me`; `homePath` returns `/all` when it was last                     |
 | C21-U16 | web `search.test.ts`      | Hits outside the open space are labelled; in All spaces all are; old per-space recent and history lists merge into one, newest first, without repeats                  |
 | C21-U17 | core `allSpaces.test.ts`  | `placesFor`: between placed neighbours only the moved task is written; with an unplaced or too-close neighbour the whole day is numbered afresh                        |
+| C21-U18 | web `refOnce.test.ts`     | The task panel tells the page a task's ref once per open task, however often the page re-renders; another task, or the same one reopened after closing, tells it again |
+| C21-U19 | web `allScope.test.ts`    | All spaces' scope keeps its identity while only `?task=` changes, changes once when `?space=` does; `setFilter` edits the address as it is when called                 |
 
 ## API (`apps/server/src/allSpaces.test.ts`, against the test database)
 
@@ -45,29 +47,32 @@ Status column is kept by `pnpm test:status` in [STATUS.md](STATUS.md). The featu
 
 Every spec makes its own users and spaces. The multi-user specs use two browser contexts: you, and Meera.
 
-| ID      | Case                                                                                                                                                                                  |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C21-E01 | You're in Personal, Northwind and Pilot Farm. All spaces Today shows your tasks from all three, each with its pill, and "2 of 5" adds up                                              |
-| C21-E02 | Isolation: Meera's Northwind tasks and her "only me" task never show in your All spaces; your "only me" task does; nothing from a space you're not in                                 |
-| C21-E03 | Pill filter: click Northwind's pill, only Northwind rows remain, the chip shows, the address has `?space=northwind`; reload keeps it; ✕ clears it                                     |
-| C21-E04 | Own order: drag a Pilot Farm task to the top in All spaces; reload keeps it; Pilot Farm's own Today keeps its old order (desk and tablet)                                             |
-| C21-E05 | Wrong-space writes: from All spaces, cross off, rename and set a due day on a Northwind task; Northwind's Today shows each change and Personal has none                               |
-| C21-E06 | Writing line: a task written in All spaces lands in Personal; filtered to Northwind, it lands in Northwind; Quick Add opened from All spaces says the same                            |
-| C21-E07 | Week (on a Wednesday): drag a Northwind task from Thursday into the middle of Friday; it's at Friday's end in Northwind, and where you dropped it in All spaces after a reload (desk) |
-| C21-E08 | Backlog: SpaceFilter lists All spaces and each space; choosing Pilot Farm narrows the list and the count; the done view is filtered the same way                                      |
-| C21-E09 | Live: Meera asks you for a task in Northwind and you take it; it appears in your All spaces without a reload. Your second tab sees your reorder live (desk and tablet)                |
-| C21-E10 | Removed while looking: Meera removes you from Pilot Farm; its rows leave All spaces live with the notice, the filter on Pilot Farm resets, and re-adding you shows no stale rows      |
-| C21-E11 | Space deleted while filtered to it: the list falls back to All spaces, and the switcher no longer lists it                                                                            |
-| C21-E12 | One space failing: Pilot Farm's day read returns 500; the banner names Pilot Farm, the other rows still show, and Try again fills it in                                               |
-| C21-E13 | Panel: the Space fact reads Northwind; clicking it opens the task in `/northwind`; the project picker lists Northwind's projects only                                                 |
-| C21-E14 | Switcher: the All spaces row is hidden with one space and appears first once you have a second; picking it opens All spaces Today                                                     |
-| C21-E15 | Slug: create a space named "All"; its address is `/all-2` (or the next free one), and `/all` is still All spaces                                                                      |
-| C21-E16 | Phone: tile-only pills, tapping one filters, the filter chip and the writing line's "in Northwind" (phone only)                                                                       |
-| C21-E17 | Dark: E01's list in dark; the All spaces tile in the switcher is cream (the dark foreground)                                                                                          |
-| C21-E18 | Requests: one day read per space and one places read on opening All spaces Today; going back to Northwind's Today makes no new day read                                               |
-| C21-E19 | Search from Northwind's Today finds a Personal task and Meera's shared Pilot Farm task, each labelled; opening one lands in its own space                                             |
-| C21-E20 | Search never shows Meera's "only me" task, and after Meera removes you from Pilot Farm its tasks drop out of the next search                                                          |
-| C21-E21 | Search from All spaces labels every hit; Recently opened lists tasks from two spaces after opening one in each                                                                        |
+| ID      | Case                                                                                                                                                                                                  |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C21-E01 | You're in Personal, Northwind and Pilot Farm. All spaces Today shows your tasks from all three, each with its pill, and "2 of 5" adds up                                                              |
+| C21-E02 | Isolation: Meera's Northwind tasks and her "only me" task never show in your All spaces; your "only me" task does; nothing from a space you're not in                                                 |
+| C21-E03 | Pill filter: click Northwind's pill, only Northwind rows remain, the chip shows, the address has `?space=northwind`; reload keeps it; ✕ clears it                                                     |
+| C21-E04 | Own order: drag a Pilot Farm task to the top in All spaces; reload keeps it; Pilot Farm's own Today keeps its old order (desk and tablet)                                                             |
+| C21-E05 | Wrong-space writes: from All spaces, cross off, rename and set a due day on a Northwind task; Northwind's Today shows each change and Personal has none                                               |
+| C21-E06 | Writing line: a task written in All spaces lands in Personal; filtered to Northwind, it lands in Northwind; Quick Add opened from All spaces says the same                                            |
+| C21-E07 | Week (on a Wednesday): drag a Northwind task from Thursday into the middle of Friday; it's at Friday's end in Northwind, and where you dropped it in All spaces after a reload (desk)                 |
+| C21-E08 | Backlog: SpaceFilter lists All spaces and each space; choosing Pilot Farm narrows the list and the count; the done view is filtered the same way                                                      |
+| C21-E09 | Live: Meera asks you for a task in Northwind and you take it; it appears in your All spaces without a reload. Your second tab sees your reorder live (desk and tablet)                                |
+| C21-E10 | Removed while looking: Meera removes you from Pilot Farm; its rows leave All spaces live with the notice, the filter on Pilot Farm resets, and re-adding you shows no stale rows                      |
+| C21-E11 | Space deleted while filtered to it: the list falls back to All spaces, and the switcher no longer lists it                                                                                            |
+| C21-E12 | One space failing: Pilot Farm's day read returns 500; the banner names Pilot Farm, the other rows still show, and Try again fills it in                                                               |
+| C21-E13 | Panel: the Space fact reads Northwind; clicking it opens the task in `/northwind`; the project picker lists Northwind's projects only                                                                 |
+| C21-E14 | Switcher: the All spaces row is hidden with one space and appears first once you have a second; picking it opens All spaces Today                                                                     |
+| C21-E15 | Slug: create a space named "All"; its address is `/all-2` (or the next free one), and `/all` is still All spaces                                                                                      |
+| C21-E16 | Phone: tile-only pills, tapping one filters, the filter chip and the writing line's "in Northwind" (phone only)                                                                                       |
+| C21-E17 | Dark: E01's list in dark; the All spaces tile in the switcher is cream (the dark foreground)                                                                                                          |
+| C21-E18 | Requests: one day read per space and one places read on opening All spaces Today; going back to Northwind's Today makes no new day read                                                               |
+| C21-E19 | Search from Northwind's Today finds a Personal task and Meera's shared Pilot Farm task, each labelled; opening one lands in its own space                                                             |
+| C21-E20 | Search never shows Meera's "only me" task, and after Meera removes you from Pilot Farm its tasks drop out of the next search                                                                          |
+| C21-E21 | Search from All spaces labels every hit; Recently opened lists tasks from two spaces after opening one in each                                                                                        |
+| C21-E22 | A task written in All spaces (every space, filtered to Personal, filtered to Northwind) opens at once while the server holds its answer back; the tab stays responsive and the address gains `?task=` |
+| C21-E23 | A saved task opens, closes and opens again on All spaces Today (unfiltered and filtered), Week and Backlog without freezing                                                                           |
+| C21-E24 | The same two triggers on a space's own Today, Week and Backlog (regression guard for the shared panel)                                                                                                |
 
 Every end-to-end spec makes its own people and spaces. Chunk 07's Search specs keep their IDs; C07-U08 now reads
 one list per browser (Search spans every space), and C07-E11 holds the new `/api/search` route.

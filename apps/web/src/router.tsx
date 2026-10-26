@@ -6,8 +6,8 @@ import {
   redirect,
 } from '@tanstack/react-router';
 import { useQuery, type QueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
-import { useNavigate, useRouterState } from '@tanstack/react-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useRouter, useRouterState } from '@tanstack/react-router';
 import {
   ALL_SLUG,
   hasAllSpaces,
@@ -26,7 +26,7 @@ import { leftHere, onSpaceGone, SettingsPage } from './app/settings';
 import { setSpaceGoneHandler, taskStore } from './app/tasks';
 import { WorkingDayProvider } from './app/workingDay';
 import { api, loadMe, meQuery, queryClient, refreshMe } from './app/session';
-import { AllProvider, filterOf, targetOf, type AllScope } from './app/allSpaces';
+import { AllProvider, useAllScopeValue } from './app/allSpaces';
 import {
   ALL_VIEWS,
   allPath,
@@ -449,14 +449,30 @@ const allRoute = createRoute({
  */
 function AllLayout({ me: ctxMe }: { me: MeResponse }) {
   const navigate = useNavigate();
-  const loc = useRouterState({ select: (s) => s.location });
+  const router = useRouter();
+  // Only the filter: the shell must not re-render as the rest of the address changes (a task opening, a day turning),
+  // or every page under it would too, and a page that answers a render by changing the address would never settle.
+  const slug = useRouterState({
+    select: (s) => new URLSearchParams(s.location.searchStr).get('space') ?? undefined,
+  });
   const { data: liveMe } = useQuery({ ...meQuery, initialData: ctxMe });
   const me = liveMe ?? ctxMe;
-  const spaces = switcherOrder(me.spaces);
-  const slug = new URLSearchParams(loc.searchStr).get('space') ?? undefined;
-  const filter = filterOf(spaces, slug);
-  const target = targetOf(spaces, filter);
+  const spaces = useMemo(() => switcherOrder(me.spaces), [me.spaces]);
   const [gone, setGone] = useState<{ name: string } | null>(null);
+  const dismissGone = useCallback(() => setGone(null), []);
+  // An edit to the address as it is now.
+  const setSearch = useCallback(
+    (edit: (q: URLSearchParams) => void) => {
+      const loc = router.state.location;
+      const q = new URLSearchParams(loc.searchStr);
+      edit(q);
+      const qs = q.toString();
+      void navigate({ href: loc.pathname + (qs ? `?${qs}` : ''), replace: true });
+    },
+    [router, navigate],
+  );
+  const scope = useAllScopeValue(spaces, slug, setSearch, gone, dismissGone);
+  const { filter, target } = scope;
   useLiveEvents(true);
 
   // Back to one space: nothing to gather any more, so Personal.
@@ -466,13 +482,8 @@ function AllLayout({ me: ctxMe }: { me: MeResponse }) {
   }, [few, navigate]);
   // A slug you are not in (a stale link, a space you left): the filter and its chip go.
   useEffect(() => {
-    if (slug && !filter) {
-      const q = new URLSearchParams(loc.searchStr);
-      q.delete('space');
-      const qs = q.toString();
-      void navigate({ href: loc.pathname + (qs ? `?${qs}` : ''), replace: true });
-    }
-  }, [slug, filter, loc.pathname, loc.searchStr, navigate]);
+    if (slug && !filter) setSearch((q) => q.delete('space'));
+  }, [slug, filter, setSearch]);
   useEffect(() => {
     setSpaceGoneHandler((e) => {
       taskStore.forgetSpace(e.spaceId);
@@ -482,21 +493,6 @@ function AllLayout({ me: ctxMe }: { me: MeResponse }) {
     return () => setSpaceGoneHandler(null);
   }, []);
 
-  const scope: AllScope = {
-    spaces,
-    filter,
-    target,
-    setFilter: (id) => {
-      const next = id ? spaces.find((s) => s.id === id) : null;
-      const q = new URLSearchParams(loc.searchStr);
-      if (next) q.set('space', next.slug);
-      else q.delete('space');
-      const qs = q.toString();
-      void navigate({ href: loc.pathname + (qs ? `?${qs}` : ''), replace: true });
-    },
-    gone,
-    dismissGone: () => setGone(null),
-  };
   if (few) return null;
   return (
     <WorkingDayProvider>
