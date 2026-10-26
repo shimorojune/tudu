@@ -22,6 +22,7 @@ import type { Mailer } from './email';
 import { inviteMail } from './email';
 import { forgetFormer, oldSlugsOf } from './settings';
 import { roleIn, toTask } from './tasks';
+import { linksColumn } from './taskLinks';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type Executor = Db | Tx;
@@ -519,7 +520,7 @@ const sharedColumns = {
   dueDay: schema.tasks.dueDay,
   visibility: schema.tasks.visibility,
   projectId: schema.tasks.projectId,
-  jiraKey: schema.tasks.jiraKey,
+  links: linksColumn,
   ownerId: schema.tasks.ownerId,
   createdAt: schema.tasks.createdAt,
   updatedAt: schema.tasks.updatedAt,

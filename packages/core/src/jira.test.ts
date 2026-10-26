@@ -96,6 +96,7 @@ describe('Jira words (chunk 10)', () => {
     const l = (key: string, taskId: string, done: boolean): JiraLink => ({
       key,
       taskId,
+      spaceId: 's',
       ref: null,
       title: '',
       day: null,
@@ -107,7 +108,7 @@ describe('Jira words (chunk 10)', () => {
         .map((x) => x.taskId),
     ).toEqual(['t2', 't1']);
 
-    // The mutations: a create linked to a key, and task.jira to link and unlink; a key is uppercased, junk refused.
+    // The mutations: a create linked to a key, and task.link to link and unlink; a key is uppercased, junk refused.
     const create = syncMutationSchema.parse({
       id: 'm1',
       at,
@@ -118,30 +119,76 @@ describe('Jira words (chunk 10)', () => {
         title: 'x',
         day: SUN,
         position: null,
-        jira: 'tudu-1',
+        link: { provider: 'jira', key: 'tudu-1' },
+        source: 'connector',
+      },
+    });
+    expect(create.type === 'task.create' && create.payload.link).toEqual({ provider: 'jira', key: 'TUDU-1' });
+    const linked = syncMutationSchema.parse({
+      id: 'm2',
+      at,
+      type: 'task.link',
+      payload: { id: 't', provider: 'jira', key: ' ops-14 ' },
+    });
+    expect(linked.type === 'task.link' && linked.payload).toEqual({
+      id: 't',
+      provider: 'jira',
+      key: 'OPS-14',
+    });
+    const unlinked = syncMutationSchema.parse({
+      id: 'm3',
+      at,
+      type: 'task.link',
+      payload: { id: 't', provider: 'jira', key: null },
+    });
+    expect(unlinked.type === 'task.link' && unlinked.payload.key).toBeNull();
+    for (const payload of [
+      { id: 't', provider: 'jira', key: 'no key' },
+      { id: 't', provider: 'linear', key: 'ENG-1' },
+    ])
+      expect(syncMutationSchema.safeParse({ id: 'm4', at, type: 'task.link', payload }).success).toBe(false);
+    // A client from before connectors still links with task.jira and creates with jira (one release).
+    expect(
+      syncMutationSchema.parse({ id: 'm5', at, type: 'task.jira', payload: { id: 't', jira: null } }).type,
+    ).toBe('task.jira');
+    expect(
+      syncMutationSchema.safeParse({ id: 'm6', at, type: 'task.jira', payload: { id: 't', jira: 'no key' } })
+        .success,
+    ).toBe(false);
+    const old = syncMutationSchema.parse({
+      id: 'm7',
+      at,
+      type: 'task.create',
+      payload: {
+        id: 't',
+        spaceId: 's',
+        title: 'x',
+        day: SUN,
+        position: null,
+        jira: 'tudu-2',
         source: 'jira',
       },
     });
-    expect(create.type === 'task.create' && create.payload.jira).toBe('TUDU-1');
-    expect(
-      syncMutationSchema.parse({ id: 'm2', at, type: 'task.jira', payload: { id: 't', jira: null } }).type,
-    ).toBe('task.jira');
-    expect(
-      syncMutationSchema.safeParse({ id: 'm3', at, type: 'task.jira', payload: { id: 't', jira: 'no key' } })
-        .success,
-    ).toBe(false);
+    expect(old.type === 'task.create' && old.payload.jira).toBe('TUDU-2');
 
     // History lines.
-    expect(historyWords({ id: 1, at, kind: 'created', source: 'jira', key: 'TUDU-212' }, SUN)).toBe(
-      'Created from TUDU-212',
+    expect(
+      historyWords(
+        { id: 1, at, kind: 'created', source: 'connector', provider: 'jira', key: 'TUDU-212' },
+        SUN,
+      ),
+    ).toBe('Created from TUDU-212');
+    expect(historyWords({ id: 2, at, kind: 'link.added', provider: 'jira', key: 'OPS-14' }, SUN)).toBe(
+      'Linked to OPS-14',
     );
-    expect(historyWords({ id: 2, at, kind: 'jira.linked', key: 'OPS-14' }, SUN)).toBe('Linked to OPS-14');
-    expect(historyWords({ id: 3, at, kind: 'jira.unlinked', key: 'OPS-14' }, SUN)).toBe('Unlinked OPS-14');
+    expect(historyWords({ id: 3, at, kind: 'link.removed', provider: 'jira', key: 'OPS-14' }, SUN)).toBe(
+      'Unlinked OPS-14',
+    );
 
     // Search: a key typed in full is the top hit; the key's parts match as words.
-    const task = { ref: 'ME-5', title: 'Fix the picker', done: false, jira: 'TUDU-219' };
+    const task = { ref: 'ME-5', title: 'Fix the picker', done: false, keys: ['TUDU-219'] };
     expect(matchScore(task, 'tudu-219')!.score).toBe(100);
     expect(matchScore(task, 'tudu')).not.toBeNull();
-    expect(matchScore({ ...task, jira: null }, 'tudu')).toBeNull();
+    expect(matchScore({ ...task, keys: [] }, 'tudu')).toBeNull();
   });
 });

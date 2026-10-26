@@ -5,11 +5,11 @@ import { createDb } from './index';
 
 export const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../migrations');
 
-/** Apply every pending migration to the database at `url`. */
-export async function migrateDatabase(url: string): Promise<void> {
+/** Apply every pending migration to the database at `url` (from another folder, for a test of one migration). */
+export async function migrateDatabase(url: string, migrationsFolder = MIGRATIONS_DIR): Promise<void> {
   const { db, close } = createDb(url, { max: 1 });
   try {
-    await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
+    await migrate(db, { migrationsFolder });
   } finally {
     await close();
   }

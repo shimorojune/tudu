@@ -99,11 +99,11 @@ describe('first run', () => {
       }),
     ]);
     await sync(b, [m('request.accept', { id: reqId, taskId: randomUUID(), day: null })]);
-    // A Jira connection in the team space counts.
+    // A Jira connection made from the team space counts.
     const jira = await post(
       server.app,
-      `/api/spaces/${space.id}/jira`,
-      { site: JIRA_TEST_SITE, token: `good-${randomUUID()}` },
+      '/api/connectors/jira',
+      { site: JIRA_TEST_SITE, token: `good-${randomUUID()}`, spaceId: space.id },
       a.jar,
     );
     expect(jira.status).toBe(200);
@@ -176,7 +176,7 @@ describe('first run', () => {
 
     const jira = await post(
       server.app,
-      `/api/spaces/${a.personalId}/jira`,
+      '/api/connectors/jira',
       { site: JIRA_TEST_SITE, token: `good-${randomUUID()}` },
       a.jar,
     );

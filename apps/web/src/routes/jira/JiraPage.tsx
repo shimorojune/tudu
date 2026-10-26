@@ -1,6 +1,6 @@
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { useEffect } from 'react';
-import { AppsList, JiraView } from '../../app/JiraHost';
+import { AppsList, JiraView, useTurnOnHere } from '../../app/JiraHost';
 import { hostOf, setFromApps, useJira, withJira } from '../../app/jira';
 import { spacePath, useSpace } from '../../app/space';
 import { useViewport } from '../../app/viewport';
@@ -45,7 +45,9 @@ export function AppsPage() {
   const vp = useViewport();
   const navigate = useNavigate();
   const space = useSpace();
-  const { conn } = useJira(space.id);
+  const { connected, onHere } = useJira(space.id);
+  // Turned on: the Jira tab fades in and comes forward, as after a first connect.
+  const here = useTurnOnHere(space.id, () => void navigate({ href: spacePath(space.slug, 'jira') }));
   useEffect(() => {
     if (vp !== 'phone') void navigate({ href: spacePath(space.slug), replace: true });
   }, [vp, space.slug, navigate]);
@@ -55,9 +57,14 @@ export function AppsPage() {
       <AppsList
         space={space}
         compact
-        connected={conn ? { who: conn.who.email || conn.who.name, site: hostOf(conn)! } : null}
+        connected={
+          connected ? { who: connected.who.email || connected.who.name, site: hostOf(connected)! } : null
+        }
+        off={!!connected && !onHere}
+        busy={here.busy}
+        onEnable={here.enable}
         onJira={() => {
-          setFromApps(!conn);
+          setFromApps(!connected);
           void navigate({ href: spacePath(space.slug, 'jira') });
         }}
       />

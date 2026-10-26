@@ -183,6 +183,10 @@ async function depart(
         ),
       ),
     );
+  // So do their switches for the apps there: coming back, by invite or by an undo, starts with them off.
+  await tx
+    .delete(schema.connectionSpaces)
+    .where(and(eq(schema.connectionSpaces.userId, target), eq(schema.connectionSpaces.spaceId, spaceId)));
   await tx
     .delete(schema.spaceMembers)
     .where(and(eq(schema.spaceMembers.spaceId, spaceId), eq(schema.spaceMembers.userId, target)));

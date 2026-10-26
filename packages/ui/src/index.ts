@@ -261,6 +261,9 @@ export {
   type SettingsUpdateState,
   type SettingsSectionName,
   UP_TO_DATE_MS,
+  JIRA_SWITCH_SETTLE_MS,
+  jiraSpaceLine,
+  type JiraSpaceRow,
 } from './components/Settings';
 export {
   MembersCard,

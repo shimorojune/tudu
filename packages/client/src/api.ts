@@ -83,6 +83,7 @@ export function createApi(config: ApiConfig) {
     get: <T>(path: string, init?: RequestInit) => request<T>('GET', path, undefined, init),
     post: <T>(path: string, body?: unknown, init?: RequestInit) => request<T>('POST', path, body, init),
     patch: <T>(path: string, body?: unknown, init?: RequestInit) => request<T>('PATCH', path, body, init),
+    put: <T>(path: string, body?: unknown, init?: RequestInit) => request<T>('PUT', path, body, init),
     delete: <T>(path: string, init?: RequestInit) => request<T>('DELETE', path, undefined, init),
   };
 }

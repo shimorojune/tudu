@@ -9,6 +9,7 @@ import {
   isProjectMutation,
   isSettingsMutation,
   isAllMutation,
+  linkKeyOf,
   LOOKALIKE_MIN,
   lookAlikesScored,
   mergeLookAlikes,
@@ -33,6 +34,7 @@ import {
   type SyncResult,
   type Task,
   type TaskDetail,
+  type TaskLink,
 } from '@tudu/core';
 import {
   and,
@@ -51,6 +53,7 @@ import {
   type Db,
 } from '@tudu/db';
 import { readableBy } from './closeMatches';
+import { linkKeyLike, linksColumn } from './taskLinks';
 import type { SubtaskClocks, TaskClocks } from '@tudu/db/schema';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -103,7 +106,7 @@ const taskColumns = {
   dueDay: schema.tasks.dueDay,
   visibility: schema.tasks.visibility,
   projectId: schema.tasks.projectId,
-  jiraKey: schema.tasks.jiraKey,
+  links: linksColumn,
   ownerId: schema.tasks.ownerId,
   createdAt: schema.tasks.createdAt,
   updatedAt: schema.tasks.updatedAt,
@@ -122,7 +125,7 @@ type TaskRow = {
   dueDay: string | null;
   visibility: 'space' | 'me';
   projectId: string | null;
-  jiraKey: string | null;
+  links: TaskLink[];
   ownerId: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -148,7 +151,8 @@ export function toTask(r: TaskRow, c: Counts = { subtasks: [], commentCount: 0 }
     due: r.dueDay,
     visibility: r.visibility,
     projectId: r.projectId,
-    jira: r.jiraKey,
+    links: r.links,
+    jira: linkKeyOf(r.links, 'jira'),
     ownerId: r.ownerId,
     subtasks: c.subtasks,
     subsDone: c.subtasks.filter((s) => s.done).length,
@@ -248,7 +252,7 @@ const searchColumns = {
   day: schema.tasks.day,
   doneAt: schema.tasks.doneAt,
   projectId: schema.tasks.projectId,
-  jiraKey: schema.tasks.jiraKey,
+  links: linksColumn,
   notesText: schema.tasks.notesText,
 };
 type SearchRow = {
@@ -260,7 +264,7 @@ type SearchRow = {
   day: string | null;
   doneAt: Date | null;
   projectId: string | null;
-  jiraKey: string | null;
+  links: TaskLink[];
   notesText: string;
 };
 
@@ -277,7 +281,7 @@ function toHit(r: SearchRow, snippet: string | null = null): SearchHit {
     day: r.day,
     done: r.doneAt !== null,
     projectId: r.projectId,
-    jira: r.jiraKey,
+    jira: linkKeyOf(r.links, 'jira'),
     snippet,
     // Search spans every space (chunk 21), so every hit says where it lives.
     spaceId: r.spaceId,
@@ -316,7 +320,7 @@ export async function searchTasks(
     or(
       sql`${schema.tasks.title} ILIKE ${like(w)}`,
       sql`${schema.tasks.notesText} ILIKE ${like(w)}`,
-      sql`${schema.tasks.jiraKey} ILIKE ${like(w)}`,
+      linkKeyLike(like(w)),
     )!,
   );
   const rows: SearchRow[] = await db
@@ -346,7 +350,7 @@ export async function searchTasks(
       day: r.day,
       done: r.doneAt !== null,
       notes: r.notesText,
-      jira: r.jiraKey,
+      keys: r.links.map((l) => l.key),
     })),
     q,
     today,
@@ -855,7 +859,9 @@ async function create(
   if (p.due !== undefined) clocks.due = m.at;
   if (p.notes !== undefined) clocks.notes = m.at;
   if (p.projectId !== undefined) clocks.project = m.at;
-  if (p.jira !== undefined) clocks.jira = m.at;
+  // A client from before connectors names the Jira key alone.
+  const link = p.link ?? (p.jira ? { provider: 'jira' as const, key: p.jira } : undefined);
+  if (link) clocks[link.provider] = m.at;
   await tx.insert(schema.tasks).values({
     id: p.id,
     spaceId: p.spaceId,
@@ -867,13 +873,22 @@ async function create(
     notes: notes ? cleanHtml(notes) : '',
     notesText: notes ? textOf(cleanHtml(notes)) : '',
     projectId,
-    jiraKey: p.jira ?? null,
     createdBy: userId,
     ownerId: userId,
     clocks,
   });
-  const made: Record<string, unknown> = p.source ? { source: p.source } : {};
-  if (p.jira) made.key = p.jira;
+  if (link)
+    await tx.insert(schema.taskLinks).values({
+      taskId: p.id,
+      spaceId: p.spaceId,
+      provider: link.provider,
+      key: link.key,
+      linkedBy: userId,
+      linkedAt: new Date(m.at),
+    });
+  const source = p.source === 'jira' ? 'connector' : p.source;
+  const made: Record<string, unknown> = source ? { source } : {};
+  if (link) Object.assign(made, { provider: link.provider, key: link.key });
   await record(tx, p.id, 'created', made, userId, new Date(m.at));
   if (p.due) await record(tx, p.id, 'due.set', { due: p.due }, userId, new Date(m.at));
   if (files.length)
@@ -901,7 +916,6 @@ async function lockTask(tx: Tx, userId: string, taskId: string, forComment = fal
       day: schema.tasks.day,
       doneAt: schema.tasks.doneAt,
       dueDay: schema.tasks.dueDay,
-      jiraKey: schema.tasks.jiraKey,
       deletedAt: schema.tasks.deletedAt,
       clocks: schema.tasks.clocks,
       ownerId: schema.tasks.ownerId,
@@ -919,6 +933,35 @@ async function lockTask(tx: Tx, userId: string, taskId: string, forComment = fal
   return t;
 }
 
+/** A task's link in one app set, changed or taken off (null), with the history saying so. */
+async function setLink(
+  tx: Tx,
+  taskId: string,
+  spaceId: string,
+  provider: TaskLink['provider'],
+  key: string | null,
+  userId: string,
+  at: Date,
+): Promise<void> {
+  const [was] = await tx
+    .select({ key: schema.taskLinks.key })
+    .from(schema.taskLinks)
+    .where(and(eq(schema.taskLinks.taskId, taskId), eq(schema.taskLinks.provider, provider)));
+  if ((was?.key ?? null) === key) return;
+  if (was) {
+    await tx
+      .delete(schema.taskLinks)
+      .where(and(eq(schema.taskLinks.taskId, taskId), eq(schema.taskLinks.provider, provider)));
+    await record(tx, taskId, 'link.removed', { provider, key: was.key }, userId, at);
+  }
+  if (key) {
+    await tx
+      .insert(schema.taskLinks)
+      .values({ taskId, spaceId, provider, key, linkedBy: userId, linkedAt: at });
+    await record(tx, taskId, 'link.added', { provider, key }, userId, at);
+  }
+}
+
 async function change(tx: Tx, userId: string, m: TaskChange): Promise<Applied> {
   const t = await lockTask(tx, userId, m.payload.id);
   const base: Applied = { taskId: m.payload.id, spaceId: t.spaceId, days: [t.day] };
@@ -926,6 +969,7 @@ async function change(tx: Tx, userId: string, m: TaskChange): Promise<Applied> {
   const set: Partial<typeof schema.tasks.$inferInsert> = {};
   const days: Array<IsoDate | null> = [t.day];
   const at = new Date(m.at);
+  let linked = false;
   if (t.deletedAt) {
     if (m.type === 'task.restore') {
       if (!newer(m.at, clocks.deleted)) return { ...base, days: [] };
@@ -1009,17 +1053,18 @@ async function change(tx: Tx, userId: string, m: TaskChange): Promise<Applied> {
         clocks.project = m.at;
       }
       break;
-    case 'task.jira':
-      if (newer(m.at, clocks.jira)) {
-        set.jiraKey = m.payload.jira;
-        clocks.jira = m.at;
-        if (m.payload.jira !== t.jiraKey) {
-          if (t.jiraKey) await record(tx, m.payload.id, 'jira.unlinked', { key: t.jiraKey }, userId, at);
-          if (m.payload.jira)
-            await record(tx, m.payload.id, 'jira.linked', { key: m.payload.jira }, userId, at);
-        }
+    case 'task.link':
+    case 'task.jira': {
+      // `task.jira` is a client from before connectors linking its Jira key.
+      const { provider, key } =
+        m.type === 'task.link' ? m.payload : { provider: 'jira' as const, key: m.payload.jira };
+      if (newer(m.at, clocks[provider])) {
+        clocks[provider] = m.at;
+        linked = true;
+        await setLink(tx, m.payload.id, t.spaceId, provider, key, userId, at);
       }
       break;
+    }
     case 'task.delete':
       if (newer(m.at, clocks.deleted)) {
         set.deletedAt = at;
@@ -1027,7 +1072,7 @@ async function change(tx: Tx, userId: string, m: TaskChange): Promise<Applied> {
       }
       break;
   }
-  if (!Object.keys(set).length) return { ...base, days: [] };
+  if (!Object.keys(set).length && !linked) return { ...base, days: [] };
   // New words, new meaning: the vector is made again by the next batch (chunk 13).
   if (set.title !== undefined || set.notes !== undefined) {
     set.embedding = null;

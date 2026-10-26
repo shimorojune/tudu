@@ -13,6 +13,10 @@ export interface AppsPanelApp {
   connected?: boolean;
   /** Once connected: "As asha@… on jira.northwind.io." */
   status?: string;
+  /** Connected for your account, but off in this space: Turn on here, no second token. */
+  off?: boolean;
+  /** Turning on here: the button spins "Turning on…". */
+  busy?: boolean;
   mark?: ReactNode;
 }
 
@@ -20,6 +24,9 @@ export interface AppsPanelProps {
   apps: AppsPanelApp[];
   title?: string;
   compact?: boolean;
+  /** The space you are in, for "Turn it on to use it in Acme Studio." */
+  spaceName?: string;
+  onEnable?: (id: string) => void;
   onConnect?: (id: string) => void;
   onOpen?: (id: string) => void;
   onClose?: () => void;
@@ -52,6 +59,8 @@ export function AppsPanel({
   apps,
   title = 'Apps',
   compact,
+  spaceName,
+  onEnable,
   onConnect,
   onOpen,
   onClose,
@@ -83,13 +92,30 @@ export function AppsPanel({
                 {a.connected ? (
                   <span className="tp-app-ok">
                     <TickMark />
-                    Connected
+                    {a.off ? 'Connected · off here' : 'Connected'}
                   </span>
                 ) : null}
               </div>
-              <p>{a.connected && a.status ? a.status : a.blurb}</p>
+              <p>
+                {a.connected && a.off
+                  ? `Connected to your account. Turn it on to use it in ${spaceName || 'this space'}.`
+                  : a.connected && a.status
+                    ? a.status
+                    : a.blurb}
+              </p>
             </div>
-            {a.connected ? (
+            {a.connected && a.off ? (
+              <Button
+                variant="primary"
+                size="sm"
+                loading={!!a.busy}
+                loadingLabel="Turning on…"
+                aria-label={`Turn on ${a.name} here`}
+                onClick={() => onEnable?.(a.id)}
+              >
+                Turn on here
+              </Button>
+            ) : a.connected ? (
               <Button
                 variant="secondary"
                 size="sm"

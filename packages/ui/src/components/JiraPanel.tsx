@@ -27,6 +27,7 @@ import { MiniCalendar, type MiniCalendarProps } from './MiniCalendar';
 import { QAChip } from './QuickAdd';
 import { RichTextContent } from './RichTextEditor';
 import { Skeleton } from './Skeleton';
+import { SpaceTile, type SpaceTileSpace } from './SpaceTile';
 import { showToast } from './Toast';
 
 /** A task of yours linked to an issue: its ID once numbered, where it sits, whether it is crossed off. */
@@ -38,6 +39,8 @@ export interface JiraPanelLink {
   title: string;
   day: IsoDate | null;
   done: boolean;
+  /** The task lives in another of your spaces: its tile and name, quiet, at the end of the chip. */
+  space?: SpaceTileSpace & { name: string };
 }
 
 export interface JiraPanelIssue {
@@ -202,6 +205,13 @@ export function JPLinked({ link: l, today, big, fresh, onShow }: JPLinkedProps) 
       {big ? <span>Show</span> : null}
       {l.id ? <span className="tp-jp-lk-id">{l.id}</span> : null}
       <span className="tp-jp-lk-day">{(l.id ? '· ' : '') + day}</span>
+      {l.space ? (
+        <span className="tp-jp-lk-sp">
+          {'· '}
+          <SpaceTile space={l.space} size={12} />
+          {l.space.name}
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -441,6 +451,10 @@ export interface JPConnectProps {
   /** After the tick: the panel moves on to loading the issues. */
   onConnected?: (input: { site: string }) => void;
   onCancel?: () => void;
+  /** Connected once for your account (the default): the words say so. `false` keeps the old per-space words. */
+  account?: boolean;
+  /** The space Jira turns on in when you connect from here. */
+  spaceName?: string;
 }
 
 /** How long the Connected tick shows before the panel moves on. */
@@ -543,8 +557,14 @@ export function JPConnect(p: JPConnectProps) {
       <h3>{re ? 'Add a new token' : 'Your Jira issues, next to your day'}</h3>
       <p>
         {re
-          ? `Your token for ${host} stopped working. Paste a new one; your views and linked tasks stay as they are.`
-          : 'Connect with a personal access token. Tudu reads your issues and adds links; it never changes them without you.'}
+          ? `Your token for ${host} stopped working. Paste a new one; ${
+              p.account !== false
+                ? 'Jira comes back in every space it was on, with your views and linked tasks.'
+                : 'your views and linked tasks stay as they are.'
+            }`
+          : p.account !== false
+            ? `Connect once for your account with a personal access token. Jira turns on in ${p.spaceName || 'this space'}; turn it on in your other spaces from Settings › Apps.`
+            : 'Connect with a personal access token. Tudu reads your issues and adds links; it never changes them without you.'}
       </p>
       {field(
         `${uid}-url`,
@@ -650,6 +670,10 @@ export interface JiraPanelProps {
   preview?: JiraPreviewIssue | null;
   previewLoading?: boolean;
   compact?: boolean;
+  /** Connected once for your account (the default); `false` words the form per space. */
+  account?: boolean;
+  /** The space you are in: connecting here turns Jira on in it. */
+  spaceName?: string;
   emptyTitle?: string;
   emptyText?: string;
   /** For the kit: start part-way through a flow. */
@@ -1130,6 +1154,8 @@ export function JiraPanel(p: JiraPanelProps) {
         reconnect={state === 'reconnect'}
         site={p.siteUrl ?? p.site}
         compact={compact}
+        account={p.account}
+        spaceName={p.spaceName}
       />
     );
   } else if (state === 'loading') {

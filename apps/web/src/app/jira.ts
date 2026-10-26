@@ -4,10 +4,11 @@ import {
   jiraCount,
   JIRA_ASSIGNED_VIEW,
   siteHost,
+  type ConnectorSpacesResponse,
   type JiraConnectionResponse,
   type JiraLink,
 } from '@tudu/core';
-import { JiraClient, jiraConnectionKey } from '@tudu/client';
+import { JiraClient, jiraConnectionKey, jiraSpacesKey } from '@tudu/client';
 import { useSyncExternalStore } from 'react';
 import { openOutside } from './links';
 import { api, queryClient } from './session';
@@ -23,41 +24,56 @@ export const JIRA_STALE_MS = 5 * 60 * 1000;
 export type Connected = Extract<JiraConnectionResponse, { connected: true }>;
 
 /**
- * Your Jira in this space, as the shell needs it: connected or not, the site, and the count of issues assigned
- * to you with no open task here. The count follows your own changes at once (the links read is Tudu's own).
+ * Your Jira as a space's shell needs it. You connect once, for your account, and turn it on per space: `conn` is
+ * set only where it is on, so a space where it is off shows no Jira at all. The count is of issues assigned to you
+ * with no open task in any space, and follows your own changes at once (the links read is Tudu's own).
  */
 export function useJira(spaceId: string): {
   conn: Connected | null;
+  /** Connected for your account, on here or not. */
+  connected: Connected | null;
   /** Read at least once: until then nothing about Jira shows. */
   known: boolean;
+  /** On in this space (false until the switches are read). */
+  onHere: boolean;
   links: JiraLink[];
   count: number | null;
 } {
   const c = useQuery({
-    ...jiraClient.connectionQuery(spaceId),
+    ...jiraClient.connectionQuery(),
     refetchInterval: JIRA_COUNT_EVERY_MS,
     staleTime: JIRA_COUNT_EVERY_MS,
   });
-  const conn = c.data?.connected ? c.data : null;
-  const links = useQuery({ ...jiraClient.linksQuery(spaceId), enabled: !!conn }).data?.links ?? [];
+  const connected = c.data?.connected ? c.data : null;
+  const sp = useQuery({ ...jiraClient.spacesQuery(), enabled: !!connected });
+  const onHere = !!connected && !!sp.data?.spaces.some((s) => s.id === spaceId && s.on);
+  const conn = onHere ? connected : null;
+  const links = useQuery({ ...jiraClient.linksQuery(), enabled: !!connected }).data?.links ?? [];
   const count = conn?.assigned ? jiraCount(conn.assigned, links) : null;
-  return { conn, known: c.isFetched, links, count };
+  return { conn, connected, known: c.isFetched && (!connected || sp.isFetched), onHere, links, count };
+}
+
+/** Jira is on in this space, as far as this tab has read. */
+export function jiraOnIn(spaceId: string): boolean {
+  const c = queryClient.getQueryData<JiraConnectionResponse>(jiraConnectionKey());
+  const sp = queryClient.getQueryData<ConnectorSpacesResponse>(jiraSpacesKey());
+  return !!c?.connected && !!sp?.spaces.some((s) => s.id === spaceId && s.on);
 }
 
 /**
- * Open an issue's page in Jira (a new tab; in the macOS app, the default browser) when Jira is connected in this
- * space; otherwise nothing.
+ * Open an issue's page in Jira (a new tab; in the macOS app, the default browser) when Jira is on in this space;
+ * otherwise nothing.
  */
 export function openInJira(spaceId: string, key: string): boolean {
-  const c = queryClient.getQueryData<JiraConnectionResponse>(jiraConnectionKey(spaceId));
-  if (!c?.connected) return false;
+  const c = queryClient.getQueryData<JiraConnectionResponse>(jiraConnectionKey());
+  if (!c?.connected || !jiraOnIn(spaceId)) return false;
   openOutside(issueUrl(c.site, key));
   return true;
 }
 
 export const hostOf = (c: Connected | null) => (c ? siteHost(c.site) : undefined);
 
-// ---- per browser: the view you were on and a draft JQL, per space ----------------------------------------------
+// ---- per browser: the view you were on and a draft JQL --------------------------------------------------------
 
 const VIEW_KEY = 'tudu.jira.view';
 export interface JiraPick {
@@ -66,17 +82,28 @@ export interface JiraPick {
   /** The custom JQL, while the view is custom. */
   jql?: string;
 }
+const isPick = (x: unknown): x is JiraPick =>
+  !!x && typeof x === 'object' && typeof (x as JiraPick).view === 'string';
 
-function readPicks(): Record<string, JiraPick> {
+/**
+ * One pick, as the views are your account's. Before, it was kept per space ({spaceId: pick}): the first space's
+ * pick carries over, once.
+ */
+function readPicks(): JiraPick | null {
   try {
-    const raw = JSON.parse(localStorage.getItem(VIEW_KEY) ?? '{}') as Record<string, JiraPick>;
-    return raw && typeof raw === 'object' ? raw : {};
+    const raw: unknown = JSON.parse(localStorage.getItem(VIEW_KEY) ?? 'null');
+    if (isPick(raw)) return raw;
+    if (!raw || typeof raw !== 'object') return null;
+    const old = Object.values(raw).find(isPick) ?? null;
+    if (old) localStorage.setItem(VIEW_KEY, JSON.stringify(old));
+    else localStorage.removeItem(VIEW_KEY);
+    return old;
   } catch {
-    return {};
+    return null;
   }
 }
 
-let picks = readPicks();
+let pick = readPicks();
 const listeners = new Set<() => void>();
 const subscribe = (l: () => void) => {
   listeners.add(l);
@@ -85,20 +112,20 @@ const subscribe = (l: () => void) => {
 const notify = () => listeners.forEach((l) => l());
 const ASSIGNED: JiraPick = { view: JIRA_ASSIGNED_VIEW };
 
-export function setJiraPick(spaceId: string, pick: JiraPick): void {
-  picks = { ...picks, [spaceId]: pick };
+export function setJiraPick(next: JiraPick): void {
+  pick = next;
   try {
-    localStorage.setItem(VIEW_KEY, JSON.stringify(picks));
+    localStorage.setItem(VIEW_KEY, JSON.stringify(next));
   } catch {
     /* fine: it lasts for this visit */
   }
   notify();
 }
 
-export function useJiraPick(spaceId: string): JiraPick {
+export function useJiraPick(): JiraPick {
   return useSyncExternalStore(
     subscribe,
-    () => picks[spaceId] ?? ASSIGNED,
+    () => pick ?? ASSIGNED,
     () => ASSIGNED,
   );
 }
@@ -106,6 +133,18 @@ export function useJiraPick(spaceId: string): JiraPick {
 // ---- the Apps panel (desk and tablets), and where the Jira panel was opened from ------------------------------
 
 let apps = false;
+/** Settings › Apps asked for a new token: the panel opens on the reconnect form. */
+let reconnect = false;
+
+export function askJiraReconnect(): void {
+  reconnect = true;
+}
+/** Read once by the panel as it opens. */
+export function takeJiraReconnect(): boolean {
+  const r = reconnect;
+  reconnect = false;
+  return r;
+}
 /** The panel's form was reached from Apps: it gets "‹ Apps" back. */
 let fromApps = false;
 /** Jira was connected a moment ago here: it fades into the sidebar, the top bar and the tabs. */
@@ -160,12 +199,19 @@ export function useJiraFresh(): boolean {
   );
 }
 
+/** For tests: read the stored pick again, as a new visit would. */
+export function reloadJiraPickForTests(): void {
+  pick = readPicks();
+  notify();
+}
+
 /** For tests. */
 export function resetJiraForTests(): void {
   apps = false;
+  reconnect = false;
   fromApps = false;
   fresh = false;
-  picks = {};
+  pick = null;
   try {
     localStorage.removeItem(VIEW_KEY);
   } catch {

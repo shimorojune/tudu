@@ -1,24 +1,9 @@
-import {
-  cleanHtml,
-  isEmptyHtml,
-  type JiraComment,
-  type JiraErrorCode,
-  type JiraIssue,
-  type JiraIssueDetail,
-} from '@tudu/core';
+import { cleanHtml, isEmptyHtml, type JiraComment, type JiraIssue, type JiraIssueDetail } from '@tudu/core';
+import { ConnectorFailure as JiraFailure } from '../failure';
 import { checkSite } from './guard';
 
-/** Jira said no, or did not answer: the code the panel reads, the words, the HTTP status the API answers with. */
-export class JiraFailure extends Error {
-  constructor(
-    readonly code: JiraErrorCode,
-    message: string,
-    readonly status: 400 | 401 | 403 | 404 | 409 | 502,
-    readonly field?: 'site' | 'token',
-  ) {
-    super(message);
-  }
-}
+/** Jira said no, or did not answer: the connectors' failure, by the name this file has always used. */
+export { JiraFailure };
 
 export const UNREACHABLE =
   'Couldn’t reach Jira at this address. Check it, or that you’re on your company network.';

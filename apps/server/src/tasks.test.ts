@@ -326,6 +326,7 @@ describe('tasks and sync', () => {
         'due',
         'id',
         'jira',
+        'links',
         'number',
         'ownerId',
         'position',

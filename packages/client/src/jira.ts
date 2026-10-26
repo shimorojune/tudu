@@ -6,6 +6,8 @@ import {
   isInboxMutation,
   isProjectMutation,
   isSettingsMutation,
+  linkKeyOf,
+  type ConnectorSpacesResponse,
   type JiraConnectionResponse,
   type JiraErrorBody,
   type JiraIssueDetail,
@@ -18,11 +20,16 @@ import {
 } from '@tudu/core';
 import { ApiError, type Api } from './api';
 
-export const jiraConnectionKey = (spaceId: string) => ['jira', spaceId, 'connection'] as const;
+// Your connection, your switches and your links are the account's; lists and issues are read in a space.
+export const jiraConnectionKey = () => ['jira', 'connection'] as const;
+export const jiraSpacesKey = () => ['jira', 'spaces'] as const;
+export const jiraLinksKey = () => ['jira', 'links'] as const;
 export const jiraIssuesKey = (spaceId: string, view: string) => ['jira', spaceId, 'issues', view] as const;
 export const jiraIssueKey = (spaceId: string, key: string) => ['jira', spaceId, 'issue', key] as const;
 export const jiraSearchKey = (spaceId: string, q: string) => ['jira', spaceId, 'search', q] as const;
-export const jiraLinksKey = (spaceId: string) => ['jira', spaceId, 'links'] as const;
+
+const BASE = '/api/connectors/jira';
+const inSpace = (spaceId: string) => `/api/spaces/${spaceId}/connectors/jira`;
 
 /** What a view is in the address of a list read: the assigned preset, a saved view, or a JQL of your own. */
 export type JiraListAsk = { view: string } | { jql: string };
@@ -41,12 +48,11 @@ export function jiraError(err: unknown): JiraErrorBody | null {
 }
 
 /**
- * Apply one change of yours to the links read (which issues have tasks). Pure; anything that is not about a task
- * of yours leaves it as it is.
+ * Apply one change of yours to the links read (which issues have tasks, in every space you're in). Pure; anything
+ * that is not about a task of yours leaves it as it is.
  */
 export function applyToLinks(
   links: JiraLink[],
-  spaceId: string,
   m: SyncMutation,
   lookup: (id: string) => Task | undefined,
 ): JiraLink[] {
@@ -54,20 +60,35 @@ export function applyToLinks(
   const id = taskIdOf(m);
   const mine = links.find((l) => l.taskId === id);
   const map = (fn: (l: JiraLink) => JiraLink) => links.map((l) => (l.taskId === id ? fn(l) : l));
+  const relink = (key: string | null) => {
+    const t = lookup(id);
+    const rest = links.filter((l) => l.taskId !== id);
+    if (!key) return mine ? rest : links;
+    if (!mine && !t) return links;
+    const base = mine ?? {
+      taskId: id,
+      spaceId: t!.spaceId,
+      ref: t!.ref,
+      title: t!.title,
+      day: t!.day,
+      done: t!.done,
+    };
+    return [...rest, { ...base, key }];
+  };
   switch (m.type) {
     case 'task.create': {
       const p = m.payload;
-      if (!p.jira || p.spaceId !== spaceId || mine) return links;
-      return [...links, { key: p.jira, taskId: p.id, ref: null, title: p.title, day: p.day, done: false }];
+      const key = p.link?.provider === 'jira' ? p.link.key : p.jira;
+      if (!key || mine) return links;
+      return [
+        ...links,
+        { key, taskId: p.id, spaceId: p.spaceId, ref: null, title: p.title, day: p.day, done: false },
+      ];
     }
-    case 'task.jira': {
-      const t = lookup(id);
-      const rest = links.filter((l) => l.taskId !== id);
-      if (!m.payload.jira) return mine ? rest : links;
-      if (!mine && (!t || t.spaceId !== spaceId)) return links;
-      const base = mine ?? { taskId: id, ref: t!.ref, title: t!.title, day: t!.day, done: t!.done };
-      return [...rest, { ...base, key: m.payload.jira }];
-    }
+    case 'task.link':
+      return m.payload.provider === 'jira' ? relink(m.payload.key) : links;
+    case 'task.jira':
+      return relink(m.payload.jira);
     case 'task.rename':
       return mine ? map((l) => ({ ...l, title: m.payload.title })) : links;
     case 'task.cross':
@@ -78,8 +99,12 @@ export function applyToLinks(
       return mine ? links.filter((l) => l.taskId !== id) : links;
     case 'task.restore': {
       const t = lookup(id);
-      if (mine || !t?.jira || t.spaceId !== spaceId) return links;
-      return [...links, { key: t.jira, taskId: id, ref: t.ref, title: t.title, day: t.day, done: t.done }];
+      const key = linkKeyOf(t?.links, 'jira');
+      if (mine || !t || !key) return links;
+      return [
+        ...links,
+        { key, taskId: id, spaceId: t.spaceId, ref: t.ref, title: t.title, day: t.day, done: t.done },
+      ];
     }
     default:
       return links;
@@ -96,11 +121,21 @@ export class JiraClient {
     private readonly qc: QueryClient,
   ) {}
 
-  /** Your Jira in a space: the site, who you are there, the views and the count. */
-  connectionQuery(spaceId: string) {
+  /** Your Jira, once for your account: the site, who you are there, the views, the count and where it is on. */
+  connectionQuery() {
     return queryOptions({
-      queryKey: jiraConnectionKey(spaceId),
-      queryFn: () => this.api.get<JiraConnectionResponse>(`/api/spaces/${spaceId}/jira`),
+      queryKey: jiraConnectionKey(),
+      queryFn: () => this.api.get<JiraConnectionResponse>(BASE),
+      networkMode: 'always',
+      retry: false,
+    });
+  }
+
+  /** Your spaces with your switch in each (Settings › Apps, and whether Jira is on in the space you're in). */
+  spacesQuery() {
+    return queryOptions({
+      queryKey: jiraSpacesKey(),
+      queryFn: () => this.api.get<ConnectorSpacesResponse>(`${BASE}/spaces`),
       networkMode: 'always',
       retry: false,
     });
@@ -111,7 +146,7 @@ export class JiraClient {
     const q = 'view' in ask ? `view=${encodeURIComponent(ask.view)}` : `jql=${encodeURIComponent(ask.jql)}`;
     return queryOptions({
       queryKey: jiraIssuesKey(spaceId, listName(ask)),
-      queryFn: () => this.api.get<JiraIssuesResponse>(`/api/spaces/${spaceId}/jira/issues?${q}`),
+      queryFn: () => this.api.get<JiraIssuesResponse>(`${inSpace(spaceId)}/issues?${q}`),
       networkMode: 'always',
       retry: false,
     });
@@ -120,8 +155,7 @@ export class JiraClient {
   issueQuery(spaceId: string, key: string) {
     return queryOptions({
       queryKey: jiraIssueKey(spaceId, key),
-      queryFn: () =>
-        this.api.get<JiraIssueDetail>(`/api/spaces/${spaceId}/jira/issues/${encodeURIComponent(key)}`),
+      queryFn: () => this.api.get<JiraIssueDetail>(`${inSpace(spaceId)}/issues/${encodeURIComponent(key)}`),
       networkMode: 'always',
       retry: false,
       staleTime: 60_000,
@@ -132,58 +166,81 @@ export class JiraClient {
     return queryOptions({
       queryKey: jiraSearchKey(spaceId, q),
       queryFn: () =>
-        this.api.get<JiraIssuesResponse>(`/api/spaces/${spaceId}/jira/search?q=${encodeURIComponent(q)}`),
+        this.api.get<JiraIssuesResponse>(`${inSpace(spaceId)}/search?q=${encodeURIComponent(q)}`),
       networkMode: 'always',
       retry: false,
       staleTime: 30_000,
     });
   }
 
-  linksQuery(spaceId: string) {
+  linksQuery() {
     return queryOptions({
-      queryKey: jiraLinksKey(spaceId),
-      queryFn: () => this.api.get<JiraLinksResponse>(`/api/spaces/${spaceId}/jira/links`),
+      queryKey: jiraLinksKey(),
+      queryFn: () => this.api.get<JiraLinksResponse>(`${BASE}/links`),
       networkMode: 'always',
     });
   }
 
-  /** Connect (or reconnect after an expiry): Jira is asked who the token is before anything is kept. */
-  async connect(spaceId: string, site: string, token: string): Promise<JiraConnectionResponse> {
-    const res = await this.api.post<JiraConnectionResponse>(`/api/spaces/${spaceId}/jira`, { site, token });
-    this.qc.setQueryData(jiraConnectionKey(spaceId), res);
-    tickGettingStarted(this.qc, 'jira');
-    void this.qc.invalidateQueries({
-      queryKey: ['jira', spaceId],
-      predicate: (q) => q.queryKey[2] === 'issues',
+  /**
+   * Connect (or reconnect after an expiry): Jira is asked who the token is before anything is kept. From a space's
+   * Apps panel, `spaceId` turns it on there too.
+   */
+  async connect(site: string, token: string, spaceId?: string): Promise<JiraConnectionResponse> {
+    const res = await this.api.post<JiraConnectionResponse>(BASE, {
+      site,
+      token,
+      ...(spaceId ? { spaceId } : {}),
     });
+    // The switches first, so the connection never shows without knowing where it is on (the panel would go blank
+    // between the two reads).
+    await this.qc.fetchQuery({ ...this.spacesQuery(), staleTime: 0 }).catch(() => undefined);
+    this.qc.setQueryData(jiraConnectionKey(), res);
+    tickGettingStarted(this.qc, 'jira');
+    void this.qc.invalidateQueries({ queryKey: ['jira'], predicate: (q) => q.queryKey[2] === 'issues' });
     return res;
   }
 
-  async disconnect(spaceId: string): Promise<void> {
-    await this.api.delete(`/api/spaces/${spaceId}/jira`);
-    this.qc.setQueryData<JiraConnectionResponse>(jiraConnectionKey(spaceId), { connected: false });
-    this.qc.removeQueries({ queryKey: ['jira', spaceId], predicate: (q) => q.queryKey[2] !== 'connection' });
+  async disconnect(): Promise<void> {
+    await this.api.delete(BASE);
+    this.qc.setQueryData<JiraConnectionResponse>(jiraConnectionKey(), { connected: false });
+    this.qc.removeQueries({
+      queryKey: ['jira'],
+      predicate: (q) => q.queryKey[1] !== 'connection' && q.queryKey[1] !== 'links',
+    });
   }
 
-  async saveView(spaceId: string, name: string, jql: string): Promise<JiraView> {
-    const view = await this.api.post<JiraView>(`/api/spaces/${spaceId}/jira/views`, { name, jql });
-    this.patchViews(spaceId, (vs) => [...vs.filter((v) => v.id !== view.id), view]);
+  /** Your switch in one space, flipped at once on screen and put back if the server says no. */
+  async setOn(spaceId: string, on: boolean): Promise<void> {
+    const flip = (to: boolean) =>
+      this.qc.setQueryData<ConnectorSpacesResponse>(jiraSpacesKey(), (r) =>
+        r ? { spaces: r.spaces.map((s) => (s.id === spaceId ? { ...s, on: to } : s)) } : r,
+      );
+    flip(on);
+    try {
+      await this.api.put(inSpace(spaceId), { on });
+    } catch (err) {
+      flip(!on);
+      throw err;
+    }
+    void this.qc.invalidateQueries({ queryKey: jiraConnectionKey() });
+    if (!on) this.qc.removeQueries({ queryKey: ['jira', spaceId] });
+  }
+
+  async saveView(name: string, jql: string): Promise<JiraView> {
+    const view = await this.api.post<JiraView>(`${BASE}/views`, { name, jql });
+    this.patchViews((vs) => [...vs.filter((v) => v.id !== view.id), view]);
     return view;
   }
 
-  async removeView(spaceId: string, id: string): Promise<void> {
-    this.patchViews(spaceId, (vs) => vs.filter((v) => v.id !== id));
-    await this.api.delete(`/api/spaces/${spaceId}/jira/views/${id}`);
+  async removeView(id: string): Promise<void> {
+    this.patchViews((vs) => vs.filter((v) => v.id !== id));
+    await this.api.delete(`${BASE}/views/${id}`);
   }
 
   /** Undo of a removed view: saved again with the same name and query, in its old place. */
-  async restoreView(spaceId: string, view: JiraView, index: number): Promise<JiraView> {
-    const back = await this.api.post<JiraView>(`/api/spaces/${spaceId}/jira/views`, {
-      name: view.name,
-      jql: view.jql,
-      index,
-    });
-    this.patchViews(spaceId, (vs) => {
+  async restoreView(view: JiraView, index: number): Promise<JiraView> {
+    const back = await this.api.post<JiraView>(`${BASE}/views`, { name: view.name, jql: view.jql, index });
+    this.patchViews((vs) => {
       const rest = vs.filter((v) => v.id !== back.id);
       rest.splice(Math.min(index, rest.length), 0, back);
       return rest;
@@ -191,8 +248,8 @@ export class JiraClient {
     return back;
   }
 
-  private patchViews(spaceId: string, fn: (vs: JiraView[]) => JiraView[]): void {
-    const c = this.qc.getQueryData<JiraConnectionResponse>(jiraConnectionKey(spaceId));
-    if (c?.connected) this.qc.setQueryData(jiraConnectionKey(spaceId), { ...c, views: fn(c.views) });
+  private patchViews(fn: (vs: JiraView[]) => JiraView[]): void {
+    const c = this.qc.getQueryData<JiraConnectionResponse>(jiraConnectionKey());
+    if (c?.connected) this.qc.setQueryData(jiraConnectionKey(), { ...c, views: fn(c.views) });
   }
 }

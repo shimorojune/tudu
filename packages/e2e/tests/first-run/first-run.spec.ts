@@ -56,8 +56,8 @@ async function themeElsewhere(page: Page): Promise<void> {
 }
 async function jiraElsewhere(page: Page): Promise<void> {
   const spaceId = (await me(page)).spaces.find((s) => s.kind === 'personal')!.id;
-  const res = await page.request.post(`${API_URL}/api/spaces/${spaceId}/jira`, {
-    data: { site: JIRA_SITE, token: goodToken() },
+  const res = await page.request.post(`${API_URL}/api/connectors/jira`, {
+    data: { site: JIRA_SITE, token: goodToken(), spaceId },
   });
   expect(res.status()).toBe(200);
 }

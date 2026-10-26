@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
 import type { ThemeChoice } from '../lib/theme';
+import { Banner } from './Banner';
 import { Button } from './Button';
 import { CodeField } from './CodeField';
 import { ColorPick } from './ColorPick';
@@ -78,6 +79,8 @@ export interface SettingsMe {
 }
 
 export interface SettingsSpace {
+  /** Names the one row of Settings › Apps when the spaces aren't given. */
+  id?: string;
   name: string;
   color?: string;
   personal?: boolean;
@@ -139,10 +142,35 @@ export interface SettingsProps {
   onRemove?: (member: MembersBodyMember) => void;
 
   // Apps
-  /** Your Jira in this space: who you are there and the site ("jira.northwind.io"). */
-  jira?: { connected: boolean; who?: string; site?: string };
+  /**
+   * Apps are yours (the default): connected once for your account, listed under You, turned on per space there.
+   * `space` draws the old per-space Apps, kept only for history boards.
+   */
+  appsScope?: 'account' | 'space';
+  /** Your Jira: who you are there, the site ("jira.northwind.io"), and your switch in each of your spaces. */
+  jira?: {
+    connected: boolean;
+    who?: string;
+    site?: string;
+    state?: 'ok' | 'expired';
+    /** The spaces are being read: skeleton rows. */
+    loading?: boolean;
+    /** The spaces couldn't be read: a banner with Try again, no list. */
+    error?: boolean;
+    /** Without it, the space you are in is the one row, on. */
+    spaces?: JiraSpaceRow[];
+  };
   /** Connect (not connected) or Disconnect (connected). */
   onJira?: () => void;
+  /** Flip your switch in a space; `{ error }` or a rejection puts it back with the reason under the row. */
+  onJiraSpace?: (
+    space: JiraSpaceRow,
+    on: boolean,
+  ) => void | { error?: string } | Promise<{ error?: string } | void>;
+  /** The token expired: Add a new token. */
+  onJiraReconnect?: () => void;
+  /** Read the spaces again after they couldn't be read. */
+  onRetry?: () => void;
 
   /** Which Tudu this is, at the foot of the list: a link to its release on GitHub. */
   version?: VersionLinkProps;
@@ -152,6 +180,259 @@ export interface SettingsProps {
   /** State boards: no rise-in. */
   still?: boolean;
   className?: string;
+}
+
+/** One of your spaces in Settings › Apps, with your switch for Jira there. */
+export interface JiraSpaceRow {
+  id: string;
+  name: string;
+  color?: string;
+  initials?: string;
+  personal?: boolean;
+  on?: boolean;
+  /** Turning on or off: the line says so with a spinner, the switch waits. */
+  busy?: boolean;
+  /** Why the switch was put back, in red under the row. */
+  error?: string;
+  /** The space you are in: "You're here". */
+  current?: boolean;
+  /** You were sent here from that space: the row glows once. */
+  highlight?: boolean;
+  /** Your tasks there linked to an issue. */
+  linked?: number;
+}
+
+/** How long a switch keeps saying Turning on… after the server answered, so the change reads as a step. */
+export const JIRA_SWITCH_SETTLE_MS = 520;
+
+const SPIN = (
+  <svg className="tp-spin" width={13} height={13} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <circle cx={12} cy={12} r={9} stroke="currentColor" strokeWidth={2.5} opacity={0.25} />
+    <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" />
+  </svg>
+);
+
+const TICK = (
+  <svg
+    width={12}
+    height={12}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2.6}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M5.5 12.2 10 16.6 18.8 7" />
+  </svg>
+);
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** A row's quiet line: On, "4 linked tasks", Off, "Off · 2 tasks keep their keys", or Turning on… */
+export function jiraSpaceLine(on: boolean, linked: number, busy?: boolean): string {
+  if (busy) return on ? 'Turning on…' : 'Turning off…';
+  if (on) return linked ? plural(linked, 'linked task', 'linked tasks') : 'On';
+  return linked ? `Off · ${plural(linked, 'task keeps its key', 'tasks keep their keys')}` : 'Off';
+}
+
+type SwitchState = { on: boolean; busy: boolean; error: string | null };
+
+/**
+ * Settings › Apps, yours: Jira connected once with your own token, then "Use Jira in" with a switch per space. A
+ * switch settles in place (Turning on…); a refusal says so under the row and puts the switch back; a row you were
+ * sent to from a space glows once.
+ */
+function AccountApps({ p }: { p: SettingsProps }) {
+  const j = p.jira;
+  const connected = !!j?.connected;
+  const spaces: JiraSpaceRow[] =
+    j?.spaces ??
+    (connected
+      ? [
+          {
+            id: p.space.id ?? 'here',
+            name: p.space.name,
+            color: p.space.color,
+            personal: p.space.personal,
+            on: true,
+            current: true,
+          },
+        ]
+      : []);
+  // Your flips while the server answers, and the reasons it said no. A flip speaks for its row only while the row's
+  // own `on` is still what it was when you flipped: once the server's word arrives (or another tab flips it), the
+  // row speaks for itself again.
+  const [st, setSt] = useState<Record<string, SwitchState & { was: boolean }>>({});
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  const stateOf = (x: JiraSpaceRow): SwitchState => {
+    const o = st[x.id];
+    if (o && (o.busy || !!x.on === o.was)) return o;
+    return { on: !!x.on, busy: !!x.busy, error: x.error ?? null };
+  };
+  const settle = (id: string, was: boolean, next: SwitchState) =>
+    timers.current.push(
+      setTimeout(() => setSt((m) => ({ ...m, [id]: { ...next, was } })), JIRA_SWITCH_SETTLE_MS),
+    );
+  const flip = (x: JiraSpaceRow, v: boolean) => {
+    if (stateOf(x).busy) return;
+    const was = !!x.on;
+    setSt((m) => ({ ...m, [x.id]: { on: v, busy: true, error: null, was } }));
+    Promise.resolve(p.onJiraSpace?.(x, v)).then(
+      (r) =>
+        settle(
+          x.id,
+          was,
+          r && r.error ? { on: !v, busy: false, error: r.error } : { on: v, busy: false, error: null },
+        ),
+      (e: unknown) =>
+        settle(x.id, was, {
+          on: !v,
+          busy: false,
+          error: e instanceof Error && e.message ? e.message : 'Couldn’t change it. Try again.',
+        }),
+    );
+  };
+
+  const site = (j?.site || 'your Jira').replace(/^https?:\/\//, '');
+  const expired = j?.state === 'expired';
+  const on = spaces.filter((x) => stateOf(x).on).length;
+  return (
+    <div className="tp-set-apps">
+      {j?.error ? (
+        <Banner tone="warning" title="Couldn’t load your spaces." action="Try again" onAction={p.onRetry}>
+          Jira stays as it was in each space.
+        </Banner>
+      ) : null}
+      <SettingsSection title="Connected">
+        <SettingRow
+          title={
+            <span className="tp-set-app">
+              <JiraMark size={18} />
+              Jira
+              {connected && !expired ? (
+                <span className="tp-app-ok">
+                  {TICK}
+                  Connected
+                </span>
+              ) : null}
+            </span>
+          }
+          sub={
+            !connected
+              ? 'Bring your Jira issues next to your day. Connect once with a personal access token, then pick the spaces it shows in.'
+              : expired
+                ? `Your token for ${site} has expired. Jira is paused in every space until you add a new one; your views and linked tasks stay.`
+                : `As ${j?.who || p.me.email} on ${site}. Only you see your issues.`
+          }
+          control={
+            !connected ? (
+              <Button variant="primary" size="sm" onClick={p.onJira}>
+                Connect
+              </Button>
+            ) : expired ? (
+              <Button variant="primary" size="sm" onClick={p.onJiraReconnect}>
+                Add a new token
+              </Button>
+            ) : (
+              <Button variant="secondary" size="sm" onClick={p.onJira}>
+                Disconnect
+              </Button>
+            )
+          }
+        />
+      </SettingsSection>
+      {!connected || j?.error ? null : (
+        <SettingsSection
+          title="Use Jira in"
+          aside={j?.loading ? undefined : `${on} of ${spaces.length} on`}
+          sub="Jira shows only in spaces where it’s on: the panel, the Jira fact on tasks and Add to a day. In a team space, people see a task’s Jira key, never your issues."
+        >
+          {j?.loading
+            ? [0, 1, 2].map((i) => (
+                <div key={i} className="tp-setrow tp-set-sprow tp-set-skl">
+                  <span className="tp-skel" style={{ width: 22, height: 22, borderRadius: 7 }} />
+                  <div className="tp-setrow-t">
+                    <Skeleton width={[96, 120, 84][i]} height={12} />
+                    <div style={{ height: 6 }} />
+                    <Skeleton width={[140, 110, 160][i]} height={8} />
+                  </div>
+                  <span className="tp-skel" style={{ width: 36, height: 22, borderRadius: 999 }} />
+                </div>
+              ))
+            : spaces.map((x) => {
+                const s = stateOf(x);
+                const line = jiraSpaceLine(s.on, x.linked ?? 0, s.busy);
+                return (
+                  <div
+                    key={x.id}
+                    className={cx('tp-set-sprow', x.highlight && 'tp-set-hl', s.error && 'tp-bad')}
+                  >
+                    <SettingRow
+                      title={
+                        <span className="tp-set-app">
+                          <SpaceTile
+                            space={{
+                              name: x.name,
+                              color: x.color,
+                              personal: x.personal,
+                              initials: x.initials ?? spaceInitials(x.name),
+                            }}
+                            size={22}
+                          />
+                          {x.name}
+                          {x.current ? <span className="tp-set-here">You’re here</span> : null}
+                        </span>
+                      }
+                      sub={
+                        <span key={line} className={cx('tp-set-spsub', s.busy && 'tp-busy')}>
+                          {s.busy ? SPIN : null}
+                          {line}
+                        </span>
+                      }
+                      control={
+                        <Switch
+                          label={`Jira in ${x.name}`}
+                          checked={s.on}
+                          disabled={s.busy || expired}
+                          onChange={(v) => flip(x, v)}
+                        />
+                      }
+                    />
+                    {s.error ? (
+                      <div className="tp-help tp-set-sperr" role="alert">
+                        <svg
+                          width={13}
+                          height={13}
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2.2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <circle cx={12} cy={12} r={10} />
+                          <path d="M12 8v4" />
+                          <path d="M12 16h.01" />
+                        </svg>
+                        {s.error}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+        </SettingsSection>
+      )}
+      <p className="tp-set-note">
+        {connected
+          ? 'New spaces start with Jira off. Turning it off hides Jira there; tasks keep their keys.'
+          : 'More apps are on the way. Everything here is optional; Tudu works fine on its own.'}
+      </p>
+    </div>
+  );
 }
 
 /** A text field that saves when you leave it; an empty value puts the old one back. */
@@ -418,10 +699,13 @@ const TITLES = (p: SettingsProps): Record<SettingsSectionName, [string, string]>
     `${p.members?.length ?? p.space.members} in ${p.space.name}` +
       (p.invites?.length ? ` · ${p.invites.length} invited` : ''),
   ],
-  apps: [
-    'Apps',
-    `What you’ve connected in ${p.space.name}.${p.space.personal ? '' : ' Each person connects their own.'}`,
-  ],
+  apps:
+    p.appsScope !== 'space'
+      ? ['Apps', 'Connected once, for you. Pick the spaces each one shows in.']
+      : [
+          'Apps',
+          `What you’ve connected in ${p.space.name}.${p.space.personal ? '' : ' Each person connects their own.'}`,
+        ],
 });
 
 /**
@@ -440,6 +724,15 @@ export function Settings(p: SettingsProps) {
   const [spaceDraft, setSpaceDraft] = useState<string | null>(null);
   const tileName = spaceDraft ?? sp.name;
 
+  // Apps are connected once, for you: Apps sits under You. `appsScope="space"` is the old per-space Apps.
+  const acct = p.appsScope !== 'space';
+  const jOn = p.jira?.spaces ? p.jira.spaces.filter((x) => x.on).length : 1;
+  const appsItem = {
+    value: 'apps',
+    label: 'Apps',
+    icon: 'plug' as const,
+    sub: p.jira?.connected ? (acct ? `Jira · on in ${plural(jOn, 'space', 'spaces')}` : 'Jira') : 'None yet',
+  };
   const groups: SettingsNavGroup[] = [
     {
       key: 'you',
@@ -462,6 +755,7 @@ export function Settings(p: SettingsProps) {
               },
             ]
           : []),
+        ...(acct ? [appsItem] : []),
       ],
     },
     {
@@ -487,12 +781,7 @@ export function Settings(p: SettingsProps) {
         : [{ value: 'space', label: 'Space', icon: 'home', sub: 'Just you' }],
     },
   ];
-  groups[1]!.items.push({
-    value: 'apps',
-    label: 'Apps',
-    icon: 'plug',
-    sub: p.jira?.connected ? 'Jira' : 'None yet',
-  });
+  if (!acct) groups[1]!.items.push(appsItem);
   const pick = (v: string) => p.onSection?.(v as SettingsSectionName);
 
   let body: ReactNode = null;
@@ -741,6 +1030,7 @@ export function Settings(p: SettingsProps) {
         onRemove={admin ? p.onRemove : undefined}
       />
     );
+  else if (sec === 'apps' && acct) body = <AccountApps p={p} />;
   else if (sec === 'apps') {
     const j = p.jira;
     body = (

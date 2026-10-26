@@ -3,7 +3,7 @@ import { and, eq, schema, sql, type Db } from '@tudu/db';
 
 /**
  * Where a person stands with Getting started. Each row is read from the real thing: a name on the account, a task
- * they wrote (in any space, crossed off or deleted since), a connection to Jira in any space. Only the theme leaves
+ * they wrote (in any space, crossed off or deleted since), a connection to Jira (one per account). Only the theme leaves
  * no row of its own, so the web records it on the user. The card is open until it is hidden or all four are done.
  */
 export async function gettingStarted(db: Db, userId: string): Promise<GettingStarted> {
@@ -12,7 +12,7 @@ export async function gettingStarted(db: Db, userId: string): Promise<GettingSta
       name: schema.user.name,
       firstRun: schema.user.firstRun,
       task: sql<boolean>`exists (select 1 from ${schema.tasks} where ${schema.tasks.createdBy} = ${userId})`,
-      jira: sql<boolean>`exists (select 1 from ${schema.jiraConnections} where ${schema.jiraConnections.userId} = ${userId})`,
+      jira: sql<boolean>`exists (select 1 from ${schema.connections} where ${schema.connections.userId} = ${userId} and ${schema.connections.provider} = 'jira')`,
     })
     .from(schema.user)
     .where(eq(schema.user.id, userId));

@@ -1,9 +1,10 @@
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto';
 
 /**
- * Jira tokens at rest: AES-256-GCM with a key derived from AUTH_SECRET (HKDF-SHA256), so no new setting is
- * needed. A sealed token reads `v1.<iv>.<tag>.<ciphertext>` in base64url; changing AUTH_SECRET makes every
- * stored token unreadable, which reads as "Your Jira token has expired".
+ * App tokens at rest (Jira's, and any connector's): AES-256-GCM with a key derived from AUTH_SECRET (HKDF-SHA256),
+ * so no new setting is needed. A sealed token reads `v1.<iv>.<tag>.<ciphertext>` in base64url; changing
+ * AUTH_SECRET makes every stored token unreadable, which reads as "Your token has expired". The HKDF info keeps
+ * its first name, "jira token v1", so tokens sealed before connectors still open.
  */
 export class TokenSeal {
   private readonly key: Buffer;

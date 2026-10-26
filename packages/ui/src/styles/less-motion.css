@@ -208,6 +208,12 @@
 :root[data-motion='less'] .tp-sswl-it.tp-picked .tp-stile {
   animation: none;
 }
+:root[data-motion='less'] .tp-set-sprow.tp-set-hl,
+:root[data-motion='less'] .tp-set-sprow > .tp-setrow,
+:root[data-motion='less'] .tp-set-spsub,
+:root[data-motion='less'] .tp-set-sperr {
+  animation: none;
+}
 
 /* app.css */
 :root[data-motion='less'] .tp-tip-pop,

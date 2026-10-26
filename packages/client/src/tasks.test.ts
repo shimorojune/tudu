@@ -44,6 +44,7 @@ function task(id: string, title: string, day: string, position: number, extra: P
     visibility: 'space',
     projectId: null,
     jira: null,
+    links: [],
     ownerId: null,
     subtasks: [],
     subsDone: 0,

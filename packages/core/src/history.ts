@@ -6,7 +6,7 @@ import type { HistoryEvent } from './tasks';
 export function historyWords(e: HistoryEvent, today: IsoDate): string {
   switch (e.kind) {
     case 'created':
-      if (e.source === 'jira' && e.key) return `Created from ${e.key}`;
+      if (e.source === 'connector' && e.key) return `Created from ${e.key}`;
       return e.source === 'quick-add' ? 'Created from Quick Add' : 'Created';
     case 'due.set':
       return `Due date set to ${formatDay(e.due)}`;
@@ -26,9 +26,9 @@ export function historyWords(e: HistoryEvent, today: IsoDate): string {
       return `Sent by ${e.from}, accepted`;
     case 'withdrawn':
       return `Sent to ${e.to}, taken back`;
-    case 'jira.linked':
+    case 'link.added':
       return `Linked to ${e.key}`;
-    case 'jira.unlinked':
+    case 'link.removed':
       return `Unlinked ${e.key}`;
   }
 }
