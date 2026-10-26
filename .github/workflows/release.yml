@@ -41,17 +41,21 @@ jobs:
   version:
     name: Version and notes
     runs-on: ubuntu-latest
+    # RELEASE_DEPLOY_KEY lives in the `release` environment, which only master may use; PR rehearsals get `rehearsal`,
+    # which holds no secrets.
+    environment: ${{ github.event_name == 'pull_request' && 'rehearsal' || 'release' }}
     outputs:
       version: ${{ steps.v.outputs.version }}
       sha: ${{ steps.v.outputs.sha }}
     steps:
       # Over SSH with the release deploy key: the master ruleset requires CI passed, and only the deploy key may push
-      # semantic-release's chore(release) commit past it (docs/release.md).
+      # semantic-release's chore(release) commit past it (docs/release.md). Never on a pull request: the PR's own code
+      # runs in this job (pnpm install, release.config.cjs), so rehearsals there check out with the token.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
-          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
+          ssh-key: ${{ github.event_name != 'pull_request' && secrets.RELEASE_DEPLOY_KEY || '' }}
           persist-credentials: true
       - uses: pnpm/action-setup@v4
         with:

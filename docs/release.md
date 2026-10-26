@@ -79,7 +79,8 @@ its `chore(release): X.Y.Z` commit straight to master, so the release job checks
 that the ruleset lets through (docs/plans/release-deploy-key.md):
 
 - Settings › Deploy keys: `Release push`, with write access (the public half of an ed25519 key made for this).
-- Settings › Secrets and variables › Actions: `RELEASE_DEPLOY_KEY` = the private half.
+- Settings › Environments › `release`, limited to the `master` branch: the secret `RELEASE_DEPLOY_KEY` = the
+  private half. Pull request rehearsals run in `rehearsal` and never see it.
 - Settings › Rules › the `master` ruleset › Bypass list: Deploy keys, and Repository admin for an emergency push.
 
 If a release fails in "Version and notes" with "push declined due to repository rule violations", one of these three
