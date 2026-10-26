@@ -141,7 +141,7 @@ E2E (Playwright, on the Mac):
 - **C22-E22** × on the pill, then Add: the task is made and the note has no new chip. Esc instead: no task, nothing
   changes.
 - **C22-E23** change the space chip to a team space before Add: the task lands there and is still linked to the note.
-- **C22-E24** toolbar: a one-line note, focus the words: the bar's bottom is within 24px of the note pane's bottom
+- **C22-E24** toolbar: a one-line note, focus the words: the bar's bottom is within 30px of the note pane's bottom (12px sticky inset over the pane's 16px padding)
   and horizontally centred (±2px); a 60-line note scrolled to the middle keeps the bar in the same place.
 - **C22-E25** placeholder: in a blank note, click the bullet list button: the placeholder is gone (no
   `tp-rte-blank`, the `::before` content is `none`) while the bullet marker shows; the same after typing `- `. Also in

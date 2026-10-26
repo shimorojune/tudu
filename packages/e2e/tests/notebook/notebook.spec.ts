@@ -564,6 +564,8 @@ test.describe('notebook', () => {
     await selectWords(page, 0, 18);
     await page.getByRole('button', { name: 'Make a task' }).click();
     await expect(quickAdd(page)).toBeVisible();
+    // New task takes the keyboard (the title) a moment after it opens; Esc before that would land in the note.
+    await expect(quickAdd(page).getByRole('textbox', { name: 'Task title' })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(quickAdd(page)).toHaveCount(0);
     await expect(words(page)).toContainText('Fix the hall light');
@@ -622,7 +624,8 @@ test.describe('notebook', () => {
       await settle(page, bar);
       const pane = (await page.locator('.tp-nb-body').boundingBox())!;
       const bb = (await bar.boundingBox())!;
-      expect(pane.y + pane.height - (bb.y + bb.height)).toBeLessThanOrEqual(24);
+      // 12px sticky inset over the pane's 16px bottom padding.
+      expect(pane.y + pane.height - (bb.y + bb.height)).toBeLessThanOrEqual(30);
       expect(pane.y + pane.height - (bb.y + bb.height)).toBeGreaterThanOrEqual(0);
       expect(Math.abs(bb.x + bb.width / 2 - (pane.x + pane.width / 2))).toBeLessThanOrEqual(2);
       return bb;
