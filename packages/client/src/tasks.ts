@@ -8,6 +8,7 @@ import {
   INBOX_CHANGED,
   isAllMutation,
   isInboxMutation,
+  isNotebookMutation,
   isProjectMutation,
   isSettingsMutation,
   MEMBERS_CHANGED,
@@ -47,8 +48,10 @@ import {
   type Project,
   type ProjectsChangedEvent,
   type Subtask,
+  type AnyMutationBody,
   type SyncMutation,
   type SyncResponse,
+  type SyncResult,
   type Task,
   type TaskDetail,
   type TaskLink,
@@ -435,6 +438,9 @@ export class TaskStore {
   private unanswered = 0;
   /** Projects deleted here, and the tasks they were on, so Undo can put them back at once. */
   private readonly deletedProjects = new Map<string, { project: Project; tasks: Set<string> }>();
+  /** Who hears what the server answered for each change (the Notebook's save state). */
+  private readonly answered = new Set<(results: SyncResult[]) => void>();
+  private readonly reachability = new Set<(on: boolean) => void>();
 
   constructor(private readonly o: TaskStoreOptions) {
     this.clientId = o.clientId;
@@ -1148,6 +1154,38 @@ export class TaskStore {
     return this.addComment(taskId, html);
   }
 
+  // ---- for the Notebook ------------------------------------------------------------------------------------
+
+  /**
+   * Queue any change through this tab's outbox: the Notebook's ride the same batch, so they wait offline and never
+   * double. Returns the change's id, which `onAnswered` reports on.
+   */
+  enqueue(body: AnyMutationBody): string {
+    return this.mutate(body);
+  }
+
+  /** Hear the server's answer for every change it took, accepted or turned down. Returns a way to stop. */
+  onAnswered(fn: (results: SyncResult[]) => void): () => void {
+    this.answered.add(fn);
+    return () => this.answered.delete(fn);
+  }
+
+  /** Hear when the server comes and goes. Returns a way to stop. */
+  onReachableChange(fn: (on: boolean) => void): () => void {
+    this.reachability.add(fn);
+    return () => this.reachability.delete(fn);
+  }
+
+  /** Whether the last request reached the server. */
+  get isReachable(): boolean {
+    return this.reachable;
+  }
+
+  /** The changes still on their way, oldest first. */
+  pendingChanges(): SyncMutation[] {
+    return [...this.pending.values()].map((p) => p.m);
+  }
+
   /** True when nothing is waiting to be saved. Tests wait on this before asserting. */
   async idle(): Promise<boolean> {
     if (this.unanswered > 0 || this.pending.size > 0) return false;
@@ -1259,7 +1297,7 @@ export class TaskStore {
     return new Date(this.lastAt).toISOString();
   }
 
-  private mutate(body: TaskMutationBody): void {
+  private mutate(body: AnyMutationBody): string {
     const m = { id: crypto.randomUUID(), at: this.nextAt(), seq: ++this.seq, ...body } as SyncMutation &
       Mutation;
     this.unanswered += 1;
@@ -1273,11 +1311,14 @@ export class TaskStore {
       },
       () => void this.outbox.flush(),
     );
+    return m.id;
   }
 
   /** Apply a mutation to every cached day and task. */
   private applyEverywhere(m: SyncMutation): void {
     const qc = this.o.queryClient;
+    // The Notebook keeps its own caches (notebook.ts): no day or task changes.
+    if (isNotebookMutation(m)) return;
     if (isAllMutation(m)) {
       for (const [key, data] of qc.getQueriesData<AllSpacesPlace[]>({ queryKey: ['all-places'] })) {
         const [, from, to, backlog] = key as unknown as [string, IsoDate, IsoDate, boolean];
@@ -1356,14 +1397,15 @@ export class TaskStore {
     this.remember(rows);
     let tasks = [...rows].sort(byPosition);
     for (const { m } of this.pending.values())
-      tasks = applyToDay(tasks, day, spaceId, m, (id) => this.known.get(id));
+      if (!isNotebookMutation(m)) tasks = applyToDay(tasks, day, spaceId, m, (id) => this.known.get(id));
     this.remember(tasks);
     return tasks;
   }
 
   private overlayDetail(d: TaskDetail): TaskDetail {
     let out = d;
-    for (const { m } of this.pending.values()) out = applyToDetail(out, m, this.o.me?.() ?? null);
+    for (const { m } of this.pending.values())
+      if (!isNotebookMutation(m)) out = applyToDetail(out, m, this.o.me?.() ?? null);
     return out;
   }
 
@@ -1384,17 +1426,21 @@ export class TaskStore {
       mutations: batch,
     });
     this.setReachable(true);
-    const rejected = res.results.filter((r) => r.status === 'rejected');
+    // The Notebook's changes answer to the Notebook: it says what a turned-down save means (a banner, a line).
+    const notebook = new Set(batch.filter((b) => isNotebookMutation(b)).map((b) => b.id));
+    const rejected = res.results.filter((r) => r.status === 'rejected' && !notebook.has(r.id));
     for (const r of res.results) {
       if (this.pending.delete(r.id)) this.unanswered = Math.max(0, this.unanswered - 1);
     }
     this.merge(res);
+    for (const fn of this.answered) fn(res.results);
     const touched = new Set<string>();
     for (const b of batch)
       if (
         !isProjectMutation(b as SyncMutation) &&
         !isSettingsMutation(b as SyncMutation) &&
-        !isAllMutation(b as SyncMutation)
+        !isAllMutation(b as SyncMutation) &&
+        !isNotebookMutation(b)
       )
         touched.add(taskIdOf(b as SyncMutation));
     if (rejected.length) {
@@ -1447,7 +1493,13 @@ export class TaskStore {
       let tasks = data.tasks.filter((t) => !rows.has(t.id) && !gone.has(t.id));
       for (const t of rows.values()) if (t.spaceId === spaceId && t.day === day) tasks.push(t);
       for (const { m } of this.pending.values())
-        if (!isProjectMutation(m) && !isSettingsMutation(m) && !isAllMutation(m) && rows.has(taskIdOf(m)))
+        if (
+          !isProjectMutation(m) &&
+          !isSettingsMutation(m) &&
+          !isAllMutation(m) &&
+          !isNotebookMutation(m) &&
+          rows.has(taskIdOf(m))
+        )
           tasks = applyToDay(tasks, day, spaceId, m, (id) => this.known.get(id));
       tasks.sort(byPosition);
       if (!sameTasks(tasks, data.tasks)) qc.setQueryData<DayData>(key, { day, tasks });
@@ -1474,6 +1526,7 @@ export class TaskStore {
     if (on === this.reachable) return;
     this.reachable = on;
     this.o.onReachable?.(on);
+    for (const fn of this.reachability) fn(on);
   }
 }
 
