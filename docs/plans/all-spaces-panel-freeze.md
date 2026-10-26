@@ -1,11 +1,12 @@
-# Opening a just-written task in All spaces freezes the tab
+# Opening a task in All spaces can freeze the tab
 
 Status: proposal, awaiting Rohit's approval (canvas: not applicable, no visible change; asked 26 Oct 2026).
 
 ## What happened
 
-Staging, 26 Oct 2026: in All spaces filtered to Personal (`/all?space=me`), Rohit wrote "Test task" and clicked it.
-The row took the selection wash, the panel never opened, and the tab stopped responding.
+Staging, 26 Oct 2026: in All spaces filtered to Personal (`/all?space=me`), Rohit clicked "Test task". The row took
+the selection wash, the panel never opened, and the tab stopped responding. He then confirmed it also happens with a
+task that already has its ID (`ME-3`, long saved on the server).
 
 ## Reproduced
 
@@ -14,18 +15,24 @@ The row took the selection wash, the panel never opened, and the tab stopped res
 - **Locally, deterministic:** a Playwright case that holds `POST /api/sync` back until the panel is open, then lets it
   through. All spaces Today froze 6 of 6 runs, filtered and unfiltered alike. A space's own Today passed 3 of 3.
 - **Without the gate:** the same click froze about 1 run in 3. It depends on whether the server's answer (which brings
-  the task's ref, `ME-3`) lands before or after the panel opens. Tasks that already had a ref never froze.
+  the task's ref, `ME-3`) lands before or after the panel opens.
+- **A saved task, opened a second time:** open a task that has had its ref for ages, close it, open it again. All
+  spaces froze 4 of 4 runs (filtered and unfiltered); a space's own Today passed 2 of 2. The first open of a page load
+  works, which is why my first try on staging did not freeze.
 
-So the space filter is not the cause. Rohit most likely hit it filtered because that is where he had just written the
-task: the row in his screenshot wears the new-task wash.
+So the space filter is not the cause, and neither is a missing ref. Both triggers are the same loop.
 
 ## Cause
 
 A trace of the frozen tab shows React flushing passive effects nonstop. `TaskPanel`'s `onRef` effect calls
 `router.navigate` → `buildAndCommitLocation` → `load` over and over, never settling.
 
-1. A task written a moment ago has no ref yet, so `openTask(id, null)` leaves `?task=` out of the address.
-2. When the server answers, the panel's detail gains `ref`, and this effect tells the page:
+1. The panel has the task's detail with its ref while the address does not yet say `?task=<that ref>`. Two ways:
+   - a task written a moment ago has no ref yet, so `openTask(id, null)` leaves `?task=` out, and the ref arrives
+     when the server answers;
+   - a task opened before in this tab has its detail cached, so on reopening the detail (with its ref) is there on the
+     very first render, before `openTask`'s own `navigate` to `?task=ME-3` has committed.
+2. This effect then tells the page about the ref:
 
    ```tsx
    useEffect(() => {
@@ -52,14 +59,19 @@ Two small fixes, one per cause. Nothing visible changes.
 
 1. **`TaskPanel` tells the page a ref once per task** (`apps/web/src/routes/today/TaskPanel.tsx`). Keep the last
    `taskId:ref` it reported in a ref and skip the call when it is unchanged. Opening another task, or the same task
-   getting a different ref, still reports. This alone fixes the freeze: with it, the deterministic case passed 9 of 9
-   (All spaces filtered, unfiltered, and a space's Today, 3 runs each). I tried it on a scratch copy and reverted it;
-   nothing is committed yet.
+   getting a different ref, still reports. Closing the panel clears it, so reopening a task whose ref arrived while
+   it was closed still puts the ref in the address. This alone fixes both triggers: with it, the new-task case passed
+   9 of 9 and the reopen case 6 of 6 (All spaces filtered, unfiltered, and a space's Today). I tried it on a scratch
+   copy and reverted it; nothing is committed yet.
 
    ```tsx
    const told = useRef<string | null>(null);
    useEffect(() => {
-     if (!open || !detail?.ref || detail.id !== open.id) return;
+     if (!open) {
+       told.current = null;
+       return;
+     }
+     if (!detail?.ref || detail.id !== open.id) return;
      const k = `${open.id}:${detail.ref}`;
      if (told.current === k) return;
      told.current = k;
@@ -87,7 +99,8 @@ New, unit (`apps/web`):
 - **C21-U18 The panel reports a task's ref once.** `renderHook` over `useRefOnce`: open a task with no ref, then
   give it ref `ME-3` and re-render 20 times with a new `onRef` function each time. `onRef` is called once, with
   `ME-3`. Then open another task with ref `ME-4`: called once more, with `ME-4`. Then the first task's detail with a
-  mismatched id (an older detail still showing): not called. Without the guard this fails at the second render.
+  mismatched id (an older detail still showing): not called. Close (open null) and reopen the first task: called once
+  again. Without the guard this fails at the second render.
 - **C21-U19 All spaces' scope holds still while the address changes.** Render `AllLayout`'s scope hook under a
   memory router at `/all?space=me`, navigate to `/all?space=me&task=ME-3` and then to `/all`. The scope object keeps
   its identity across the `?task=` change and changes once when `?space=` goes. `setFilter` after both navigations
@@ -101,7 +114,10 @@ New, end-to-end (`packages/e2e/tests/all-spaces/all-spaces.spec.ts`, added to `d
   places: All spaces Today unfiltered, Today filtered to Personal, and Today filtered to Northwind (task lands in
   Northwind, its ref is Northwind's).
 - **C21-E23 The same on All spaces' Week and Backlog** (writing on a day tile and in the Backlog, opening at once).
-- **C21-E24 A space's own Today, Week and Backlog** behave the same (regression guard for the shared panel).
+- **C21-E24 A saved task opened, closed and opened again** in All spaces Today (unfiltered and filtered), Week and
+  Backlog. No gate needed: the second open freezes on master every time.
+- **C21-E25 A space's own Today, Week and Backlog** behave the same for both triggers (regression guard for the
+  shared panel).
 
 Existing, must stay green unchanged: C21-E03 (filter kept through a reload), C21-E13 (panel and Space fact), C21-E06
 (writing line), C21-U15 (`?space=` handling), and every e2e group that opens the panel from an address
