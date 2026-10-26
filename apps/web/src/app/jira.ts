@@ -9,6 +9,7 @@ import {
   type JiraLink,
 } from '@tudu/core';
 import { JiraClient, jiraConnectionKey, jiraSpacesKey } from '@tudu/client';
+import { showToast } from '@tudu/ui';
 import { useSyncExternalStore } from 'react';
 import { openOutside } from './links';
 import { api, queryClient } from './session';
@@ -180,6 +181,48 @@ export function useFromApps(): boolean {
     () => fromApps,
     () => false,
   );
+}
+
+// ---- Manage spaces… from a space: that space's row in Settings › Apps glows once ------------------------------
+
+let glow: string | null = null;
+/** Settings › Apps is about to open from this space's Jira panel: its row glows when the list first draws. */
+export function glowJiraSpace(spaceId: string): void {
+  glow = spaceId;
+}
+/** The row to glow, if any (read while Settings mounts; cleared once it has). */
+export const peekJiraGlow = (): string | null => glow;
+export function clearJiraGlow(): void {
+  glow = null;
+}
+
+/**
+ * Turn Jira off in one space and keep it everywhere else: the switch flips on screen at once (Jira leaves the top
+ * bar and sidebar), the toast offers Undo. Resolves true once the server agrees; on a refusal the switch is back on
+ * and, unless `quiet`, a toast offers Try again.
+ */
+export async function turnOffHere(
+  space: { id: string; name: string },
+  opts: { quiet?: boolean } = {},
+): Promise<boolean> {
+  try {
+    await jiraClient.setOn(space.id, false);
+  } catch {
+    if (!opts.quiet)
+      showToast('Couldn’t turn Jira off here.', {
+        action: 'Try again',
+        onAction: () => void turnOffHere(space),
+      });
+    return false;
+  }
+  showToast(`Jira is off in ${space.name}.`, {
+    action: 'Undo',
+    onAction: () =>
+      void jiraClient
+        .setOn(space.id, true)
+        .then(markJiraFresh, () => showToast('Couldn’t turn Jira back on. Try again from Settings › Apps.')),
+  });
+  return true;
 }
 
 export function markJiraFresh(): void {

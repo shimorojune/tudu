@@ -1,8 +1,12 @@
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { desktop, type NoteWindowState } from '../../app/desktop';
 import { useLiveEvents } from '../../app/live';
 import { leaveWindow, showInWindow } from '../../app/notebook';
 import { NoteWindowView } from '../../app/NoteWindowView';
+import { QuickAddHost } from '../../app/quickAdd';
+import { meQuery } from '../../app/session';
+import { SpaceProvider } from '../../app/space';
 import { WorkingDayProvider } from '../../app/workingDay';
 import './notebook.css';
 
@@ -67,6 +71,8 @@ export function NoteWindowPage({ noteId }: { noteId?: string }) {
         d!.openInNotebook(id);
       }}
       openPath={(path) => d!.showMain(path)}
+      // Make a task: the floating New task bar (⌘⇧N) comes up over every app, filled in; the desk stays put.
+      makeTask={(seed) => d!.summonWith(seed)}
     />
   ) : (
     <NoteWindowView
@@ -87,8 +93,21 @@ export function NoteWindowPage({ noteId }: { noteId?: string }) {
         className={mac ? 'tp-root app-note-window app-note-mac' : 'tp-root app-note-window app-note-popup'}
       >
         {view}
+        {mac ? null : <PopupQuickAdd />}
       </div>
     </WorkingDayProvider>
+  );
+}
+
+/** The popup's own New task (Make a task opens it here, over the note), set on Personal like the desk's. */
+function PopupQuickAdd() {
+  const me = useQuery(meQuery).data;
+  const personal = me?.spaces.find((s) => s.kind === 'personal');
+  if (!me || !personal) return null;
+  return (
+    <SpaceProvider space={personal}>
+      <QuickAddHost me={me} openPath={toOpener} />
+    </SpaceProvider>
   );
 }
 

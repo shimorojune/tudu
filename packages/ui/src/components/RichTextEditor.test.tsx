@@ -442,3 +442,48 @@ describe('paste, drop and uploading chips', () => {
     expect(onSubmit.mock.calls[0]![0]).toContain('data-id="map-1"');
   });
 });
+
+describe('C03-U29 the placeholder only on a truly blank editor', () => {
+  it('C03-U29 an empty list, checklist, heading or quote is not blank; an empty line is', () => {
+    for (const value of [
+      '<ul><li><p></p></li></ul>',
+      '<ul data-type="taskList" class="tp-checks"><li data-type="taskItem" data-checked="false"><p></p></li></ul>',
+      '<h2></h2>',
+      '<blockquote><p></p></blockquote>',
+    ]) {
+      const { container, unmount } = render(<RichTextEditor variant="notes" label="Notes" value={value} />);
+      expect(container.querySelector('.tp-rte'), value).not.toHaveClass('tp-rte-blank');
+      unmount();
+    }
+    for (const value of ['', '<p></p>']) {
+      const { container, unmount } = render(<RichTextEditor variant="notes" label="Notes" value={value} />);
+      expect(container.querySelector('.tp-rte')).toHaveClass('tp-rte-blank');
+      unmount();
+    }
+  });
+
+  it('C03-U29 starting a list in a blank note drops the placeholder, though it still reports empty', async () => {
+    const user = userEvent.setup();
+    const onInput = vi.fn();
+    const { container } = render(
+      <RichTextEditor variant="notes" label="Notes" placeholder="Write anything." onInput={onInput} />,
+    );
+    const wrap = container.querySelector('.tp-rte')!;
+    await user.click(screen.getByRole('textbox', { name: 'Notes' }));
+    expect(wrap).toHaveClass('tp-rte-blank');
+    await user.click(screen.getByRole('button', { name: 'Bulleted list' }));
+    expect(wrap).not.toHaveClass('tp-rte-blank');
+    expect(onInput.mock.calls.at(-1)![1]).toBe(true);
+  });
+
+  it('C03-U29 typing "- " starts a list and drops the placeholder; so does a comment box', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <RichTextEditor variant="comment" label="Comment" placeholder="Add a comment" />,
+    );
+    await user.click(screen.getByRole('textbox', { name: 'Comment' }));
+    await user.keyboard('- ');
+    expect(container.querySelector('.tp-rte-area ul')).not.toBeNull();
+    expect(container.querySelector('.tp-rte')).not.toHaveClass('tp-rte-blank');
+  });
+});

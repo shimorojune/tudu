@@ -71,6 +71,8 @@ describe('C11-U03 the bridge to the macOS app', () => {
     await d.openExternal('https://jira.example.com/browse/NW-1');
     await d.checkUpdate();
     await d.saveDownload('Q3 plan.pdf', new Uint8Array([1, 2]));
+    d.summonWith({ title: 'Call the venue', from: { noteId: 'n1', name: 'Offsite' } });
+    await d.quickAddSeed();
     expect(invoke.mock.calls.map((c) => c[0])).toEqual([
       'app_info',
       'set_badge',
@@ -80,7 +82,13 @@ describe('C11-U03 the bridge to the macOS app', () => {
       'open_external',
       'update_check',
       'save_download',
+      'summon_with',
+      'quick_add_seed',
     ]);
+    // C22-U27 Make a task in the note window hands its words to the floating bar.
+    expect(invoke.mock.calls[8]![1]).toEqual({
+      seed: { title: 'Call the venue', from: { noteId: 'n1', name: 'Offsite' } },
+    });
     expect(invoke.mock.calls[1]![1]).toEqual({ count: 3 });
     expect(invoke.mock.calls[4]![1]).toEqual({ path: '/sign-in' });
     // The file goes as the body, its name in a header.
@@ -95,6 +103,10 @@ describe('C11-U03 the bridge to the macOS app', () => {
       { name: 'checkUpdate', args: [] },
       { name: 'setBadge', args: [2] },
     ]);
+    // C22-U27 the fake keeps the seed until the floating bar takes it, once.
+    b.summonWith({ title: 'Gutters' });
+    expect(await b.quickAddSeed()).toEqual({ title: 'Gutters' });
+    expect(await b.quickAddSeed()).toBeNull();
   });
 
   it('outside links go through the opener in the app and stay plain links on the web', () => {

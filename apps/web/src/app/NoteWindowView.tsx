@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { noteName } from '@tudu/core';
 import { NoteEditor, NoteWindow, type NoteWindowProps } from '@tudu/ui';
 import { noteItem, notebookStore, showInWindow, treeItems, useNoteWindow } from './notebook';
+import type { QuickAddSeed } from './dayView';
 import { useNoteEditor, type OpenPath } from './noteEditing';
 
 export interface NoteWindowViewProps extends Pick<
@@ -21,6 +22,8 @@ export interface NoteWindowViewProps extends Pick<
   onOpenApp?: (noteId: string | null) => void;
   /** Where a linked task, or a task just made, opens. */
   openPath: OpenPath;
+  /** Make a task: where New task opens (the Mac's floating bar); Quick Add over the page by default. */
+  makeTask?: (seed: QuickAddSeed) => void;
 }
 
 /**
@@ -42,6 +45,7 @@ export function NoteWindowView(p: NoteWindowViewProps) {
     onDeleted: () => showInWindow(null),
     onBack: (id) => showInWindow(id),
     openPath: p.openPath,
+    makeTask: p.makeTask,
   });
   const title = view && (view.title.trim() || view.first.trim()) ? noteName(view) : '';
 
