@@ -11,6 +11,7 @@ import { ResendMailer } from './email/resend';
 import type { Env } from './env';
 import { createApp, type App } from './app';
 import { sweepAttachments } from './files';
+import { sweepNotebook } from './notebook';
 import { EMBED_EVERY_MS, Embeddings } from './closeMatches';
 import { LocalEmbedder, type Embedder } from './embeddings';
 import { MemoryStorage, S3Storage, type Storage } from './storage';
@@ -67,6 +68,8 @@ export function bootstrap(
       ? null
       : setInterval(() => {
           void sweepAttachments(db, storage).catch(() => {});
+          // The Notebook's Trash keeps things 30 days, then they go for good with their files.
+          void sweepNotebook(db, storage).catch(() => {});
           // Inbox items cleared over 30 days ago: Undo is long past.
           void sweepCleared(db).catch(() => {});
         }, SWEEP_EVERY_MS);

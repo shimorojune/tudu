@@ -12,6 +12,8 @@ import {
   type AllSpacesPlacesResponse,
   INBOX_CHANGED,
   type InboxChangedEvent,
+  NOTEBOOK_CHANGED,
+  type NotebookChangedEvent,
   type DayResponse,
   type IsoDate,
   type MarksResponse,
@@ -28,6 +30,8 @@ import {
 } from '@tudu/core';
 import type { Db } from '@tudu/db';
 import type { EventHub } from '../events';
+import { searchNotes } from '../notebook';
+import type { Storage } from '../storage';
 import { MeaningUnavailable, searchByMeaning, type Embeddings } from '../closeMatches';
 import { requireSession, type SessionVars } from '../middleware/session';
 import { spaceSummaries } from '../spaces';
@@ -92,7 +96,7 @@ export async function announceProjects(
 }
 
 /** Days, the dots on the calendar, and the sync endpoint the outbox replays changes to. */
-export function taskRoutes(db: Db, hub: EventHub, embeddings: Embeddings) {
+export function taskRoutes(db: Db, hub: EventHub, embeddings: Embeddings, storage?: Storage) {
   const r = new Hono<{ Variables: SessionVars }>();
 
   r.get('/spaces/:spaceId/days/:day', requireSession, async (c) => {
@@ -203,7 +207,9 @@ export function taskRoutes(db: Db, hub: EventHub, embeddings: Embeddings) {
       ids !== undefined
         ? await hitsById(db, null, userId, ids.split(',').filter(Boolean).slice(0, 20))
         : await searchTasks(db, null, userId, q, isIsoDate(today) ? today : isoToday(), here);
-    const body: SearchResponse = { hits };
+    // Your notes come along under their own heading (chunk 22): yours alone, never anyone else's.
+    const body: SearchResponse =
+      ids !== undefined ? { hits } : { hits, notes: await searchNotes(db, userId, q) };
     return c.json(body);
   });
 
@@ -289,7 +295,7 @@ export function taskRoutes(db: Db, hub: EventHub, embeddings: Embeddings) {
     const { clientId, mutations } = parsed.data;
     const { results, applied } = await applyBatch(db, userId, mutations);
 
-    const tasky = applied.filter((a) => !a.space && !a.me && !a.allPlace);
+    const tasky = applied.filter((a) => !a.space && !a.me && !a.allPlace && !a.notebook);
     const touched = [
       ...new Set(tasky.filter((a) => !a.projects && (!a.requests || a.days.length)).map((a) => a.taskId)),
     ];
@@ -331,6 +337,17 @@ export function taskRoutes(db: Db, hub: EventHub, embeddings: Embeddings) {
       };
       hub.publish(userId, ALL_SPACES_CHANGED, event);
     }
+    // The Notebook is yours alone: only your other windows and devices hear, and files gone for good leave the bucket.
+    const notebook = applied.filter((a) => a.notebook);
+    if (notebook.length) {
+      const event: NotebookChangedEvent = {
+        notes: [...new Set(notebook.flatMap((a) => a.notebook!.notes))],
+        folders: [...new Set(notebook.flatMap((a) => a.notebook!.folders))],
+        clientId,
+      };
+      hub.publish(userId, NOTEBOOK_CHANGED, event);
+    }
+    for (const key of applied.flatMap((a) => a.purged ?? [])) await storage?.delete(key).catch(() => {});
     // New or changed words get their vector after the answer goes out (chunk 13).
     if (tasky.length) embeddings.kick();
     return c.json(body);

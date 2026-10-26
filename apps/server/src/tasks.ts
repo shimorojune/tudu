@@ -9,6 +9,7 @@ import {
   isProjectMutation,
   isSettingsMutation,
   isAllMutation,
+  isNotebookMutation,
   linkKeyOf,
   LOOKALIKE_MIN,
   lookAlikesScored,
@@ -27,6 +28,7 @@ import {
   type Comment,
   type HistoryEvent,
   type IsoDate,
+  type NotebookRejection,
   type Project,
   type SearchHit,
   type Subtask,
@@ -53,6 +55,7 @@ import {
   type Db,
 } from '@tudu/db';
 import { readableBy } from './closeMatches';
+import { applyNotebook, type NotebookMutation } from './notebook';
 import { linkKeyLike, linksColumn } from './taskLinks';
 import type { SubtaskClocks, TaskClocks } from '@tudu/db/schema';
 
@@ -64,6 +67,8 @@ export class Rejected extends Error {
   constructor(
     readonly code: number,
     message: string,
+    /** A Notebook rejection the client acts on (a stale body, a folder name taken). */
+    readonly reason?: NotebookRejection,
   ) {
     super(message);
   }
@@ -750,6 +755,10 @@ export interface Applied {
   me?: boolean;
   /** Their All spaces order changed on this day (chunk 21): only they hear, and no space's list changed. */
   allPlace?: { day: IsoDate | null };
+  /** Their Notebook changed (chunk 22): these notes and folders. Only they hear; no space's list changed. */
+  notebook?: { notes: string[]; folders: string[] };
+  /** Notebook files gone for good with their notes: the keys to take out of the bucket. */
+  purged?: string[];
 }
 
 /** Apply one mutation for `userId`, once. Throws Rejected for a change that will never apply. */
@@ -766,7 +775,13 @@ export async function applyMutation(db: Db, userId: string, raw: unknown): Promi
       .returning({ id: schema.appliedMutations.id });
     if (!claimed.length) {
       // Already applied: nothing changes, and the client gets the row as it is.
-      if (isProjectMutation(m) || isInboxMutation(m) || isSettingsMutation(m) || isAllMutation(m))
+      if (
+        isProjectMutation(m) ||
+        isInboxMutation(m) ||
+        isSettingsMutation(m) ||
+        isAllMutation(m) ||
+        isNotebookMutation(m)
+      )
         return null;
       const taskId = taskIdOf(m);
       const [t] = await tx
@@ -775,6 +790,7 @@ export async function applyMutation(db: Db, userId: string, raw: unknown): Promi
         .where(eq(schema.tasks.id, taskId));
       return t ? { taskId, spaceId: t.spaceId, days: [] } : null;
     }
+    if (isNotebookMutation(m)) return applyNotebook(tx, userId, m as NotebookMutation);
     if (m.type === 'task.create') return create(tx, userId, m);
     if (isInboxMutation(m)) return applyRequest(tx, userId, m);
     if (isProjectMutation(m)) return project(tx, userId, m);
@@ -794,6 +810,7 @@ type SettingsMutation = Extract<SyncMutation, { type: `me.${string}` | `space.${
 type AllMutation = Extract<SyncMutation, { type: `all.${string}` }>;
 type TaskChange = Exclude<
   SyncMutation,
+  | NotebookMutation
   | { type: 'task.create' }
   | SubtaskMutation
   | CommentMutation
@@ -1405,7 +1422,13 @@ export async function applyBatch(
       results.push({ id, status: 'ok' });
     } catch (err) {
       if (!(err instanceof Rejected)) throw err;
-      results.push({ id, status: 'rejected', code: err.code, error: err.message });
+      results.push({
+        id,
+        status: 'rejected',
+        code: err.code,
+        error: err.message,
+        ...(err.reason ? { reason: err.reason } : {}),
+      });
     }
   }
   return { results, applied };

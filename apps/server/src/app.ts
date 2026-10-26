@@ -21,6 +21,7 @@ import { fakeJira } from './connectors/jira/fake';
 import { TokenSeal } from './connectors/seal';
 import { spaceRoutes } from './routes/spaces';
 import { taskRoutes } from './routes/tasks';
+import { notebookRoutes } from './routes/notebook';
 import { testRoutes } from './routes/test';
 import type { Embeddings } from './closeMatches';
 import { updateRoutes } from './routes/updates';
@@ -123,7 +124,8 @@ export function createApp(deps: AppDeps) {
 
   app.use('/api/*', sessionMiddleware(auth));
   app.route('/api', meRoutes(db, hub, mailer, storage));
-  app.route('/api', taskRoutes(db, hub, deps.embeddings));
+  app.route('/api', taskRoutes(db, hub, deps.embeddings, storage));
+  app.route('/api', notebookRoutes(db, storage));
   app.route('/api', spaceRoutes(db, hub, mailer, env.WEB_URL!, storage));
   app.route('/api', inboxRoutes(db));
   app.route('/api', fileRoutes(db, storage));

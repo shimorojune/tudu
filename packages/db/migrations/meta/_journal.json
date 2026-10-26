@@ -113,6 +113,13 @@
       "when": 1792957090695,
       "tag": "0015_connectors",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792983811293,
+      "tag": "0016_notebook",
+      "breakpoints": true
     }
   ]
 }

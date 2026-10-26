@@ -1,3 +1,4 @@
+import type { NoteSearchHit } from './notebook';
 import { addDays, diffDays, formatDay, type IsoDate } from './dates';
 
 /** One task as a search result: enough for its row and for going to it. */
@@ -19,6 +20,8 @@ export interface SearchHit {
 
 export interface SearchResponse {
   hits: SearchHit[];
+  /** Your notes that hold the words (chunk 22), under their own heading after the tasks. */
+  notes?: NoteSearchHit[];
 }
 
 /** What the ranking reads of a task. `notes` is plain text, never markup. */

@@ -6,6 +6,7 @@ import { projectColorSchema, projectNameSchema } from './projects';
 import { CONNECTOR_PROVIDERS, LINK_KEY_MAX, parseLinkKey, type TaskLink } from './connectors';
 import { JIRA_KEY_MAX, JIRA_KEY_PATTERN } from './jira';
 import { personNameSchema, spaceColorSchema, spaceNameSchema } from './spaces';
+import { notebookMutationSchema, type NotebookMutationBody, type NotebookRejection } from './notebook';
 
 /** A task as the API sends it. `number` (and so `ref`, "ME-58") is assigned by the server when the task is saved. */
 export interface Task {
@@ -360,44 +361,50 @@ export const taskMutationSchema = z.discriminatedUnion('type', [
 ]);
 
 /** The task a mutation is about, whatever it names; a project change names its project instead. */
-export function taskIdOf(m: TaskMutationBody): string {
+export function taskIdOf(m: AnyMutationBody): string {
   return 'taskId' in m.payload ? m.payload.taskId : m.payload.id;
 }
 
 /** A request or Inbox change: not about a task of yours (until an accept makes one). */
 export function isInboxMutation(
-  m: TaskMutationBody,
+  m: AnyMutationBody,
 ): m is Extract<TaskMutationBody, { type: `request.${string}` | `inbox.${string}` }> {
   return m.type.startsWith('request.') || m.type.startsWith('inbox.');
 }
 
 /** A change to All spaces' order: yours alone, no task or list of a space changes. */
-export function isAllMutation(
-  m: TaskMutationBody,
-): m is Extract<TaskMutationBody, { type: `all.${string}` }> {
+export function isAllMutation(m: AnyMutationBody): m is Extract<TaskMutationBody, { type: `all.${string}` }> {
   return m.type.startsWith('all.');
 }
 
 export function isProjectMutation(
-  m: TaskMutationBody,
+  m: AnyMutationBody,
 ): m is Extract<TaskMutationBody, { type: `project.${string}` }> {
   return m.type.startsWith('project.');
 }
 
 /** A change to you or to a space itself: no task, no list. */
 export function isSettingsMutation(
-  m: TaskMutationBody,
+  m: AnyMutationBody,
 ): m is Extract<TaskMutationBody, { type: `me.${string}` | `space.${string}` }> {
   return m.type.startsWith('me.') || m.type.startsWith('space.');
 }
 
 export type TaskMutationBody = z.infer<typeof taskMutationSchema>;
+/** A task change or a Notebook change. */
+export type AnyMutationBody = TaskMutationBody | NotebookMutationBody;
 export type TaskMutationType = TaskMutationBody['type'];
+
+/** Every change a client can send: tasks and everything around them, and the Notebook's (chunk 22). */
+export const anyMutationSchema = z.discriminatedUnion('type', [
+  ...taskMutationSchema.options,
+  ...notebookMutationSchema.options,
+]);
 
 /** A mutation on the wire: its own id (so a retry never doubles it) and the client's clock when it was made. */
 export const syncMutationSchema = z.intersection(
   z.object({ id, at: z.iso.datetime({ offset: true }) }),
-  taskMutationSchema,
+  anyMutationSchema,
 );
 export type SyncMutation = z.infer<typeof syncMutationSchema>;
 
@@ -411,9 +418,11 @@ export interface SyncResult {
   id: string;
   /** `ok` applied (or already applied); `rejected` will never apply, and the client undoes it. */
   status: 'ok' | 'rejected';
-  /** For a rejection: 400 bad change, 403 not yours, 404 no such task, 410 deleted. */
+  /** For a rejection: 400 bad change, 403 not yours, 404 no such task, 409 out of date, 410 deleted. */
   code?: number;
   error?: string;
+  /** A Notebook rejection the client acts on: `stale` (a body written on an old rev), `name-taken`. */
+  reason?: NotebookRejection;
 }
 
 export interface SyncResponse {
