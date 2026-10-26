@@ -53,7 +53,7 @@ no more 10-minute stalls on a bad one.
 4. The Mac job is untouched: it drives the real Tauri app on `macos-latest`, never ran `install --with-deps`, and a
    Linux container cannot run it.
 
-## Optional extras (accept or drop each separately)
+## Optional extra (accept or drop)
 
 **O1. `pnpm e2e` on the Mac skips the web build when nothing changed.** Today the `webServer` command always runs
 `pnpm --filter web build` (~20-40s per run). New `scripts/build-web-if-stale.mjs` hashes the contents of
@@ -61,7 +61,9 @@ no more 10-minute stalls on a bad one.
 with `apps/web/dist/.e2e-build-hash`, and builds only on a mismatch. CI always builds (`CI` set). `E2E_REBUILD=1`
 forces a build.
 
-**O2. Worktrees share one embeddings model folder.** A fresh git worktree has no `.local/models`, so the API logs
+## Worktrees share one embeddings model folder (in scope, asked for by Rohit 26 Oct 2026)
+
+**O2.** A fresh git worktree has no `.local/models`, so the API logs
 "Unable to get model file path" and close-match tests fail until `fetch-model` is run again in it. Change the default
 model folder (server `bootstrap.ts`, `test/harness.ts`, the `fetch-model` default) to the **main checkout's**
 `.local/models`: when the repo's `.git` is a file (`gitdir: <main>/.git/worktrees/<name>`), resolve the main checkout
@@ -80,7 +82,7 @@ New / updated automated tests:
   caught).
 - **U4** (only with O1) `scripts/build-web-if-stale.test.ts`: same tree → no build; one changed source byte → build;
   changed `VITE_API_URL` → build; `CI=true` or `E2E_REBUILD=1` → build.
-- **U5** (only with O2) model-dir helper test: plain checkout → `<repo>/.local/models`; worktree (`.git` file with a
+- **U5** model-dir helper test: plain checkout → `<repo>/.local/models`; worktree (`.git` file with a
   `gitdir:` line, in a temp dir) → `<main>/.local/models`; `EMBEDDINGS_MODEL_DIR` set → that wins.
 
 CI verification (on the PR):
@@ -97,7 +99,7 @@ Local verification on Rohit's Mac (per the project rule):
 - **M1** `pnpm vitest run --project scripts` green.
 - **M2** `pnpm e2e kit` still green (the local path never used the container; this checks the bucket script and,
   with O1, the build skip: the second run must not rebuild).
-- **M3** (only with O2) in a fresh `git worktree add`, `pnpm e2e -g <a close-matches case>` passes without running
+- **M3** in a fresh `git worktree add`, `pnpm e2e -g <a close-matches case>` passes without running
   `fetch-model` there.
 
 ## Rollback
