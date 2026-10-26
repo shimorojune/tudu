@@ -132,7 +132,7 @@ async function chipLifts(page: Page) {
   await page.reload();
   await goAll(page);
   await expect.poll(() => titlesOf(allDay(page))).toEqual(ALL_SUNDAY);
-  const lifts: Record<string, number> = {};
+  const lifts = { Personal: 0, Northwind: 0 };
   for (const [title, space] of [
     ['Pay the electricity bill', 'Personal'],
     ['Review the Northwind roadmap', 'Northwind'],
