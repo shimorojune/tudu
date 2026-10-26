@@ -128,6 +128,8 @@ async function openAndClose(page: Page, list: Locator, title: string): Promise<v
   await expect(page).toHaveURL(/[?&]task=[A-Z]+-\d+/);
   await page.keyboard.press('Escape');
   await expect(p).toHaveCount(0);
+  // Closed when the address has let go of the task too.
+  await expect(page).not.toHaveURL(/[?&]task=/);
 }
 
 /** The Backlog of whatever is shown (a space or All spaces), from the sidebar, the rail or the phone's More. */
