@@ -35,7 +35,7 @@ import { api, meQuery } from '../../app/session';
 import {
   allBacklogCount,
   cachedAll,
-  taskHref,
+  useTaskHref,
   useAllBacklog,
   useAllFilters,
   useAllMarks,
@@ -87,9 +87,7 @@ export function BacklogPage() {
   const closed = useRef<string | null>(null);
   const spaceId = space.id;
   const base = all ? allPath('backlog') : spacePath(space.slug, 'backlog');
-  const filterSlug = all?.filter?.slug ?? null;
-  const here = taskHref(base, null, filterSlug);
-  const hrefFor = (ref: string | null | undefined) => taskHref(base, ref, filterSlug);
+  const hrefFor = useTaskHref(base, !!all);
   useEffect(() => {
     const ref = search.task;
     if (!ref || !spaceId || open || resolving.current === ref || closed.current === ref) return;
@@ -98,10 +96,10 @@ export function BacklogPage() {
       (r) => setOpen({ id: r.taskId, spaceId: r.spaceId, dir: 'next' }),
       () => {
         resolving.current = null;
-        void navigate({ href: here, replace: true });
+        void navigate({ href: hrefFor(null), replace: true });
       },
     );
-  }, [search.task, spaceId, open, navigate, here]);
+  }, [search.task, spaceId, open, navigate, hrefFor]);
   const openTask = (id: string, ref: string | null | undefined, dir: 'next' | 'prev' = 'next') => {
     setOpen({ id, dir, spaceId: taskStore.lastSeen(id)?.spaceId });
     closed.current = null;
@@ -112,7 +110,7 @@ export function BacklogPage() {
     setOpen(null);
     closed.current = search.task ?? null;
     resolving.current = null;
-    if (search.task) void navigate({ href: here, replace: true });
+    if (search.task) void navigate({ href: hrefFor(null), replace: true });
   };
 
   const gathered = useAllBacklog(all, me?.user.id ?? '', today);

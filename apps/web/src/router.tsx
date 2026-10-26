@@ -463,8 +463,8 @@ function AllLayout({ me: ctxMe }: { me: MeResponse }) {
   // An edit to the address as it is now.
   const setSearch = useCallback(
     (edit: (q: URLSearchParams) => void) => {
-      const loc = router.state.location;
-      const q = new URLSearchParams(loc.searchStr);
+      const loc = router.history.location;
+      const q = new URLSearchParams(loc.search);
       edit(q);
       const qs = q.toString();
       void navigate({ href: loc.pathname + (qs ? `?${qs}` : ''), replace: true });

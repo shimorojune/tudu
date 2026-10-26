@@ -46,6 +46,7 @@ import {
   emptyAllWords,
   filteredWords,
   taskHref,
+  useTaskHref,
   tileOf,
   useAllDay,
   useAllFilters,
@@ -165,9 +166,7 @@ export function TodayPage() {
   const closed = useRef<string | null>(null);
   const spaceId = space.id;
   const base = all ? allPath('today') : spacePath(space.slug);
-  const filterSlug = all?.filter?.slug ?? null;
-  const here = taskHref(base, null, filterSlug);
-  const hrefFor = (ref: string | null | undefined) => taskHref(base, ref, filterSlug);
+  const hrefFor = useTaskHref(base, !!all);
   useEffect(() => {
     const ref = search.task;
     if (!ref || !spaceId || open || resolving.current === ref || closed.current === ref) return;
@@ -180,10 +179,10 @@ export function TodayPage() {
       },
       () => {
         resolving.current = null;
-        void navigate({ href: here, replace: true });
+        void navigate({ href: hrefFor(null), replace: true });
       },
     );
-  }, [search.task, spaceId, open, today, navigate, here]);
+  }, [search.task, spaceId, open, today, navigate, hrefFor]);
   const openTask = (
     id: string,
     ref: string | null | undefined,
@@ -199,7 +198,7 @@ export function TodayPage() {
     setOpen(null);
     closed.current = search.task ?? null;
     resolving.current = null;
-    if (search.task) void navigate({ href: here, replace: true });
+    if (search.task) void navigate({ href: hrefFor(null), replace: true });
   };
 
   const [day2, setDay2] = useState(() => addDays(day, 1));

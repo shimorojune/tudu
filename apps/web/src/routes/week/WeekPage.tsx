@@ -35,7 +35,7 @@ import { api, meQuery } from '../../app/session';
 import {
   cachedAll,
   cachedOrder,
-  taskHref,
+  useTaskHref,
   useAllFilters,
   useAllMarks,
   useAllProjects,
@@ -96,9 +96,7 @@ export function WeekPage() {
   const closed = useRef<string | null>(null);
   const spaceId = space.id;
   const base = all ? allPath('week') : spacePath(space.slug, 'week');
-  const filterSlug = all?.filter?.slug ?? null;
-  const here = taskHref(base, null, filterSlug);
-  const hrefFor = (ref: string | null | undefined) => taskHref(base, ref, filterSlug);
+  const hrefFor = useTaskHref(base, !!all);
   useEffect(() => {
     const ref = search.task;
     if (!ref || !spaceId || open || resolving.current === ref || closed.current === ref) return;
@@ -110,10 +108,10 @@ export function WeekPage() {
       },
       () => {
         resolving.current = null;
-        void navigate({ href: here, replace: true });
+        void navigate({ href: hrefFor(null), replace: true });
       },
     );
-  }, [search.task, spaceId, open, thisMonday, navigate, here]);
+  }, [search.task, spaceId, open, thisMonday, navigate, hrefFor]);
   const openTask = (id: string, ref: string | null | undefined, dir: 'next' | 'prev' = 'next') => {
     setOpen({ id, dir, spaceId: taskStore.lastSeen(id)?.spaceId });
     closed.current = null;
@@ -124,7 +122,7 @@ export function WeekPage() {
     setOpen(null);
     closed.current = search.task ?? null;
     resolving.current = null;
-    if (search.task) void navigate({ href: here, replace: true });
+    if (search.task) void navigate({ href: hrefFor(null), replace: true });
   };
 
   const week = useAllWeek(all, me?.user.id ?? '', monday, today);

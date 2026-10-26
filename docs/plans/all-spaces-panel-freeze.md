@@ -145,6 +145,12 @@ Differences from the approved text, none of them in behaviour:
   just-written task on Week and Backlog is not a case of its own. Those pages share the panel and the guard, and the
   reopen case already freezes them on master.
 
+- One more race fixed, found by C21-E23 on phone on Rohit's Mac (1 run in 3): tapping a space pill and then a task
+  within a few milliseconds dropped the filter. The pill had already put `?space=me` in the address, but the page had
+  not re-rendered yet, so opening the task built `?task=ME-1` from the old, unfiltered filter. The same was true on
+  master. Today, Week and Backlog now build task addresses with `useTaskHref`, which reads `?space=` from the address
+  when it is called. All spaces' `setSearch` reads the browser history's location for the same reason.
+
 Results here (the container, desktop, tablet and phone), before the full run on Rohit's Mac:
 
 - On master, C21-E22 (all three) and C21-E23 froze. C21-E24 passed, as expected: space pages do not loop.

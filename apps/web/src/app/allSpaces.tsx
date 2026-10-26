@@ -11,7 +11,17 @@ import {
   type Task,
 } from '@tudu/core';
 import type { TaskSpace } from '@tudu/ui';
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useRouter } from '@tanstack/react-router';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { queryClient } from './session';
 import { taskStore } from './tasks';
 
@@ -418,6 +428,19 @@ export function cachedOrder(
   for (const [, data] of queryClient.getQueriesData<AllSpacesPlace[]>({ queryKey: ['all-places'] }))
     for (const p of data ?? []) if (p.day === day) byTask.set(p.taskId, p.position);
   return cachedAll(scope, meId, day, false).map((t) => ({ id: t.id, position: byTask.get(t.id) ?? null }));
+}
+
+/**
+ * A page's address with a task open (or none), keeping All spaces' filter as the address has it when called, not as
+ * at the last render: a task opened a moment after a pill press keeps the filter the press put there.
+ */
+export function useTaskHref(base: string, all: boolean): (ref: string | null | undefined) => string {
+  const router = useRouter();
+  return useCallback(
+    (ref: string | null | undefined) =>
+      taskHref(base, ref, all ? new URLSearchParams(router.history.location.search).get('space') : null),
+    [base, all, router],
+  );
 }
 
 /** A page's address with the open task (`?task=`), and in All spaces the filter (`?space=`) kept. */
