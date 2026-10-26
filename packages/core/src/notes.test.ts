@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanHtml, isEmptyHtml, textOf } from './notes';
+import { cleanHtml, isBlankHtml, isEmptyHtml, textOf } from './notes';
 
 describe('C03-U24 cleaning notes', () => {
   it('C03-U24 keeps the tags the editor makes', () => {
@@ -78,5 +78,25 @@ describe('C22-U06 a note body is cleaned like task notes', () => {
     expect(out).toContain('href="https://tudu.app" rel="noopener noreferrer" target="_blank"');
     expect(out).not.toMatch(/script|onerror|onclick|<img|marquee|steal/);
     expect(out).toContain('hi');
+  });
+});
+
+describe('C03-U29 the placeholder only on a truly blank note', () => {
+  it('C03-U29 nothing, or one empty paragraph, is blank; a list, heading, quote or file is not (though it saves as empty)', () => {
+    expect(isBlankHtml('')).toBe(true);
+    expect(isBlankHtml('<p></p>')).toBe(true);
+    expect(isBlankHtml('<p><br class="ProseMirror-trailingBreak"></p>')).toBe(true);
+    expect(isBlankHtml('<p style="text-align: center"> &nbsp;</p>')).toBe(true);
+    for (const html of [
+      '<ul><li><p></p></li></ul>',
+      '<ol><li><p></p></li></ol>',
+      '<ul data-type="taskList" class="tp-checks"><li data-type="taskItem" data-checked="false"><p></p></li></ul>',
+      '<h2></h2>',
+      '<blockquote><p></p></blockquote>',
+      '<p></p><p></p>',
+      '<p>x</p>',
+    ])
+      expect(isBlankHtml(html), html).toBe(false);
+    expect(isEmptyHtml('<ul><li><p></p></li></ul>')).toBe(true);
   });
 });

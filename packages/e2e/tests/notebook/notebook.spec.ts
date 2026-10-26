@@ -12,7 +12,7 @@ import {
 import { box, openSearch, panel } from '../../fixtures/search';
 import { joinLink, me, secondPerson } from '../../fixtures/spaces';
 import { settle } from '../../fixtures/motion';
-import { idle } from '../../fixtures/today';
+import { dayList, idle, row, titlesOf } from '../../fixtures/today';
 
 /**
  * Chunk 22, the Notebook: your notes, in folders, linked to tasks, and the note window. Every test makes its own
@@ -91,6 +91,25 @@ const folderRow = (page: Page, name: string) =>
   tree(page)
     .locator('.tp-nb-frow')
     .filter({ has: page.locator('.tp-nb-fname', { hasText: new RegExp(`^${name}$`) }) });
+
+/** New task over the page (Quick Add, named New task once you have more than one space). */
+const quickAdd = (page: Page) => page.getByRole('dialog', { name: /^(New task|Quick Add)$/ });
+
+/** Select characters `from` to `to` of the note's first line. */
+async function selectWords(page: Page, from: number, to: number): Promise<void> {
+  await words(page).evaluate(
+    (el, [a, b]) => {
+      const t = el.querySelector('p')!.firstChild!;
+      const r = document.createRange();
+      r.setStart(t, a!);
+      r.setEnd(t, b!);
+      const s = getSelection()!;
+      s.removeAllRanges();
+      s.addRange(r);
+    },
+    [from, to],
+  );
+}
 
 async function openNotebook(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Notebook', exact: true }).click();
@@ -468,7 +487,7 @@ test.describe('notebook', () => {
     await meera.context.close();
   });
 
-  test('C22-E11 Make a task: select words, Make a task; the toast’s Open shows it on Today in Personal, linked to the note', async ({
+  test('C22-E11 Make a task opens New task on the words; nothing is made until Add task; then it is linked and Open shows it', async ({
     page,
   }) => {
     test.skip(!desk(), 'desktop web');
@@ -476,16 +495,17 @@ test.describe('notebook', () => {
     const id = await seedNote(page, 'Interviews', { html: '<p>Ask Meera for the venue shortlist</p>' });
     await page.goto(`/notebook/${id}`);
     await expect(words(page)).toContainText('venue shortlist');
-    await words(page).evaluate((el) => {
-      const t = el.querySelector('p')!.firstChild!;
-      const r = document.createRange();
-      r.setStart(t, 0);
-      r.setEnd(t, 33);
-      const s = getSelection()!;
-      s.removeAllRanges();
-      s.addRange(r);
-    });
+    await selectWords(page, 0, 33);
     await page.getByRole('button', { name: 'Make a task' }).click();
+    const bar = quickAdd(page);
+    await expect(bar).toBeVisible();
+    await expect(bar.getByRole('textbox', { name: 'Task title' })).toHaveValue(
+      'Ask Meera for the venue shortlist',
+    );
+    await expect(bar.locator('.tp-qa-from')).toContainText('Interviews');
+    // Nothing made yet: no chip, nothing on Today.
+    await expect(page.locator('.tp-nb-tchip')).toHaveCount(0);
+    await bar.getByRole('button', { name: 'Add task' }).click();
     await expect(page.getByText(/is on Today in Personal, linked to this note\./)).toBeVisible();
     const chip = page.locator('.tp-nb-tchip');
     await expect(chip).toContainText('Ask Meera for the venue shortlist');
@@ -497,6 +517,172 @@ test.describe('notebook', () => {
       'Ask Meera for the venue shortlist',
     );
     await expect(page.getByRole('region', { name: 'From your notebook' })).toContainText('Interviews');
+  });
+
+  test('C22-E21 two selected lines: the first is the title, the second the note; the task panel shows that note', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    const id = await seedNote(page, 'Offsite', {
+      html: '<p>Call the venue</p><p>Ask about the garden room</p>',
+    });
+    await page.goto(`/notebook/${id}`);
+    await expect(words(page)).toContainText('garden room');
+    await words(page).evaluate((el) => {
+      const ps = el.querySelectorAll('p');
+      const r = document.createRange();
+      r.setStart(ps[0]!.firstChild!, 0);
+      r.setEnd(ps[1]!.firstChild!, ps[1]!.textContent!.length);
+      const s = getSelection()!;
+      s.removeAllRanges();
+      s.addRange(r);
+    });
+    await page.getByRole('button', { name: 'Make a task' }).click();
+    const bar = quickAdd(page);
+    await expect(bar.getByRole('textbox', { name: 'Task title' })).toHaveValue('Call the venue');
+    await expect(bar.getByRole('textbox', { name: 'Note' })).toContainText('Ask about the garden room');
+    await bar.getByRole('button', { name: 'Add task' }).click();
+    const chip = page.locator('.tp-nb-tchip');
+    await expect(chip).toContainText('Call the venue');
+    await idle(page);
+    await page.goto('/me');
+    await row(dayList(page), 'Call the venue').getByRole('button', { name: 'Call the venue' }).click();
+    const panel = page.getByRole('dialog', { name: 'Task details' });
+    await expect(panel.getByRole('textbox', { name: 'Notes' })).toContainText('Ask about the garden room');
+  });
+
+  test('C22-E22 × on the pill, then Add: the task is made but not linked; Esc instead makes nothing', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    const id = await seedNote(page, 'Flat', { html: '<p>Fix the hall light</p><p>Call the plumber</p>' });
+    await page.goto(`/notebook/${id}`);
+    await expect(words(page)).toContainText('plumber');
+    // Esc: nothing made, the note untouched.
+    await selectWords(page, 0, 18);
+    await page.getByRole('button', { name: 'Make a task' }).click();
+    await expect(quickAdd(page)).toBeVisible();
+    // New task takes the keyboard (the title) a moment after it opens; Esc before that would land in the note.
+    await expect(quickAdd(page).getByRole('textbox', { name: 'Task title' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(quickAdd(page)).toHaveCount(0);
+    await expect(words(page)).toContainText('Fix the hall light');
+    // × on the pill: the pill shrinks away, the task is made, and no chip comes.
+    await selectWords(page, 0, 18);
+    await page.getByRole('button', { name: 'Make a task' }).click();
+    const bar = quickAdd(page);
+    await expect(bar.getByRole('textbox', { name: 'Task title' })).toHaveValue('Fix the hall light');
+    await bar.getByRole('button', { name: 'Don’t link it to this note' }).click();
+    await expect(bar.locator('.tp-qa-from')).toHaveCount(0);
+    await bar.getByRole('button', { name: 'Add task' }).click();
+    await idle(page);
+    await expect(page.locator('.tp-nb-tchip')).toHaveCount(0);
+    await page.goto('/me');
+    await expect.poll(() => titlesOf(dayList(page))).toEqual(['Fix the hall light']);
+  });
+
+  test('C22-E23 the space chip moved to a team space: the task lands there, still linked to the note', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    await page.request.post(`${API_URL}/api/spaces`, {
+      data: { name: 'Northwind', color: '#3d5a80', invites: [] },
+    });
+    const id = await seedNote(page, 'Offsite agenda draft', { html: '<p>Book the coach</p>' });
+    await page.goto(`/notebook/${id}`);
+    await expect(words(page)).toContainText('Book the coach');
+    await selectWords(page, 0, 14);
+    await page.getByRole('button', { name: 'Make a task' }).click();
+    const bar = quickAdd(page);
+    await bar.getByRole('button', { name: 'Space: Personal' }).click();
+    await page.getByRole('menuitemradio', { name: /Northwind/ }).click();
+    await expect(bar.locator('.tp-qa-from')).toContainText('Offsite agenda draft');
+    await bar.getByRole('button', { name: 'Add task' }).click();
+    await expect(page.getByText(/is on Today in Northwind, linked to this note\./)).toBeVisible();
+    const chip = page.locator('.tp-nb-tchip');
+    await expect(chip).toContainText('Book the coach');
+    await expect(chip).toContainText(/[A-Z]+-\d+/);
+    await expect(chip).not.toContainText(/ME-\d+/);
+  });
+
+  test('C22-E24 the formatting bar sits at the foot of the note pane, centred, in a short note and a long one', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    const short = await seedNote(page, 'Short', { html: '<p>One line</p>' });
+    const long = await seedNote(page, 'Long', {
+      html: Array.from({ length: 60 }, (_, i) => `<p>Line ${i + 1}</p>`).join(''),
+    });
+    const place = async () => {
+      await words(page).click();
+      const bar = page.locator('.tp-nb-body .tp-rte-bar');
+      await expect(bar).toBeVisible();
+      await settle(page, bar);
+      const pane = (await page.locator('.tp-nb-body').boundingBox())!;
+      const bb = (await bar.boundingBox())!;
+      // 12px sticky inset over the pane's 16px bottom padding.
+      expect(pane.y + pane.height - (bb.y + bb.height)).toBeLessThanOrEqual(30);
+      expect(pane.y + pane.height - (bb.y + bb.height)).toBeGreaterThanOrEqual(0);
+      expect(Math.abs(bb.x + bb.width / 2 - (pane.x + pane.width / 2))).toBeLessThanOrEqual(2);
+      return bb;
+    };
+    await page.goto(`/notebook/${short}`);
+    await expect(words(page)).toContainText('One line');
+    const a = await place();
+    await page.goto(`/notebook/${long}`);
+    await expect(words(page)).toContainText('Line 60');
+    await page
+      .locator('.tp-nb-body')
+      .evaluate((el) => (el.scrollTop = el.scrollHeight / 2 - el.clientHeight / 2));
+    const b = await place();
+    expect(Math.abs(a.y - b.y)).toBeLessThanOrEqual(2);
+  });
+
+  test('C22-E25 a bullet clears the placeholder: the list button, “- ”, a task’s notes and a comment', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    const blank = async (rte: Locator, yes: boolean) => {
+      if (yes) await expect(rte).toHaveClass(/tp-rte-blank/);
+      else await expect(rte).not.toHaveClass(/tp-rte-blank/);
+      const before = await rte
+        .locator('.tp-rte-area')
+        .evaluate((el) => getComputedStyle(el, '::before').content);
+      if (!yes) expect(before).toBe('none');
+    };
+    const one = await seedNote(page, 'Blank one');
+    await page.goto(`/notebook/${one}`);
+    const rte = page.locator('.tp-nb-body .tp-rte');
+    await words(page).click();
+    await blank(rte, true);
+    await page.locator('.tp-nb-body').getByRole('button', { name: 'Bulleted list' }).click();
+    await blank(rte, false);
+    await expect(words(page).locator('ul > li')).toHaveCount(1);
+    const two = await seedNote(page, 'Blank two');
+    await page.goto(`/notebook/${two}`);
+    await words(page).click();
+    await page.keyboard.type('- ');
+    await blank(page.locator('.tp-nb-body .tp-rte'), false);
+    await expect(words(page).locator('ul > li')).toHaveCount(1);
+    // A task's notes and a comment box.
+    const pid = await personalId(page);
+    const taskId = await seedTask(page, pid, 'Plan the offsite', null);
+    const ref = await refOf(page, pid, taskId);
+    await page.goto(`/t/${ref}`);
+    const panel = page.getByRole('dialog', { name: 'Task details' });
+    const notes = panel.getByRole('textbox', { name: 'Notes' });
+    await notes.click();
+    await page.keyboard.type('- ');
+    await blank(panel.locator('.tp-rte-notes'), false);
+    const box = panel.getByRole('textbox', { name: 'Write a comment' });
+    await box.click();
+    await page.keyboard.type('- ');
+    await blank(panel.locator('.tp-rte-comment'), false);
   });
 
   test('C22-E12 Search: a word only in a note’s words finds it under Notes, washed in ink; picking it opens the note window', async ({

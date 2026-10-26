@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 
 use serde::Serialize;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::windows;
 use crate::{App, SUMMON_LABEL};
@@ -20,6 +20,18 @@ pub struct Seen {
     pub opened: Vec<String>,
     /// Files saved to Downloads, as full paths.
     pub saved: Vec<String>,
+    /// What the floating bar opens on next (Make a task in the note window): taken once, then gone.
+    pub seed: Option<serde_json::Value>,
+}
+
+/// Keep a seed for the floating bar; a newer one replaces it.
+pub fn keep_seed(seen: &mut Seen, seed: serde_json::Value) {
+    seen.seed = Some(seed);
+}
+
+/// The seed, once: the next summon opens a plain Quick Add.
+pub fn take_seed(seen: &mut Seen) -> Option<serde_json::Value> {
+    seen.seed.take()
 }
 
 #[derive(Serialize)]
@@ -185,6 +197,30 @@ pub fn summon(app: AppHandle) {
     windows::summon(&app, false);
 }
 
+/// Make a task in the note window: the floating bar comes up over every app, filled in with these words and the
+/// note it links back to. The note window stays where it is and the desk never comes forward.
+#[tauri::command]
+pub fn summon_with(app: AppHandle, state: State<'_, App>, seed: serde_json::Value) {
+    if let Ok(mut s) = state.seen.lock() {
+        keep_seed(&mut s, seed);
+    }
+    let up = app
+        .get_webview_window(windows::FLOATING)
+        .and_then(|w| w.is_visible().ok())
+        .unwrap_or(false);
+    windows::summon(&app, false);
+    // Already up, the summon only focuses it: say it again so it takes the new words.
+    if up {
+        let _ = app.emit_to(windows::FLOATING, "floating:shown", ());
+    }
+}
+
+/// The floating page, as it comes up: the seed waiting for it, if any (taken, so it is used once).
+#[tauri::command]
+pub fn quick_add_seed(state: State<'_, App>) -> Option<serde_json::Value> {
+    state.seen.lock().ok().and_then(|mut s| take_seed(&mut s))
+}
+
 /// Esc in the sheet, or a click on its clear edge.
 #[tauri::command]
 pub fn hide_menubar(app: AppHandle) {
@@ -216,5 +252,15 @@ mod tests {
         assert_eq!(free_path(&dir, "a.txt"), dir.join("a (3).txt"));
         std::fs::remove_dir_all(&dir).unwrap();
         assert_eq!(percent_decode("Q3%20plan.pdf"), "Q3 plan.pdf");
+    }
+
+    #[test]
+    fn c22_d07_the_floating_bar_takes_its_seed_once() {
+        let mut seen = Seen::default();
+        assert_eq!(take_seed(&mut seen), None);
+        keep_seed(&mut seen, serde_json::json!({ "title": "Call the venue" }));
+        keep_seed(&mut seen, serde_json::json!({ "title": "Ask Meera" }));
+        assert_eq!(take_seed(&mut seen), Some(serde_json::json!({ "title": "Ask Meera" })));
+        assert_eq!(take_seed(&mut seen), None);
     }
 }

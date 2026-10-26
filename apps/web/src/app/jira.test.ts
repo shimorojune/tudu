@@ -3,23 +3,30 @@ import { renderHook, waitFor } from '@testing-library/react';
 import type { JiraLink, SpaceSummary, SyncMutation, Task } from '@tudu/core';
 import { applyToLinks, jiraConnectionKey, jiraLinksKey, jiraSpacesKey } from '@tudu/client';
 import { createElement, type ReactNode } from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { showToast } from '@tudu/ui';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { moreItems } from '../routes/more/MorePage';
 import { phoneTab } from './AppShell';
 import { askOf, panelState, toPanelIssue } from './JiraHost';
 import {
+  clearJiraGlow,
+  glowJiraSpace,
   jiraParam,
   openInJira,
+  peekJiraGlow,
   reloadJiraPickForTests,
   resetJiraForTests,
   setJiraPick,
+  turnOffHere,
   useJira,
   useJiraPick,
   withJira,
 } from './jira';
-import { queryClient } from './session';
+import { api, queryClient } from './session';
 import { sectionFor } from './settings';
 import { viewOf } from './space';
+
+vi.mock('@tudu/ui', async (orig) => ({ ...(await orig<Record<string, unknown>>()), showToast: vi.fn() }));
 
 const at = '2026-10-18T10:00:00.000Z';
 const base = {
@@ -260,5 +267,76 @@ describe('C10-U16 Jira is your account’s, on per space', () => {
     localStorage.setItem('tudu.jira.view', 'not json');
     reloadJiraPickForTests();
     expect(renderHook(() => useJiraPick()).result.current).toEqual({ view: 'assigned' });
+  });
+});
+
+describe('C10-U22 Turn off here: one space, at once, with Undo', () => {
+  const NW = { id: 'nw', name: 'Northwind' };
+  const spaces = () =>
+    queryClient.setQueryData(jiraSpacesKey(), {
+      spaces: [
+        { id: 'me', name: 'Personal', kind: 'personal', color: null, on: true, linked: 0 },
+        { id: 'nw', name: 'Northwind', kind: 'team', color: null, on: true, linked: 0 },
+      ],
+    });
+  const onIn = (id: string) =>
+    queryClient
+      .getQueryData<{ spaces: Array<{ id: string; on: boolean }> }>(jiraSpacesKey())!
+      .spaces.find((s) => s.id === id)!.on;
+  const toast = vi.mocked(showToast);
+  afterEach(() => {
+    queryClient.clear();
+    vi.restoreAllMocks();
+    toast.mockReset();
+  });
+
+  it('the switch flips before the server answers; the toast offers Undo, which turns it back on', async () => {
+    spaces();
+    let answer!: () => void;
+    const put = vi
+      .spyOn(api, 'put')
+      .mockImplementationOnce(() => new Promise<never>((res) => (answer = () => res(undefined as never))))
+      .mockResolvedValue(undefined as never);
+    const done = turnOffHere(NW);
+    expect(onIn('nw')).toBe(false);
+    expect(onIn('me')).toBe(true);
+    expect(put).toHaveBeenCalledWith('/api/spaces/nw/connectors/jira', { on: false });
+    answer();
+    expect(await done).toBe(true);
+    expect(toast).toHaveBeenCalledWith(
+      'Jira is off in Northwind.',
+      expect.objectContaining({ action: 'Undo' }),
+    );
+    toast.mock.calls[0]![1]!.onAction!();
+    await waitFor(() => expect(put).toHaveBeenLastCalledWith('/api/spaces/nw/connectors/jira', { on: true }));
+    await waitFor(() => expect(onIn('nw')).toBe(true));
+  });
+
+  it('a refusal puts the switch back and offers Try again; quiet leaves the words to the Apps card', async () => {
+    spaces();
+    const put = vi.spyOn(api, 'put').mockRejectedValue(new Error('offline'));
+    expect(await turnOffHere(NW)).toBe(false);
+    expect(onIn('nw')).toBe(true);
+    expect(toast).toHaveBeenCalledWith(
+      'Couldn’t turn Jira off here.',
+      expect.objectContaining({ action: 'Try again' }),
+    );
+    toast.mock.calls[0]![1]!.onAction!();
+    await waitFor(() => expect(put).toHaveBeenCalledTimes(2));
+    toast.mockReset();
+    expect(await turnOffHere(NW, { quiet: true })).toBe(false);
+    expect(toast).not.toHaveBeenCalled();
+    expect(onIn('nw')).toBe(true);
+  });
+});
+
+describe('C10-U23 Manage spaces… glows the space you came from, once', () => {
+  it('the row to glow is kept until Settings has drawn, then cleared', () => {
+    expect(peekJiraGlow()).toBeNull();
+    glowJiraSpace('nw');
+    expect(peekJiraGlow()).toBe('nw');
+    expect(peekJiraGlow()).toBe('nw');
+    clearJiraGlow();
+    expect(peekJiraGlow()).toBeNull();
   });
 });

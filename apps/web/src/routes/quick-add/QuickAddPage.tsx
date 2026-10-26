@@ -3,6 +3,7 @@ import { addedWords } from '@tudu/core';
 import { Desk, QuickAdd, showToast, syncThemeChoice, useTheme, type QuickAddDraft } from '@tudu/ui';
 import type { MeResponse } from '@tudu/client';
 import { useEffect, useState, type PointerEvent } from 'react';
+import type { QuickAddSeed } from '../../app/dayView';
 import { desktop } from '../../app/desktop';
 import { useLiveEvents } from '../../app/live';
 import { sendLine, useQuickAddActions, useSpacePeople } from '../../app/quickAdd';
@@ -36,11 +37,24 @@ export function QuickAddPage({ me }: { me: MeResponse }) {
   const a = useQuickAddActions(target.id);
   // In the app the draft is kept on the Mac, so a quit and a new launch still have it.
   const [initial] = useState(() => (app ? readDraft(a.today) : undefined));
+  // Make a task in the note window: the words (and the note's pill) it was summoned with, written over the draft.
+  const [seed, setSeed] = useState<(QuickAddSeed & { nonce: number }) | null>(null);
+  const takeSeed = () => {
+    if (!app) return;
+    void app.quickAddSeed().then((s) => {
+      if (!s) return;
+      const personal = me.spaces.find((x) => x.kind === 'personal');
+      setSendTo({ spaceId: s.spaceId ?? personal?.id ?? lastHere() ?? '', toId: null });
+      setSeed((was) => ({ ...s, nonce: (was?.nonce ?? 0) + 1 }));
+    });
+  };
 
   useEffect(() => {
     if (!app) return;
+    takeSeed();
     return app.on('floating:shown', () => {
       setSendTo({ spaceId: lastHere() ?? '', toId: null });
+      takeSeed();
       // The theme picked on the desk while the bar was put away (a hidden window may not hear it as it happens).
       syncThemeChoice();
       // The line is ready to write in, with the draft you left.
@@ -92,6 +106,7 @@ export function QuickAddPage({ me }: { me: MeResponse }) {
           }}
           onClose={app ? () => app.hideFloating() : undefined}
           initial={initial}
+          seed={seed}
           onDraftChange={app ? keepDraft : undefined}
           onAdded={(t) => {
             // In the app the window goes once the tick has shown; the desk shows the task as it arrives.

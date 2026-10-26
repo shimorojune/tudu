@@ -204,6 +204,45 @@ test.describe('chunk 22 · the note window', () => {
     await app.until(`return T.all('button', 'Gift ideas for Mum').length > 0`);
   });
 
+  test('C22-D08 Make a task in the note window: the floating New task shows filled in with the pill, the desk stays hidden; Add links it', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const id = await writeNote(app, 'Offsite agenda draft', '<p>Call the venue about the garden room</p>');
+    await app.act('close', { window: 'main' });
+    await app.waitState((s) => !s.windows.main.visible);
+    await openNote(app, id);
+    await app.until(`return !!document.querySelector('.tp-nb-win .tp-rte-area p')?.firstChild`, 'note');
+    await app.eval(
+      `const t = document.querySelector('.tp-nb-win .tp-rte-area p').firstChild;
+       const r = document.createRange();
+       r.setStart(t, 0);
+       r.setEnd(t, 14);
+       const s = getSelection();
+       s.removeAllRanges();
+       s.addRange(r);`,
+      'note',
+    );
+    await app.until(`return T.all('button', 'Make a task').length > 0`, 'note');
+    await app.eval(`T.click(T.get('button', 'Make a task'))`, 'note');
+    const s = await app.waitState((x) => x.windows.floating.visible);
+    expect(s.windows.main.visible).toBe(false);
+    await app.until(`return T.get('textbox', 'Task title').value === 'Call the venue'`, 'floating');
+    await app.until(
+      `return document.querySelector('.tp-qa-from')?.textContent?.includes('Offsite agenda draft') ?? false`,
+      'floating',
+    );
+    await app.eval(`T.click(T.get('button', 'Add task'))`, 'floating');
+    await app.waitState((x) => !x.windows.floating.visible);
+    // The chip comes into the note window once the link is through (NOTEBOOK_CHANGED).
+    await app.until(
+      `return document.querySelector('.tp-nb-win .tp-nb-tchip')?.textContent?.includes('Call the venue') ?? false`,
+      'note',
+      10_000,
+    );
+    expect((await app.state()).windows.main.visible).toBe(false);
+  });
+
   test('C22-D09 the note window is clear around the note: html and body paint nothing, only the note does', async ({
     app,
   }) => {

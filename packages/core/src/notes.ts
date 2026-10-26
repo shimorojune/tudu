@@ -182,6 +182,16 @@ export function isEmptyHtml(html: string): boolean {
     .trim();
 }
 
+/**
+ * True when the editor would show its placeholder: nothing at all, or one paragraph with no words in it. A bullet,
+ * number, checkbox, heading, quote or file is something, even with no words yet (isEmptyHtml says it saves as empty).
+ */
+export function isBlankHtml(html: string): boolean {
+  const t = html.trim();
+  if (!t) return true;
+  return /^<p(?:\s[^>]*)?>(?:\s|&nbsp;|<br[^>]*>)*<\/p>$/i.test(t);
+}
+
 /** The words alone, for a search index or a short preview. */
 export function textOf(html: string): string {
   return html

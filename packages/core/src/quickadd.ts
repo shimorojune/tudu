@@ -2,6 +2,7 @@ import { dayWord } from './carried';
 import { formatDay, type IsoDate } from './dates';
 import { weekPlannedDay } from './week';
 import { isEmptyHtml, toHtml } from './notes';
+import { TITLE_MAX } from './tasks';
 
 /** The pages a new task can be written from. */
 export type AppPage = 'today' | 'week' | 'backlog';
@@ -40,6 +41,13 @@ export function addedWords(planned: IsoDate | null, today: IsoDate): string {
   return `Added to ${planned ? dayWord(planned, today) : 'Backlog'}`;
 }
 
+/** Made from a note: "‘Call the venue’ is on Today in Personal, linked to this note." */
+export function linkedWords(title: string, planned: IsoDate | null, today: IsoDate, space: string): string {
+  const short = title.length > 60 ? `${title.slice(0, 59)}…` : title;
+  const where = planned ? `on ${dayWord(planned, today)}` : 'in the Backlog';
+  return `‘${short}’ is ${where} in ${space}, linked to this note.`;
+}
+
 /** "248 KB", "1.2 MB". */
 export function fileSize(bytes: number): string {
   const k = Math.max(1, Math.round(bytes / 1024));
@@ -60,4 +68,36 @@ export function pagePlannedDay(
   if (page === 'backlog') return null;
   if (page === 'week') return weekPlannedDay(at.monday, at.today);
   return at.shownDay;
+}
+
+/** The note a task is being made from, carried by New task until it is added (or its pill is dropped). */
+export interface QuickAddFrom {
+  noteId: string;
+  /** Its title, else its first line, else "This note". */
+  name: string;
+}
+
+function escapeText(t: string): string {
+  return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
+ * Words selected in a note, as New task opens on them: the first line is the title (cut at a word past half of
+ * TITLE_MAX when it runs longer, the rest of that line leading the note), every other line a paragraph of the note.
+ */
+export function taskFromWords(raw: string): { title: string; note: string } {
+  const lines = raw
+    .split(/\n+/)
+    .map((l) => l.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  const first = lines[0] ?? '';
+  let title = first;
+  let rest = lines.slice(1);
+  if (first.length > TITLE_MAX) {
+    const cut = first.slice(0, TITLE_MAX);
+    const space = cut.lastIndexOf(' ');
+    title = (space > TITLE_MAX / 2 ? cut.slice(0, space) : cut).trimEnd();
+    rest = [first.slice(title.length).trim(), ...rest];
+  }
+  return { title, note: rest.length ? rest.map((l) => `<p>${escapeText(l)}</p>`).join('') : '' };
 }

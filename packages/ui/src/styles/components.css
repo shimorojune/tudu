@@ -997,6 +997,16 @@ html.tp-is-dragging .tp-sub-del { opacity: 0 !important; }
 .tp-root .tp-qa-file button:hover { background: var(--accent); color: var(--foreground); }
 .tp-qa-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 12px 12px 14px 48px; }
 .tp-qa-sp { flex: 1; }
+/* Made from a note: a quiet pill on the top line, the note's name, × to drop the link (it shrinks away first). */
+.tp-qa-from { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 240px; height: 26px; padding: 0 3px 0 9px; border-radius: var(--radius-full); background: var(--secondary); color: var(--foreground-2); font-size: 12.5px; line-height: 1; animation: tp-label-in var(--dur-menu) var(--ease-arrive) both; transition: opacity 140ms var(--ease-leave), transform 140ms var(--ease-leave); }
+.tp-qa-from > svg { flex: none; color: var(--muted-foreground); }
+.tp-qa-from-n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tp-qa-from button { flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: var(--radius-full); background: none; color: var(--muted-foreground); cursor: pointer; transition: background-color var(--dur-menu) var(--ease-change), color var(--dur-menu) var(--ease-change); }
+.tp-qa-from button:hover { background: var(--accent); color: var(--foreground); }
+.tp-qa-from button:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.tp-qa-from.tp-out { opacity: 0; transform: scale(.94); }
+.tp-qa-phone .tp-qa-from { max-width: 160px; }
+@media (prefers-reduced-motion: reduce) { .tp-qa-from { animation-duration: 1ms; transition: none; } }
 .tp-qa-chipw { position: relative; }
 .tp-root .tp-qa-chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px 0 9px; border-radius: var(--radius-full); font-size: 13px; font-weight: 500; color: var(--foreground-2);
   box-shadow: inset 0 0 0 1px var(--border); white-space: nowrap;
@@ -1366,7 +1376,8 @@ p.tp-jp-none { margin: 0; font-size: 13.5px; }
 .tp-nav-quiet .tp-nav:hover { color: var(--foreground); }
 .tp-jp-morew { position: relative; }
 .tp-jp-morepop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; animation: tp-pop-in var(--dur-menu) var(--ease-arrive) both; transform-origin: top right; }
-.tp-jp-morepop .tp-menu { width: 200px; }
+.tp-jp-morepop .tp-menu { width: max-content; min-width: 200px; max-width: 280px; }
+.tp-jp-morepop .tp-mi { display: block; line-height: 36px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* AppsPanel */
 .tp-apps { height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--card); color: var(--card-foreground); overflow-y: auto; }
 .tp-apps-top { display: flex; align-items: center; gap: 8px; padding: 18px 14px 4px 28px; }
@@ -1381,6 +1392,10 @@ p.tp-jp-none { margin: 0; font-size: 13.5px; }
 .tp-app-ok { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: var(--muted-foreground); }
 .tp-app-ok svg { color: var(--foreground); }
 .tp-app-main p { margin: 2px 0 0; font-size: 13px; line-height: 1.45; color: var(--muted-foreground); }
+.tp-app-off { display: inline-flex; align-items: center; gap: 6px; height: 28px; margin: 4px 0 -4px -8px; padding: 0 8px; border-radius: var(--radius-sm); font-size: 12.5px; font-weight: 500; color: var(--foreground-2); transition: background-color var(--dur-menu) var(--ease-change), color var(--dur-menu) var(--ease-change); }
+.tp-app-off:hover:not([disabled]) { background: var(--accent); color: var(--foreground); }
+.tp-app-off.tp-busy { color: var(--muted-foreground); cursor: progress; }
+.tp-app-main .tp-app-err { color: var(--destructive); animation: tp-pop-in 200ms var(--ease-arrive) both; }
 .tp-apps-fine { margin: 14px 28px 24px; font-size: 12.5px; color: var(--muted-foreground); }
 .tp-apps.tp-compact .tp-apps-top { padding: 8px 8px 2px 20px; }
 .tp-apps.tp-compact .tp-apps-top h2 { font-size: 26px; }
@@ -2676,6 +2691,11 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 .tp-nb-body .tp-rte-notes:not(.tp-compact) .tp-rte-bar { order: 2; position: sticky; top: auto; bottom: 12px; z-index: 3; align-self: center; width: max-content; max-width: 100%; margin: 12px 0 0; }
 .tp-nb-body .tp-rte-notes:not(.tp-compact) .tp-rte-area { order: 1; }
 .tp-nb-body { padding-bottom: 16px; }
+/* The bar sits at the foot of the note pane however short the note is: the words fill the pane (a click anywhere
+   under them writes) and the bar stays stuck to the bottom while a long note scrolls under it. */
+.tp-nb-body { display: flex; flex-direction: column; }
+.tp-nb-body > .tp-rte-notes { flex: 1 0 auto; }
+.tp-nb-body .tp-rte-notes .tp-rte-area { flex: 1 0 auto; }
 
 /* Saving, quietly: a small ring only if a save takes a moment, a tick that draws in and fades when it lands. */
 .tp-nb-save-quiet { min-width: 18px; justify-content: center; padding: 0; }

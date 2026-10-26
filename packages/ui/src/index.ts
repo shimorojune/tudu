@@ -180,6 +180,7 @@ export {
   QA_CLOSE_AFTER_MS,
   QA_LEAVE_MS,
   QA_LEAVE_PHONE_MS,
+  QA_FROM_OUT_MS,
   QA_SIMILAR_AFTER_MS,
   QA_SIMILAR_MIN,
   type QuickAddProps,
@@ -187,6 +188,7 @@ export {
   type QuickAddDraft,
   type QuickAddFile,
   type QuickAddResult,
+  type QuickAddFromNote,
 } from './components/QuickAdd';
 
 // Week (chunk 05)

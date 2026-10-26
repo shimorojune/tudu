@@ -1,4 +1,5 @@
 import type { Track } from '@tudu/core';
+import type { QuickAddSeed } from './dayView';
 
 /**
  * The macOS app, as the page sees it. In the app the page is Tudu on the web inside a Tauri window, and this bridge
@@ -73,6 +74,10 @@ export interface DesktopBridge {
   feedback(): void;
   /** From the sheet: the floating bar, as the summon brings it. */
   summon(): void;
+  /** Make a task in the note window: the floating bar comes up filled in with these words (the desk stays put). */
+  summonWith(seed: QuickAddSeed): void;
+  /** The floating page as it comes up: the words it was summoned with, once; null for a plain summon. */
+  quickAddSeed(): Promise<QuickAddSeed | null>;
   hideMenubar(): void;
   quit(): void;
   /** The note window on a note, or on a blank one (linked to a task): it floats over every app, the desk stays put. */
@@ -144,6 +149,8 @@ export interface DesktopFake {
   loginAnswer?: LoginState;
   /** The note window as the fake app has it. */
   note?: Partial<NoteWindowState>;
+  /** The floating bar's waiting seed (summonWith keeps it, quickAddSeed takes it). */
+  seed?: QuickAddSeed | null;
   calls: Array<{ name: string; args: unknown[] }>;
   listeners?: Record<string, Array<(payload: unknown) => void>>;
 }
@@ -197,6 +204,15 @@ function fakeBridge(f: DesktopFake): DesktopBridge {
     openTask: (path) => call('openTask', path),
     feedback: () => call('feedback'),
     summon: () => call('summon'),
+    summonWith: (seed) => {
+      call('summonWith', seed);
+      f.seed = seed;
+    },
+    quickAddSeed: async () => {
+      const s = f.seed ?? null;
+      f.seed = null;
+      return s;
+    },
     hideMenubar: () => call('hideMenubar'),
     quit: () => call('quit'),
     openNote: (id, linkTo) => call('openNote', id, linkTo ?? null),
@@ -301,6 +317,8 @@ function tauriBridge(t: NonNullable<Window['__TAURI_INTERNALS__']>): DesktopBrid
     openTask: (path) => quiet(invoke('show_main', { path })),
     feedback: () => quiet(invoke('show_main', { path: FEEDBACK_GO })),
     summon: () => quiet(invoke('summon')),
+    summonWith: (seed) => quiet(invoke('summon_with', { seed })),
+    quickAddSeed: () => invoke<QuickAddSeed | null>('quick_add_seed').catch(() => null),
     hideMenubar: () => quiet(invoke('hide_menubar')),
     quit: () => quiet(invoke('quit')),
     openNote: (id, linkTo) => quiet(invoke('open_note', { id, linkTo: linkTo ?? null })),

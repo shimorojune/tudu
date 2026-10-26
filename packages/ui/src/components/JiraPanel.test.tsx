@@ -530,4 +530,48 @@ describe('the Jira panel (chunk 10)', () => {
     rerender(<JPConnect account={false} />);
     expect(screen.getByText(/^Connect with a personal access token\./)).toBeInTheDocument();
   });
+
+  it('C10-U20 More holds Turn off in {space}, Manage spaces… and a red Disconnect Jira, in that order', async () => {
+    const user = userEvent.setup();
+    const onTurnOff = vi.fn();
+    const onManage = vi.fn();
+    const onDisconnect = vi.fn();
+    const { rerender } = render(
+      <Panel spaceName="Northwind" onTurnOff={onTurnOff} onManage={onManage} onDisconnect={onDisconnect} />,
+    );
+    const more = screen.getByRole('button', { name: 'More' });
+    await user.click(more);
+    const items = within(screen.getByRole('menu', { name: 'More' })).getAllByRole('menuitem');
+    expect(items.map((x) => x.textContent)).toEqual([
+      'Turn off in Northwind',
+      'Manage spaces…',
+      'Disconnect Jira',
+    ]);
+    expect(items[2]).toHaveClass('tp-mi-danger');
+    expect(items[0]).not.toHaveClass('tp-mi-danger');
+    expect(items[1]).not.toHaveClass('tp-mi-danger');
+
+    await user.click(items[0]!);
+    expect(onTurnOff).toHaveBeenCalledTimes(1);
+    expect(onManage).not.toHaveBeenCalled();
+    expect(onDisconnect).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole('menu', { name: 'More' })).toBeNull());
+
+    await user.click(more);
+    await user.click(screen.getByRole('menuitem', { name: 'Manage spaces…' }));
+    expect(onManage).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.queryByRole('menu', { name: 'More' })).toBeNull());
+
+    await user.click(more);
+    await user.click(screen.getByRole('menuitem', { name: 'Disconnect Jira' }));
+    expect(onDisconnect).toHaveBeenCalledTimes(1);
+    expect(onTurnOff).toHaveBeenCalledTimes(1);
+
+    rerender(<Panel onTurnOff={onTurnOff} onManage={onManage} onDisconnect={onDisconnect} />);
+    await user.click(screen.getByRole('button', { name: 'More' }));
+    expect(screen.getByRole('menuitem', { name: 'Turn off in this space' })).toBeInTheDocument();
+
+    rerender(<Panel state="connect" onTurnOff={onTurnOff} onManage={onManage} onDisconnect={onDisconnect} />);
+    expect(screen.queryByRole('button', { name: 'More' })).toBeNull();
+  });
 });
