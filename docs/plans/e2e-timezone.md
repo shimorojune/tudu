@@ -1,7 +1,7 @@
 # E2E suite: pin the timezone so ticks don't lose to their own seeds
 
-Status: proposal, awaiting Rohit's approval (26 Oct 2026). No app code changes; no visible design change (canvas step
-not applicable, needs Rohit's OK to skip).
+Status: approved by Rohit 26 Oct 2026 (canvas skipped with his OK). No app code changes; no visible design change (canvas step
+not applicable).
 
 ## What fails
 
