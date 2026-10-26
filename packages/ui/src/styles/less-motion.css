@@ -84,6 +84,10 @@
 :root[data-motion='less'] .tp-td-cmt.tp-fresh::before {
   animation-duration: 1200ms;
 }
+:root[data-motion='less'] .tp-qa-from {
+  animation-duration: 1ms;
+  transition: none;
+}
 :root[data-motion='less'] .tp-qa-layer .tp-qa {
   animation: tp-veil-in 120ms linear both !important;
 }

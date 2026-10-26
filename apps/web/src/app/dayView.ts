@@ -1,4 +1,4 @@
-import type { AppPage, IsoDate } from '@tudu/core';
+import type { AppPage, IsoDate, QuickAddFrom } from '@tudu/core';
 import { useSyncExternalStore } from 'react';
 
 /**
@@ -35,7 +35,16 @@ let locate: { id: string; day: IsoDate | null; nonce: number } | null = null;
 /** The search panel, over the page. */
 let search = false;
 /** Words to start Quick Add's title with (Create from Search), or who it is for ("Send Meera a task"). */
-let quickAddSeed: { title?: string; toId?: string; spaceId?: string; nonce: number } | null = null;
+/** What Quick Add opens on: words for the title (and the note), a person, a space, the note it is made from. */
+export interface QuickAddSeed {
+  title?: string;
+  note?: string;
+  toId?: string;
+  spaceId?: string;
+  from?: QuickAddFrom;
+}
+
+let quickAddSeed: (QuickAddSeed & { nonce: number }) | null = null;
 /** The view the Backlog should open on next (a crossed-off task picked in Search). */
 let backlogView: { view: 'open' | 'done'; nonce: number } | null = null;
 /** The Create a space dialog, and the Members card, over the page. */
@@ -97,13 +106,20 @@ export function useShownDay(): IsoDate | null {
 }
 
 /** Quick Add, over the page; with words, they become the title; with a person, it is for them. */
-export function openQuickAdd(seed?: { title?: string; toId?: string; spaceId?: string }): void {
+export function openQuickAdd(seed?: QuickAddSeed): void {
   // A click handler may pass its event: only real words or a real person count.
   const words = seed && typeof seed.title === 'string' ? seed.title : undefined;
   const toId = seed && typeof seed.toId === 'string' ? seed.toId : undefined;
   const spaceId = seed && typeof seed.spaceId === 'string' ? seed.spaceId : undefined;
   if (words !== undefined || toId !== undefined)
-    quickAddSeed = { title: words, toId, spaceId, nonce: (quickAddSeed?.nonce ?? 0) + 1 };
+    quickAddSeed = {
+      title: words,
+      toId,
+      spaceId,
+      note: typeof seed?.note === 'string' ? seed.note : undefined,
+      from: seed?.from && typeof seed.from.noteId === 'string' ? seed.from : undefined,
+      nonce: (quickAddSeed?.nonce ?? 0) + 1,
+    };
   if (quickAdd) {
     if (words !== undefined || toId !== undefined) notify();
     return;
@@ -112,7 +128,7 @@ export function openQuickAdd(seed?: { title?: string; toId?: string; spaceId?: s
   notify();
 }
 
-export function useQuickAddSeed(): { title?: string; toId?: string; spaceId?: string; nonce: number } | null {
+export function useQuickAddSeed(): (QuickAddSeed & { nonce: number }) | null {
   return useSyncExternalStore(
     subscribe,
     () => quickAddSeed,

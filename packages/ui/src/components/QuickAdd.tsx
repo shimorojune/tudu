@@ -26,6 +26,7 @@ import { Button } from './Button';
 import { IconButton } from './IconButton';
 import { Logo } from './Logo';
 import { MiniCalendar, type MiniCalendarProps } from './MiniCalendar';
+import { NoteIcon } from './NoteParts';
 import { PersonDot, type PersonDotPerson } from './PersonDot';
 import { PersonPick, type PickPerson } from './PersonPick';
 import { ProjectMenu, type ProjectOption } from './ProjectMenu';
@@ -69,6 +70,14 @@ export interface QuickAddResult {
   spaceId?: string;
   /** Who it goes to; null is you. */
   toId?: string | null;
+  /** Made from a note, its pill kept: the new task links back to that note. */
+  from?: QuickAddFromNote | null;
+}
+
+/** The note New task was opened from (Make a task), named on the top line's pill. */
+export interface QuickAddFromNote {
+  noteId: string;
+  name: string;
 }
 
 export interface QuickAddSpace extends SpaceTileSpace {
@@ -135,9 +144,13 @@ export interface QuickAddProps {
     /** The look-alike line already open with these tasks. */
     similar?: SimilarItem[];
     similarOpen?: boolean;
+    from?: QuickAddFromNote | null;
   };
-  /** Words to start the title with (Create from Search): a new nonce writes them in. */
-  seed?: { title?: string; nonce: number } | null;
+  /**
+   * Words to start with (Create from Search, Make a task in a note): a new nonce writes them in. `note` fills the
+   * note; `from` names the note the task links back to (any seed without it drops the pill).
+   */
+  seed?: { title?: string; note?: string; from?: QuickAddFromNote | null; nonce: number } | null;
   /**
    * Close matches while you write: tasks that read like the title, asked a moment after a pause. A quiet line under
    * the title names the closest; it never blocks adding.
@@ -172,6 +185,8 @@ function sameSimilar(a: SimilarItem[], b: SimilarItem[]) {
 export const QA_CLOSE_AFTER_MS = 650;
 export const QA_LEAVE_MS = 160;
 export const QA_LEAVE_PHONE_MS = 220;
+/** The note pill shrinks away this long before it leaves. */
+export const QA_FROM_OUT_MS = 140;
 
 function fresh(p: QuickAddProps): QuickAddDraft {
   const i = p.initial ?? {};
@@ -180,7 +195,7 @@ function fresh(p: QuickAddProps): QuickAddDraft {
     planned: i.planned !== undefined ? i.planned : p.planned !== undefined ? p.planned : p.today,
     due: i.due ?? null,
     projectId: i.projectId ?? null,
-    note: toHtml(i.note ?? ''),
+    note: toHtml(i.note ?? p.seed?.note ?? ''),
     files: i.files ?? [],
   };
 }
@@ -290,7 +305,10 @@ export function QuickAdd(p: QuickAddProps) {
   const [drop, setDrop] = useState(p.initial?.dropping ? 1 : 0);
   const [mounted, setMounted] = useState(open);
   const [leaving, setLeaving] = useState(false);
-  const [noteOpen, setNoteOpen] = useState(!!p.initial?.note);
+  const [noteOpen, setNoteOpen] = useState(!!p.initial?.note || !!p.seed?.note);
+  // The note it was made from (its pill on the top line); × shrinks the pill away, then the task won't link.
+  const [from, setFrom] = useState<QuickAddFromNote | null>(() => p.initial?.from ?? p.seed?.from ?? null);
+  const [fromGoing, setFromGoing] = useState(false);
   const input = useRef<HTMLInputElement | null>(null);
   const sheet = useRef<HTMLElement | null>(null);
   // A new key loads a fresh note into the editor (after a task is added and the draft starts again).
@@ -309,11 +327,18 @@ export function QuickAdd(p: QuickAddProps) {
     live.current.onDraftChange?.(f);
   }, [f]);
 
-  // Words handed in (Create from Search) become the title.
+  // Words handed in (Create from Search, Make a task) become the title, the rest the note.
   const [seenSeed, setSeenSeed] = useState(p.seed?.nonce ?? 0);
   if (p.seed && p.seed.nonce !== seenSeed) {
     setSeenSeed(p.seed.nonce);
     if (p.seed.title !== undefined) set({ title: p.seed.title });
+    if (p.seed.note !== undefined) {
+      set({ note: toHtml(p.seed.note) });
+      setNoteOpen(!!p.seed.note);
+      setNoteKey((k) => k + 1);
+    }
+    setFrom(p.seed.from ?? null);
+    setFromGoing(false);
   }
 
   // Close matches while you write: when the title reads like tasks you already have, a quiet box under it says so
@@ -461,6 +486,8 @@ export function QuickAdd(p: QuickAddProps) {
         attachments: files.filter((x) => x.id).map((x) => x.id!),
         spaceId: p.send?.spaceId,
         toId: p.send ? (p.send.to?.id ?? null) : undefined,
+        // A request isn't a task of yours until they take it, so only your own task links back.
+        from: p.send?.to ? null : from,
       };
       await p.onSave?.(task);
       setSaving(false);
@@ -476,6 +503,7 @@ export function QuickAdd(p: QuickAddProps) {
           note: '',
           files: [],
         });
+        setFrom(null);
         setNoteKey((k) => k + 1);
         if (overlay) now.onClose?.();
         else {
@@ -877,6 +905,28 @@ export function QuickAdd(p: QuickAddProps) {
           <span className="tp-qa-tol">for</span>
           {forChip}
           <span className="tp-qa-sp" />
+          {from && !p.send?.to ? (
+            <span
+              className={cx('tp-qa-from', fromGoing && 'tp-out')}
+              title={`Links to the note “${from.name}”`}
+            >
+              <NoteIcon name="note" size={13} />
+              <span className="tp-qa-from-n">{from.name}</span>
+              <button
+                type="button"
+                aria-label="Don’t link it to this note"
+                onClick={() => {
+                  setFromGoing(true);
+                  setTimeout(() => {
+                    setFromGoing(false);
+                    setFrom(null);
+                  }, QA_FROM_OUT_MS);
+                }}
+              >
+                <Icon name="x" size={11} />
+              </button>
+            </span>
+          ) : null}
           {!phone && p.onClose ? (
             <IconButton label="Close" className="tp-qa-x" tip={false} onClick={p.onClose}>
               <Icon name="x" size={16} />

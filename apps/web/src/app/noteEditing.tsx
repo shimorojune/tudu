@@ -1,14 +1,15 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import type { MeResponse } from '@tudu/client';
 import { ApiError } from '@tudu/client';
-import type { NoteTask, SearchHit, SearchResponse } from '@tudu/core';
+import { noteName, taskFromWords, type NoteTask, type SearchHit, type SearchResponse } from '@tudu/core';
 import { Banner, showToast, type NoteEditorProps, type NoteTaskItem, type PickItem } from '@tudu/ui';
 import { useState } from 'react';
 import { API_URL } from './config';
+import { openQuickAdd, type QuickAddSeed } from './dayView';
 import { editorNote, movedWords, notebookStore, taskPick, todayIso, useSaveState } from './notebook';
 import { getRecentTasks } from './search';
 import { api, meQuery, queryClient } from './session';
-import { taskStore, useOnline } from './tasks';
+import { useOnline } from './tasks';
 
 /** Where a task opens from a note: a page in this window, or the desk (the Mac's note window). */
 export type OpenPath = (path: string) => void;
@@ -57,6 +58,8 @@ export function useNoteEditor(
     /** Undo of a delete: show it again. */
     onBack?: (id: string) => void;
     openPath: OpenPath;
+    /** Make a task: New task opens on these words (Quick Add over the page unless the window says otherwise). */
+    makeTask?: (seed: QuickAddSeed) => void;
   },
 ): NoteEditorProps {
   const q = useQuery({ ...notebookStore.noteQuery(id ?? ''), enabled: !!id, retry: false });
@@ -137,28 +140,20 @@ export function useNoteEditor(
       });
     },
     onOpenTask: openTask,
+    // Make a task opens New task on the words, in Personal on Today; nothing is made until Add task. The note rides
+    // along as the pill on its top line, so the task links back to it.
     onMakeTask: (words) => {
       const me = queryClient.getQueryData<MeResponse>(meQuery.queryKey);
       const personal = me?.spaces.find((s) => s.kind === 'personal');
-      if (!personal) return;
-      const title = words.length > 500 ? words.slice(0, 500) : words;
-      const today = todayIso();
-      const taskId = taskStore.create(personal.id, today, title);
-      notebookStore.link(id, {
-        id: taskId,
-        ref: '',
-        title,
-        spaceId: personal.id,
-        space: { name: personal.name, color: null, personal: true },
-      });
-      const short = title.length > 60 ? `${title.slice(0, 59)}…` : title;
-      showToast(`“${short}” is on Today in Personal, linked to this note.`, {
-        action: 'Open',
-        onAction: () => {
-          const ref = taskStore.lastSeen(taskId)?.ref;
-          o.openPath(ref ? `/t/${encodeURIComponent(ref)}` : `/me`);
-        },
-      });
+      const w = taskFromWords(words);
+      if (!w.title) return;
+      const seed: QuickAddSeed = {
+        title: w.title,
+        note: w.note,
+        spaceId: personal?.id,
+        from: { noteId: id, name: view.title.trim() || view.first.trim() ? noteName(view) : 'This note' },
+      };
+      (o.makeTask ?? openQuickAdd)(seed);
     },
     onAttach: async (file, onProgress) => {
       try {

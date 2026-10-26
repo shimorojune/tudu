@@ -33,6 +33,8 @@
             "allow-show-main",
             "allow-hide-floating",
             "allow-summon",
+            "allow-summon-with",
+            "allow-quick-add-seed",
             "allow-hide-menubar",
             "allow-quit",
             "allow-update-check",

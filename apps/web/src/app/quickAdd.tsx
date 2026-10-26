@@ -3,6 +3,7 @@ import { useNavigate, useRouterState } from '@tanstack/react-router';
 import {
   addedWords,
   initialsOf,
+  linkedWords,
   mondayOf,
   pagePlannedDay,
   searchWhere,
@@ -39,7 +40,8 @@ import {
 } from './dayView';
 import { editProjects, editProjectsHref } from './editProjects';
 import { goToTask } from './search';
-import { api } from './session';
+import { notebookStore } from './notebook';
+import { api, meQuery, queryClient } from './session';
 import { useAllScope } from './allSpaces';
 import { inboxPath, pagePath, spacePath, useSpace } from './space';
 import { taskStore, useOnline } from './tasks';
@@ -77,13 +79,16 @@ export function useQuickAddActions(spaceId: string | undefined) {
   const online = useOnline();
   const save = (t: QuickAddResult) => {
     if (!spaceId) throw new Error('no space');
-    return taskStore.create(spaceId, t.planned, t.title, undefined, {
+    const id = taskStore.create(spaceId, t.planned, t.title, undefined, {
       due: t.due,
       projectId: t.projectId,
       notes: t.note,
       attachments: t.attachments,
       source: 'quick-add',
     });
+    // Made from a note (Make a task), its pill kept: the new task links back to that note, after the task itself.
+    if (t.from) linkToNote(t.from.noteId, id, spaceId, t.title);
+    return id;
   };
   return {
     today,
@@ -99,6 +104,19 @@ export function useQuickAddActions(spaceId: string | undefined) {
     upload: (file: File, onProgress: (ratio: number) => void) =>
       spaceId ? taskStore.upload(spaceId, file, null, onProgress) : Promise.reject(new Error('no space')),
   };
+}
+
+/** Link a task just made to the note it came from; its chip shows in the note at once. */
+export function linkToNote(noteId: string, taskId: string, spaceId: string, title: string): void {
+  const me = queryClient.getQueryData<MeResponse>(meQuery.queryKey);
+  const s = me?.spaces.find((x) => x.id === spaceId);
+  notebookStore.link(noteId, {
+    id: taskId,
+    ref: '',
+    title,
+    spaceId,
+    space: { name: s?.name ?? '', color: s?.color ?? null, personal: s?.kind === 'personal' },
+  });
 }
 
 type SendTo = { spaceId: string; toId: string | null };
@@ -151,7 +169,7 @@ export function sendLine(
 }
 
 /** Quick Add over the app: the bar on the desk and tablets, the sheet above the keyboard on phones. */
-export function QuickAddHost({ me }: { me: MeResponse }) {
+export function QuickAddHost({ me, openPath }: { me: MeResponse; openPath?: (href: string) => void }) {
   const vp = useViewport();
   const open = useQuickAddOpen();
   const space = useSpace();
@@ -241,6 +259,19 @@ export function QuickAddHost({ me }: { me: MeResponse }) {
       onAdded={(t) => {
         const id = lastId.current;
         if (!id) return;
+        if (t.from) {
+          // Made from a note: say it's linked, wherever it landed; Open shows the task.
+          showToast(linkedWords(t.title, t.planned, a.today, target.name), {
+            action: 'Open',
+            onAction: () => {
+              const ref = taskStore.lastSeen(id)?.ref;
+              const href = ref ? `/t/${encodeURIComponent(ref)}` : spacePath(target.slug, 'today');
+              if (openPath) openPath(href);
+              else void navigate({ href });
+            },
+          });
+          return;
+        }
         if (t.toId) {
           // Sent: it waits in their Inbox, and in your Sent.
           const first = (to?.name ?? 'them').trim().split(/\s+/)[0]!;

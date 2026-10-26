@@ -71,7 +71,7 @@ export interface NoteEditorProps {
   onLink?: (task: PickItem) => void;
   onUnlink?: (task: NoteTaskItem) => void;
   onOpenTask?: (task: NoteTaskItem) => void;
-  /** Words selected in the note: make a task of them. */
+  /** Words selected in the note (line breaks kept): New task opens on them. */
   onMakeTask?: (words: string) => void;
   /** ↗ in the browser: the note in its own window. */
   onPop?: () => void;
@@ -189,7 +189,8 @@ export function NoteEditor(p: NoteEditorProps) {
       setBubble({
         x: Math.max(70, Math.min(el.offsetWidth - 70, x)),
         y: Math.max(8, y - 8),
-        text: text.replace(/\s+/g, ' '),
+        // The words as selected, line breaks kept: the first line becomes the task, the rest its note.
+        text,
       });
     }
     document.addEventListener('selectionchange', check);

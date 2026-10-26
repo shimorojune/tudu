@@ -37,6 +37,8 @@ macro_rules! handlers {
             bridge::show_main,
             bridge::hide_floating,
             bridge::summon,
+            bridge::summon_with,
+            bridge::quick_add_seed,
             bridge::hide_menubar,
             bridge::quit,
             updates::update_check,
