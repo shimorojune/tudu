@@ -14,3 +14,4 @@ export interface Embedder {
 export { embeddingText } from '@tudu/core';
 export { FakeEmbedder } from './fake';
 export { LocalEmbedder, LOCAL_MODEL } from './local';
+export { localModelDir } from './modelDir';

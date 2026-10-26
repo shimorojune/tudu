@@ -160,6 +160,11 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4]
+    # Playwright's own image: browsers and their system libraries are in it, so no apt step (the Ubuntu mirror hung
+    # this job for up to 45 minutes). The tag must equal @playwright/test in the lockfile; C01-U16 checks it.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --ipc=host
     services:
       postgres: *postgres
       rustfs:
@@ -169,8 +174,9 @@ jobs:
           RUSTFS_SECRET_KEY: tudu-ci-secret
         ports: ['9000:9000']
     env:
-      TUDU_CI_DATABASE_URL: postgres://tudu:tudu@127.0.0.1:5432/postgres
-      TUDU_CI_S3_ENDPOINT: http://127.0.0.1:9000
+      # Inside a container job the services are reached by name.
+      TUDU_CI_DATABASE_URL: postgres://tudu:tudu@postgres:5432/postgres
+      TUDU_CI_S3_ENDPOINT: http://rustfs:9000
       TUDU_CI_S3_BUCKET: tudu-ci
       TUDU_CI_S3_ACCESS_KEY_ID: tudu-ci
       TUDU_CI_S3_SECRET_ACCESS_KEY: tudu-ci-secret
@@ -190,20 +196,9 @@ jobs:
           path: .local/models
           key: embeddings-all-MiniLM-L6-v2-q8
       - run: EMBEDDINGS_MODEL_DIR=$PWD/.local/models pnpm --filter @tudu/server exec node --import tsx src/embeddings/fetch-model.ts
-      # Usually under a minute; it once hung 45 minutes on the apt step (PR #35).
-      - run: pnpm --filter e2e exec playwright install --with-deps chromium webkit
-        timeout-minutes: 10
       - name: Create the storage bucket
-        env:
-          AWS_ACCESS_KEY_ID: tudu-ci
-          AWS_SECRET_ACCESS_KEY: tudu-ci-secret
-          AWS_DEFAULT_REGION: us-east-1
-        run: |
-          for i in $(seq 1 30); do
-            aws --endpoint-url "$TUDU_CI_S3_ENDPOINT" s3 mb "s3://$TUDU_CI_S3_BUCKET" && exit 0
-            sleep 2
-          done
-          exit 1
+        run: pnpm --filter @tudu/server exec node --import tsx src/ensure-bucket.ts
+        timeout-minutes: 2
       - run: pnpm e2e --shard=${{ matrix.shard }}/4
         env:
           CI: 'true'

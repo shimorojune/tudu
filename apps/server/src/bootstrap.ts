@@ -13,7 +13,7 @@ import { createApp, type App } from './app';
 import { sweepAttachments } from './files';
 import { sweepNotebook } from './notebook';
 import { EMBED_EVERY_MS, Embeddings } from './closeMatches';
-import { LocalEmbedder, type Embedder } from './embeddings';
+import { LocalEmbedder, localModelDir, type Embedder } from './embeddings';
 import { MemoryStorage, S3Storage, type Storage } from './storage';
 import { sweepCleared } from './inbox';
 import { ISSUE_SWEEP_EVERY_MS, sweepIssues } from './feedback/filing';
@@ -80,10 +80,10 @@ export function bootstrap(
       : env.EMBEDDINGS === 'off'
         ? null
         : new LocalEmbedder({
-            // Local work and tests keep the model in the repo's own cache; the image sets its own folder.
+            // Local work and tests share the main checkout's cache (worktrees too); the image sets its own folder.
             modelDir:
               env.EMBEDDINGS_MODEL_DIR ??
-              resolve(fileURLToPath(import.meta.url), '../../../../.local/models'),
+              localModelDir(resolve(fileURLToPath(import.meta.url), '../../../..')),
             offline: env.EMBEDDINGS_OFFLINE === '1',
             quiet: options.quiet,
           });

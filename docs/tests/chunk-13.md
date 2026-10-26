@@ -30,6 +30,11 @@ Last measured 2026-10-22 15:03 UTC with `Xenova/all-MiniLM-L6-v2` (floor 0.3) ov
 | C13-U07 | SearchPanel     | No word match: Create first, close matches under it; Enter still creates                                                                                                                                                         |
 | C13-U08 | QuickAdd        | Covered by C07-U07: the box after the pause with the hits the app answers, "N more", ×, Open (the app's answer now merges words and meaning, C13-A06)                                                                            |
 | C13-U09 | web             | A hit from another space carries that space for its row, one from this space none; a pick in another space goes to its address                                                                                                   |
+| C13-U10 | model folder    | A plain checkout keeps the model in its own .local/models                                                                                                                                                                        |
+| C13-U11 | model folder    | A git worktree uses the main checkout's .local/models                                                                                                                                                                            |
+| C13-U12 | model folder    | A worktree whose gitdir has no commondir file still finds the main checkout                                                                                                                                                      |
+| C13-U13 | model folder    | No .git at all falls back to the folder itself                                                                                                                                                                                   |
+| C13-U14 | model folder    | A .git file without a gitdir line falls back to the folder itself                                                                                                                                                                |
 
 ## API (`apps/server`)
 
