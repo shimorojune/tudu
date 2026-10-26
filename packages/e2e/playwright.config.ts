@@ -6,6 +6,11 @@ import { defineConfig, devices } from '@playwright/test';
  * relies on another test having run. Reduced motion is on so no assertion lands mid-animation.
  */
 // Ports can move (E2E_API_PORT, E2E_WEB_PORT) when another copy of the app already runs on the usual ones.
+// The suite runs in UTC, as CI does. The fixtures write local dates (`new Date(2026, 9, 18, 10, 0)`) for the page's
+// clock and fixed UTC times for seeded tasks; in another timezone a tick can be older than the task it ticks, and the
+// server's last-write-wins drops it. Node, the API it starts and the browser all read this (C00-E06).
+process.env.TZ = 'UTC';
+
 const apiPort = process.env.E2E_API_PORT ?? '3456';
 const webPort = process.env.E2E_WEB_PORT ?? '5173';
 const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${webPort}`;
@@ -27,6 +32,7 @@ export default defineConfig({
   ],
   use: {
     baseURL,
+    timezoneId: 'UTC',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     contextOptions: { reducedMotion: 'reduce' },

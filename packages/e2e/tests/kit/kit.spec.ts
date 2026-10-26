@@ -109,4 +109,15 @@ test.describe('kit page', () => {
     await page.reload();
     await expect(page.locator('html')).toHaveClass(/dark/);
   });
+
+  test('C00-E06 the suite runs in UTC: the test and the page agree on the hour', async ({ page }) => {
+    // The fixtures' local "Sunday 10:00" is the instant the seeds are stamped against (playwright.config.ts).
+    expect(new Date(2026, 9, 18, 10, 0).toISOString()).toBe('2026-10-18T10:00:00.000Z');
+    await page.goto('/kit');
+    const zone = await page.evaluate(() => ({
+      offset: new Date(2026, 9, 18, 10, 0).getTimezoneOffset(),
+      name: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    }));
+    expect(zone).toEqual({ offset: 0, name: 'UTC' });
+  });
 });
