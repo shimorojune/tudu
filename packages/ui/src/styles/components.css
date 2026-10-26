@@ -755,9 +755,9 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 .tp-mi .tp-td-mi { font-family: var(--font-sans); font-size: 13.5px; color: var(--popover-foreground); }
 
 /* TaskDetail: the comment box is pinned to the bottom of the panel, always one tap away */
-.tp-td-compose { flex: none; display: flex; align-items: flex-start; gap: 12px; padding: 12px 24px 14px 36px; border-top: 1px solid var(--line); position: relative; z-index: 3; }
+.tp-td-compose { flex: none; display: flex; align-items: flex-start; gap: 12px; padding: 12px 36px 14px; border-top: 1px solid var(--line); position: relative; z-index: 3; }
 .tp-td-compose > .tp-avatar { margin-top: 6px; }
-.tp-td.tp-compact .tp-td-compose { padding: 10px 16px max(12px, env(safe-area-inset-bottom, 0px)) 20px; }
+.tp-td.tp-compact .tp-td-compose { padding: 10px 20px max(12px, env(safe-area-inset-bottom, 0px)); }
 .tp-td-more { position: relative; }
 .tp-td-pop-r { left: auto; right: 0; transform-origin: top right; }
 .tp-mi.tp-mi-danger { color: var(--destructive); }
@@ -2442,3 +2442,382 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 .tp-jp-lk-sp { display: inline-flex; align-items: center; gap: 4px; color: var(--muted-foreground); font-weight: 400; }
 .tp-jp-lk-sp .tp-stile { flex: none; }
 @media (prefers-reduced-motion: reduce) { .tp-set-sprow.tp-set-hl, .tp-set-sprow > .tp-setrow, .tp-set-spsub, .tp-set-sperr { animation: none; } }
+
+/* Banners never squeeze their words into a column: the banner measures its own width, and when the words and buttons
+   don't fit side by side the buttons drop under the words (lined up with them, past the icon). */
+.tp-banner-wrap { container-type: inline-size; }
+.tp-banner button { white-space: nowrap; flex: none; }
+@container (max-width: 520px) {
+  .tp-banner { flex-wrap: wrap; row-gap: 10px; }
+  .tp-banner .tp-sp { flex: 1 1 calc(100% - 40px); text-wrap: pretty; }
+  .tp-banner > svg + .tp-sp ~ button:not(.tp-x) { order: 3; }
+  .tp-banner > svg + .tp-sp + button:not(.tp-x) { margin-left: 28px; }
+  .tp-banner button.tp-x { order: 2; margin: -4px -6px 0 auto; }
+}
+@container (max-width: 270px) {
+  .tp-banner > svg + .tp-sp ~ button:not(.tp-x) { margin-left: 28px; }
+}
+/* An empty state's words wrap and balance at any width instead of squeezing. */
+.tp-empty { max-width: 100%; min-width: 0; }
+.tp-empty-t, .tp-empty-b { text-wrap: balance; overflow-wrap: break-word; max-width: 100%; }
+
+/* Notebook (chunk 22): your notes, in folders, linked to tasks. Tokens only; motion uses the system's durations and curves. */
+
+/* Rows: a note or a folder. Neutral ink wash on hover, the accent fill when open (never the brand selection tint). */
+.tp-nb-row.tp-root { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 34px; margin: 0; padding: 6px 10px 6px calc(10px + var(--nb-depth, 0) * 16px); box-sizing: border-box; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--foreground-2); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer; transition: background-color var(--dur-menu) var(--ease-change), color var(--dur-menu) var(--ease-change); }
+.tp-nb-row.tp-root:hover, .tp-nb-row.tp-root.tp-cur { background: color-mix(in srgb, var(--foreground) 4%, transparent); color: var(--foreground); }
+.tp-nb-row.tp-root.tp-on { background: var(--accent); color: var(--foreground); }
+.tp-nb-row.tp-root.tp-on .tp-nb-row-t { font-weight: 500; }
+.tp-nb-row.tp-root:focus-visible { outline: none; box-shadow: inset 0 0 0 1.5px var(--ring); }
+.tp-nb-row-ic { flex: none; width: 16px; display: inline-flex; justify-content: center; color: var(--muted-foreground); }
+.tp-nb-row-m { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.tp-nb-row-t { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; line-height: 19px; }
+.tp-nb-untitled { color: var(--muted-foreground); }
+.tp-nb-row-s { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; line-height: 16px; color: var(--muted-foreground); }
+.tp-nb-row-ln { flex: none; display: inline-flex; align-items: center; gap: 3px; font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); }
+.tp-nb-row-time { flex: none; font-family: var(--font-mono); font-size: 11px; color: var(--ghost); font-variant-numeric: tabular-nums; }
+
+/* Folders. The chevron turns, the children open by easing their height (grid rows 0fr to 1fr). */
+.tp-nb-frow { position: relative; display: flex; align-items: center; border-radius: var(--radius-sm); transition: background-color var(--dur-menu) var(--ease-change); }
+.tp-nb-frow:hover { background: color-mix(in srgb, var(--foreground) 4%, transparent); }
+.tp-nb-ftog { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; min-height: 34px; margin: 0; padding: 6px 8px 6px calc(2px + var(--nb-depth, 0) * 16px); border: 0; background: transparent; color: var(--foreground); font: inherit; font-size: 13.5px; font-weight: 500; text-align: left; cursor: pointer; border-radius: var(--radius-sm); }
+.tp-nb-ftog:focus-visible { outline: none; box-shadow: inset 0 0 0 1.5px var(--ring); }
+.tp-nb-chev { flex: none; width: 14px; display: inline-flex; color: var(--ghost); transition: transform var(--dur-menu) var(--ease-change); }
+.tp-nb-frow.tp-open .tp-nb-chev { transform: rotate(90deg); }
+.tp-nb-fname { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tp-nb-fcount { flex: none; font-family: var(--font-mono); font-size: 11px; font-weight: 400; color: var(--ghost); font-variant-numeric: tabular-nums; }
+.tp-nb-fadd { display: inline-flex; gap: 0; padding-right: 2px; opacity: 0; transition: opacity var(--dur-menu) var(--ease-change); }
+.tp-nb-fadd .tp-ib { width: 26px; height: 26px; border-radius: var(--radius-xs); }
+.tp-nb-frow:hover .tp-nb-fadd, .tp-nb-frow:focus-within .tp-nb-fadd { opacity: 1; }
+.tp-nb-frow:hover .tp-nb-fcount { opacity: 0; }
+.tp-nb-kids { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--dur-fold) var(--ease-change); }
+.tp-nb-kids > div { min-height: 0; overflow: hidden; opacity: 0; transition: opacity var(--dur-menu) var(--ease-change); }
+.tp-nb-kids.tp-open { grid-template-rows: 1fr; }
+.tp-nb-kids.tp-open > div { opacity: 1; }
+.tp-nb-fempty { margin: 0; padding: 6px 10px 8px calc(36px + var(--nb-depth, 0) * 16px); font-size: 12.5px; color: var(--ghost); }
+
+/* The tree: the left pane of the Notebook page. */
+.tp-nb-tree { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.tp-nb-tree-h { display: flex; align-items: center; gap: 2px; padding: 18px 12px 10px 18px; }
+.tp-nb-tree-h h2 { flex: 1; margin: 0; font-family: var(--font-serif); font-weight: 400; font-size: 28px; line-height: 1; color: var(--foreground); }
+.tp-nb-tree-h .tp-ib { width: 32px; height: 32px; }
+.tp-nb-tree-ff { padding: 0 12px 10px 12px; display: flex; }
+.tp-nb-tree-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 8px; scrollbar-width: thin; }
+.tp-nb-loose-h { margin: 14px 0 4px; padding: 0 10px; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted-foreground); }
+.tp-nb-tree-f { padding: 8px; border-top: 1px solid var(--hair); }
+.tp-nb-trash { display: flex; align-items: center; gap: 9px; width: 100%; height: 34px; padding: 0 10px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted-foreground); font: inherit; font-size: 13.5px; cursor: pointer; transition: background-color var(--dur-menu) var(--ease-change), color var(--dur-menu) var(--ease-change); }
+.tp-nb-trash span:first-of-type { flex: 1; text-align: left; }
+.tp-nb-trash:hover, .tp-nb-trash.tp-on { background: color-mix(in srgb, var(--foreground) 4%, transparent); color: var(--foreground); }
+.tp-nb-tree-load { padding: 4px 0; }
+.tp-nb-skrow { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; }
+.tp-nb-tree-msg { padding: 24px 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.tp-nb-tree-msg p, .tp-nb-none, .tp-nb-quiet { margin: 0; font-size: 13px; line-height: 19px; color: var(--muted-foreground); }
+.tp-nb-none { padding: 12px 10px; }
+.tp-nb-none b { color: var(--foreground); font-weight: 500; }
+
+/* Save state: a dot and a word, cross-fading when it changes. */
+.tp-nb-save { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 4px; font-size: 12px; color: var(--muted-foreground); white-space: nowrap; }
+.tp-nb-save-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ghost); transition: background-color var(--dur-menu) var(--ease-change); }
+.tp-nb-save-l { animation: tp-nb-fade var(--dur-menu) var(--ease-change) both; }
+.tp-nb-save-saving .tp-nb-save-dot { animation: tp-nb-pulse 900ms var(--ease-change) infinite alternate; }
+.tp-nb-save-offline, .tp-nb-save-error { color: var(--warning); }
+.tp-nb-save-offline .tp-nb-save-dot, .tp-nb-save-error .tp-nb-save-dot { background: var(--warning); }
+.tp-nb-save-conflict { color: var(--warning); }
+.tp-nb-save-conflict .tp-nb-save-dot { background: var(--warning); }
+@keyframes tp-nb-fade { from { opacity: 0; } }
+@keyframes tp-nb-pulse { from { opacity: .35; } to { opacity: 1; } }
+
+/* The note. */
+.tp-nb-ed { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; color: var(--foreground); }
+.tp-nb-ed-top { display: flex; align-items: center; gap: 4px; padding: 14px 16px 0 28px; min-height: 38px; }
+.tp-nb-ed .tp-nb-ed-top .tp-ib { width: 32px; height: 32px; }
+.tp-nb-crumb { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted-foreground); }
+.tp-nb-ed-in { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 40px 28px 40px; scrollbar-width: thin; }
+.tp-nb-title { display: block; width: 100%; margin: 0; padding: 0; border: 0; outline: none; background: transparent; font-family: var(--font-serif); font-weight: 400; font-size: 38px; line-height: 1.1; color: var(--foreground); }
+.tp-nb-title::placeholder { color: var(--ghost); }
+.tp-nb-links { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 14px 0 18px; }
+.tp-nb-body .tp-rte, .tp-nb-body > * { min-height: 260px; }
+.tp-nb-ed-foot { padding: 10px 28px 14px; border-top: 1px solid var(--hair); font-size: 12px; color: var(--muted-foreground); }
+.tp-nb-ed.tp-compact .tp-nb-ed-top { padding: 10px 10px 0 20px; }
+.tp-nb-ed.tp-compact .tp-nb-ed-in { padding: 8px 22px 18px; }
+.tp-nb-ed.tp-compact .tp-nb-title { font-size: 28px; }
+.tp-nb-ed.tp-compact .tp-nb-links { margin: 10px 0 12px; }
+.tp-nb-ed-err { justify-content: center; }
+.tp-nb-ed .tp-banner-wrap { margin: 12px 16px 0; }
+
+/* Linked task chips, and the quiet "Link a task" button beside them. */
+.tp-nb-tchip.tp-root { display: inline-flex; align-items: center; max-width: 300px; height: 26px; border-radius: var(--radius-full); background: var(--muted); box-shadow: inset 0 0 0 1px var(--hair); transition: background-color var(--dur-menu) var(--ease-change); animation: tp-nb-in var(--dur-arrive) var(--ease-arrive) both; }
+.tp-nb-tchip.tp-root:hover { background: color-mix(in srgb, var(--foreground) 5%, var(--muted)); }
+.tp-nb-tchip-b { min-width: 0; display: inline-flex; align-items: center; gap: 6px; height: 100%; padding: 0 4px 0 6px; border: 0; background: transparent; color: var(--foreground-2); font: inherit; font-size: 12.5px; cursor: pointer; }
+.tp-nb-tchip-id { flex: none; font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); }
+.tp-nb-tchip-t { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tp-nb-tchip-x { flex: none; width: 20px; height: 20px; margin-right: 3px; border: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: var(--muted-foreground); cursor: pointer; opacity: 0; transition: opacity var(--dur-menu) var(--ease-change), background-color var(--dur-menu) var(--ease-change); }
+.tp-nb-tchip:hover .tp-nb-tchip-x, .tp-nb-tchip-x:focus-visible { opacity: 1; }
+.tp-nb-tchip-x:hover { background: var(--accent); color: var(--foreground); }
+.tp-nb-addlink { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 0; border-radius: var(--radius-full); background: transparent; color: var(--muted-foreground); font: inherit; font-size: 12.5px; cursor: pointer; box-shadow: inset 0 0 0 1px var(--border); transition: color var(--dur-menu) var(--ease-change), background-color var(--dur-menu) var(--ease-change), box-shadow var(--dur-menu) var(--ease-change); }
+.tp-nb-addlink:hover, .tp-nb-addlink.tp-on { color: var(--foreground); background: var(--accent); box-shadow: inset 0 0 0 1px var(--border-strong); }
+@keyframes tp-nb-in { from { opacity: 0; transform: scale(.94); } }
+
+/* Popovers (the ⋯ menu and the pickers) open under what opened them. */
+.tp-nb-menuw { position: relative; display: inline-flex; }
+.tp-nb-pop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; animation: tp-nb-pop var(--dur-menu) var(--ease-arrive) both; transform-origin: top left; }
+.tp-nb-pop-r { left: auto; right: 0; transform-origin: top right; }
+.tp-nb-pop .tp-menu { width: 260px; }
+@keyframes tp-nb-pop { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+.tp-nb-pick.tp-root { width: 340px; background: var(--popover); color: var(--popover-foreground); border-radius: var(--radius-lg); box-shadow: var(--shadow-pop); overflow: hidden; }
+.tp-nb-pick-line { display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; border-bottom: 1px solid var(--hair); color: var(--muted-foreground); }
+.tp-nb-pick-line input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font: inherit; font-size: 13.5px; color: var(--foreground); }
+.tp-nb-pick-line input::placeholder { color: var(--muted-foreground); }
+.tp-nb-pick-list { padding: 6px; max-height: 260px; overflow-y: auto; }
+.tp-nb-pick-it { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 6px 10px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--foreground); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer; }
+.tp-nb-pick-it.tp-on { background: var(--accent); }
+.tp-nb-pick-it.tp-nb-linked .tp-nb-row-t { color: var(--muted-foreground); }
+.tp-nb-pick-f { padding: 8px 12px; border-top: 1px solid var(--hair); font-size: 12px; color: var(--muted-foreground); }
+
+/* The floating window. A card with the sheet shadow, its own title bar to drag by and a grip to resize from. */
+.tp-nb-win.tp-root { position: relative; display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; background: var(--card); color: var(--foreground); border-radius: 14px; box-shadow: var(--shadow-pop), 0 40px 80px -30px rgba(40, 30, 10, .35); font-family: var(--font-sans); transition: border-radius var(--dur-panel-in) var(--ease-settle), box-shadow var(--dur-panel-in) var(--ease-settle); }
+.tp-nb-win.tp-nb-max { border-radius: 10px; }
+.tp-nb-win.tp-nb-pinned { box-shadow: var(--shadow-pop), 0 0 0 1.5px var(--border-strong), 0 40px 80px -30px rgba(40, 30, 10, .35); }
+.tp-nb-win-bar { flex: none; display: flex; align-items: center; gap: 2px; height: 44px; padding: 0 6px; border-bottom: 1px solid var(--hair); cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; }
+.tp-nb-win-bar:active { cursor: grabbing; }
+.tp-nb-win-bar .tp-ib { width: 32px; height: 32px; cursor: default; }
+.tp-nb-win-title { flex: 1; min-width: 0; text-align: center; font-size: 12.5px; font-weight: 500; color: var(--muted-foreground); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tp-nb-win-title > span { display: inline-block; animation: tp-nb-fade var(--dur-menu) var(--ease-change) both; }
+.tp-nb-pinbtn.tp-on { color: var(--foreground); }
+.tp-nb-pinbtn svg { transition: transform var(--dur-menu) var(--ease-change); }
+.tp-nb-pinbtn.tp-on svg { transform: rotate(-30deg); }
+.tp-nb-win-b { flex: 1; min-height: 0; display: flex; }
+.tp-nb-rail { flex: none; width: 216px; overflow: hidden; border-right: 1px solid var(--hair); background: var(--muted); transition: width var(--dur-panel-in) var(--ease-settle), border-color var(--dur-panel-in) var(--ease-settle); }
+.tp-nb-rail.tp-off { width: 0; border-right-color: transparent; }
+.tp-nb-rail-in { width: 216px; height: 100%; display: flex; flex-direction: column; box-sizing: border-box; transition: opacity var(--dur-menu) var(--ease-change); }
+.tp-nb-rail.tp-off .tp-nb-rail-in { opacity: 0; }
+.tp-nb-rail-list { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 6px; outline: none; scrollbar-width: thin; }
+.tp-nb-rail-list:focus-visible { box-shadow: inset 0 0 0 1.5px var(--ring); }
+.tp-nb-rail .tp-nb-row.tp-root { font-size: 13px; }
+.tp-nb-rail-empty { margin: 4px 10px; font-size: 12.5px; line-height: 18px; color: var(--muted-foreground); }
+.tp-nb-win-ed { flex: 1; min-width: 0; min-height: 0; position: relative; }
+.tp-nb-turn { height: 100%; animation: tp-nb-turn var(--dur-arrive) var(--ease-arrive) both; }
+@keyframes tp-nb-turn { from { opacity: 0; transform: translateY(4px); } }
+.tp-nb-grip { position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; cursor: nwse-resize; touch-action: none; }
+.tp-nb-grip::before { content: ''; position: absolute; right: 4px; bottom: 4px; width: 8px; height: 8px; border-right: 1.5px solid var(--border-strong); border-bottom: 1.5px solid var(--border-strong); border-bottom-right-radius: 3px; }
+.tp-nb-max .tp-nb-grip { display: none; }
+
+/* Notes in the task panel. */
+.tp-nb-sec .tp-td-h em { margin-left: auto; font-style: normal; font-weight: 400; font-size: 12px; color: var(--ghost); }
+.tp-nb-list { display: flex; flex-direction: column; margin: 0 -10px; }
+.tp-nb-li { position: relative; display: flex; align-items: center; }
+.tp-nb-li .tp-nb-row.tp-root { padding-right: 76px; }
+.tp-nb-li-acts { position: absolute; right: 4px; display: inline-flex; opacity: 0; transition: opacity var(--dur-menu) var(--ease-change); }
+.tp-nb-li-acts .tp-ib { width: 28px; height: 28px; }
+.tp-nb-li:hover .tp-nb-li-acts, .tp-nb-li:focus-within .tp-nb-li-acts { opacity: 1; }
+.tp-nb-li:hover .tp-nb-row-time { opacity: 0; }
+.tp-nb-sec-acts { display: flex; gap: 6px; margin-top: 8px; }
+.tp-nb-textbtn { border: 0; padding: 0; background: none; font: inherit; color: var(--foreground); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+
+/* A note in Search. */
+.tp-nb-hit-mark { color: var(--foreground-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tp-nb-kids, .tp-nb-rail, .tp-nb-win.tp-root, .tp-nb-chev { transition-duration: 1ms; }
+  .tp-nb-turn, .tp-nb-pop, .tp-nb-tchip.tp-root, .tp-nb-save-l { animation-duration: 1ms; }
+  .tp-nb-save-saving .tp-nb-save-dot { animation: none; }
+}
+
+/* The tree's one New button opens a two-item menu under it. */
+.tp-nb-newmenu .tp-menu { width: 200px; }
+
+/* No sideways scroll: the folders' grid column may never grow past the pane (long titles ellipsize instead). */
+.tp-nb-tree-scroll { overflow-x: hidden; }
+.tp-nb-kids { grid-template-columns: minmax(0, 1fr); }
+.tp-nb-kids > div, .tp-nb-f, .tp-nb-tp, .tp-nb-root { min-width: 0; }
+
+/* Tree notes are quiet: the mark in ghost ink, the title, nothing else. */
+.tp-nb-tree .tp-nb-row-ic, .tp-nb-tree .tp-nb-frow .tp-nb-row-ic { color: var(--ghost); }
+.tp-nb-tree .tp-nb-row.tp-root.tp-on .tp-nb-row-ic { color: var(--foreground-2); }
+
+/* Drag and drop. The row you lift fades; an ink line shows where it will land, or a ring when it goes into a folder.
+   Too deep: the folder says so and takes nothing. The row that landed glows once with the accent. */
+.tp-nb-frow, .tp-nb-tp { position: relative; }
+.tp-nb-frow[draggable="true"], .tp-nb-tp[draggable="true"] { cursor: grab; }
+.tp-nb-dragging { opacity: .4; transition: opacity var(--dur-menu) var(--ease-change); }
+.tp-nb-drop-before::before, .tp-nb-drop-after::after { content: ''; position: absolute; left: calc(10px + var(--nb-depth, 0) * 16px); right: 6px; height: 2px; border-radius: 1px; background: var(--foreground); pointer-events: none; animation: tp-nb-fade var(--dur-menu) var(--ease-change) both; }
+.tp-nb-drop-before::before { top: -1px; }
+.tp-nb-drop-after::after { bottom: -1px; }
+.tp-nb-tp .tp-nb-row.tp-root { --nb-depth: inherit; }
+.tp-nb-frow.tp-nb-drop-into { background: var(--accent); box-shadow: inset 0 0 0 1.5px var(--border-strong); }
+.tp-nb-frow.tp-nb-nodrop { background: transparent; box-shadow: inset 0 0 0 1.5px var(--hair); cursor: not-allowed; }
+.tp-nb-nodrop-l { flex: none; font-size: 11.5px; color: var(--muted-foreground); }
+.tp-nb-root { border-radius: var(--radius-sm); padding-bottom: 6px; transition: background-color var(--dur-menu) var(--ease-change); }
+.tp-nb-root.tp-nb-drop-root { background: var(--accent); }
+.tp-nb-landed > .tp-nb-row.tp-root, .tp-nb-frow.tp-nb-landed { animation: tp-nb-landed 700ms var(--ease-change) both; }
+@keyframes tp-nb-landed { 0% { background: var(--accent); box-shadow: inset 0 0 0 1.5px var(--border-strong); } 100% { background: transparent; box-shadow: inset 0 0 0 1.5px transparent; } }
+.tp-nb-dragon .tp-nb-frow:hover .tp-nb-fadd { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .tp-nb-landed > .tp-nb-row.tp-root, .tp-nb-frow.tp-nb-landed { animation-duration: 1ms; } }
+
+/* Only the writing scrolls: the title and linked tasks stay put above it. */
+.tp-nb-ed-in { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
+.tp-nb-ed-in > .tp-nb-title, .tp-nb-ed-in > .tp-nb-links { flex: 0 0 auto; }
+.tp-nb-body { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -40px; padding: 0 40px 28px; scrollbar-width: thin; }
+.tp-nb-ed.tp-compact .tp-nb-body { margin: 0 -22px; padding: 0 22px 18px; }
+
+/* The search line is the field: no second ring around the input inside it. */
+.tp-nb-pick-line input:focus, .tp-nb-pick-line input:focus-visible { outline: none; box-shadow: none; }
+
+/* A note is always editable: the page is the field, so no hover tint or edit box around the writing. */
+.tp-nb-body .tp-rte-notes .tp-rte-area, .tp-nb-body .tp-rte-notes:not(.tp-on) .tp-rte-area:hover, .tp-nb-body .tp-rte-notes.tp-on .tp-rte-area { margin: 0; padding: 0; background: none; box-shadow: none; border-radius: 0; }
+.tp-nb-body .tp-rte-notes.tp-rte-blank .tp-rte-area::before { top: 0; left: 0; }
+/* The formatting bar docks at the bottom of the writing while you edit, over the text, and stays in view as it
+   scrolls (floating above the writing, the scroller would clip it). Its room at the end is kept while hidden, so nothing jumps on click. */
+.tp-nb-body .tp-rte-notes:not(.tp-compact) { display: flex; flex-direction: column; }
+.tp-nb-body .tp-rte-notes:not(.tp-compact) .tp-rte-bar { order: 2; position: sticky; top: auto; bottom: 12px; z-index: 3; align-self: center; width: max-content; max-width: 100%; margin: 12px 0 0; }
+.tp-nb-body .tp-rte-notes:not(.tp-compact) .tp-rte-area { order: 1; }
+.tp-nb-body { padding-bottom: 16px; }
+
+/* Saving, quietly: a small ring only if a save takes a moment, a tick that draws in and fades when it lands. */
+.tp-nb-save-quiet { min-width: 18px; justify-content: center; padding: 0; }
+.tp-nb-save-ring { width: 11px; height: 11px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid var(--hair); border-top-color: var(--muted-foreground); animation: tp-nb-spin 800ms linear infinite, tp-nb-fade var(--dur-menu) var(--ease-change) both; }
+@keyframes tp-nb-spin { to { transform: rotate(360deg); } }
+.tp-nb-save-tick { fill: none; stroke: var(--muted-foreground); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; animation: tp-nb-tick-out 1400ms var(--ease-change) both; }
+.tp-nb-save-tick path { stroke-dasharray: 12; stroke-dashoffset: 12; animation: tp-nb-tick-draw var(--dur-tick) var(--ease-arrive) forwards; }
+@keyframes tp-nb-tick-draw { to { stroke-dashoffset: 0; } }
+@keyframes tp-nb-tick-out { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+
+/* Linked tasks: siblings glide (useFlip); an unlinked chip shrinks away before it leaves. */
+.tp-nb-flip { display: inline-flex; min-width: 0; max-width: 100%; }
+.tp-nb-leaving .tp-nb-tchip.tp-root { animation: tp-nb-out 170ms var(--ease-leave) forwards; }
+@keyframes tp-nb-out { to { opacity: 0; transform: scale(.9); } }
+.tp-nb-links { overflow: visible; }
+
+/* Selection bubble: rises above the selected words. */
+.tp-nb-bubble { position: absolute; z-index: 40; transform: translate(-50%, -100%); animation: tp-nb-bubble-in var(--dur-menu) var(--ease-arrive) both; }
+.tp-nb-bubble button { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px 0 10px; border: 0; border-radius: var(--radius-lg); background: var(--popover); color: var(--foreground); box-shadow: var(--shadow-pop); font: inherit; font-size: 13px; cursor: pointer; transition: background-color var(--dur-menu) var(--ease-change); }
+.tp-nb-bubble button:hover { background: color-mix(in srgb, var(--foreground) 5%, var(--popover)); }
+@keyframes tp-nb-bubble-in { from { opacity: 0; transform: translate(-50%, calc(-100% + 4px)); } }
+
+/* Open in Tudu: the Tudu mark, quiet until you point at it. */
+.tp-nb-opentudu .tp-logo { filter: grayscale(1); opacity: .7; transition: filter var(--dur-menu) var(--ease-change), opacity var(--dur-menu) var(--ease-change); }
+.tp-nb-opentudu:hover .tp-logo, .tp-nb-opentudu:focus-visible .tp-logo { filter: none; opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tp-nb-save-ring { animation-duration: 1600ms, 1ms; }
+  .tp-nb-save-tick, .tp-nb-save-tick path, .tp-nb-leaving .tp-nb-tchip.tp-root, .tp-nb-bubble { animation-duration: 1ms; }
+}
+/* Folder counts sit on the row's right edge (like the sidebar's): the hover buttons float over that spot instead of
+   holding an empty slot beside it, and swap in as the count fades. */
+.tp-nb-frow .tp-nb-fadd { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); }
+.tp-nb-frow .tp-nb-ftog { padding-right: 12px; }
+.tp-nb-fcount { min-width: 14px; text-align: right; transition: opacity var(--dur-menu) var(--ease-change); }
+/* Errors hold their shape at any width: the note's error scales its title and room to its pane (container query),
+   stays centred, and scrolls rather than clipping when the pane is short. */
+.tp-nb-ed-err { container-type: inline-size; overflow-y: auto; }
+.tp-nb-ed-err .tp-empty { margin: auto 0; padding: 40px 24px; }
+@container (max-width: 440px) {
+  .tp-nb-ed-err .tp-empty { padding: 28px 20px; gap: 8px; }
+  .tp-nb-ed-err .tp-empty-t { font-size: 24px; text-wrap: balance; }
+  .tp-nb-ed-err .tp-empty-b { font-size: 13.5px; text-wrap: pretty; }
+}
+@container (max-width: 300px) {
+  .tp-nb-ed-err .tp-empty-t { font-size: 21px; }
+}
+.tp-nb-ed-err .tp-empty-t, .tp-nb-ed-err .tp-empty-b { text-wrap: balance; }
+/* One-line errors: the words and "Try again" wrap as whole pieces, never a lone link on its own line. */
+.tp-nb-quiet.tp-nb-err-line { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; }
+.tp-nb-err-line .tp-nb-textbtn { white-space: nowrap; }
+.tp-nb-sec .tp-td-h { flex-wrap: wrap; row-gap: 2px; }
+
+/* Notes in a task: a new one slides in like a new task row (height opens, then it fades up); an unlinked one folds away
+   first; the rest glide (useFlip). */
+.tp-nb-li-new { animation: tp-nb-li-in var(--dur-row-open) var(--ease-arrive) both; }
+@keyframes tp-nb-li-in { from { opacity: 0; transform: translateY(-4px); max-height: 0; } 60% { max-height: 60px; } to { max-height: 60px; } }
+.tp-nb-li-out { animation: tp-nb-li-out 200ms var(--ease-leave) forwards; overflow: hidden; }
+@keyframes tp-nb-li-out { from { max-height: 60px; } to { opacity: 0; max-height: 0; transform: translateX(6px); } }
+
+/* The window's list: Recent or All notes (the whole notebook, folders and all). */
+.tp-nb-rail-seg { flex: none; padding: 8px 8px 2px; }
+.tp-nb-rail-seg .tp-seg { width: 100%; }
+.tp-nb-rail-seg .tp-seg button { flex: 1; }
+.tp-nb-rail-all { flex: 1; min-height: 0; display: flex; flex-direction: column; animation: tp-nb-fade var(--dur-menu) var(--ease-change) both; }
+.tp-nb-tree-bare { height: 100%; display: flex; flex-direction: column; min-height: 0; }
+.tp-nb-tree-bare .tp-nb-tree-ff { padding: 8px 8px 4px; }
+.tp-nb-tree-bare .tp-nb-tree-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 6px 8px; }
+.tp-nb-rail .tp-nb-tree-bare .tp-nb-ftog, .tp-nb-rail .tp-nb-tree-bare .tp-nb-row.tp-root { font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { .tp-nb-li-new, .tp-nb-li-out, .tp-nb-rail-all { animation-duration: 1ms; } }
+/* The folder path gives way first, with an ellipsis, so the save state and buttons always show in full. */
+.tp-nb-crumb > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tp-nb-crumb > svg { flex: none; }
+
+/* A picker with no room below opens upward from its button. */
+.tp-nb-pop.tp-nb-pop-up { top: auto; bottom: calc(100% + 6px); transform-origin: bottom left; }
+.tp-nb-pop.tp-nb-pop-up.tp-nb-pop-r { transform-origin: bottom right; }
+
+
+/* Phone editor: the formatting bar floats at the bottom of the note (one row, swipes sideways) instead of appearing above the
+   words and pushing them down. */
+.tp-nb-body .tp-rte-notes.tp-compact { display: flex; flex-direction: column; }
+.tp-nb-body .tp-rte-notes.tp-compact .tp-rte-area { order: 1; }
+.tp-nb-body .tp-rte-notes.tp-compact .tp-rte-bar { order: 2; position: sticky; bottom: 10px; z-index: 3; align-self: center; flex-wrap: nowrap; width: max-content; max-width: 100%;
+  margin: 12px 0 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+.tp-nb-body .tp-rte-notes.tp-compact .tp-rte-bar::-webkit-scrollbar { display: none; }
+.tp-nb-body .tp-rte-notes.tp-compact .tp-rte-bar > * { flex: none; }
+.tp-nb-body .tp-rte-notes.tp-compact .tp-rte-bar { height: 44px; padding: 0 6px; gap: 4px; }
+.tp-nb-body .tp-rte-notes.tp-compact .tp-rte-bar button { min-width: 36px; min-height: 36px; }
+.tp-nb-body .tp-rte-notes.tp-compact .tp-rte-bar { align-self: stretch; width: auto; max-width: none; }
+.tp-nb-body .tp-rte-notes.tp-compact .tp-rte-bar { margin: 12px -14px 0; gap: 0; }
+.tp-nb-body .tp-rte-notes.tp-compact .tp-rte-bar button { min-width: 34px; }
+
+
+/* A linked note's count and time sit at the row's right edge; on hover the time gives its place to Unlink (×). */
+.tp-nb-li .tp-nb-row.tp-root { padding-right: 10px; }
+.tp-nb-li .tp-nb-row-time { min-width: 26px; text-align: right; }
+
+/* Delete: the note leaves the page (180ms) before the next one takes its place. */
+.tp-nb-ed > .tp-nb-ed-top, .tp-nb-ed > .tp-nb-ed-in, .tp-nb-ed > .tp-nb-ed-foot { transition: opacity 180ms var(--ease-leave), transform 180ms var(--ease-leave); }
+.tp-nb-ed.tp-nb-ed-going > .tp-nb-ed-top, .tp-nb-ed.tp-nb-ed-going > .tp-nb-ed-in, .tp-nb-ed.tp-nb-ed-going > .tp-nb-ed-foot { opacity: 0; transform: translateY(6px); pointer-events: none; }
+.tp-nb-pick-it[aria-disabled="true"] { cursor: default; }
+@media (prefers-reduced-motion: reduce) { .tp-nb-ed > .tp-nb-ed-top, .tp-nb-ed > .tp-nb-ed-in, .tp-nb-ed > .tp-nb-ed-foot { transition: none; } }
+
+/* Recent ⇄ All notes: the list slides in from the side of the tab you picked (All is on the right). */
+.tp-nb-rail-all.tp-nb-rail-from-r { animation: tp-nb-rail-r 220ms var(--ease-arrive) both; }
+.tp-nb-rail-list.tp-nb-rail-from-l { animation: tp-nb-rail-l 220ms var(--ease-arrive) both; }
+@keyframes tp-nb-rail-r { from { opacity: 0; transform: translateX(14px); } }
+@keyframes tp-nb-rail-l { from { opacity: 0; transform: translateX(-14px); } }
+@media (prefers-reduced-motion: reduce) { .tp-nb-rail-all.tp-nb-rail-from-r, .tp-nb-rail-list.tp-nb-rail-from-l { animation: tp-nb-fade 120ms linear both; } }
+
+/* Folder ⋯: Rename and Delete. While its menu is open or it's being renamed, the row keeps its buttons showing. */
+.tp-nb-frow.tp-nb-frow-busy .tp-nb-fadd { opacity: 1; }
+.tp-nb-frow.tp-nb-frow-busy .tp-nb-fcount { opacity: 0; }
+.tp-nb-frow.tp-nb-frow-busy:has(.tp-nb-frename) .tp-nb-fadd { display: none; }
+.tp-nb-fmenu .tp-menu { width: 180px; }
+.tp-nb-frename { cursor: text; }
+.tp-nb-fname-in { flex: 1; min-width: 0; height: 24px; margin: -3px 0; padding: 0 6px; box-sizing: border-box; border: 0; border-radius: var(--radius-xs); background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--border-strong); color: var(--foreground); font: inherit; outline: none; animation: tp-nb-fade var(--dur-menu) var(--ease-change) both; }
+
+/* Popovers leave with motion too (NotePop). */
+.tp-nb-pop.tp-nb-pop-leaving { animation: tp-pop-out 130ms var(--ease-leave) both; pointer-events: none; }
+.tp-nb-pop.tp-nb-pop-leaving.tp-nb-pop-up { animation-name: tp-pop-out-up; }
+/* A folder row with its menu open sits above the rows after it. */
+.tp-nb-frow.tp-nb-frow-busy { z-index: 6; }
+@media (prefers-reduced-motion: reduce) { .tp-nb-pop.tp-nb-pop-leaving { animation: tp-nb-fade-out 1ms linear both; } }
+@keyframes tp-nb-fade-out { to { opacity: 0; } }
+
+/* Trash, in the Notebook page's right pane. */
+.tp-nb-trashv { height: 100%; display: flex; flex-direction: column; padding: 18px 40px 24px; box-sizing: border-box; overflow-y: auto; }
+.tp-nb-trash-h { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; padding: 4px 0 14px; }
+.tp-nb-trash-h h2 { margin: 0; font-family: var(--font-serif); font-weight: 400; font-size: 30px; line-height: 1.15; color: var(--foreground); }
+.tp-nb-trash-h .tp-nb-quiet { flex: 1; min-width: 180px; }
+.tp-nb-trash-list { display: flex; flex-direction: column; margin: 0 -10px; }
+.tp-nb-trrow { position: relative; display: flex; align-items: center; }
+.tp-nb-trrow .tp-nb-row.tp-root { cursor: default; padding-right: 112px; }
+.tp-nb-trrow .tp-nb-row.tp-root:hover { background: color-mix(in srgb, var(--foreground) 4%, transparent); }
+.tp-nb-tr-left { position: absolute; right: 12px; font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); pointer-events: none; transition: opacity var(--dur-menu) var(--ease-change); }
+.tp-nb-tr-acts { position: absolute; right: 4px; display: inline-flex; opacity: 0; transition: opacity var(--dur-menu) var(--ease-change); }
+.tp-nb-tr-acts .tp-ib { width: 30px; height: 30px; }
+.tp-nb-trrow:hover .tp-nb-tr-acts, .tp-nb-trrow:focus-within .tp-nb-tr-acts { opacity: 1; }
+.tp-nb-trrow:hover .tp-nb-tr-left, .tp-nb-trrow:focus-within .tp-nb-tr-left { opacity: 0; }
+@media (hover: none) { .tp-nb-tr-acts { opacity: 1; } .tp-nb-tr-left { display: none; } }
+.tp-nb-trash-empty { flex: 1; display: flex; align-items: center; justify-content: center; animation: tp-nb-fade 220ms var(--ease-change) both; }
+.tp-nb-trashv { animation: tp-nb-fade 180ms var(--ease-change) both; }
+@container (max-width: 440px) { .tp-nb-trashv { padding: 14px 18px 18px; } }
+/* A folder name another folder in the same place has: the field and its line say so, like a project's name. */
+.tp-nb-fname-in.tp-bad { box-shadow: inset 0 0 0 1px var(--destructive); }
+.tp-help.tp-nb-fname-err { margin: 2px 0 6px; padding-left: calc(36px + var(--nb-depth, 0) * 16px); padding-right: 10px; animation: tp-nb-fade var(--dur-menu) var(--ease-change) both; }

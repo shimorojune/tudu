@@ -343,3 +343,41 @@ export {
   type MenuBarRowItem,
   type MenuBarGroupItem,
 } from './components/MenuBarSheet';
+export {
+  NoteIcon,
+  NoteRow,
+  NoteTaskChip,
+  NotePicker,
+  NotePop,
+  SaveState,
+  noteLabel,
+  reducedMotion,
+  useFlip,
+  SAVE_TICK_MS,
+  SAVE_RING_AFTER_MS,
+  type NoteIconName,
+  type NoteItem,
+  type NoteRowProps,
+  type NoteSaveState,
+  type NoteTaskItem,
+  type NotePickerProps,
+  type PickItem,
+} from './components/NoteParts';
+export {
+  NoteTree,
+  countNotes,
+  LANDED_MS,
+  type NoteTreeProps,
+  type NoteFolderItem,
+} from './components/NoteTree';
+export {
+  NoteEditor,
+  NOTE_GOING_MS,
+  CHIP_OUT_MS,
+  type NoteEditorProps,
+  type NoteEditorNote,
+} from './components/NoteEditor';
+export { NoteWindow, type NoteWindowProps } from './components/NoteWindow';
+export { NoteLinks, ROW_OUT_MS, type NoteLinksProps } from './components/NoteLinks';
+export { NoteTrash, TRASH_ROW_OUT_MS, type NoteTrashProps, type NoteTrashItem } from './components/NoteTrash';
+export { NoteHit, type NoteHitProps, type NoteHitItem } from './components/NoteHit';

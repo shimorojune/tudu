@@ -156,6 +156,8 @@ export interface TaskDetailProps {
   onDeleteComment?: (c: DetailComment) => void;
   onRestoreComment?: (c: DetailComment) => void;
   onDelete?: () => void;
+  /** Your notes linked to this task (chunk 22): the notebook section, placed under Notes. Only you see it. */
+  notebook?: ReactNode;
   className?: string;
 }
 
@@ -993,6 +995,7 @@ export function TaskDetail(p: TaskDetailProps) {
           ) : null}
           {facts}
           {notesSec}
+          {p.notebook ?? null}
           {subsSec}
           {history}
           {comments}
