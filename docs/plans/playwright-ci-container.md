@@ -1,7 +1,7 @@
 # CI: stop installing Playwright browsers and their apt packages on every web E2E job
 
-Status: proposal, awaiting Rohit's approval. Canvas: not applicable (CI and local tooling only, no visible change);
-asking Rohit to confirm skipping it.
+Status: approved by Rohit 26 Oct 2026 (container + shared model folder; O1 left out); implementing. Canvas: not
+applicable (CI and local tooling only), skipping it approved by Rohit 26 Oct 2026.
 
 ## The problem
 
@@ -38,14 +38,14 @@ no more 10-minute stalls on a bad one.
      `*postgres` anchor). The API and the web preview still run inside the job container, so `localhost` in
      `playwright.config.ts` is unchanged.
    - Delete the `playwright install --with-deps` step.
-   - "Create the storage bucket" uses the `aws` CLI, which the image does not have. Replace it with a short Node
-     script, `packages/e2e/scripts/create-bucket.mjs`, that retries `CreateBucket` (via `@aws-sdk/client-s3`, already
-     a server dependency) for up to 60s and treats "already exists" as success. Same behaviour as the current loop.
+   - "Create the storage bucket" uses the `aws` CLI, which the image does not have. Replace it with
+     `apps/server/src/ensure-bucket.ts` (run like `fetch-model`), which retries the server's own `S3Storage.ready()`
+     (head, else create) for up to 60s. Same behaviour as the current loop.
    - Keep `actions/setup-node` (Node 22) and the pnpm cache: both work inside a container job, and pinning Node 22
      keeps us independent of whichever Node the image ships.
 2. `.github/workflows/flake-check.yml`, `web` job: the same container, the postgres URL by name, the install step
    removed.
-3. Version guard: a unit test `scripts/playwright-image.test.ts` (in the existing `scripts` vitest project) that reads
+3. Version guard: a unit test `scripts/playwright-image.test.mjs` (C01-U16..U19) (in the existing `scripts` vitest project) that reads
    `pnpm-lock.yaml` for the resolved `@playwright/test` version and asserts every
    `mcr.microsoft.com/playwright:vX.Y.Z-noble` tag in `.github/workflows/*.yml` matches it. A Playwright bump that
    forgets the image fails `Unit tests` with a message naming both versions, instead of failing E2E with

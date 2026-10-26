@@ -29,6 +29,10 @@ jobs:
     if: inputs.suite == 'web'
     name: Web × ${{ inputs.repeat }} (${{ inputs.grep }})
     runs-on: ubuntu-latest
+    # The same Playwright image as CI's web end-to-end jobs (see ci.yml).
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --ipc=host
     services:
       postgres:
         image: pgvector/pgvector:pg17
@@ -40,7 +44,7 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U tudu -d postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      TUDU_CI_DATABASE_URL: postgres://tudu:tudu@127.0.0.1:5432/postgres
+      TUDU_CI_DATABASE_URL: postgres://tudu:tudu@postgres:5432/postgres
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -57,7 +61,6 @@ jobs:
           path: .local/models
           key: embeddings-all-MiniLM-L6-v2-q8
       - run: EMBEDDINGS_MODEL_DIR=$PWD/.local/models pnpm --filter @tudu/server exec node --import tsx src/embeddings/fetch-model.ts
-      - run: pnpm --filter e2e exec playwright install --with-deps chromium webkit
       - run: pnpm e2e -g "$GREP" --project="$PROJECT" --repeat-each="$REPEAT"
         env:
           CI: 'true'
