@@ -62,10 +62,12 @@ export function NotebookPage() {
 
   // On the desk the page never stands empty while there are notes: the first one opens.
   const first = order[0]?.id;
+  const bare = pathname === NOTEBOOK_PATH || pathname === `${NOTEBOOK_PATH}/`;
   useEffect(() => {
-    if (!phone && !noteId && !trash && first) go(notePath(first), true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when what's open or the first note changes
-  }, [phone, noteId, trash, first]);
+    // Only on /notebook itself: leaving for a task passes through here with the new address, and stays left.
+    if (!phone && bare && first) go(notePath(first), true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the address or the first note changes
+  }, [phone, bare, first]);
 
   const nextAfter = (id: string) => {
     const i = order.findIndex((n) => n.id === id);

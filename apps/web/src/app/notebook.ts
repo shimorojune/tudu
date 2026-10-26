@@ -41,7 +41,12 @@ export const notebookStore = new NotebookStore({
 });
 
 // Words still waiting for quiet save as the page goes (a reload, a closed tab or popup).
-if (typeof window !== 'undefined') window.addEventListener('pagehide', () => notebookStore.flushAll());
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => notebookStore.flushAll());
+  // For end-to-end tests: words waiting for quiet are not saved yet either.
+  const hook = (window as unknown as { __tudu?: { idle?: () => Promise<boolean> } }).__tudu;
+  if (hook) hook.idle = async () => !notebookStore.isBusy() && (await taskStore.idle());
+}
 
 /** A note's save state and whether its save is taking a while, kept live. */
 export function useSaveState(id: string | null): { state: SaveState; slow: boolean } {

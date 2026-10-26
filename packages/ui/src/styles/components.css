@@ -2823,6 +2823,8 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 .tp-help.tp-nb-fname-err { margin: 2px 0 6px; padding-left: calc(36px + var(--nb-depth, 0) * 16px); padding-right: 10px; animation: tp-nb-fade var(--dur-menu) var(--ease-change) both; }
 /* The note window floating over the page (the browser): it fades up with a hair of scale and sinks back as it closes. */
 .tp-nb-float { position: fixed; z-index: 60; animation: tp-nb-float-in 220ms var(--ease-arrive) both; }
+/* It follows the pointer exactly while you drag it: nothing eases its place, not even Less motion's short fades. */
+.tp-nb-float { transition-property: none; }
 .tp-nb-float.tp-nb-float-out { animation: tp-nb-float-out 180ms var(--ease-leave) both; pointer-events: none; }
 @keyframes tp-nb-float-in { from { opacity: 0; transform: scale(.97) translateY(6px); } }
 @keyframes tp-nb-float-out { to { opacity: 0; transform: scale(.97) translateY(6px); } }

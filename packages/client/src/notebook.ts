@@ -383,6 +383,12 @@ export class NotebookStore {
     }
   }
 
+  /** True while some note's words are still waiting for quiet (not in the outbox yet). Tests wait on it. */
+  isBusy(): boolean {
+    for (const w of this.writing.values()) if (w.timer || ((w.titleDirty || w.bodyDirty) && w.created)) return true;
+    return false;
+  }
+
   /** Save every note's waiting words now (the page is going away). */
   flushAll(): void {
     for (const id of this.writing.keys()) this.flush(id);
@@ -674,7 +680,7 @@ export class NotebookStore {
     const busy = !!w && (w.titleDirty || w.bodyDirty || w.waiting.size > 0 || w.conflict);
     if (w && busy) return { ...note, title: w.title, html: w.html, rev: w.rev, gen: had?.gen ?? 0 };
     if (w) Object.assign(w, { title: note.title, html: note.html, rev: note.rev });
-    const changed = !!had && !had.draft && had.html !== note.html;
+    const changed = !!had && !had.draft && (had.html !== note.html || had.title !== note.title);
     return { ...note, gen: (had?.gen ?? 0) + (changed ? 1 : 0) };
   }
 
