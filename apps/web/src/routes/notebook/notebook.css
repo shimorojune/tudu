@@ -109,6 +109,12 @@
 }
 
 /* The bare note window: the popup in the browser, and the Mac's own window (which draws its shadow itself). */
+/* The Mac note window is clear all round: only the note's own section paints, and the 10px around it is for its
+   shadow. */
+html[data-app='note'],
+html[data-app='note'] body {
+  background: transparent !important;
+}
 .app-note-window {
   position: fixed;
   inset: 0;

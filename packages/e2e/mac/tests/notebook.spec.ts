@@ -242,4 +242,20 @@ test.describe('chunk 22 · the note window', () => {
     );
     expect((await app.state()).windows.main.visible).toBe(false);
   });
+
+  test('C22-D09 the note window is clear around the note: html and body paint nothing, only the note does', async ({
+    app,
+  }) => {
+    await signIn(app);
+    await openNote(app);
+    const bg = await app.eval<{ html: string; body: string; note: string }>(
+      `const c = (el) => getComputedStyle(el).backgroundColor;
+       return { html: c(document.documentElement), body: c(document.body), note: c(document.querySelector('.tp-nb-win')) };`,
+      'note',
+    );
+    const clear = /^(transparent|rgba\(0, 0, 0, 0\))$/;
+    expect(bg.html).toMatch(clear);
+    expect(bg.body).toMatch(clear);
+    expect(bg.note).not.toMatch(clear);
+  });
 });

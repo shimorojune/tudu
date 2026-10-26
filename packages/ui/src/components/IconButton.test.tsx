@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { Icon } from '../lib/icons';
 import { parseRules, readStylesheet, rulesWhere } from '../test-utils/stylesheet';
@@ -46,5 +46,17 @@ describe('IconButton', () => {
     }
     const base = rulesWhere(rules, (s) => s === '.tp-ib')[0];
     expect(base?.declarations.transition).toContain('background-color var(--dur-menu)');
+  });
+
+  it('C20-U09 tipLabel says more in the tooltip while the label stays the accessible name', async () => {
+    render(
+      <IconButton label="New task" tipLabel="New task  ⌘⇧N">
+        <Icon name="plus" />
+      </IconButton>,
+    );
+    const btn = screen.getByRole('button', { name: 'New task' });
+    act(() => btn.focus());
+    await waitFor(() => expect(screen.getByRole('tooltip')).toHaveTextContent('New task ⌘⇧N'));
+    expect(btn).toHaveAttribute('aria-label', 'New task');
   });
 });

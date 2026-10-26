@@ -110,9 +110,17 @@ export function MenuBarRow({
   );
 }
 
+const KEY_NAMES: Record<string, string> = { '⌘': 'Meta', '⇧': 'Shift', '⌥': 'Alt', '⌃': 'Control' };
+
+/** `⌘⇧N` as aria-keyshortcuts writes it: `Meta+Shift+N`. */
+function keyShortcuts(shortcut: string): string {
+  return [...shortcut].map((k) => KEY_NAMES[k] ?? k.toUpperCase()).join('+');
+}
+
 /**
  * Today from the menu bar (K-MenuBar): the day and its ring, every space's tasks (headed when there is more than
- * one), and New task, Open Tudu and ⋯ (Send feedback…, Quit). Signed out it asks you to sign in and keeps ⋯ for
+ * one), and a foot of icon buttons for New task (its shortcut in the tooltip) and New note, Open Tudu and ⋯
+ * (Send feedback…, Quit). Signed out it asks you to sign in and keeps ⋯ for
  * Quit alone.
  */
 export function MenuBarSheet({
@@ -224,18 +232,25 @@ export function MenuBarSheet({
       )}
       <div className="tp-mb-f">
         {state === 'day' ? (
-          <Button variant="quiet" size="sm" icon={<Icon name="plus" size={14} />} onClick={onNew}>
-            New task <span className="tp-mb-kbd">{shortcut}</span>
-          </Button>
+          <IconButton
+            label="New task"
+            className="tp-mb-ib"
+            tipLabel={`New task  ${shortcut}`}
+            tipSide="top"
+            aria-keyshortcuts={keyShortcuts(shortcut)}
+            onClick={onNew}
+          >
+            <Icon name="plus" size={16} />
+          </IconButton>
         ) : null}
         {onNewNote ? (
-          <Button variant="quiet" size="sm" icon={<NoteIcon name="note" size={14} />} onClick={onNewNote}>
-            New note
-          </Button>
+          <IconButton label="New note" className="tp-mb-ib" tipSide="top" onClick={onNewNote}>
+            <NoteIcon name="note" size={16} />
+          </IconButton>
         ) : null}
         <span className="tp-mb-sp" />
-        <Button variant="quiet" size="sm" onClick={onOpenApp}>
-          Open {appName}
+        <Button variant="quiet" size="sm" aria-label={`Open ${appName}`} onClick={onOpenApp}>
+          Open Tudu
         </Button>
         {more}
       </div>
