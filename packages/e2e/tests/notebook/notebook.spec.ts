@@ -1354,6 +1354,22 @@ async function startDrawing(page: Page, noteId: string, firstWords: string): Pro
 
 /** An empty spot on the canvas, clear of Excalidraw's own controls: the welcome menu in the middle, Help and the
  * zoom in the corners, the shape properties on the left, a phone's tools at the foot. Right of what drawSomething draws. */
+/** The canvas's box once Excalidraw has sized it to the sheet (it can first read the window's size). */
+async function canvasBox(page: Page) {
+  let box: { x: number; y: number; width: number; height: number } | null = null;
+  await expect
+    .poll(async () => {
+      const [b, wrap] = await Promise.all([
+        drawCanvas(page).boundingBox(),
+        sheet(page).locator('.excalidraw').first().boundingBox(),
+      ]);
+      box = b;
+      return !!b && !!wrap && b.x >= wrap.x - 1 && b.x + b.width <= wrap.x + wrap.width + 1;
+    })
+    .toBe(true);
+  return box!;
+}
+
 const awayFrom = (b: { x: number; y: number; width: number; height: number }) => ({
   x: b.x + b.width * 0.85,
   y: b.y + b.height * 0.3,
@@ -1361,7 +1377,7 @@ const awayFrom = (b: { x: number; y: number; width: number; height: number }) =>
 
 /** A rectangle (r, then drag) and a line of text (t, click, type), the way a person draws them. */
 async function drawSomething(page: Page, text: string): Promise<void> {
-  const b = (await drawCanvas(page).boundingBox())!;
+  const b = await canvasBox(page);
   const away = awayFrom(b);
   await page.mouse.click(away.x, away.y);
   // Wider than a phone, the shape properties stand over the left of the canvas (about 215px) once a tool is on.
@@ -1478,7 +1494,7 @@ test.describe('notebook drawings', () => {
     const id = await seedNote(page, 'Whiteboard photo', { html: '<p>From the session</p>' });
     const did = await startDrawing(page, id, 'From the session');
     // The pointer over the canvas and Excalidraw focused, as when you paste with the mouse over the drawing.
-    const c = awayFrom((await drawCanvas(page).boundingBox())!);
+    const c = awayFrom(await canvasBox(page));
     await page.mouse.move(c.x, c.y);
     await sheet(page).locator('.excalidraw').focus();
     // Excalidraw takes a paste only with the focus inside it.
@@ -1518,6 +1534,7 @@ test.describe('notebook drawings', () => {
     await signInFresh(page);
     const id = await seedNote(page, 'Venue map', { html: '<p>Mark the exits</p>' });
     const did = await startDrawing(page, id, 'Mark the exits');
+    await canvasBox(page);
     const dt = await imageTransfer(page);
     await drawCanvas(page).evaluate((el, d) => {
       const r = el.getBoundingClientRect();
