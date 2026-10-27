@@ -1478,14 +1478,19 @@ test.describe('notebook drawings', () => {
     const c = awayFrom((await drawCanvas(page).boundingBox())!);
     await page.mouse.move(c.x, c.y);
     await sheet(page).locator('.excalidraw').focus();
+    // Excalidraw takes a paste only with the focus inside it.
+    await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest('.excalidraw'))).toBe(true);
     const dt = await imageTransfer(page);
-    await page.evaluate(
-      (d) =>
-        document.dispatchEvent(
-          new ClipboardEvent('paste', { clipboardData: d, bubbles: true, cancelable: true }),
-        ),
-      dt,
-    );
+    await Promise.all([
+      page.waitForResponse((r) => r.url().endsWith('/api/notebook/files') && r.request().method() === 'POST'),
+      page.evaluate(
+        (d) =>
+          document.dispatchEvent(
+            new ClipboardEvent('paste', { clipboardData: d, bubbles: true, cancelable: true }),
+          ),
+        dt,
+      ),
+    ]);
     await imageKept(page, did);
     await done(page);
     await idle(page);
@@ -1644,10 +1649,14 @@ test.describe('notebook drawings', () => {
     await expect(blk).toBeVisible();
     // ⌘← on a Mac, Ctrl+← elsewhere (a word back: the line is one word). Home doesn't move the caret on a Mac.
     const startOfBelow = async () => {
+      // The editor takes the caret from the page's selectionchange a moment after each move, and puts its own back
+      // on the page after a click: a person never types that fast, so the test waits that moment too.
+      const settle = () =>
+        page.evaluate(() => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 50))));
       await words(page).locator('p', { hasText: 'below' }).click();
+      await settle();
       await page.keyboard.press('ControlOrMeta+ArrowLeft');
-      // The editor takes the caret from the page's selectionchange, a moment later: a person never types that fast.
-      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 50))));
+      await settle();
     };
     await startOfBelow();
     await page.keyboard.press('Backspace');
