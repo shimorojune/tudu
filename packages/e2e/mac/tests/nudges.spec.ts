@@ -61,28 +61,28 @@ test.describe('working hours and nudges', () => {
     await signIn(app);
     const permission = await nudgesOn(app);
     expect(await app.eval(`return T.get('heading', 'Working hours') !== null`)).toBe(true);
+    expect(
+      await app.eval(`return T.get('switch', 'Nudge me in my hours').getAttribute('aria-checked')`),
+    ).toBe('true');
+    // What Settings shows: the rows, the guide, macOS's box still up, or (asked, nobody answered) neither.
+    const shows = await app.eval<string>(`
+      const open = (role, name) => T.all(role, name).some((el) => !el.closest('[aria-hidden="true"]'));
+      const text = document.body.textContent;
+      if (open('group', 'How often')) return 'rows';
+      if (text.includes('macOS has Tudu’s notifications off.')) return 'guide';
+      if (text.includes('Allow Tudu in the box macOS just showed.')) return 'asking';
+      return 'neither';`);
     if (permission === 'allowed') {
+      expect(shows).toBe('rows');
       await app.until(`return T.all('button', 'Send now').length > 0`);
-      await app.until(`return T.all('group', 'How often').length > 0`);
-    } else if (permission === 'unknown') {
-      // macOS's box is up, or went, unanswered (CI's Mac): the switch is on, and neither the rows nor the guide show.
-      expect(
-        await app.eval(`return T.get('switch', 'Nudge me in my hours').getAttribute('aria-checked')`),
-      ).toBe('true');
-      expect(
-        await app.eval(
-          `return T.all('group', 'How often').filter((el) => !el.closest('[aria-hidden="true"]')).length`,
-        ),
-      ).toBe(0);
-      expect(
-        await app.eval(
-          `return T.all('list', 'How to allow Tudu').filter((el) => !el.closest('[aria-hidden="true"]')).length`,
-        ),
-      ).toBe(0);
-    } else {
-      await app.until(`return document.body.textContent.includes('macOS has Tudu’s notifications off.')`);
+    } else if (shows === 'guide') {
+      expect(permission).toBe('denied');
       await app.until(`return T.all('button', 'Open Notification settings').length > 0`);
       await app.until(`return T.all('list', 'How to allow Tudu').length > 0`);
+    } else {
+      // CI's Mac: nobody answers macOS's box, so it is still up or went without an answer. Neither rows nor guide.
+      expect(['asking', 'neither']).toContain(shows);
+      expect(permission).not.toBe('allowed');
     }
   });
 
