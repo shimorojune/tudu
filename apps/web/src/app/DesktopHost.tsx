@@ -7,7 +7,7 @@ import { keepAppearance } from './appearance';
 import { desktop, FEEDBACK_GO, UPDATES_GO, type AppInfo, type UpdateReady } from './desktop';
 import { openFeedback } from './feedback';
 import { interceptLinks } from './links';
-import { NudgeClock } from './Nudges';
+import { NudgeClock } from './NudgeClock';
 import { setOpenUpdates } from './notebook';
 import { meQuery, queryClient } from './session';
 import { settingsHref } from './settings';

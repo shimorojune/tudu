@@ -89,13 +89,27 @@ describe('WH-U11 Settings › Working hours', () => {
       .getAllByRole('button')
       .map((b) => b.querySelector('.tp-snav-l')?.textContent);
     expect(labels.slice(0, 3)).toEqual(['Account', 'Appearance', 'Working hours']);
-    expect(within(nav).getByText('Mon to Fri, 09:00 to 18:00')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Working hours');
     await user.click(screen.getByRole('button', { name: 'Saturday' }));
     expect(onChange).toHaveBeenLastCalledWith({
       same: true,
       days: [1, 2, 3, 4, 5, 6].map((day) => ({ day, start: '09:00', end: '18:00' })),
     });
+  });
+
+  it('WH-U11 on a phone the list carries the hours line under Working hours', () => {
+    render(
+      <Settings
+        me={ME}
+        space={NW}
+        still
+        layout="phone"
+        view="list"
+        workHours={{ hours: DEFAULT_HOURS, onChange: vi.fn() }}
+      />,
+    );
+    const nav = screen.getByRole('navigation', { name: 'Settings' });
+    expect(within(nav).getByText('Mon to Fri, 09:00 to 18:00')).toBeInTheDocument();
   });
 
   it('WH-U11 loading shimmers the final shape; an end before the start is refused; a failed save says so', async () => {

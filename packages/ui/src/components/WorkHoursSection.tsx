@@ -383,10 +383,9 @@ export interface WorkHoursSectionProps {
 /** Settings › Working hours: your hours (all devices) and, in the Mac app, Nudges. */
 export function WorkHoursSection({ hours, nudges, phone }: WorkHoursSectionProps) {
   const loading = hours.hours === null;
+  // Set during render, once the hours arrive: the reveal plays once, never on a later load.
   const [shown, setShown] = useState(false);
-  useEffect(() => {
-    if (!loading) setShown(true);
-  }, [loading]);
+  if (!loading && !shown) setShown(true);
   return (
     <AutoHeight>
       <div

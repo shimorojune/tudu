@@ -29,7 +29,7 @@ import {
   type SettingsSectionName,
 } from '@tudu/ui';
 import { useEffect, useState } from 'react';
-import { useNudgeSettings } from './Nudges';
+import { useNudgeSettings } from './NudgeClock';
 import { useWorkHours } from './workHours';
 import { openCreateSpace } from './dayView';
 import { useAppVersion } from './DesktopHost';
