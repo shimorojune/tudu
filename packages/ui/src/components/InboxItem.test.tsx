@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { parseRules, readStylesheet, rulesWhere } from '../test-utils/stylesheet';
+import { parseRules, readStylesheet } from '../test-utils/stylesheet';
 import { InboxItem, InboxSection, type InboxEntry } from './InboxItem';
 
 const TODAY = '2026-10-18';
@@ -332,8 +332,9 @@ describe('InboxItem, a new version (chunk 11)', () => {
   });
 
   it('C11-U24 the arrow nudges up and right on hover, and holds still under reduced motion', () => {
-    const rules = rulesWhere(parseRules(readStylesheet('components.css')), (sel) =>
-      sel.includes('.tp-ix-notes-arrow'),
+    // Every rule, at-rules included (rulesWhere keeps only the top level).
+    const rules = parseRules(readStylesheet('components.css')).filter((r) =>
+      r.selector.includes('.tp-ix-notes-arrow'),
     );
     const hover = rules.filter((r) => r.selector.includes(':hover'));
     expect(

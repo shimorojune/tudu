@@ -1,4 +1,5 @@
 /// <reference types="node" />
+import '@testing-library/jest-dom/vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,6 +42,8 @@ function runHeadScript(look?: unknown, path = '/'): void {
 const root = document.documentElement;
 
 beforeEach(() => {
+  // jsdom has no matchMedia; the head script asks it for System.
+  window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as unknown as typeof window.matchMedia;
   resetBoot();
   root.className = '';
   root.removeAttribute('data-boot');
