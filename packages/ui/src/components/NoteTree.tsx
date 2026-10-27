@@ -142,6 +142,8 @@ export const SPRING_MS = 600;
 export const GLIDE_MS = 220;
 /** Near the list's top or bottom edge, it scrolls by itself. */
 const EDGE_PX = 36;
+/** Takes away the guard that eats the click after a drag; one pointer, so one guard for every tree. */
+let unswallowing: (() => void) | null = null;
 
 interface Common {
   openIds: Record<string, boolean>;
@@ -473,8 +475,6 @@ export function NoteTree(p: NoteTreeProps) {
   const nav = useRef<HTMLElement | null>(null);
   const scroller = useRef<HTMLDivElement | null>(null);
   const stop = useRef<(() => void) | null>(null);
-  /** Takes away the guard that eats the click after a drag. */
-  const unswallowing = useRef<(() => void) | null>(null);
   useEffect(
     () => () => {
       if (lt.current) clearTimeout(lt.current);
@@ -629,7 +629,7 @@ export function NoteTree(p: NoteTreeProps) {
     if (target.closest?.('.tp-nb-fadd, .tp-nb-menuw, input')) return;
     if (!nav.current || carry.current.drag) return;
     // A new press: the click after the last drag has had its chance.
-    unswallowing.current?.();
+    unswallowing?.();
     stop.current?.();
     const row = e.currentTarget as HTMLElement;
     const touch = e.pointerType !== 'mouse';
@@ -704,12 +704,12 @@ export function NoteTree(p: NoteTreeProps) {
     };
     const unswallow = () => {
       document.removeEventListener('click', swallow, true);
-      if (unswallowing.current === unswallow) unswallowing.current = null;
+      if (unswallowing === unswallow) unswallowing = null;
     };
     const up = () => {
       if (!lifted) return end();
       document.addEventListener('click', swallow, true);
-      unswallowing.current = unswallow;
+      unswallowing = unswallow;
       setTimeout(unswallow, 60);
       finish(false);
     };
