@@ -413,3 +413,12 @@ export {
 export { NoteLinks, ROW_OUT_MS, type NoteLinksProps } from './components/NoteLinks';
 export { NoteTrash, TRASH_ROW_OUT_MS, type NoteTrashProps, type NoteTrashItem } from './components/NoteTrash';
 export { NoteHit, type NoteHitProps, type NoteHitItem } from './components/NoteHit';
+export { DayPick, type DayPickProps } from './components/DayPick';
+export { HoursField, tidyTime, type HoursFieldProps } from './components/HoursField';
+export {
+  WorkHoursSection,
+  type WorkHoursSectionProps,
+  type SettingsHours,
+  type SettingsNudges,
+  type NudgePermission,
+} from './components/WorkHoursSection';

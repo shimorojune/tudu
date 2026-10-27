@@ -1,4 +1,4 @@
-import { deleteWords, membersWords, spaceInitials, spaceLine } from '@tudu/core';
+import { DEFAULT_HOURS, deleteWords, hoursLine, membersWords, spaceInitials, spaceLine } from '@tudu/core';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
@@ -18,11 +18,12 @@ import { SettingRow, SettingsSection } from './SettingsSection';
 import { SettingsNav, type SettingsNavGroup } from './SettingsNav';
 import { Skeleton } from './Skeleton';
 import { VersionLink, type VersionLinkProps } from './VersionLink';
+import { WorkHoursSection, type SettingsHours, type SettingsNudges } from './WorkHoursSection';
 import { SpaceTile } from './SpaceTile';
 import { Switch } from './Switch';
 import { ThemePick } from './ThemePick';
 
-export type SettingsSectionName = 'account' | 'appearance' | 'mac' | 'space' | 'members' | 'apps';
+export type SettingsSectionName = 'account' | 'appearance' | 'hours' | 'mac' | 'space' | 'members' | 'apps';
 
 /** Open at login, as macOS has it: `approval` waits for your OK in Login Items, `refused` is macOS saying no. */
 export type SettingsLogin = 'off' | 'on' | 'approval' | 'refused';
@@ -125,6 +126,11 @@ export interface SettingsProps {
   onTheme?: (t: ThemeChoice) => void;
   lessMotion?: boolean;
   onLessMotion?: (on: boolean) => void;
+
+  // Working hours: listed when given (every device).
+  workHours?: SettingsHours;
+  /** Working hours › Nudges: the Mac app only; elsewhere the section says where nudges come from. */
+  nudges?: SettingsNudges;
 
   // This Mac: the Mac app only; without it the section is not listed.
   mac?: SettingsMac;
@@ -698,6 +704,7 @@ function UpdatesSection({ u }: { u: SettingsUpdates }) {
 const TITLES = (p: SettingsProps): Record<SettingsSectionName, [string, string]> => ({
   account: ['Account', p.me.email],
   appearance: ['Appearance', 'How Tudu looks on this computer.'],
+  hours: ['Working hours', 'When you work, and what Tudu does in those hours.'],
   mac: ['This Mac', 'How Tudu runs on this Mac.'],
   space: [
     p.space.name,
@@ -725,7 +732,10 @@ const TITLES = (p: SettingsProps): Record<SettingsSectionName, [string, string]>
 export function Settings(p: SettingsProps) {
   const layout = p.layout ?? 'dialog';
   const phone = layout === 'phone';
-  const sec = p.section === 'mac' && !p.mac ? 'account' : (p.section ?? 'account');
+  const sec =
+    (p.section === 'mac' && !p.mac) || (p.section === 'hours' && !p.workHours)
+      ? 'account'
+      : (p.section ?? 'account');
   const sp = p.space;
   const team = !sp.personal;
   const admin = team && sp.role === 'admin';
@@ -754,6 +764,16 @@ export function Settings(p: SettingsProps) {
           icon: 'sun',
           sub: { light: 'Light', dark: 'Dark', system: 'System' }[p.theme ?? 'system'],
         },
+        ...(p.workHours
+          ? [
+              {
+                value: 'hours',
+                label: 'Working hours',
+                icon: 'clock' as const,
+                sub: hoursLine(p.workHours.hours ?? DEFAULT_HOURS),
+              },
+            ]
+          : []),
         ...(p.mac
           ? [
               {
@@ -878,6 +898,8 @@ export function Settings(p: SettingsProps) {
         </SettingsSection>
       </>
     );
+  else if (sec === 'hours' && p.workHours)
+    body = <WorkHoursSection hours={p.workHours} nudges={p.nudges} phone={phone} />;
   else if (sec === 'mac' && p.mac) {
     const m = p.mac;
     const on = m.openAtLogin === 'on' || m.openAtLogin === 'approval';
