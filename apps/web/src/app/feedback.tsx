@@ -39,9 +39,11 @@ export interface FeedbackDraft {
   kind: FeedbackKind;
   text: string;
   shot: File | null;
+  /** "Show it on the public issue": off for each new screenshot. */
+  shotPublic: boolean;
 }
 
-const EMPTY: FeedbackDraft = { kind: 'bug', text: '', shot: null };
+const EMPTY: FeedbackDraft = { kind: 'bug', text: '', shot: null, shotPublic: false };
 let open = false;
 let draft: FeedbackDraft = EMPTY;
 const listeners = new Set<() => void>();
@@ -361,6 +363,7 @@ export function FeedbackHost({ space, vp }: { space: Pick<SpaceSummary, 'kind'> 
       kind: d.kind,
       text: d.text.trim(),
       details: details ? currentDetails(view0, space?.kind ?? null, app) : null,
+      shotPublic: github && !!d.shot && d.shotPublic,
     };
     const shot = d.shot ? { blob: d.shot, name: d.shot.name, type: d.shot.type } : null;
     let out: Submitted;
@@ -419,7 +422,10 @@ export function FeedbackHost({ space, vp }: { space: Pick<SpaceSummary, 'kind'> 
         if (error) setError(null);
       }}
       shot={d.shot}
-      onShot={(shot) => setFeedbackDraft({ shot })}
+      // Each new screenshot (or none) starts private: showing one is asked for every time.
+      onShot={(shot) => setFeedbackDraft({ shot, shotPublic: false })}
+      shotPublic={d.shotPublic}
+      onShotPublic={(shotPublic) => setFeedbackDraft({ shotPublic })}
       details={details}
       onDetails={(on) => {
         setDetails(on);

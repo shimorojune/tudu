@@ -122,3 +122,16 @@ version after.
 A smoke test that fails right after a green "Wait until production is ready" is not explained by a slow rollout: the
 wait already needs the web and the API to pass three rounds in a row. If the build is good and only the timing is in
 doubt, re-run the failed jobs: the tag and the draft release are reused.
+
+## Feedback screenshots
+
+A report's screenshot shows on its public GitHub issue only when the person switched "Show it on the public issue" on.
+The issue embeds `https://api.tudu.ezdev.net/api/feedback/shots/<ref>/<sig>`, where `<ref>` is the report's short
+reference (the one on the issue) and `<sig>` is signed with `AUTH_SECRET`. To take one down:
+
+1. Make the link 404 at once: on the production database run
+   `UPDATE feedback SET screenshot_public = false WHERE id LIKE '<ref>-%';` (or delete the object from storage).
+2. Edit the issue on github.com and delete its `**Screenshot**` section. GitHub's image proxy can keep a cached copy
+   for a while, and this is what removes it from the page.
+
+Rotating `AUTH_SECRET` also breaks every screenshot link at once, along with every session.

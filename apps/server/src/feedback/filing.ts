@@ -9,6 +9,7 @@ import {
 } from '@tudu/core';
 import { and, asc, count, eq, gt, isNull, lt, or, schema, sql, type Db } from '@tudu/db';
 import { IssueError, type IssueTracker } from './github';
+import { shotUrl, type ShotLinks } from './shots';
 
 /** Issues the whole app files in an hour; past it reports wait (saved and mailed) and go later. */
 export const ISSUES_PER_HOUR = 30;
@@ -38,15 +39,24 @@ async function filedThisHour(db: Db, now: Date): Promise<number> {
   return row?.n ?? 0;
 }
 
+/** How filing runs: the clock, whether to log a wait, and where public screenshots are served from. */
+export interface FileOptions {
+  now?: Date;
+  quiet?: boolean;
+  /** Without it no screenshot is embedded, whatever its sender chose. */
+  shots?: ShotLinks;
+}
+
 /**
  * File one waiting report as its public issue. The row is claimed first with a conditional update, so a request and
- * the sweep (or two sweeps) never both file it. Built from the row's kind, words and listed details only.
+ * the sweep (or two sweeps) never both file it. Built from the row's kind, words and listed details only, plus the
+ * screenshot's link when its sender chose to show it.
  */
 export async function fileReport(
   db: Db,
   tracker: IssueTracker,
   id: string,
-  opts: { now?: Date; quiet?: boolean } = {},
+  opts: FileOptions = {},
 ): Promise<FileOutcome> {
   const now = opts.now ?? new Date();
   if ((await filedThisHour(db, now)) >= (tracker.perHour ?? ISSUES_PER_HOUR)) return { state: 'pending' };
@@ -75,6 +85,7 @@ export async function fileReport(
         text: row.text,
         details: details.success ? details.data : null,
         ref: feedbackRef(row.id),
+        shot: row.screenshotPublic && row.screenshotKey && opts.shots ? shotUrl(opts.shots, row.id) : null,
       }),
       labels: issueLabels(row.kind as FeedbackKind),
     });
@@ -98,11 +109,7 @@ export async function fileReport(
 }
 
 /** File what waits: oldest first, a few a run, under the hourly cap. The server runs it every five minutes. */
-export async function sweepIssues(
-  db: Db,
-  tracker: IssueTracker,
-  opts: { now?: Date; quiet?: boolean } = {},
-): Promise<number> {
+export async function sweepIssues(db: Db, tracker: IssueTracker, opts: FileOptions = {}): Promise<number> {
   const now = opts.now ?? new Date();
   const waiting = await db
     .select({ id: schema.feedback.id })

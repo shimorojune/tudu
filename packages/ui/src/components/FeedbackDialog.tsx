@@ -1,6 +1,7 @@
 import {
   FEEDBACK_IMAGE_MAX,
   fileSize,
+  shotCanBePublic,
   type FeedbackIssue,
   type FeedbackKind,
   type MyReport,
@@ -30,6 +31,9 @@ export interface FeedbackDialogProps {
   /** The one screenshot, as the person picked, pasted or dropped it. */
   shot: File | null;
   onShot?: (file: File | null) => void;
+  /** "Show it on the public issue" (GitHub filing only): off for each new screenshot, and the caller resets it. */
+  shotPublic?: boolean;
+  onShotPublic?: (on: boolean) => void;
   details: boolean;
   onDetails?: (on: boolean) => void;
   /** What the details are: "Tudu 0.38.0, macOS, the Today page. Never your tasks." */
@@ -102,6 +106,8 @@ export function FeedbackDialog({
   onText,
   shot,
   onShot,
+  shotPublic = false,
+  onShotPublic,
   details,
   onDetails,
   detailsLine,
@@ -181,6 +187,9 @@ export function FeedbackDialog({
 
   const shown = !!shot && !leaving;
   const github = filing === 'github';
+  // Only kinds GitHub shows inline can go on the issue; anything else keeps the row, off and disabled, saying why.
+  const canShow = !!shot && shotCanBePublic(shot.type);
+  const showing = github && canShow && shotPublic;
   const sheet = variant === 'sheet';
   const ask = kind === 'bug' ? 'What happened?' : 'What would help?';
   const placeholder =
@@ -359,7 +368,7 @@ export function FeedbackDialog({
             <div className={cx('tp-fb-slot', !shown && 'tp-hide')} aria-hidden={!shown} inert={!shown}>
               <div>
                 {shot ? (
-                  <figure className="tp-fb-shot">
+                  <figure className={cx('tp-fb-shot', showing && 'tp-shown')}>
                     <div
                       className={cx('tp-fb-shot-img', ready && 'tp-ready')}
                       role="img"
@@ -367,6 +376,10 @@ export function FeedbackDialog({
                     >
                       {url ? <img src={url} alt="" onLoad={() => setReadyFor(shot)} /> : null}
                     </div>
+                    <span className="tp-fb-pill" aria-hidden="true">
+                      <Icon name="globe" size={12} />
+                      Public
+                    </span>
                     <button
                       type="button"
                       className="tp-fb-shot-x"
@@ -381,6 +394,32 @@ export function FeedbackDialog({
                     </figcaption>
                   </figure>
                 ) : null}
+                {shot && github ? (
+                  <SettingRow
+                    className={cx('tp-fb-shotrow', !canShow && 'tp-cant')}
+                    title="Show it on the public issue"
+                    sub={
+                      canShow ? (
+                        <span className={cx('tp-fb-sub', showing && 'tp-on')}>
+                          <span className="tp-fb-sub-off">
+                            Private. Only the Tudu team sees it, with your report.
+                          </span>
+                          <span className="tp-fb-sub-on">Public. Anyone can see it on the GitHub issue.</span>
+                        </span>
+                      ) : (
+                        'GitHub can’t show this kind of image. It stays with the team.'
+                      )
+                    }
+                    control={
+                      <Switch
+                        label="Show the screenshot on the public issue"
+                        checked={showing}
+                        disabled={!canShow}
+                        onChange={(v) => onShotPublic?.(v)}
+                      />
+                    }
+                  />
+                ) : null}
               </div>
             </div>
             <div className={cx('tp-fb-slot', shown && 'tp-hide')} aria-hidden={shown} inert={shown}>
@@ -394,7 +433,7 @@ export function FeedbackDialog({
                       (github ? (
                         <>
                           <Icon name="lock" size={12} />
-                          Only the Tudu team sees it
+                          Private unless you show it
                         </>
                       ) : (
                         'or paste or drop one'
@@ -473,11 +512,12 @@ function PublicNotice() {
             <li>What you write</li>
             <li>Bug or idea</li>
             <li>App details, when switched on: version, system, page, window, theme</li>
+            <li>The screenshot, only when you show it</li>
           </ul>
           <h4>Only the Tudu team</h4>
           <ul className="tp-fb-priv">
             <li>Your name and email (so we can reply)</li>
-            <li>The screenshot</li>
+            <li>The screenshot, unless you show it</li>
           </ul>
           <p>Never sent anywhere: your tasks, notes, people or space names.</p>
         </Popover.Content>

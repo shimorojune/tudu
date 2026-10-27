@@ -733,7 +733,8 @@
 .tp-root .tp-fb-shot {
   position: relative;
   margin: 0;
-  padding: 2px;
+  /* Room for the accent ring when it's shown on the issue: the fold clips what's outside. */
+  padding: 3px;
   transform: none;
   transition: transform 280ms var(--ease-change);
 }
@@ -855,11 +856,81 @@
 .tp-fb-sp {
   flex: 1;
 }
+
+/* "Show it on the public issue" (K-FeedbackShot): a row under the screenshot, inside its fold. On, a Public pill
+   fades onto the preview's corner, the frame takes the accent ring, and the sub line crossfades. */
+.tp-root .tp-fb-shot-img {
+  transition: box-shadow 220ms var(--ease-change);
+}
+.tp-root .tp-fb-shot.tp-shown .tp-fb-shot-img {
+  box-shadow:
+    inset 0 0 0 1px var(--border-strong),
+    0 0 0 3px var(--accent);
+}
+.tp-root .tp-fb-pill {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px 0 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--foreground) 78%, transparent);
+  color: var(--background);
+  font-size: 11.5px;
+  font-weight: 500;
+  opacity: 0;
+  transform: translateY(-3px) scale(0.92);
+  transition:
+    opacity 180ms var(--ease-change),
+    transform 220ms var(--ease-arrive);
+  pointer-events: none;
+}
+.tp-root .tp-fb-shot.tp-shown .tp-fb-pill {
+  opacity: 1;
+  transform: none;
+}
+.tp-root .tp-fb-shotrow.tp-setrow {
+  margin-top: 12px;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--line);
+}
+.tp-root .tp-fb-shotrow.tp-cant .tp-setrow-l {
+  color: var(--muted-foreground);
+}
+.tp-root .tp-fb-sub {
+  display: grid;
+}
+.tp-root .tp-fb-sub > span {
+  grid-area: 1 / 1;
+  transition:
+    opacity 160ms var(--ease-change),
+    transform 200ms var(--ease-arrive);
+}
+.tp-root .tp-fb-sub-on {
+  opacity: 0;
+  transform: translateY(3px);
+}
+.tp-root .tp-fb-sub.tp-on .tp-fb-sub-off {
+  opacity: 0;
+  transform: translateY(-3px);
+}
+.tp-root .tp-fb-sub.tp-on .tp-fb-sub-on {
+  opacity: 1;
+  transform: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tp-root .tp-fb-slot,
   .tp-root .tp-fb-shot,
+  .tp-root .tp-fb-shot-img,
   .tp-root .tp-fb-shot-img img,
   .tp-root .tp-fb-shot-img::before,
+  .tp-root .tp-fb-pill,
+  .tp-root .tp-fb-sub > span,
   .tp-fb-drop {
     transition: none;
     animation: none;
