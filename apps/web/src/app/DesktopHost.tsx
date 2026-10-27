@@ -1,19 +1,28 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
 import type { MeResponse } from '@tudu/client';
-import { gatherToday, todayLeft, type Task } from '@tudu/core';
+import { ALL_SLUG, gatherToday, hasAllSpaces, PERSONAL_SLUG, todayLeft, type Task } from '@tudu/core';
 import { useNavigate, useRouter } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { keepAppearance } from './appearance';
 import { desktop, FEEDBACK_GO, UPDATES_GO, type AppInfo, type UpdateReady } from './desktop';
 import { openFeedback } from './feedback';
 import { interceptLinks } from './links';
+import { NudgeClock } from './NudgeClock';
 import { setOpenUpdates } from './notebook';
-import { meQuery } from './session';
+import { meQuery, queryClient } from './session';
 import { settingsHref } from './settings';
 import { taskStore } from './tasks';
 import { inboxTotal, startUpdates, updateStore, useUpdate } from './updates';
 import { appVersion } from './version';
 import { useWorkingDay, WorkingDayProvider } from './workingDay';
+
+/** A click on a nudge: Today, across your spaces when you are in more than one. */
+export const TODAY_GO = '/today';
+
+function todayHref(): string {
+  const me = queryClient.getQueryData<MeResponse | null>(['me']);
+  return me && hasAllSpaces(me.spaces) ? `/${ALL_SLUG}` : `/${PERSONAL_SLUG}`;
+}
 
 let appInfo: AppInfo | null = null;
 /** The app's name and track, once known ("Tudu" until then). */
@@ -70,6 +79,7 @@ export function DesktopHost() {
     const stop = d.on('go', (path) => {
       if (path === FEEDBACK_GO) openFeedback();
       else if (path === UPDATES_GO) updates();
+      else if (path === TODAY_GO) void navigate({ href: todayHref() });
       else if (typeof path === 'string' && path.startsWith('/')) void navigate({ href: path });
     });
     return () => {
@@ -116,6 +126,7 @@ export function DesktopHost() {
   return d && main && me ? (
     <WorkingDayProvider>
       <TodayCount me={me} report={(t) => d.setTick(t)} />
+      <NudgeClock d={d} me={me} />
     </WorkingDayProvider>
   ) : null;
 }

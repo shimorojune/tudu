@@ -122,7 +122,13 @@ test.describe('settings', () => {
     await signInFresh(page);
     await openSettings(page);
     await expect(page).toHaveURL(/\/me\?settings=account$/);
-    await expect(nav(page).getByRole('button')).toHaveText(['Account', 'Appearance', 'Apps', 'Space']);
+    await expect(nav(page).getByRole('button')).toHaveText([
+      'Account',
+      'Appearance',
+      'Working hours',
+      'Apps',
+      'Space',
+    ]);
     await expect(dialog(page).getByRole('heading', { level: 1 })).toHaveText('Account');
     for (const [label, key, title] of [
       ['Appearance', 'appearance', 'Appearance'],
@@ -424,7 +430,8 @@ test.describe('settings', () => {
     const box = (await d.boundingBox())!;
     expect(box.width).toBeGreaterThan(760);
     const find = d.getByRole('searchbox', { name: 'Find someone' });
-    await find.fill('gi');
+    // Long enough that no member's random e-mail (base36 time, hex) matches too.
+    await find.fill('gita');
     await expect(d.getByRole('list', { name: 'Members' }).getByRole('listitem')).toHaveCount(1);
     await find.fill('zed');
     await expect(d.getByText('No one called “zed” in Harbour.')).toBeVisible();

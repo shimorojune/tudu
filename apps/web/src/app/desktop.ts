@@ -70,6 +70,9 @@ export interface ThisMac {
   dock: DockMode;
 }
 
+/** Whether macOS lets Tudu notify you (`unavailable`: a build that can't, such as a bare dev binary). */
+export type NotifyPermission = 'unknown' | 'allowed' | 'denied' | 'unavailable';
+
 export interface DesktopBridge {
   /** Which of the app's windows this page is in. */
   window: DesktopWindow;
@@ -135,6 +138,17 @@ export interface DesktopBridge {
   /** Settings › Appearance and Less motion, kept by the app for its windows; an app from before this does nothing. */
   setAppearance(look: Appearance): void;
   /**
+   * Ask macOS for notifications. An ad hoc signed Tudu gets `denied` at once, with no box, until you allow it in
+   * System Settings. An app from before nudges answers `unavailable`.
+   */
+  notifyPermission(): Promise<NotifyPermission>;
+  /** Notifications as macOS has them now. */
+  notifyStatus(): Promise<NotifyPermission>;
+  /** Post a nudge, replacing the one in Notification Center; rejects when macOS refused it. */
+  notifyNudge(title: string, body: string): Promise<void>;
+  /** System Settings › Notifications, on Tudu's own row where macOS can. */
+  openNotificationSettings(): void;
+  /**
    * `go` (the desk is asked to show a page, or `feedback` for the form), `floating:shown` (the summon),
    * `menubar:shown` and `menubar:hidden` (the tick's click, and the sheet put away), `update:ready` (a check,
    * whoever asked for it, downloaded a newer version) and `update:status` (the updater's state changed).
@@ -149,7 +163,8 @@ export type DesktopEvent =
   | 'menubar:hidden'
   | 'update:ready'
   | 'update:status'
-  | 'note:open';
+  | 'note:open'
+  | 'nudges:pause';
 
 /** The look the app builds its windows with. */
 export interface Appearance {
@@ -185,6 +200,11 @@ export interface DesktopFake {
   refuseOpenNote?: boolean;
   /** What a failed check failed at (`failCheck`): the feed by default. */
   errorKind?: UpdateErrorKind;
+  /** Notifications as the fake macOS has them; `notifyAnswer` is what asking gives (the status follows it). */
+  notify?: NotifyPermission;
+  notifyAnswer?: NotifyPermission;
+  /** The nudges the fake app posted, newest last. */
+  nudges?: Array<{ title: string; body: string }>;
   /** The floating bar's waiting seed (summonWith keeps it, quickAddSeed takes it). */
   seed?: QuickAddSeed | null;
   calls: Array<{ name: string; args: unknown[] }>;
@@ -337,6 +357,21 @@ function fakeBridge(f: DesktopFake): DesktopBridge {
       f.thisMac = { ...f.thisMac, dock: mode };
     },
     setAppearance: (look) => call('setAppearance', look),
+    notifyPermission: async () => {
+      call('notifyPermission');
+      if (f.notify === undefined || f.notify === 'unknown') f.notify = f.notifyAnswer ?? 'allowed';
+      return f.notify;
+    },
+    notifyStatus: async () => {
+      call('notifyStatus');
+      return f.notify ?? 'unknown';
+    },
+    notifyNudge: async (title, body) => {
+      call('notifyNudge', title, body);
+      if (f.notify !== 'allowed') throw new Error('Notifications are not allowed for this application');
+      (f.nudges ??= []).push({ title, body });
+    },
+    openNotificationSettings: () => call('openNotificationSettings'),
     on: (event, fn) => {
       (f.listeners![event] ??= []).push(fn);
       return () => {
@@ -392,6 +427,10 @@ function tauriBridge(t: NonNullable<Window['__TAURI_INTERNALS__']>): DesktopBrid
     setDock: (dock) => quiet(invoke('set_dock', { dock })),
     setAppearance: (look) =>
       quiet(invoke('set_appearance', { theme: look.theme, lessMotion: look.lessMotion })),
+    notifyPermission: () => invoke<NotifyPermission>('notify_permission').catch(() => 'unavailable' as const),
+    notifyStatus: () => invoke<NotifyPermission>('notify_status').catch(() => 'unavailable' as const),
+    notifyNudge: (title, body) => invoke<void>('notify_nudge', { title, body }),
+    openNotificationSettings: () => quiet(invoke('open_notification_settings')),
     on: (event, fn) => {
       let stop: (() => void) | null = null;
       let gone = false;

@@ -29,6 +29,8 @@ import {
   type SettingsSectionName,
 } from '@tudu/ui';
 import { useEffect, useState } from 'react';
+import { useNudgeSettings } from './NudgeClock';
+import { useWorkHours } from './workHours';
 import { openCreateSpace } from './dayView';
 import { useAppVersion } from './DesktopHost';
 import { desktop, inApp, type ThisMac } from './desktop';
@@ -42,7 +44,15 @@ import { askJiraReconnect, clearJiraGlow, hostOf, jiraClient, peekJiraGlow, useJ
 import { taskStore, useOnline } from './tasks';
 import { useViewport } from './viewport';
 
-export const SECTIONS: SettingsSectionName[] = ['account', 'appearance', 'mac', 'space', 'members', 'apps'];
+export const SECTIONS: SettingsSectionName[] = [
+  'account',
+  'appearance',
+  'hours',
+  'mac',
+  'space',
+  'members',
+  'apps',
+];
 
 /** A section this space has: Personal has no Members, and This Mac is only in the Mac app. */
 export function sectionFor(raw: unknown, space: Pick<SpaceSummary, 'kind'>): SettingsSectionName | null {
@@ -218,6 +228,8 @@ export function SettingsView({
   const { choice, setTheme } = useTheme();
   const [lessMotion, setLessMotion] = useLessMotion();
   const mac = useThisMac();
+  const workHours = useWorkHours(me);
+  const nudges = useNudgeSettings(me);
   const version = useAppVersion();
   const team = space.kind === 'team';
   const members = useQuery({ ...taskStore.membersQuery(space.id), enabled: team });
@@ -395,6 +407,8 @@ export function SettingsView({
         onTheme={setTheme}
         lessMotion={lessMotion}
         onLessMotion={setLessMotion}
+        workHours={workHours}
+        nudges={nudges}
         mac={mac}
         onSpaceName={(name) => taskStore.updateSpace(space.id, { name })}
         onSpaceColor={(color) => taskStore.updateSpace(space.id, { color })}

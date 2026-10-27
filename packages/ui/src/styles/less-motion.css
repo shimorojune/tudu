@@ -292,6 +292,15 @@
 :root[data-motion='less'] .tp-nb-sheet-tools {
   animation: none;
 }
+:root[data-motion='less'] .tp-wh-auto {
+  transition: none;
+}
+:root[data-motion='less'] .tp-wh-shown {
+  animation: tp-fade-in 160ms linear both;
+}
+:root[data-motion='less'] .tp-wh-fold {
+  transition: opacity 160ms linear;
+}
 
 /* app.css */
 :root[data-motion='less'] .tp-tip-pop,

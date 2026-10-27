@@ -31,6 +31,10 @@ const COMMANDS: &[&str] = &[
     "hide_note",
     "note_resize_begin",
     "note_resize_to",
+    "notify_permission",
+    "notify_status",
+    "notify_nudge",
+    "open_notification_settings",
 ];
 const TEST_COMMANDS: &[&str] = &[
     "app_info",
@@ -62,6 +66,10 @@ const TEST_COMMANDS: &[&str] = &[
     "hide_note",
     "note_resize_begin",
     "note_resize_to",
+    "notify_permission",
+    "notify_status",
+    "notify_nudge",
+    "open_notification_settings",
     "control_reply",
 ];
 

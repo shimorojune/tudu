@@ -8,6 +8,7 @@ mod bridge;
 mod control;
 mod look;
 mod notes;
+mod nudges;
 mod place;
 mod track;
 mod updates;
@@ -59,6 +60,10 @@ macro_rules! handlers {
             notes::hide_note,
             notes::note_resize_begin,
             notes::note_resize_to,
+            nudges::notify_permission,
+            nudges::notify_status,
+            nudges::notify_nudge,
+            nudges::open_notification_settings,
             $($extra),*
         ]
     };
@@ -80,6 +85,7 @@ pub fn run() {
         )
         .manage(updates::Updates::default())
         .manage(notes::Notes::default())
+        .manage(nudges::Nudges::default())
         // Any of the windows coming to the front checks for a new version, once the last check is old enough.
         .on_window_event(|w, e| {
             if let WindowEvent::Focused(true) = e {
@@ -106,6 +112,8 @@ pub fn run() {
             let at_login = background.at_login;
             app.manage(background);
             app.manage(look::Looks::start(app.handle()));
+            // Before any window: a click on a nudge that launched Tudu is delivered to the delegate.
+            nudges::start(app.handle());
 
             windows::create(app.handle(), at_login)?;
             background::seed_tray_place();

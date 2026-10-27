@@ -54,6 +54,10 @@
             "allow-hide-note",
             "allow-note-resize-begin",
             "allow-note-resize-to",
+            "allow-notify-permission",
+            "allow-notify-status",
+            "allow-notify-nudge",
+            "allow-open-notification-settings",
             "allow-control-reply"
           ]
         }

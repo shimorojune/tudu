@@ -145,6 +145,9 @@ const T = {
     heading: 'h1,h2,h3,h4,[role=heading]',
     article: 'article,[role=article]',
     checkbox: '[role=checkbox],input[type=checkbox]',
+    switch: '[role=switch]',
+    group: '[role=group],fieldset',
+    list: 'ul,ol,[role=list]',
   },
   all(role, name, root = document) {
     const els = [...root.querySelectorAll(T.roles[role] || role)].filter(T.visible);

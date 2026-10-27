@@ -12,7 +12,9 @@
 //!   `button`: left or right), `reopen` (the dock icon), `close` (with `window`), `frame` (a window dragged and
 //!   resized: `window`, `x`, `y`, `width`, `height` in points), `outside-click` (a click in another
 //!   app), `check-update` (`auto`: only past the floor, as focus would), `wake`, `age-check` (with `minutes`), `quit`,
-//!   `tick` (with `hidden`: true or false says macOS hides or shows the tick, null hands the answer back to macOS).
+//!   `tick` (with `hidden`: true or false says macOS hides or shows the tick, null hands the answer back to macOS),
+//!   `notify` (a nudge, with `title` and `body`: posted as the page would post it), `notify-status` (notifications as
+//!   macOS has them, with the last nudge posted and the last answer to one: the click or Pause for today).
 //! - `POST /eval {"window", "script"}`: runs the script (an async function body) in that window's WKWebView and
 //!   answers its result, so the tests drive the real page.
 //!
@@ -419,6 +421,28 @@ fn act(app: &AppHandle, input: &Value) -> (u16, Value) {
             }
             (200, json!({ "ok": true }))
         }
+        "notify" => {
+            let text = |k: &str| {
+                input
+                    .get(k)
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string()
+            };
+            match crate::nudges::post(app, &text("title"), &text("body")) {
+                Ok(()) => (200, json!({ "ok": true, "id": crate::nudges::NUDGE_ID })),
+                Err(e) => (200, json!({ "ok": false, "error": e })),
+            }
+        }
+        "notify-status" => (
+            200,
+            json!({
+                "available": crate::nudges::available(),
+                "permission": crate::nudges::status(),
+                "delivered": crate::nudges::delivered(),
+                "last": crate::nudges::last(app),
+            }),
+        ),
         "quit" => {
             let a = app.clone();
             std::thread::spawn(move || {

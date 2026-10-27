@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { connectEvents } from '@tudu/client';
 import {
   INBOX_CHANGED,
+  ME_CHANGED,
   MEMBERS_CHANGED,
   NOTEBOOK_CHANGED,
   PROJECTS_CHANGED,
@@ -28,6 +29,8 @@ export function useLiveEvents(enabled: boolean): void {
         if (e.type === 'hello') return;
         // Your Notebook: only what another window or device changed reads again.
         if (e.type === NOTEBOOK_CHANGED) return notebookStore.onEvent(e);
+        // Your own account (your hours) changed elsewhere: only who you are reads again.
+        if (e.type === ME_CHANGED) return void queryClient.invalidateQueries({ queryKey: ['me'] });
         if (
           [
             TASKS_CHANGED,
