@@ -168,7 +168,24 @@ pub fn resize(f: Frame, edge: &str, dx: f64, dy: f64, min_w: f64, min_h: f64) ->
     out
 }
 
-/// A frame in Cocoa's terms, for a window gliding (AppKit animates its frame): points, from the bottom-left of the
+/// Part way through a glide from `a` to `b`: `t` from 0 to 1 eased in and out (cubic), each edge on whole pixels.
+pub fn between(a: Frame, b: Frame, t: f64) -> Frame {
+    let t = t.clamp(0.0, 1.0);
+    let e = if t < 0.5 {
+        4.0 * t * t * t
+    } else {
+        1.0 - (-2.0 * t + 2.0).powi(3) / 2.0
+    };
+    let mix = |p: f64, q: f64| (p + (q - p) * e).round();
+    Frame {
+        x: mix(a.x, b.x),
+        y: mix(a.y, b.y),
+        width: mix(a.width, b.width),
+        height: mix(a.height, b.height),
+    }
+}
+
+/// A frame in Cocoa's terms, for setting a window's frame in one step: points, from the bottom-left of the
 /// primary screen. `scale` is the window's backing scale, `primary_height` the primary screen's height in points.
 pub fn cocoa_rect(f: Frame, scale: f64, primary_height: f64) -> Frame {
     let (x, y) = (f.x / scale, f.y / scale);
@@ -352,6 +369,30 @@ mod tests {
                 height: 500.0
             }
         );
+    }
+
+    #[test]
+    fn c22_u71_a_glide_eases_from_one_frame_to_the_other() {
+        let a = Frame {
+            x: 100.0,
+            y: 100.0,
+            width: 640.0,
+            height: 480.0,
+        };
+        let b = Frame {
+            x: 8.0,
+            y: 33.0,
+            width: 1904.0,
+            height: 1039.0,
+        };
+        assert_eq!(between(a, b, 0.0), a);
+        assert_eq!(between(a, b, 1.0), b);
+        assert_eq!(between(a, b, 2.0), b);
+        let mid = between(a, b, 0.5);
+        assert_eq!(mid.width, 1272.0);
+        // Slow at the ends, quick in the middle.
+        assert!(between(a, b, 0.1).width - a.width < (b.width - a.width) * 0.1);
+        assert!(between(a, b, 0.9).width > a.width + (b.width - a.width) * 0.9);
     }
 
     #[test]

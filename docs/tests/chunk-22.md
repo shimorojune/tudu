@@ -105,6 +105,7 @@ The frame and fill-the-screen rules also have Rust tests under the same ids (`pl
 | C22-U68 | Rust `place.rs`               | `cocoa_rect` flips a top-left physical frame to Cocoa points, on a 2× primary and on a screen above it                                       |
 | C22-U69 | Rust `place.rs`               | `resize` moves only the named edges, never below the least size                                                                              |
 | C22-U70 | web `NoteWindowPage.test.tsx` | An edge's pointer down asks the app to begin, then to resize by how far the pointer moved on the screen                                      |
+| C22-U71 | Rust `place.rs`               | `between` eases a glide from one frame to the other (slow at the ends), on whole pixels, and stops at the end                                |
 | C22-E15 | e2e `notebook`                | (Replaces the popup steps.) The window drags; the Tudu mark opens the note on the Notebook page and closes it; no popup                      |
 | C22-E60 | e2e `notebook`                | Every edge and corner resizes the window; never below 420×320 or past the page; the frame is kept across a reload                            |
 | C22-E61 | e2e `notebook`                | Light and dark: the drag mark shows, the rail is the note's own paper, each handle has its cursor                                            |

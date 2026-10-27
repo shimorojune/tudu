@@ -449,19 +449,6 @@ pub(crate) fn set_frame_now(w: &WebviewWindow, f: crate::place::Frame) {
     }
 }
 
-/// The window glides to a frame (physical pixels, as `set_size` and `set_position` take them) over `over`, with the
-/// system's curve; AppKit animates it on the main thread without blocking it.
-pub(crate) fn glide_frame(w: &WebviewWindow, f: crate::place::Frame, over: Duration) {
-    #[cfg(target_os = "macos")]
-    panel::glide(w, f, over);
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = over;
-        let _ = w.set_size(tauri::PhysicalSize::new(f.width as u32, f.height as u32));
-        let _ = w.set_position(PhysicalPosition::new(f.x as i32, f.y as i32));
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -528,7 +515,7 @@ mod panel {
     use block2::RcBlock;
     use objc2::rc::Retained;
     use objc2::runtime::{AnyClass, AnyObject};
-    use objc2::{define_class, msg_send, ClassType, MainThreadMarker, MainThreadOnly};
+    use objc2::{define_class, ClassType, MainThreadMarker, MainThreadOnly};
     use objc2_app_kit::{
         NSEvent, NSEventMask, NSPanel, NSRunningApplication, NSScreen, NSWindow,
         NSWindowCollectionBehavior, NSWindowStyleMask, NSWorkspace, NSWorkspaceApplicationKey,
@@ -650,28 +637,6 @@ mod panel {
         let _ = w.run_on_main_thread(move || {
             if let Some(win) = ns_window(&w2) {
                 win.setFrame_display(cocoa(&win, f), true);
-            }
-        });
-    }
-
-    /// `[[window animator] setFrame:display:]` in an animation group of its own length: the frame moves in steps
-    /// on the main run loop (the window's size reads back mid-way), the default ease-in-out curve.
-    pub fn glide(w: &WebviewWindow, f: crate::place::Frame, over: std::time::Duration) {
-        let w2 = w.clone();
-        let _ = w.run_on_main_thread(move || {
-            let Some(win) = ns_window(&w2) else { return };
-            let rect = cocoa(&win, f);
-            let Some(ctx) = AnyClass::get(c"NSAnimationContext") else {
-                win.setFrame_display(rect, true);
-                return;
-            };
-            unsafe {
-                let animator: Retained<AnyObject> = msg_send![&*win, animator];
-                let _: () = msg_send![ctx, beginGrouping];
-                let current: *mut AnyObject = msg_send![ctx, currentContext];
-                let _: () = msg_send![current, setDuration: over.as_secs_f64()];
-                let _: () = msg_send![&*animator, setFrame: rect, display: true];
-                let _: () = msg_send![ctx, endGrouping];
             }
         });
     }

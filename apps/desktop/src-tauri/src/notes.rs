@@ -5,6 +5,7 @@
 //! displays change.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -40,6 +41,8 @@ pub struct Notes {
     frame: Mutex<Option<Frame>>,
     /// Gliding to fill the screen or back until then: the frames it passes through are not where you put it.
     gliding: Mutex<Option<Instant>>,
+    /// Which glide is running: a newer one stops the older one's steps.
+    glide: AtomicU64,
     /// Being resized from an edge or corner: its frame when the pointer went down.
     resizing: Mutex<Option<Frame>>,
 }
@@ -109,17 +112,35 @@ fn set_frame(w: &WebviewWindow, f: Frame) {
     let _ = w.set_position(PhysicalPosition::new(f.x as i32, f.y as i32));
 }
 
-/// Fill the screen and back: a glide, unless Less motion (Settings) or Reduce motion (macOS) is on.
+/// Fill the screen and back: a glide, unless Less motion (Settings) or Reduce motion (macOS) is on. The frame steps
+/// about every 16ms from a thread of its own, each step set in one go on the main thread, so nothing waits on it.
 fn glide_to(app: &AppHandle, w: &WebviewWindow, f: Frame) {
     let still = crate::look::current(app).less_motion || windows::reduce_motion();
-    if still {
+    let notes = app.state::<Notes>();
+    let run = notes.glide.fetch_add(1, Ordering::SeqCst) + 1;
+    let from = frame_of(w);
+    let Some(from) = from.filter(|_| !still) else {
         set_frame(w, f);
         return;
-    }
-    if let Ok(mut g) = app.state::<Notes>().gliding.lock() {
+    };
+    if let Ok(mut g) = notes.gliding.lock() {
         *g = Some(Instant::now() + GLIDE + Duration::from_millis(100));
     }
-    windows::glide_frame(w, f, GLIDE);
+    let (app, w) = (app.clone(), w.clone());
+    std::thread::spawn(move || {
+        let start = Instant::now();
+        loop {
+            if app.state::<Notes>().glide.load(Ordering::SeqCst) != run {
+                return;
+            }
+            let t = start.elapsed().as_secs_f64() / GLIDE.as_secs_f64();
+            windows::set_frame_now(&w, place::between(from, f, t));
+            if t >= 1.0 {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(16));
+        }
+    });
 }
 
 /// It moved or was resized: remember where, unless it is filling the screen or gliding (that is not where you put
