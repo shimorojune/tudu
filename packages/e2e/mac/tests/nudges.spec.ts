@@ -125,7 +125,7 @@ test.describe('working hours and nudges', () => {
     await writeTask(app, (await personal(app)).id, 'Call the bank', day);
     test.skip((await nudgesOn(app)) !== 'allowed', 'Pause shows once macOS allows Tudu Test');
     await clock(app, day, '09:00');
-    await posted(app, '1 left today');
+    await posted(app, '1 on today');
     await app.act('notify', { title: 'marker', body: '' });
     await app.eval(`T.click(T.get('button', 'Pause for today'))`);
     await app.until(`return T.all('button', 'Resume').length > 0`);
@@ -136,7 +136,8 @@ test.describe('working hours and nudges', () => {
     do next.setDate(next.getDate() + 1);
     while (next.getDay() === 0 || next.getDay() === 6);
     await clock(app, next.toLocaleDateString('en-CA'), '09:00');
-    await posted(app, 'Nothing on today');
+    // The unfinished task carries to the next working day, so its first nudge has it.
+    await posted(app, '1 on today');
   });
 
   test('WH-D05 Send now outside your hours says today as it is', async ({ app }) => {
