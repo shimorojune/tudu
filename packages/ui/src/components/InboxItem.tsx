@@ -32,8 +32,7 @@ export interface InboxTaskFacts {
 }
 
 export type InboxOutcome =
-  | { status: 'accepted'; label: string }
-  | { status: 'declined'; reason: string | null };
+  { status: 'accepted'; label: string } | { status: 'declined'; reason: string | null };
 
 export type SentStatus =
   | { state: 'waiting'; seen?: string | null }
