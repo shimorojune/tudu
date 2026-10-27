@@ -24,7 +24,8 @@ vi.mock('./tasks', () => ({
         const d = days[spaceId];
         if (d === 'fail') throw new Error('offline');
         if (d === 'wait') await new Promise<void>((r) => waiting.push(r));
-        return { day, tasks: Array.isArray(d) ? d : [] };
+        const now = days[spaceId];
+        return { day, tasks: Array.isArray(now) ? now : [] };
       },
     }),
   },
@@ -80,10 +81,13 @@ describe('MC-U04 the number beside the tick, from the desk', () => {
         tasks: [task('a', { done: true }), task('b', { done: true })],
       }),
     );
-    expect(report).toHaveBeenLastCalledWith({ left: 1, total: 3 });
+    await vi.waitFor(() => expect(report).toHaveBeenLastCalledWith({ left: 1, total: 3 }));
     const count = report.mock.calls.length;
     // The same numbers again are not reported again.
-    act(() => qc.setQueryData(['day', 'n', TODAY], { day: TODAY, tasks: [task('c', { ownerId: 'u' })] }));
+    await act(async () => {
+      qc.setQueryData(['day', 'n', TODAY], { day: TODAY, tasks: [task('c', { ownerId: 'u' })] });
+      await new Promise((r) => setTimeout(r, 20));
+    });
     expect(report.mock.calls.length).toBe(count);
   });
 
