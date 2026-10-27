@@ -1288,6 +1288,13 @@ test.describe('the look', () => {
       await web.up();
       await app.eval(`T.click(document.getElementById('again'))`);
       await onToday(app);
+      // The stand-in is its own origin, with nothing stored: the page there followed System and told the app so.
+      // Give it the pick as well, so the next launch is built in it again.
+      await app
+        .eval(`localStorage.setItem('tudu.theme', '${pick.toLowerCase()}'); location.reload()`)
+        .catch(() => {});
+      await onToday(app);
+      await app.waitState((s) => s.look.saved.theme === pick.toLowerCase());
       await app.quit();
 
       // Slow: the loader shows the mark after 300ms; the web, arriving later, starts held (no second intro).
