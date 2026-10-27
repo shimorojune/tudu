@@ -41,3 +41,10 @@ Status column is kept by `pnpm test:status` in [STATUS.md](STATUS.md). Run this 
 | C20-D05 | ⋯ › Quit Tudu ends the process, signed in and signed out                                                                 |
 | C20-D06 | With another app in front (Tudu not active), another app coming forward hides the sheet. Both apps checked in front      |
 | C20-D07 | With another app in front, a click in it hides the sheet; after the grace a click on the tick opens it again             |
+
+## The note window's shortcut ([docs/plans/note-window-fixes.md](../plans/note-window-fixes.md))
+
+| ID      | Where                       | Case                                                                                       |
+| ------- | --------------------------- | ------------------------------------------------------------------------------------------ |
+| C20-U20 | ui `MenuBarSheet.test.tsx`  | New note's tooltip shows "New note ⌥⌘N" above, with `aria-keyshortcuts`; without it, New note |
+| C20-E20 | e2e `menubar`               | The sheet with `noteShortcut` shows ⌥⌘N on New note; from an older app, New note alone        |

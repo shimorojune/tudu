@@ -111,3 +111,13 @@ Not automated: Gatekeeper on the first open of a downloaded dmg, About Tudu, the
 other apps, a real key press of ⌘⇧N (the tests press it through the same handler), the default browser actually
 opening, and the real feeds over the internet, which the `staging` pre-release and the 0.37.0 release exercise
 themselves.
+
+## Update errors ([docs/plans/note-window-fixes.md](../plans/note-window-fixes.md))
+
+| ID      | Where                  | Case                                                                                                                          |
+| ------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| C11-U40 | web `desktop.test.tsx` | `updatesRow`: the feed and download lines after Check now only; a refused safety check after any check; `releasePage`         |
+| C11-U41 | ui `Settings.test.tsx` | An error with `onGetIt` shows Get it from the website (no Try again) and calls it                                             |
+| C11-U42 | Rust `updates.rs`      | `kind()`: signature errors are `signature`, others `download` in the download and `check` at the feed; the status carries them |
+| C11-U43 | Rust `track.rs`        | ⌥⌘N parses as Alt+Super+KeyN, differs from the summon, and shows as ⌥⌘N                                                       |
+| C11-E40 | e2e `desktop`          | This Mac › Updates says what failed: the safety check with Get it from the website, a download and the feed after Check now    |

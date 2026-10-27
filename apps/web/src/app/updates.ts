@@ -1,4 +1,5 @@
 import {
+  RELEASES_URL,
   releaseUrl,
   checkedWords,
   inboxBadge,
@@ -242,10 +243,26 @@ export function useUpdateStatus(bridge: Pick<DesktopBridge, 'updateStatus' | 'on
 
 /** Check now's failure, as the row says it. */
 export const CHECK_FAILED = 'Couldn’t check for updates. Check your connection and try again.';
+/** The download failed. */
+export const downloadFailed = (name: string, version: string) =>
+  `Couldn’t download ${name} ${version}. Check your connection and try again.`;
+/** The download didn't pass its safety check (signed with another key): retrying can't fix it. */
+export const signatureFailed = (name: string, version: string) =>
+  `${name} ${version} didn’t pass its safety check, so it wasn’t installed. Download it from the Tudu website instead.`;
+
+/** The last check's failure is one retrying can't fix: Get it from the website, in place of Try again. */
+export function needsWebsite(status: UpdateStatus | null): boolean {
+  return !!status && !status.ready && status.lastResult === 'error' && status.errorKind === 'signature';
+}
+
+/** Where Get it from the website goes: the release the failed version belongs to, else the latest release. */
+export function releasePage(track: AppInfo['track'] | undefined, version: string | null | undefined): string {
+  return (track && releaseUrl(track, version ?? '')) || `${RELEASES_URL}/latest`;
+}
 
 /**
- * This Mac › Updates from the updater's state. A failure shows only after Check now; an automatic check's failure
- * leaves the row as it was (the next check tries again).
+ * This Mac › Updates from the updater's state. A failure shows only after Check now (an automatic check's failure
+ * leaves the row as it was: the next check tries again), except a refused safety check, which shows whoever checked.
  */
 export function updatesRow(
   status: UpdateStatus | null,
@@ -260,8 +277,17 @@ export function updatesRow(
   }
   if (status.checking) return { ...base, state: 'checking' };
   if (status.ready) return { ...base, state: 'ready', version: status.ready.version };
+  if (needsWebsite(status))
+    return { ...base, state: 'error', error: signatureFailed(app.name, status.errorVersion ?? '') };
   if (status.lastResult === 'error' && status.lastManual)
-    return { ...base, state: 'error', error: CHECK_FAILED };
+    return {
+      ...base,
+      state: 'error',
+      error:
+        status.errorKind === 'download' && status.errorVersion
+          ? downloadFailed(app.name, status.errorVersion)
+          : CHECK_FAILED,
+    };
   if (!status.lastCheck || status.lastResult === null) return { ...base, state: 'never' };
   return { ...base, state: 'idle', checked: checkedWords(status.lastCheck, now) };
 }

@@ -146,6 +146,41 @@ pub fn fill(area: Screen) -> Frame {
     }
 }
 
+/// Resizing from an edge or corner (`n`, `ne`, `e`, `se`, `s`, `sw`, `w`, `nw`): the edges it names follow the pointer
+/// by `dx`, `dy` while the opposite ones stay put, never smaller than `min_w` × `min_h`. All in physical pixels.
+pub fn resize(f: Frame, edge: &str, dx: f64, dy: f64, min_w: f64, min_h: f64) -> Frame {
+    let (right, bottom) = (f.x + f.width, f.y + f.height);
+    let mut out = f;
+    if edge.contains('e') {
+        out.width = (f.width + dx).max(min_w);
+    }
+    if edge.contains('s') {
+        out.height = (f.height + dy).max(min_h);
+    }
+    if edge.contains('w') {
+        out.x = (f.x + dx).min(right - min_w);
+        out.width = right - out.x;
+    }
+    if edge.contains('n') {
+        out.y = (f.y + dy).min(bottom - min_h);
+        out.height = bottom - out.y;
+    }
+    out
+}
+
+/// A frame in Cocoa's terms, for a window gliding (AppKit animates its frame): points, from the bottom-left of the
+/// primary screen. `scale` is the window's backing scale, `primary_height` the primary screen's height in points.
+pub fn cocoa_rect(f: Frame, scale: f64, primary_height: f64) -> Frame {
+    let (x, y) = (f.x / scale, f.y / scale);
+    let (width, height) = (f.width / scale, f.height / scale);
+    Frame {
+        x,
+        y: primary_height - (y + height),
+        width,
+        height,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -281,5 +316,93 @@ mod tests {
                 height: 1768.0
             }
         );
+    }
+
+    #[test]
+    fn c22_u68_a_glide_s_frame_flips_to_cocoa_points() {
+        // A 2× primary screen 900 points tall: 200,100 (points) from its top-left, 640×520 points.
+        let f = Frame {
+            x: 400.0,
+            y: 200.0,
+            width: 1280.0,
+            height: 1040.0,
+        };
+        assert_eq!(
+            cocoa_rect(f, 2.0, 900.0),
+            Frame {
+                x: 200.0,
+                y: 900.0 - (100.0 + 520.0),
+                width: 640.0,
+                height: 520.0
+            }
+        );
+        // On a 1× screen above the primary one (negative y in Tauri's terms): above the primary in Cocoa's.
+        let above = Frame {
+            x: -300.0,
+            y: -800.0,
+            width: 600.0,
+            height: 500.0,
+        };
+        assert_eq!(
+            cocoa_rect(above, 1.0, 900.0),
+            Frame {
+                x: -300.0,
+                y: 1200.0,
+                width: 600.0,
+                height: 500.0
+            }
+        );
+    }
+
+    #[test]
+    fn c22_u69_resizing_from_an_edge_moves_only_its_edges() {
+        let f = Frame {
+            x: 100.0,
+            y: 100.0,
+            width: 800.0,
+            height: 600.0,
+        };
+        let r = |e: &str, dx: f64, dy: f64| resize(f, e, dx, dy, 420.0, 320.0);
+        assert_eq!(r("e", 50.0, 9.0), Frame { width: 850.0, ..f });
+        assert_eq!(r("s", 9.0, 40.0), Frame { height: 640.0, ..f });
+        assert_eq!(
+            r("w", 30.0, 0.0),
+            Frame {
+                x: 130.0,
+                width: 770.0,
+                ..f
+            }
+        );
+        assert_eq!(
+            r("nw", -20.0, -10.0),
+            Frame {
+                x: 80.0,
+                y: 90.0,
+                width: 820.0,
+                height: 610.0
+            }
+        );
+        assert_eq!(
+            r("ne", 10.0, 20.0),
+            Frame {
+                y: 120.0,
+                width: 810.0,
+                height: 580.0,
+                ..f
+            }
+        );
+        // Never smaller than the least; the far edge stays where it was.
+        assert_eq!(
+            r("se", -900.0, -900.0),
+            Frame {
+                width: 420.0,
+                height: 320.0,
+                ..f
+            }
+        );
+        let w = r("w", 900.0, 0.0);
+        assert_eq!((w.x + w.width, w.width), (900.0, 420.0));
+        let n = r("n", 0.0, 900.0);
+        assert_eq!((n.y + n.height, n.height), (700.0, 320.0));
     }
 }

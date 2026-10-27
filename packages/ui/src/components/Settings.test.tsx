@@ -494,6 +494,39 @@ describe('C11-U12 Settings › This Mac › Updates', () => {
   });
 });
 
+describe('C11-U41 Settings › This Mac › Updates, an error retrying can’t fix', () => {
+  const base = { openAtLogin: 'off' as const, dock: 'open' as const };
+  const button = () => within(screen.getByRole('region', { name: 'Updates' })).getByRole('button');
+  const line =
+    'Tudu 0.37.1 didn’t pass its safety check, so it wasn’t installed. Download it from the Tudu website instead.';
+
+  it('C11-U41 with onGetIt the button is Get it from the website (no Try again) and calls it', () => {
+    const onGetIt = vi.fn();
+    const onCheck = vi.fn();
+    settings({
+      section: 'mac',
+      mac: {
+        ...base,
+        updates: { name: 'Tudu', current: '0.37.0', state: 'error', error: line, onGetIt, onCheck },
+      },
+    });
+    expect(screen.getByText(line)).toHaveClass('tp-set-bad');
+    expect(button()).toHaveTextContent('Get it from the website');
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    fireEvent.click(button());
+    expect(onGetIt).toHaveBeenCalledOnce();
+    expect(onCheck).not.toHaveBeenCalled();
+  });
+
+  it('C11-U41 without it: Try again, as before', () => {
+    settings({
+      section: 'mac',
+      mac: { ...base, updates: { name: 'Tudu', current: '0.37.0', state: 'error', error: 'Couldn’t check.' } },
+    });
+    expect(button()).toHaveTextContent('Try again');
+  });
+});
+
 describe('C11-U13 Settings › This Mac › Updates, acting', () => {
   afterEach(() => vi.useRealTimers());
   const base = { openAtLogin: 'off' as const, dock: 'open' as const };

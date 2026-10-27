@@ -5,6 +5,7 @@ import { keepAppearance } from './appearance';
 import { desktop, FEEDBACK_GO, UPDATES_GO, type AppInfo, type UpdateReady } from './desktop';
 import { openFeedback } from './feedback';
 import { interceptLinks } from './links';
+import { setOpenUpdates } from './notebook';
 import { meQuery } from './session';
 import { settingsHref } from './settings';
 import { inboxTotal, startUpdates, updateStore, useUpdate } from './updates';
@@ -58,13 +59,19 @@ export function DesktopHost() {
 
   useEffect(() => {
     if (!d || !main) return;
-    return d.on('go', (path) => {
+    // Settings › This Mac over the page the desk is on; whoever asks already started the check.
+    const updates = () => void navigate({ href: settingsHref(router.state.location, '', 'mac', false) });
+    // An old app's note fallback offers Update Tudu from the desk itself.
+    setOpenUpdates(updates);
+    const stop = d.on('go', (path) => {
       if (path === FEEDBACK_GO) openFeedback();
-      // Settings › This Mac over the page the desk is on; the sheet already started the check.
-      else if (path === UPDATES_GO)
-        void navigate({ href: settingsHref(router.state.location, '', 'mac', false) });
+      else if (path === UPDATES_GO) updates();
       else if (typeof path === 'string' && path.startsWith('/')) void navigate({ href: path });
     });
+    return () => {
+      stop();
+      setOpenUpdates(null);
+    };
   }, [d, main, navigate, router]);
 
   useEffect(() => {

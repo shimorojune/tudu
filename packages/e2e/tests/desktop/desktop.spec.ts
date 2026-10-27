@@ -521,6 +521,59 @@ test.describe('This Mac', () => {
     await expect(updatesButton(page)).toHaveText('Check now');
   });
 
+  test('C11-E40 Updates says what failed: a refused safety check after any check, with the website; a download or the feed after Check now only', async ({
+    page,
+  }) => {
+    await fixClock(page);
+    await installFake(page, {
+      info: { track: 'staging', name: 'Tudu Staging', version: '0.37.1-staging.10' },
+    });
+    await signInFresh(page);
+    await openThisMac(page);
+    await expect(updatesRow(page)).toContainText('Up to date.');
+    // A check the app made by itself: its download didn't pass the safety check. It shows anyway.
+    await updaterSays(page, {
+      lastResult: 'error',
+      error: 'signature was created with a different key',
+      errorKind: 'signature',
+      errorVersion: '0.37.1-staging.12',
+      lastManual: false,
+    });
+    await expect(updatesRow(page).locator('.tp-set-bad')).toHaveText(
+      'Tudu Staging 0.37.1-staging.12 didn’t pass its safety check, so it wasn’t installed. Download it from the Tudu website instead.',
+    );
+    await expect(updatesButton(page)).toHaveText('Get it from the website');
+    await updatesButton(page).click();
+    await expect
+      .poll(async () => (await calls(page, 'openExternal')).map((c) => c.args[0]))
+      .toEqual(['https://github.com/shimorojune/tudu/releases#release-staging']);
+
+    // A failed download: only after Check now, and Try again.
+    await updaterSays(page, {
+      lastResult: 'error',
+      error: 'connection reset',
+      errorKind: 'download',
+      errorVersion: '0.37.1-staging.12',
+      lastManual: false,
+    });
+    await expect(updatesRow(page).locator('.tp-set-bad')).toHaveCount(0);
+    await updaterSays(page, { lastManual: true });
+    await expect(updatesRow(page).locator('.tp-set-bad')).toHaveText(
+      'Couldn’t download Tudu Staging 0.37.1-staging.12. Check your connection and try again.',
+    );
+    await expect(updatesButton(page)).toHaveText('Try again');
+
+    // The feed: the connection line, after Check now only.
+    await updaterSays(page, { errorKind: 'check', errorVersion: null, lastManual: false });
+    await expect(updatesRow(page).locator('.tp-set-bad')).toHaveCount(0);
+    await setFake(page, { failCheck: true, errorKind: 'check' });
+    await updatesButton(page).click();
+    await expect(updatesRow(page).locator('.tp-set-bad')).toHaveText(
+      'Couldn’t check for updates. Check your connection and try again.',
+    );
+    await expect(updatesButton(page)).toHaveText('Try again');
+  });
+
   test('C11-E17 an older app (no update_status): This Mac has no Updates section', async ({ page }) => {
     await fixClock(page);
     await installFake(page, { noStatus: true });

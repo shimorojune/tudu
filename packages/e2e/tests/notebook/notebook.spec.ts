@@ -9,6 +9,7 @@ import {
   signInFresh,
   test,
 } from '../../fixtures/app';
+import { calls, installFake } from '../../fixtures/desktop';
 import { box, openSearch, panel } from '../../fixtures/search';
 import { joinLink, me, secondPerson } from '../../fixtures/spaces';
 import { settle } from '../../fixtures/motion';
@@ -136,6 +137,69 @@ async function newFolderIn(page: Page, parent: string | null, name: string): Pro
   }
   await nameIt(page, name);
   await expect(folderRow(page, name)).toBeVisible();
+}
+
+/** A note linked to a task, opened in the note window from the task panel; answers the note's id. */
+async function floatNote(page: Page, html = '<p>The Old Mill</p>'): Promise<string> {
+  const sid = await personalId(page);
+  const taskId = await seedTask(page, sid, 'Book the venue', new Date().toLocaleDateString('en-CA'));
+  const id = await seedNote(page, 'Venue shortlist', { html, linkTo: taskId });
+  await page.goto(`/t/${await refOf(page, sid, taskId)}`);
+  await page
+    .getByRole('region', { name: 'From your notebook' })
+    .getByRole('button', { name: /Venue shortlist/ })
+    .click();
+  await expect(noteWindow(page)).toBeVisible();
+  await settle(page, page.locator('.tp-nb-float'));
+  return id;
+}
+
+const floatBox = async (page: Page) => (await page.locator('.tp-nb-float').boundingBox())!;
+
+/** Drag from the middle of `handle` by dx, dy. */
+async function dragBy(page: Page, handle: Locator, dx: number, dy: number): Promise<void> {
+  const h = (await handle.boundingBox())!;
+  const x = h.x + h.width / 2;
+  const y = h.y + h.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + dx, y + dy, { steps: 6 });
+  await page.mouse.up();
+}
+
+/** The formatting bar is a solid strip above the writing, and only the words under it scroll. */
+async function barOnTop(page: Page, scope: Locator): Promise<void> {
+  const bar = scope.locator('.tp-nb-body .tp-rte-bar');
+  const host = scope.locator('.tp-nb-body .tp-rte-host');
+  await expect(bar).toBeVisible();
+  const b = (await bar.boundingBox())!;
+  const h = (await host.boundingBox())!;
+  expect(Math.abs(b.y + b.height - h.y)).toBeLessThanOrEqual(1);
+  // Away from the note: the strip stays solid, only its controls dim.
+  const alpha = await bar.evaluate((el) => {
+    const m = getComputedStyle(el).backgroundColor.match(/rgba?\(([^)]+)\)/);
+    const parts = m ? m[1]!.split(/[ ,/]+/).filter(Boolean) : [];
+    return parts.length > 3 ? Number(parts[3]) : 1;
+  });
+  expect(alpha).toBe(1);
+  // The first line stays where it is when you click in.
+  const first = scope.locator('.tp-nb-body .tp-rte-area > *').first();
+  const before = (await first.boundingBox())!.y;
+  await first.click();
+  await expect(scope.locator('.tp-nb-body .tp-rte-notes')).toHaveClass(/tp-on/);
+  expect(Math.abs((await first.boundingBox())!.y - before)).toBeLessThanOrEqual(0.5);
+  // Scrolled to the end: right under the bar's lower edge is the bar, never a line of text behind it.
+  await host.evaluate((el) => (el.scrollTop = el.scrollHeight));
+  const under = await bar.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const at = document.elementFromPoint(r.left + r.width / 2, r.bottom - 2);
+    return !!at?.closest('.tp-rte-bar');
+  });
+  expect(under).toBe(true);
+  // The words scroll inside their own box, which starts at the bar's lower edge: nothing shows above it.
+  expect(await host.evaluate((el) => getComputedStyle(el).overflowY)).toMatch(/auto|scroll/);
+  const h2 = (await host.boundingBox())!;
+  expect(h2.y).toBeGreaterThanOrEqual(b.y + b.height - 0.5);
 }
 
 async function noteMenu(page: Page, item: 'Move' | 'Delete', scope: Page | Locator = page): Promise<void> {
@@ -632,40 +696,6 @@ test.describe('notebook', () => {
     await expect(chip).not.toContainText(/ME-\d+/);
   });
 
-  test('C22-E24 the formatting bar sits at the foot of the note pane, centred, in a short note and a long one', async ({
-    page,
-  }) => {
-    test.skip(!desk(), 'desktop web');
-    await signInFresh(page);
-    const short = await seedNote(page, 'Short', { html: '<p>One line</p>' });
-    const long = await seedNote(page, 'Long', {
-      html: Array.from({ length: 60 }, (_, i) => `<p>Line ${i + 1}</p>`).join(''),
-    });
-    const place = async () => {
-      await words(page).click();
-      const bar = page.locator('.tp-nb-body .tp-rte-bar');
-      await expect(bar).toBeVisible();
-      await settle(page, bar);
-      const pane = (await page.locator('.tp-nb-body').boundingBox())!;
-      const bb = (await bar.boundingBox())!;
-      // 12px sticky inset over the pane's 16px bottom padding.
-      expect(pane.y + pane.height - (bb.y + bb.height)).toBeLessThanOrEqual(30);
-      expect(pane.y + pane.height - (bb.y + bb.height)).toBeGreaterThanOrEqual(0);
-      expect(Math.abs(bb.x + bb.width / 2 - (pane.x + pane.width / 2))).toBeLessThanOrEqual(2);
-      return bb;
-    };
-    await page.goto(`/notebook/${short}`);
-    await expect(words(page)).toContainText('One line');
-    const a = await place();
-    await page.goto(`/notebook/${long}`);
-    await expect(words(page)).toContainText('Line 60');
-    await page
-      .locator('.tp-nb-body')
-      .evaluate((el) => (el.scrollTop = el.scrollHeight / 2 - el.clientHeight / 2));
-    const b = await place();
-    expect(Math.abs(a.y - b.y)).toBeLessThanOrEqual(2);
-  });
-
   test('C22-E25 a bullet clears the placeholder: the list button, “- ”, a task’s notes and a comment', async ({
     page,
   }) => {
@@ -809,44 +839,168 @@ test.describe('notebook', () => {
     await other.close();
   });
 
-  test('C22-E15 the note window on the web: it drags; ↗ opens the popup on the same note; edits there show in the panel', async ({
+  test('C22-E15 the note window on the web: it drags; the Tudu mark opens the note on the Notebook page and closes the window, no popup', async ({
     page,
     context,
   }) => {
     test.skip(!desk(), 'desktop web');
     await signInFresh(page);
-    const sid = await personalId(page);
-    const taskId = await seedTask(page, sid, 'Book the venue', new Date().toLocaleDateString('en-CA'));
-    const id = await seedNote(page, 'Venue shortlist', { html: '<p>The Old Mill</p>', linkTo: taskId });
-    await page.goto(`/t/${await refOf(page, sid, taskId)}`);
+    const id = await floatNote(page);
+    const win = noteWindow(page);
+    const before = await floatBox(page);
+    await dragBy(page, win.locator('.tp-nb-win-title'), -200, 60);
+    const after = await floatBox(page);
+    expect(Math.round(before.x - after.x)).toBe(200);
+    expect(Math.round(after.y - before.y)).toBe(60);
+    const tabs = context.pages().length;
+    await win.getByRole('button', { name: 'Open in your Notebook' }).click();
+    await expect(page).toHaveURL(new RegExp(`/notebook/${id}$`));
+    await expect(title(page)).toHaveValue('Venue shortlist');
+    await expect(noteWindow(page)).toHaveCount(0);
+    expect(context.pages()).toHaveLength(tabs);
+    // An old link to the popup lands on the Notebook page too.
+    await page.goto(`/note-window/${id}`);
+    await expect(page).toHaveURL(new RegExp(`/notebook/${id}$`));
+  });
+
+  test('C22-E60 the note window resizes from every edge and corner, never below 420×320 or past the page, and keeps it', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    await floatNote(page);
+    const win = noteWindow(page);
+    // Each edge in by 60 and back out: only the edges it names move.
+    const moves: Array<[string, number, number]> = [
+      ['n', 0, 60],
+      ['s', 0, -60],
+      ['e', -60, 0],
+      ['w', 60, 0],
+      ['ne', -60, 60],
+      ['nw', 60, 60],
+      ['se', -60, -60],
+      ['sw', 60, -60],
+    ];
+    for (const [edge, dx, dy] of moves) {
+      const a = await floatBox(page);
+      await dragBy(page, win.locator(`[data-edge="${edge}"]`), dx, dy);
+      const b = await floatBox(page);
+      const left = edge.includes('w') ? dx : 0;
+      const top = edge.includes('n') ? dy : 0;
+      const right = edge.includes('e') ? dx : 0;
+      const bottom = edge.includes('s') ? dy : 0;
+      expect(Math.round(b.x - a.x), `${edge} left`).toBe(left);
+      expect(Math.round(b.y - a.y), `${edge} top`).toBe(top);
+      expect(Math.round(b.x + b.width - (a.x + a.width)), `${edge} right`).toBe(right);
+      expect(Math.round(b.y + b.height - (a.y + a.height)), `${edge} bottom`).toBe(bottom);
+      await dragBy(page, win.locator(`[data-edge="${edge}"]`), -dx, -dy);
+      const c = await floatBox(page);
+      expect(Math.round(c.width), `${edge} back`).toBe(Math.round(a.width));
+      expect(Math.round(c.height), `${edge} back`).toBe(Math.round(a.height));
+    }
+    // Never smaller than 420×320.
+    await dragBy(page, win.locator('[data-edge="se"]'), -900, -900);
+    let f = await floatBox(page);
+    expect(Math.round(f.width)).toBe(420);
+    expect(Math.round(f.height)).toBe(320);
+    // Never past the page.
+    await dragBy(page, win.locator('[data-edge="nw"]'), -3000, -3000);
+    f = await floatBox(page);
+    expect(Math.round(f.x)).toBe(0);
+    expect(Math.round(f.y)).toBe(0);
+    const vp = page.viewportSize()!;
+    await dragBy(page, win.locator('[data-edge="se"]'), 3000, 3000);
+    f = await floatBox(page);
+    expect(Math.round(f.x + f.width)).toBeLessThanOrEqual(vp.width);
+    expect(Math.round(f.y + f.height)).toBeLessThanOrEqual(vp.height);
+    await dragBy(page, win.locator('[data-edge="se"]'), -200, -150);
+    const kept = await floatBox(page);
+    // The same frame after a reload.
+    await page.reload();
     await page
       .getByRole('region', { name: 'From your notebook' })
       .getByRole('button', { name: /Venue shortlist/ })
       .click();
-    const win = noteWindow(page);
-    await expect(win).toBeVisible();
-    // Once it has finished rising in.
     await settle(page, page.locator('.tp-nb-float'));
-    const before = (await page.locator('.tp-nb-float').boundingBox())!;
-    const bar = win.locator('.tp-nb-win-title');
-    const b = (await bar.boundingBox())!;
-    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(b.x + b.width / 2 - 200, b.y + b.height / 2 + 60, { steps: 6 });
-    await page.mouse.up();
-    const after = (await page.locator('.tp-nb-float').boundingBox())!;
-    expect(Math.round(before.x - after.x)).toBe(200);
-    expect(Math.round(after.y - before.y)).toBe(60);
-    const [popup] = await Promise.all([
-      context.waitForEvent('page'),
-      win.getByRole('button', { name: 'Open in its own window' }).click(),
-    ]);
-    await popup.waitForLoadState();
-    expect(new URL(popup.url()).pathname).toBe(`/note-window/${id}`);
-    await expect(title(popup)).toHaveValue('Venue shortlist');
-    await title(popup).fill('Venue shortlist, final');
-    await expect(title(win)).toHaveValue('Venue shortlist, final', { timeout: 10_000 });
-    await popup.close();
+    const back = await floatBox(page);
+    expect([back.x, back.y, back.width, back.height].map(Math.round)).toEqual(
+      [kept.x, kept.y, kept.width, kept.height].map(Math.round),
+    );
+  });
+
+  for (const scheme of ['light', 'dark'] as const)
+    test(`C22-E61 (${scheme}) the drag mark shows in the bar, the rail is the note’s own paper, and each handle has its cursor`, async ({
+      page,
+    }) => {
+      test.skip(!desk(), 'desktop web');
+      await page.emulateMedia({ colorScheme: scheme });
+      await signInFresh(page);
+      await floatNote(page);
+      const win = noteWindow(page);
+      await expect(win.locator('.tp-nb-win-bar .tp-nb-win-grab')).toBeVisible();
+      const bg = (sel: string) => win.locator(sel).first().evaluate((el) => getComputedStyle(el).backgroundColor);
+      expect(await bg('.tp-nb-rail')).toBe(await win.evaluate((el) => getComputedStyle(el).backgroundColor));
+      const cursors: Record<string, string> = {
+        n: 'ns-resize',
+        s: 'ns-resize',
+        e: 'ew-resize',
+        w: 'ew-resize',
+        ne: 'nesw-resize',
+        sw: 'nesw-resize',
+        nw: 'nwse-resize',
+        se: 'nwse-resize',
+      };
+      for (const [edge, cursor] of Object.entries(cursors))
+        expect(
+          await win.locator(`[data-edge="${edge}"]`).evaluate((el) => getComputedStyle(el).cursor),
+          edge,
+        ).toBe(cursor);
+    });
+
+  test('C22-E62 the formatting bar is a solid strip above the writing on the Notebook page and in the note window; phones keep it at the foot', async ({
+    page,
+  }) => {
+    test.skip(test.info().project.name === 'tablet', 'desktop and phones');
+    await signInFresh(page);
+    const html = Array.from({ length: 60 }, (_, i) => `<p>Line ${i + 1}</p>`).join('');
+    if (phone()) {
+      const id = await seedNote(page, 'Long', { html });
+      await page.goto(`/notebook/${id}`);
+      await expect(words(page)).toContainText('Line 60');
+      await words(page).click();
+      const bar = page.locator('.tp-nb-body .tp-rte-bar');
+      await expect(bar).toBeVisible();
+      await page.locator('.tp-nb-body').evaluate((el) => (el.scrollTop = el.scrollHeight));
+      const last = (await words(page).locator('p').last().boundingBox())!;
+      expect((await bar.boundingBox())!.y).toBeGreaterThanOrEqual(last.y + last.height - 1);
+      return;
+    }
+    const id = await seedNote(page, 'Long', { html });
+    await page.goto(`/notebook/${id}`);
+    await expect(words(page)).toContainText('Line 60');
+    await barOnTop(page, page.locator('.app-notebook'));
+    // The note window, the same.
+    await floatNote(page, html);
+    await barOnTop(page, noteWindow(page));
+  });
+
+  test('C22-E63 an older Mac app: the note opens over the page with a toast; Update Tudu opens This Mac and checks', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await installFake(page, { refuseOpenNote: true });
+    await signInFresh(page);
+    await floatNote(page);
+    await expect(title(noteWindow(page))).toHaveValue('Venue shortlist');
+    expect((await calls(page, 'openNote')).length).toBe(1);
+    const toast = page.getByText('This version of Tudu can’t float notes over other apps, so this one opens here.');
+    await expect(toast).toBeVisible();
+    await page.getByRole('button', { name: 'Update Tudu' }).click();
+    await expect(page).toHaveURL(/[?&]settings=mac/);
+    await expect(
+      page.getByRole('dialog', { name: 'Settings' }).getByRole('region', { name: 'Updates' }),
+    ).toBeVisible();
+    expect((await calls(page, 'checkUpdate')).map((c) => c.args)).toContainEqual([true]);
   });
 
   test('C22-E16 Recent and All notes in the window: All shows the tree; picking a note there opens it in the window', async ({

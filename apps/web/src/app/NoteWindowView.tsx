@@ -18,7 +18,7 @@ export interface NoteWindowViewProps extends Pick<
   | 'onResizeStart'
 > {
   onClose: () => void;
-  /** Open in your Notebook (Mac), ↗ (web), Open in Tudu (the popup). Gets the open note, unless it's still blank. */
+  /** Open in your Notebook (the Tudu mark). Gets the open note, unless it's still blank. */
   onOpenApp?: (noteId: string | null) => void;
   /** Where a linked task, or a task just made, opens. */
   openPath: OpenPath;
@@ -27,7 +27,7 @@ export interface NoteWindowViewProps extends Pick<
 }
 
 /**
- * The note window's inside, the same in the browser's floating panel, its popup and the Mac's own window: your
+ * The note window's inside, the same in the browser's floating panel and the Mac's own window: your
  * notes down the left (Recent, or All notes), the note on the right. It opens on a blank note unless it was asked
  * for one; a blank note closed without a word is never kept.
  */

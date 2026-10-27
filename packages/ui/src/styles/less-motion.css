@@ -228,6 +228,11 @@
 :root[data-motion='less'] .tp-nb-chev {
   transition-duration: 1ms;
 }
+:root[data-motion='less'] .tp-nb-win-grab,
+:root[data-motion='less'] .tp-nb-edge::after,
+:root[data-motion='less'] .tp-nb-body .tp-rte-notes .tp-rte-bar > * {
+  transition-duration: 1ms;
+}
 :root[data-motion='less'] .tp-nb-turn,
 :root[data-motion='less'] .tp-nb-pop,
 :root[data-motion='less'] .tp-nb-tchip.tp-root,

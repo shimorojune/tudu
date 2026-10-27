@@ -23,19 +23,34 @@ export interface UpdateStatus {
   lastManual: boolean;
   ready: UpdateReady | null;
   error: string | null;
+  /**
+   * What failed: the feed (`check`), the download, or its safety check (`signature`, which retrying can't fix). Null
+   * from an app before this.
+   */
+  errorKind?: UpdateErrorKind | null;
+  /** The version whose download or safety check failed. */
+  errorVersion?: string | null;
   downloads: number;
   checking: boolean;
   downloading: { version: string; received: number; total: number | null } | null;
 }
+
+export type UpdateErrorKind = 'check' | 'download' | 'signature';
 
 export interface AppInfo {
   track: Track;
   name: string;
   version: string;
   shortcut: string;
+  /** The note window's shortcut (⌥⌘N), only while the app has it registered; none from an older app. */
+  noteShortcut?: string;
 }
 
 export type DesktopWindow = 'main' | 'floating' | 'menubar' | 'note';
+
+/** Where a resize of the note window starts: an edge or a corner. */
+export type ResizeEdge = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
+
 
 /** The note window (chunk 22): what it was last asked to show, and whether it is pinned or fills the screen. */
 export interface NoteWindowState {
@@ -80,8 +95,11 @@ export interface DesktopBridge {
   quickAddSeed(): Promise<QuickAddSeed | null>;
   hideMenubar(): void;
   quit(): void;
-  /** The note window on a note, or on a blank one (linked to a task): it floats over every app, the desk stays put. */
-  openNote(id: string | null, linkTo?: string | null): void;
+  /**
+   * The note window on a note, or on a blank one (linked to a task): it floats over every app, the desk stays put.
+   * Rejects when the app is too old to have one.
+   */
+  openNote(id: string | null, linkTo?: string | null): Promise<void>;
   /** From the note window: what it should show, and how it sits. */
   noteState(): Promise<NoteWindowState>;
   setNotePinned(on: boolean): Promise<boolean>;
@@ -89,9 +107,14 @@ export interface DesktopBridge {
   /** Open in your Notebook: the desk on the note (or the Notebook), and the note window hides. */
   openInNotebook(id: string | null): void;
   hideNote(): void;
-  /** The note window follows the pointer: by its bar, or from its corner. */
+  /** The note window follows the pointer by its bar. */
   startDragging(): void;
-  startResizing(): void;
+  /**
+   * Resizing the note window from an edge or corner (macOS has no native drag for them): `beginResize` as the
+   * pointer goes down, then `resizeTo` with how far it has moved since, in points.
+   */
+  beginResize(): void;
+  resizeTo(edge: ResizeEdge, dx: number, dy: number): void;
   /**
    * Checks the feed; a newer version is downloaded and verified before it is answered. `manual`: Check now, so a
    * failure shows.
@@ -157,6 +180,10 @@ export interface DesktopFake {
   loginAnswer?: LoginState;
   /** The note window as the fake app has it. */
   note?: Partial<NoteWindowState>;
+  /** An app from before the note window: open_note is refused. */
+  refuseOpenNote?: boolean;
+  /** What a failed check failed at (`failCheck`): the feed by default. */
+  errorKind?: UpdateErrorKind;
   /** The floating bar's waiting seed (summonWith keeps it, quickAddSeed takes it). */
   seed?: QuickAddSeed | null;
   calls: Array<{ name: string; args: unknown[] }>;
@@ -223,7 +250,10 @@ function fakeBridge(f: DesktopFake): DesktopBridge {
     },
     hideMenubar: () => call('hideMenubar'),
     quit: () => call('quit'),
-    openNote: (id, linkTo) => call('openNote', id, linkTo ?? null),
+    openNote: async (id, linkTo) => {
+      call('openNote', id, linkTo ?? null);
+      if (f.refuseOpenNote) throw new Error('Command open_note not found');
+    },
     noteState: async () => ({ pinned: false, expanded: false, ask: null, ...f.note }),
     setNotePinned: async (on) => {
       call('setNotePinned', on);
@@ -238,7 +268,8 @@ function fakeBridge(f: DesktopFake): DesktopBridge {
     openInNotebook: (id) => call('openInNotebook', id),
     hideNote: () => call('hideNote'),
     startDragging: () => call('startDragging'),
-    startResizing: () => call('startResizing'),
+    beginResize: () => call('beginResize'),
+    resizeTo: (edge, dx, dy) => call('resizeTo', edge, dx, dy),
     checkUpdate: async (manual) => {
       call('checkUpdate', ...(manual ? [true] : []));
       // A fake app old or new: the status steps through as the real one's do, then the answer.
@@ -259,7 +290,15 @@ function fakeBridge(f: DesktopFake): DesktopBridge {
       if (!f.noStatus) step({ checking: true });
       await wait();
       if (f.failCheck) {
-        if (!f.noStatus) end({ lastResult: 'error', error: 'The feed could not be reached.' });
+        const kind = f.errorKind ?? 'check';
+        const version = kind === 'check' ? null : (f.update?.version ?? null);
+        if (!f.noStatus)
+          end({
+            lastResult: 'error',
+            error: 'The feed could not be reached.',
+            errorKind: kind,
+            errorVersion: version,
+          });
         throw new Error('The feed could not be reached.');
       }
       const u = f.update ?? null;
@@ -330,14 +369,15 @@ function tauriBridge(t: NonNullable<Window['__TAURI_INTERNALS__']>): DesktopBrid
     quickAddSeed: () => invoke<QuickAddSeed | null>('quick_add_seed').catch(() => null),
     hideMenubar: () => quiet(invoke('hide_menubar')),
     quit: () => quiet(invoke('quit')),
-    openNote: (id, linkTo) => quiet(invoke('open_note', { id, linkTo: linkTo ?? null })),
+    openNote: (id, linkTo) => invoke<void>('open_note', { id, linkTo: linkTo ?? null }),
     noteState: () => invoke<NoteWindowState>('note_state'),
     setNotePinned: (on) => invoke<boolean>('set_note_pinned', { on }),
     setNoteExpanded: (on) => invoke<boolean>('set_note_expanded', { on }),
     openInNotebook: (id) => quiet(invoke('open_in_notebook', { id })),
     hideNote: () => quiet(invoke('hide_note')),
     startDragging: () => quiet(win().then((w) => w.startDragging())),
-    startResizing: () => quiet(win().then((w) => w.startResizeDragging('SouthEast'))),
+    beginResize: () => quiet(invoke('note_resize_begin')),
+    resizeTo: (edge, dx, dy) => quiet(invoke('note_resize_to', { edge, dx, dy })),
     // Not asked for: the page's own check, which keeps to the app's 30-minute floor (an older app ignores `auto`).
     checkUpdate: (manual) => invoke<UpdateReady | null>('update_check', { manual: !!manual, auto: !manual }),
     // An app before this command refuses it: no Check now there.

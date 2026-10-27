@@ -1,11 +1,12 @@
 //! The note window (chunk 22): a small window for writing without the desk. Like Quick Add it is a non-activating
 //! panel, so it takes the keyboard without bringing the desk forward, but it stays when you click into another app.
-//! It drags by its bar and resizes from its corner; Pin keeps it above other apps (off to start) and the arrows fill
-//! the screen and take it back. Its place and size are kept across launches and brought back onto a screen when
+//! It drags by its bar and resizes from any edge or corner; Pin keeps it above other apps (off to start, and off again
+//! once it closes) and the arrows glide it to fill the screen and back. Its place and size are kept across launches and brought back onto a screen when
 //! displays change.
 
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, State, WebviewWindow};
@@ -37,7 +38,14 @@ pub struct Notes {
     state: Mutex<NoteState>,
     /// Where it sits while not filling the screen.
     frame: Mutex<Option<Frame>>,
+    /// Gliding to fill the screen or back until then: the frames it passes through are not where you put it.
+    gliding: Mutex<Option<Instant>>,
+    /// Being resized from an edge or corner: its frame when the pointer went down.
+    resizing: Mutex<Option<Frame>>,
 }
+
+/// How long filling the screen (and coming back) takes, as the page's own motion does.
+pub const GLIDE: Duration = Duration::from_millis(200);
 
 impl Notes {
     pub fn state(&self) -> NoteState {
@@ -101,10 +109,30 @@ fn set_frame(w: &WebviewWindow, f: Frame) {
     let _ = w.set_position(PhysicalPosition::new(f.x as i32, f.y as i32));
 }
 
-/// It moved or was resized: remember where, unless it is filling the screen (that is not where you put it).
+/// Fill the screen and back: a glide, unless Less motion (Settings) or Reduce motion (macOS) is on.
+fn glide_to(app: &AppHandle, w: &WebviewWindow, f: Frame) {
+    let still = crate::look::current(app).less_motion || windows::reduce_motion();
+    if still {
+        set_frame(w, f);
+        return;
+    }
+    if let Ok(mut g) = app.state::<Notes>().gliding.lock() {
+        *g = Some(Instant::now() + GLIDE + Duration::from_millis(100));
+    }
+    windows::glide_frame(w, f, GLIDE);
+}
+
+/// It moved or was resized: remember where, unless it is filling the screen or gliding (that is not where you put
+/// it).
 pub fn remember(app: &AppHandle, w: &WebviewWindow) {
     let notes = app.state::<Notes>();
-    if notes.state().expanded || !w.is_visible().unwrap_or(false) {
+    let gliding = notes
+        .gliding
+        .lock()
+        .ok()
+        .and_then(|g| *g)
+        .is_some_and(|until| Instant::now() < until);
+    if gliding || notes.state().expanded || !w.is_visible().unwrap_or(false) {
         return;
     }
     let Some(f) = frame_of(w) else { return };
@@ -184,11 +212,21 @@ pub fn open(app: &AppHandle, id: Option<String>, link_to: Option<String>) {
     let _ = w.emit_to(NOTE, "note:open", state);
 }
 
-/// Close: it hides, keeping its place, its size and its page.
+/// What closing does to the state: it unpins, so it always opens unpinned ("off to start"); filling the screen and
+/// the last ask stay.
+pub fn on_close(s: &mut NoteState) {
+    s.pinned = false;
+}
+
+/// Close: it hides, keeping its place, its size and its page, and stops floating above other apps.
 pub fn hide(app: &AppHandle) {
     if let Some(w) = app.get_webview_window(NOTE) {
         remember(app, &w);
+        let _ = w.set_always_on_top(false);
         let _ = w.hide();
+    }
+    if let Ok(mut s) = app.state::<Notes>().state.lock() {
+        on_close(&mut s);
     }
     save(app);
 }
@@ -215,7 +253,7 @@ pub fn set_expanded(app: &AppHandle, on: bool) -> bool {
             s.expanded = true;
         }
         if let Some(area) = work_area(&w) {
-            set_frame(&w, place::fill(area));
+            glide_to(app, &w, place::fill(area));
         }
     } else {
         if let Ok(mut s) = notes.state.lock() {
@@ -226,7 +264,7 @@ pub fn set_expanded(app: &AppHandle, on: bool) -> bool {
             .frame()
             .and_then(|f| place::keep_on_screen(f, &screens))
         {
-            set_frame(&w, f);
+            glide_to(app, &w, f);
         }
     }
     on
@@ -268,6 +306,39 @@ pub fn hide_note(app: AppHandle) {
     hide(&app);
 }
 
+/// The pointer went down on an edge or corner: resizing starts from the frame it has now. (macOS gives a borderless
+/// window no native drag from its edges, and Tauri's start_resize_dragging does nothing there.)
+#[tauri::command]
+pub fn note_resize_begin(app: AppHandle) {
+    let Some(w) = app.get_webview_window(NOTE) else {
+        return;
+    };
+    if let Ok(mut r) = app.state::<Notes>().resizing.lock() {
+        *r = frame_of(&w);
+    }
+}
+
+/// The pointer is `dx`, `dy` points from where it went down: the edges `edge` names follow it, at once.
+#[tauri::command]
+pub fn note_resize_to(app: AppHandle, edge: String, dx: f64, dy: f64) {
+    let Some(w) = app.get_webview_window(NOTE) else {
+        return;
+    };
+    let Some(from) = app.state::<Notes>().resizing.lock().ok().and_then(|r| *r) else {
+        return;
+    };
+    let scale = w.scale_factor().unwrap_or(1.0);
+    let f = place::resize(
+        from,
+        &edge,
+        dx * scale,
+        dy * scale,
+        place::NOTE_MIN_WIDTH * scale,
+        place::NOTE_MIN_HEIGHT * scale,
+    );
+    windows::set_frame_now(&w, f);
+}
+
 /// A note's id in a path: letters, digits and `-` as they are, anything else percent-encoded.
 fn encode(id: &str) -> String {
     id.bytes()
@@ -281,6 +352,25 @@ fn encode(id: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn c22_u67_closing_unpins_and_keeps_the_rest() {
+        let ask = Ask {
+            id: Some("n1".into()),
+            link_to: None,
+            nonce: 4,
+        };
+        let mut s = NoteState {
+            pinned: true,
+            expanded: true,
+            ask: Some(ask),
+        };
+        on_close(&mut s);
+        assert!(!s.pinned);
+        assert!(s.expanded);
+        assert_eq!(s.ask.as_ref().map(|a| a.nonce), Some(4));
+        assert_eq!(s.ask.and_then(|a| a.id).as_deref(), Some("n1"));
+    }
 
     #[test]
     fn c22_d04_open_in_your_notebook_goes_to_the_note_s_page() {

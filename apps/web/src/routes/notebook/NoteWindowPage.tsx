@@ -1,33 +1,73 @@
-import { useQuery } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
+import { syncThemeChoice, useTheme, type NoteResizeEdge } from '@tudu/ui';
+import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { desktop, type NoteWindowState } from '../../app/desktop';
 import { useLiveEvents } from '../../app/live';
 import { leaveWindow, showInWindow } from '../../app/notebook';
 import { NoteWindowView } from '../../app/NoteWindowView';
-import { QuickAddHost } from '../../app/quickAdd';
-import { meQuery } from '../../app/session';
-import { SpaceProvider } from '../../app/space';
 import { WorkingDayProvider } from '../../app/workingDay';
 import './notebook.css';
 
 /**
- * The note window alone, at /note-window (and /note-window/<id>): the Mac app's own note window holds it, and in the
- * browser ↗ opens it in a popup. On the Mac the app says which note to show each time it opens the window.
+ * The note window alone, at /note-window (and /note-window/<id>): the Mac app's own note window holds it, and the app
+ * says which note to show each time it opens the window. It paints your theme and follows it live. Opened in a
+ * browser (an old bookmark, or the popup ↗ used to open) it takes you to the note on the Notebook page.
  */
 export function NoteWindowPage({ noteId }: { noteId?: string }) {
-  useLiveEvents(true);
   const d = desktop();
   const mac = d?.window === 'note';
+  if (!mac || !d) return <ToNotebook noteId={noteId} />;
+  return <MacNoteWindow />;
+}
+
+function ToNotebook({ noteId }: { noteId?: string }) {
+  const navigate = useNavigate();
+  useEffect(() => {
+    void navigate({ href: noteId ? `/notebook/${encodeURIComponent(noteId)}` : '/notebook', replace: true });
+  }, [navigate, noteId]);
+  return null;
+}
+
+/**
+ * Resize from an edge or corner: the app takes the frame as the pointer goes down, then follows how far the pointer
+ * has moved on the screen (the window moves under it on the top and left edges), once a frame.
+ */
+function resizeFrom(e: PointerEvent<HTMLElement>, edge: NoteResizeEdge): void {
+  const d = desktop()!;
+  e.preventDefault();
+  e.currentTarget.setPointerCapture?.(e.pointerId);
+  const sx = e.screenX;
+  const sy = e.screenY;
+  let next: [number, number] | null = null;
+  let frame = 0;
+  d.beginResize();
+  const move = (ev: globalThis.PointerEvent) => {
+    next = [ev.screenX - sx, ev.screenY - sy];
+    frame ||= requestAnimationFrame(() => {
+      frame = 0;
+      if (next) d.resizeTo(edge, next[0], next[1]);
+    });
+  };
+  const up = (ev: globalThis.PointerEvent) => {
+    cancelAnimationFrame(frame);
+    d.resizeTo(edge, ev.screenX - sx, ev.screenY - sy);
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', up);
+  };
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', up);
+}
+
+function MacNoteWindow() {
+  useLiveEvents(true);
+  // The theme picked on the desk, live (the storage event), and on every open (a hidden window may miss it).
+  useTheme();
+  const d = desktop()!;
   const [pinned, setPinned] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const seen = useRef(0);
 
   useEffect(() => {
-    if (!mac || !d) {
-      // The popup: the note it was opened on.
-      showInWindow(noteId ?? null);
-      return;
-    }
     let on = true;
     const take = (s: NoteWindowState) => {
       if (!on) return;
@@ -40,88 +80,47 @@ export function NoteWindowPage({ noteId }: { noteId?: string }) {
       }
     };
     void d.noteState().then(take);
-    const stop = d.on('note:open', (payload) => take(payload as NoteWindowState));
+    const stop = d.on('note:open', (payload) => {
+      syncThemeChoice();
+      take(payload as NoteWindowState);
+    });
     return () => {
       on = false;
       stop();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the window is set up once; the note it shows comes from the app
-  }, [mac, d]);
+  }, [d]);
 
-  const view = mac ? (
-    <NoteWindowView
-      variant="mac"
-      pinned={pinned}
-      expanded={expanded}
-      onPin={() => void d!.setNotePinned(!pinned).then(setPinned)}
-      onExpand={() => void d!.setNoteExpanded(!expanded).then(setExpanded)}
-      onDragStart={(e) => {
-        if (e.button === 0 && !(e.target as Element).closest('button')) d!.startDragging();
-      }}
-      onResizeStart={(e) => {
-        e.preventDefault();
-        d!.startResizing();
-      }}
-      onClose={() => {
-        leaveWindow();
-        d!.hideNote();
-      }}
-      onOpenApp={(id) => {
-        leaveWindow();
-        d!.openInNotebook(id);
-      }}
-      openPath={(path) => d!.showMain(path)}
-      // Make a task: the floating New task bar (⌘⇧N) comes up over every app, filled in; the desk stays put.
-      makeTask={(seed) => d!.summonWith(seed)}
-    />
-  ) : (
-    <NoteWindowView
-      variant="web"
-      rail={false}
-      openLabel="Open in Tudu"
-      onClose={() => {
-        leaveWindow();
-        window.close();
-      }}
-      onOpenApp={(id) => toOpener(id ? `/notebook/${encodeURIComponent(id)}` : '/notebook')}
-      openPath={toOpener}
-    />
-  );
   return (
     <WorkingDayProvider>
-      <div
-        className={mac ? 'tp-root app-note-window app-note-mac' : 'tp-root app-note-window app-note-popup'}
-      >
-        {view}
-        {mac ? null : <PopupQuickAdd />}
+      <div className="tp-root app-note-window app-note-mac">
+        <NoteWindowView
+          variant="mac"
+          pinned={pinned}
+          expanded={expanded}
+          onPin={() => void d.setNotePinned(!pinned).then(setPinned)}
+          onExpand={() => void d.setNoteExpanded(!expanded).then(setExpanded)}
+          onDragStart={(e) => {
+            if (e.button === 0 && !(e.target as Element).closest('button')) d.startDragging();
+          }}
+          onResizeStart={(e, edge) => {
+            if (e.button === 0) resizeFrom(e, edge);
+          }}
+          onClose={() => {
+            leaveWindow();
+            // Closing unpins it (the app does too): it always opens unpinned.
+            setPinned(false);
+            d.hideNote();
+          }}
+          onOpenApp={(id) => {
+            leaveWindow();
+            setPinned(false);
+            d.openInNotebook(id);
+          }}
+          openPath={(path) => d.showMain(path)}
+          // Make a task: the floating New task bar (⌘⇧N) comes up over every app, filled in; the desk stays put.
+          makeTask={(seed) => d.summonWith(seed)}
+        />
       </div>
     </WorkingDayProvider>
   );
-}
-
-/** The popup's own New task (Make a task opens it here, over the note), set on Personal like the desk's. */
-function PopupQuickAdd() {
-  const me = useQuery(meQuery).data;
-  const personal = me?.spaces.find((s) => s.kind === 'personal');
-  if (!me || !personal) return null;
-  return (
-    <SpaceProvider space={personal}>
-      <QuickAddHost me={me} openPath={toOpener} />
-    </SpaceProvider>
-  );
-}
-
-/** From the popup: the page in the Tudu tab that opened it, or a tab of its own. */
-function toOpener(href: string): void {
-  const opener = window.opener as Window | null;
-  try {
-    if (opener && !opener.closed) {
-      opener.location.href = href;
-      opener.focus();
-      return;
-    }
-  } catch {
-    /* another origin: a tab of its own */
-  }
-  window.open(href, '_blank');
 }

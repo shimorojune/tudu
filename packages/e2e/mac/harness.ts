@@ -75,6 +75,11 @@ export interface AppState {
     deskBackground: string | null;
   };
   shortcut: { accelerator: string; registered: boolean };
+  /** Each global shortcut: the summon (⌘⇧N) and the note window (⌥⌘N). */
+  shortcuts: {
+    summon: { accelerator: string; registered: boolean };
+    notes: { accelerator: string; registered: boolean };
+  };
   badge: string | null;
   updater: {
     checks: number;

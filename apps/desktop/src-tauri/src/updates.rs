@@ -33,6 +33,11 @@ pub struct Status {
     pub last_manual: bool,
     pub ready: Option<Ready>,
     pub error: Option<String>,
+    /// What failed: `check` (the feed), `download`, or `signature` (the download didn't pass its signature check, which
+    /// retrying can't fix).
+    pub error_kind: Option<&'static str>,
+    /// The version whose download or signature failed.
+    pub error_version: Option<String>,
     pub downloads: u32,
     /// A check is asking the feed or downloading, or waiting its turn to.
     pub checking: bool,
@@ -78,6 +83,24 @@ pub fn auto_due(checking: bool, finished: Option<SystemTime>, now: SystemTime) -
     }
 }
 
+/// What a failure was, for the page's line: a refused signature, else the download or the check it happened in.
+pub fn kind(e: &tauri_plugin_updater::Error, downloading: bool) -> &'static str {
+    use tauri_plugin_updater::Error;
+    match e {
+        Error::Minisign(_) | Error::Base64(_) | Error::SignatureUtf8(_) => "signature",
+        _ if downloading => "download",
+        _ => "check",
+    }
+}
+
+/// A failure's kind and version kept with it; anything that ends well clears both.
+fn failed(s: &mut Status, error: String, kind: &'static str, version: Option<String>) {
+    s.last_result = Some("error".into());
+    s.error = Some(error);
+    s.error_kind = Some(kind);
+    s.error_version = version;
+}
+
 fn now() -> String {
     time::OffsetDateTime::now_utc()
         .format(&time::format_description::well_known::Rfc3339)
@@ -115,6 +138,8 @@ fn finish(app: &AppHandle, manual: bool, f: impl FnOnce(&mut Status)) {
         s.pending = s.pending.saturating_sub(1);
         s.checking = s.pending > 0;
         s.downloading = None;
+        s.error_kind = None;
+        s.error_version = None;
         f(s);
     });
 }
@@ -176,8 +201,11 @@ async fn run(app: AppHandle, manual: bool) -> Result<Option<Ready>, String> {
     let updates = app.state::<Updates>();
     let _turn = updates.1.lock().await;
     let found = match updater(&app) {
-        Ok(u) => u.check().await.map_err(|e| e.to_string()),
-        Err(e) => Err(e),
+        Ok(u) => u
+            .check()
+            .await
+            .map_err(|e| (e.to_string(), kind(&e, false))),
+        Err(e) => Err((e, "check")),
     };
     let update = match found {
         Ok(Some(u)) => u,
@@ -188,13 +216,10 @@ async fn run(app: AppHandle, manual: bool) -> Result<Option<Ready>, String> {
             });
             return Ok(None);
         }
-        Err(e) => {
+        Err((e, k)) => {
             eprintln!("tudu: update check failed: {e}");
             let ready = ready_before(&app);
-            finish(&app, manual, |s| {
-                s.last_result = Some("error".into());
-                s.error = Some(e.clone());
-            });
+            finish(&app, manual, |s| failed(s, e.clone(), k, None));
             return Ok(ready);
         }
     };
@@ -254,12 +279,12 @@ async fn run(app: AppHandle, manual: bool) -> Result<Option<Ready>, String> {
             Ok(Some(ready))
         }
         Err(e) => {
+            let k = kind(&e, true);
             let e = e.to_string();
             eprintln!("tudu: update download refused: {e}");
             let ready = ready_before(&app);
             finish(&app, manual, |s| {
-                s.last_result = Some("error".into());
-                s.error = Some(e.clone());
+                failed(s, e.clone(), k, Some(version.clone()))
             });
             Ok(ready)
         }
@@ -354,6 +379,27 @@ mod tests {
         ));
         // A clock set back counts as just now.
         assert!(!auto_due(false, Some(now + Duration::from_secs(60)), now));
+    }
+
+    #[test]
+    fn c11_u42_a_failure_says_what_failed() {
+        use tauri_plugin_updater::Error;
+        let sig = Error::SignatureUtf8("not base64".into());
+        assert_eq!(kind(&sig, true), "signature");
+        assert_eq!(kind(&sig, false), "signature");
+        let net = Error::Network("connection reset".into());
+        assert_eq!(kind(&net, true), "download");
+        assert_eq!(kind(&Error::ReleaseNotFound, false), "check");
+        assert_eq!(kind(&Error::EmptyEndpoints, false), "check");
+
+        let mut s = Status::default();
+        failed(&mut s, "bad".into(), "signature", Some("0.37.1".into()));
+        assert_eq!(s.last_result.as_deref(), Some("error"));
+        assert_eq!(s.error_kind, Some("signature"));
+        assert_eq!(s.error_version.as_deref(), Some("0.37.1"));
+        let v = serde_json::to_value(&s).unwrap();
+        assert_eq!(v["errorKind"], "signature");
+        assert_eq!(v["errorVersion"], "0.37.1");
     }
 
     #[test]
