@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { NotebookFolder } from '@tudu/core';
 import { readStylesheet } from '../test-utils/stylesheet';
-import { NoteEditor, type NoteEditorNote } from './NoteEditor';
+import { NoteEditor, bubbleSpot, type NoteEditorNote } from './NoteEditor';
 
 const FOLDERS: NotebookFolder[] = [
   { id: 'nw', parentId: null, name: 'Northwind', position: 1 },
@@ -182,5 +182,52 @@ describe('C22-U24 Make a task opens New task, it makes nothing itself', () => {
     expect(css).toContain('.tp-nb-body { display: flex; flex-direction: column; }');
     expect(css).toContain('.tp-nb-body > .tp-rte-notes { flex: 1 0 auto; }');
     expect(css).toContain('.tp-nb-body .tp-rte-notes .tp-rte-area { flex: 1 0 auto; }');
+  });
+});
+
+describe('C22-U31 the Make a task bubble sits on whole pixels', () => {
+  it('C22-U31 centred on the selection, its foot on the line, rounded, and kept 8px inside the pane', () => {
+    expect(bubbleSpot(200.5, 120.3, 117, 32, 600)).toEqual({ left: 142, top: 88 });
+    // near the left or right edge, or the top, it stays 8px inside
+    expect(bubbleSpot(20, 120, 117, 32, 600)).toEqual({ left: 8, top: 88 });
+    expect(bubbleSpot(590.4, 120, 117, 32, 600)).toEqual({ left: 475, top: 88 });
+    expect(bubbleSpot(300, 20, 117, 32, 600)).toEqual({ left: 242, top: 8 });
+  });
+
+  it('C22-U31 the shown bubble gets whole-pixel left and top before it paints', async () => {
+    const width = vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.classList.contains('tp-nb-bubble') ? 117 : 600;
+    });
+    const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.classList.contains('tp-nb-bubble') ? 32 : 400;
+    });
+    try {
+      const { container } = setup();
+      const text = await waitFor(() => {
+        const p = container.querySelector('.tp-rte-area p');
+        expect(p?.firstChild).toBeTruthy();
+        return p!.firstChild!;
+      });
+      select(text, 0, 21);
+      const bubble = container.querySelector<HTMLElement>('.tp-nb-bubble')!;
+      expect(bubble).toBeTruthy();
+      expect(bubble.style.left).toMatch(/^\d+px$/);
+      expect(bubble.style.top).toMatch(/^\d+px$/);
+    } finally {
+      width.mockRestore();
+      height.mockRestore();
+    }
+  });
+
+  it('C22-U31 no half-width shift, and nothing stays transformed once it has risen', () => {
+    const css = readStylesheet('components.css').replace(/\s+/g, ' ');
+    const rule = css.match(/\.tp-nb-bubble \{[^}]*\}/)![0];
+    expect(rule).not.toContain('translate(-50%');
+    expect(rule).toContain('animation: tp-nb-bubble-in var(--dur-menu) var(--ease-arrive) backwards;');
+    expect(css).toContain('@keyframes tp-nb-bubble-in { from { opacity: 0; transform: translateY(4px); } }');
   });
 });

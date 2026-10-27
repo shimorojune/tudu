@@ -386,3 +386,25 @@ describe('TaskRow project (chunk 04)', () => {
     );
   });
 });
+
+describe('C21-U22 a space tile shown alone is 16px', () => {
+  const NW2 = { id: 'nw', name: 'Northwind', color: '#3d5a80', initials: 'N' };
+  const size = (el: HTMLElement) => el.querySelector<HTMLElement>('.tp-sg-tile')!.style.width;
+
+  it('C21-U22 brief (the week) and compact (phones) draw 16px; beside its name it stays 13px', () => {
+    const { container, rerender } = render(<TaskRow title="Ship the pilot" id="NW-12" inSpace={NW2} />);
+    expect(size(container)).toBe('13px');
+    rerender(<TaskRow title="Ship the pilot" id="NW-12" inSpace={NW2} brief />);
+    expect(size(container)).toBe('16px');
+    rerender(<TaskRow title="Ship the pilot" id="NW-12" inSpace={NW2} compact />);
+    expect(size(container)).toBe('16px');
+  });
+
+  it('C21-U22 the bare tile’s letter is 9px with radius 5', () => {
+    const rule = rulesWhere(rules, (x) => x === '.tp-sg-bare .tp-sg-tile').find(
+      (r) => r.declarations['font-size'],
+    );
+    expect(rule!.declarations['font-size']).toMatch(/^9px/);
+    expect(rule!.declarations['border-radius']).toMatch(/^5px/);
+  });
+});

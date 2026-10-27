@@ -127,6 +127,15 @@ test.describe('menubar', () => {
     await e02(page, browser);
   });
 
+  test('C20-E10 two spaces: each heading’s space tile is 20px', async ({ page, browser }) => {
+    const m = await e02(page, browser);
+    const tiles = m.locator('.tp-mb-gh .tp-stile');
+    await expect(tiles).toHaveCount(2);
+    for (const i of [0, 1]) {
+      expect(await tiles.nth(i).boundingBox()).toMatchObject({ width: 20, height: 20 });
+    }
+  });
+
   test('C20-E03 live: a task added on another device and a tick made on the desk show on the sheet within a second', async ({
     page,
   }) => {

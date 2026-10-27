@@ -48,8 +48,8 @@ export default defineConfig({
     {
       name: 'webkit',
       use: { ...devices['Desktop Safari'], viewport: { width: 1440, height: 900 } },
-      testMatch: /motion\.spec\.ts/,
-      grep: /FX-E0[1-3]/,
+      testMatch: /(motion|notebook)\.spec\.ts/,
+      grep: /FX-E0[1-3]|C22-E26/,
     },
   ],
   // The API on a throwaway database, then the built web app. With E2E_BASE_URL set (staging) nothing is started.
