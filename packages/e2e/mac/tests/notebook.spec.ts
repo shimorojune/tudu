@@ -346,9 +346,10 @@ test.describe('chunk 22 · the note window', () => {
   test('C22-D32 fill the screen glides there and back', async ({ app }) => {
     await signIn(app);
     await openNote(app);
+    // CI's Macs have Reduce motion on, which makes the glide instant (checked below): off for the glide itself.
+    await app.act('reduce-motion', { on: false });
     const before = await app.state();
     const was = before.windows.note;
-    // The glide is instant with Less motion or macOS Reduce motion; this run has neither, or it says which.
     expect({ less: before.look.saved.lessMotion, reduce: before.reduceMotion }).toEqual({
       less: false,
       reduce: false,
@@ -371,6 +372,17 @@ test.describe('chunk 22 · the note window', () => {
     expect(back.note.glideSteps - out.note.glideSteps).toBeGreaterThanOrEqual(5);
     // Where it was, as C22-D03 has it; the glide's in-between frames were not kept.
     expect(near(back.windows.note.x, was.x)).toBe(true);
+    // With Reduce motion on it goes there and back in one step.
+    await new Promise((r) => setTimeout(r, 400));
+    const steps = (await app.state()).note.glideSteps;
+    await app.act('reduce-motion', { on: true });
+    await app.eval(`T.click(T.get('button', 'Fill the screen'))`, 'note');
+    const jump = await until((x) => near(x.windows.note.width, x.windows.note.screen!.width - 16));
+    expect(jump.note.glideSteps).toBe(steps);
+    await app.eval(`T.click(T.get('button', 'Back to its size'))`, 'note');
+    const jumpBack = await until((x) => near(x.windows.note.width, was.width));
+    expect(jumpBack.note.glideSteps).toBe(steps);
+    await app.act('reduce-motion', { on: null });
     await app.act('close', { window: 'note' });
     await noteHidden(app);
     await openNote(app);

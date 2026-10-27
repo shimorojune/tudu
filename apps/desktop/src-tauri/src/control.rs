@@ -371,6 +371,16 @@ fn act(app: &AppHandle, input: &Value) -> (u16, Value) {
             }
             (200, json!({ "ok": true }))
         }
+        "reduce-motion" => {
+            // macOS Reduce motion as the app sees it: on, off, or (null) as the system says.
+            let v = match input.get("on").and_then(Value::as_bool) {
+                Some(false) => 1,
+                Some(true) => 2,
+                None => 0,
+            };
+            windows::REDUCE_MOTION_OVERRIDE.store(v, std::sync::atomic::Ordering::SeqCst);
+            (200, json!({ "ok": true }))
+        }
         "tick" => {
             let hidden = input.get("hidden").and_then(Value::as_bool);
             if let Ok(mut o) = app.state::<background::Background>().tick_override.lock() {

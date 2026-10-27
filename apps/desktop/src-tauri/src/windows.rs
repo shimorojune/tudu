@@ -429,8 +429,19 @@ fn focus_floating(w: &WebviewWindow) {
     let _ = w.set_focus();
 }
 
+/// Tudu Test only: Reduce motion as a test sets it (0: as macOS says, 1: off, 2: on), since CI's Macs have it on.
+#[cfg(feature = "control")]
+pub(crate) static REDUCE_MOTION_OVERRIDE: std::sync::atomic::AtomicU8 =
+    std::sync::atomic::AtomicU8::new(0);
+
 /// macOS's Reduce motion (Accessibility › Display).
 pub(crate) fn reduce_motion() -> bool {
+    #[cfg(feature = "control")]
+    match REDUCE_MOTION_OVERRIDE.load(std::sync::atomic::Ordering::SeqCst) {
+        1 => return false,
+        2 => return true,
+        _ => {}
+    }
     #[cfg(target_os = "macos")]
     return panel::reduce_motion();
     #[cfg(not(target_os = "macos"))]
