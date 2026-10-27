@@ -150,8 +150,15 @@
 .tl-offline .tl-slow {
   display: none;
 }
-.tl-boot.tl-offline {
+/* Offline is known at once (often before the 300ms wait): the mark shows straight away, fully drawn, over
+   Less motion too. */
+:root .tl-boot.tl-offline.tl-offline {
+  opacity: 1;
+  animation: none;
   pointer-events: auto;
+}
+.tl-offline :is(.tl-box, .tl-ink) {
+  animation: none;
 }
 @keyframes tl-show {
   to {

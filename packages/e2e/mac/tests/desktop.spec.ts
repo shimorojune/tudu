@@ -1167,9 +1167,16 @@ const against = () => (macDark() ? 'Light' : 'Dark');
 
 /** Settings › Appearance on the desk: pick a theme and wait for the app to have it. */
 async function pickTheme(app: App, label: 'Light' | 'Dark' | 'System'): Promise<void> {
-  await go(app, `/me?settings=appearance`);
-  await app.until(`return T.all('[role=radio]').some((r) => r.innerText.trim().startsWith('${label}'))`);
-  await app.eval(`T.click(T.all('[role=radio]').find((r) => r.innerText.trim().startsWith('${label}')))`);
+  // Already open (a second pick in one test): stay, since re-going to the same address passes its check on the old
+  // page and the click would land mid-reload.
+  const open = await app.eval<boolean>(
+    `return location.pathname === '/me' && T.all('[role=radio]').some((r) => r.innerText.trim().startsWith('${label}'))`,
+  );
+  if (!open) await go(app, `/me?settings=appearance`);
+  await app.until(`const r = T.all('[role=radio]').find((r) => r.innerText.trim().startsWith('${label}'));
+    if (!r) return false;
+    T.click(r);
+    return true;`);
   await app.waitState((s) => s.look.saved.theme === label.toLowerCase());
 }
 
