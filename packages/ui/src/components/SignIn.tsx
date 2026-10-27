@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { EMAIL_PATTERN } from '@tudu/core';
 import { cx } from '../lib/cx';
 import { useFieldId, useTimer } from '../lib/hooks';
 import { Icon } from '../lib/icons';
@@ -68,8 +69,7 @@ export interface SignInProps {
   onDone: (info: { email: string }) => void;
 }
 
-// Each part after the @ is split on its dots, so the pattern never retries a long run (no slow inputs).
-export const EMAIL_PATTERN = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]*)*\.[^\s@.]+$/;
+export { EMAIL_PATTERN };
 /** The tick pops in (200ms), then the page gives way. */
 export const DONE_DELAY_MS = 500;
 export const DEFAULT_RESEND_SECONDS = 30;

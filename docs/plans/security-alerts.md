@@ -1,7 +1,7 @@
 # Clear the Dependabot and code scanning alerts
 
-Status: awaiting Rohit's approval. Canvas: not applicable (dependency and input-hardening changes only, nothing on
-screen changes); skipping it asked of Rohit 27 Oct 2026.
+Status: approved by Rohit 27 Oct 2026. Canvas: not applicable (dependency and input-hardening changes only, nothing on
+screen changes); skipping it approved by Rohit 27 Oct 2026.
 
 ## The alerts (27 Oct 2026)
 
