@@ -57,7 +57,36 @@ export interface MenuBarSheetProps {
    * (with the version as its hint) once one is downloaded. Not while signed out: Settings needs you signed in.
    */
   update?: { ready?: string; onCheck?: () => void; onRestart?: () => void };
+  /**
+   * What is new in the Inbox: a line under the heading while the count is above 0, opening the Inbox. It grows in
+   * and out with the count, so the rows below slide instead of jumping.
+   */
+  inbox?: { count: number; onOpen?: () => void };
   className?: string;
+}
+
+/** "2 new in your Inbox": always in the sheet, collapsed (and out of the reading order) while nothing is new. */
+function InboxLine({ inbox }: { inbox?: MenuBarSheetProps['inbox'] }) {
+  const count = inbox?.count ?? 0;
+  const shown = count > 0;
+  return (
+    <div className={cx('tp-mb-ibx', shown && 'tp-on')} aria-hidden={!shown} inert={!shown}>
+      <div>
+        <button
+          type="button"
+          className="tp-mb-ibx-b"
+          aria-label={shown ? `${count} new in your Inbox, open the Inbox` : undefined}
+          tabIndex={shown ? undefined : -1}
+          onClick={inbox?.onOpen}
+        >
+          <span className="tp-mb-ibx-dot" aria-hidden="true" />
+          <Icon name="inbox" size={15} />
+          <span className="tp-mb-ibx-t">{shown ? `${count} new in your Inbox` : ''}</span>
+          <Icon name="right" size={14} />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /** The byline as Today writes it: "From Sat", the due date (red when overdue), the project's dot, the Jira key. */
@@ -142,6 +171,7 @@ export function MenuBarSheet({
   onFeedback,
   onQuit,
   update,
+  inbox,
   className,
 }: MenuBarSheetProps) {
   const total = groups.reduce((n, g) => n + g.rows.length, 0);
@@ -200,6 +230,7 @@ export function MenuBarSheet({
           {state === 'day' ? <DayProgress done={done} total={total} compact size={30} /> : null}
         </div>
       ) : null}
+      {heading ? <InboxLine inbox={inbox} /> : null}
       {offline ? (
         <Banner tone="warning" title="You’re offline.">
           Ticks save here and go when you’re back.

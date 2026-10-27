@@ -17,6 +17,8 @@ pub struct Seen {
     pub signed_in: bool,
     /// The Inbox count the page last gave.
     pub badge: Option<i64>,
+    /// Today's tasks left and planned, as the page last gave them (none: not known yet, or signed out).
+    pub today: Option<crate::background::Today>,
     /// Outside links handed to the default browser, in order.
     pub opened: Vec<String>,
     /// Files saved to Downloads, as full paths.
@@ -69,12 +71,23 @@ pub fn set_signed_in(state: State<'_, App>, signed_in: bool) {
     }
 }
 
-/// The Inbox count across your spaces: on the Dock icon while there is one, beside the tick in the menu bar while
-/// there is not (chunk 16); zero clears it.
+/// The Inbox count across your spaces: the Dock icon's badge while there is one, and the tick's dot; zero clears
+/// both.
 #[tauri::command]
 pub fn set_badge(app: AppHandle, state: State<'_, App>, count: i64) {
     if let Ok(mut s) = state.seen.lock() {
         s.badge = (count > 0).then_some(count);
+    }
+    crate::background::apply(&app);
+}
+
+/// Today's tasks across your spaces, left and planned: the number beside the tick. None clears it (signed out).
+#[tauri::command]
+pub fn set_tick(app: AppHandle, state: State<'_, App>, left: Option<i64>, total: Option<i64>) {
+    if let Ok(mut s) = state.seen.lock() {
+        s.today = left
+            .zip(total)
+            .map(|(left, total)| crate::background::Today { left, total });
     }
     crate::background::apply(&app);
 }

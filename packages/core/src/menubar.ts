@@ -29,6 +29,16 @@ export function gatherToday<T extends { ownerId: string | null; done: boolean }>
   return out;
 }
 
+/** Today's count for the menu bar's tick: how many of the gathered tasks are still open, out of how many. */
+export function todayLeft(groups: Array<{ tasks: unknown[]; done: number }>): {
+  left: number;
+  total: number;
+} {
+  const total = groups.reduce((n, g) => n + g.tasks.length, 0);
+  const done = groups.reduce((n, g) => n + g.done, 0);
+  return { left: total - done, total };
+}
+
 /** "2 of 5": how far through a list. */
 export function ofWords(done: number, total: number): string {
   return `${done} of ${total}`;

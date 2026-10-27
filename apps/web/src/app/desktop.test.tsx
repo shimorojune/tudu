@@ -74,6 +74,7 @@ describe('C11-U03 the bridge to the macOS app', () => {
     expect(d.window).toBe('floating');
     await d.info();
     d.setBadge(3);
+    d.setTick({ left: 3, total: 5 });
     d.setSignedIn(true);
     d.hideFloating();
     d.showMain('/sign-in');
@@ -85,6 +86,7 @@ describe('C11-U03 the bridge to the macOS app', () => {
     expect(invoke.mock.calls.map((c) => c[0])).toEqual([
       'app_info',
       'set_badge',
+      'set_tick',
       'set_signed_in',
       'hide_floating',
       'show_main',
@@ -94,14 +96,16 @@ describe('C11-U03 the bridge to the macOS app', () => {
       'summon_with',
       'quick_add_seed',
     ]);
+    // MC-U04 today's count goes to the tick as left and planned.
+    expect(invoke.mock.calls[2]![1]).toEqual({ left: 3, total: 5 });
     // C22-U27 Make a task in the note window hands its words to the floating bar.
-    expect(invoke.mock.calls[8]![1]).toEqual({
+    expect(invoke.mock.calls[9]![1]).toEqual({
       seed: { title: 'Call the venue', from: { noteId: 'n1', name: 'Offsite' } },
     });
     expect(invoke.mock.calls[1]![1]).toEqual({ count: 3 });
-    expect(invoke.mock.calls[4]![1]).toEqual({ path: '/sign-in' });
+    expect(invoke.mock.calls[5]![1]).toEqual({ path: '/sign-in' });
     // The file goes as the body, its name in a header.
-    expect(invoke.mock.calls[7]![2]).toEqual({ headers: { 'x-name': 'Q3%20plan.pdf' } });
+    expect(invoke.mock.calls[8]![2]).toEqual({ headers: { 'x-name': 'Q3%20plan.pdf' } });
 
     const f = fake({ window: 'main', update: { version: '0.38.0', notes: '', date: null } });
     const b = desktop()!;

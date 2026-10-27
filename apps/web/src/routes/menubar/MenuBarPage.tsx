@@ -18,7 +18,7 @@ import { useLiveEvents } from '../../app/live';
 import { meQuery, refreshMe } from '../../app/session';
 import { spacePath } from '../../app/space';
 import { taskStore, useOnline } from '../../app/tasks';
-import { restartToUpdate, useUpdateStatus } from '../../app/updates';
+import { inboxTotal, restartToUpdate, useUpdate, useUpdateStatus } from '../../app/updates';
 import { useWorkingDay, WorkingDayProvider } from '../../app/workingDay';
 import { toItem } from '../today/TodayPage';
 import './menubar.css';
@@ -146,6 +146,8 @@ function Today({
 }) {
   const { today } = useWorkingDay();
   const online = useOnline();
+  const unreadUpdate = useUpdate().unread;
+  const newInInbox = inboxTotal(me, unreadUpdate);
   const spaces = me.spaces;
   const days = useQueries({ queries: spaces.map((s) => taskStore.dayQuery(s.id, today, today)) });
   const projects = useQueries({ queries: spaces.map((s) => taskStore.projectsQuery(s.id)) });
@@ -206,6 +208,7 @@ function Today({
       onFeedback={() => app?.feedback()}
       onQuit={onQuit}
       update={update}
+      inbox={{ count: newInInbox, onOpen: () => (app ? app.showMain('/inbox') : go('/inbox')) }}
     />
   );
 }

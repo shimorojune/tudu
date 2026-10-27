@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
 import { calls, emit, installFake, READY, teamOfTwo, updaterSays } from '../../fixtures/desktop';
+import { sendRequest } from '../../fixtures/inbox';
 import { createSpace, me, seedTasks } from '../../fixtures/spaces';
 import { dayList, fixClock, idle, row, SUNDAY } from '../../fixtures/today';
 
@@ -334,5 +335,23 @@ test.describe('menubar', () => {
     await expect(m.locator('html')).toHaveClass(/dark/);
     await m.getByRole('button', { name: 'More' }).click();
     await expect(m.getByRole('menuitem').first()).toHaveText('Check for updates…');
+  });
+
+  test('MC-E01 what is new in the Inbox: a line under the heading that opens the desk on the Inbox; none, no line', async ({
+    page,
+    browser,
+  }) => {
+    const { space, b, aId } = await teamOfTwo(page, browser);
+    const quiet = await sheet(page);
+    await expect(quiet.getByRole('heading', { name: 'Sunday' })).toBeVisible();
+    await expect(quiet.getByRole('button', { name: /new in your Inbox/ })).toHaveCount(0);
+
+    await sendRequest(b.page, space.id, aId, 'Proofread the brochure');
+    const m = await sheet(page);
+    const line = m.getByRole('button', { name: '1 new in your Inbox, open the Inbox' });
+    await expect(line).toBeVisible();
+    await line.click();
+    expect((await calls(m, 'showMain')).map((c) => c.args)).toEqual([['/inbox']]);
+    await b.context.close();
   });
 });

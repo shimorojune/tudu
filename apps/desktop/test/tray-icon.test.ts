@@ -75,3 +75,32 @@ describe('the menu bar tick', () => {
     for (let y = 0; y < 36; y++) for (let x = 0; x < 3; x++) expect(png.at(x, y)).toBeLessThan(16);
   });
 });
+
+describe('the menu bar tick with the Inbox dot', () => {
+  it('MC-S01 tray-dot is the same tick cut by a clear ring around one dot, black on clear, 36 by 36', () => {
+    const svg = readFileSync(resolve(icons, 'tray-dot.svg'), 'utf8');
+    expect(svg).toContain('width="36" height="36"');
+    expect(svg.match(/<path/g)).toHaveLength(1);
+    expect(svg).toContain(`d="${shape}"`);
+    expect(svg).toContain('mask="url(#clear)"');
+    expect(svg.match(/<circle/g)).toHaveLength(2);
+
+    const dot = alpha(resolve(icons, 'tray-dot.png'));
+    const bare = alpha(resolve(icons, 'tray.png'));
+    expect([dot.width, dot.height]).toEqual([36, 36]);
+    // The dot's middle is ink; the ring around it is clear where the bare tick had ink.
+    expect(dot.at(30, 6)).toBeGreaterThan(200);
+    let cut = 0;
+    let added = 0;
+    for (let y = 0; y < 36; y++)
+      for (let x = 0; x < 36; x++) {
+        if (bare.at(x, y) > 128 && dot.at(x, y) < 16) cut++;
+        if (bare.at(x, y) < 16 && dot.at(x, y) > 128) added++;
+      }
+    expect(cut).toBeGreaterThan(0);
+    expect(added).toBeGreaterThan(20);
+    // Below the dot the two images are the same tick.
+    for (let y = 16; y < 36; y++)
+      for (let x = 0; x < 36; x++) expect(Math.abs(dot.at(x, y) - bare.at(x, y))).toBeLessThan(8);
+  });
+});

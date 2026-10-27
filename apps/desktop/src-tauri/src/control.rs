@@ -233,6 +233,15 @@ fn dock_badge(app: &AppHandle) -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
+/// The tick's tooltip as last set (None: still the one it was built with).
+fn bg_tooltip(app: &AppHandle) -> Option<String> {
+    app.state::<background::Background>()
+        .tray_tooltip
+        .lock()
+        .ok()
+        .and_then(|t| t.clone())
+}
+
 fn state(app: &AppHandle) -> Value {
     let a = app.state::<App>();
     let track = a.track;
@@ -245,7 +254,7 @@ fn state(app: &AppHandle) -> Value {
         .unwrap_or_default();
     // No native menu any more: an empty list says so (chunk 20).
     let tray = app.tray_by_id("tray").map(|_| {
-        json!({ "tooltip": track.name(), "items": [], "rect": crate::tray_icon(app).map(|i| json!({
+        json!({ "tooltip": bg_tooltip(app).unwrap_or_else(|| track.name().to_string()), "items": [], "rect": crate::tray_icon(app).map(|i| json!({
             "x": i.x, "y": i.y, "width": i.width, "height": i.height,
         })) })
     });
@@ -269,6 +278,7 @@ fn state(app: &AppHandle) -> Value {
         "atLogin": bg.at_login,
         "awake": bg.awake.load(Ordering::SeqCst),
         "trayTitle": bg.tray_title.lock().ok().and_then(|t| t.clone()),
+        "trayDot": bg.tray_dot.lock().map(|d| *d).unwrap_or(false),
         "trayPosition": background::tray_position(),
         "trayAutosave": background::tray_autosave(app),
         "tickHidden": bg.tick_hidden.load(Ordering::SeqCst),

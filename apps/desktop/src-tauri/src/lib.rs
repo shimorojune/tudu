@@ -33,6 +33,7 @@ macro_rules! handlers {
             bridge::app_info,
             bridge::set_signed_in,
             bridge::set_badge,
+            bridge::set_tick,
             bridge::open_external,
             bridge::save_download,
             bridge::show_main,
@@ -149,9 +150,7 @@ pub fn pressed(app: &tauri::AppHandle, shortcut: &Shortcut) {
 /// menu bar (the `menubar` window) under it.
 fn tray(app: &tauri::AppHandle, track: Track) -> tauri::Result<()> {
     TrayIconBuilder::with_id("tray")
-        .icon(tauri::image::Image::from_bytes(include_bytes!(
-            "../icons/tray.png"
-        ))?)
+        .icon(tick_icon(false)?)
         .icon_as_template(true)
         .tooltip(track.name())
         .on_tray_icon_event(|tray, event| {
@@ -169,6 +168,15 @@ fn tray(app: &tauri::AppHandle, track: Track) -> tauri::Result<()> {
         })
         .build(app)?;
     Ok(())
+}
+
+/// The tick's image: the bare tick, or the tick with its Inbox dot. Both are template images.
+pub fn tick_icon(dot: bool) -> tauri::Result<tauri::image::Image<'static>> {
+    tauri::image::Image::from_bytes(if dot {
+        include_bytes!("../icons/tray-dot.png").as_slice()
+    } else {
+        include_bytes!("../icons/tray.png").as_slice()
+    })
 }
 
 /// The tick's place, in physical pixels.

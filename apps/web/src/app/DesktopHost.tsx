@@ -1,4 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
+import type { MeResponse } from '@tudu/client';
+import { gatherToday, todayLeft, type Task } from '@tudu/core';
 import { useNavigate, useRouter } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { keepAppearance } from './appearance';
@@ -8,8 +10,10 @@ import { interceptLinks } from './links';
 import { setOpenUpdates } from './notebook';
 import { meQuery } from './session';
 import { settingsHref } from './settings';
+import { taskStore } from './tasks';
 import { inboxTotal, startUpdates, updateStore, useUpdate } from './updates';
 import { appVersion } from './version';
+import { useWorkingDay, WorkingDayProvider } from './workingDay';
 
 let appInfo: AppInfo | null = null;
 /** The app's name and track, once known ("Tudu" until then). */
@@ -103,5 +107,42 @@ export function DesktopHost() {
     d.setBadge(count);
   }, [d, main, count, isFetched]);
 
+  // Signed out: nothing beside the tick.
+  useEffect(() => {
+    if (!d || !main || !isFetched || me) return;
+    d.setTick(null);
+  }, [d, main, me, isFetched]);
+
+  return d && main && me ? (
+    <WorkingDayProvider>
+      <TodayCount me={me} report={(t) => d.setTick(t)} />
+    </WorkingDayProvider>
+  ) : null;
+}
+
+/**
+ * The number beside the menu bar's tick: today's tasks left across your spaces, the same rows the menu bar's sheet
+ * lists. Read from the same cache the sheet and All spaces use, and reported only once every space has answered (or
+ * failed), so the tick never shows a count that is about to change.
+ */
+export function TodayCount({
+  me,
+  report,
+}: {
+  me: MeResponse;
+  report: (today: { left: number; total: number }) => void;
+}) {
+  const { today } = useWorkingDay();
+  const spaces = me.spaces;
+  const days = useQueries({ queries: spaces.map((s) => taskStore.dayQuery(s.id, today, today)) });
+  const ready = days.every((q) => q.data !== undefined || q.isError);
+  const read: Record<string, Task[] | undefined> = {};
+  spaces.forEach((s, i) => (read[s.id] = days[i]?.data?.tasks));
+  const { left, total } = todayLeft(gatherToday(spaces, read, me.user.id));
+  useEffect(() => {
+    if (ready) report({ left, total });
+    // `report` is a fresh arrow each render; the numbers are what matter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, left, total]);
   return null;
 }

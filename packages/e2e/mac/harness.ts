@@ -106,8 +106,10 @@ export interface AppState {
     atLogin: boolean;
     /** The App Nap opt-out is held. */
     awake: boolean;
-    /** Beside the tick: the Inbox count while there is no Dock icon. */
+    /** Beside the tick: today's tasks left (with or without a Dock icon), capped at 99+. */
     trayTitle: string | null;
+    /** The tick wears its Inbox dot: something is new in the Inbox. */
+    trayDot: boolean;
     /** The tick's place as macOS keeps it: the saved position (points from the right edge), null before any. */
     trayPosition: number | null;
     /** The status item's autosave name, the key that position is saved under. */

@@ -76,6 +76,8 @@ export interface DesktopBridge {
   info(): Promise<AppInfo>;
   setSignedIn(signedIn: boolean): void;
   setBadge(count: number): void;
+  /** Today's tasks across your spaces, left and planned, beside the menu bar's tick; null clears it (signed out). */
+  setTick(today: { left: number; total: number } | null): void;
   openExternal(url: string): Promise<void>;
   /** Writes the file to Downloads; answers where it landed. */
   saveDownload(name: string, bytes: Uint8Array): Promise<string>;
@@ -226,6 +228,7 @@ function fakeBridge(f: DesktopFake): DesktopBridge {
     info: async () => ({ track: 'test', name: 'Tudu Test', version: '0.37.0', shortcut: '⌘⇧N', ...f.info }),
     setSignedIn: (v) => call('setSignedIn', v),
     setBadge: (n) => call('setBadge', n),
+    setTick: (t) => call('setTick', t),
     openExternal: async (url) => {
       call('openExternal', url);
     },
@@ -354,6 +357,7 @@ function tauriBridge(t: NonNullable<Window['__TAURI_INTERNALS__']>): DesktopBrid
     info: () => invoke<AppInfo>('app_info'),
     setSignedIn: (signedIn) => quiet(invoke('set_signed_in', { signedIn })),
     setBadge: (count) => quiet(invoke('set_badge', { count })),
+    setTick: (t) => quiet(invoke('set_tick', { left: t?.left ?? null, total: t?.total ?? null })),
     openExternal: (url) => invoke('open_external', { url }),
     saveDownload: (name, bytes) =>
       t.invoke('save_download', bytes, {
