@@ -163,7 +163,13 @@ test.describe('chunk 22 · the note window', () => {
     await app.until(`return T.all('button', 'Pinned on top · click to unpin').length > 0`, 'note');
     const was = s.windows.note;
     await app.eval(`T.click(T.get('button', 'Fill the screen'))`, 'note');
-    s = await app.waitState((x) => x.note.state.expanded && x.windows.note.width > was.width + 100);
+    // It glides there: wait for the end of the glide, not a frame on the way.
+    s = await app.waitState(
+      (x) =>
+        x.note.state.expanded &&
+        !!x.windows.note.screen &&
+        near(x.windows.note.width, x.windows.note.screen.width - 16),
+    );
     // The whole screen but a small margin (the menu bar and the Dock may take some of its height).
     const scr = s.windows.note.screen!;
     expect(near(s.windows.note.width, scr.width - 16)).toBe(true);
@@ -286,6 +292,58 @@ test.describe('chunk 22 · the note window', () => {
     expect(alpha(bg.html)).toBe(0);
     expect(alpha(bg.body)).toBe(0);
     expect(alpha(bg.note)).toBeGreaterThan(0);
+  });
+
+  test('C22-D20 in the real WKWebView a note drags onto a folder and moves (HTML drag and drop never reached the page)', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const folder = crypto.randomUUID();
+    await asPage(app, 'POST', '/api/sync', {
+      clientId: 'mac-seed',
+      mutations: [
+        {
+          id: crypto.randomUUID(),
+          type: 'folder.create',
+          payload: { id: folder, parentId: null, name: 'Home', position: null },
+          at: new Date().toISOString(),
+        },
+      ],
+    });
+    const id = await writeNote(app, 'Gift ideas');
+    await go(app, `/notebook/${id}`);
+    await app.until(`return T.all('button', 'Gift ideas').length > 0 && T.all('button', /^Home/).length > 0`);
+    // A mouse press, a move past the lift, and a glide onto Home: the pointer events WebKit gives the page.
+    await app.eval(
+      `const row = document.querySelector('[data-nb-kind="note"][data-nb-id=${JSON.stringify(id)}]');
+       const to = document.querySelector('[data-nb-kind="folder"][data-nb-id=${JSON.stringify(folder)}]');
+       const at = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+       const a = at(row);
+       const b = at(to);
+       const o = (p) => ({ bubbles: true, cancelable: true, view: window, button: 0, pointerType: 'mouse', isPrimary: true, pointerId: 1, clientX: p.x, clientY: p.y });
+       row.dispatchEvent(new PointerEvent('pointerdown', o(a)));
+       document.dispatchEvent(new PointerEvent('pointermove', o({ x: a.x + 8, y: a.y + 2 })));
+       // React draws the card on its own schedule: give it up to a second.
+       const wait = () => new Promise((r) => setTimeout(r, 20));
+       for (let i = 0; i < 50 && !document.querySelector('.tp-nb-ghost'); i++) await wait();
+       if (!document.querySelector('.tp-nb-ghost')) throw new Error('the row did not lift');
+       for (let i = 1; i <= 8; i++) {
+         document.dispatchEvent(new PointerEvent('pointermove', o({ x: a.x + ((b.x - a.x) * i) / 8, y: a.y + ((b.y - a.y) * i) / 8 })));
+         await wait();
+       }
+       document.dispatchEvent(new PointerEvent('pointerup', o(b)));`,
+    );
+    await app.until(`return document.querySelector('.tp-nb-crumb')?.textContent?.includes('Home') ?? false`);
+    await expect
+      .poll(async () => {
+        const t = await asPage<{ notes: Array<{ id: string; folderId: string | null }> }>(
+          app,
+          'GET',
+          '/api/notebook',
+        );
+        return t.notes.find((n) => n.id === id)?.folderId;
+      })
+      .toBe(folder);
   });
 
   test('C22-D30 ⌥⌘N opens the note window on a blank note over another app; with the sheet open, the sheet goes first', async ({

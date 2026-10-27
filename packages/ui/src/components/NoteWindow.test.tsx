@@ -5,7 +5,7 @@ import { NoteWindow } from './NoteWindow';
 
 const RECENT = [
   { id: 'agenda', title: 'Offsite agenda draft', where: 'Northwind / Planning / Offsite', edited: '4m' },
-  { id: 'sunday', title: '', first: 'Sunday scribbles', where: 'Not in a folder', edited: 'Yesterday' },
+  { id: 'sunday', title: '', first: 'Sunday scribbles', where: 'Notebook', edited: 'Yesterday' },
 ];
 const TREE = {
   folders: [

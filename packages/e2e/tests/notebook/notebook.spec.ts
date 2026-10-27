@@ -207,6 +207,49 @@ async function noteMenu(page: Page, item: 'Move' | 'Delete', scope: Page | Locat
   await page.getByRole('menuitem', { name: item }).click();
 }
 
+/** Drag a row with the mouse, as a person does: press, move past the 4 px that lifts it, glide over, let go. `at` is
+ * how far down the target to let go (0 top, 1 bottom). Rows move on pointer events, not HTML drag and drop. */
+async function mouseDrag(page: Page, from: Locator, to: Locator, at = 0.5): Promise<void> {
+  const a = (await from.boundingBox())!;
+  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(a.x + a.width / 2 + 8, a.y + a.height / 2 + 2, { steps: 2 });
+  await expect(tree(page).locator('.tp-nb-ghost')).toBeVisible();
+  const b = (await to.boundingBox())!;
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height * at, { steps: 8 });
+  await page.mouse.up();
+}
+
+/** A finger on the screen, through Chromium's touch input: `hold` ms still, then along `path`, then up. */
+async function touchDrag(page: Page, from: Locator, path: Array<{ x: number; y: number }>, hold: number) {
+  const cdp = await page.context().newCDPSession(page);
+  const a = (await from.boundingBox())!;
+  const start = { x: a.x + a.width / 2, y: a.y + a.height / 2 };
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [start] });
+  if (hold) await page.waitForTimeout(hold);
+  for (const p of path) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [p] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+}
+
+/** Points from one spot to another, `n` of them. */
+const line = (a: { x: number; y: number }, b: { x: number; y: number }, n = 10) =>
+  Array.from({ length: n }, (_, i) => ({
+    x: a.x + ((b.x - a.x) * (i + 1)) / n,
+    y: a.y + ((b.y - a.y) * (i + 1)) / n,
+  }));
+const mid = (b: { x: number; y: number; width: number; height: number }) => ({
+  x: b.x + b.width / 2,
+  y: b.y + b.height / 2,
+});
+
+async function notebookNow(page: Page) {
+  return (await (await page.request.get(`${API_URL}/api/notebook`)).json()) as {
+    folders: Array<{ id: string; name: string; parentId: string | null }>;
+    notes: Array<{ id: string; title: string; folderId: string | null }>;
+  };
+}
+
 test.describe('notebook', () => {
   test('C22-E01 first visit: the Notebook button opens the empty Notebook; a new note saves with the ring and the tick; reload keeps it', async ({
     page,
@@ -253,9 +296,11 @@ test.describe('notebook', () => {
       folderRow(page, 'Offsite').getByRole('button', { name: 'New note in Offsite' }),
     ).toBeVisible();
     // A note into Planning.
-    await tree(page)
-      .getByRole('button', { name: 'Q4 planning braindump' })
-      .dragTo(folderRow(page, 'Planning'));
+    await mouseDrag(
+      page,
+      tree(page).getByRole('button', { name: 'Q4 planning braindump' }),
+      folderRow(page, 'Planning'),
+    );
     await expect(page.locator('.tp-nb-crumb')).toContainText(/Northwind\s+\/\s+Planning/);
     await idle(page);
     const t = (await (await page.request.get(`${API_URL}/api/notebook`)).json()) as {
@@ -265,11 +310,120 @@ test.describe('notebook', () => {
     const planning = t.folders.find((f) => f.name === 'Planning')!;
     expect(t.notes.find((n) => n.title === 'Q4 planning braindump')!.folderId).toBe(planning.id);
     // Planning into Offsite (below itself, past three levels): refused, and it stays where it was.
-    await folderRow(page, 'Planning').dragTo(folderRow(page, 'Offsite'));
+    await mouseDrag(page, folderRow(page, 'Planning'), folderRow(page, 'Offsite'));
     await expect(page.getByText('Folders go three levels deep.')).toBeVisible();
     await idle(page);
     const after = (await (await page.request.get(`${API_URL}/api/notebook`)).json()) as typeof t;
     expect(after.folders.find((f) => f.name === 'Planning')!.parentId).toBe(planning.parentId);
+  });
+
+  test('C22-E40 a note in no folder drags onto a folder with the mouse; the crumb and the server agree', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    const home = await seedFolder(page, 'Home');
+    const id = await seedNote(page, 'Gift ideas');
+    await page.goto(`/notebook/${id}`);
+    await expect(page.locator('.tp-nb-crumb')).toHaveText('Notebook');
+    await mouseDrag(page, tree(page).getByRole('button', { name: 'Gift ideas' }), folderRow(page, 'Home'));
+    await expect(page.locator('.tp-nb-crumb')).toContainText('Home');
+    // The card has landed and gone; the row is back in the tree, in Home.
+    await expect(tree(page).locator('.tp-nb-ghost')).toHaveCount(0);
+    await expect(tree(page).getByRole('button', { name: 'Gift ideas' })).toBeVisible();
+    await idle(page);
+    expect((await notebookNow(page)).notes.find((n) => n.id === id)!.folderId).toBe(home);
+  });
+
+  test('C22-E41 a note dragged out of its folder to the top level: the crumb says Notebook and the server has no folder', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    const home = await seedFolder(page, 'Home');
+    const id = await seedNote(page, 'Things to fix in the flat', { folderId: home });
+    await seedNote(page, 'Sunday scribbles');
+    await page.goto(`/notebook/${id}`);
+    await expect(page.locator('.tp-nb-crumb')).toContainText('Home');
+    await expect(tree(page).locator('.tp-nb-loose-sep')).toBeVisible();
+    await expect(tree(page).getByText('Not in a folder')).toHaveCount(0);
+    await mouseDrag(
+      page,
+      tree(page).getByRole('button', { name: 'Things to fix in the flat' }),
+      tree(page).getByRole('button', { name: 'Sunday scribbles' }),
+      0.8,
+    );
+    await expect(page.locator('.tp-nb-crumb')).toHaveText('Notebook');
+    await idle(page);
+    expect((await notebookNow(page)).notes.find((n) => n.id === id)!.folderId).toBeNull();
+  });
+
+  test('C22-E42 phone: hold a note, then carry it onto a folder; a quick swipe moves nothing', async ({
+    page,
+  }) => {
+    test.skip(!phone(), 'phones');
+    await signInFresh(page);
+    const home = await seedFolder(page, 'Home');
+    const id = await seedNote(page, 'Gift ideas');
+    await page.goto('/notebook');
+    const note = tree(page).getByRole('button', { name: 'Gift ideas' });
+    await expect(note).toBeVisible();
+    // A quick swipe: no hold, so no lift; the list may scroll but nothing moves.
+    const n0 = mid((await note.boundingBox())!);
+    await touchDrag(page, note, line(n0, { x: n0.x, y: n0.y - 120 }, 4), 0);
+    await expect(tree(page).locator('.tp-nb-ghost')).toHaveCount(0);
+    await idle(page);
+    expect((await notebookNow(page)).notes.find((n) => n.id === id)!.folderId).toBeNull();
+    // Hold half a second, then carry it onto Home.
+    const from = mid((await note.boundingBox())!);
+    const to = mid((await folderRow(page, 'Home').boundingBox())!);
+    await touchDrag(page, note, line(from, to), 500);
+    await idle(page);
+    await expect
+      .poll(async () => (await notebookNow(page)).notes.find((n) => n.id === id)!.folderId)
+      .toBe(home);
+  });
+
+  test('C22-E43 a new note shows no ⋯ until its first letter; then Move and Delete work', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    await seedFolder(page, 'Home');
+    await seedNote(page, 'Gift ideas');
+    await openNotebook(page);
+    await tree(page).getByRole('button', { name: 'New note or folder' }).click();
+    await page.getByRole('menuitem', { name: 'New note' }).click();
+    await expect(title(page)).toBeVisible();
+    const more = page.locator('.tp-nb-ed-top .tp-nb-more');
+    await expect(more).toHaveClass(/tp-nb-more-hide/);
+    await expect(more).toBeHidden();
+    // Hidden and out of reach: Tab never lands on it.
+    await page.locator('.tp-nb-ed-top').click({ position: { x: 4, y: 4 } });
+    for (let i = 0; i < 4; i++) {
+      await page.keyboard.press('Tab');
+      await expect(more.locator(':focus')).toHaveCount(0);
+    }
+    await title(page).click();
+    await title(page).pressSequentially('V');
+    await expect(more).not.toHaveClass(/tp-nb-more-hide/);
+    await expect(more.getByRole('button', { name: 'More' })).toBeVisible();
+    await title(page).pressSequentially('enue shortlist');
+    await noteMenu(page, 'Move');
+    await page
+      .getByRole('dialog', { name: 'Move to a folder' })
+      .getByRole('option', { name: /^Home/ })
+      .click();
+    await expect(page.locator('.tp-nb-crumb')).toContainText('Home');
+    await noteMenu(page, 'Delete');
+    await page
+      .getByRole('dialog', { name: 'Delete “Venue shortlist”?' })
+      .getByRole('button', { name: 'Delete' })
+      .click();
+    await expect(page.getByText('Moved to Trash. It stays there for 30 days.')).toBeVisible();
+    await idle(page);
+    const t = await notebookNow(page);
+    expect(t.notes.map((n) => n.title)).not.toContain('Venue shortlist');
   });
 
   test('C22-E03 rename a folder from ⋯ and by double-click; Esc keeps the old name', async ({ page }) => {

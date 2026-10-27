@@ -35,6 +35,8 @@ export interface NoteEditorNote {
   linked: NoteTaskItem[];
   /** "4m"; none for a new note. */
   edited?: string | null;
+  /** A new note nobody has written in yet: not saved, so it has no ⋯ (Move, Delete). */
+  draft?: boolean;
   words?: number;
   /** Bumped when the words change under the editor: it starts again with them. */
   gen?: number;
@@ -311,7 +313,7 @@ export function NoteEditor(p: NoteEditorProps) {
               <span>{crumb}</span>
             </>
           ) : (
-            'Not in a folder'
+            'Notebook'
           )}
         </span>
         <SaveState state={p.save} slow={p.slow} />
@@ -320,7 +322,13 @@ export function NoteEditor(p: NoteEditorProps) {
             <Icon name="external" size={16} />
           </IconButton>
         ) : null}
-        <span className="tp-nb-menuw">
+        {/* A new note nobody has written in isn't saved yet: nothing to move or delete. The ⋯ keeps its place,
+            hidden, and arrives with the first character. */}
+        <span
+          className={cx('tp-nb-menuw tp-nb-more', note.draft && 'tp-nb-more-hide')}
+          aria-hidden={note.draft ? 'true' : undefined}
+          inert={note.draft || undefined}
+        >
           <IconButton
             label="More"
             tipSide="bottom-end"

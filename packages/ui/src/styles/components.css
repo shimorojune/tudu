@@ -2697,7 +2697,7 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 /* Drag and drop. The row you lift fades; an ink line shows where it will land, or a ring when it goes into a folder.
    Too deep: the folder says so and takes nothing. The row that landed glows once with the accent. */
 .tp-nb-frow, .tp-nb-tp { position: relative; }
-.tp-nb-frow[draggable="true"], .tp-nb-tp[draggable="true"] { cursor: grab; }
+.tp-nb-frow, .tp-nb-tp { touch-action: pan-y; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .tp-nb-dragging { opacity: .4; transition: opacity var(--dur-menu) var(--ease-change); }
 .tp-nb-drop-before::before, .tp-nb-drop-after::after { content: ''; position: absolute; left: calc(10px + var(--nb-depth, 0) * 16px); right: 6px; height: 2px; border-radius: 1px; background: var(--foreground); pointer-events: none; animation: tp-nb-fade var(--dur-menu) var(--ease-change) both; }
 .tp-nb-drop-before::before { top: -1px; }
@@ -2707,7 +2707,32 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 .tp-nb-frow.tp-nb-nodrop { background: transparent; box-shadow: inset 0 0 0 1.5px var(--hair); cursor: not-allowed; }
 .tp-nb-nodrop-l { flex: none; font-size: 11.5px; color: var(--muted-foreground); }
 .tp-nb-root { border-radius: var(--radius-sm); padding-bottom: 6px; transition: background-color var(--dur-menu) var(--ease-change); }
-.tp-nb-root.tp-nb-drop-root { background: var(--accent); }
+.tp-nb-root.tp-nb-drop-root { background: var(--accent); box-shadow: inset 0 0 0 1.5px var(--border-strong); }
+/* Notes in no folder sit at the top of the Notebook, after the folders: a hairline between, no heading. */
+.tp-nb-loose-sep { height: 1px; margin: 8px 10px 6px; background: var(--hair); }
+.tp-nb-root-hint { margin: 2px 0 0; padding: 10px; border: 1px dashed var(--border); border-radius: var(--radius-sm); font-size: 12.5px; color: var(--muted-foreground); text-align: center; animation: tp-nb-fade var(--dur-menu) var(--ease-change) both; transition: color var(--dur-menu) var(--ease-change), border-color var(--dur-menu) var(--ease-change); }
+.tp-nb-root.tp-nb-drop-root .tp-nb-root-hint { color: var(--foreground); border-color: var(--border-strong); }
+/* Carrying a row: it lifts as a card that follows the pointer; the row it left stays dimmed. Touch: the row sinks a
+   little while you hold. On a drop the card glides to the row's new place (hidden until it lands) or onto a folder and
+   sinks into it. */
+.tp-nb-tree { position: relative; }
+.tp-nb-carrying, .tp-nb-carrying * { cursor: grabbing !important; }
+.tp-nb-carrying .tp-nb-row.tp-root:hover, .tp-nb-carrying .tp-nb-frow:hover:not(.tp-nb-drop-into) { background: transparent; }
+.tp-nb-carrying .tp-nb-root { min-height: 44px; }
+.tp-nb-pressing { animation: tp-nb-hold 380ms var(--ease-change) both; }
+@keyframes tp-nb-hold { to { transform: scale(.97); background: color-mix(in srgb, var(--foreground) 6%, transparent); } }
+.tp-nb-flying { opacity: 0; }
+.tp-nb-ghost { position: absolute; z-index: 40; display: flex; align-items: center; gap: 9px; height: 34px; padding: 0 12px 0 10px; box-sizing: border-box; border-radius: var(--radius-sm); background: var(--popover); color: var(--foreground); font-size: 13.5px; line-height: 1; box-shadow: var(--shadow-pop); pointer-events: none; transform: scale(1.03); transform-origin: 24px 50%; animation: tp-nb-lift 160ms var(--ease-arrive) both; }
+.tp-nb-ghost .tp-nb-row-ic { display: inline-flex; color: var(--muted-foreground); }
+.tp-nb-ghost-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tp-nb-ghost-touch { transform: scale(1.05); }
+@keyframes tp-nb-lift { from { transform: scale(1); box-shadow: 0 0 0 1px transparent; } }
+.tp-nb-ghost-placed { animation: none; transform: scale(1); box-shadow: 0 0 0 1px var(--hair); transition: left 220ms var(--ease-settle), top 220ms var(--ease-settle), width 220ms var(--ease-settle), transform 220ms var(--ease-settle), opacity 220ms var(--ease-change), box-shadow 220ms var(--ease-change); }
+.tp-nb-ghost-placed.tp-nb-ghost-sink { transform: translateX(28px) scale(.55); opacity: 0; }
+/* "More" on a new note keeps its place while hidden, so nothing moves when it arrives with the first character. */
+.tp-nb-more { display: inline-flex; transition: opacity var(--dur-arrive) var(--ease-arrive), transform var(--dur-arrive) var(--ease-arrive), visibility 0s linear 0s; }
+.tp-nb-more.tp-nb-more-hide { opacity: 0; transform: scale(.6) rotate(-45deg); visibility: hidden; pointer-events: none; transition: opacity var(--dur-menu) var(--ease-change), transform var(--dur-menu) var(--ease-change), visibility 0s linear var(--dur-menu); }
+@media (prefers-reduced-motion: reduce) { .tp-nb-ghost, .tp-nb-ghost-placed, .tp-nb-pressing, .tp-nb-more { animation: none; transition: none; } }
 .tp-nb-landed > .tp-nb-row.tp-root, .tp-nb-frow.tp-nb-landed { animation: tp-nb-landed 700ms var(--ease-change) both; }
 @keyframes tp-nb-landed { 0% { background: var(--accent); box-shadow: inset 0 0 0 1.5px var(--border-strong); } 100% { background: transparent; box-shadow: inset 0 0 0 1.5px transparent; } }
 .tp-nb-dragon .tp-nb-frow:hover .tp-nb-fadd { opacity: 0; }

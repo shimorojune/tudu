@@ -26,7 +26,7 @@ describe('C22-U19 Trash', () => {
     expect(row('Gift ideas')).toHaveTextContent('From Home');
     expect(row('Gift ideas')).toHaveTextContent('29 days left');
     expect(row('Old offsite ideas')).toHaveTextContent('From Northwind · 2 notes');
-    expect(row('asdf')).toHaveTextContent('Not in a folder');
+    expect(row('asdf')).toHaveTextContent('From Notebook');
     expect(screen.getByText(/4 notes · each one is deleted 30 days after you trash it/)).toBeInTheDocument();
     await user.click(within(row('Gift ideas')).getByRole('button', { name: 'Put back' }));
     await waitFor(() => expect(onRestore).toHaveBeenCalledWith(ITEMS[0]));

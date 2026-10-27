@@ -1,7 +1,8 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
-import { NoteTree, type NoteFolderItem } from './NoteTree';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { HOLD_MS, NoteTree, SPRING_MS, type NoteFolderItem } from './NoteTree';
+import { ToastHost } from './Toast';
 
 const note = (id: string, title: string, first = '') => ({ id, title, first });
 const FOLDERS: NoteFolderItem[] = [
@@ -130,5 +131,202 @@ describe('C22-U13 Find a note', () => {
     await waitFor(() =>
       expect(screen.getByText(/No note matches/)).toHaveTextContent('No note matches “teapot”.'),
     );
+  });
+});
+
+// Dragging rows: pointer events, with the page's hit-testing and boxes stubbed (jsdom has no layout).
+const rowOf = (kind: 'note' | 'folder', id: string) =>
+  document.querySelector<HTMLElement>(`[data-nb-kind="${kind}"][data-nb-id="${id}"]:not(.tp-nb-fempty)`)!;
+const rootOf = () => document.querySelector<HTMLElement>('[data-nb-kind="root"]')!;
+const ghost = () => document.querySelector('.tp-nb-ghost');
+let under: Element | null = null;
+function over(el: Element | null, box?: { top: number; height: number }) {
+  under = el;
+  if (el && box)
+    el.getBoundingClientRect = () =>
+      ({
+        top: box.top,
+        bottom: box.top + box.height,
+        height: box.height,
+        left: 0,
+        right: 200,
+        width: 200,
+        x: 0,
+        y: box.top,
+      }) as DOMRect;
+}
+beforeEach(() => {
+  under = null;
+  document.elementFromPoint = () => under;
+});
+const press = (el: Element, pointerType = 'mouse', x = 10, y = 10) =>
+  fireEvent.pointerDown(el, { pointerType, button: 0, clientX: x, clientY: y });
+const to = (x: number, y: number) => fireEvent.pointerMove(document, { clientX: x, clientY: y });
+const letGo = () => fireEvent.pointerUp(document);
+
+describe('C22-U40 a mouse drag', () => {
+  it('C22-U40 lifts after 4 px, not before, and drops a note into a folder', () => {
+    const onMoveNote = vi.fn();
+    setup({ onMoveNote });
+    press(rowOf('note', 'sunday'));
+    to(13, 10);
+    expect(ghost()).toBeNull();
+    to(15, 10);
+    expect(ghost()).toHaveTextContent('Sunday scribbles');
+    expect(rowOf('note', 'sunday')).toHaveClass('tp-nb-dragging');
+    over(rowOf('folder', 'home'));
+    to(20, 40);
+    expect(rowOf('folder', 'home')).toHaveClass('tp-nb-drop-into');
+    letGo();
+    expect(onMoveNote).toHaveBeenCalledWith('sunday', 'home', undefined);
+  });
+});
+
+describe('C22-U41 a click is still a click', () => {
+  it('C22-U41 a click with no movement picks the note; the click after a drag does not', async () => {
+    const { user, onPick } = setup({ onMoveNote: vi.fn() });
+    await user.click(screen.getByRole('button', { name: /Gift ideas/ }));
+    expect(onPick).toHaveBeenCalledTimes(1);
+    press(rowOf('note', 'gifts'));
+    to(30, 10);
+    letGo();
+    fireEvent.click(screen.getByRole('button', { name: /Gift ideas/ }));
+    expect(onPick).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('C22-U42 touch', () => {
+  afterEach(() => vi.useRealTimers());
+  it('C22-U42 a 380 ms hold lifts; moving 9 px first cancels and nothing moves', () => {
+    vi.useFakeTimers();
+    const onMoveNote = vi.fn();
+    setup({ onMoveNote });
+    press(rowOf('note', 'sunday'), 'touch');
+    expect(rowOf('note', 'sunday')).toHaveClass('tp-nb-pressing');
+    act(() => vi.advanceTimersByTime(HOLD_MS - 10));
+    expect(ghost()).toBeNull();
+    act(() => vi.advanceTimersByTime(20));
+    expect(ghost()).toHaveClass('tp-nb-ghost-touch');
+    over(rowOf('folder', 'home'));
+    to(10, 60);
+    letGo();
+    expect(onMoveNote).toHaveBeenCalledWith('sunday', 'home', undefined);
+
+    onMoveNote.mockClear();
+    act(() => vi.advanceTimersByTime(1000));
+    press(rowOf('note', 'sunday'), 'touch');
+    to(10, 19);
+    act(() => vi.advanceTimersByTime(HOLD_MS + 50));
+    expect(ghost()).toBeNull();
+    letGo();
+    expect(onMoveNote).not.toHaveBeenCalled();
+  });
+});
+
+describe('C22-U43 between notes', () => {
+  it('C22-U43 the upper half drops before a note, the lower half after it', () => {
+    const onMoveNote = vi.fn();
+    setup({ onMoveNote });
+    press(rowOf('note', 'gifts'));
+    to(30, 10);
+    over(rowOf('note', 'interviews'), { top: 100, height: 20 });
+    to(30, 104);
+    expect(rowOf('note', 'interviews')).toHaveClass('tp-nb-drop-before');
+    letGo();
+    expect(onMoveNote).toHaveBeenLastCalledWith('gifts', 'nw', 0);
+
+    press(rowOf('note', 'gifts'));
+    to(30, 30);
+    over(rowOf('note', 'interviews'), { top: 100, height: 20 });
+    to(30, 116);
+    letGo();
+    expect(onMoveNote).toHaveBeenLastCalledWith('gifts', 'nw', 1);
+  });
+});
+
+describe('C22-U44 letting go of nothing', () => {
+  it('C22-U44 Esc and a drop on nothing move nothing, and the card goes', async () => {
+    const onMoveNote = vi.fn();
+    setup({ onMoveNote });
+    press(rowOf('note', 'sunday'));
+    to(30, 10);
+    over(rowOf('folder', 'home'));
+    to(30, 40);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    press(rowOf('note', 'sunday'));
+    to(30, 10);
+    over(null);
+    to(500, 900);
+    letGo();
+    expect(onMoveNote).not.toHaveBeenCalled();
+    await waitFor(() => expect(ghost()).toBeNull());
+  });
+});
+
+describe('C22-U45 too deep', () => {
+  it('C22-U45 a folder over a third-level folder says Too deep and is refused with a toast', () => {
+    const onMoveFolder = vi.fn();
+    setup({ onMoveFolder });
+    const toasts = render(<ToastHost />);
+    press(rowOf('folder', 'home'));
+    to(30, 10);
+    over(rowOf('folder', 'off'));
+    to(30, 80);
+    expect(within(rowOf('folder', 'off')).getByText('Too deep')).toBeInTheDocument();
+    letGo();
+    expect(onMoveFolder).not.toHaveBeenCalled();
+    expect(document.querySelector('.tp-toast')).toHaveTextContent('Folders go three levels deep.');
+    toasts.unmount();
+  });
+});
+
+describe('C22-U46 spring-open', () => {
+  afterEach(() => vi.useRealTimers());
+  it('C22-U46 holding over a closed folder opens it', () => {
+    vi.useFakeTimers();
+    setup({ onMoveNote: vi.fn() });
+    expect(rowOf('folder', 'home')).toHaveAttribute('aria-expanded', 'false');
+    press(rowOf('note', 'sunday'));
+    to(30, 10);
+    over(rowOf('folder', 'home'));
+    to(30, 40);
+    act(() => vi.advanceTimersByTime(SPRING_MS - 50));
+    expect(rowOf('folder', 'home')).toHaveAttribute('aria-expanded', 'false');
+    act(() => vi.advanceTimersByTime(100));
+    expect(rowOf('folder', 'home')).toHaveAttribute('aria-expanded', 'true');
+  });
+});
+
+describe('C22-U47 notes in no folder', () => {
+  it('C22-U47 have no heading and sit after a hairline, only when there are folders', () => {
+    setup();
+    expect(screen.queryByText(/Not in a folder|Unfiled/)).toBeNull();
+    expect(document.querySelector('.tp-nb-loose-sep')).not.toBeNull();
+    cleanup();
+    render(<NoteTree folders={[]} notes={LOOSE} />);
+    expect(document.querySelector('.tp-nb-loose-sep')).toBeNull();
+  });
+
+  it('C22-U47 with none there, dragging a filed note offers the top level, and dropping there unfiles it', () => {
+    const onMoveNote = vi.fn();
+    render(<NoteTree folders={FOLDERS} notes={[]} defaultOpen={{ home: true }} onMoveNote={onMoveNote} />);
+    expect(screen.queryByText('Drop here to take it out of its folder')).toBeNull();
+    press(rowOf('note', 'gifts'));
+    to(30, 10);
+    expect(screen.getByText('Drop here to take it out of its folder')).toBeInTheDocument();
+    over(rootOf());
+    to(30, 200);
+    letGo();
+    expect(onMoveNote).toHaveBeenCalledWith('gifts', null, undefined);
+  });
+});
+
+describe('C22-U48 while finding', () => {
+  it('C22-U48 rows do not lift while Find a note narrows the tree', async () => {
+    const { user } = setup({ onMoveNote: vi.fn() });
+    await user.type(screen.getByPlaceholderText('Find a note'), 'gift');
+    press(rowOf('note', 'gifts'));
+    to(40, 10);
+    expect(ghost()).toBeNull();
   });
 });

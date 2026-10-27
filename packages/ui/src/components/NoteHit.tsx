@@ -52,7 +52,7 @@ export function NoteHit(p: NoteHitProps) {
         </span>
         {it.snippet ? <span className="tp-sh-snip">{markWords(it.snippet, p.tokens)}</span> : null}
         <span className="tp-sh-by">
-          <span className="tp-sh-where">{it.where || 'Not in a folder'}</span>
+          <span className="tp-sh-where">{it.where || 'Notebook'}</span>
           {it.links ? (
             <span className="tp-sh-id">{it.links === 1 ? '1 task' : `${it.links} tasks`}</span>
           ) : null}

@@ -56,7 +56,7 @@ describe('C22-U01 the tree', () => {
     expect(tree.loose.map((n) => n.id)).toEqual(['loose']);
   });
 
-  it('C22-U01 leaves trashed ones out, and a note whose folder is gone is not in a folder', () => {
+  it('C22-U01 leaves trashed ones out, and a note whose folder is gone sits at the top of Notebook', () => {
     const tree = buildTree(
       [...folders, { ...folder('old', null, 'Old'), deletedAt: '2026-10-20T00:00:00.000Z' }],
       [
@@ -122,10 +122,10 @@ describe('C22-U02 what a drop may do', () => {
 });
 
 describe('C22-U03 the Move list', () => {
-  it('C22-U03 lists every folder with its path, Not in a folder first, and marks the current one Here', () => {
+  it('C22-U03 lists every folder with its path, Notebook first, and marks the current one Here', () => {
     const list = moveTargets(folders, 'plan');
     expect(list.map((t) => [t.title, t.sub, t.here])).toEqual([
-      ['Not in a folder', null, false],
+      ['Notebook', null, false],
       ['Northwind', null, false],
       ['Planning', 'Northwind', true],
       ['Offsite', 'Northwind / Planning', false],

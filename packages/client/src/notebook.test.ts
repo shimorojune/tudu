@@ -265,3 +265,36 @@ describe('C22-U11 the live event', () => {
     expect(stale()).toEqual([true, true, false]);
   });
 });
+
+describe('C22-U51 a turned-down move', () => {
+  it('C22-U51 tells onRejected the note’s name, and its retry sends the same move again', async () => {
+    const t = setup();
+    const told: { msg: string; name?: string; retry?: () => void }[] = [];
+    const nb = new NotebookStore({
+      api: createApi({ baseUrl: 'http://api.test', fetch: vi.fn(async () => new Response('{}')) as never }),
+      queryClient: t.queryClient,
+      tasks: t.tasks,
+      onRejected: (msg, move) => told.push({ msg, name: move?.name, retry: move?.retry }),
+    });
+    t.queryClient.setQueryData<NotebookResponse>(notebookKey(), {
+      folders: [{ id: 'f1', parentId: null, name: 'Northwind', position: 1 }],
+      notes: [serverNote('n1', { title: 'Offsite agenda' })],
+      trashCount: 0,
+    });
+    t.setAnswer((m) => ({ id: m.id, status: 'rejected', code: 404, error: 'That folder is gone.' }));
+    nb.moveNote('n1', 'f1');
+    await tick(10);
+    expect(told).toHaveLength(1);
+    expect(told[0]).toMatchObject({ msg: 'That folder is gone.', name: 'Offsite agenda' });
+    // No save-state error for a move: the toast says it.
+    expect(nb.saveState('n1')).not.toBe('error');
+
+    const before = t.sent.length;
+    t.setAnswer((m) => ({ id: m.id, status: 'ok' }));
+    told[0]!.retry!();
+    await tick(10);
+    const again = t.sent.slice(before);
+    expect(again).toHaveLength(1);
+    expect(again[0]).toMatchObject({ type: 'note.move', payload: { id: 'n1', folderId: 'f1' } });
+  });
+});
