@@ -1,3 +1,33 @@
+## [0.40.0](https://github.com/shimorojune/tudu/compare/tudu-0.39.0...tudu-0.40.0) (2026-10-27)
+
+### Features
+
+* **feedback:** show the screenshot on the public issue when the sender switches it on ([abea141](https://github.com/shimorojune/tudu/commit/abea14142a78f8e8b86a549fbae16e7950a94e5b))
+* **hours:** working hours on your account, and the nudge rules ([5c76af0](https://github.com/shimorojune/tudu/commit/5c76af0d17dd8e671dca736b3ff331b57f003a9d))
+* **notebook:** drawing blocks in notes (Excalidraw) ([eba278b](https://github.com/shimorojune/tudu/commit/eba278b6bcb7b6d98c39aced8d8c280e395b5e0d))
+* **ui:** Settings › Working hours, DayPick and HoursField ([3a1ac3d](https://github.com/shimorojune/tudu/commit/3a1ac3d8d0ad2f96d8f1924f7d659cd2bc32d3e1))
+* **web:** the nudge clock in the Mac app, and Settings › Working hours ([ab41402](https://github.com/shimorojune/tudu/commit/ab41402ccce6c0835312c3dcb0d5ea9d03eea860))
+
+### Bug Fixes
+
+* **all-spaces:** opening a task no longer freezes the tab ([7b61350](https://github.com/shimorojune/tudu/commit/7b613503fec698d9e014bec51c04c8790397def9))
+* **all-spaces:** opening a task right after a pill press keeps the filter ([a2bfef8](https://github.com/shimorojune/tudu/commit/a2bfef8de58fb35d97127126094ec30d0b49e037))
+* DayPick's class no longer restyles the day heading; e2e follow the new Settings row ([dfb35b8](https://github.com/shimorojune/tudu/commit/dfb35b87872527be5037f33e2b90a0a9c7d36f13))
+* **e2e:** C09-E12 searches 'gita', not 'gi' ([b3982e2](https://github.com/shimorojune/tudu/commit/b3982e2e56adcbc0d838c10bafd8f488db7bb954))
+* **e2e:** WH-D01 and the nudge setup don't wait out an unanswered macOS box ([46320e0](https://github.com/shimorojune/tudu/commit/46320e004e46465c1b233f846800673105d3fc7b))
+* **e2e:** WH-D01 checks what Settings shows, not only what macOS says ([83213b5](https://github.com/shimorojune/tudu/commit/83213b53d4871662830e701a1f6659c84ea9f119))
+* **e2e:** WH-D01 when macOS's box goes unanswered ([b2bf168](https://github.com/shimorojune/tudu/commit/b2bf168b555179685371df57fa319154080bb4f6))
+* **e2e:** WH-D04 expects today's first words ([4c54584](https://github.com/shimorojune/tudu/commit/4c5458418b69d15105e9ad72cabb4514bf4316cd))
+* **mac:** clear note window frame; menu bar sheet foot icon buttons ([24493f1](https://github.com/shimorojune/tudu/commit/24493f1982d82cb77e6873f41885db8d02e0b272))
+* **notebook:** ← and → step onto a drawing from the line beside it; C22-E88 lets the caret settle ([c65bcf0](https://github.com/shimorojune/tudu/commit/c65bcf035202e11fb572c375b99311f97ec0a896))
+* **notebook:** a drawing's pictures save after Done; Backspace runs as an editor command ([8702ba6](https://github.com/shimorojune/tudu/commit/8702ba6b59f7aafe31882a8d605c0a857a636764))
+* **notebook:** Backspace after a drawing selects it first instead of deleting it ([a9d829b](https://github.com/shimorojune/tudu/commit/a9d829bd49c944189fad06feccb497c9b71c6511))
+* **notebook:** clicks on a drawing block's buttons are its own; the Backspace keys are registered directly ([34d20bc](https://github.com/shimorojune/tudu/commit/34d20bcb5723c7ea5790da8dabfb3c29abd37778))
+* **notebook:** drawing tests click clear of Excalidraw's controls; the sheet counts its first change ([a1146bc](https://github.com/shimorojune/tudu/commit/a1146bcfb24a947152b7e0299988c26ceddf44c9))
+* **notebook:** the drawing Backspace lives in its own extension so drawing never becomes the default block ([9774c97](https://github.com/shimorojune/tudu/commit/9774c97e3ef70c91daf9dccef4b03ac8563c82c8))
+* **notebook:** the phone sheet covers the app's bars; drawing tests clear the shape panel and wait for saves ([069d405](https://github.com/shimorojune/tudu/commit/069d4058e141063f13fbc9417da641e510538dd6))
+* working hours lint, the Nudges file clash on macOS, and WH-U11's hours line ([e75ce3a](https://github.com/shimorojune/tudu/commit/e75ce3ad06f733ba51b722c639eca6a20c37c9bd))
+
 ## [0.39.0](https://github.com/shimorojune/tudu/compare/tudu-0.38.0...tudu-0.39.0) (2026-10-26)
 
 ### Features
