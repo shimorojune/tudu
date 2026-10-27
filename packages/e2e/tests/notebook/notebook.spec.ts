@@ -1606,6 +1606,37 @@ test.describe('notebook drawings', () => {
     expect([...hosts].filter((h) => /unpkg|jsdelivr|esm\.sh|excalidraw\.com/.test(h))).toEqual([]);
   });
 
+  test('C22-E88 the keys over a block: Backspace selects it then deletes it, Undo brings it back; ArrowLeft steps onto it and Enter opens it', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    const id = await seedNote(page, 'Keys', {
+      html: '<p>above</p><div data-drawing="k1"></div><p>below</p>',
+    });
+    await page.goto(`/notebook/${id}`);
+    const blk = drawingBlock(page, 'k1');
+    await expect(blk).toBeVisible();
+    const startOfBelow = async () => {
+      await words(page).locator('p', { hasText: 'below' }).click();
+      await page.keyboard.press('Home');
+    };
+    await startOfBelow();
+    await page.keyboard.press('Backspace');
+    await expect(blk).toHaveClass(/tp-sel/);
+    await page.keyboard.press('Backspace');
+    await expect(blk).toHaveCount(0);
+    await page.keyboard.press('ControlOrMeta+z');
+    await expect(blk).toBeVisible();
+    await startOfBelow();
+    await expect(blk).not.toHaveClass(/tp-sel/);
+    await page.keyboard.press('ArrowLeft');
+    await expect(blk).toHaveClass(/tp-sel/);
+    await page.keyboard.press('Enter');
+    await expect(sheet(page)).toBeVisible();
+    await expect(words(page)).toContainText('above');
+  });
+
   test('C22-E87 on a phone the drawing fills the screen with Excalidraw’s phone tools at the foot; Done returns to the note', async ({
     page,
   }) => {

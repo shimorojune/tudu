@@ -152,7 +152,7 @@ The frame and fill-the-screen rules also have Rust tests under the same ids (`pl
 | C22-U90 | client `drawings.test.ts`         | `stale`: loads the newer scene and raises the toast; Open mine resends the local scene on the new rev                                                           |
 | C22-U91 | client `drawings.test.ts`         | Done on an empty drawing sends no save and its block goes; one erased back to nothing sends `drawing.delete`                                                    |
 | C22-U92 | ui `NoteDrawing.test.tsx`         | Shows the light or dark picture by theme; "Picture not ready" without one; Edit, click and Enter all call `onOpen`; ⋯ › Delete calls `onDelete`                 |
-| C22-U93 | ui `RichTextEditor.test.tsx`      | The drawing node round-trips through HTML; Backspace next to it selects it, a second deletes it; arrows step over it; only the notes editor has Draw            |
+| C22-U93 | ui `RichTextEditor.test.tsx`      | The drawing node round-trips through HTML; only the notes editor has Draw (the keys over a block need layout: C22-E88)                                          |
 | C22-U94 | ui `DrawingSheet.test.tsx`        | Bar shows "<note> · Drawing N", the save ring and Done; Excalidraw is imported lazily (mocked), with a loading state and the "didn't open" state with Try again |
 | C22-U95 | ui `DrawingSheet.test.tsx`        | Opening animates `clip-path` and never `transform`; with Less motion there is no animation                                                                      |
 | C22-U96 | ui `NoteEditor.test.tsx`          | Draw is the last item in the strip; it inserts a block at the cursor and opens its sheet ("Drawing N"); an empty Done takes the block out                       |
@@ -164,6 +164,7 @@ The frame and fill-the-screen rules also have Rust tests under the same ids (`pl
 | C22-E85 | e2e web `notebook`                | Dark mode: the block swaps to its dark picture; the open sheet is in Excalidraw's dark theme                                                                    |
 | C22-E86 | e2e web `notebook`                | The drawing chunk isn't requested until a drawing opens; fonts load from `/excalidraw/fonts/`, never from a CDN                                                 |
 | C22-E87 | e2e web `notebook`, phone project | Open a drawing on the phone: full screen, tools at the foot, Done returns to the note                                                                           |
+| C22-E88 | e2e web `notebook`                | Over a block: Backspace selects it, a second deletes it, Undo brings it back; ArrowLeft steps onto it; Enter opens it                                           |
 | C22-D40 | mac `notebook.spec.ts`            | In the note window, Draw opens the sheet over the whole window; drawing and Done work in WKWebView; ⌥⌘N still reaches Tudu while drawing                        |
 | C22-D41 | mac `notebook.spec.ts`            | Offline (the server drops every connection): draw, Done, back up: the save goes through and the picture shows                                                   |
 | C22-D42 | mac `notebook.spec.ts`            | An image pasted into a drawing (WebKit paste event with a PNG) uploads, survives a reload, and the scene holds no `dataURL`                                     |

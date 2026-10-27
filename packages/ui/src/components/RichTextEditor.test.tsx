@@ -524,36 +524,7 @@ describe('C22-U93 drawing blocks in the Notebook’s editor', () => {
     expect(html).toContain('<p>Two rooms</p><div data-drawing="d1"></div><p>Coffee');
   });
 
-  it('C22-U93 Backspace next to it selects it, a second Backspace deletes it', async () => {
-    const { container, onInput, area } = drawn('<p>a</p><div data-drawing="d1"></div><p></p>');
-    await waitFor(() => expect(container.querySelector('[data-drawing-id="d1"]')).not.toBeNull());
-    act(() => {
-      fireEvent.keyDown(area, { key: 'Backspace' });
-    });
-    await waitFor(() => expect(container.querySelector('.tp-nb-draw')).toHaveClass('tp-sel'));
-    act(() => {
-      fireEvent.keyDown(area, { key: 'Backspace' });
-    });
-    await waitFor(() => expect(container.querySelector('.tp-nb-draw')).toBeNull());
-    expect(onInput.mock.calls.at(-1)![0]).not.toContain('data-drawing');
-  });
-
-  it('C22-U93 arrows step onto it and past it; Enter on it opens it', async () => {
-    const { container, onOpen, area } = drawn('<p>a</p><div data-drawing="d1"></div><p></p>');
-    await waitFor(() => expect(container.querySelector('[data-drawing-id="d1"]')).not.toBeNull());
-    act(() => {
-      fireEvent.keyDown(area, { key: 'ArrowLeft' });
-    });
-    await waitFor(() => expect(container.querySelector('.tp-nb-draw')).toHaveClass('tp-sel'));
-    act(() => {
-      fireEvent.keyDown(area, { key: 'Enter' });
-    });
-    expect(onOpen).toHaveBeenCalledWith('d1', expect.anything());
-    act(() => {
-      fireEvent.keyDown(area, { key: 'ArrowLeft' });
-    });
-    await waitFor(() => expect(container.querySelector('.tp-nb-draw')).not.toHaveClass('tp-sel'));
-  });
+  // Backspace and the arrows over a block need layout (ProseMirror measures the caret): C22-E88 runs them in a browser.
 
   it('C22-U93 only the Notebook’s editor has Draw; it drops a block at the caret and opens it', async () => {
     const user = userEvent.setup();
