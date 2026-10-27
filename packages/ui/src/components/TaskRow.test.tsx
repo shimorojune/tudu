@@ -388,7 +388,7 @@ describe('TaskRow project (chunk 04)', () => {
 });
 
 describe('C21-U22 a space tile shown alone is 16px', () => {
-  const NW2 = { name: 'Northwind', color: '#3d5a80', initials: 'N' };
+  const NW2 = { id: 'nw', name: 'Northwind', color: '#3d5a80', initials: 'N' };
   const size = (el: HTMLElement) => el.querySelector<HTMLElement>('.tp-sg-tile')!.style.width;
 
   it('C21-U22 brief (the week) and compact (phones) draw 16px; beside its name it stays 13px', () => {
