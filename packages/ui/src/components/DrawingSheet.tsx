@@ -109,6 +109,8 @@ export interface DrawingSheetProps {
 }
 
 const live = (els: readonly Element[]) => els.filter((e) => !e.isDeleted);
+const sigOf = (els: readonly Element[], files: number) =>
+  `${els.length}:${els.reduce((n, e) => n + e.version, 0)}:${files}`;
 
 /** A clip from the sheet's own box down onto `r` (or the whole box when null). */
 function inset(box: DOMRect, r: DOMRect | null, radius: number): string {
@@ -140,7 +142,14 @@ function Canvas(p: {
   /** Each image's Notebook file, by Excalidraw's id for it. */
   const files = useRef(new Map<string, DrawingImage>(Object.entries(p.drawing.scene.files)));
   const sending = useRef(new Set<string>());
-  const lastSig = useRef('');
+  /** What Excalidraw last handed over, as a count, a sum of versions and the images landed: the scene as it opened. */
+  const [opened] = useState(() =>
+    sigOf(
+      p.drawing.scene.elements as unknown as readonly Element[],
+      Object.keys(p.drawing.scene.files).length,
+    ),
+  );
+  const lastSig = useRef(opened);
   const api = useRef<ExcalidrawApi | null>(null);
   const [initial] = useState(() => ({
     elements: p.drawing.scene.elements,
@@ -201,11 +210,10 @@ function Canvas(p: {
     (els: readonly Element[], _app: unknown, bin: Record<string, BinaryFile> | undefined) => {
       for (const f of Object.values(bin ?? {})) if (!files.current.has(f.id)) sendImage(f);
       // Excalidraw calls this on every pointer move; only a changed element is a change.
-      const sig = `${els.length}:${els.reduce((n, e) => n + e.version, 0)}:${files.current.size}`;
+      const sig = sigOf(live(els), files.current.size);
       if (sig === lastSig.current) return;
-      const first = lastSig.current === '';
       lastSig.current = sig;
-      if (!first) cb.current.onChange(sceneOf(els));
+      cb.current.onChange(sceneOf(els));
     },
     [cb, sceneOf, sendImage],
   );

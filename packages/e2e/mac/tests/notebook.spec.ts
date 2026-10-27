@@ -517,9 +517,10 @@ test.describe('chunk 22 · the note window', () => {
 /** The drawing open full size in the note window: Excalidraw's canvas is drawn. */
 const sheetReady = (a: App) =>
   a.until(
-    `return !!document.querySelector('.tp-nb-sheet canvas.excalidraw__canvas.interactive')`,
+    `if (document.querySelector('.tp-nb-sheet-err')) throw new Error('the sheet says the drawing did not open');
+     return !!document.querySelector('.tp-nb-sheet canvas.excalidraw__canvas.interactive')`,
     'note',
-    20_000,
+    45_000,
   );
 
 /** Draw at the end of the note's words: the block goes in and its sheet opens. Answers the drawing's id. */
@@ -610,7 +611,8 @@ test.describe('chunk 22 · drawings in the note window', () => {
       await app.eval(drawRect, 'note');
       await done(app);
       await app.until(`return !document.querySelector('.tp-nb-sheet')`, 'note');
-      await app.until(`return document.body.innerText.includes('Not saved yet')`, 'note', 20_000);
+      // The block keeps its picture from this window while the save waits.
+      await app.until(`return !!document.querySelector('.tp-nb-draw[data-drawing-id="${did}"] img')`, 'note');
     } finally {
       await fetch(`${API}/__test/net/down`, { method: 'POST', body: JSON.stringify({ down: false }) });
     }

@@ -1349,10 +1349,18 @@ async function startDrawing(page: Page, noteId: string, firstWords: string): Pro
   return (await page.locator('.tp-nb-draw').last().getAttribute('data-drawing-id'))!;
 }
 
+/** An empty spot on the canvas, clear of Excalidraw's own controls: the welcome menu in the middle, Help and the
+ * zoom in the corners, the shape properties on the left, a phone's tools at the foot. */
+const awayFrom = (b: { x: number; y: number; width: number; height: number }) => ({
+  x: b.x + b.width * 0.7,
+  y: b.y + b.height * 0.3,
+});
+
 /** A rectangle (r, then drag) and a line of text (t, click, type), the way a person draws them. */
 async function drawSomething(page: Page, text: string): Promise<void> {
   const b = (await drawCanvas(page).boundingBox())!;
-  await page.mouse.click(b.x + b.width - 40, b.y + b.height - 40);
+  const away = awayFrom(b);
+  await page.mouse.click(away.x, away.y);
   await page.keyboard.press('r');
   await page.mouse.move(b.x + 120, b.y + 120);
   await page.mouse.down();
@@ -1363,7 +1371,7 @@ async function drawSomething(page: Page, text: string): Promise<void> {
   await expect(sheet(page).locator('textarea.excalidraw-wysiwyg')).toBeVisible();
   await page.keyboard.type(text);
   // A click away keeps the text and goes back to selecting.
-  await page.mouse.click(b.x + b.width - 40, b.y + b.height - 40);
+  await page.mouse.click(away.x, away.y);
   await expect(sheet(page).locator('textarea.excalidraw-wysiwyg')).toHaveCount(0);
 }
 
@@ -1451,8 +1459,10 @@ test.describe('notebook drawings', () => {
     await signInFresh(page);
     const id = await seedNote(page, 'Whiteboard photo', { html: '<p>From the session</p>' });
     const did = await startDrawing(page, id, 'From the session');
-    const c = mid((await drawCanvas(page).boundingBox())!);
-    await page.mouse.click(c.x, c.y);
+    // The pointer over the canvas and Excalidraw focused, as when you paste with the mouse over the drawing.
+    const c = awayFrom((await drawCanvas(page).boundingBox())!);
+    await page.mouse.move(c.x, c.y);
+    await sheet(page).locator('.excalidraw').focus();
     const dt = await imageTransfer(page);
     await page.evaluate(
       (d) =>
@@ -1480,8 +1490,8 @@ test.describe('notebook drawings', () => {
     await drawCanvas(page).evaluate((el, d) => {
       const r = el.getBoundingClientRect();
       const at = {
-        clientX: r.left + r.width / 2,
-        clientY: r.top + r.height / 2,
+        clientX: r.left + r.width * 0.7,
+        clientY: r.top + r.height * 0.3,
         bubbles: true,
         cancelable: true,
       };
