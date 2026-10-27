@@ -26,9 +26,6 @@ test.describe('working hours', () => {
     await end.fill('1730');
     await end.press('Enter');
     await again;
-    await expect(page.getByRole('navigation', { name: 'Settings' })).toContainText(
-      'Mon to Sat, 09:00 to 17:30',
-    );
 
     await page.reload();
     await expect(d.getByRole('button', { name: 'Saturday' })).toHaveAttribute('aria-pressed', 'true');
@@ -48,10 +45,12 @@ test.describe('working hours', () => {
     test.skip(!phone(), 'phone only');
     await signInFresh(page);
     await page.goto('/me/settings');
-    await page
+    // The list carries the hours line under the row (the dialog's nav has no sub-lines).
+    const row = page
       .getByRole('navigation', { name: 'Settings' })
-      .getByRole('button', { name: /^Working hours/ })
-      .click();
+      .getByRole('button', { name: /^Working hours/ });
+    await expect(row).toContainText('Mon to Fri, 09:00 to 18:00');
+    await row.click();
     await expect(page).toHaveURL(/\/me\/settings\/hours$/);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Working hours');
     const start = page.getByRole('textbox', { name: 'Every day starts at' });

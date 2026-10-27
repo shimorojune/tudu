@@ -2982,12 +2982,12 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 .tp-nb-sheet-err-t { font-family: var(--font-serif); font-size: 22px; color: var(--foreground); }
 @media (prefers-reduced-motion: reduce) { .tp-nb-draw-new { animation: none; } .tp-nb-sheet-tools { animation: none; } }
 
-/* Settings › Working hours. DayPick: seven round toggles, Monday first; pressed is ink, like a picked day. */
-.tp-days { display: inline-flex; flex-wrap: wrap; gap: 6px; }
-.tp-day { width: 34px; height: 34px; border: 0; border-radius: var(--radius-full); display: inline-flex; align-items: center; justify-content: center; font: 600 12.5px/1 var(--font-sans); color: var(--foreground-2); background: var(--secondary); box-shadow: inset 0 0 0 1px var(--border); cursor: pointer; transition: background-color 130ms var(--ease-change), color 130ms var(--ease-change), box-shadow 130ms var(--ease-change); }
-.tp-day:hover { box-shadow: inset 0 0 0 1px var(--border-strong); }
-.tp-day[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); box-shadow: none; }
-.tp-day:focus-visible, .tp-wh-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+/* Settings › Working hours. DayPick (.tp-dpick; .tp-day is the day heading): seven round toggles, Monday first; pressed is ink, like a picked day. */
+.tp-dpick { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.tp-dpick-d { width: 34px; height: 34px; border: 0; border-radius: var(--radius-full); display: inline-flex; align-items: center; justify-content: center; font: 600 12.5px/1 var(--font-sans); color: var(--foreground-2); background: var(--secondary); box-shadow: inset 0 0 0 1px var(--border); cursor: pointer; transition: background-color 130ms var(--ease-change), color 130ms var(--ease-change), box-shadow 130ms var(--ease-change); }
+.tp-dpick-d:hover { box-shadow: inset 0 0 0 1px var(--border-strong); }
+.tp-dpick-d[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); box-shadow: none; }
+.tp-dpick-d:focus-visible, .tp-wh-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 /* HoursField: from and to, two short 24-hour fields and "to". */
 .tp-hours { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted-foreground); }
 .tp-hours .tp-field { width: 104px; height: 34px; padding: 0 10px; }
@@ -3005,12 +3005,12 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 /* Loading: the section itself in its final shape, every word and control shimmering in place, so nothing moves
    or changes height when your hours arrive; then the content fades up through it. */
 .tp-wh-ld { pointer-events: none; }
-.tp-wh-ld :is(.tp-setrow-l, .tp-setrow-s, .tp-ssec-h span, .tp-set-note, .tp-day, .tp-field, .tp-switch, .tp-seg, .tp-wh-link, .tp-btn) {
+.tp-wh-ld :is(.tp-setrow-l, .tp-setrow-s, .tp-ssec-h span, .tp-set-note, .tp-dpick-d, .tp-field, .tp-switch, .tp-seg, .tp-wh-link, .tp-btn) {
   color: transparent !important; text-decoration: none !important; box-shadow: none !important; border-color: transparent !important;
   background: linear-gradient(90deg, var(--skeleton) 0, var(--skeleton-2) 50%, var(--skeleton) 100%) !important; background-size: 600px 100% !important;
   animation: tp-shimmer 1.4s linear infinite; border-radius: 6px; }
 .tp-wh-ld :is(.tp-setrow-l, .tp-setrow-s, .tp-ssec-h span, .tp-set-note) { width: fit-content; max-width: 100%; }
-.tp-wh-ld .tp-day, .tp-wh-ld .tp-switch { border-radius: var(--radius-full) !important; }
+.tp-wh-ld .tp-dpick-d, .tp-wh-ld .tp-switch { border-radius: var(--radius-full) !important; }
 .tp-wh-ld :is(.tp-field input, .tp-switch-k, .tp-seg > *, .tp-btn > *) { visibility: hidden; }
 .tp-wh-shown { animation: tp-wh-up 240ms var(--ease-arrive) both; }
 @keyframes tp-wh-up { from { opacity: .35; } to { opacity: 1; } }

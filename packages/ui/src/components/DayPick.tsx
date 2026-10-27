@@ -26,7 +26,7 @@ export function DayPick({ days, onChange, label = 'Days', className }: DayPickPr
     box.current?.querySelectorAll<HTMLButtonElement>('button')[(i + step + 7) % 7]?.focus();
   };
   return (
-    <div ref={box} className={cx('tp-root tp-days', className)} role="group" aria-label={label}>
+    <div ref={box} className={cx('tp-root tp-dpick', className)} role="group" aria-label={label}>
       {DAY_NAMES.map((name, i) => {
         const day = i + 1;
         const on = days.includes(day);
@@ -34,7 +34,7 @@ export function DayPick({ days, onChange, label = 'Days', className }: DayPickPr
           <button
             key={day}
             type="button"
-            className="tp-day"
+            className="tp-dpick-d"
             aria-pressed={on ? 'true' : 'false'}
             aria-label={name}
             onKeyDown={(e) => move(e, i)}
