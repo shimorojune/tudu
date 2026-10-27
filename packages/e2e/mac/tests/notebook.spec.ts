@@ -321,14 +321,15 @@ test.describe('chunk 22 · the note window', () => {
        const a = at(row);
        const b = at(to);
        const o = (p) => ({ bubbles: true, cancelable: true, view: window, button: 0, pointerType: 'mouse', isPrimary: true, pointerId: 1, clientX: p.x, clientY: p.y });
-       const tick = () => new Promise((r) => requestAnimationFrame(() => r()));
        row.dispatchEvent(new PointerEvent('pointerdown', o(a)));
        document.dispatchEvent(new PointerEvent('pointermove', o({ x: a.x + 8, y: a.y + 2 })));
-       await tick();
+       // React draws the card on its own schedule: give it up to a second.
+       const wait = () => new Promise((r) => setTimeout(r, 20));
+       for (let i = 0; i < 50 && !document.querySelector('.tp-nb-ghost'); i++) await wait();
        if (!document.querySelector('.tp-nb-ghost')) throw new Error('the row did not lift');
        for (let i = 1; i <= 8; i++) {
          document.dispatchEvent(new PointerEvent('pointermove', o({ x: a.x + ((b.x - a.x) * i) / 8, y: a.y + ((b.y - a.y) * i) / 8 })));
-         await tick();
+         await wait();
        }
        document.dispatchEvent(new PointerEvent('pointerup', o(b)));`,
     );
