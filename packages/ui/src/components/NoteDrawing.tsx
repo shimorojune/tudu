@@ -204,7 +204,7 @@ function DrawingBlockView(props: NodeViewProps) {
  * (whose joinBackward deletes an atom outright): a priority on the node itself would put it first in the schema and
  * make it the default block.
  */
-const DrawingKeys = Extension.create({
+export const DrawingKeys = Extension.create({
   name: 'drawingKeys',
   priority: 1000,
   addKeyboardShortcuts() {
@@ -253,10 +253,14 @@ export const DrawingNode = Node.create<{ onOpen: (id: string) => void }>({
     return ['div', mergeAttributes(HTMLAttributes)];
   },
   addNodeView() {
-    return ReactNodeViewRenderer(DrawingBlockView);
-  },
-  addExtensions() {
-    return [DrawingKeys];
+    return ReactNodeViewRenderer(DrawingBlockView, {
+      // Its buttons and picture are the block's own: ProseMirror leaves their clicks alone (its mouseup would select
+      // the block on a document the click has just changed by opening it).
+      stopEvent: ({ event }) =>
+        /^(mouse|pointer|click)/.test(event.type) &&
+        event.target instanceof Element &&
+        !!event.target.closest('button, [role="button"], [role="menu"]'),
+    });
   },
   addKeyboardShortcuts() {
     return {

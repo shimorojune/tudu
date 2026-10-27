@@ -9,7 +9,7 @@ import {
 } from '@tudu/core';
 import type { Node as PmNode } from '@tiptap/pm/model';
 import { Attachment, AttachmentUpload, withFileBase, withoutFileBase, withoutUploads } from './attachment';
-import { DrawingNode, drawingFrame, PenIcon } from './NoteDrawing';
+import { DrawingKeys, DrawingNode, drawingFrame, PenIcon } from './NoteDrawing';
 import { showToast, TOAST_WITH_ACTION_MS } from './Toast';
 import Highlight from '@tiptap/extension-highlight';
 import Subscript from '@tiptap/extension-subscript';
@@ -203,7 +203,7 @@ const STYLES = [
  */
 export function editorExtensions(fileBase = '', drawings?: { onOpen: (id: string) => void }) {
   return [
-    ...(drawings ? [DrawingNode.configure({ onOpen: drawings.onOpen })] : []),
+    ...(drawings ? [DrawingNode.configure({ onOpen: drawings.onOpen }), DrawingKeys] : []),
     Attachment.configure({ base: fileBase }),
     AttachmentUpload,
     StarterKit.configure({
