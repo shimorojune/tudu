@@ -1,8 +1,9 @@
 # Working hours, and nudges in the Mac app
 
-Status: proposed 27 Oct 2026, awaiting Rohit's approval. Canvas approved by Rohit on 27 Oct 2026 ("looks good"), with
-the recommended pick on all four decisions: boards `H-Hours`(+Dark) and `H-Nudge`(+Dark) on the page "Settings & theme",
-canvas v157. Discussion:
+Status: approved by Rohit on 27 Oct 2026 ("Approve, start building"); built on `claude/project-thread-p9r4il`. The
+allow-notifications guide (canvas v163) approved the same day. Canvas approved by Rohit on 27 Oct 2026 ("looks good"),
+with the recommended pick on all four decisions: boards `H-Hours`(+Dark) and `H-Nudge`(+Dark) on the page "Settings &
+theme", canvas v157. Discussion:
 [Working hours and nudges: discussion](https://claude.ai/artifact/NfGoYZPW9iEZ1sS9AtsRx5).
 
 ## Why
@@ -43,7 +44,7 @@ during working hours that says what is done and what is still left today. Short 
      (macOS 26, ad hoc signed) macOS shows **no prompt**: it refuses at once and lists Tudu in System Settings ›
      Notifications with notifications off. So the refused state is the usual first-run path, not an edge case: the
      switch stays on with `macOS has Tudu's notifications off.` and one line `Turn on Allow notifications for Tudu,
-     then come back.` and an **Open Notification settings** button that opens that page. When Tudu comes to the front
+then come back.` and an **Open Notification settings** button that opens that page. When Tudu comes to the front
      again it re-reads the status by itself; once allowed it reads `On` and sends one test nudge so you see it work.
      Also read again each time Settings opens, and if it is switched off later in System Settings.
    - Paused: the row reads `Paused until Wednesday 09:00` with **Resume**. A pause ends on its own at the start of your
@@ -51,9 +52,9 @@ during working hours that says what is done and what is still left today. Short 
    - Send now: `Sent. It shows at the top right of your screen.` Works outside your hours and while paused. Failure:
      `Couldn't read today, so nothing was sent. Try again in a moment.` While reading: the button spins (`Sending…`).
    - A note under the section: `Nudges come from Tudu while it runs on this Mac. Turn on Open at login in This Mac so
-     they still come after a restart.`
+they still come after a restart.`
    - On the web and on phones, the Nudges part is one line: `Nudges come from the Tudu app on a Mac. Your hours here are
-     the ones it uses.`
+the ones it uses.`
 3. **The nudge** is macOS's own banner with Tudu's words. Title: the numbers. Body: one line on what is next. The
    numbers are the menu bar tick's (your own tasks today, across all spaces, the rows the sheet lists).
 
@@ -67,7 +68,6 @@ during working hours that says what is done and what is still left today. Short 
    | All done                     | `All 8 done for today`            | `Tomorrow has 4.` (or nothing more if tomorrow is empty)   |
    | Nothing on today             | `Nothing on today`                | the sheet's empty lines (`menuBarEmptyLines`)              |
    | End of your hours            | `End of your day: 6 done, 2 left` | `The 2 left carry to tomorrow.`                            |
-
    - "Next" is the first open task in the sheet's order (Personal first). A task from a team space ends in
      ` · <space name>`.
    - All done and Nothing on today are sent once, then nothing for the rest of the day unless a task lands on today.
@@ -76,6 +76,7 @@ during working hours that says what is done and what is still left today. Short 
    - Click: Tudu comes forward on Today (All spaces when you are in more than one space).
    - Pointer over it: one action, **Pause for today**.
    - Never marked time sensitive, so Focus always wins: the nudge waits silently in Notification Center.
+
 4. **When nudges come.** On the clock from your start time (hourly from 09:00: 09:00, 10:00, 11:00, …), plus one at your
    end time. Window closed: they still come (Tudu stays in the menu bar). Tudu quit, signed out, a day off, outside your
    hours, or paused: nothing. Asleep through a slot: the missed one is not sent late. On wake, if the next slot is more
@@ -148,6 +149,20 @@ during working hours that says what is done and what is still left today. Short 
   `G-B-Dialog`, `G-Desktop-Dark`, `G-Tablet`, `G-Phone`(+Dark/Theme), `G-States`(+Dark), `K-Login`(+Dark), `K-Updates`(+Dark),
   `K-Proto`.
 
+## As built: where it differs from this plan
+
+- **Nudge prefs live in the page**, in `localStorage` (`tudu.nudges`, per app track; the last nudge per account in
+  `tudu.nudges.last.<userId>`), not in `NSUserDefaults`. Each Mac still has its own, which is what decision 1 asks for,
+  and it needs no `nudges_get`/`nudges_set` commands. The plan's WH-R01 went with it.
+- **Times are 24-hour text fields** (`inputmode="numeric"`, `9`, `930`, `9:30` and `9.30` all read as times), not native
+  time inputs, which follow the Mac's 12/24-hour setting and could not match the canvas. WH-E02 checks the text field.
+- **A failed save keeps the change** on screen and in the `me` cache and goes again once back online, instead of putting
+  the old value back (WH-U16).
+- **Mac e2e moves the page's clock** with `window.__tuduNudgeClock` over the existing `/eval` control, plus a focus
+  event; there is no `nudge-clock` or `wake` control. What was posted is read with `notify-status`.
+- **The guide** (approved on canvas v163) draws a small System Settings window with Tudu's switch picked out, plus three
+  numbered steps; **Open Notification settings** opens System Settings › Notifications.
+
 ## Tests
 
 IDs are new (`WH-`) unless marked "updated". Test cases also go in `docs/tests/working-hours-nudges.md`. All tests are
@@ -155,51 +170,51 @@ run on Rohit's Mac, not in the cloud container.
 
 ### Unit (vitest)
 
-| ID     | Where              | Scenario                                                                                                                                                                         |
-| ------ | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| WH-U01 | core hours         | `parseWorkHours`: default; per-day; refuses end ≤ start, no days, `25:00`, `9:5`, duplicate day; `same` kept                                                                     |
-| WH-U02 | core hours         | `hoursLine`: Mon to Fri one stretch; every day; a short Friday; a single day                                                                                                     |
-| WH-U03 | core nudges        | `nudgeSlots`: 09:00 to 18:00 hourly → 09..17 + 18; 30 min; 3 hours (09, 12, 15, 18); an end not on the grid (17:30) still gets its slot; a day off → none                       |
-| WH-U04 | core nudges        | `nextNudge`: before start, mid-day, after end, a day off, paused until tomorrow, a pause ending at next working day's start (over a weekend)                                      |
-| WH-U05 | core nudges        | `dueNow`: on a slot → yes once; same slot twice → no; woke 13:20 with hourly → yes; woke 13:40 → no (waits for 14:00); asleep through two slots → one, never two                 |
-| WH-U06 | core nudges        | `nudgeWords`: each row of the table (start, after, since, still, one left, all done, nothing on, end); team space suffix; another person's task never counts                     |
-| WH-U07 | core nudges        | Once-a-day: all done sent once, then nothing; a task added to today after → nudges again; nothing on today likewise                                                              |
-| WH-U08 | core nudges        | Times are local: same `hours` give the same slots under `TZ=Asia/Kolkata` and `TZ=UTC` (the IST/UTC lesson from the e2e fixtures)                                                |
-| WH-U09 | ui DayPick         | Seven toggles with full day names as labels; click toggles `aria-pressed`; `onChange` with the new set; arrow keys move focus                                                   |
-| WH-U10 | ui HoursField      | Shows both times; an end before start marks the end field invalid with the error line; `onChange` only with a valid value                                                        |
-| WH-U11 | ui Settings        | Working hours row after Appearance on every layout; sub-line from `hoursLine`; loading → skeleton; save error line; per-day swap and back keeps Monday's hours                    |
-| WH-U12 | ui Settings        | Nudges block only with `nudges`; off shows the switch alone; on unfolds the rows; asking, denied (+ Open Notifications), paused (+ Resume), sent, failed, sending                 |
-| WH-U13 | ui Settings        | Web/phone line shown without `nudges`; reduced motion has no height transition                                                                                                   |
-| WH-U14 | web Nudges         | Fake bridge + fake clock: nothing while off; on at 08:59 → nothing; 09:00 → `notify` once with the start words; 10:00 → after words; no `notify` when a day query failed        |
-| WH-U15 | web Nudges         | Reload mid-day does not resend the last slot; signed out stops it; pause from the bridge event stops it; Send now ignores hours and pause                                         |
-| WH-U16 | web settings       | Saving hours posts `/api/me/hours` once per change, updates the `me` cache at once, and puts the value back with the error line when the post fails                              |
+| ID     | Where         | Scenario                                                                                                                                                                 |
+| ------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| WH-U01 | core hours    | `parseWorkHours`: default; per-day; refuses end ≤ start, no days, `25:00`, `9:5`, duplicate day; `same` kept                                                             |
+| WH-U02 | core hours    | `hoursLine`: Mon to Fri one stretch; every day; a short Friday; a single day                                                                                             |
+| WH-U03 | core nudges   | `nudgeSlots`: 09:00 to 18:00 hourly → 09..17 + 18; 30 min; 3 hours (09, 12, 15, 18); an end not on the grid (17:30) still gets its slot; a day off → none                |
+| WH-U04 | core nudges   | `nextNudge`: before start, mid-day, after end, a day off, paused until tomorrow, a pause ending at next working day's start (over a weekend)                             |
+| WH-U05 | core nudges   | `dueNow`: on a slot → yes once; same slot twice → no; woke 13:20 with hourly → yes; woke 13:40 → no (waits for 14:00); asleep through two slots → one, never two         |
+| WH-U06 | core nudges   | `nudgeWords`: each row of the table (start, after, since, still, one left, all done, nothing on, end); team space suffix; another person's task never counts             |
+| WH-U07 | core nudges   | Once-a-day: all done sent once, then nothing; a task added to today after → nudges again; nothing on today likewise                                                      |
+| WH-U08 | core nudges   | Times are local: same `hours` give the same slots under `TZ=Asia/Kolkata` and `TZ=UTC` (the IST/UTC lesson from the e2e fixtures)                                        |
+| WH-U09 | ui DayPick    | Seven toggles with full day names as labels; click toggles `aria-pressed`; `onChange` with the new set; arrow keys move focus                                            |
+| WH-U10 | ui HoursField | Shows both times; an end before start marks the end field invalid with the error line; `onChange` only with a valid value                                                |
+| WH-U11 | ui Settings   | Working hours row after Appearance on every layout; sub-line from `hoursLine`; loading → skeleton; save error line; per-day swap and back keeps Monday's hours           |
+| WH-U12 | ui Settings   | Nudges block only with `nudges`; off shows the switch alone; on unfolds the rows; asking, denied (+ Open Notifications), paused (+ Resume), sent, failed, sending        |
+| WH-U13 | ui Settings   | Web/phone line shown without `nudges`; reduced motion has no height transition                                                                                           |
+| WH-U14 | web Nudges    | Fake bridge + fake clock: nothing while off; on at 08:59 → nothing; 09:00 → `notify` once with the start words; 10:00 → after words; no `notify` when a day query failed |
+| WH-U15 | web Nudges    | Reload mid-day does not resend the last slot; signed out stops it; pause from the bridge event stops it; Send now ignores hours and pause                                |
+| WH-U16 | web settings  | Saving hours posts `/api/me/hours` once per change, updates the `me` cache at once, and puts the value back with the error line when the post fails                      |
 
 ### API (vitest, test database)
 
-| ID     | Scenario                                                                                                              |
-| ------ | --------------------------------------------------------------------------------------------------------------------- |
-| WH-A01 | `GET /api/me` returns the default hours for a new account                                                             |
-| WH-A02 | `POST /api/me/hours` saves and `GET` returns it; a second post replaces it; another session gets the `me` change        |
-| WH-A03 | Refuses bad bodies (400 with the reason): no days, end before start, bad time, unknown keys; signed out → 401         |
+| ID     | Scenario                                                                                                         |
+| ------ | ---------------------------------------------------------------------------------------------------------------- |
+| WH-A01 | `GET /api/me` returns the default hours for a new account                                                        |
+| WH-A02 | `POST /api/me/hours` saves and `GET` returns it; a second post replaces it; another session gets the `me` change |
+| WH-A03 | Refuses bad bodies (400 with the reason): no days, end before start, bad time, unknown keys; signed out → 401    |
 
 ### Rust unit (macOS runner)
 
-| ID     | Scenario                                                                                                    |
-| ------ | ----------------------------------------------------------------------------------------------------------- |
-| WH-R01 | Prefs round-trip through `NSUserDefaults` per track; missing → off, hourly, not paused                      |
-| WH-R02 | The nudge request: identifier `tudu.nudge`, the category with "Pause for today", not time sensitive         |
-| WH-R03 | No bundle identifier → `unavailable`, and no call into `UNUserNotificationCenter`                           |
+| ID     | Scenario                                                                                            |
+| ------ | --------------------------------------------------------------------------------------------------- |
+| WH-R01 | Prefs round-trip through `NSUserDefaults` per track; missing → off, hourly, not paused              |
+| WH-R02 | The nudge request: identifier `tudu.nudge`, the category with "Pause for today", not time sensitive |
+| WH-R03 | No bundle identifier → `unavailable`, and no call into `UNUserNotificationCenter`                   |
 
 ### Mac E2E (`packages/e2e/mac/tests`, run on Rohit's Mac, Tudu Test)
 
-| ID     | Scenario                                                                                                                                                         |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| WH-D01 | Settings › Working hours shows Nudges in the app; turning it on asks macOS (permission pre-granted for Tudu Test) and the rows unfold                            |
-| WH-D02 | Fake clock at 09:00 with 6 seeded tasks, window hidden → control `nudges` shows title `6 on today`; tick 3 in the sheet, clock 10:00 → `3 done, 3 left today`  |
-| WH-D03 | Same identifier each time: Notification Center's delivered list for Tudu Test holds one nudge after three slots                                                  |
-| WH-D04 | Pause from Settings: no nudge at the next slot; clock to the next working day 09:00 → nudges again                                                              |
-| WH-D05 | Send now outside hours posts the current summary; with the API down it posts nothing and shows the failure line                                                 |
-| WH-D06 | Wake simulation (`wake` control at 13:20 and 13:40, hourly) → one nudge at 13:20, none at 13:40                                                                   |
+| ID     | Scenario                                                                                                                                                      |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| WH-D01 | Settings › Working hours shows Nudges in the app; turning it on asks macOS (permission pre-granted for Tudu Test) and the rows unfold                         |
+| WH-D02 | Fake clock at 09:00 with 6 seeded tasks, window hidden → control `nudges` shows title `6 on today`; tick 3 in the sheet, clock 10:00 → `3 done, 3 left today` |
+| WH-D03 | Same identifier each time: Notification Center's delivered list for Tudu Test holds one nudge after three slots                                               |
+| WH-D04 | Pause from Settings: no nudge at the next slot; clock to the next working day 09:00 → nudges again                                                            |
+| WH-D05 | Send now outside hours posts the current summary; with the API down it posts nothing and shows the failure line                                               |
+| WH-D06 | Wake simulation (`wake` control at 13:20 and 13:40, hourly) → one nudge at 13:20, none at 13:40                                                               |
 
 ### Web E2E (Playwright)
 
@@ -210,12 +225,12 @@ run on Rohit's Mac, not in the cloud container.
 
 ### Manual on Rohit's Mac (before merge, results in the PR)
 
-| ID     | Scenario                                                                                                    |
-| ------ | ----------------------------------------------------------------------------------------------------------- |
-| WH-M01 | The real permission prompt on first switch-on (production build); Don't Allow → the denied line and button  |
-| WH-M02 | A real hourly nudge reads as drawn in light and dark; the click opens Today; Pause for today works          |
-| WH-M03 | With Focus on, nudges stay silent and wait in Notification Center                                           |
-| WH-M04 | Close the lid over a slot, open after → behaves per the half-interval rule; no pile-up                     |
+| ID     | Scenario                                                                                                                                                                                                 |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| WH-M01 | The real permission prompt on first switch-on (production build); Don't Allow → the denied line and button                                                                                               |
+| WH-M02 | A real hourly nudge reads as drawn in light and dark; the click opens Today; Pause for today works                                                                                                       |
+| WH-M03 | With Focus on, nudges stay silent and wait in Notification Center                                                                                                                                        |
+| WH-M04 | Close the lid over a slot, open after → behaves per the half-interval rule; no pile-up                                                                                                                   |
 | WH-M05 | Fresh install, switch Nudges on → macOS refuses silently → the off-in-macOS step shows; Open Notification settings opens the Notifications page; allow Tudu, come back → On + one test nudge, no restart |
 
 ## Out of scope

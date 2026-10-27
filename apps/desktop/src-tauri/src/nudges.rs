@@ -398,7 +398,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn wh_u_permission_reads_as_macos_has_it() {
+    fn wh_r01_permission_reads_as_macos_has_it() {
         assert_eq!(permission_from_status(0), Permission::Unknown);
         assert_eq!(permission_from_status(1), Permission::Denied);
         assert_eq!(permission_from_status(2), Permission::Allowed);
@@ -411,7 +411,7 @@ mod tests {
     }
 
     #[test]
-    fn wh_u_a_click_opens_today_and_the_action_pauses() {
+    fn wh_r02_a_click_opens_today_and_the_action_pauses() {
         assert_eq!(
             answer_from("com.apple.UNNotificationDefaultActionIdentifier"),
             Answer::Open
@@ -424,7 +424,7 @@ mod tests {
     }
 
     #[test]
-    fn wh_u_every_nudge_shares_one_identifier() {
+    fn wh_r02_every_nudge_shares_one_identifier() {
         assert_eq!(NUDGE_ID, "tudu.nudge");
         assert_eq!(CATEGORY, "tudu.nudge");
     }
