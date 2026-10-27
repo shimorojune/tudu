@@ -1,4 +1,4 @@
-import { mergeAttributes, Node } from '@tiptap/core';
+import { Extension, mergeAttributes, Node } from '@tiptap/core';
 import { NodeSelection, type TextSelection } from '@tiptap/pm/state';
 import { NodeViewWrapper, ReactNodeViewRenderer, type NodeViewProps } from '@tiptap/react';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -200,14 +200,37 @@ function DrawingBlockView(props: NodeViewProps) {
 }
 
 /**
+ * Backspace just after a drawing selects it, so a second one deletes it. Its own extension, above the core keymap
+ * (whose joinBackward deletes an atom outright): a priority on the node itself would put it first in the schema and
+ * make it the default block.
+ */
+const DrawingKeys = Extension.create({
+  name: 'drawingKeys',
+  priority: 1000,
+  addKeyboardShortcuts() {
+    return {
+      Backspace: ({ editor }) => {
+        const { $cursor } = editor.state.selection as TextSelection;
+        if (!$cursor || $cursor.parentOffset > 0 || $cursor.depth < 1) return false;
+        const at = $cursor.before();
+        const before = editor.state.doc.resolve(at).nodeBefore;
+        if (before?.type.name !== 'drawing') return false;
+        editor.view.dispatch(
+          editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, at - before.nodeSize)),
+        );
+        return true;
+      },
+    };
+  },
+});
+
+/**
  * A drawing block in a note's words: `<div data-drawing="id"></div>`, nothing else. The drawing itself lives in its
  * own row; the block is one unit in the words (arrows step over it, Backspace selects it then deletes it, it drags
  * like a paragraph). Enter on a selected block opens it.
  */
 export const DrawingNode = Node.create<{ onOpen: (id: string) => void }>({
   name: 'drawing',
-  // Above the core keymap, whose Backspace (joinBackward) deletes an atom outright.
-  priority: 1000,
   group: 'block',
   atom: true,
   draggable: true,
@@ -233,23 +256,15 @@ export const DrawingNode = Node.create<{ onOpen: (id: string) => void }>({
   addNodeView() {
     return ReactNodeViewRenderer(DrawingBlockView);
   },
+  addExtensions() {
+    return [DrawingKeys];
+  },
   addKeyboardShortcuts() {
     return {
       Enter: ({ editor }) => {
         const sel = editor.state.selection;
         if (!(sel instanceof NodeSelection) || sel.node.type.name !== this.name) return false;
         this.options.onOpen(String(sel.node.attrs.id));
-        return true;
-      },
-      Backspace: ({ editor }) => {
-        const { $cursor } = editor.state.selection as TextSelection;
-        if (!$cursor || $cursor.parentOffset > 0 || $cursor.depth < 1) return false;
-        const at = $cursor.before();
-        const before = editor.state.doc.resolve(at).nodeBefore;
-        if (before?.type.name !== this.name) return false;
-        editor.view.dispatch(
-          editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, at - before.nodeSize)),
-        );
         return true;
       },
     };

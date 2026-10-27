@@ -1346,7 +1346,10 @@ async function startDrawing(page: Page, noteId: string, firstWords: string): Pro
   await page.locator('.tp-nb-body').getByRole('button', { name: 'Draw', exact: true }).click();
   await expect(sheet(page)).toBeVisible();
   await expect(drawCanvas(page)).toBeVisible({ timeout: 15_000 });
-  return (await page.locator('.tp-nb-draw').last().getAttribute('data-drawing-id'))!;
+  const id = (await sheet(page).getAttribute('data-drawing-sheet'))!;
+  expect(id).toBeTruthy();
+  await expect(drawingBlock(page, id)).toHaveCount(1);
+  return id;
 }
 
 /** An empty spot on the canvas, clear of Excalidraw's own controls: the welcome menu in the middle, Help and the
