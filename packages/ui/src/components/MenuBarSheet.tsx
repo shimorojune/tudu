@@ -216,7 +216,7 @@ export function MenuBarSheet({
             <section key={g.key} className="tp-mb-g" aria-label={g.name}>
               {headed ? (
                 <div className="tp-mb-gh">
-                  <SpaceTile space={g.space} size={16} />
+                  <SpaceTile space={g.space} size={20} />
                   <span className="tp-mb-gn">{g.name}</span>
                   {`${g.rows.filter((r) => r.done).length} of ${g.rows.length}`}
                 </div>

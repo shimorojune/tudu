@@ -91,7 +91,7 @@ The numbers follow each chunk's last test on master. They get renumbered at merg
 Unit (Vitest, `packages/ui`):
 
 - **C22-U31** bubble position: with the pane 600px wide and a selection centred at x = 200.5, y = 120.3, and the
-  bubble measured 117 × 32, its inline `left` and `top` are whole numbers (142, 80). A selection near either edge
+  bubble measured 117 × 32, its inline `left` and `top` are whole numbers (142, 88). A selection near either edge
   clamps the bubble 8px inside the pane. `.tp-nb-bubble` has no `translate(-50%` and its animation's fill is
   `backwards` (read from the stylesheet as the other CSS tests do).
 - **C20-U12** menu bar headings: with two spaces, each heading's tile is 20 × 20 with radius 6. Personal's person icon

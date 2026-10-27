@@ -519,6 +519,30 @@ test.describe('notebook', () => {
     await expect(page.getByRole('region', { name: 'From your notebook' })).toContainText('Interviews');
   });
 
+  test('C22-E26 the Make a task bubble lands on whole pixels with nothing transformed, so its words are sharp', async ({
+    page,
+  }) => {
+    test.skip(!desk() && test.info().project.name !== 'webkit', 'desktop web and WebKit');
+    await signInFresh(page);
+    const id = await seedNote(page, 'Interviews', { html: '<p>Ask Meera for the venue shortlist</p>' });
+    await page.goto(`/notebook/${id}`);
+    await expect(words(page)).toContainText('venue shortlist');
+    await selectWords(page, 4, 15);
+    const bubble = page.locator('.tp-nb-bubble');
+    await expect(bubble).toBeVisible();
+    // Once it has risen: no animation left, no transform, left and top in whole pixels.
+    await expect.poll(() => bubble.evaluate((el) => el.getAnimations().length)).toBe(0);
+    const at = await bubble.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return { transform: cs.transform, left: cs.left, top: cs.top };
+    });
+    expect(at.transform).toBe('none');
+    expect(at.left).toMatch(/^\d+px$/);
+    expect(at.top).toMatch(/^\d+px$/);
+    await page.getByRole('button', { name: 'Make a task' }).click();
+    await expect(quickAdd(page).getByRole('textbox', { name: 'Task title' })).toHaveValue('Meera for t');
+  });
+
   test('C22-E21 two selected lines: the first is the title, the second the note; the task panel shows that note', async ({
     page,
   }) => {

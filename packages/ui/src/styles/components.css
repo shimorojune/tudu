@@ -2430,6 +2430,8 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
    (Geist caps are .71em; text is 12.5px). Browsers place the line box differently; the baseline relation holds. */
 .tp-sg .tp-sg-tile { vertical-align: calc(12.5px * .355 - 6.5px); margin-right: 5px; }
 .tp-sg-bare .tp-sg-tile { margin-right: 0; }
+/* Alone (the week's tiles, phones) the tile carries the space by itself: 16px, a 9px letter. */
+.tp-sg-bare .tp-sg-tile { border-radius: 5px !important; font-size: 9px !important; vertical-align: calc(12.5px * .355 - 8px); }
 .tp-byline-wrap .tp-sg-space > span { max-width: 140px; }
 /* A tight byline gives up the space's name first (its tile stays), then the others share what is left. */
 .tp-byline .tp-sg-space { flex-shrink: 12; min-width: 23px; }
@@ -2712,11 +2714,12 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 @keyframes tp-nb-out { to { opacity: 0; transform: scale(.9); } }
 .tp-nb-links { overflow: visible; }
 
-/* Selection bubble: rises above the selected words. */
-.tp-nb-bubble { position: absolute; z-index: 40; transform: translate(-50%, -100%); animation: tp-nb-bubble-in var(--dur-menu) var(--ease-arrive) both; }
+/* Selection bubble: rises above the selected words. NoteEditor places it in whole pixels; once it has risen nothing
+   is left transformed, so its words render on the pixel grid like the note's. */
+.tp-nb-bubble { position: absolute; z-index: 40; animation: tp-nb-bubble-in var(--dur-menu) var(--ease-arrive) backwards; }
 .tp-nb-bubble button { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px 0 10px; border: 0; border-radius: var(--radius-lg); background: var(--popover); color: var(--foreground); box-shadow: var(--shadow-pop); font: inherit; font-size: 13px; cursor: pointer; transition: background-color var(--dur-menu) var(--ease-change); }
 .tp-nb-bubble button:hover { background: color-mix(in srgb, var(--foreground) 5%, var(--popover)); }
-@keyframes tp-nb-bubble-in { from { opacity: 0; transform: translate(-50%, calc(-100% + 4px)); } }
+@keyframes tp-nb-bubble-in { from { opacity: 0; transform: translateY(4px); } }
 
 /* Open in Tudu: the Tudu mark, quiet until you point at it. */
 .tp-nb-opentudu .tp-logo { filter: grayscale(1); opacity: .7; transition: filter var(--dur-menu) var(--ease-change), opacity var(--dur-menu) var(--ease-change); }
