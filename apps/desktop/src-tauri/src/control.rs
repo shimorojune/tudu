@@ -8,7 +8,7 @@
 //!   App Nap opt-out and each webview's inactive scheduling policy; and the tick's place as macOS keeps it (its
 //!   autosave name and saved position) and whether it is hidden; and the last blur, click or app coming forward that
 //!   could put the sheet away, with whether it did (`outside`).
-//! - `POST /act {"do": …}`: what a person does outside the page: `summon`, `tray` (a click on the tick, with
+//! - `POST /act {"do": …}`: what a person does outside the page: `summon`, `notes-shortcut` (⌥⌘N), `tray` (a click on the tick, with
 //!   `button`: left or right), `reopen` (the dock icon), `close` (with `window`), `frame` (a window dragged and
 //!   resized: `window`, `x`, `y`, `width`, `height` in points), `outside-click` (a click in another
 //!   app), `check-update` (`auto`: only past the floor, as focus would), `wake`, `age-check` (with `minutes`), `quit`,
@@ -35,7 +35,7 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Manager, State, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
-use crate::{background, updates, windows, App, SUMMON};
+use crate::{background, updates, windows, App, NOTES, SUMMON};
 
 #[derive(Default)]
 pub struct Control {
@@ -250,6 +250,7 @@ fn state(app: &AppHandle) -> Value {
         })) })
     });
     let registered = app.global_shortcut().is_registered(SUMMON);
+    let notes_registered = app.global_shortcut().is_registered(NOTES);
     let bg = app.state::<background::Background>();
     let webview = |label: &str| {
         app.get_webview_window(label)
@@ -281,7 +282,7 @@ fn state(app: &AppHandle) -> Value {
     });
     // The note window (chunk 22): pinned, filling the screen, what it was last asked for, and where it is kept.
     let notes = app.state::<crate::notes::Notes>();
-    let note = json!({ "state": notes.state(), "frame": notes.frame() });
+    let note = json!({ "state": notes.state(), "frame": notes.frame(), "glideSteps": notes.glide_steps() });
     json!({
         "track": track,
         "name": track.name(),
@@ -297,9 +298,14 @@ fn state(app: &AppHandle) -> Value {
         "note": note,
         "tray": tray,
         "shortcut": { "accelerator": SUMMON, "registered": registered },
+        "shortcuts": {
+            "summon": { "accelerator": SUMMON, "registered": registered },
+            "notes": { "accelerator": NOTES, "registered": notes_registered },
+        },
         "badge": dock_badge(app),
         "background": background,
         "look": look,
+        "reduceMotion": windows::reduce_motion(),
         "updater": updater,
         "seen": seen,
         "outside": windows::last_outside(),
@@ -312,12 +318,18 @@ fn act(app: &AppHandle, input: &Value) -> (u16, Value) {
     let a = app.clone();
     let input = input.clone();
     match what {
-        "summon" | "tray" | "reopen" | "close" | "outside-click" => {
+        "summon" | "notes-shortcut" | "tray" | "reopen" | "close" | "outside-click" => {
             // On the main thread, as a key press, a click in the menu or the Dock would be.
             let w = what.to_string();
             let _ = app.run_on_main_thread(move || {
                 match w.as_str() {
                     "summon" => windows::summon(&a, true),
+                    // ⌥⌘N, through the same handler a key press reaches.
+                    "notes-shortcut" => {
+                        if let Ok(s) = NOTES.parse() {
+                            crate::pressed(&a, &s);
+                        }
+                    }
                     // Either button toggles the sheet; the click comes from where the tick is.
                     "tray" => windows::toggle_menubar(&a, crate::tray_icon(&a)),
                     "reopen" => windows::show_main(&a, None),
@@ -357,6 +369,16 @@ fn act(app: &AppHandle, input: &Value) -> (u16, Value) {
             if let (Some(x), Some(y)) = (n("x"), n("y")) {
                 let _ = w.set_position(tauri::LogicalPosition::new(x, y));
             }
+            (200, json!({ "ok": true }))
+        }
+        "reduce-motion" => {
+            // macOS Reduce motion as the app sees it: on, off, or (null) as the system says.
+            let v = match input.get("on").and_then(Value::as_bool) {
+                Some(false) => 1,
+                Some(true) => 2,
+                None => 0,
+            };
+            windows::REDUCE_MOTION_OVERRIDE.store(v, std::sync::atomic::Ordering::SeqCst);
             (200, json!({ "ok": true }))
         }
         "tick" => {

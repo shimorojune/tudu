@@ -80,6 +80,33 @@ async function bringForward(name = 'Finder'): Promise<void> {
 
 const near = (a: number, b: number) => Math.abs(a - b) <= 2;
 
+/** Settings › Appearance on the desk: pick a theme and wait for the app to keep it. */
+async function pickTheme(app: App, label: 'Light' | 'Dark'): Promise<void> {
+  const open = await app.eval<boolean>(
+    `return location.pathname === '/me' && T.all('[role=radio]').some((r) => r.innerText.trim().startsWith('${label}'))`,
+  );
+  if (!open) await go(app, `/me?settings=appearance`);
+  await app.until(`const r = T.all('[role=radio]').find((r) => r.innerText.trim().startsWith('${label}'));
+    if (!r) return false;
+    T.click(r);
+    return true;`);
+  await app.waitState((s) => s.look.saved.theme === label.toLowerCase());
+}
+
+/** A pointer down on the note window's edge handle, moved by dx, dy on the screen, and let go. */
+const dragEdge = (edge: string, dx: number, dy: number) => `
+  const h = document.querySelector('[data-edge="${edge}"]');
+  const r = h.getBoundingClientRect();
+  const o = (x, y) => ({ bubbles: true, cancelable: true, button: 0, buttons: 1, pointerId: 1, pointerType: 'mouse', isPrimary: true,
+    clientX: r.left + r.width / 2 + x, clientY: r.top + r.height / 2 + y, screenX: 500 + x, screenY: 400 + y });
+  h.dispatchEvent(new PointerEvent('pointerdown', o(0, 0)));
+  for (let i = 1; i <= 4; i++) {
+    document.dispatchEvent(new PointerEvent('pointermove', o((${dx} * i) / 4, (${dy} * i) / 4)));
+    await new Promise((res) => requestAnimationFrame(res));
+  }
+  document.dispatchEvent(new PointerEvent('pointerup', { ...o(${dx}, ${dy}), buttons: 0 }));
+  return true;`;
+
 test.describe('chunk 22 · the note window', () => {
   test('C22-D01 menu bar sheet New note: the sheet hides, the note window shows on a blank note, the desk stays hidden', async ({
     app,
@@ -310,5 +337,171 @@ test.describe('chunk 22 · the note window', () => {
         return t.notes.find((n) => n.id === id)?.folderId;
       })
       .toBe(folder);
+  });
+
+  test('C22-D30 ⌥⌘N opens the note window on a blank note over another app; with the sheet open, the sheet goes first', async ({
+    app,
+  }) => {
+    await signIn(app);
+    let s = await app.state();
+    expect(s.shortcuts.notes).toEqual({ accelerator: 'CommandOrControl+Alt+N', registered: true });
+    expect(s.shortcuts.summon.registered).toBe(true);
+    await app.act('close', { window: 'main' });
+    await app.waitState((x) => !x.windows.main.visible);
+    await bringForward('Finder');
+    await app.act('notes-shortcut');
+    s = await noteShown(app);
+    expect(s.windows.main.visible).toBe(false);
+    expect(s.note.state.ask).toMatchObject({ id: null });
+    await noteReady(app);
+    await app.until(`return document.querySelector('.tp-nb-win-title')?.textContent === 'New note'`, 'note');
+    // The app says so to the page: the sheet's New note shows it.
+    const info = await app.eval<{ noteShortcut?: string }>(
+      `return await window.__TAURI_INTERNALS__.invoke('app_info')`,
+    );
+    expect(info.noteShortcut).toBe('⌥⌘N');
+    await app.act('close', { window: 'note' });
+    await noteHidden(app);
+    await app.act('tray');
+    await app.waitState((x) => x.windows.menubar.visible);
+    await app.act('notes-shortcut');
+    s = await app.waitState((x) => x.windows.note.visible && !x.windows.menubar.visible);
+    expect(s.windows.main.visible).toBe(false);
+  });
+
+  test('C22-D31 pinned, closed and opened again: it opens unpinned, and says so', async ({ app }) => {
+    await signIn(app);
+    await openNote(app);
+    await app.eval(`T.click(T.get('button', 'Keep on top of other windows'))`, 'note');
+    await app.waitState((x) => x.note.state.pinned && x.windows.note.alwaysOnTop);
+    await app.eval(`T.click(T.get('button', 'Close'))`, 'note');
+    let s = await noteHidden(app);
+    expect(s.note.state.pinned).toBe(false);
+    await openNote(app);
+    s = await app.state();
+    expect(s.note.state.pinned).toBe(false);
+    expect(s.windows.note.alwaysOnTop).toBe(false);
+    await app.until(
+      `const b = T.get('button', 'Keep on top of other windows'); return b.getAttribute('aria-pressed') === 'false'`,
+      'note',
+    );
+    // Pinned again and closed from the app's side (⌘W): the same.
+    await app.eval(`T.click(T.get('button', 'Keep on top of other windows'))`, 'note');
+    await app.waitState((x) => x.note.state.pinned);
+    await app.act('close', { window: 'note' });
+    s = await noteHidden(app);
+    expect(s.note.state.pinned).toBe(false);
+    expect(s.windows.note.alwaysOnTop).toBe(false);
+  });
+
+  test('C22-D32 fill the screen glides there and back', async ({ app }) => {
+    await signIn(app);
+    await openNote(app);
+    // CI's Macs have Reduce motion on, which makes the glide instant (checked below): off for the glide itself.
+    await app.act('reduce-motion', { on: false });
+    const before = await app.state();
+    const was = before.windows.note;
+    expect({ less: before.look.saved.lessMotion, reduce: before.reduceMotion }).toEqual({
+      less: false,
+      reduce: false,
+    });
+    const until = async (done: (s: AppState) => boolean) => {
+      const end = Date.now() + 3000;
+      let s = await app.state();
+      while (!done(s) && Date.now() < end) {
+        await new Promise((r) => setTimeout(r, 30));
+        s = await app.state();
+      }
+      return s;
+    };
+    // Once it is there and has stopped moving, the steps it took.
+    const settled = async (done: (s: AppState) => boolean) => {
+      await until(done);
+      await new Promise((r) => setTimeout(r, 400));
+      return app.state();
+    };
+    await app.eval(`T.click(T.get('button', 'Fill the screen'))`, 'note');
+    const out = await settled((x) => near(x.windows.note.width, x.windows.note.screen!.width - 16));
+    // It got there in steps (about one every 16ms over 200ms; fewer on a slow CI Mac), not in one jump.
+    expect(out.note.glideSteps - before.note.glideSteps).toBeGreaterThanOrEqual(3);
+    await app.eval(`T.click(T.get('button', 'Back to its size'))`, 'note');
+    const back = await settled((x) => near(x.windows.note.width, was.width));
+    expect(back.note.glideSteps - out.note.glideSteps).toBeGreaterThanOrEqual(3);
+    // Where it was, as C22-D03 has it; the glide's in-between frames were not kept.
+    expect(near(back.windows.note.x, was.x)).toBe(true);
+    // With Reduce motion on it goes there and back in one step.
+    const steps = back.note.glideSteps;
+    await app.act('reduce-motion', { on: true });
+    await app.eval(`T.click(T.get('button', 'Fill the screen'))`, 'note');
+    const jump = await until((x) => near(x.windows.note.width, x.windows.note.screen!.width - 16));
+    expect(jump.note.glideSteps).toBe(steps);
+    await app.eval(`T.click(T.get('button', 'Back to its size'))`, 'note');
+    const jumpBack = await until((x) => near(x.windows.note.width, was.width));
+    expect(jumpBack.note.glideSteps).toBe(steps);
+    await app.act('reduce-motion', { on: null });
+    await app.act('close', { window: 'note' });
+    await noteHidden(app);
+    await openNote(app);
+    const again = (await app.state()).windows.note;
+    expect(near(again.width, was.width) && near(again.x, was.x)).toBe(true);
+  });
+
+  test('C22-D33 the note window paints the theme picked on the desk: picked while hidden, and live while open', async ({
+    app,
+  }) => {
+    await signIn(app);
+    await pickTheme(app, 'Dark');
+    await openNote(app);
+    const look = () =>
+      app.eval<{ dark: boolean; bg: string }>(
+        `return { dark: document.documentElement.classList.contains('dark'), bg: getComputedStyle(document.querySelector('.tp-nb-win')).backgroundColor }`,
+        'note',
+      );
+    const lum = (c: string) => {
+      const [r, g, b] = (/rgba?\(([^)]+)\)/.exec(c)?.[1] ?? '255,255,255').split(/[ ,]+/).map(Number);
+      return (0.2126 * r! + 0.7152 * g! + 0.0722 * b!) / 255;
+    };
+    let l = await look();
+    expect(l.dark).toBe(true);
+    expect(lum(l.bg)).toBeLessThan(0.3);
+    await pickTheme(app, 'Light');
+    await app.until(`return !document.documentElement.classList.contains('dark')`, 'note', 1000);
+    l = await look();
+    expect(lum(l.bg)).toBeGreaterThan(0.7);
+  });
+
+  test('C22-D34 every edge and corner resizes the window, its far edges staying put, never below 420×320', async ({
+    app,
+  }) => {
+    await signIn(app);
+    await openNote(app);
+    for (const [edge, dx, dy] of [
+      ['e', -60, 0],
+      ['s', 0, -60],
+      ['w', 60, 0],
+      ['n', 0, 60],
+      ['se', 40, 40],
+      ['sw', -40, 40],
+      ['ne', 40, -40],
+      ['nw', -40, -40],
+    ] as Array<[string, number, number]>) {
+      const a = (await app.state()).windows.note;
+      await app.eval(dragEdge(edge, dx, dy), 'note');
+      const b = (
+        await app.waitState(
+          (x) => !near(x.windows.note.width, a.width) || !near(x.windows.note.height, a.height),
+        )
+      ).windows.note;
+      const left = edge.includes('w') ? dx : 0;
+      const top = edge.includes('n') ? dy : 0;
+      const right = edge.includes('e') ? dx : 0;
+      const bottom = edge.includes('s') ? dy : 0;
+      expect(near(b.x - a.x, left), `${edge} left`).toBe(true);
+      expect(near(b.y - a.y, top), `${edge} top`).toBe(true);
+      expect(near(b.x + b.width - (a.x + a.width), right), `${edge} right`).toBe(true);
+      expect(near(b.y + b.height - (a.y + a.height), bottom), `${edge} bottom`).toBe(true);
+    }
+    await app.eval(dragEdge('se', -2000, -2000), 'note');
+    await app.waitState((x) => near(x.windows.note.width, 420) && near(x.windows.note.height, 320));
   });
 });

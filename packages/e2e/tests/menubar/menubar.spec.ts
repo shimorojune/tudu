@@ -18,10 +18,14 @@ const SAT = '2026-10-17';
 const MON = '2026-10-19';
 
 /** The sheet: the same session as `page`, its own page at /menubar, the fake saying "menubar". */
-async function sheet(page: Page, at: Date = SUNDAY): Promise<Page> {
+async function sheet(
+  page: Page,
+  at: Date = SUNDAY,
+  init: Parameters<typeof installFake>[1] = {},
+): Promise<Page> {
   const m = await page.context().newPage();
   await m.clock.setFixedTime(at);
-  await installFake(m, { window: 'menubar' });
+  await installFake(m, { window: 'menubar', ...init });
   await m.goto('/menubar');
   return m;
 }
@@ -301,6 +305,27 @@ test.describe('menubar', () => {
     await expect(first).toContainText('0.38.0');
     await first.click();
     expect(await calls(m, 'installUpdate')).toHaveLength(1);
+  });
+
+  test('C20-E20 New note’s tooltip shows ⌥⌘N when the app has it, and New note alone from an older app', async ({
+    page,
+  }) => {
+    await fixClock(page);
+    await installFake(page);
+    await signInFresh(page);
+    const m = await sheet(page, SUNDAY, { info: { noteShortcut: '⌥⌘N' } });
+    const note = m.getByRole('button', { name: 'New note' });
+    await expect(note).toHaveAttribute('aria-keyshortcuts', 'Alt+Meta+N');
+    await note.hover();
+    await expect(m.getByRole('tooltip')).toHaveText(/^New note\s+⌥⌘N$/);
+    await note.click();
+    expect((await calls(m, 'openNote')).map((c) => c.args)).toEqual([[null, null]]);
+
+    const old = await sheet(page);
+    const plain = old.getByRole('button', { name: 'New note' });
+    expect(await plain.getAttribute('aria-keyshortcuts')).toBeNull();
+    await plain.hover();
+    await expect(old.getByRole('tooltip')).toHaveText('New note');
   });
 
   test('C11-E16 dark: the ⋯ with Check for updates…', async ({ page }) => {

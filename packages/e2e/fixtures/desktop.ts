@@ -9,7 +9,7 @@ import { fixClock, SUNDAY } from './today';
  */
 export interface FakeInit {
   window?: 'main' | 'floating' | 'menubar';
-  info?: { track?: string; name?: string; version?: string };
+  info?: { track?: string; name?: string; version?: string; noteShortcut?: string };
   update?: { version: string; notes: string; date: string | null } | null;
   failCheck?: boolean;
   refuseRestart?: boolean;
@@ -22,6 +22,10 @@ export interface FakeInit {
   stepMs?: number;
   /** The updater as the fake app has it. */
   status?: Partial<FakeStatus>;
+  /** An app from before the note window: open_note is refused. */
+  refuseOpenNote?: boolean;
+  /** What a failed check failed at (`failCheck`): the feed by default. */
+  errorKind?: 'check' | 'download' | 'signature';
 }
 
 /** The updater's state as the app sends it (`update:status`). */
@@ -32,6 +36,8 @@ export interface FakeStatus {
   lastManual: boolean;
   ready: { version: string; notes: string; date: string | null } | null;
   error: string | null;
+  errorKind?: 'check' | 'download' | 'signature' | null;
+  errorVersion?: string | null;
   downloads: number;
   checking: boolean;
   downloading: { version: string; received: number; total: number | null } | null;

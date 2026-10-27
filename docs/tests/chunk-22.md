@@ -107,3 +107,30 @@ The frame and fill-the-screen rules also have Rust tests under the same ids (`pl
 | C22-D05 | Clicking a note in the desk's task panel opens it in the note window, not the desk's Notebook page                     |
 | C22-D06 | A note edited in the window shows the change in the desk's Notebook page (`NOTEBOOK_CHANGED`)                          |
 | C22-D20 | In the real WKWebView a pointer drag of a note onto a folder moves it (HTML drag and drop never reached the page)      |
+
+## Note window fixes ([docs/plans/note-window-fixes.md](../plans/note-window-fixes.md))
+
+| ID      | Where                         | Case                                                                                                                                         |
+| ------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| C22-U60 | ui `NoteWindow.test.tsx`      | Both variants: the grip and seven edge handles, each calls `onResizeStart` with its direction; none while expanded                           |
+| C22-U61 | ui `NoteWindow.test.tsx`      | Web: the open button is the Tudu mark, "Open in your Notebook" (no ↗); the bar holds the drag mark                                           |
+| C22-U62 | web `notebook.test.tsx`       | `resizeFrame`: each edge moves only its edges; never below 420×320, stops 8px inside the page                                                |
+| C22-U63 | web `desktop.test.tsx`        | An app that refuses `open_note`: the note opens over the page, the toast's Update Tudu checks and opens This Mac, once                       |
+| C22-U64 | web `NoteWindowPage.test.tsx` | The Mac note window paints a theme stored by the desk, and one picked while hidden on `note:open`                                            |
+| C22-U65 | web `NoteWindowPage.test.tsx` | After pin and close, `note:open` with pinned false shows "Keep on top of other windows", not pressed                                         |
+| C22-U66 | web `NoteWindowPage.test.tsx` | `/note-window/abc` in a browser goes on to `/notebook/abc`                                                                                   |
+| C22-U67 | Rust `notes.rs`               | `on_close` unpins and leaves expanded and the last ask alone                                                                                 |
+| C22-U68 | Rust `place.rs`               | `cocoa_rect` flips a top-left physical frame to Cocoa points, on a 2× primary and on a screen above it                                       |
+| C22-U69 | Rust `place.rs`               | `resize` moves only the named edges, never below the least size                                                                              |
+| C22-U70 | web `NoteWindowPage.test.tsx` | An edge's pointer down asks the app to begin, then to resize by how far the pointer moved on the screen                                      |
+| C22-U71 | Rust `place.rs`               | `between` eases a glide from one frame to the other (slow at the ends), on whole pixels, and stops at the end                                |
+| C22-E15 | e2e `notebook`                | (Replaces the popup steps.) The window drags; the Tudu mark opens the note on the Notebook page and closes it; no popup                      |
+| C22-E60 | e2e `notebook`                | Every edge and corner resizes the window; never below 420×320 or past the page; the frame is kept across a reload                            |
+| C22-E61 | e2e `notebook`                | Light and dark: the drag mark shows, the rail is the note's own paper, each handle has its cursor                                            |
+| C22-E62 | e2e `notebook`                | (Replaces C22-E24.) The formatting bar is a solid strip above the writing on the Notebook page and in the window; phones keep it at the foot |
+| C22-E63 | e2e `notebook`                | An older Mac app: the note opens over the page with the toast; Update Tudu opens This Mac and checks                                         |
+| C22-D30 | mac `notebook.spec.ts`        | ⌥⌘N is registered and opens the note window on a blank note over another app; with the sheet open the sheet goes first                       |
+| C22-D31 | mac `notebook.spec.ts`        | Pinned, closed (its button or ⌘W) and opened again: unpinned, not on top, and the button says so                                             |
+| C22-D32 | mac `notebook.spec.ts`        | Fill the screen glides there and back (widths in between), ending where C22-D03 does                                                         |
+| C22-D33 | mac `notebook.spec.ts`        | The note window paints Dark picked on the desk while hidden, and Light picked while open within a second                                     |
+| C22-D34 | mac `notebook.spec.ts`        | Every edge and corner resizes the real window, its far edges staying put, never below 420×320                                                |

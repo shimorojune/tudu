@@ -6,8 +6,17 @@ import { switchSpaces } from './AppShell';
 import { desktop, resetDesktop, type DesktopFake } from './desktop';
 import { interceptLinks, linkKind, openOutside } from './links';
 import {
+  FALLBACK_TOAST,
+  openNoteWindow,
+  resetNoteWindowFallback,
+  setOpenUpdates,
+  useNoteWindow,
+  closeNoteWindow,
+} from './notebook';
+import {
   appEntry,
   CHECK_FAILED,
+  releasePage,
   inboxTotal,
   CHECK_EVERY_MS,
   restartToUpdate,
@@ -367,6 +376,132 @@ describe('C11-U15 where the updater stands', () => {
     expect(seen.at(-1)).toBe('ready');
     expect(result.current.status).toMatchObject({ lastResult: 'ready', lastManual: true, checks: 1 });
     expect(f.calls).toContainEqual({ name: 'checkUpdate', args: [true] });
+  });
+});
+
+describe('C11-U40 what failed, said plainly', () => {
+  const APP = { name: 'Tudu', version: '0.37.0' };
+  const NOW = new Date('2026-10-24T12:00:00Z');
+  const st = (over: Partial<UpdateStatus> = {}): UpdateStatus => ({
+    checks: 1,
+    lastCheck: '2026-10-24T11:48:00Z',
+    lastResult: 'error',
+    lastManual: false,
+    ready: null,
+    error: 'x',
+    downloads: 0,
+    checking: false,
+    downloading: null,
+    ...over,
+  });
+  const SIGNATURE =
+    'Tudu 0.37.1 didn’t pass its safety check, so it wasn’t installed. Download it from the Tudu website instead.';
+
+  it('C11-U40 the feed and the download show after Check now only; a refused safety check shows whoever checked', () => {
+    expect(updatesRow(st({ errorKind: 'check' }), APP, NOW).state).toBe('idle');
+    expect(updatesRow(st({ errorKind: 'check', lastManual: true }), APP, NOW)).toMatchObject({
+      state: 'error',
+      error: CHECK_FAILED,
+    });
+    expect(updatesRow(st({ errorKind: 'download', errorVersion: '0.37.1' }), APP, NOW).state).toBe('idle');
+    expect(
+      updatesRow(st({ errorKind: 'download', errorVersion: '0.37.1', lastManual: true }), APP, NOW),
+    ).toMatchObject({
+      state: 'error',
+      error: 'Couldn’t download Tudu 0.37.1. Check your connection and try again.',
+    });
+    for (const lastManual of [false, true])
+      expect(
+        updatesRow(st({ errorKind: 'signature', errorVersion: '0.37.1', lastManual }), APP, NOW),
+      ).toMatchObject({ state: 'error', error: SIGNATURE });
+    // A version ready still wins.
+    expect(
+      updatesRow(
+        st({
+          errorKind: 'signature',
+          errorVersion: '0.37.2',
+          ready: { version: '0.37.1', notes: '', date: null },
+        }),
+        APP,
+        NOW,
+      ).state,
+    ).toBe('ready');
+    // An app from before errorKind: as before.
+    expect(updatesRow(st({ lastManual: true }), APP, NOW).error).toBe(CHECK_FAILED);
+  });
+
+  it('C11-U40 Get it from the website: the release the version belongs to', () => {
+    expect(releasePage('staging', '0.37.1-staging.12')).toBe(
+      'https://github.com/shimorojune/tudu/releases#release-staging',
+    );
+    expect(releasePage('production', '0.37.1')).toBe(
+      'https://github.com/shimorojune/tudu/releases/tag/tudu-0.37.1',
+    );
+    expect(releasePage('test', '0.37.1')).toBe('https://github.com/shimorojune/tudu/releases/latest');
+    expect(releasePage(undefined, null)).toBe('https://github.com/shimorojune/tudu/releases/latest');
+  });
+});
+
+describe('C22-U63 an older Mac app has no note window', () => {
+  afterEach(() => {
+    closeNoteWindow();
+    resetNoteWindowFallback();
+    setOpenUpdates(null);
+  });
+
+  it('C22-U63 open_note refused: the note opens over the page, with a toast whose Update Tudu checks and opens This Mac', async () => {
+    const f = fake({ window: 'main', refuseOpenNote: true });
+    const updates = vi.fn();
+    setOpenUpdates(updates);
+    const { result, rerender } = renderHook(() => useNoteWindow());
+    openNoteWindow({ id: 'n1' });
+    await waitFor(() => {
+      rerender();
+      expect(result.current).toMatchObject({ open: true, note: { id: 'n1', blank: false } });
+    });
+    expect(f.calls.filter((c) => c.name === 'openNote')).toHaveLength(1);
+    expect(showToast).toHaveBeenCalledWith(
+      FALLBACK_TOAST,
+      expect.objectContaining({ action: 'Update Tudu' }),
+    );
+    const opts = vi.mocked(showToast).mock.calls[0]![1]!;
+    opts.onAction!();
+    expect(f.calls).toContainEqual({ name: 'checkUpdate', args: [true] });
+    expect(updates).toHaveBeenCalledOnce();
+    // From then on notes open here at once, and the toast doesn't come again.
+    closeNoteWindow();
+    openNoteWindow({ id: 'n2' });
+    rerender();
+    expect(result.current).toMatchObject({ open: true, note: { id: 'n2' } });
+    expect(f.calls.filter((c) => c.name === 'openNote')).toHaveLength(1);
+    expect(showToast).toHaveBeenCalledOnce();
+  });
+
+  it('C22-U63 an app that has it: its own window, nothing over the page and no toast', async () => {
+    const f = fake({ window: 'main' });
+    const { result } = renderHook(() => useNoteWindow());
+    openNoteWindow({ id: 'n1' });
+    await Promise.resolve();
+    expect(f.calls).toContainEqual({ name: 'openNote', args: ['n1', null] });
+    expect(result.current.open).toBe(false);
+    expect(showToast).not.toHaveBeenCalled();
+  });
+
+  it('C22-U63 the real bridge: open_note’s refusal reaches the page; resizing goes to the app', async () => {
+    const invoke = vi.fn(async (cmd: string, _args?: unknown) => {
+      if (cmd === 'open_note') throw new Error('Command open_note not found');
+      return null;
+    });
+    window.__TAURI_INTERNALS__ = { invoke, metadata: { currentWindow: { label: 'note' } } };
+    resetDesktop();
+    const d = desktop()!;
+    await expect(d.openNote('n1', null)).rejects.toThrow('open_note');
+    d.beginResize();
+    d.resizeTo('sw', -12, 30);
+    expect(invoke.mock.calls.slice(1).map((c) => [c[0], c[1]])).toEqual([
+      ['note_resize_begin', undefined],
+      ['note_resize_to', { edge: 'sw', dx: -12, dy: 30 }],
+    ]);
   });
 });
 

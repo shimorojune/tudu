@@ -433,6 +433,37 @@ fn focus_floating(w: &WebviewWindow) {
     let _ = w.set_focus();
 }
 
+/// Tudu Test only: Reduce motion as a test sets it (0: as macOS says, 1: off, 2: on), since CI's Macs have it on.
+#[cfg(feature = "control")]
+pub(crate) static REDUCE_MOTION_OVERRIDE: std::sync::atomic::AtomicU8 =
+    std::sync::atomic::AtomicU8::new(0);
+
+/// macOS's Reduce motion (Accessibility › Display).
+pub(crate) fn reduce_motion() -> bool {
+    #[cfg(feature = "control")]
+    match REDUCE_MOTION_OVERRIDE.load(std::sync::atomic::Ordering::SeqCst) {
+        1 => return false,
+        2 => return true,
+        _ => {}
+    }
+    #[cfg(target_os = "macos")]
+    return panel::reduce_motion();
+    #[cfg(not(target_os = "macos"))]
+    false
+}
+
+/// The window takes a frame (physical pixels) in one step, place and size together, so an edge being dragged
+/// doesn't make the far edge jitter.
+pub(crate) fn set_frame_now(w: &WebviewWindow, f: crate::place::Frame) {
+    #[cfg(target_os = "macos")]
+    panel::set_frame(w, f);
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = w.set_size(tauri::PhysicalSize::new(f.width as u32, f.height as u32));
+        let _ = w.set_position(PhysicalPosition::new(f.x as i32, f.y as i32));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -499,13 +530,13 @@ mod panel {
     use block2::RcBlock;
     use objc2::rc::Retained;
     use objc2::runtime::{AnyClass, AnyObject};
-    use objc2::{define_class, ClassType, MainThreadOnly};
+    use objc2::{define_class, ClassType, MainThreadMarker, MainThreadOnly};
     use objc2_app_kit::{
-        NSEvent, NSEventMask, NSPanel, NSRunningApplication, NSWindow, NSWindowCollectionBehavior,
-        NSWindowStyleMask, NSWorkspace, NSWorkspaceApplicationKey,
+        NSEvent, NSEventMask, NSPanel, NSRunningApplication, NSScreen, NSWindow,
+        NSWindowCollectionBehavior, NSWindowStyleMask, NSWorkspace, NSWorkspaceApplicationKey,
         NSWorkspaceDidActivateApplicationNotification,
     };
-    use objc2_foundation::{NSNotification, NSOperationQueue};
+    use objc2_foundation::{NSNotification, NSOperationQueue, NSPoint, NSRect, NSSize};
     use tauri::{AppHandle, WebviewWindow};
 
     define_class!(
@@ -599,6 +630,30 @@ mod panel {
         let key: &AnyObject = unsafe { NSWorkspaceApplicationKey };
         let app = info.objectForKey(key)?;
         app.downcast::<NSRunningApplication>().ok()
+    }
+
+    pub fn reduce_motion() -> bool {
+        NSWorkspace::sharedWorkspace().accessibilityDisplayShouldReduceMotion()
+    }
+
+    /// A frame (physical pixels, top-left) as Cocoa has it: points, from the bottom-left of the primary screen.
+    fn cocoa(win: &NSWindow, f: crate::place::Frame) -> NSRect {
+        let mtm = MainThreadMarker::from(win);
+        let primary = NSScreen::screens(mtm)
+            .firstObject()
+            .map(|s| s.frame().size.height)
+            .unwrap_or(0.0);
+        let r = crate::place::cocoa_rect(f, win.backingScaleFactor(), primary);
+        NSRect::new(NSPoint::new(r.x, r.y), NSSize::new(r.width, r.height))
+    }
+
+    pub fn set_frame(w: &WebviewWindow, f: crate::place::Frame) {
+        let w2 = w.clone();
+        let _ = w.run_on_main_thread(move || {
+            if let Some(win) = ns_window(&w2) {
+                win.setFrame_display(cocoa(&win, f), true);
+            }
+        });
     }
 
     pub fn make_key(w: &WebviewWindow) {

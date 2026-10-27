@@ -195,6 +195,33 @@ describe('C20-U07 MenuBarSheet', () => {
   });
 });
 
+describe('C20-U20 MenuBarSheet', () => {
+  it('C20-U20 New note shows the note window’s shortcut in its tooltip, above, when the app has one', async () => {
+    render(
+      <MenuBarSheet
+        state="day"
+        heading={heading}
+        groups={[personal]}
+        noteShortcut="⌥⌘N"
+        onNewNote={vi.fn()}
+      />,
+    );
+    const note = screen.getByRole('button', { name: 'New note' });
+    expect(note).toHaveAttribute('aria-keyshortcuts', 'Alt+Meta+N');
+    act(() => note.focus());
+    await waitFor(() => expect(screen.getByRole('tooltip')).toHaveTextContent('New note ⌥⌘N'));
+    expect(document.querySelector('.tp-tip-pop')).toHaveAttribute('data-side', 'top');
+  });
+
+  it('C20-U20 without one (an older app): the tooltip is New note alone and no shortcut is announced', async () => {
+    render(<MenuBarSheet state="day" heading={heading} groups={[personal]} onNewNote={vi.fn()} />);
+    const note = screen.getByRole('button', { name: 'New note' });
+    expect(note).not.toHaveAttribute('aria-keyshortcuts');
+    act(() => note.focus());
+    await waitFor(() => expect(screen.getByRole('tooltip')).toHaveTextContent(/^New note$/));
+  });
+});
+
 describe('C20-U08 MenuBarSheet', () => {
   it('C20-U08 empty: New task stays in the body, the foot has New note but no New task icon', () => {
     const { rerender } = render(<MenuBarSheet state="empty" heading={heading} onNewNote={vi.fn()} />);

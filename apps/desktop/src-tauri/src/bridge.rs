@@ -5,9 +5,10 @@ use std::path::PathBuf;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
+use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 use crate::windows;
-use crate::{App, SUMMON_LABEL};
+use crate::{App, NOTES, NOTES_LABEL, SUMMON_LABEL};
 
 /// What the app has been asked to do that leaves no trace in a window, kept for the control channel.
 #[derive(Default, Serialize, Clone)]
@@ -41,6 +42,9 @@ pub struct AppInfo {
     name: &'static str,
     version: String,
     shortcut: &'static str,
+    /// The note window's shortcut, only while it is registered (another app may hold it).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    note_shortcut: Option<&'static str>,
 }
 
 #[tauri::command]
@@ -50,6 +54,10 @@ pub fn app_info(app: AppHandle, state: State<'_, App>) -> AppInfo {
         name: state.track.name(),
         version: app.package_info().version.to_string(),
         shortcut: SUMMON_LABEL,
+        note_shortcut: app
+            .global_shortcut()
+            .is_registered(NOTES)
+            .then_some(NOTES_LABEL),
     }
 }
 
@@ -260,7 +268,10 @@ mod tests {
         assert_eq!(take_seed(&mut seen), None);
         keep_seed(&mut seen, serde_json::json!({ "title": "Call the venue" }));
         keep_seed(&mut seen, serde_json::json!({ "title": "Ask Meera" }));
-        assert_eq!(take_seed(&mut seen), Some(serde_json::json!({ "title": "Ask Meera" })));
+        assert_eq!(
+            take_seed(&mut seen),
+            Some(serde_json::json!({ "title": "Ask Meera" }))
+        );
         assert_eq!(take_seed(&mut seen), None);
     }
 }

@@ -47,6 +47,8 @@ export interface MenuBarSheetProps {
   onNew?: () => void;
   /** New note (chunk 22): the note window on a blank note, over whatever app you are in. */
   onNewNote?: () => void;
+  /** The note window's shortcut, beside New note; an app too old to register it gives none. */
+  noteShortcut?: string;
   onOpenApp?: () => void;
   onFeedback?: () => void;
   onQuit?: () => void;
@@ -119,7 +121,7 @@ function keyShortcuts(shortcut: string): string {
 
 /**
  * Today from the menu bar (K-MenuBar): the day and its ring, every space's tasks (headed when there is more than
- * one), and a foot of icon buttons for New task (its shortcut in the tooltip) and New note, Open Tudu and ⋯
+ * one), and a foot of icon buttons for New task and New note (each with its shortcut in the tooltip), Open Tudu and ⋯
  * (Send feedback…, Quit). Signed out it asks you to sign in and keeps ⋯ for
  * Quit alone.
  */
@@ -131,6 +133,7 @@ export function MenuBarSheet({
   offline,
   appName = 'Tudu',
   shortcut = '⌘⇧N',
+  noteShortcut,
   onToggle,
   onOpen,
   onNew,
@@ -244,7 +247,14 @@ export function MenuBarSheet({
           </IconButton>
         ) : null}
         {onNewNote ? (
-          <IconButton label="New note" className="tp-mb-ib" tipSide="top" onClick={onNewNote}>
+          <IconButton
+            label="New note"
+            className="tp-mb-ib"
+            tipLabel={noteShortcut ? `New note  ${noteShortcut}` : undefined}
+            tipSide="top"
+            aria-keyshortcuts={noteShortcut ? keyShortcuts(noteShortcut) : undefined}
+            onClick={onNewNote}
+          >
             <NoteIcon name="note" size={16} />
           </IconButton>
         ) : null}
