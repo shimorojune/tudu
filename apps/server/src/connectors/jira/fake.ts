@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { stripTags } from '@tudu/core';
 
 /**
  * A small Jira Data Center for tests, mounted at /__test/jira when TEST_ROUTES=1. It answers the three endpoints
@@ -228,7 +229,7 @@ export function readJql(jql: string): { filter: Filter; sort: (a: FakeIssue, b: 
         const words = lv.replace(/\*/g, '').split(/\s+/).filter(Boolean);
         f = (i) => {
           const hay =
-            `${i.summary} ${field === 'text' ? i.description.replace(/<[^>]*>/g, ' ') : ''}`.toLowerCase();
+            `${i.summary} ${field === 'text' ? stripTags(i.description, ' ') : ''}`.toLowerCase();
           return words.every((w) => hay.includes(w));
         };
       }
@@ -250,7 +251,7 @@ function rawIssue(i: FakeIssue, detail: boolean) {
     id: `${i.key}-c${n + 1}`,
     author: { displayName: x.who },
     created: x.at,
-    body: x.html.replace(/<[^>]*>/g, ''),
+    body: stripTags(x.html),
   }));
   return {
     key: i.key,
@@ -261,7 +262,7 @@ function rawIssue(i: FakeIssue, detail: boolean) {
         ? { displayName: ME.displayName, name: ME.name }
         : { displayName: 'Meera Iyer', name: 'meera' },
       priority: { name: i.priority },
-      description: i.description.replace(/<[^>]*>/g, ''),
+      description: stripTags(i.description),
       comment: { total: comments.length, comments },
     },
     renderedFields: {

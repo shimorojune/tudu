@@ -87,7 +87,7 @@ export function upgradeChips(html: string): string {
     const name = attr(open, 'data-name');
     if (name === undefined) return chip;
     const size = Number(attr(open, 'data-size') ?? 0);
-    const titled = /\btitle="/.test(open) ? open : open.replace(/>$/, ` title="${name}">`);
+    const titled = /\btitle="/.test(open) ? open : open.replace(/>$/, ` title="${esc(unesc(name))}">`);
     return `${titled}${chipInnerHtml({ name: unesc(name), size })}</a>`;
   });
 }

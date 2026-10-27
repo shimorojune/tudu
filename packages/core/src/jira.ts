@@ -141,15 +141,19 @@ export function siteProblem(site: string): string | null {
 
 /** The address kept: no trailing slash, no query. */
 export function normalSite(site: string): string {
-  return site
-    .trim()
-    .replace(/[?#].*$/, '')
-    .replace(/\/+$/, '');
+  return trimSlashes(site.trim().split(/[?#]/)[0]!);
 }
 
 /** "jira.northwind.io", for the header and Settings. */
 export function siteHost(site: string): string {
-  return site.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+  return trimSlashes(site.replace(/^https?:\/\//i, ''));
+}
+
+/** Trailing slashes gone, without a regex that slows on a long run of them. */
+export function trimSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s[end - 1] === '/') end--;
+  return s.slice(0, end);
 }
 
 /** The issue's page in Jira. */

@@ -8,6 +8,7 @@ import {
   linkFootWords,
   siteHost,
   siteProblem,
+  trimSlashes,
   type IsoDate,
 } from '@tudu/core';
 import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from 'react';
@@ -497,7 +498,7 @@ export function JPConnect(p: JPConnectProps) {
     }
     setErr(null);
     setBusy(true);
-    const site = u.replace(/\/+$/, '');
+    const site = trimSlashes(u);
     Promise.resolve(p.onConnect?.({ site, token: t })).then(
       (r) => {
         if (!live.current) return;

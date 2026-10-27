@@ -68,7 +68,8 @@ export interface SignInProps {
   onDone: (info: { email: string }) => void;
 }
 
-export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Each part after the @ is split on its dots, so the pattern never retries a long run (no slow inputs).
+export const EMAIL_PATTERN = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]*)*\.[^\s@.]+$/;
 /** The tick pops in (200ms), then the page gives way. */
 export const DONE_DELAY_MS = 500;
 export const DEFAULT_RESEND_SECONDS = 30;

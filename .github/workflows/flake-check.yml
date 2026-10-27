@@ -21,6 +21,9 @@ on:
         description: 'web only: the Playwright project'
         default: desktop
 
+permissions:
+  contents: read
+
 env:
   PNPM_VERSION: 9.15.9
 
