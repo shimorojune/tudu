@@ -1485,6 +1485,61 @@
   font-size: 13px;
   color: var(--muted-foreground);
 }
+/* What is new in the Inbox, under the heading: grows in and out with the count (rows slide, never jump). */
+.tp-mb .tp-mb-ibx {
+  flex: none;
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 200ms var(--ease-change),
+    opacity 160ms var(--ease-change);
+}
+.tp-mb .tp-mb-ibx.tp-on {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.tp-mb .tp-mb-ibx > div {
+  overflow: hidden;
+  min-height: 0;
+}
+.tp-mb .tp-mb-ibx-b {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 14px 9px 18px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--foreground);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur-menu) var(--ease-change);
+}
+.tp-mb .tp-mb-ibx-b:hover {
+  background: var(--accent);
+}
+.tp-mb .tp-mb-ibx-b:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.tp-mb .tp-mb-ibx-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--foreground);
+}
+.tp-mb .tp-mb-ibx-t {
+  flex: 1;
+}
+.tp-mb .tp-mb-ibx-b > svg:last-child {
+  color: var(--muted-foreground);
+}
 .tp-mb > .tp-banner-wrap {
   margin: 10px 12px 0;
 }
@@ -1648,5 +1703,8 @@
 @media (prefers-reduced-motion: reduce) {
   .tp-root.tp-mb {
     animation: none;
+  }
+  .tp-mb .tp-mb-ibx {
+    transition: opacity 160ms var(--ease-change);
   }
 }

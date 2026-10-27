@@ -23,13 +23,13 @@ Status column is kept by `pnpm test:status` in [STATUS.md](STATUS.md). Run this 
 
 ## Desktop (`packages/e2e/mac`, Tudu Test on the macOS runner)
 
-| ID      | Case                                                                                                                                               |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C16-D01 | Close: hidden, accessory, still running, awake, every page's scheduling policy none; Open Tudu from the sheet: regular, front                      |
-| C16-D02 | Hidden 15 seconds: a request sent to you shows as 1 beside the tick, a write made just before closing reached the API; reopen moves it to the Dock |
-| C16-D03 | The summon with the window hidden shows the floating bar and adds; the policy stays accessory throughout                                           |
-| C16-D04 | Reopen while hidden brings the window back focused as a regular app                                                                                |
-| C16-D05 | Open at login: on registers (on or waiting), off unregisters, Settings reads macOS across a relaunch; a launch at login starts hidden, accessory   |
-| C16-D06 | ⌘Q from the shown and the hidden state, and ⋯ › Quit in the sheet while hidden, end the process                                                    |
-| C16-D07 | Always keeps the Dock icon and the badge after close and holds across a relaunch; While the window is open applies at once                         |
-| C11-D02 | Rewritten: closing hides the window and drops the Dock icon; the sheet's Open Tudu and the reopen bring it back as a regular app                   |
+| ID      | Case                                                                                                                                                                                      |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C16-D01 | Close: hidden, accessory, still running, awake, every page's scheduling policy none; Open Tudu from the sheet: regular, front                                                             |
+| C16-D02 | Hidden 15 seconds: a request sent to you shows as the tick's dot (today's count beside it, MC), a write made just before closing reached the API; reopen puts the Inbox count on the Dock |
+| C16-D03 | The summon with the window hidden shows the floating bar and adds; the policy stays accessory throughout                                                                                  |
+| C16-D04 | Reopen while hidden brings the window back focused as a regular app                                                                                                                       |
+| C16-D05 | Open at login: on registers (on or waiting), off unregisters, Settings reads macOS across a relaunch; a launch at login starts hidden, accessory                                          |
+| C16-D06 | ⌘Q from the shown and the hidden state, and ⋯ › Quit in the sheet while hidden, end the process                                                                                           |
+| C16-D07 | Always keeps the Dock icon and the badge after close and holds across a relaunch; While the window is open applies at once                                                                |
+| C11-D02 | Rewritten: closing hides the window and drops the Dock icon; the sheet's Open Tudu and the reopen bring it back as a regular app                                                          |

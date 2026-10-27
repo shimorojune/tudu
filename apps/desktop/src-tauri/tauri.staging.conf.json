@@ -24,6 +24,7 @@
             "allow-app-info",
             "allow-set-signed-in",
             "allow-set-badge",
+            "allow-set-tick",
             "allow-open-external",
             "allow-save-download",
             "allow-show-main",

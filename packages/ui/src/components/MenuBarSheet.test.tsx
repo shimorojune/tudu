@@ -24,7 +24,10 @@ const northwind: MenuBarGroupItem = {
 
 describe('C20-U02 MenuBarSheet', () => {
   it('C20-U02 one space is one plain list: no headings, the ring counts the day', () => {
-    render(<MenuBarSheet state="day" heading={heading} groups={[personal]} />);
+    const { container } = render(<MenuBarSheet state="day" heading={heading} groups={[personal]} />);
+    // MC-U02: no Inbox line unless something is new (collapsed, out of the reading order).
+    expect(screen.queryByRole('button', { name: /new in your Inbox/ })).toBeNull();
+    expect(container.querySelector('.tp-mb-ibx')).not.toHaveClass('tp-on');
     expect(screen.getByText('Friday')).toBeTruthy();
     expect(screen.getByText('Today · Week 43')).toBeTruthy();
     expect(screen.getByRole('list', { name: 'Today in Personal' })).toBeTruthy();
@@ -260,5 +263,45 @@ describe('C20-U12 the space headings carry 20px tiles', () => {
   it('C20-U12 one space alone still has no headings', () => {
     const { container } = render(<MenuBarSheet state="day" heading={heading} groups={[personal]} />);
     expect(container.querySelector('.tp-mb-gh')).toBeNull();
+  });
+});
+
+describe('MC-U02 the Inbox line under the heading', () => {
+  it('MC-U02 hidden while nothing is new; "2 new in your Inbox" opens the Inbox once', async () => {
+    const user = userEvent.setup();
+    const onOpen = vi.fn();
+    const { container, rerender } = render(
+      <MenuBarSheet state="day" heading={heading} groups={[personal]} inbox={{ count: 0, onOpen }} />,
+    );
+    const line = container.querySelector('.tp-mb-ibx')!;
+    expect(line).toHaveAttribute('aria-hidden', 'true');
+    expect(line).toHaveAttribute('inert');
+    expect(screen.queryByRole('button', { name: /new in your Inbox/ })).toBeNull();
+
+    rerender(<MenuBarSheet state="day" heading={heading} groups={[personal]} inbox={{ count: 2, onOpen }} />);
+    expect(line).toHaveClass('tp-on');
+    expect(line).not.toHaveAttribute('inert');
+    const open = screen.getByRole('button', { name: '2 new in your Inbox, open the Inbox' });
+    expect(open).toHaveTextContent('2 new in your Inbox');
+    await user.click(open);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+
+    // The same line rides over an empty day too.
+    rerender(<MenuBarSheet state="empty" heading={heading} inbox={{ count: 1, onOpen }} />);
+    expect(screen.getByRole('button', { name: '1 new in your Inbox, open the Inbox' })).toBeTruthy();
+  });
+
+  it('MC-U03 it grows in and out (rows slide); with Reduce motion it only fades', () => {
+    const rules = parseRules(readStylesheet('app.css'));
+    const base = rulesWhere(rules, (x) => x === '.tp-mb .tp-mb-ibx')[0]!;
+    expect(base.declarations['grid-template-rows']).toBe('0fr');
+    expect(base.declarations['transition']).toMatch(/grid-template-rows 200ms/);
+    const on = rulesWhere(rules, (x) => x === '.tp-mb .tp-mb-ibx.tp-on')[0]!;
+    expect(on.declarations['grid-template-rows']).toBe('1fr');
+    const reduced = rules.find(
+      (r) =>
+        r.selector === '.tp-mb .tp-mb-ibx' && r.context.some((c) => c.includes('prefers-reduced-motion')),
+    )!;
+    expect(reduced.declarations['transition']).not.toMatch(/grid-template-rows/);
   });
 });

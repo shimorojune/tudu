@@ -3,8 +3,9 @@
 //! bar.
 //!
 //! The Dock icon follows the desk: a regular app while the desk is open (or always, if you chose that in Settings ›
-//! This Mac), an accessory app (no Dock icon, not in ⌘Tab) once it is closed. The Inbox count goes where you can see
-//! it: the Dock's badge while there is a Dock icon, beside the tick in the menu bar while there is not.
+//! This Mac), an accessory app (no Dock icon, not in ⌘Tab) once it is closed. Beside the tick: how many of today's
+//! tasks are left, with a dot while something is new in the Inbox; the Dock's badge, while there is a Dock icon, is
+//! the Inbox count.
 //!
 //! The tick in a crowded menu bar: macOS has no priority for an app's icon and hides them from the left when the bar
 //! is full. On a first launch Tudu takes the place macOS would save for a ⌘-drag to the right end of the apps' icons;
@@ -50,17 +51,52 @@ pub fn policy(dock: Dock, desk_open: bool, tick_hidden: bool) -> Policy {
     }
 }
 
-/// Where the Inbox count shows: the Dock's badge while there is a Dock icon, the tick's title while there is not.
-/// No count, neither.
-pub fn count_places(policy: Policy, count: Option<i64>) -> (Option<i64>, Option<String>) {
-    let count = count.filter(|n| *n > 0);
-    match policy {
-        Policy::Regular => (count, None),
-        Policy::Accessory => (None, tray_title(count)),
+/// What the tick and the Dock icon show.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Places {
+    /// The Dock's badge: the Inbox count, while there is a Dock icon.
+    pub badge: Option<i64>,
+    /// Beside the tick: today's tasks left, with or without a Dock icon.
+    pub title: Option<String>,
+    /// The dot on the tick: something is new in the Inbox.
+    pub dot: bool,
+}
+
+pub fn tick_places(policy: Policy, inbox: Option<i64>, left: Option<i64>) -> Places {
+    let inbox = inbox.filter(|n| *n > 0);
+    Places {
+        badge: match policy {
+            Policy::Regular => inbox,
+            Policy::Accessory => None,
+        },
+        title: tray_title(left),
+        dot: inbox.is_some(),
     }
 }
 
-/// The count beside the tick stops at 99+, so the tick stays narrow; the Dock badge keeps the real number.
+/// Today as the page counts it: tasks left, out of how many are planned.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Today {
+    pub left: i64,
+    pub total: i64,
+}
+
+/// The tick's tooltip says what the number and the dot mean; each part only when it is true.
+pub fn tick_tooltip(name: &str, today: Option<Today>, inbox: Option<i64>) -> String {
+    let mut parts = vec![name.to_string()];
+    match today {
+        Some(t) if t.total <= 0 => parts.push("Nothing planned today".into()),
+        Some(t) if t.left <= 0 => parts.push("All done for today".into()),
+        Some(t) => parts.push(format!("{} left today", t.left)),
+        None => {}
+    }
+    if let Some(n) = inbox.filter(|n| *n > 0) {
+        parts.push(format!("{n} new in your Inbox"));
+    }
+    parts.join(" · ")
+}
+
+/// The count beside the tick stops at 99+, so the tick stays narrow.
 pub fn tray_title(count: Option<i64>) -> Option<String> {
     match count.filter(|n| *n > 0)? {
         n if n > 99 => Some("99+".into()),
@@ -116,8 +152,12 @@ pub struct Background {
     pub at_login: bool,
     /// The App Nap opt-out is held (from launch to quit).
     pub awake: AtomicBool,
-    /// What the tick carries beside it now (the Inbox count, while there is no Dock icon).
+    /// What the tick carries beside it now (today's tasks left).
     pub tray_title: Mutex<Option<String>>,
+    /// Whether the tick now has its Inbox dot.
+    pub tray_dot: Mutex<bool>,
+    /// The tick's tooltip now (None: still the name it was built with).
+    pub tray_tooltip: Mutex<Option<String>>,
     /// What macOS was last told, so a badge change that leaves the policy as it was does not tell it again.
     pub applied: Mutex<Option<Policy>>,
     /// macOS is not drawing the tick (the menu bar is full).
@@ -210,6 +250,8 @@ pub fn start(app: &AppHandle) -> Background {
         at_login,
         awake: AtomicBool::new(false),
         tray_title: Mutex::new(None),
+        tray_dot: Mutex::new(false),
+        tray_tooltip: Mutex::new(None),
         applied: Mutex::new(None),
         tick_hidden: AtomicBool::new(false),
         #[cfg(feature = "control")]
@@ -293,7 +335,7 @@ pub fn tick(app: &AppHandle, hidden: bool) {
     }
 }
 
-/// Tell macOS what the app is now, and put the Inbox count where it can be seen.
+/// Tell macOS what the app is now, and put today's count and the Inbox where they can be seen.
 pub fn apply(app: &AppHandle) {
     let b = app.state::<Background>();
     let p = current_policy(app);
@@ -305,17 +347,44 @@ pub fn apply(app: &AppHandle) {
             *last = Some(p);
         }
     }
-    let count = app.state::<App>().seen.lock().ok().and_then(|s| s.badge);
-    let (badge, title) = count_places(p, count);
+    let a = app.state::<App>();
+    let (inbox, today) = a
+        .seen
+        .lock()
+        .map(|s| (s.badge, s.today))
+        .unwrap_or_default();
+    let places = tick_places(p, inbox, today.map(|t| t.left));
     if let Some(w) = app.get_webview_window(windows::MAIN) {
-        let _ = w.set_badge_count(badge);
+        let _ = w.set_badge_count(places.badge);
     }
+    let tray = app.tray_by_id("tray");
     if let Ok(mut t) = b.tray_title.lock() {
-        if *t != title {
-            if let Some(tray) = app.tray_by_id("tray") {
-                let _ = tray.set_title(title.as_deref());
+        if *t != places.title {
+            if let Some(tray) = &tray {
+                let _ = tray.set_title(places.title.as_deref());
             }
-            *t = title;
+            *t = places.title;
+        }
+    };
+    if let Ok(mut d) = b.tray_dot.lock() {
+        if *d != places.dot {
+            if let Some(tray) = &tray {
+                // A new image can drop the template flag; set it again so macOS keeps inking it.
+                if let Ok(icon) = crate::tick_icon(places.dot) {
+                    let _ = tray.set_icon(Some(icon));
+                    let _ = tray.set_icon_as_template(true);
+                }
+            }
+            *d = places.dot;
+        }
+    };
+    let tip = tick_tooltip(a.track.name(), today, inbox);
+    if let Ok(mut t) = b.tray_tooltip.lock() {
+        if t.as_deref() != Some(tip.as_str()) {
+            if let Some(tray) = &tray {
+                let _ = tray.set_tooltip(Some(tip.as_str()));
+            }
+            *t = Some(tip);
         }
     };
 }
@@ -636,15 +705,58 @@ mod tests {
         );
     }
 
+    fn places(badge: Option<i64>, title: Option<&str>, dot: bool) -> Places {
+        Places {
+            badge,
+            title: title.map(String::from),
+            dot,
+        }
+    }
+
     #[test]
-    fn c16_u01_the_count_rides_beside_the_tick_only_while_there_is_no_dock_icon() {
-        assert_eq!(count_places(Policy::Regular, Some(3)), (Some(3), None));
+    fn mc_r01_today_beside_the_tick_either_way_the_inbox_on_the_badge_and_the_dot() {
         assert_eq!(
-            count_places(Policy::Accessory, Some(3)),
-            (None, Some("3".into()))
+            tick_places(Policy::Regular, Some(2), Some(3)),
+            places(Some(2), Some("3"), true)
         );
-        assert_eq!(count_places(Policy::Accessory, Some(0)), (None, None));
-        assert_eq!(count_places(Policy::Regular, None), (None, None));
+        assert_eq!(
+            tick_places(Policy::Accessory, Some(2), Some(3)),
+            places(None, Some("3"), true)
+        );
+        assert_eq!(
+            tick_places(Policy::Accessory, Some(0), Some(0)),
+            places(None, None, false)
+        );
+        assert_eq!(
+            tick_places(Policy::Regular, None, None),
+            places(None, None, false)
+        );
+    }
+
+    #[test]
+    fn mc_r03_the_tooltip_says_what_the_number_and_the_dot_mean() {
+        let t = |left, total| Some(Today { left, total });
+        assert_eq!(
+            tick_tooltip("Tudu", t(3, 5), Some(2)),
+            "Tudu · 3 left today · 2 new in your Inbox"
+        );
+        assert_eq!(
+            tick_tooltip("Tudu", t(0, 4), Some(0)),
+            "Tudu · All done for today"
+        );
+        assert_eq!(
+            tick_tooltip("Tudu", t(0, 0), None),
+            "Tudu · Nothing planned today"
+        );
+        assert_eq!(tick_tooltip("Tudu", None, None), "Tudu");
+        assert_eq!(
+            tick_tooltip("Tudu Staging", t(1, 1), Some(1)),
+            "Tudu Staging · 1 left today · 1 new in your Inbox"
+        );
+        assert_eq!(
+            tick_tooltip("Tudu", None, Some(4)),
+            "Tudu · 4 new in your Inbox"
+        );
     }
 
     #[test]
@@ -659,12 +771,15 @@ mod tests {
     }
 
     #[test]
-    fn mb_u02_only_the_tick_is_capped_the_dock_badge_keeps_the_number() {
+    fn mc_r02_only_the_tick_is_capped_the_dock_badge_keeps_the_number() {
         assert_eq!(
-            count_places(Policy::Accessory, Some(150)),
-            (None, Some("99+".into()))
+            tick_places(Policy::Accessory, Some(150), Some(120)),
+            places(None, Some("99+"), true)
         );
-        assert_eq!(count_places(Policy::Regular, Some(150)), (Some(150), None));
+        assert_eq!(
+            tick_places(Policy::Regular, Some(150), Some(120)),
+            places(Some(150), Some("99+"), true)
+        );
     }
 
     #[test]

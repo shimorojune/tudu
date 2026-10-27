@@ -2,7 +2,8 @@
 // The app and tray icons, drawn from the Logo board's stacked ink tick (packages/ui Logo and INK_SHAPE):
 // `pnpm --filter @tudu/desktop icons` rewrites src-tauri/icons. The Dock icon sits on Apple's grid (a 1024 canvas,
 // an 824 paper tile inset 100 with 22.37% corners, the mark at 76% of the tile); the tray icon is a 36px template
-// (black on clear, 18pt @2x): the bare ink tick, as every menu bar board draws it.
+// (black on clear, 18pt @2x): the bare ink tick, as every menu bar board draws it, and the same tick with the Inbox
+// dot (tray-dot).
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -43,17 +44,30 @@ const tray = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" vie
   <path d="${shape}" fill="#000"/>
 </svg>`;
 
+// Tray with the Inbox dot: a 5pt dot at the tick's top right, inside the view, cut from the tick by a 1.33pt clear ring
+// (the boards' 6px dot and 1.5px ring at the 16pt tick, eased in so nothing is cropped). Still black on clear.
+const dot = { cx: 21, cy: 3, r: 3.75, ring: 2 };
+const trayDot = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="-1.5 -1.5 27 27">
+  <mask id="clear"><rect x="-1.5" y="-1.5" width="27" height="27" fill="#fff"/><circle cx="${dot.cx}" cy="${dot.cy}" r="${dot.r + dot.ring}" fill="#000"/></mask>
+  <path d="${shape}" fill="#000" mask="url(#clear)"/>
+  <circle cx="${dot.cx}" cy="${dot.cy}" r="${dot.r}" fill="#000"/>
+</svg>`;
+
 const work = mkdtempSync(join(tmpdir(), 'tudu-icons-'));
 try {
   writeFileSync(join(work, 'app.svg'), app);
   writeFileSync(join(work, 'tray.svg'), tray);
+  writeFileSync(join(work, 'tray-dot.svg'), trayDot);
   const tauri = (args) =>
     execFileSync('pnpm', ['exec', 'tauri', 'icon', ...args], { cwd: desktop, stdio: 'inherit' });
   tauri([join(work, 'app.svg'), '-o', icons]);
   tauri([join(work, 'tray.svg'), '-o', join(work, 'tray'), '-p', '36']);
   copyFileSync(join(work, 'tray/36x36.png'), join(icons, 'tray.png'));
+  tauri([join(work, 'tray-dot.svg'), '-o', join(work, 'tray-dot'), '-p', '36']);
+  copyFileSync(join(work, 'tray-dot/36x36.png'), join(icons, 'tray-dot.png'));
   writeFileSync(join(icons, 'app.svg'), app);
   writeFileSync(join(icons, 'tray.svg'), tray);
+  writeFileSync(join(icons, 'tray-dot.svg'), trayDot);
   // macOS only: the Windows, Android and iOS sizes tauri icon also writes are dropped.
   for (const f of readdirSync(icons))
     if (/^(android|ios|Square|StoreLogo|icon\.ico|64x64)/.test(f))

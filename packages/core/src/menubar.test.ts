@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { carriedLabel, dayTurn } from './carried';
-import { gatherToday, menuBarEmptyLines, ofWords } from './menubar';
+import { gatherToday, menuBarEmptyLines, ofWords, todayLeft } from './menubar';
 import type { SpaceSummary } from './spaces';
 
 const space = (id: string, kind: 'personal' | 'team', name: string): SpaceSummary => ({
@@ -51,5 +51,29 @@ describe('C20-U01 today across your spaces', () => {
     expect(menuBarEmptyLines(3, 12)).toEqual(['Tomorrow has 3.', 'The Backlog has 12 waiting for a day.']);
     expect(menuBarEmptyLines(0, 12)).toEqual(['The Backlog has 12 waiting for a day.']);
     expect(menuBarEmptyLines(0, 0)).toEqual([]);
+  });
+});
+
+describe('MC-U01 the number beside the tick', () => {
+  it('MC-U01 counts the open tasks the sheet lists, out of all of them; only yours ever reach it', () => {
+    const me = space('me', 'personal', 'Personal');
+    const nw = space('nw', 'team', 'Northwind');
+    const groups = gatherToday(
+      [me, nw],
+      {
+        me: [task('Pay the bill', null), task('Renew the domain', 'u1', true)],
+        nw: [
+          task('Review the PR', 'u1'),
+          task('Their task', 'u2'),
+          task('Book flights', 'u1', true),
+          task('Sync', 'u1'),
+        ],
+      },
+      'u1',
+    );
+    expect(todayLeft(groups)).toEqual({ left: 3, total: 5 });
+    const allDone = gatherToday([me], { me: [task('Pay the bill', null, true)] }, 'u1');
+    expect(todayLeft(allDone)).toEqual({ left: 0, total: 1 });
+    expect(todayLeft([])).toEqual({ left: 0, total: 0 });
   });
 });

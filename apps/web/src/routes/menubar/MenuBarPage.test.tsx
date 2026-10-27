@@ -153,3 +153,23 @@ describe('C20-U04 the menu bar page', () => {
     expect(live).not.toHaveBeenCalledWith(true);
   });
 });
+
+describe('MC-U06 the Inbox line in the menu bar page', () => {
+  it('MC-U06 what is new in the Inbox shows under the heading; it opens the desk on the Inbox and nothing else', async () => {
+    const user = userEvent.setup();
+    const withNew = {
+      ...ME,
+      spaces: [{ ...ME.spaces[0]!, inbox: { toAnswer: 1, unread: 1 } }, ME.spaces[1]!],
+    } as unknown as MeResponse;
+    mount(withNew);
+    await user.click(await screen.findByRole('button', { name: '2 new in your Inbox, open the Inbox' }));
+    expect(calls('showMain')).toEqual([['/inbox']]);
+    expect(calls('openTask')).toEqual([]);
+  });
+
+  it('MC-U06 nothing new: no line', async () => {
+    mount(ME);
+    await screen.findByRole('list', { name: 'Today in Personal' });
+    expect(screen.queryByRole('button', { name: /new in your Inbox/ })).toBeNull();
+  });
+});

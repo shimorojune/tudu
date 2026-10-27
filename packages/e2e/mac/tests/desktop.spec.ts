@@ -874,7 +874,7 @@ test.describe('background', () => {
     expect(back.background.deskOpen).toBe(true);
   });
 
-  test('C16-D02 hidden for a while: a task sent to you arrives, the count rides beside the tick, then moves to the Dock when the window opens', async ({
+  test("C16-D02 hidden for a while: a task sent to you arrives as the tick's dot, today's task beside it; the Inbox count moves to the Dock when the window opens", async ({
     app,
   }) => {
     await signIn(app);
@@ -889,8 +889,10 @@ test.describe('background', () => {
     // A while hidden: long enough for anything that would park the page to have done so.
     await new Promise((r) => setTimeout(r, 15_000));
     await sendRequest(b, space.id, meId, 'Proofread the brochure');
-    const s = await app.waitState((x) => x.background.trayTitle === '1', 15_000);
+    const s = await app.waitState((x) => x.background.trayDot, 15_000);
     expect(s.badge).toBeNull();
+    // The one task written before closing is today's one left.
+    expect(s.background.trayTitle).toBe('1');
     const day = await asPage<{ tasks: Array<{ title: string }> }>(
       app,
       'GET',
@@ -900,7 +902,11 @@ test.describe('background', () => {
 
     await app.act('reopen');
     await app.waitState(
-      (x) => x.background.policy === 'regular' && x.badge === '1' && x.background.trayTitle === null,
+      (x) =>
+        x.background.policy === 'regular' &&
+        x.badge === '1' &&
+        x.background.trayTitle === '1' &&
+        x.background.trayDot,
     );
   });
 
@@ -1047,7 +1053,9 @@ test.describe('background', () => {
     const kept = await app.waitState((x) => !x.windows.main.visible);
     expect(kept.background.policy).toBe('regular');
     expect(kept.badge).toBe('1');
+    // Nothing planned today: no number beside the tick; the dot says something is new.
     expect(kept.background.trayTitle).toBeNull();
+    expect(kept.background.trayDot).toBe(true);
 
     await app.quit();
     await app.launch();
@@ -1057,12 +1065,12 @@ test.describe('background', () => {
     await app.until(
       `return T.get('button', 'Always', document.querySelector('[role=group][aria-label="Show Tudu in the Dock"]')).getAttribute('aria-pressed') === 'true'`,
     );
-    // Back to While the window is open: at once, the icon goes when the window does and the count moves to the tick.
+    // Back to While the window is open: at once, the icon and its badge go when the window does; the dot stays.
     await app.eval(dockChoice('While the window is open'));
     await app.waitState((x) => x.background.dock === 'open');
     await app.act('close', { window: 'main' });
     await app.waitState(
-      (x) => x.background.policy === 'accessory' && x.badge === null && x.background.trayTitle === '1',
+      (x) => x.background.policy === 'accessory' && x.badge === null && x.background.trayDot,
     );
   });
 });
@@ -1075,6 +1083,115 @@ const defaults = (...args: string[]) => spawnSync('defaults', args, { encoding: 
 /** The page reports the Inbox count to the app as it would (set_badge), so a big count needs no hundred requests. */
 const reportBadge = (app: App, count: number) =>
   app.eval(`await window.__TAURI_INTERNALS__.invoke('set_badge', { count: ${count} }); return true`);
+
+/** The page reports today's count to the app as it would (set_tick), so a big day needs no hundred tasks. */
+const reportTick = (app: App, left: number, total: number) =>
+  app.eval(
+    `await window.__TAURI_INTERNALS__.invoke('set_tick', { left: ${left}, total: ${total} }); return true`,
+  );
+
+/** Tasks on today in a space, written as the page's person would from another device. */
+async function addToday(app: App, spaceId: string, titles: string[]): Promise<string[]> {
+  const ids = titles.map(() => crypto.randomUUID());
+  await asPage(app, 'POST', '/api/sync', {
+    clientId: 'other-device',
+    mutations: titles.map((title, i) => ({
+      id: crypto.randomUUID(),
+      type: 'task.create',
+      payload: { id: ids[i], spaceId, title, day: today(), position: 1024 * (i + 1) },
+      at: new Date(Date.now() + i).toISOString(),
+    })),
+  });
+  return ids;
+}
+
+/** Ticked off from another device (the phone). */
+async function crossElsewhere(app: App, ids: string[]): Promise<void> {
+  await asPage(app, 'POST', '/api/sync', {
+    clientId: 'other-device',
+    mutations: ids.map((id, i) => ({
+      id: crypto.randomUUID(),
+      type: 'task.cross',
+      payload: { id, done: true },
+      at: new Date(Date.now() + i).toISOString(),
+    })),
+  });
+}
+
+test.describe('the number beside the tick', () => {
+  test('MC-D05 signed out: the bare tick, no dot, the name alone as its tooltip', async ({ app }) => {
+    const s = await app.waitState((x) => x.tray.rect !== null);
+    expect(s.background.trayTitle).toBeNull();
+    expect(s.background.trayDot).toBe(false);
+    expect(s.tray.tooltip).toBe('Tudu Test');
+  });
+
+  test("MC-D01 window closed: today's tasks left beside the tick; a tick in the sheet counts down; all done is the bare tick", async ({
+    app,
+  }) => {
+    await signIn(app);
+    const own = await personal(app);
+    const ids = await addToday(app, own.id, [
+      'Pay the electricity bill',
+      'Call the bank',
+      'Renew the domain',
+    ]);
+    await app.act('close', { window: 'main' });
+    const s = await app.waitState(
+      (x) => x.background.policy === 'accessory' && x.background.trayTitle === '3',
+      15_000,
+    );
+    expect(s.tray.tooltip).toBe('Tudu Test · 3 left today');
+    expect(s.background.trayDot).toBe(false);
+
+    await openSheet(app);
+    await sheetDay(app);
+    await app.until(`return T.all('checkbox', 'Call the bank').length > 0`, 'menubar');
+    await app.eval(`T.click(T.get('checkbox', 'Call the bank'))`, 'menubar');
+    await app.waitState((x) => x.background.trayTitle === '2', 15_000);
+
+    await crossElsewhere(app, [ids[0]!, ids[2]!]);
+    const done = await app.waitState((x) => x.background.trayTitle === null, 20_000);
+    expect(done.tray.tooltip).toBe('Tudu Test · All done for today');
+  });
+
+  test("MC-D02 window open: the tick keeps today's count; the Dock badge is the Inbox, not today", async ({
+    app,
+  }) => {
+    await signIn(app);
+    const own = await personal(app);
+    await addToday(app, own.id, ['Book the dentist', 'Send the invoice']);
+    const s = await app.waitState((x) => x.background.trayTitle === '2', 20_000);
+    expect(s.background.policy).toBe('regular');
+    expect(s.badge).toBeNull();
+  });
+
+  test("MC-D03 new in the Inbox: the dot, the tooltip, the sheet's line; the line opens the desk on the Inbox", async ({
+    app,
+  }) => {
+    await signIn(app);
+    const { b, space, meId } = await withSecond(app);
+    await app.act('close', { window: 'main' });
+    await app.waitState((x) => x.background.policy === 'accessory');
+    await sendRequest(b, space.id, meId, 'Proofread the brochure');
+    const s = await app.waitState((x) => x.background.trayDot, 15_000);
+    expect(s.tray.tooltip).toBe('Tudu Test · Nothing planned today · 1 new in your Inbox');
+
+    await openSheet(app);
+    await sheetDay(app);
+    await app.until(`return T.all('button', '1 new in your Inbox, open the Inbox').length > 0`, 'menubar');
+    await app.eval(`T.click(T.get('button', '1 new in your Inbox, open the Inbox'))`, 'menubar');
+    const shown = await app.waitState(
+      (x) => x.windows.main.visible && /\/inbox/.test(x.windows.main.url),
+      15_000,
+    );
+    expect(shown.windows.menubar.visible).toBe(false);
+
+    // Nothing new any more: the dot goes.
+    await reportBadge(app, 0);
+    await app.waitState((x) => !x.background.trayDot);
+  });
+});
 
 test.describe('the menu bar tick', () => {
   test('MB-D01 first launch: no saved place, so Tudu seeds the one next to the system icons under the item’s own name', async ({
@@ -1108,22 +1225,23 @@ test.describe('the menu bar tick', () => {
     }
   });
 
-  test('MB-D03 the count beside the tick stops at 99+; the Dock badge keeps the real number', async ({
+  test('MB-D03 the count beside the tick stops at 99+ either way; the Dock badge keeps the real Inbox number', async ({
     app,
   }) => {
     await signIn(app);
     await app.act('close', { window: 'main' });
     await app.waitState((x) => x.background.policy === 'accessory');
-    await reportBadge(app, 120);
-    const hidden = await app.waitState((x) => x.background.trayTitle === '99+');
+    await reportTick(app, 120, 130);
+    await reportBadge(app, 150);
+    const hidden = await app.waitState((x) => x.background.trayTitle === '99+' && x.background.trayDot);
     expect(hidden.badge).toBeNull();
-    await reportBadge(app, 99);
+    await reportTick(app, 99, 130);
     await app.waitState((x) => x.background.trayTitle === '99');
-    await reportBadge(app, 120);
+    await reportTick(app, 120, 130);
     await app.waitState((x) => x.background.trayTitle === '99+');
     await app.act('reopen');
     await app.waitState(
-      (x) => x.background.policy === 'regular' && x.badge === '120' && x.background.trayTitle === null,
+      (x) => x.background.policy === 'regular' && x.badge === '150' && x.background.trayTitle === '99+',
     );
   });
 
@@ -1134,7 +1252,8 @@ test.describe('the menu bar tick', () => {
     await app.act('close', { window: 'main' });
     await app.waitState((x) => x.background.policy === 'accessory');
     await reportBadge(app, 3);
-    await app.waitState((x) => x.background.trayTitle === '3');
+    await reportTick(app, 2, 4);
+    await app.waitState((x) => x.background.trayTitle === '2' && x.background.trayDot);
     try {
       await app.act('tick', { hidden: true });
       const kept = await app.waitState(
@@ -1142,15 +1261,16 @@ test.describe('the menu bar tick', () => {
         15_000,
       );
       expect(kept.windows.main.visible).toBe(false);
-      await app.waitState((x) => x.badge === '3' && x.background.trayTitle === null);
-      // Room again: out of the Dock, the count back beside the tick.
+      // The Dock icon carries the Inbox count; the tick keeps today's number and its dot, ready for when it shows.
+      await app.waitState((x) => x.badge === '3' && x.background.trayTitle === '2' && x.background.trayDot);
+      // Room again: out of the Dock, the badge gone with it.
       await app.act('tick', { hidden: false });
       await app.waitState(
         (x) =>
           !x.background.tickHidden &&
           x.background.policy === 'accessory' &&
           x.badge === null &&
-          x.background.trayTitle === '3',
+          x.background.trayTitle === '2',
         15_000,
       );
     } finally {

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-tick"
+description = "Enables the set_tick command without any pre-configured scope."
+commands.allow = ["set_tick"]
+
+[[permission]]
+identifier = "deny-set-tick"
+description = "Denies the set_tick command without any pre-configured scope."
+commands.deny = ["set_tick"]

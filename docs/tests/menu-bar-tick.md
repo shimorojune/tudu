@@ -8,7 +8,7 @@ chunk, so `pnpm test:status` does not list them in STATUS.md; the test names car
 | ID     | Case                                                                                                     |
 | ------ | -------------------------------------------------------------------------------------------------------- |
 | MB-U01 | The count beside the tick: none or 0 shows nothing; 7 and 99 as they are; 100 and more read 99+          |
-| MB-U02 | Only the tick is capped: with a Dock icon the badge keeps 150                                            |
+| MB-U02 | Replaced by MC-R02 ([menu-bar-count.md](menu-bar-count.md)): the tick now carries today's count          |
 | MB-U03 | The tick's place is seeded only when macOS has none; any saved place (yours, or an earlier seed) is kept |
 | MB-U04 | A hidden tick keeps the Dock icon with the window closed; Always and an open window are regular anyway   |
 

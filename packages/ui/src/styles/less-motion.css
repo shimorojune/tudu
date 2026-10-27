@@ -333,3 +333,6 @@
 :root[data-motion='less'] .tp-root.tp-mb {
   animation: none;
 }
+:root[data-motion='less'] .tp-mb .tp-mb-ibx {
+  transition: opacity 160ms var(--ease-change);
+}
