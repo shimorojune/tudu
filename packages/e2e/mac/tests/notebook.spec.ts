@@ -346,28 +346,31 @@ test.describe('chunk 22 · the note window', () => {
   test('C22-D32 fill the screen glides there and back', async ({ app }) => {
     await signIn(app);
     await openNote(app);
-    const was = (await app.state()).windows.note;
-    const sample = async (done: (s: AppState) => boolean) => {
-      const widths = new Set<number>();
+    const before = await app.state();
+    const was = before.windows.note;
+    // The glide is instant with Less motion or macOS Reduce motion; this run has neither, or it says which.
+    expect({ less: before.look.saved.lessMotion, reduce: before.reduceMotion }).toEqual({
+      less: false,
+      reduce: false,
+    });
+    const until = async (done: (s: AppState) => boolean) => {
       const end = Date.now() + 3000;
       let s = await app.state();
-      while (Date.now() < end) {
-        s = await app.state();
-        widths.add(Math.round(s.windows.note.width));
-        if (done(s)) break;
+      while (!done(s) && Date.now() < end) {
         await new Promise((r) => setTimeout(r, 30));
+        s = await app.state();
       }
-      return { widths: [...widths], last: s };
+      return s;
     };
     await app.eval(`T.click(T.get('button', 'Fill the screen'))`, 'note');
-    const out = await sample((x) => near(x.windows.note.width, x.windows.note.screen!.width - 16));
-    const full = out.last.windows.note.width;
-    expect(out.widths.filter((w) => w > was.width + 2 && w < full - 2).length).toBeGreaterThanOrEqual(3);
+    const out = await until((x) => near(x.windows.note.width, x.windows.note.screen!.width - 16));
+    // It got there in steps (about one every 16ms over 200ms), not in one jump.
+    expect(out.note.glideSteps - before.note.glideSteps).toBeGreaterThanOrEqual(5);
     await app.eval(`T.click(T.get('button', 'Back to its size'))`, 'note');
-    const back = await sample((x) => near(x.windows.note.width, was.width));
-    expect(back.widths.filter((w) => w > was.width + 2 && w < full - 2).length).toBeGreaterThanOrEqual(3);
+    const back = await until((x) => near(x.windows.note.width, was.width));
+    expect(back.note.glideSteps - out.note.glideSteps).toBeGreaterThanOrEqual(5);
     // Where it was, as C22-D03 has it; the glide's in-between frames were not kept.
-    expect(near(back.last.windows.note.x, was.x)).toBe(true);
+    expect(near(back.windows.note.x, was.x)).toBe(true);
     await app.act('close', { window: 'note' });
     await noteHidden(app);
     await openNote(app);

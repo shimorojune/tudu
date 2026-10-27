@@ -61,6 +61,8 @@ export interface AppState {
       ask: { id: string | null; linkTo: string | null; nonce: number } | null;
     };
     frame: { x: number; y: number; width: number; height: number } | null;
+    /** Glide steps set so far (fill the screen and back). */
+    glideSteps: number;
   };
   /** The tick: no native menu any more (items is empty); a click opens the menu bar's sheet under `rect`. */
   tray: {
@@ -69,6 +71,8 @@ export interface AppState {
     rect: { x: number; y: number; width: number; height: number } | null;
   };
   /** Chunk 11: the look the app keeps (Settings › Appearance, Less motion), the launch's start, the desk's background. */
+  /** macOS Reduce motion (Accessibility › Display): the glide is instant while it is on. */
+  reduceMotion: boolean;
   look: {
     saved: { theme: 'light' | 'dark' | 'system'; lessMotion: boolean };
     launchedAt: number;

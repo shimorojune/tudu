@@ -43,6 +43,8 @@ pub struct Notes {
     gliding: Mutex<Option<Instant>>,
     /// Which glide is running: a newer one stops the older one's steps.
     glide: AtomicU64,
+    /// How many glide steps have been set, all told (the Mac e2e reads it: a glide takes several).
+    steps: AtomicU64,
     /// Being resized from an edge or corner: its frame when the pointer went down.
     resizing: Mutex<Option<Frame>>,
 }
@@ -56,6 +58,10 @@ impl Notes {
     }
     pub fn frame(&self) -> Option<Frame> {
         self.frame.lock().ok().and_then(|f| *f)
+    }
+
+    pub fn glide_steps(&self) -> u64 {
+        self.steps.load(Ordering::SeqCst)
     }
 }
 
@@ -130,9 +136,11 @@ fn glide_to(app: &AppHandle, w: &WebviewWindow, f: Frame) {
     std::thread::spawn(move || {
         let start = Instant::now();
         loop {
-            if app.state::<Notes>().glide.load(Ordering::SeqCst) != run {
+            let notes = app.state::<Notes>();
+            if notes.glide.load(Ordering::SeqCst) != run {
                 return;
             }
+            notes.steps.fetch_add(1, Ordering::SeqCst);
             let t = start.elapsed().as_secs_f64() / GLIDE.as_secs_f64();
             windows::set_frame_now(&w, place::between(from, f, t));
             if t >= 1.0 {

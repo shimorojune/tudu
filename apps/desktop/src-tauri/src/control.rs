@@ -282,7 +282,7 @@ fn state(app: &AppHandle) -> Value {
     });
     // The note window (chunk 22): pinned, filling the screen, what it was last asked for, and where it is kept.
     let notes = app.state::<crate::notes::Notes>();
-    let note = json!({ "state": notes.state(), "frame": notes.frame() });
+    let note = json!({ "state": notes.state(), "frame": notes.frame(), "glideSteps": notes.glide_steps() });
     json!({
         "track": track,
         "name": track.name(),
@@ -305,6 +305,7 @@ fn state(app: &AppHandle) -> Value {
         "badge": dock_badge(app),
         "background": background,
         "look": look,
+        "reduceMotion": windows::reduce_motion(),
         "updater": updater,
         "seen": seen,
         "outside": windows::last_outside(),
