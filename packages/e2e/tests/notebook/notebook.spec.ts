@@ -1483,15 +1483,24 @@ test.describe('notebook drawings', () => {
     await sheet(page).locator('.excalidraw').focus();
     // Excalidraw takes a paste only with the focus inside it.
     await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest('.excalidraw'))).toBe(true);
+    // Excalidraw drops a paste unless the canvas is under the last pointer position it saw.
+    await expect
+      .poll(() => page.evaluate((p) => document.elementFromPoint(p.x, p.y)?.tagName, c))
+      .toBe('CANVAS');
     const dt = await imageTransfer(page);
     await Promise.all([
       page.waitForResponse((r) => r.url().endsWith('/api/notebook/files') && r.request().method() === 'POST'),
       page.evaluate(
-        (d) =>
+        ({ d, p }) => {
+          // The pointer position goes in the same task as the paste, so nothing can move it in between.
+          document.dispatchEvent(
+            new PointerEvent('pointermove', { clientX: p.x, clientY: p.y, bubbles: true }),
+          );
           document.dispatchEvent(
             new ClipboardEvent('paste', { clipboardData: d, bubbles: true, cancelable: true }),
-          ),
-        dt,
+          );
+        },
+        { d: dt, p: c },
       ),
     ]);
     await imageKept(page, did);
