@@ -32,7 +32,8 @@ export interface InboxTaskFacts {
 }
 
 export type InboxOutcome =
-  { status: 'accepted'; label: string } | { status: 'declined'; reason: string | null };
+  | { status: 'accepted'; label: string }
+  | { status: 'declined'; reason: string | null };
 
 export type SentStatus =
   | { state: 'waiting'; seen?: string | null }
@@ -87,6 +88,8 @@ export interface InboxItemProps {
   onPerson?: (who: InboxWho) => void;
   /** A new version: Restart to update. While it runs the button says Restarting…; a promise that fails frees it. */
   onUpdate?: (item: InboxEntry) => void | Promise<unknown>;
+  /** A new version: What's new, which opens its release notes outside Tudu. Without it there is no What's new. */
+  onNotes?: (item: InboxEntry) => void;
   /** An invite: Join. While it runs the button says Joining…; a promise that fails frees it. */
   onJoin?: (item: InboxEntry) => void | Promise<unknown>;
   /** An invite: Not now, which puts it away. */
@@ -447,7 +450,7 @@ export function InboxItem(p: InboxItemProps) {
     ) : null;
 
   const canReply = full && it.kind === 'comment' && !!p.onReply;
-  // A new version: Restart to update (it is already downloaded), with What's new beside it.
+  // A new version: Restart to update (it is already downloaded), with What's new (its release, outside Tudu) beside it.
   const update = () => {
     if (updating) return;
     setUpdating(true);
@@ -458,9 +461,12 @@ export function InboxItem(p: InboxItemProps) {
   const appActs =
     app && full ? (
       <div className="tp-ix-acts">
-        <Button variant="quiet" size="sm" onClick={() => p.onOpen?.(it)}>
-          What’s new
-        </Button>
+        {p.onNotes ? (
+          <Button variant="quiet" size="sm" className="tp-ix-notes" onClick={() => p.onNotes!(it)}>
+            What’s new
+            <Icon name="external" size={13} className="tp-ix-notes-arrow" />
+          </Button>
+        ) : null}
         <Button variant="primary" size="sm" loading={updating} loadingLabel="Restarting…" onClick={update}>
           Restart to update
         </Button>

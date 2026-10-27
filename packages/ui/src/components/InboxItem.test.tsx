@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { readStylesheet } from '../test-utils/stylesheet';
+import { parseRules, readStylesheet, rulesWhere } from '../test-utils/stylesheet';
 import { InboxItem, InboxSection, type InboxEntry } from './InboxItem';
 
 const TODAY = '2026-10-18';
@@ -287,12 +287,14 @@ describe('InboxItem, a new version (chunk 11)', () => {
 
     // The reading pane: What's new reports; Restart to update reports once, says Restarting… and stays busy.
     const onUpdate = vi.fn();
-    rerender(<InboxItem item={APP} mode="full" onOpen={onOpen} onUpdate={onUpdate} />);
+    const onNotes = vi.fn();
+    rerender(<InboxItem item={APP} mode="full" onOpen={onOpen} onNotes={onNotes} onUpdate={onUpdate} />);
     expect(screen.getByRole('article').querySelector('.tp-ix-quote li')!.textContent).toBe(
       'The floating bar keeps your draft',
     );
     await user.click(screen.getByRole('button', { name: 'What’s new' }));
-    expect(onOpen).toHaveBeenCalledTimes(2);
+    expect(onNotes).toHaveBeenCalledTimes(1);
+    expect(onOpen).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: 'Restart to update' }));
     const busy = screen.getByRole('button', { name: /Restarting…/ });
     await user.click(busy);
@@ -304,6 +306,45 @@ describe('InboxItem, a new version (chunk 11)', () => {
       <InboxItem item={{ ...APP, id: 'app-s', who: { name: 'Tudu Staging', initials: 'T' } }} mode="list" />,
     );
     expect(screen.getByRole('article', { name: 'Tudu Staging is ready: version 0.38.0' })).toBeTruthy();
+  });
+
+  it('C11-U24 What’s new opens the release: the arrow after its label, onNotes with the item; none without onNotes', async () => {
+    const user = userEvent.setup();
+    const onNotes = vi.fn();
+    const onOpen = vi.fn();
+    const { rerender } = render(
+      <InboxItem item={APP} mode="full" onOpen={onOpen} onNotes={onNotes} onUpdate={vi.fn()} />,
+    );
+    const notes = screen.getByRole('button', { name: 'What’s new' });
+    // The arrow sits inside the label, after the words, so it centres on them.
+    const label = notes.querySelector('.tp-btn-label')!;
+    expect(label.lastElementChild).toHaveClass('tp-ix-notes-arrow');
+    expect(label.textContent).toBe('What’s new');
+    await user.click(notes);
+    expect(onNotes).toHaveBeenCalledWith(APP);
+    // It no longer re-opens the item it is in.
+    expect(onOpen).not.toHaveBeenCalled();
+
+    // Without a release to open (Tudu Test, dev): no What's new, Restart to update unchanged.
+    rerender(<InboxItem item={APP} mode="full" onOpen={onOpen} onUpdate={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: 'What’s new' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Restart to update' })).toBeTruthy();
+  });
+
+  it('C11-U24 the arrow nudges up and right on hover, and holds still under reduced motion', () => {
+    const rules = rulesWhere(parseRules(readStylesheet('components.css')), (sel) =>
+      sel.includes('.tp-ix-notes-arrow'),
+    );
+    const hover = rules.filter((r) => r.selector.includes(':hover'));
+    expect(
+      hover.some((r) => r.context.length === 0 && r.declarations.transform === 'translate(1px, -1px)'),
+    ).toBe(true);
+    expect(
+      hover.some(
+        (r) =>
+          r.context.some((c) => c.includes('prefers-reduced-motion')) && r.declarations.transform === 'none',
+      ),
+    ).toBe(true);
   });
 
   it('C11-U02 a restart that fails frees the button', async () => {

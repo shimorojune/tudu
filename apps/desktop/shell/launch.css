@@ -1,0 +1,339 @@
+/* launch */
+/* Opening Tudu: the stacked ink tick while the app loads (canvas K-Launch). Kept identical in the Mac app's loader
+   (apps/desktop/shell/launch.css) and inline in apps/web/index.html; C11-U19 checks. Nothing shows for 300ms, and
+   it never takes a click: the app under it works from its first frame. */
+:root {
+  --tl-bg: #eeece6;
+  --tl-card: #fffdf8;
+  --tl-fg: #18181b;
+  --tl-muted: #71717a;
+  --tl-brand: #e8361b;
+  --tl-edge: #b5b2aa;
+  --tl-spark: #eaa21c;
+  --tl-arrive: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --tl-change: cubic-bezier(0.4, 0, 0.2, 1);
+}
+:root.dark {
+  --tl-bg: #111211;
+  --tl-card: #1d1c1a;
+  --tl-fg: #f2efe8;
+  --tl-muted: #a39f96;
+  --tl-brand: #ff6a4a;
+  --tl-edge: #6f6b64;
+  --tl-spark: #ffd27a;
+}
+.tl-boot {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding-bottom: 6vh;
+  background: var(--tl-bg);
+  font:
+    13px/19px Geist,
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  opacity: 0;
+  animation: tl-show 1ms linear 300ms forwards;
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+:root[data-boot='off'] .tl-boot {
+  display: none;
+}
+.tl-hop {
+  position: relative;
+  display: block;
+  transform-origin: 50% 100%;
+  animation: tl-hop 1250ms cubic-bezier(0.3, 0.7, 0.4, 1) 1500ms infinite;
+}
+.tl-mark {
+  display: block;
+  overflow: visible;
+}
+.tl-sheet {
+  fill: var(--tl-brand);
+  transform-box: view-box;
+  transform-origin: 54px 62px;
+  transform: rotate(-10deg);
+  animation:
+    tl-sheet 480ms linear 420ms both,
+    tl-flap 1250ms cubic-bezier(0.3, 0.7, 0.4, 1) 1500ms infinite;
+}
+.tl-box {
+  fill: var(--tl-card);
+  stroke: var(--tl-edge);
+  transform-box: view-box;
+  transform-origin: 61px 71px;
+  animation: tl-box 480ms linear 300ms both;
+}
+.tl-ink {
+  fill: var(--tl-fg);
+  animation: tl-ink 310ms var(--tl-change) 700ms both;
+}
+.tl-sparks {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.tl-sparks i {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px;
+  border-radius: 50%;
+  background: var(--tl-spark);
+  opacity: 0;
+  animation:
+    tl-burst 620ms var(--tl-arrive) 1000ms both,
+    tl-puff 1250ms var(--tl-arrive) 1900ms infinite;
+}
+.tl-sparks i:nth-child(odd) {
+  width: 4px;
+  height: 4px;
+  margin: -2px;
+}
+.tl-sparks i:nth-child(3n) {
+  background: var(--tl-brand);
+}
+.tl-sparks i:nth-child(3n + 1) {
+  background: var(--tl-fg);
+}
+.tl-slow {
+  margin: 0;
+  color: var(--tl-muted);
+  opacity: 0;
+  animation: tl-rise 300ms var(--tl-arrive) var(--tl-slow-at, 6s) forwards;
+}
+/* Arrived from the loader with the mark already up: no wait, no intro, straight into the hops. */
+:root[data-boot='held'] .tl-boot {
+  opacity: 1;
+  animation: none;
+}
+:root[data-boot='held'] :is(.tl-sheet, .tl-box, .tl-ink) {
+  animation: none;
+}
+:root[data-boot='held'] .tl-sheet {
+  animation: tl-flap 1250ms cubic-bezier(0.3, 0.7, 0.4, 1) infinite;
+}
+:root[data-boot='held'] .tl-hop {
+  animation-delay: 0ms;
+}
+:root[data-boot='held'] .tl-sparks i {
+  animation: tl-puff 1250ms var(--tl-arrive) 400ms infinite;
+}
+/* Ready: the mark swells as it fades; the app comes up under it. */
+.tl-leaving .tl-hop {
+  animation: tl-swell 180ms var(--tl-change) forwards;
+}
+.tl-arrive {
+  animation: tl-arrive 220ms var(--tl-arrive) both;
+}
+/* The loader with no network: the mark holds still where it was and the words come up beneath it. */
+.tl-offline .tl-hop,
+.tl-offline .tl-sparks i {
+  animation: none;
+}
+.tl-offline .tl-sheet {
+  animation: none;
+  transform: rotate(-10deg);
+}
+.tl-offline .tl-slow {
+  display: none;
+}
+.tl-boot.tl-offline {
+  pointer-events: auto;
+}
+@keyframes tl-show {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes tl-box {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  70% {
+    transform: scale(0.95);
+  }
+  88% {
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes tl-sheet {
+  0% {
+    opacity: 0;
+    transform: translate(26px, -34px) rotate(24deg);
+  }
+  12% {
+    opacity: 1;
+  }
+  40% {
+    transform: translate(0, 0) rotate(-18deg);
+  }
+  62% {
+    transform: rotate(-5deg);
+  }
+  82% {
+    transform: rotate(-12deg);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(-10deg);
+  }
+}
+@keyframes tl-ink {
+  from {
+    clip-path: inset(-20% 100% -20% 0);
+  }
+  to {
+    clip-path: inset(-20% -20% -20% 0);
+  }
+}
+@keyframes tl-hop {
+  0%,
+  40%,
+  100% {
+    transform: none;
+  }
+  8% {
+    transform: scale(1.08, 0.9);
+  }
+  20% {
+    transform: translateY(-14px) scale(0.95, 1.06);
+  }
+  32% {
+    transform: translateY(0) scale(1.06, 0.93);
+  }
+}
+@keyframes tl-flap {
+  0%,
+  40%,
+  100% {
+    transform: rotate(-10deg);
+  }
+  20% {
+    transform: rotate(-16deg);
+  }
+  32% {
+    transform: rotate(-7deg);
+  }
+}
+@keyframes tl-burst {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--a)) translateY(-20px) scale(0.4);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--a)) translateY(-58px) scale(1);
+  }
+}
+@keyframes tl-puff {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--a)) translateY(-26px) scale(0.3);
+  }
+  4% {
+    opacity: 0.8;
+  }
+  40%,
+  100% {
+    opacity: 0;
+    transform: rotate(var(--a)) translateY(-44px) scale(0.7);
+  }
+}
+@keyframes tl-rise {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes tl-leave {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes tl-swell {
+  to {
+    transform: scale(1.18);
+  }
+}
+@keyframes tl-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes tl-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* Less motion (Settings, or macOS Reduce motion): the mark fades in and holds still. */
+@media (prefers-reduced-motion: reduce) {
+  .tl-boot {
+    animation: tl-fade 120ms linear 300ms both;
+  }
+  .tl-hop,
+  .tl-sheet,
+  .tl-box,
+  .tl-ink,
+  .tl-sparks i,
+  .tl-leaving .tl-hop {
+    animation: none;
+  }
+  .tl-arrive {
+    animation: tl-fade 120ms linear both;
+  }
+}
+:root[data-motion='less'] .tl-boot {
+  animation: tl-fade 120ms linear 300ms both;
+}
+:root[data-motion='less'] :is(.tl-hop, .tl-sheet, .tl-box, .tl-ink, .tl-sparks i, .tl-leaving .tl-hop) {
+  animation: none;
+}
+:root[data-motion='less'] .tl-arrive {
+  animation: tl-fade 120ms linear both;
+}
+:root[data-boot='held'][data-motion='less'] .tl-boot {
+  animation: none;
+}
+/* Leaving wins over every other state (held, Less motion): a short fade, whatever came before. */
+:root .tl-boot.tl-leaving.tl-leaving {
+  opacity: 1;
+  animation: tl-leave 180ms var(--tl-change) forwards;
+}
+/* /launch */

@@ -97,12 +97,18 @@ fn builder<'a>(
     } else {
         WebviewUrl::App(page.into())
     };
+    // The look as saved: every window is built in Tudu's theme, and every page learns it (and when the launch began)
+    // before it runs, so the loader paints in it from its first frame.
+    let looks = app.state::<crate::look::Looks>();
+    let look = looks.look.lock().map(|l| *l).unwrap_or_default();
     #[allow(unused_mut)]
     let mut b = WebviewWindowBuilder::new(app, label, url)
         .initialization_script(format!(
             "window.__TUDU_WEB__ = {};",
             serde_json::Value::String(web.to_string())
         ))
+        .initialization_script(crate::look::init_script(look, looks.launched_at))
+        .theme(crate::look::native_theme(look.theme))
         .on_navigation(move |url| {
             if inside(url, &home, tauri::is_dev()) {
                 return true;
@@ -120,7 +126,12 @@ fn builder<'a>(
 /// The windows, made once at launch. Started by the login item, the desk stays hidden: Tudu is in the menu bar only.
 pub fn create(app: &AppHandle, at_login: bool) -> tauri::Result<()> {
     let track = app.state::<App>().track;
+    let look = crate::look::current(app);
     let main = builder(app, MAIN, "index.html", "/")
+        .background_color(crate::look::desk_background(
+            look.theme,
+            crate::look::system_theme(),
+        ))
         .title(track.name())
         .inner_size(1200.0, 800.0)
         .min_inner_size(900.0, 600.0)
@@ -132,7 +143,15 @@ pub fn create(app: &AppHandle, at_login: bool) -> tauri::Result<()> {
     background::keep_awake(&main);
     let m = main.clone();
     let a = app.clone();
+    crate::look::repaint_desk(app, look);
     main.on_window_event(move |e| {
+        // On System, macOS changing appearance changes the desk's background with it.
+        if let WindowEvent::ThemeChanged(_) = e {
+            let look = crate::look::current(&a);
+            if look.theme == crate::look::ThemeChoice::System {
+                crate::look::repaint_desk(&a, look);
+            }
+        }
         if let WindowEvent::CloseRequested { api, .. } = e {
             // Closing the desk hides it: Tudu carries on in the menu bar, and leaves the Dock unless you keep it
             // there. ⌘Q quits.

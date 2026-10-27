@@ -18,6 +18,7 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, State};
 
+use crate::look::Look;
 use crate::{windows, App};
 
 /// Settings › This Mac › Show Tudu in the Dock.
@@ -126,10 +127,13 @@ pub struct Background {
     pub tick_override: Mutex<Option<bool>>,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+/// This Mac's file: the Dock choice and the look (theme and Less motion).
+#[derive(Serialize, Deserialize, Default, Clone, Copy, Debug, PartialEq)]
 struct Prefs {
     #[serde(default)]
     dock: Dock,
+    #[serde(default)]
+    look: Look,
 }
 
 /// Where This Mac's choices live: the app's own config folder (Tudu Test: the run's data folder). Never the server.
@@ -144,28 +148,57 @@ fn prefs_path(app: &AppHandle) -> Option<PathBuf> {
         .map(|d| d.join("this-mac.json"))
 }
 
-fn load(app: &AppHandle) -> Dock {
+fn read_prefs(app: &AppHandle) -> Prefs {
     prefs_path(app)
         .and_then(|p| std::fs::read(p).ok())
-        .map(|b| dock_from(&b))
+        .map(|b| prefs_from(&b))
         .unwrap_or_default()
 }
 
-/// The saved choice; anything unreadable (an old "never", a torn write) is the default.
+fn load(app: &AppHandle) -> Dock {
+    read_prefs(app).dock
+}
+
+/// The saved look, for the windows at launch.
+pub fn load_look(app: &AppHandle) -> Look {
+    read_prefs(app).look
+}
+
+/// The saved choices, each on its own: one unreadable (an old "never", a torn write) is its default and leaves the
+/// others as they were.
+fn prefs_from(bytes: &[u8]) -> Prefs {
+    let Ok(v) = serde_json::from_slice::<serde_json::Value>(bytes) else {
+        return Prefs::default();
+    };
+    let field = |k: &str| v.get(k).cloned().unwrap_or(serde_json::Value::Null);
+    Prefs {
+        dock: serde_json::from_value(field("dock")).unwrap_or_default(),
+        look: serde_json::from_value(field("look")).unwrap_or_default(),
+    }
+}
+
+/// The saved Dock choice.
 fn dock_from(bytes: &[u8]) -> Dock {
-    serde_json::from_slice::<Prefs>(bytes)
-        .unwrap_or_default()
-        .dock
+    prefs_from(bytes).dock
 }
 
-fn save(app: &AppHandle, dock: Dock) {
+fn write_prefs(app: &AppHandle, prefs: Prefs) {
     let Some(p) = prefs_path(app) else { return };
     if let Some(dir) = p.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    if let Ok(text) = serde_json::to_vec(&Prefs { dock }) {
+    if let Ok(text) = serde_json::to_vec(&prefs) {
         let _ = std::fs::write(p, text);
     }
+}
+
+fn save(app: &AppHandle, dock: Dock) {
+    write_prefs(app, Prefs { dock, ..read_prefs(app) });
+}
+
+/// Keep the look beside the Dock choice.
+pub fn save_look(app: &AppHandle, look: Look) {
+    write_prefs(app, Prefs { look, ..read_prefs(app) });
 }
 
 /// At launch: the saved Dock choice, whether the login item started us, and the App Nap opt-out.
@@ -654,11 +687,66 @@ mod tests {
 
     #[test]
     fn c16_u02_the_dock_choice_is_kept_and_anything_unreadable_is_the_default() {
-        let saved = serde_json::to_vec(&Prefs { dock: Dock::Always }).unwrap();
+        let saved = serde_json::to_vec(&Prefs {
+            dock: Dock::Always,
+            ..Prefs::default()
+        })
+        .unwrap();
         assert_eq!(dock_from(&saved), Dock::Always);
         assert_eq!(dock_from(b"{}"), Dock::Open);
         assert_eq!(dock_from(br#"{"dock":"never"}"#), Dock::Open);
         assert_eq!(dock_from(b"{\"do"), Dock::Open);
+    }
+
+    #[test]
+    fn c11_u17_the_look_is_kept_beside_the_dock_and_an_old_file_still_reads() {
+        use crate::look::ThemeChoice;
+        let look = Look {
+            theme: ThemeChoice::Light,
+            less_motion: true,
+        };
+        let saved = serde_json::to_vec(&Prefs {
+            dock: Dock::Always,
+            look,
+        })
+        .unwrap();
+        assert_eq!(
+            prefs_from(&saved),
+            Prefs {
+                dock: Dock::Always,
+                look
+            }
+        );
+        // A file from before the look: its Dock choice holds, the look is System with motion.
+        assert_eq!(
+            prefs_from(br#"{"dock":"always"}"#),
+            Prefs {
+                dock: Dock::Always,
+                look: Look::default()
+            }
+        );
+        assert_eq!(Look::default().theme, ThemeChoice::System);
+        assert!(!Look::default().less_motion);
+        // An unknown theme is System; one bad field leaves the other alone.
+        assert_eq!(
+            prefs_from(br#"{"dock":"always","look":{"theme":"sepia","lessMotion":true}}"#).look,
+            Look {
+                theme: ThemeChoice::System,
+                less_motion: true
+            }
+        );
+        assert_eq!(
+            prefs_from(br#"{"dock":"never","look":{"theme":"dark"}}"#),
+            Prefs {
+                dock: Dock::Open,
+                look: Look {
+                    theme: ThemeChoice::Dark,
+                    less_motion: false
+                }
+            }
+        );
+        // A torn file is all defaults.
+        assert_eq!(prefs_from(b"{\"look"), Prefs::default());
     }
 
     #[test]

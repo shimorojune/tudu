@@ -102,7 +102,7 @@ As drawn on the canvas:
     (we came from the loader with the mark already showing), it adds `.held`, which skips the delay and the intro and
     starts in the hopping pose, so the mark doesn't redraw across the document swap.
   - The slow line's 6s delay is also counted from `launchedAt`.
-- **Dismissal.** `main.tsx` subscribes once to the router's first `onResolved`, so a redirect to Sign in counts too.
+- **Dismissal.** `main.tsx` subscribes once to the router's first `onRendered`, so a redirect to Sign in or an error page counts too (changed while building from `onResolved`).
   It adds `.leaving` to `#boot` (the swell and fade) and removes it on `animationend`, with a 400ms fallback timer.
   `#root` fades up with the existing `tp-fade-in`. If the boot screen was never shown (under 300ms), it's removed at
   once with no animation.
@@ -140,17 +140,17 @@ D16). If another thread lands chunk 11 IDs first, these renumber upward. Each ID
 
 ### Unit (vitest, cargo)
 
-| ID      | Where                           | Case                                                                                                                                                                                                                           |
-| ------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| C11-U17 | desktop `background.rs` (cargo) | Prefs round-trip: theme and less motion save and load; an old file with only `dock` reads as System, no less motion, and keeps its dock; an unknown theme reads as System; a torn file reads as defaults                       |
-| C11-U18 | desktop `bridge.rs` (cargo)     | The appearance mapping: light, dark and system map to `Some(Light)`, `Some(Dark)` and `None`; the desk's background colour for light and dark, and system resolved through the window's theme; an unchanged value doesn't save |
-| C11-U19 | web `boot.test.ts`              | The launch keyframes and markup in `apps/web/index.html` and `apps/desktop/shell/index.html` + `shell.css` are identical (extracted between the `/* launch */` markers)                                                        |
-| C11-U20 | web `boot.test.ts` (jsdom)      | The boot script: under 300ms since `launchedAt` no `.held`; over 300ms `.held`; no `__TUDU_LOOK__` (the web) uses the page's own start; Less motion from `tudu.motion` sets `data-motion`                                      |
-| C11-U21 | web `boot.test.ts`              | Dismissal: the first `onResolved` adds `.leaving` and removes `#boot` on `animationend`; without the event it's gone by 400ms; a boot screen never shown is removed at once; a second `onResolved` does nothing                |
-| C11-U22 | ui `theme.test.ts`              | `onThemeChange` fires for a pick and for a sync from another window, never twice for one change, and stops when unsubscribed                                                                                                   |
-| C11-U23 | web `desktop.test.tsx`          | `DesktopHost` sends `setAppearance` on mount with the stored choice and Less motion, again on a pick, a storage sync and a Less motion change; an app without the command (rejects) is ignored, no error toast                 |
-| C11-U24 | ui `InboxItem.test.tsx`         | An app item with `onNotes`: What's new has the trailing arrow and calls `onNotes` with the item; without `onNotes` there's no What's new; Restart to update is unchanged                                                       |
-| C11-U25 | web `InboxPage` test, core      | `onNotes` opens `releaseUrl`: production `…/releases/tag/tudu-0.38.0`, staging `…/releases#release-staging`; test and dev give no button; the item stays picked and read                                                       |
+| ID      | Where                            | Case                                                                                                                                                                                                                                                  |
+| ------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C11-U17 | desktop `background.rs` (cargo)  | Prefs round-trip: theme and less motion save and load; an old file with only `dock` reads as System, no less motion, and keeps its dock; an unknown theme reads as System; a torn file reads as defaults                                              |
+| C11-U18 | desktop `look.rs` (cargo)        | The appearance mapping: light, dark and system map to `Some(Light)`, `Some(Dark)` and `None`; the desk's background colour for light and dark, and system resolved through the window's theme; an unchanged value doesn't save                        |
+| C11-U19 | web `boot.test.ts`               | The launch keyframes and markup in `apps/web/index.html` and `apps/desktop/shell/index.html` + `shell.css` are identical (extracted between the `/* launch */` markers)                                                                               |
+| C11-U20 | web `boot.test.ts` (jsdom)       | The boot script: under 300ms since `launchedAt` no `.held`; over 300ms `.held`; no `__TUDU_LOOK__` (the web) uses the page's own start; Less motion from `tudu.motion` sets `data-motion`                                                             |
+| C11-U21 | web `boot.test.ts`               | Dismissal: the first `onRendered` adds `.leaving` and removes `#boot` on `animationend`; without the event it's gone by 400ms; a boot screen never shown is removed at once; a second `onRendered` does nothing                                       |
+| C11-U22 | ui `theme.test.ts`               | `onThemeChange` fires for a pick and for a sync from another window, never twice for one change, and stops when unsubscribed                                                                                                                          |
+| C11-U23 | web `boot.test.ts`               | `keepAppearance` (from `DesktopHost`, the desk only) sends `setAppearance` on mount with the stored choice and Less motion, again on a pick, a storage sync and a Less motion change; an app without the command (rejects) is ignored, no error toast |
+| C11-U24 | ui `InboxItem.test.tsx`          | An app item with `onNotes`: What's new has the trailing arrow and calls `onNotes` with the item; without `onNotes` there's no What's new; Restart to update is unchanged                                                                              |
+| C11-U25 | web `boot.test.ts` (`notesHref`) | `onNotes` opens `releaseUrl`: production `…/releases/tag/tudu-0.38.0`, staging `…/releases#release-staging`; test and dev give no button; the item stays picked and read                                                                              |
 
 ### End to end, web against the app fake (`packages/e2e/tests/desktop`, plus the web group)
 
@@ -168,9 +168,9 @@ D16). If another thread lands chunk 11 IDs first, these renumber upward. Each ID
 | ID      | Case                                                                                                                                                                                                                                                             |
 | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | C11-D17 | Pick Light with macOS in dark: all four windows report the Light appearance (the traffic lights follow) and the desk's background is `#eeece6`; Dark gives Dark and `#111211`; System gives no override and follows macOS                                        |
-| C11-D18 | Across launches: quit with Light picked on a dark Mac and launch: the desk is built Light with the light background before any page loads, and the loader page reports `data-theme="light"` and the light background on its first read                           |
+| C11-D18 | Across launches: quit with Light picked on a dark Mac and launch: the desk is built Light with the light background before any page loads, and the page reports the same look (`__TUDU_LOOK__`, no `.dark`)                                                      |
 | C11-D19 | The web held (the test web server delays `/`): the loader shows the mark in the picked theme after 300ms; once the web answers the page starts `.held`, then the app; with the web down the offline text fades in under the same mark, Try again reaches the app |
-| C11-D20 | What's new on the real app's Inbox item hands `…/releases/tag/tudu-<next>` to the default browser (the opener the suite already records, as C11-D10) and the window stays put                                                                                    |
+| C11-D20 | Tudu Test has no release page, so its Inbox item shows Restart to update and no What's new (production and staging are covered by C11-U25 and C11-E02, the opener itself by C11-D10)                                                                             |
 
 The existing C11-D11 ("the dark theme you picked holds") keeps its ID. It now also implies D18's native side.
 

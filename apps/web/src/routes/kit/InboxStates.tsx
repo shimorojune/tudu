@@ -228,13 +228,20 @@ export function InboxStates() {
       />
       <Pair
         title="Reading a new version"
-        note="What’s new and Restart to update. Restarting shows on the button; a restart that fails frees it with a toast."
+        note="What’s new (its release on GitHub, in the browser) and Restart to update. Restarting shows on the button; a restart that fails frees it with a toast."
         render={() => (
           <div style={{ width: 'min(560px, 100%)', display: 'grid', gap: 16 }}>
-            <InboxItem item={{ ...APP, unread: false }} mode="full" onOpen={noop} onUpdate={noop} />
+            <InboxItem
+              item={{ ...APP, unread: false }}
+              mode="full"
+              onOpen={noop}
+              onNotes={noop}
+              onUpdate={noop}
+            />
             <InboxItem
               item={{ ...APP, id: 'app-busy', unread: false }}
               mode="full"
+              onNotes={noop}
               onUpdate={never}
               initial={{ updating: true }}
             />
