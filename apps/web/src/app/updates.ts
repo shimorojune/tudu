@@ -1,4 +1,5 @@
 import {
+  releaseUrl,
   checkedWords,
   inboxBadge,
   notesHtml,
@@ -9,7 +10,7 @@ import {
 } from '@tudu/core';
 import { showToast, type InboxEntry, type SettingsUpdates } from '@tudu/ui';
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import type { DesktopBridge, UpdateReady, UpdateStatus } from './desktop';
+import type { AppInfo, DesktopBridge, UpdateReady, UpdateStatus } from './desktop';
 
 /** The app asks for a newer version on launch and then this often. */
 export const CHECK_EVERY_MS = 4 * 60 * 60 * 1000;
@@ -198,6 +199,14 @@ export function appEntry(
 }
 
 export const appItemId = (version: string) => `app-${version}`;
+
+/** What's new: the ready version's release on GitHub, for the app's own track; none for Tudu Test and dev builds. */
+export function notesHref(
+  info: Pick<AppInfo, 'track'> | null,
+  ready: Pick<UpdateReady, 'version'> | null,
+): string | null {
+  return info && ready ? releaseUrl(info.track, ready.version) : null;
+}
 export const isAppItem = (id: string | null | undefined) => !!id && id.startsWith('app-');
 
 /**

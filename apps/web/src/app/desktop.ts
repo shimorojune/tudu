@@ -108,6 +108,8 @@ export interface DesktopBridge {
   /** System Settings › General › Login Items. */
   openLoginItems(): void;
   setDock(mode: DockMode): void;
+  /** Settings › Appearance and Less motion, kept by the app for its windows; an app from before this does nothing. */
+  setAppearance(look: Appearance): void;
   /**
    * `go` (the desk is asked to show a page, or `feedback` for the form), `floating:shown` (the summon),
    * `menubar:shown` and `menubar:hidden` (the tick's click, and the sheet put away), `update:ready` (a check,
@@ -124,6 +126,12 @@ export type DesktopEvent =
   | 'update:ready'
   | 'update:status'
   | 'note:open';
+
+/** The look the app builds its windows with. */
+export interface Appearance {
+  theme: 'light' | 'dark' | 'system';
+  lessMotion: boolean;
+}
 
 /** What the sheet asks the desk to show for Send feedback, in place of a page. */
 export const FEEDBACK_GO = 'feedback';
@@ -287,6 +295,7 @@ function fakeBridge(f: DesktopFake): DesktopBridge {
       call('setDock', mode);
       f.thisMac = { ...f.thisMac, dock: mode };
     },
+    setAppearance: (look) => call('setAppearance', look),
     on: (event, fn) => {
       (f.listeners![event] ??= []).push(fn);
       return () => {
@@ -338,6 +347,8 @@ function tauriBridge(t: NonNullable<Window['__TAURI_INTERNALS__']>): DesktopBrid
     setOpenAtLogin: (on) => invoke<LoginState>('set_open_at_login', { on }),
     openLoginItems: () => quiet(invoke('open_login_items')),
     setDock: (dock) => quiet(invoke('set_dock', { dock })),
+    setAppearance: (look) =>
+      quiet(invoke('set_appearance', { theme: look.theme, lessMotion: look.lessMotion })),
     on: (event, fn) => {
       let stop: (() => void) | null = null;
       let gone = false;

@@ -11,6 +11,9 @@
 html[data-app='menubar'],
 html[data-app='menubar'] body {
   background: transparent !important;
+  /* Clear from the first frame: no fade from the desk colour, even where Less motion gives everything a 120ms
+     transition. */
+  transition: none !important;
 }
 html[data-app='menubar'] .app-menubar {
   padding: 0 8px 16px;

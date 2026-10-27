@@ -43,6 +43,8 @@ export interface WindowState {
   height: number;
   screen: { x: number; y: number; width: number; height: number } | null;
   url: string;
+  /** The appearance macOS draws the window in (its traffic lights): Settings › Appearance, or macOS's own on System. */
+  theme: 'light' | 'dark' | null;
 }
 export interface AppState {
   track: string;
@@ -65,6 +67,12 @@ export interface AppState {
     tooltip: string;
     items: unknown[];
     rect: { x: number; y: number; width: number; height: number } | null;
+  };
+  /** Chunk 11: the look the app keeps (Settings › Appearance, Less motion), the launch's start, the desk's background. */
+  look: {
+    saved: { theme: 'light' | 'dark' | 'system'; lessMotion: boolean };
+    launchedAt: number;
+    deskBackground: string | null;
   };
   shortcut: { accelerator: string; registered: boolean };
   badge: string | null;

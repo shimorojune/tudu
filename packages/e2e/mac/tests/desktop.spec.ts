@@ -1,7 +1,9 @@
 import { join } from 'node:path';
+import { request, createServer, type Server } from 'node:http';
 import { existsSync, readFileSync } from 'node:fs';
 import { rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { HOLD_PORT } from '../playwright.config';
 import {
   alive,
   API,
@@ -23,6 +25,7 @@ import {
   WEB,
   writeTask,
   type Space,
+  type AppState,
   type TuduApp as App,
 } from '../harness';
 
@@ -357,9 +360,7 @@ test.describe('desktop', () => {
       await app.until(
         `return !!document.querySelector('.tp-ix-full') && document.querySelector('.tp-ix-full').innerText.includes('The floating bar keeps your draft')`,
       );
-      await app.until(
-        `return T.all('button', 'What’s new').length === 1 && T.all('button', 'Restart to update').length === 1`,
-      );
+      await app.until(`return T.all('button', 'Restart to update').length === 1`);
       await expect.poll(() => inboxPip(app)).toBe(0);
       // Hide and show: still read.
       await app.act('close', { window: 'main' });
@@ -394,6 +395,22 @@ test.describe('desktop', () => {
       await app.until(`return !!document.querySelector('[aria-label="The Inbox"]')`);
       expect(await app.eval(hasRow(next))).toBe(false);
       expect(await inboxPip(app)).toBe(0);
+    });
+
+    test('C11-D20 What’s new is offered only where there is a release page: Tudu Test has none, Restart to update stays', async ({
+      app,
+    }) => {
+      const next = run().next.version;
+      await app.waitState((x) => x.updater.lastResult === 'ready');
+      expect((await app.state()).track).toBe('test');
+      await signIn(app);
+      await go(app, '/inbox');
+      await app.until(hasRow(next));
+      await app.eval(openRow(next));
+      await app.until(`return T.all('button', 'Restart to update').length === 1`);
+      // Production opens its tag and staging its release (C11-U25, C11-E02); the test build never shows a dead button.
+      expect(await app.eval(`return T.all('button', /What’s new/).length`)).toBe(0);
+      expect((await app.state()).seen.opened).toEqual([]);
     });
 
     test('C11-D12 two spaces in the app: the version once in the one Inbox; read once; the dock counts it once', async ({
@@ -1138,6 +1155,161 @@ test.describe('the menu bar tick', () => {
       );
     } finally {
       await app.act('tick', { hidden: null });
+    }
+  });
+});
+
+/** What macOS shows now: the theme System follows. */
+const macDark = () =>
+  /Dark/.test(spawnSync('defaults', ['read', '-g', 'AppleInterfaceStyle'], { encoding: 'utf8' }).stdout);
+/** The pick that differs from macOS, so following it can't pass by accident. */
+const against = () => (macDark() ? 'Light' : 'Dark');
+
+/** Settings › Appearance on the desk: pick a theme and wait for the app to have it. */
+async function pickTheme(app: App, label: 'Light' | 'Dark' | 'System'): Promise<void> {
+  // Already open (a second pick in one test): stay, since re-going to the same address passes its check on the old
+  // page and the click would land mid-reload.
+  const open = await app.eval<boolean>(
+    `return location.pathname === '/me' && T.all('[role=radio]').some((r) => r.innerText.trim().startsWith('${label}'))`,
+  );
+  if (!open) await go(app, `/me?settings=appearance`);
+  await app.until(`const r = T.all('[role=radio]').find((r) => r.innerText.trim().startsWith('${label}'));
+    if (!r) return false;
+    T.click(r);
+    return true;`);
+  await app.waitState((s) => s.look.saved.theme === label.toLowerCase());
+}
+
+const BACKGROUND = { light: '#eeece6', dark: '#111211' } as const;
+const themes = (s: AppState) =>
+  (['main', 'floating', 'menubar', 'note'] as const).map((w) => s.windows[w].theme);
+
+/**
+ * A stand-in for the web on HOLD_PORT, passing everything to the real one: down until `up()`, and `/` answered only
+ * after `holdMs` (the loader's reachability check and the page itself).
+ */
+function standIn() {
+  let server: Server | null = null;
+  let holdMs = 0;
+  const up = (hold = 0) =>
+    new Promise<void>((resolve) => {
+      holdMs = hold;
+      server = createServer((req, res) => {
+        const pass = () => {
+          const out = request(`${WEB}${req.url}`, { method: req.method, headers: req.headers }, (r) => {
+            res.writeHead(r.statusCode ?? 502, r.headers);
+            r.pipe(res);
+          });
+          out.on('error', () => res.destroy());
+          req.pipe(out);
+        };
+        if (req.url === '/' && holdMs) setTimeout(pass, holdMs);
+        else pass();
+      });
+      server.listen(Number(HOLD_PORT), '127.0.0.1', () => resolve());
+    });
+  const down = () =>
+    new Promise<void>((resolve) => {
+      if (!server) return resolve();
+      server.closeAllConnections();
+      server.close(() => resolve());
+      server = null;
+    });
+  return { url: `http://localhost:${HOLD_PORT}`, up, down };
+}
+
+test.describe('the look', () => {
+  test('C11-D17 Settings › Appearance sets every window’s macOS appearance (the traffic lights) and the desk’s background; System follows macOS', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const pick = against();
+    const want = pick.toLowerCase() as 'light' | 'dark';
+    await pickTheme(app, pick);
+    let s = await app.waitState((x) => themes(x).every((t) => t === want));
+    expect(s.look.deskBackground).toBe(BACKGROUND[want]);
+    expect(await app.eval(`return document.documentElement.classList.contains('dark')`)).toBe(
+      want === 'dark',
+    );
+
+    const other = want === 'light' ? 'dark' : 'light';
+    await pickTheme(app, other === 'light' ? 'Light' : 'Dark');
+    s = await app.waitState((x) => themes(x).every((t) => t === other));
+    expect(s.look.deskBackground).toBe(BACKGROUND[other]);
+
+    // System: no override, every window back on macOS's own appearance.
+    await pickTheme(app, 'System');
+    const mac = macDark() ? 'dark' : 'light';
+    s = await app.waitState((x) => themes(x).every((t) => t === mac));
+    expect(s.look.deskBackground).toBe(BACKGROUND[mac]);
+  });
+
+  test('C11-D18 across launches: the desk is built in the picked theme, with its background, before any page loads', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const pick = against();
+    const want = pick.toLowerCase() as 'light' | 'dark';
+    await pickTheme(app, pick);
+    await app.quit();
+
+    await app.launch();
+    // The first answer from the channel: the app has built its windows, the page may not have run yet.
+    const s = await app.state();
+    expect(s.look.saved.theme).toBe(want);
+    expect(s.look.deskBackground).toBe(BACKGROUND[want]);
+    expect(themes(s).every((t) => t === want)).toBe(true);
+    await onToday(app);
+    expect(
+      await app.eval(
+        `return [window.__TUDU_LOOK__.theme, document.documentElement.classList.contains('dark')]`,
+      ),
+    ).toEqual([want, want === 'dark']);
+  });
+
+  test('C11-D19 the web slow or down: the loader shows the mark in the picked theme, offline words under it, and the web carries the mark on held', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const pick = against();
+    const dark = pick === 'Dark';
+    await pickTheme(app, pick);
+    await app.quit();
+    const web = standIn();
+    try {
+      // Down: the loader's mark, still, in the picked theme, with the offline words beneath.
+      await app.launch({ TUDU_TEST_WEB: web.url });
+      await app.until(`return location.protocol !== 'http:' && !document.getElementById('offline').hidden`);
+      expect(
+        await app.eval(`const b = document.getElementById('boot');
+          return [b.classList.contains('tl-offline'), getComputedStyle(b).opacity, document.documentElement.classList.contains('dark'), T.text('#offline').includes('Try again')]`),
+      ).toEqual([true, '1', dark, true]);
+      // Back: Try again reaches the app.
+      await web.up();
+      await app.eval(`T.click(document.getElementById('again'))`);
+      await onToday(app);
+      // The stand-in is its own origin, with nothing stored: the page there followed System and told the app so.
+      // Give it the pick as well, so the next launch is built in it again.
+      await app
+        .eval(`localStorage.setItem('tudu.theme', '${pick.toLowerCase()}'); location.reload()`)
+        .catch(() => {});
+      await onToday(app);
+      await app.waitState((s) => s.look.saved.theme === pick.toLowerCase());
+      await app.quit();
+
+      // Slow: the loader shows the mark after 300ms; the web, arriving later, starts held (no second intro).
+      await web.down();
+      await web.up(2_000);
+      await app.launch({ TUDU_TEST_WEB: web.url });
+      await app.until(
+        `return location.protocol !== 'http:' && getComputedStyle(document.getElementById('boot')).opacity === '1'`,
+      );
+      expect(await app.eval(`return document.documentElement.classList.contains('dark')`)).toBe(dark);
+      await onToday(app);
+      expect(await app.eval(`return document.documentElement.dataset.boot`)).toBe('held');
+      await app.until(`return !document.getElementById('boot')`);
+    } finally {
+      await web.down();
     }
   });
 });

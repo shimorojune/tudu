@@ -148,6 +148,10 @@
 :root[data-motion='less'] .tp-ix-more {
   transition: none;
 }
+:root[data-motion='less'] .tp-ix-notes:hover .tp-ix-notes-arrow,
+:root[data-motion='less'] .tp-ix-notes:focus-visible .tp-ix-notes-arrow {
+  transform: none;
+}
 :root[data-motion='less'] .tp-ix-full {
   animation: none;
 }

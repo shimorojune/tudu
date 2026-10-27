@@ -1726,6 +1726,11 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 .tp-root .tp-ix-reply textarea:focus { box-shadow: inset 0 0 0 1px var(--foreground), 0 0 0 3px var(--accent); }
 .tp-ix-full .tp-ix-upd { padding-top: 4px; }
 .tp-ix-full .tp-ix-upd .tp-ix-acts { padding: 0; }
+/* What's new leaves Tudu: the arrow after its label, centred on it, nudging up and right on hover. */
+.tp-ix-notes .tp-btn-label { display: inline-flex; align-items: center; gap: 4px; }
+.tp-ix-notes-arrow { flex: none; margin-right: -2px; transition: transform var(--dur-menu) var(--ease-change); }
+.tp-ix-notes:hover .tp-ix-notes-arrow, .tp-ix-notes:focus-visible .tp-ix-notes-arrow { transform: translate(1px, -1px); }
+@media (prefers-reduced-motion: reduce) { .tp-ix-notes:hover .tp-ix-notes-arrow, .tp-ix-notes:focus-visible .tp-ix-notes-arrow { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .tp-ix-full { animation: none; } }
 .tp-ix-backrow { margin: 8px 0 -8px -8px; }
 /* Reading pane: a small avatar on the "who did what" line, then everything uses the full width;

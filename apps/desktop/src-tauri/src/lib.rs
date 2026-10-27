@@ -6,6 +6,7 @@ mod background;
 mod bridge;
 #[cfg(feature = "control")]
 mod control;
+mod look;
 mod notes;
 mod place;
 mod track;
@@ -48,6 +49,7 @@ macro_rules! handlers {
             background::set_open_at_login,
             background::open_login_items,
             background::set_dock,
+            look::set_appearance,
             notes::open_note,
             notes::note_state,
             notes::set_note_pinned,
@@ -100,6 +102,7 @@ pub fn run() {
             let background = background::start(app.handle());
             let at_login = background.at_login;
             app.manage(background);
+            app.manage(look::Looks::start(app.handle()));
 
             windows::create(app.handle(), at_login)?;
             background::seed_tray_place();

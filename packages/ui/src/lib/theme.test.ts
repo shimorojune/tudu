@@ -4,7 +4,11 @@ import { parseRules, readStylesheet, rulesWhere } from '../test-utils/stylesheet
 import {
   CROSS_FADE_MS,
   THEME_STORAGE_KEY,
+  currentThemeChoice,
+  onLessMotion,
+  onThemeChange,
   onThemeChoice,
+  setLessMotion,
   readThemeChoice,
   resetThemeForTests,
   resolveTheme,
@@ -253,5 +257,39 @@ describe('theme', () => {
     expect(result.current.choice).toBe('system');
     expect(result.current.theme).toBe('light');
     expect(html).not.toHaveClass('dark');
+  });
+
+  it('C11-U22 onThemeChange hears a pick here and one taken up from another window, once each, until it stops', () => {
+    const changes = vi.fn();
+    const stop = onThemeChange(changes);
+
+    setThemeChoice('dark');
+    expect(changes).toHaveBeenCalledTimes(1);
+    expect(changes).toHaveBeenLastCalledWith('dark');
+    expect(currentThemeChoice()).toBe('dark');
+
+    // Picked in another window: taken up here and heard once.
+    localStorage.setItem(THEME_STORAGE_KEY, 'light');
+    syncThemeChoice();
+    expect(changes).toHaveBeenCalledTimes(2);
+    expect(changes).toHaveBeenLastCalledWith('light');
+    // A sync with nothing new says nothing.
+    syncThemeChoice();
+    expect(changes).toHaveBeenCalledTimes(2);
+
+    stop();
+    setThemeChoice('system');
+    expect(changes).toHaveBeenCalledTimes(2);
+    expect(currentThemeChoice()).toBe('system');
+  });
+
+  it('C11-U22 onLessMotion hears the switch until it stops', () => {
+    const heard = vi.fn();
+    const stop = onLessMotion(heard);
+    setLessMotion(true);
+    expect(heard).toHaveBeenLastCalledWith(true);
+    stop();
+    setLessMotion(false);
+    expect(heard).toHaveBeenCalledTimes(1);
   });
 });

@@ -213,6 +213,7 @@ fn window_state(w: Option<WebviewWindow>) -> Value {
         "height": size.map(|s| s.height),
         "screen": screen,
         "url": w.url().map(|u| u.to_string()).unwrap_or_default(),
+        "theme": w.theme().ok(),
     })
 }
 
@@ -254,6 +255,12 @@ fn state(app: &AppHandle) -> Value {
         app.get_webview_window(label)
             .and_then(|w| background::webview_policy(&w))
     };
+    let looks = app.state::<crate::look::Looks>();
+    let look = json!({
+        "saved": crate::look::current(app),
+        "launchedAt": looks.launched_at,
+        "deskBackground": looks.background.lock().ok().and_then(|b| b.map(crate::look::hex)),
+    });
     let background = json!({
         "policy": background::current_policy(app),
         "dock": bg.dock.lock().map(|d| *d).unwrap_or_default(),
@@ -292,6 +299,7 @@ fn state(app: &AppHandle) -> Value {
         "shortcut": { "accelerator": SUMMON, "registered": registered },
         "badge": dock_badge(app),
         "background": background,
+        "look": look,
         "updater": updater,
         "seen": seen,
         "outside": windows::last_outside(),

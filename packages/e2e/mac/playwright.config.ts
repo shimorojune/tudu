@@ -8,6 +8,8 @@ import { defineConfig } from '@playwright/test';
  */
 export const API_PORT = process.env.MAC_API_PORT ?? '3713';
 export const WEB_PORT = process.env.MAC_WEB_PORT ?? '5713';
+/** A stand-in for the web that a test can take down or slow (C11-D19); the API takes its origin too. */
+export const HOLD_PORT = process.env.MAC_HOLD_PORT ?? String(Number(WEB_PORT) + 1);
 const api = `http://localhost:${API_PORT}`;
 
 export default defineConfig({
@@ -35,6 +37,7 @@ export default defineConfig({
       env: {
         E2E_API_PORT: API_PORT,
         E2E_WEB_PORT: WEB_PORT,
+        E2E_EXTRA_ORIGINS: `http://localhost:${HOLD_PORT}`,
         // The update feed reads the fake GitHub this same API serves.
         UPDATES_TRACK: 'production',
         UPDATES_GITHUB_TOKEN: 'test-token',

@@ -47,7 +47,7 @@ import { useEffect, useRef, useState } from 'react';
 import { API_URL } from '../../app/config';
 import { desktop } from '../../app/desktop';
 import { useAppInfo } from '../../app/DesktopHost';
-import { appEntry, isAppItem, restartToUpdate, updateStore, useUpdate } from '../../app/updates';
+import { appEntry, isAppItem, notesHref, restartToUpdate, updateStore, useUpdate } from '../../app/updates';
 import { locateTask, showDay } from '../../app/dayView';
 import { api, meQuery, queryClient } from '../../app/session';
 import { inboxPath, spaceBySlug, spacePath, useSpace } from '../../app/space';
@@ -251,7 +251,8 @@ export function InboxPage() {
 
   // The macOS app's new version, once downloaded: first in Updates (unfiltered), until restarted or deleted.
   const update = useUpdate();
-  const appName = useAppInfo()?.name ?? 'Tudu';
+  const appInfo = useAppInfo();
+  const appName = appInfo?.name ?? 'Tudu';
   const [arrived] = useState(() => new Date().toISOString());
   const term = q.trim().toLowerCase();
   const appItem =
@@ -357,7 +358,7 @@ export function InboxPage() {
       moveOn(e.id);
     },
     onOpen: (e: InboxEntry) => {
-      // What's new: the version's own item, its notes in the reading pane.
+      // The version's own item from the list: its notes in the reading pane.
       if (isAppItem(e.id)) {
         if (picked !== e.id) select(e.id);
         return;
@@ -584,6 +585,8 @@ export function InboxPage() {
       />
     );
 
+  // What's new: the ready version's release on GitHub, opened in the browser (none for Tudu Test or dev).
+  const notes = pickedApp ? notesHref(appInfo, update.ready) : null;
   const pickedEntry = pickedApp
     ? pickedApp
     : pickedItem
@@ -605,6 +608,14 @@ export function InboxPage() {
         const d = desktop();
         return d ? restartToUpdate(d, appName) : undefined;
       }}
+      onNotes={
+        notes
+          ? () =>
+              void desktop()
+                ?.openExternal(notes)
+                .catch(() => {})
+          : undefined
+      }
       {...handlers}
     />
   ) : compact ? null : (
