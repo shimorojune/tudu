@@ -612,10 +612,14 @@ export function NoteTree(p: NoteTreeProps) {
     );
     const b = el ? boxOf(el) : null;
     setGhost({ ...ghost, placed: true, ...(b ?? {}) });
-    const t = setTimeout(() => setGhost(null), reducedMotion() ? 0 : GLIDE_MS + 10);
-    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the card gets somewhere to go
   }, [ghost]);
+  const placed = !!ghost?.placed;
+  useEffect(() => {
+    if (!placed) return;
+    const t = setTimeout(() => setGhost(null), reducedMotion() ? 0 : GLIDE_MS + 10);
+    return () => clearTimeout(t);
+  }, [placed]);
 
   const down: Common['down'] = (e, kind, id, label) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;

@@ -285,15 +285,15 @@ describe('C22-U46 spring-open', () => {
   it('C22-U46 holding over a closed folder opens it', () => {
     vi.useFakeTimers();
     setup({ onMoveNote: vi.fn() });
-    expect(screen.queryByText('Gift ideas')).toBeNull();
+    expect(rowOf('folder', 'home')).toHaveAttribute('aria-expanded', 'false');
     press(rowOf('note', 'sunday'));
     to(30, 10);
     over(rowOf('folder', 'home'));
     to(30, 40);
     act(() => vi.advanceTimersByTime(SPRING_MS - 50));
-    expect(screen.queryByText('Gift ideas')).toBeNull();
+    expect(rowOf('folder', 'home')).toHaveAttribute('aria-expanded', 'false');
     act(() => vi.advanceTimersByTime(100));
-    expect(screen.getByText('Gift ideas')).toBeInTheDocument();
+    expect(rowOf('folder', 'home')).toHaveAttribute('aria-expanded', 'true');
   });
 });
 
