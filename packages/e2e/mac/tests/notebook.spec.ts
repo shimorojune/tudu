@@ -659,6 +659,21 @@ test.describe('chunk 22 · drawings in the note window', () => {
       .toBe(1);
     await done(app);
     await app.until(`return !!document.querySelector('.tp-nb-draw[data-drawing-id="${did}"] img')`, 'note');
+    // Saved first (the block in the words, the drawing with its pictures), so the reload reads it back.
+    await expect
+      .poll(
+        async () => {
+          const n = await asPage<{
+            html: string;
+            drawings: Array<{ id: string; previewLight: string | null }>;
+          }>(app, 'GET', `/api/notebook/notes/${id}`);
+          return (
+            n.html.includes(`data-drawing="${did}"`) && !!n.drawings.find((d) => d.id === did)?.previewLight
+          );
+        },
+        { timeout: 20_000 },
+      )
+      .toBe(true);
     await app.eval(`location.reload(); return true;`, 'note');
     await noteReady(app);
     await app.until(
