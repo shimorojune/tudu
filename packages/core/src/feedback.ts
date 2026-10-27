@@ -4,6 +4,18 @@ import { z } from 'zod';
 export const FEEDBACK_TEXT_MAX = 5000;
 /** One screenshot, an image, up to this big. */
 export const FEEDBACK_IMAGE_MAX = 10 * 1024 * 1024;
+/** The kinds of image GitHub shows inline on an issue; only these can go public. SVG never does: it can carry script. */
+export const FEEDBACK_PUBLIC_IMAGE_TYPES: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+};
+
+/** Whether a screenshot of this type can be shown on the public issue. */
+export function shotCanBePublic(type: string): boolean {
+  return Object.hasOwn(FEEDBACK_PUBLIC_IMAGE_TYPES, type);
+}
 /** Reports one person may send in an hour. */
 export const FEEDBACK_PER_HOUR = 10;
 
@@ -41,6 +53,8 @@ export const feedbackReportSchema = z.object({
     .min(1, 'Say what happened first.')
     .max(FEEDBACK_TEXT_MAX, 'That is too long. Keep it under 5000 characters.'),
   details: feedbackDetailsSchema.nullable(),
+  /** "Show it on the public issue": the screenshot goes on the GitHub issue too. Off unless asked for. */
+  shotPublic: z.boolean().default(false),
 });
 export type FeedbackReport = z.infer<typeof feedbackReportSchema>;
 
@@ -164,12 +178,16 @@ export function issueLabels(kind: FeedbackKind): string[] {
   return [kind === 'bug' ? 'bug' : 'enhancement', 'from-app'];
 }
 
-/** The issue's body: the words, the app details (or that there are none), and the short reference to the report. */
+/**
+ * The issue's body: the words, the screenshot when its sender chose to show it (`shot` is the link Tudu serves it
+ * at), the app details (or that there are none), and the short reference to the report.
+ */
 export function issueBody(x: {
   kind: FeedbackKind;
   text: string;
   details: FeedbackDetails | null;
   ref: string;
+  shot?: string | null;
 }): string {
   const details = x.details
     ? feedbackDetailsLines(x.details).map((l) => `- ${l}`)
@@ -177,6 +195,7 @@ export function issueBody(x: {
   return [
     noMentions(x.text.trim()),
     '',
+    ...(x.shot ? ['**Screenshot**', '', `![Screenshot](${x.shot})`, ''] : []),
     '---',
     `**${x.kind === 'bug' ? 'Something’s wrong' : 'An idea'}**, sent from the Tudu app.`,
     '',

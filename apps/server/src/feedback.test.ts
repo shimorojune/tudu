@@ -8,6 +8,7 @@ import { GITHUB_TEST_HOST, signIn, startServer, type Jar } from '../test/harness
 import { fileReport, ISSUE_MAX_ATTEMPTS, ISSUES_PER_HOUR, sweepIssues } from './feedback/filing';
 import { GithubIssues, IssueError } from './feedback/github';
 import type { FakeIssue } from './feedback/fake';
+import { shotSig, shotUrl } from './feedback/shots';
 
 const TO = 'reports@tudu.test';
 const ISSUES_API = `http://${GITHUB_TEST_HOST}/__test/github-issues`;
@@ -69,6 +70,7 @@ function report(over: Partial<FeedbackReport> = {}): FeedbackReport {
     kind: 'bug',
     text: 'The tick did not stick.\nIt came back after a reload.',
     details: DETAILS,
+    shotPublic: false,
     ...over,
   };
 }
@@ -78,6 +80,11 @@ function png(bytes = 2048): File {
   const body = new Uint8Array(bytes);
   body.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   return new File([body], 'Screenshot.png', { type: 'image/png' });
+}
+
+/** An image of a kind GitHub can't show inline. */
+function image(type: string, name: string): File {
+  return new File([new Uint8Array(1024)], name, { type });
 }
 
 function send(jar: Jar | null, r: unknown, shot?: File, on = server): Promise<Response> {
@@ -166,6 +173,10 @@ describe('POST /api/feedback (chunk 19)', () => {
     expect(await rowsOf(r.id)).toHaveLength(1);
     expect(mailsAbout(r.id)).toHaveLength(1);
     expect(await issuesWith(marker)).toHaveLength(1);
+    // A retry that now asks to show the screenshot doesn't change the first request's choice.
+    expect((await send(jar, { ...r, shotPublic: true }, png())).status).toBe(200);
+    expect((await rowsOf(r.id))[0]!.screenshotPublic).toBe(false);
+    expect((await issuesWith(marker))[0]!.body).not.toContain('/api/feedback/shots/');
     // A double click: both at once.
     const both = report({ text: `At once. ${marker}` });
     const [x, y] = await Promise.all([send(jar, both), send(jar, both)]);
@@ -226,6 +237,7 @@ describe('POST /api/feedback (chunk 19)', () => {
       'kind:NO',
       'report_id:NO',
       'screenshot_key:YES',
+      'screenshot_public:NO',
       'text:NO',
       'user_id:NO',
     ]);
@@ -418,16 +430,178 @@ describe('the public GitHub issue', () => {
     expect((await server.app.request('/api/feedback/mine')).status).toBe(401);
   });
 
-  it('C19-A11 the issue never holds the name, email, user id, a space name or the screenshot', async () => {
+  it('C19-A11 the issue never holds the name, email, user id, a space name, the storage key or the file name', async () => {
     const { jar, email, userId } = await signInWithId();
     const marker = `A11 ${uuid()}`;
-    const r = report({ text: `Private check. ${marker}` });
-    const { id } = (await (await send(jar, r, png())).json()) as Sent;
+    // With the screenshot shown too: its link carries the short reference and a signature, nothing else.
+    for (const shotPublic of [false, true]) {
+      const r = report({ text: `Private check ${shotPublic}. ${marker}`, shotPublic });
+      const { id } = (await (await send(jar, r, png())).json()) as Sent;
+      const [issue] = await issuesWith(`Private check ${shotPublic}. ${marker}`);
+      const [row] = await rowsOf(r.id);
+      const everything = `${issue!.title}\n${issue!.body}`;
+      for (const secret of [email, userId, row!.screenshotKey!, 'Screenshot.png', 'Personal', id, r.id])
+        expect(everything).not.toContain(secret);
+      expect(issue!.body).toContain(`ref ${id.replace(/-/g, '').slice(0, 8)}`);
+    }
+  });
+});
+
+describe('the screenshot on the public issue', () => {
+  const LINKS = { base: 'http://localhost:3456', secret: 'test-secret-test-secret-test-secret' };
+  /** The image link a filed issue embeds, or null. */
+  const linkIn = (body: string) => /!\[Screenshot\]\((\S+)\)/.exec(body)?.[1] ?? null;
+  /** GET a public screenshot link the way GitHub's image proxy does: no cookie. */
+  const fetchShot = (url: string) => server.app.request(url.replace(LINKS.base, ''));
+
+  it('C19-A12 shown: the issue embeds a signed link under the words, and the link serves the image to anyone', async () => {
+    const { jar } = await signIn(server);
+    const marker = `A12 ${uuid()}`;
+    const r = report({ text: `Show the shot. ${marker}`, shotPublic: true });
+    const { id } = (await (await send(jar, r, png(3000))).json()) as Sent;
     const [issue] = await issuesWith(marker);
-    const [row] = await rowsOf(r.id);
-    const everything = `${issue!.title}\n${issue!.body}`;
-    for (const secret of [email, userId, row!.screenshotKey!, 'Screenshot.png', 'Personal', id, r.id])
-      expect(everything).not.toContain(secret);
-    expect(issue!.body).toContain(`ref ${id.replace(/-/g, '').slice(0, 8)}`);
+    const link = linkIn(issue!.body);
+    expect(link).toBe(shotUrl(LINKS, id));
+    expect(link).toBe(
+      `http://localhost:3456/api/feedback/shots/${id.slice(0, 8)}/${shotSig(LINKS.secret, id)}`,
+    );
+    // Under the words, before the details.
+    const body = issue!.body;
+    expect(body.indexOf('**Screenshot**')).toBeGreaterThan(body.indexOf(marker));
+    expect(body.indexOf('**Screenshot**')).toBeLessThan(body.indexOf('---'));
+    expect((await rowsOf(r.id))[0]!.screenshotPublic).toBe(true);
+    const res = await fetchShot(link!);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('image/png');
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(res.headers.get('content-security-policy')).toBe("default-src 'none'; sandbox");
+    expect(res.headers.get('cache-control')).toBe('public, max-age=3600');
+    expect(res.headers.get('content-disposition')).toBe('inline');
+    expect((await res.arrayBuffer()).byteLength).toBe(3000);
+  });
+
+  it('C19-A13 private by default: off, left out, or on with no screenshot, the issue has no image and no link', async () => {
+    const { jar } = await signIn(server);
+    const marker = `A13 ${uuid()}`;
+    const off = report({ text: `Off. ${marker}`, shotPublic: false });
+    await send(jar, off, png());
+    const { shotPublic: _, ...older } = report({ text: `Older client. ${marker}` });
+    await send(jar, older, png());
+    const none = report({ text: `No shot. ${marker}`, shotPublic: true });
+    await send(jar, none);
+    const issues = await issuesWith(marker);
+    expect(issues).toHaveLength(3);
+    for (const issue of issues) {
+      expect(issue.body).not.toContain('Screenshot');
+      expect(issue.body).not.toContain('/api/feedback/shots/');
+    }
+    for (const r of [off, older, none]) expect((await rowsOf(r.id))[0]!.screenshotPublic).toBe(false);
+    // A private screenshot's would-be link is a 404.
+    const [row] = await rowsOf(off.id);
+    expect((await fetchShot(shotUrl(LINKS, row!.id))).status).toBe(404);
+  });
+
+  it('C19-A14 a wrong, missing or borrowed signature, an unknown report, or a private one: the same 404', async () => {
+    const { jar } = await signIn(server);
+    const marker = `A14 ${uuid()}`;
+    const a = report({ text: `A. ${marker}`, shotPublic: true });
+    const b = report({ text: `B. ${marker}`, shotPublic: true });
+    const ida = ((await (await send(jar, a, png())).json()) as Sent).id;
+    const idb = ((await (await send(jar, b, png())).json()) as Sent).id;
+    const ref = ida.slice(0, 8);
+    const misses = [
+      `/api/feedback/shots/${ref}/${'x'.repeat(32)}`,
+      `/api/feedback/shots/${ref}/`,
+      `/api/feedback/shots/${ref}/${shotSig(LINKS.secret, idb)}`,
+      `/api/feedback/shots/${ref}/${shotSig('another-secret-another-secret', ida)}`,
+      `/api/feedback/shots/00000000/${shotSig(LINKS.secret, ida)}`,
+      `/api/feedback/shots/${ida}/${shotSig(LINKS.secret, ida)}`,
+    ];
+    for (const url of misses) {
+      const res = await server.app.request(url);
+      expect(res.status, url).toBe(404);
+    }
+    // Signatures differ per report and per secret.
+    expect(shotSig(LINKS.secret, ida)).not.toBe(shotSig(LINKS.secret, idb));
+    expect(shotSig(LINKS.secret, ida)).not.toBe(shotSig('another-secret-another-secret', ida));
+    expect(shotSig(LINKS.secret, ida)).toHaveLength(32);
+    expect((await fetchShot(shotUrl(LINKS, ida))).status).toBe(200);
+  });
+
+  it('C19-A15 GitHub down at send: the sweep files it later with the same image link', async () => {
+    const { jar } = await signIn(server);
+    const marker = `A15 ${uuid()}`;
+    await githubMode(marker, 'down');
+    const r = report({ text: `Later, with the shot. ${marker}`, shotPublic: true });
+    const { id } = (await (await send(jar, r, png())).json()) as Sent;
+    expect(await issuesWith(marker)).toHaveLength(0);
+    await githubMode(marker, 'up');
+    await server.app.request('/__test/feedback/sweep', { method: 'POST' });
+    const [issue] = await issuesWith(marker);
+    expect(linkIn(issue!.body)).toBe(shotUrl(LINKS, id));
+  });
+
+  it('C19-A16 an SVG or HEIC asked to be shown stays private: no image on the issue, the link 404s, the mail has it', async () => {
+    const { jar } = await signIn(server);
+    for (const [type, name] of [
+      ['image/svg+xml', 'Drawing.svg'],
+      ['image/heic', 'IMG_2041.heic'],
+    ] as const) {
+      const marker = `A16 ${type} ${uuid()}`;
+      const r = report({ text: `Can't go public. ${marker}`, shotPublic: true });
+      const { id } = (await (await send(jar, r, image(type, name))).json()) as Sent;
+      const [issue] = await issuesWith(marker);
+      expect(issue!.body).not.toContain('Screenshot');
+      expect((await rowsOf(r.id))[0]!.screenshotPublic).toBe(false);
+      expect((await fetchShot(shotUrl(LINKS, id))).status).toBe(404);
+      const [mail] = mailsAbout(r.id);
+      expect(mail!.attachments?.map((a) => a.filename)).toEqual([name]);
+      expect(mail!.text).toContain(`Screenshot: ${name} (attached, private)`);
+    }
+  });
+
+  it('C19-A17 taken down: switched back to private, or the image deleted, the link 404s', async () => {
+    const { jar } = await signIn(server);
+    const marker = `A17 ${uuid()}`;
+    const r1 = report({ text: `Unshow. ${marker}`, shotPublic: true });
+    const r2 = report({ text: `Delete. ${marker}`, shotPublic: true });
+    const id1 = ((await (await send(jar, r1, png())).json()) as Sent).id;
+    const id2 = ((await (await send(jar, r2, png())).json()) as Sent).id;
+    expect((await fetchShot(shotUrl(LINKS, id1))).status).toBe(200);
+    await server.db
+      .update(schema.feedback)
+      .set({ screenshotPublic: false })
+      .where(eq(schema.feedback.id, id1));
+    expect((await fetchShot(shotUrl(LINKS, id1))).status).toBe(404);
+    const [row2] = await rowsOf(r2.id);
+    await server.storage.delete(row2!.screenshotKey!);
+    expect((await fetchShot(shotUrl(LINKS, id2))).status).toBe(404);
+  });
+
+  it('C19-A18 the mail says whether the screenshot is shown on the issue, and attaches it either way', async () => {
+    const { jar } = await signIn(server);
+    const shown = report({ text: `Mail shown. ${uuid()}`, shotPublic: true });
+    const kept = report({ text: `Mail kept. ${uuid()}` });
+    await send(jar, shown, png());
+    await send(jar, kept, png());
+    const [m1] = mailsAbout(shown.id);
+    const [m2] = mailsAbout(kept.id);
+    expect(m1!.text).toContain('Screenshot: Screenshot.png (attached, shown on the issue)');
+    expect(m2!.text).toContain('Screenshot: Screenshot.png (attached, private)');
+    expect(m1!.attachments).toHaveLength(1);
+    expect(m2!.attachments).toHaveLength(1);
+  });
+
+  it('C19-A19 migration 0017 adds screenshot_public, false by default, so every older report stays private', async () => {
+    const defaults = (
+      await server.db.execute(
+        sql`select column_default, is_nullable from information_schema.columns where table_name = 'feedback' and column_name = 'screenshot_public'`,
+      )
+    ).rows;
+    expect(defaults).toEqual([{ column_default: 'false', is_nullable: 'NO' }]);
+    const { jar } = await signIn(server);
+    const r = report({ text: `Before the switch. ${uuid()}` });
+    await send(jar, r, png());
+    expect((await rowsOf(r.id))[0]!.screenshotPublic).toBe(false);
   });
 });

@@ -161,7 +161,7 @@ async function shotFlow(page: Page) {
   await expect(f.locator('.tp-fb-shot-img')).toHaveClass(/tp-ready/);
   await f.getByRole('button', { name: 'Remove the screenshot' }).click();
   await expect(caption(f)).toHaveCount(0);
-  await expect(f.getByText('Only the Tudu team sees it')).toBeVisible();
+  await expect(f.getByText('Private unless you show it')).toBeVisible();
   await pickShot(page, f, 'Board.png');
   await sendIt(page, f, `With a picture ${marker}`);
   const mail = await oneMail(page, marker);
@@ -345,6 +345,36 @@ test.describe('send feedback', () => {
           expect(l.getByRole('button', { name: 'Public on GitHub: what’s shared' })).toBeVisible(),
       ],
       [
+        'Send feedback, screenshot kept private',
+        async (l: Locator) => {
+          const sw = l.getByRole('switch', { name: 'Show the screenshot on the public issue' });
+          await expect(sw).not.toBeChecked();
+          await expect(sw).toBeEnabled();
+          await expect(l.locator('.tp-fb-shot')).not.toHaveClass(/tp-shown/);
+        },
+      ],
+      [
+        'Send feedback, screenshot shown on the issue',
+        async (l: Locator) => {
+          await expect(
+            l.getByRole('switch', { name: 'Show the screenshot on the public issue' }),
+          ).toBeChecked();
+          await expect(l.locator('.tp-fb-shot')).toHaveClass(/tp-shown/);
+          await expect(l.locator('.tp-fb-shot-img')).toHaveClass(/tp-ready/);
+        },
+      ],
+      [
+        'Send feedback, screenshot GitHub can’t show',
+        async (l: Locator) => {
+          await expect(
+            l.getByRole('switch', { name: 'Show the screenshot on the public issue' }),
+          ).toBeDisabled();
+          await expect(
+            l.getByText('GitHub can’t show this kind of image. It stays with the team.'),
+          ).toBeVisible();
+        },
+      ],
+      [
         'Send feedback, filing',
         (l: Locator) => expect(l.getByRole('button', { name: /Filing…/ })).toBeVisible(),
       ],
@@ -443,7 +473,7 @@ test.describe('send feedback', () => {
     test.skip(!desktop(), 'the same form on every size');
     await signInFresh(page);
     const f = await openByBug(page);
-    await expect(f.getByText('Only the Tudu team sees it')).toBeVisible();
+    await expect(f.getByText('Private unless you show it')).toBeVisible();
     await expect(words(f)).toHaveAttribute('placeholder', /Leave out anything private\.$/);
     await words(f).fill('Kept while I look');
     await f.getByRole('button', { name: 'Public on GitHub: what’s shared' }).click();
@@ -453,8 +483,9 @@ test.describe('send feedback', () => {
       'What you write',
       'Bug or idea',
       'App details, when switched on: version, system, page, window, theme',
+      'The screenshot, only when you show it',
       'Your name and email (so we can reply)',
-      'The screenshot',
+      'The screenshot, unless you show it',
     ]);
     await expect(pop).toContainText('Never sent anywhere: your tasks, notes, people or space names.');
     await page.keyboard.press('Escape');
@@ -496,5 +527,75 @@ test.describe('send feedback', () => {
     const copied = await page.evaluate(() => navigator.clipboard.readText()).catch(() => null);
     if (copied !== null) expect(copied).toMatch(ISSUE_URL);
     if (copied !== null) expect(copied).toBe(`https://github.com/shimorojune/tudu/issues/${n}`);
+  });
+
+  test('C19-E15 switched on, the issue shows the screenshot: its link serves the same bytes to a cookieless request', async ({
+    page,
+  }) => {
+    test.skip(!desktop(), 'the same form on every size');
+    await signInFresh(page);
+    const marker = `e15-${crypto.randomUUID()}`;
+    const f = await openByBug(page);
+    await pickShot(page, f, 'Public.png');
+    const sw = f.getByRole('switch', { name: 'Show the screenshot on the public issue' });
+    await expect(sw).not.toBeChecked();
+    await expect(f.getByText('Private. Only the Tudu team sees it, with your report.')).toBeVisible();
+    await sw.click();
+    await expect(sw).toBeChecked();
+    await expect(f.locator('.tp-fb-shot')).toHaveClass(/tp-shown/);
+    await expect(f.locator('.tp-fb-pill')).toHaveText('Public');
+    await expect(f.getByText('Public. Anyone can see it on the GitHub issue.')).toBeVisible();
+    await sendIt(page, f, `Shown on the issue ${marker}`);
+    const issue = await oneIssue(page, marker);
+    const link = /!\[Screenshot\]\(([^)]+)\)/.exec(issue.body)?.[1];
+    expect(link).toMatch(new RegExp(`^${API_URL}/api/feedback/shots/[0-9a-f]{8}/[A-Za-z0-9_-]{32}$`));
+    expect(issue.body).not.toContain('Public.png');
+    // GitHub's image proxy fetches it with no cookies: Node's fetch has none.
+    const res = await fetch(link!);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('image/png');
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(Buffer.from(await res.arrayBuffer()).equals(PNG)).toBe(true);
+    const mail = await oneMail(page, marker);
+    expect(mail.text).toContain('Screenshot: Public.png (attached, shown on the issue)');
+    expect(mail.attachments?.map((a) => a.filename)).toEqual(['Public.png']);
+  });
+
+  test('C19-E16 left off, the issue has no screenshot; the mail still attaches it', async ({ page }) => {
+    test.skip(!desktop(), 'the same form on every size');
+    await signInFresh(page);
+    const marker = `e16-${crypto.randomUUID()}`;
+    const f = await openByBug(page);
+    await pickShot(page, f, 'Private.png');
+    await expect(
+      f.getByRole('switch', { name: 'Show the screenshot on the public issue' }),
+    ).not.toBeChecked();
+    await sendIt(page, f, `Kept private ${marker}`);
+    const issue = await oneIssue(page, marker);
+    expect(issue.body).not.toContain('Screenshot');
+    expect(issue.body).not.toContain('/api/feedback/shots/');
+    const mail = await oneMail(page, marker);
+    expect(mail.text).toContain('Screenshot: Private.png (attached, private)');
+    expect(mail.attachments?.map((a) => [a.filename, a.type, a.size])).toEqual([
+      ['Private.png', 'image/png', PNG.length],
+    ]);
+  });
+
+  test('C19-E17 switched on, then the screenshot removed and another added: the switch is off again', async ({
+    page,
+  }) => {
+    test.skip(!desktop(), 'the same form on every size');
+    await signInFresh(page);
+    const f = await openByBug(page);
+    await expect(f.getByRole('switch', { name: 'Show the screenshot on the public issue' })).toHaveCount(0);
+    await pickShot(page, f, 'First.png');
+    const sw = f.getByRole('switch', { name: 'Show the screenshot on the public issue' });
+    await sw.click();
+    await expect(sw).toBeChecked();
+    await f.getByRole('button', { name: 'Remove the screenshot' }).click();
+    await expect(caption(f)).toHaveCount(0);
+    await pickShot(page, f, 'Second.png');
+    await expect(sw).not.toBeChecked();
+    await expect(f.locator('.tp-fb-shot')).not.toHaveClass(/tp-shown/);
   });
 });

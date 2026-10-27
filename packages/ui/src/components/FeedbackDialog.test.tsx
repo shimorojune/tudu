@@ -15,6 +15,7 @@ function Form({
   const [kind, setKind] = useState<FeedbackKind>('bug');
   const [text, setText] = useState('');
   const [shot, setShot] = useState<File | null>(null);
+  const [shotPublic, setShotPublic] = useState(false);
   const [details, setDetails] = useState(true);
   return (
     <FeedbackDialog
@@ -24,7 +25,13 @@ function Form({
       text={text}
       onText={setText}
       shot={shot}
-      onShot={setShot}
+      onShot={(f) => {
+        // As the app does: each new screenshot comes in private.
+        setShot(f);
+        setShotPublic(false);
+      }}
+      shotPublic={shotPublic}
+      onShotPublic={setShotPublic}
       details={details}
       onDetails={setDetails}
       detailsLine="Tudu 0.38.0, macOS, the Today page. Never your tasks."
@@ -90,7 +97,7 @@ describe('FeedbackDialog (chunk 19)', () => {
       'placeholder',
       'What you’d like Tudu to do, and what it would save you. Leave out anything private.',
     );
-    expect(screen.getByText('Only the Tudu team sees it')).toBeInTheDocument();
+    expect(screen.getByText('Private unless you show it')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Public on GitHub: what’s shared' })).toBeInTheDocument();
     rerender(<Form onSend={onSend} filing="github" phase="sending" />);
     expect(screen.getByRole('button', { name: /Filing…/ })).toBeInTheDocument();
@@ -108,7 +115,8 @@ describe('FeedbackDialog (chunk 19)', () => {
     expect(pop).toHaveTextContent('What you write');
     expect(pop).toHaveTextContent('App details, when switched on: version, system, page, window, theme');
     expect(pop).toHaveTextContent('Your name and email (so we can reply)');
-    expect(pop).toHaveTextContent('The screenshot');
+    expect(pop).toHaveTextContent('The screenshot, only when you show it');
+    expect(pop).toHaveTextContent('The screenshot, unless you show it');
     expect(pop).toHaveTextContent('Never sent anywhere: your tasks, notes, people or space names.');
     await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'What’s shared' })).toBeNull());
@@ -259,6 +267,67 @@ describe('FeedbackDialog (chunk 19)', () => {
     await user.upload(screen.getByLabelText('Choose a screenshot'), image('Fine.png', 1));
     expect(screen.queryByRole('status')).toBeNull();
     expect(screen.getByText('or paste or drop one')).toBeInTheDocument();
+  });
+
+  it('C19-U19 a screenshot brings "Show it on the public issue", off; on shows the Public pill, the ring and says so', async () => {
+    const user = userEvent.setup();
+    render(<Form filing="github" />);
+    const row = () => screen.queryByRole('switch', { name: 'Show the screenshot on the public issue' });
+    const fig = () => document.querySelector('.tp-fb-shot')!;
+    const sub = () => document.querySelector('.tp-fb-sub')!;
+    // No screenshot, no switch.
+    expect(row()).toBeNull();
+    await user.upload(screen.getByLabelText('Choose a screenshot'), image('Screenshot.png', 12));
+    await waitFor(() => expect(row()).not.toBeNull());
+    expect(row()).toHaveAttribute('aria-checked', 'false');
+    expect(row()).toBeEnabled();
+    expect(fig()).not.toHaveClass('tp-shown');
+    expect(sub()).not.toHaveClass('tp-on');
+    expect(sub()).toHaveTextContent('Private. Only the Tudu team sees it, with your report.');
+    await user.click(row()!);
+    expect(row()).toHaveAttribute('aria-checked', 'true');
+    expect(fig()).toHaveClass('tp-shown');
+    expect(sub()).toHaveClass('tp-on');
+    expect(sub()).toHaveTextContent('Public. Anyone can see it on the GitHub issue.');
+    expect(document.querySelector('.tp-fb-pill')).toHaveTextContent('Public');
+    // Another screenshot comes in private again.
+    act(() => {
+      box().dispatchEvent(withFiles('paste', [image('Other.png', 3)]));
+    });
+    await waitFor(() => expect(caption()).toBe('Other.png3 KB'));
+    expect(row()).toHaveAttribute('aria-checked', 'false');
+    expect(fig()).not.toHaveClass('tp-shown');
+    // A kind GitHub can't show keeps the row, off and disabled, saying why.
+    act(() => {
+      box().dispatchEvent(
+        withFiles('paste', [new File([new Uint8Array(64)], 'IMG_2041.heic', { type: 'image/heic' })]),
+      );
+    });
+    await waitFor(() => expect(caption()).toBe('IMG_2041.heic1 KB'));
+    expect(row()).toBeDisabled();
+    expect(row()).toHaveAttribute('aria-checked', 'false');
+    expect(
+      screen.getByText('GitHub can’t show this kind of image. It stays with the team.'),
+    ).toBeInTheDocument();
+    await user.click(row()!);
+    expect(row()).toHaveAttribute('aria-checked', 'false');
+    expect(fig()).not.toHaveClass('tp-shown');
+  });
+
+  it('C19-U20 email only: a screenshot brings no switch and no pill; the hint is as before', async () => {
+    const user = userEvent.setup();
+    render(<Form filing="email" />);
+    expect(screen.getByText('or paste or drop one')).toBeInTheDocument();
+    await user.upload(screen.getByLabelText('Choose a screenshot'), image('Screenshot.png', 12));
+    await waitFor(() => expect(caption()).toBe('Screenshot.png12 KB'));
+    expect(screen.queryByRole('switch', { name: 'Show the screenshot on the public issue' })).toBeNull();
+    expect(document.querySelector('.tp-fb-shot')).not.toHaveClass('tp-shown');
+  });
+
+  it('C19-U21 the hint by Add a screenshot says it’s private unless you show it', () => {
+    render(<Form filing="github" />);
+    expect(screen.getByText('Private unless you show it')).toBeInTheDocument();
+    expect(screen.queryByText('Only the Tudu team sees it')).toBeNull();
   });
 
   it('C19-U01 the avatar menu has Send feedback between Settings and Sign out', async () => {

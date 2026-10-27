@@ -12,6 +12,7 @@ import {
   issueTitle,
   noMentions,
   osOf,
+  shotCanBePublic,
 } from './feedback';
 
 const MAC_CHROME =
@@ -161,6 +162,24 @@ describe('the public GitHub issue', () => {
     expect(off).toContain('**An idea**');
     expect(off).toContain('_App details were switched off._');
     expect(off).not.toContain('App:');
+    // Without a screenshot link the body is exactly as before, and holds no Screenshot section.
+    expect(body).not.toContain('Screenshot');
+    expect(
+      issueBody({
+        kind: 'bug',
+        text: 'It broke.\nTwice.',
+        details,
+        ref: feedbackRef('0f3c2a1b-9d8e-4c7b'),
+        shot: null,
+      }),
+    ).toBe(body);
+  });
+
+  it('C19-U18 a shown screenshot sits under the words and before the details, as an image', () => {
+    const url = 'https://api.tudu.ezdev.net/api/feedback/shots/0f3c2a1b/sig';
+    const body = issueBody({ kind: 'bug', text: 'It broke.', details, ref: '0f3c2a1b', shot: url });
+    expect(body.startsWith(`It broke.\n\n**Screenshot**\n\n![Screenshot](${url})\n\n---\n`)).toBe(true);
+    expect(body.indexOf('![Screenshot]')).toBeLessThan(body.indexOf('- App:'));
   });
 
   it('C19-U09 @mentions are defused, #refs, emails and links pass; labels by kind', () => {
@@ -174,5 +193,24 @@ describe('the public GitHub issue', () => {
     );
     expect(issueLabels('bug')).toEqual(['bug', 'from-app']);
     expect(issueLabels('idea')).toEqual(['enhancement', 'from-app']);
+  });
+});
+
+describe('the screenshot on the public issue', () => {
+  it('C19-U17 a report is private unless it asks (shotPublic defaults to false); only PNG, JPEG, GIF and WebP can go public', () => {
+    const base = {
+      id: '9b2f7c1e-4a3d-4e5f-8a6b-7c8d9e0f1a2b',
+      kind: 'bug',
+      text: 'It broke.',
+      details: null,
+    };
+    expect(feedbackReportSchema.parse(base).shotPublic).toBe(false);
+    expect(feedbackReportSchema.parse({ ...base, shotPublic: true }).shotPublic).toBe(true);
+    expect(feedbackReportSchema.safeParse({ ...base, shotPublic: 'yes' }).success).toBe(false);
+    // Only the kinds GitHub shows inline can go on the issue.
+    for (const t of ['image/png', 'image/jpeg', 'image/gif', 'image/webp'])
+      expect(shotCanBePublic(t)).toBe(true);
+    for (const t of ['image/svg+xml', 'image/heic', 'image/tiff', 'image/bmp', 'text/html', 'toString'])
+      expect(shotCanBePublic(t)).toBe(false);
   });
 });

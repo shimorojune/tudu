@@ -129,7 +129,8 @@ export function createApp(deps: AppDeps) {
   app.route('/api', spaceRoutes(db, hub, mailer, env.WEB_URL!, storage));
   app.route('/api', inboxRoutes(db));
   app.route('/api', fileRoutes(db, storage));
-  app.route('/api', feedbackRoutes(db, storage, mailer, env.FEEDBACK_TO, deps.issues ?? null));
+  const shots = { base: env.BASE_URL, secret: env.AUTH_SECRET };
+  app.route('/api', feedbackRoutes(db, storage, mailer, env.FEEDBACK_TO, deps.issues ?? null, shots));
   app.route(
     '/api',
     connectorRoutes(db, hub, {
@@ -147,7 +148,11 @@ export function createApp(deps: AppDeps) {
     // The issue sweep on demand: the server runs it every five minutes, tests can't wait that long.
     app.post('/__test/feedback/sweep', async (c) => {
       const filed = deps.issues
-        ? await sweepIssues(db, deps.issues, { quiet: true, now: new Date(Date.now() + 10 * 60 * 1000) })
+        ? await sweepIssues(db, deps.issues, {
+            quiet: true,
+            now: new Date(Date.now() + 10 * 60 * 1000),
+            shots,
+          })
         : 0;
       return c.json({ filed });
     });

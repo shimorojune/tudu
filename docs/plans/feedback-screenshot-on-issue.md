@@ -1,6 +1,7 @@
 # Show the feedback screenshot on its GitHub issue, if you choose
 
-Status: proposal, awaiting Rohit's approval. Canvas approved 27 Oct 2026 (boards `K-FeedbackShot` and
+Status: approved by Rohit on 27 Oct 2026, with the switch disabled for HEIC and other types GitHub can't show.
+Canvas approved 27 Oct 2026 (boards `K-FeedbackShot` and
 `K-FeedbackShot-Dark` on the Send feedback page, light and dark). Approach picked by Rohit on 27 Oct: Tudu serves the
 image at an unguessable link, and each report decides with a switch whether its screenshot goes public. The switch is
 off by default.
@@ -63,19 +64,21 @@ Everything below is only when GitHub filing is on (`filing: 'github'`). With ema
 
 3. **Migration `0017_feedback-shot-public`** adds `feedback.screenshot_public boolean not null default false`. The
    server only sets it to true when the request had a screenshot. Existing rows stay private.
-4. **The link.** `GET /api/feedback/shots/:id/:sig.:ext` is public and needs no session (GitHub's image proxy fetches
+4. **The link.** `GET /api/feedback/shots/:ref/:sig` is public and needs no session (GitHub's image proxy fetches
    it with no cookies).
-   - `sig` is the first 32 base64url characters of `HMAC-SHA256(AUTH_SECRET, 'feedback-shot:' + id)`. It is checked
-     with `timingSafeEqual`, so nobody can guess or enumerate links.
+   - `ref` is the report's short reference (the first 8 hex characters of its id), which the issue already shows. The
+     whole id never goes public. `sig` is the first 32 base64url characters of
+     `HMAC-SHA256(AUTH_SECRET, 'feedback-shot:' + id)`, checked with `timingSafeEqual` against the public rows that
+     share the reference, so nobody can guess or enumerate links.
    - It answers only when the row exists, `screenshot_public` is true and the stored object is still there. Every
-     other case gets the same 404: unknown id, wrong signature, private row, or object gone.
-   - `ext` comes from the content type. The URL never carries the file name, which can be personal ("Rohit's
-     screen.png").
+     other case gets the same 404: unknown reference, wrong signature, private row, or object gone.
+   - The URL has no extension and never carries the file name, which can be personal ("Rohit's screen.png"). The
+     content type header says what it is.
    - Headers: the stored content type, `x-content-type-options: nosniff`, `content-disposition: inline`,
      `content-security-policy: default-src 'none'; sandbox`, `cache-control: public, max-age=3600`.
 5. **Which images go public.** Only `image/png`, `image/jpeg`, `image/gif` and `image/webp`, the types GitHub's image
    proxy shows inline. SVG is never served publicly, because it can carry script. HEIC and other types stay private
-   too (see the open point below).
+   too, and for them the switch is disabled with "GitHub can’t show this kind of image. It stays with the team."
 6. **Filing.** `fileReport` builds the URL from the row (`BASE_URL` + the route above) when `screenshot_public` and the
    type allow it, and passes it to `issueBody`. The sweep uses the same function, so a report filed later still
    embeds its image. `BASE_URL` is already the public API origin on staging (`https://api.staging.tudu.ezdev.net`) and
@@ -120,18 +123,18 @@ Unit, core (`packages/core/src/feedback.test.ts`):
 
 Server (`apps/server/src/feedback.test.ts`, against the fake tracker and memory storage):
 
-| ID               | Scenario                                                                                                                                                                    |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C19-A12 (new)    | PNG with `shotPublic: true`: the filed body embeds `BASE_URL/api/feedback/shots/<id>/<sig>.png`; GET with no cookie returns the bytes, type, nosniff, CSP and cache headers |
-| C19-A13 (new)    | `shotPublic` false, missing, or true with no screenshot: no Screenshot section and no link in the body; `screenshot_public` stays false                                     |
-| C19-A14 (new)    | The link 404s alike for a wrong or missing sig, another report's sig, an unknown id and a private row; the sig differs per id and per `AUTH_SECRET`                         |
-| C19-A15 (new)    | GitHub down at send: the row waits; the sweep later files it with the same image link                                                                                       |
-| C19-A16 (new)    | SVG or HEIC with `shotPublic: true`: not embedded, the link 404s, the mail still attaches it                                                                                |
-| C19-A17 (new)    | Taken down: after `screenshot_public` is set to false, or the object is deleted, the link 404s                                                                              |
-| C19-A18 (new)    | The mail's screenshot line says "shown on the issue" or "private"; the attachment is there either way                                                                       |
-| C19-A19 (new)    | Migration 0017 adds `screenshot_public` with default false; existing rows read as private                                                                                   |
-| C19-A02 (update) | The same report twice: one row, one issue, and the first request's choice stands                                                                                            |
-| C19-A11 (update) | The body never holds the name, email, user id, space name, storage key or file name (asserted on what the fake received)                                                    |
+| ID               | Scenario                                                                                                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| C19-A12 (new)    | PNG with `shotPublic: true`: the filed body embeds `BASE_URL/api/feedback/shots/<ref>/<sig>`; GET with no cookie returns the bytes, type, nosniff, CSP and cache headers |
+| C19-A13 (new)    | `shotPublic` false, missing, or true with no screenshot: no Screenshot section and no link in the body; `screenshot_public` stays false                                  |
+| C19-A14 (new)    | The link 404s alike for a wrong or missing sig, another report's sig, an unknown ref and a private row; the sig differs per id and per `AUTH_SECRET`                     |
+| C19-A15 (new)    | GitHub down at send: the row waits; the sweep later files it with the same image link                                                                                    |
+| C19-A16 (new)    | SVG or HEIC with `shotPublic: true`: not embedded, the link 404s, the mail still attaches it                                                                             |
+| C19-A17 (new)    | Taken down: after `screenshot_public` is set to false, or the object is deleted, the link 404s                                                                           |
+| C19-A18 (new)    | The mail's screenshot line says "shown on the issue" or "private"; the attachment is there either way                                                                    |
+| C19-A19 (new)    | Migration 0017 adds `screenshot_public` with default false; existing rows read as private                                                                                |
+| C19-A02 (update) | The same report twice: one row, one issue, and the first request's choice stands                                                                                         |
+| C19-A11 (update) | The body never holds the name, email, user id, space name, storage key or file name (asserted on what the fake received)                                                 |
 
 Unit, UI (`packages/ui/src/components/FeedbackDialog.test.tsx`):
 
@@ -164,10 +167,8 @@ This is the one thing the fake can't prove: that GitHub's image proxy can fetch 
 
 ## Open points
 
-- **HEIC and other non-web images** (phone photos) stay private even with the switch on, because GitHub can't show
-  them inline. I recommend the switch disables itself for those, with the sub line "This kind of image can’t go on
-  the issue." That is a small canvas addition I'd draw before building. Converting HEIC to PNG on the server is the
-  alternative, but it adds an image library for an edge case.
+- **HEIC and other non-web images** (phone photos): decided 27 Oct. The switch disables itself for them, with the sub
+  line "GitHub can’t show this kind of image. It stays with the team." No server-side conversion.
 - **Very large images.** Uploads stay capped at 10 MB. GitHub's image proxy may refuse images above its own limit, in
   which case the issue shows the alt text "Screenshot". The staging check above covers the common case.
 - **No in-app "take it down".** It's done by hand for now (step 8). A button in Your reports could come later.

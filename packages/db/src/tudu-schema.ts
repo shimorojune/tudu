@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   date,
   doublePrecision,
@@ -574,6 +575,8 @@ export const feedback = pgTable(
     text: text('text').notNull(),
     details: jsonb('details').$type<Record<string, unknown>>(),
     screenshotKey: text('screenshot_key'),
+    /** Its sender switched on "Show it on the public issue": the issue embeds it and Tudu serves it to anyone. */
+    screenshotPublic: boolean('screenshot_public').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     /**
      * Its public GitHub issue: `none` (not filed: no token, or sent before issues), `pending` (waiting for GitHub;

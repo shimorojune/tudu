@@ -111,7 +111,10 @@ export function bootstrap(
     env.NODE_ENV === 'test' || !issues
       ? null
       : setInterval(() => {
-          void sweepIssues(db, issues, { quiet: options.quiet }).catch((err) => {
+          void sweepIssues(db, issues, {
+            quiet: options.quiet,
+            shots: { base: env.BASE_URL, secret: env.AUTH_SECRET },
+          }).catch((err) => {
             if (!options.quiet) console.error('feedback: the issue sweep failed', err);
           });
         }, ISSUE_SWEEP_EVERY_MS);

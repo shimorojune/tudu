@@ -279,8 +279,11 @@
 }
 :root[data-motion='less'] .tp-root .tp-fb-slot,
 :root[data-motion='less'] .tp-root .tp-fb-shot,
+:root[data-motion='less'] .tp-root .tp-fb-shot-img,
 :root[data-motion='less'] .tp-root .tp-fb-shot-img img,
 :root[data-motion='less'] .tp-root .tp-fb-shot-img::before,
+:root[data-motion='less'] .tp-root .tp-fb-pill,
+:root[data-motion='less'] .tp-root .tp-fb-sub > span,
 :root[data-motion='less'] .tp-fb-drop {
   transition: none;
   animation: none;

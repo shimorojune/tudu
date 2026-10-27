@@ -1,20 +1,23 @@
 import { randomUUID } from 'node:crypto';
 import { Hono } from 'hono';
+import { stream } from 'hono/streaming';
 import {
   FEEDBACK_IMAGE_MAX,
   FEEDBACK_PER_HOUR,
   feedbackDetailsLines,
   feedbackReportSchema,
   issueTitle,
+  shotCanBePublic,
   type FeedbackIssue,
   type FeedbackReport,
   type FeedbackSent,
   type MyReports,
 } from '@tudu/core';
-import { and, count, desc, eq, gt, schema, type Db } from '@tudu/db';
+import { and, count, desc, eq, gt, like, schema, type Db } from '@tudu/db';
 import type { Mail, Mailer } from '../email';
 import { fileReport } from '../feedback/filing';
 import type { IssueTracker } from '../feedback/github';
+import { shotSigMatches, type ShotLinks } from '../feedback/shots';
 import { cleanFileName } from '../files';
 import { requireSession, type SessionVars } from '../middleware/session';
 import type { Storage } from '../storage';
@@ -28,7 +31,8 @@ export function feedbackMail(x: {
   to: string;
   report: FeedbackReport;
   from: { name: string; email: string };
-  shot: { name: string; type: string; body: Uint8Array } | null;
+  /** `public`: its sender chose to show it on the GitHub issue. */
+  shot: { name: string; type: string; body: Uint8Array; public?: boolean } | null;
   /** Its public issue, once filed; `pending` when GitHub is still to come. */
   issue?: FeedbackIssue | 'pending' | null;
 }): Mail {
@@ -47,7 +51,9 @@ export function feedbackMail(x: {
       '---',
       `From ${x.from.name} <${x.from.email}>`,
       ...details,
-      x.shot ? `Screenshot: ${x.shot.name} (attached)` : 'No screenshot.',
+      x.shot
+        ? `Screenshot: ${x.shot.name} (attached, ${x.shot.public ? 'shown on the issue' : 'private'})`
+        : 'No screenshot.',
       ...(x.issue === 'pending'
         ? ['GitHub issue: waiting for GitHub; it is filed later.']
         : x.issue
@@ -82,8 +88,35 @@ export function feedbackRoutes(
   mailer: Mailer,
   to: string | undefined,
   tracker: IssueTracker | null = null,
+  shots?: ShotLinks,
 ) {
   const r = new Hono<{ Variables: SessionVars }>();
+
+  // A screenshot its sender chose to show on the public issue, for GitHub's image proxy: no session, only the
+  // signed link. Anything else (unknown, unsigned, private, gone) is the same 404, so a link can't be probed.
+  r.get('/feedback/shots/:ref/:sig', async (c) => {
+    const missing = () => c.json({ error: 'Not found.' }, 404);
+    const { ref, sig } = c.req.param();
+    if (!shots || !/^[0-9a-f]{8}$/.test(ref)) return missing();
+    // The reference is the id's first eight characters; the signature picks the one report among any that share it.
+    const shown = await db
+      .select({ id: schema.feedback.id, key: schema.feedback.screenshotKey })
+      .from(schema.feedback)
+      .where(and(like(schema.feedback.id, `${ref}-%`), eq(schema.feedback.screenshotPublic, true)));
+    const row = shown.find((x) => shotSigMatches(shots.secret, x.id, sig));
+    if (!row?.key) return missing();
+    const obj = await storage.get(row.key);
+    if (!obj || !shotCanBePublic(obj.type)) return missing();
+    c.header('content-type', obj.type);
+    if (obj.size) c.header('content-length', String(obj.size));
+    c.header('content-disposition', 'inline');
+    c.header('content-security-policy', "default-src 'none'; sandbox");
+    c.header('cache-control', 'public, max-age=3600');
+    c.header('x-content-type-options', 'nosniff');
+    return stream(c, async (s) => {
+      for await (const chunk of obj.body) await s.write(chunk as Uint8Array);
+    });
+  });
 
   r.get('/feedback/mine', requireSession, async (c) => {
     const user = c.get('session')!.user;
@@ -157,13 +190,14 @@ export function feedbackRoutes(
       );
 
     const id = randomUUID();
-    let shot: { name: string; type: string; body: Uint8Array; key: string } | null = null;
+    let shot: { name: string; type: string; body: Uint8Array; key: string; public: boolean } | null = null;
     if (file && file.size) {
       const name = cleanFileName(file.name || 'Screenshot.png');
       const key = `feedback/${id}/${name}`;
       const body = new Uint8Array(await file.arrayBuffer());
       await storage.put(key, body, file.type);
-      shot = { name, type: file.type, body, key };
+      // Only kinds GitHub shows inline go public; the form disables the switch for the rest.
+      shot = { name, type: file.type, body, key, public: report.shotPublic && shotCanBePublic(file.type) };
     }
     const [row] = await db
       .insert(schema.feedback)
@@ -175,6 +209,7 @@ export function feedbackRoutes(
         text: report.text,
         details: report.details,
         screenshotKey: shot?.key ?? null,
+        screenshotPublic: shot?.public ?? false,
         issueState: tracker ? 'pending' : 'none',
       })
       .onConflictDoNothing()
@@ -191,7 +226,7 @@ export function feedbackRoutes(
 
     let sent: FeedbackSent = { id, issue: null, pending: false };
     if (tracker) {
-      const out = await fileReport(db, tracker, id, { quiet: true });
+      const out = await fileReport(db, tracker, id, { quiet: true, shots });
       sent =
         out.state === 'filed'
           ? { id, issue: out.issue, pending: false }
