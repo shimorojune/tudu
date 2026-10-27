@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { parseRules, readStylesheet, rulesWhere } from '../test-utils/stylesheet';
 import { MenuBarSheet, type MenuBarGroupItem } from './MenuBarSheet';
 
 const heading = { eyebrow: 'Today · Week 43', day: 'Friday', date: '23 October' };
@@ -205,5 +206,32 @@ describe('C20-U08 MenuBarSheet', () => {
     expect(within(foot).getByRole('button', { name: 'New note' })).toBeTruthy();
     rerender(<MenuBarSheet state="empty" heading={heading} />);
     expect(screen.queryByRole('button', { name: 'New note' })).toBeNull();
+  });
+});
+
+describe('C20-U12 the space headings carry 20px tiles', () => {
+  it('C20-U12 each heading’s tile is 20px with radius 6; Personal’s person is 10px', () => {
+    const { container } = render(
+      <MenuBarSheet state="day" heading={heading} groups={[personal, northwind]} />,
+    );
+    const tiles = [...container.querySelectorAll<HTMLElement>('.tp-mb-gh .tp-stile')];
+    expect(tiles).toHaveLength(2);
+    for (const t of tiles) {
+      expect(t.style.width).toBe('20px');
+      expect(t.style.height).toBe('20px');
+      expect(t.style.borderRadius).toBe('6px');
+    }
+    expect(tiles[0]!.querySelector('svg')).toHaveAttribute('width', '10');
+  });
+
+  it('C20-U12 the heading moves 2px left so the tile centres over the checkboxes', () => {
+    const rule = rulesWhere(parseRules(readStylesheet('app.css')), (x) => x === '.tp-mb .tp-mb-gh')[0]!;
+    expect(rule.declarations['gap']).toBe('9px');
+    expect(rule.declarations['padding']).toBe('8px 10px 4px 8px');
+  });
+
+  it('C20-U12 one space alone still has no headings', () => {
+    const { container } = render(<MenuBarSheet state="day" heading={heading} groups={[personal]} />);
+    expect(container.querySelector('.tp-mb-gh')).toBeNull();
   });
 });

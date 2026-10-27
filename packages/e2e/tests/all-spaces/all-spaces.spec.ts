@@ -814,6 +814,40 @@ test.describe('all spaces', () => {
     await expect(recent).toHaveCount(2);
   });
 
+  test('C21-E26 desktop: a week tile shows a row’s space as a 16px tile; Today’s named pill keeps its 13px tile', async ({
+    page,
+    browser,
+  }) => {
+    test.skip(phone() || tablet(), 'the desk’s week tiles');
+    await world(page, browser);
+    await page.reload();
+    await goAll(page);
+    await expect.poll(() => titlesOf(allDay(page))).toEqual(ALL_SUNDAY);
+    const named = pill(allDay(page), 'Review the Northwind roadmap', 'Northwind');
+    await expect(named).toContainText('Northwind');
+    expect(await named.locator('.tp-stile').boundingBox()).toMatchObject({ width: 13, height: 13 });
+    const week = await goWeekShown(page);
+    const bare = pill(week, 'Review the Northwind roadmap', 'Northwind');
+    await expect(bare).toHaveClass(/tp-sg-bare/);
+    expect(await bare.locator('.tp-stile').boundingBox()).toMatchObject({ width: 16, height: 16 });
+  });
+
+  test('C21-E27 phone: All spaces Today shows each row’s space as a 16px tile', async ({ page, browser }) => {
+    test.skip(!phone(), 'the phone’s own layout');
+    await world(page, browser);
+    await page.reload();
+    await goAll(page);
+    await expect.poll(() => titlesOf(allDay(page))).toEqual(ALL_SUNDAY);
+    for (const [title, space] of [
+      ['Pay the electricity bill', 'Personal'],
+      ['Review the Northwind roadmap', 'Northwind'],
+    ] as const) {
+      const p = pill(allDay(page), title, space);
+      await expect(p).toHaveClass(/tp-sg-bare/);
+      expect(await p.locator('.tp-stile').boundingBox()).toMatchObject({ width: 16, height: 16 });
+    }
+  });
+
   test('STB-E01 chip: the Personal tile hangs off the label baseline like a team space’s tile', async ({
     page,
     browser,

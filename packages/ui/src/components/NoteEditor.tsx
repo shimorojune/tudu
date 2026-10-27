@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { moveTargets, type NotebookFolder } from '@tudu/core';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
@@ -89,6 +89,17 @@ export interface NoteEditorProps {
 export const NOTE_GOING_MS = 180;
 /** An unlinked chip shrinks away this long before it leaves. */
 export const CHIP_OUT_MS = 170;
+
+/**
+ * Where the Make a task bubble goes, in whole pixels: centred on `x`, its foot on `y`, never closer than 8px to the
+ * pane's sides or top. A bubble half a pixel off is drawn off the pixel grid, and its words look soft on the Mac.
+ */
+export function bubbleSpot(x: number, y: number, width: number, height: number, paneWidth: number) {
+  return {
+    left: Math.round(Math.max(8, Math.min(paneWidth - width - 8, x - width / 2))),
+    top: Math.round(Math.max(8, y - height)),
+  };
+}
 
 /** The note's linked tasks and its Link button. A new link pops in; an unlinked one shrinks away first. */
 function LinkRow({
@@ -196,6 +207,16 @@ export function NoteEditor(p: NoteEditorProps) {
     document.addEventListener('selectionchange', check);
     return () => document.removeEventListener('selectionchange', check);
   }, [makeTask]);
+  // Placed once it has measured itself, before it paints, so it never shows at a wrong spot.
+  const bubbleEl = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const el = bubbleEl.current;
+    const pane = wrap.current;
+    if (!el || !pane || !bubble) return;
+    const at = bubbleSpot(bubble.x, bubble.y, el.offsetWidth, el.offsetHeight, pane.offsetWidth);
+    el.style.left = `${at.left}px`;
+    el.style.top = `${at.top}px`;
+  }, [bubble]);
 
   if (p.loading)
     return (
@@ -262,7 +283,7 @@ export function NoteEditor(p: NoteEditorProps) {
       </ConfirmDialog>
       {p.banner ?? null}
       {bubble && p.onMakeTask ? (
-        <div className="tp-nb-bubble" style={{ left: bubble.x, top: bubble.y }}>
+        <div ref={bubbleEl} className="tp-nb-bubble">
           <button
             type="button"
             onMouseDown={(e) => e.preventDefault()}

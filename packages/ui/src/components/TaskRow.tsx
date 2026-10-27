@@ -165,7 +165,8 @@ function signals(p: TaskRowProps): Sig[] {
     out.push({
       k: 'space',
       bare: !!(p.brief || p.compact),
-      icon: <SpaceTile space={p.inSpace} size={13} className="tp-sg-tile" />,
+      // Alone (the week, phones) the tile carries the space by itself, so it is bigger than beside its name.
+      icon: <SpaceTile space={p.inSpace} size={p.brief || p.compact ? 16 : 13} className="tp-sg-tile" />,
       long: p.inSpace.name,
       label: `Space · ${p.inSpace.name}`,
       act: `Show only ${p.inSpace.name}`,
