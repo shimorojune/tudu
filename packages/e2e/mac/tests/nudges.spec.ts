@@ -61,6 +61,21 @@ test.describe('working hours and nudges', () => {
     if (permission === 'allowed') {
       await app.until(`return T.all('button', 'Send now').length > 0`);
       await app.until(`return T.all('group', 'How often').length > 0`);
+    } else if (permission === 'unknown') {
+      // macOS's box is up and nobody answers it (CI's Mac): the switch is on, and neither the rows nor the guide show.
+      expect(
+        await app.eval(`return T.get('switch', 'Nudge me in my hours').getAttribute('aria-checked')`),
+      ).toBe('true');
+      expect(
+        await app.eval(
+          `return T.all('group', 'How often').filter((el) => !el.closest('[aria-hidden="true"]')).length`,
+        ),
+      ).toBe(0);
+      expect(
+        await app.eval(
+          `return T.all('list', 'How to allow Tudu').filter((el) => !el.closest('[aria-hidden="true"]')).length`,
+        ),
+      ).toBe(0);
     } else {
       await app.until(`return document.body.textContent.includes('macOS has Tudu’s notifications off.')`);
       await app.until(`return T.all('button', 'Open Notification settings').length > 0`);

@@ -57,7 +57,7 @@ The page's clock is moved with `window.__tuduNudgeClock` and a focus event; what
 
 | ID     | Case                                                                                                             |
 | ------ | ---------------------------------------------------------------------------------------------------------------- |
-| WH-D01 | Settings › Working hours in the app has Nudges; switching on shows the rows, or the guide when macOS has it off  |
+| WH-D01 | Settings › Working hours in the app has Nudges; on shows the rows, the guide when off, neither while macOS asks |
 | WH-D02 | Window hidden, 6 today: 09:00 → "6 on today"; 3 ticked, 10:00 → "3 done, 3 left today", "3 since 09:00. Next: …" |
 | WH-D03 | Three slots, one nudge in Notification Center                                                                    |
 | WH-D04 | Pause for today: nothing at the next slot; the next working day 09:00 nudges again                               |
