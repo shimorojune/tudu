@@ -34,8 +34,9 @@ time = { version = "0.3", features = ["formatting"] }
 objc2 = "0.6"
 block2 = "0.6"
 objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSDockTile", "NSPanel", "NSWindow", "NSResponder", "NSScreen", "NSEvent", "NSGraphics", "NSMenu", "NSStatusItem", "NSStatusBarButton", "NSButton", "NSControl", "NSView", "NSRunningApplication", "NSWorkspace", "block2"] }
-objc2-foundation = { version = "0.3", features = ["NSString", "NSGeometry", "NSProcessInfo", "NSAppleEventManager", "NSAppleEventDescriptor", "NSError", "NSUserDefaults", "NSNotification", "NSDictionary", "NSOperation", "block2"] }
+objc2-foundation = { version = "0.3", features = ["NSString", "NSGeometry", "NSProcessInfo", "NSAppleEventManager", "NSAppleEventDescriptor", "NSError", "NSUserDefaults", "NSNotification", "NSDictionary", "NSOperation", "NSBundle", "NSSet", "NSArray", "block2"] }
 objc2-service-management = { version = "0.3", default-features = false, features = ["std", "SMAppService", "objc2", "objc2-foundation"] }
+objc2-user-notifications = { version = "0.3", default-features = false, features = ["std", "UNUserNotificationCenter", "UNNotification", "UNNotificationRequest", "UNNotificationContent", "UNNotificationSettings", "UNNotificationCategory", "UNNotificationAction", "UNNotificationResponse", "UNNotificationSound", "UNNotificationTrigger", "block2"] }
 objc2-web-kit = { version = "0.3", features = ["WKWebView", "WKWebViewConfiguration", "WKPreferences"] }
 
 [profile.release]
