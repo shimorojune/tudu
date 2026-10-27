@@ -63,6 +63,11 @@ export interface SettingsUpdates {
   /** The line for `error`: "Couldn’t check for updates. …". */
   error?: string;
   onCheck?: () => void;
+  /**
+   * The error is one retrying can't fix (the download failed its safety check): its button reads "Get it from the
+   * website" and calls this in place of Try again.
+   */
+  onGetIt?: () => void;
   onRestart?: () => void;
   /** Restart to update failed: what to do instead. */
   restartError?: string;
@@ -653,6 +658,10 @@ function UpdatesSection({ u }: { u: SettingsUpdates }) {
     ) : u.state === 'downloading' ? (
       <Button variant="secondary" size="sm" progress={u.progress ?? 0}>
         Downloading
+      </Button>
+    ) : u.state === 'error' && u.onGetIt ? (
+      <Button variant="secondary" size="sm" onClick={u.onGetIt}>
+        Get it from the website
       </Button>
     ) : (
       <Button

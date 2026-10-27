@@ -16,7 +16,7 @@
       "capabilities": [
         {
           "identifier": "web",
-          "description": "Tudu on the web, in the app's windows: the app's own commands, and dragging the window by the top bar (and the note window by its bar and corner).",
+          "description": "Tudu on the web, in the app's windows: the app's own commands, and dragging the window by the top bar (and the note window by its bar).",
           "windows": ["main", "floating", "menubar", "note"],
           "remote": {
             "urls": ["http://localhost:*/*"]
@@ -51,6 +51,8 @@
             "allow-set-note-expanded",
             "allow-open-in-notebook",
             "allow-hide-note",
+            "allow-note-resize-begin",
+            "allow-note-resize-to",
             "allow-control-reply"
           ]
         }

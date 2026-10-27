@@ -16,8 +16,14 @@ import { NoteTree, type NoteFolderItem } from './NoteTree';
 import { Segmented } from './Segmented';
 import { Skeleton } from './Skeleton';
 
+/** Where a resize starts: an edge or a corner. */
+export type NoteResizeEdge = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
+
+/** The edges and corners besides the bottom-right grip, which always shows. */
+const EDGES: NoteResizeEdge[] = ['n', 'e', 's', 'w', 'ne', 'nw', 'sw'];
+
 export interface NoteWindowProps {
-  /** The Mac's own window (pin, fill the screen, resize), or the browser's panel and popup (↗). */
+  /** The Mac's own window (pin, fill the screen), or the browser's panel over the page. */
   variant?: 'mac' | 'web';
   /** The list down the left starts shown. */
   rail?: boolean;
@@ -34,7 +40,7 @@ export interface NoteWindowProps {
   treeLoading?: boolean;
   pinned?: boolean;
   expanded?: boolean;
-  /** What the open button says: "Open in your Notebook" (Mac), "Open in its own window" (↗ on the web). */
+  /** What the open button (the Tudu mark) says: "Open in your Notebook". */
   openLabel?: string;
   /** The note, on the right. */
   children?: ReactNode;
@@ -47,14 +53,15 @@ export interface NoteWindowProps {
   onClose?: () => void;
   /** The bar is the handle: drag the window by it. */
   onDragStart?: (e: PointerEvent<HTMLElement>) => void;
-  /** The corner grip (Mac). */
-  onResizeStart?: (e: PointerEvent<HTMLElement>) => void;
+  /** Resize from any edge or corner: the grip and the edge handles show only with it, and never while it fills the screen. */
+  onResizeStart?: (e: PointerEvent<HTMLElement>, edge: NoteResizeEdge) => void;
 }
 
 /**
  * The small window for writing without the desk: a bar to drag it by, your notes down the left (Recent, or All
  * notes with Find), the note on the right. On the Mac it floats over every app: Pin keeps it above them (off to
- * start), the arrows fill the screen. In the browser it floats over the page and ↗ opens it in its own popup.
+ * start, and off again once it closes), the arrows fill the screen. In the browser it floats over the page. Either
+ * way it resizes from every edge and corner, and the Tudu mark opens the note on the Notebook page.
  */
 export function NoteWindow(p: NoteWindowProps) {
   const web = p.variant === 'web';
@@ -93,6 +100,7 @@ export function NoteWindow(p: NoteWindowProps) {
         onPointerDown={p.onDragStart}
         onDoubleClick={web ? undefined : p.onExpand}
       >
+        <span className="tp-nb-win-grab" aria-hidden="true" />
         <IconButton
           label={rail ? 'Hide the list' : 'Show your notes'}
           tipSide="bottom"
@@ -127,12 +135,12 @@ export function NoteWindow(p: NoteWindowProps) {
         )}
         {p.onOpenApp ? (
           <IconButton
-            label={p.openLabel ?? (web ? 'Open in its own window' : 'Open in your Notebook')}
+            label={p.openLabel ?? 'Open in your Notebook'}
             tipSide="bottom"
-            className={web ? undefined : 'tp-nb-opentudu'}
+            className="tp-nb-opentudu"
             onClick={p.onOpenApp}
           >
-            {web ? <Icon name="external" size={15} /> : <Logo size={15} />}
+            <Logo size={15} />
           </IconButton>
         ) : null}
         <IconButton label="Close" tipSide="bottom-end" onClick={p.onClose}>
@@ -233,7 +241,25 @@ export function NoteWindow(p: NoteWindowProps) {
           </div>
         </div>
       </div>
-      {web ? null : <span className="tp-nb-grip" aria-hidden="true" onPointerDown={p.onResizeStart} />}
+      {p.onResizeStart && !p.expanded ? (
+        <>
+          {EDGES.map((d) => (
+            <span
+              key={d}
+              className={`tp-nb-edge tp-nb-edge-${d}`}
+              data-edge={d}
+              aria-hidden="true"
+              onPointerDown={(e) => p.onResizeStart!(e, d)}
+            />
+          ))}
+          <span
+            className="tp-nb-grip"
+            data-edge="se"
+            aria-hidden="true"
+            onPointerDown={(e) => p.onResizeStart!(e, 'se')}
+          />
+        </>
+      ) : null}
     </section>
   );
 }

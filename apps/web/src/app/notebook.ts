@@ -219,19 +219,57 @@ export function leaveWindow(): void {
   notifyWin();
 }
 
+/** The Mac app refused to open its note window (a version from before it): notes open over the page instead. */
+let fallback = false;
+let openUpdates: (() => void) | null = null;
+
+/** What the fallback's Update Tudu shows: Settings › This Mac (the desk sets it). */
+export function setOpenUpdates(fn: (() => void) | null): void {
+  openUpdates = fn;
+}
+
+/** The note window over the page in the Mac app: only once the app said it has no window of its own. */
+export function noteWindowFallback(): boolean {
+  return fallback;
+}
+
+export const FALLBACK_TOAST =
+  'This version of Tudu can’t float notes over other apps, so this one opens here.';
+
 /**
  * Open the note window on a note, or on a blank one. On the desk in the browser it is the panel over the page; in
  * the Mac app the app's own window (the desktop bridge asks it); on a phone there is no window (the note's page).
+ * An app too old to have the window refuses: the note opens over the page, and a toast (once) offers the update.
  */
 export function openNoteWindow(o: { id?: string; linkTo?: string } = {}): void {
   // The Mac app's own window, from the desk or the menu bar's sheet; the note window itself switches in place.
   const d = desktop();
-  if (d && d.window !== 'note') {
-    d.openNote(o.id ?? null, o.linkTo ?? null);
+  if (d && d.window !== 'note' && !fallback) {
+    d.openNote(o.id ?? null, o.linkTo ?? null).catch(() => {
+      fallback = true;
+      notifyWin();
+      openHere(o);
+      showToast(FALLBACK_TOAST, {
+        action: 'Update Tudu',
+        onAction: () => {
+          void d.checkUpdate(true).catch(() => {});
+          openUpdates?.();
+        },
+      });
+    });
     return;
   }
+  openHere(o);
+}
+
+function openHere(o: { id?: string; linkTo?: string }): void {
   shown = true;
   showInWindow(o.id ?? null, o.linkTo);
+}
+
+/** Tests only: an app that has its window again. */
+export function resetNoteWindowFallback(): void {
+  fallback = false;
 }
 
 /**
@@ -292,6 +330,37 @@ export function saveFrame(f: WindowFrame): void {
   } catch {
     /* fine: it lasts for this visit */
   }
+}
+
+/** How close the window comes to the page's edges. */
+const EDGE_GAP = 8;
+
+/**
+ * Resizing from an edge or corner: the edges it names follow the pointer by dx/dy while the opposite ones stay put,
+ * never smaller than the least and never closer than 8px to the page's edges (where `fitFrame` keeps it on a reload).
+ */
+export function resizeFrame(
+  f: WindowFrame,
+  edge: 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw',
+  dx: number,
+  dy: number,
+  vw: number,
+  vh: number,
+): WindowFrame {
+  let { x, y, w, h } = f;
+  const right = x + w;
+  const bottom = y + h;
+  if (edge.includes('e')) w = Math.max(NOTE_WINDOW_MIN.w, Math.min(w + dx, vw - EDGE_GAP - x));
+  if (edge.includes('s')) h = Math.max(NOTE_WINDOW_MIN.h, Math.min(h + dy, vh - EDGE_GAP - y));
+  if (edge.includes('w')) {
+    x = Math.max(EDGE_GAP, Math.min(x + dx, right - NOTE_WINDOW_MIN.w));
+    w = right - x;
+  }
+  if (edge.includes('n')) {
+    y = Math.max(EDGE_GAP, Math.min(y + dy, bottom - NOTE_WINDOW_MIN.h));
+    h = bottom - y;
+  }
+  return { x, y, w, h };
 }
 
 /** Inside the page, whatever it was saved at: at least 120px of the bar on screen, never smaller than the least. */

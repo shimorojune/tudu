@@ -116,7 +116,7 @@ export function MenuBarPage({ me: first }: { me: MeResponse | null }) {
     >
       {me ? (
         <WorkingDayProvider>
-          <Today me={me} app={app} shortcut={info?.shortcut} {...common} />
+          <Today me={me} app={app} shortcut={info?.shortcut} noteShortcut={info?.noteShortcut} {...common} />
         </WorkingDayProvider>
       ) : (
         <MenuBarSheet state="signed-out" {...common} />
@@ -129,6 +129,7 @@ function Today({
   me,
   app,
   shortcut,
+  noteShortcut,
   appName,
   onOpenApp,
   onQuit,
@@ -137,6 +138,7 @@ function Today({
   me: MeResponse;
   app: DesktopBridge | null;
   shortcut?: string;
+  noteShortcut?: string;
   appName: string;
   onOpenApp: () => void;
   onQuit: () => void;
@@ -192,12 +194,14 @@ function Today({
       )}
       offline={!online}
       shortcut={shortcut}
+      noteShortcut={noteShortcut}
       appName={appName}
       onToggle={(row, done) => taskStore.cross(row.key, done)}
       onOpen={open}
       onNew={() => app?.summon()}
       // The note window on a blank note, over whatever app you are in; the sheet hides first, the desk stays put.
-      onNewNote={app ? () => app.openNote(null) : undefined}
+      // An app too old to have the window: the Notebook on the desk.
+      onNewNote={app ? () => void app.openNote(null).catch(() => app.showMain('/notebook')) : undefined}
       onOpenApp={onOpenApp}
       onFeedback={() => app?.feedback()}
       onQuit={onQuit}

@@ -222,6 +222,10 @@
 :root[data-motion='less'] .tp-set-sperr {
   animation: none;
 }
+:root[data-motion='less'] .tp-nb-win-grab,
+:root[data-motion='less'] .tp-nb-edge::after {
+  transition-duration: 1ms;
+}
 :root[data-motion='less'] .tp-nb-kids,
 :root[data-motion='less'] .tp-nb-rail,
 :root[data-motion='less'] .tp-nb-win.tp-root,
@@ -254,6 +258,10 @@
 :root[data-motion='less'] .tp-nb-li-out,
 :root[data-motion='less'] .tp-nb-rail-all {
   animation-duration: 1ms;
+}
+:root[data-motion='less'] .tp-nb-ed:not(.tp-compact) .tp-nb-body .tp-rte-notes .tp-rte-bar > *,
+:root[data-motion='less'] .tp-nb-win .tp-nb-ed .tp-nb-body .tp-rte-notes .tp-rte-bar > * {
+  transition-duration: 1ms;
 }
 :root[data-motion='less'] .tp-nb-ed > .tp-nb-ed-top,
 :root[data-motion='less'] .tp-nb-ed > .tp-nb-ed-in,

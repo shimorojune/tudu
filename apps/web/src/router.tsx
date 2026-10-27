@@ -567,8 +567,8 @@ const menuBarRoute = createRoute({
 });
 
 /**
- * The note window alone: the page the macOS app's note window holds, and the browser's popup (↗ on a note). In the
- * app it never turns into Sign in; the desk does that.
+ * The note window alone: the page the macOS app's note window holds (in a browser it goes on to the Notebook page).
+ * In the app it never turns into Sign in; the desk does that.
  */
 const noteWindowSearch = (s: Record<string, unknown>) => s;
 async function noteWindowLoad({

@@ -108,7 +108,7 @@
   animation: tp-veil-in 120ms linear both;
 }
 
-/* The bare note window: the popup in the browser, and the Mac's own window (which draws its shadow itself). */
+/* The bare note window: the Mac's own window (which draws its shadow itself). */
 /* The Mac note window is clear all round: only the note's own section paints, and the 10px around it is for its
    shadow. */
 html[data-app='note'],
@@ -122,10 +122,6 @@ html[data-app='note'] body {
   position: fixed;
   inset: 0;
   background: transparent;
-}
-.app-note-window.app-note-popup .tp-nb-win.tp-root {
-  border-radius: 0;
-  box-shadow: none;
 }
 .app-note-window.app-note-mac {
   padding: 10px;

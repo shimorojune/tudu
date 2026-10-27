@@ -28,6 +28,8 @@ const COMMANDS: &[&str] = &[
     "set_note_expanded",
     "open_in_notebook",
     "hide_note",
+    "note_resize_begin",
+    "note_resize_to",
 ];
 const TEST_COMMANDS: &[&str] = &[
     "app_info",
@@ -56,6 +58,8 @@ const TEST_COMMANDS: &[&str] = &[
     "set_note_expanded",
     "open_in_notebook",
     "hide_note",
+    "note_resize_begin",
+    "note_resize_to",
     "control_reply",
 ];
 

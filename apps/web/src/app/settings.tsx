@@ -33,7 +33,7 @@ import { openCreateSpace } from './dayView';
 import { useAppVersion } from './DesktopHost';
 import { desktop, inApp, type ThisMac } from './desktop';
 import { useAppInfo } from './DesktopHost';
-import { updateStore, updatesRow, useUpdateStatus } from './updates';
+import { needsWebsite, releasePage, updateStore, updatesRow, useUpdateStatus } from './updates';
 import { scrollToProjects, settingsClosed } from './editProjects';
 import { api, initialsOf, photoSrc, queryClient, refreshMe, signOut } from './session';
 import { forgetSpace, spacePath, useSpace as useSpaceFromShell } from './space';
@@ -171,6 +171,9 @@ export function useThisMac(): SettingsMac | undefined {
                 .catch(() => setRestartError(`Couldn’t restart. Quit and open ${name} again to finish.`));
             },
             restartError,
+            onGetIt: needsWebsite(status)
+              ? () => void bridge.openExternal(releasePage(info?.track, status?.errorVersion)).catch(() => {})
+              : undefined,
           },
     onOpenAtLogin: (on) => {
       setMac((m) => m && { ...m, openAtLogin: on ? 'on' : 'off' });

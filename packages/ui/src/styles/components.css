@@ -2613,7 +2613,7 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 .tp-nb-pinbtn svg { transition: transform var(--dur-menu) var(--ease-change); }
 .tp-nb-pinbtn.tp-on svg { transform: rotate(-30deg); }
 .tp-nb-win-b { flex: 1; min-height: 0; display: flex; }
-.tp-nb-rail { flex: none; width: 216px; overflow: hidden; border-right: 1px solid var(--hair); background: var(--muted); transition: width var(--dur-panel-in) var(--ease-settle), border-color var(--dur-panel-in) var(--ease-settle); }
+.tp-nb-rail { flex: none; width: 216px; overflow: hidden; border-right: 1px solid var(--hair); background: var(--card); transition: width var(--dur-panel-in) var(--ease-settle), border-color var(--dur-panel-in) var(--ease-settle); }
 .tp-nb-rail.tp-off { width: 0; border-right-color: transparent; }
 .tp-nb-rail-in { width: 216px; height: 100%; display: flex; flex-direction: column; box-sizing: border-box; transition: opacity var(--dur-menu) var(--ease-change); }
 .tp-nb-rail.tp-off .tp-nb-rail-in { opacity: 0; }
@@ -2627,6 +2627,39 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 .tp-nb-grip { position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; cursor: nwse-resize; touch-action: none; }
 .tp-nb-grip::before { content: ''; position: absolute; right: 4px; bottom: 4px; width: 8px; height: 8px; border-right: 1.5px solid var(--border-strong); border-bottom: 1.5px solid var(--border-strong); border-bottom-right-radius: 3px; }
 .tp-nb-max .tp-nb-grip { display: none; }
+/* Where to drag it: a short bar at the top centre of its title bar, darker and wider under the pointer. */
+.tp-nb-win-bar { position: relative; }
+.tp-nb-win-grab { position: absolute; left: 50%; top: 5px; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: var(--border); pointer-events: none; transition: background-color var(--dur-menu) var(--ease-change), width var(--dur-menu) var(--ease-change), margin-left var(--dur-menu) var(--ease-change); }
+.tp-nb-win-bar:hover .tp-nb-win-grab { background: var(--border-strong); width: 44px; margin-left: -22px; }
+.tp-nb-win-bar:active .tp-nb-win-grab { background: var(--foreground-2); }
+/* Resize from any edge or corner: thin bands along the edges, corners of their own, each with its cursor. A short
+   line shows on the edge under the pointer; the corner marks show while the pointer is on the window. */
+.tp-nb-edge { position: absolute; z-index: 6; touch-action: none; }
+.tp-nb-edge-n { top: 0; left: 16px; right: 16px; height: 5px; cursor: ns-resize; }
+.tp-nb-edge-s { bottom: 0; left: 16px; right: 18px; height: 6px; cursor: ns-resize; }
+.tp-nb-edge-e { right: 0; top: 16px; bottom: 18px; width: 6px; cursor: ew-resize; }
+.tp-nb-edge-w { left: 0; top: 16px; bottom: 16px; width: 6px; cursor: ew-resize; }
+.tp-nb-edge-ne, .tp-nb-edge-nw, .tp-nb-edge-sw { width: 16px; height: 16px; }
+.tp-nb-edge-ne { top: 0; right: 0; cursor: nesw-resize; }
+.tp-nb-edge-nw { top: 0; left: 0; cursor: nwse-resize; }
+.tp-nb-edge-sw { bottom: 0; left: 0; cursor: nesw-resize; }
+.tp-nb-edge::after { content: ''; position: absolute; opacity: 0; transition: opacity var(--dur-menu) var(--ease-change); }
+.tp-nb-edge-n::after, .tp-nb-edge-s::after { left: 50%; width: 48px; margin-left: -24px; height: 2px; border-radius: 1px; background: var(--border-strong); }
+.tp-nb-edge-n::after { top: 1px; }
+.tp-nb-edge-s::after { bottom: 1px; }
+.tp-nb-edge-e::after, .tp-nb-edge-w::after { top: 50%; height: 48px; margin-top: -24px; width: 2px; border-radius: 1px; background: var(--border-strong); }
+.tp-nb-edge-e::after { right: 1px; }
+.tp-nb-edge-w::after { left: 1px; }
+.tp-nb-edge-ne::after, .tp-nb-edge-nw::after, .tp-nb-edge-sw::after { width: 8px; height: 8px; border: 0 solid var(--border-strong); }
+.tp-nb-edge-ne::after { top: 4px; right: 4px; border-top-width: 1.5px; border-right-width: 1.5px; border-top-right-radius: 3px; }
+.tp-nb-edge-nw::after { top: 4px; left: 4px; border-top-width: 1.5px; border-left-width: 1.5px; border-top-left-radius: 3px; }
+.tp-nb-edge-sw::after { bottom: 4px; left: 4px; border-bottom-width: 1.5px; border-left-width: 1.5px; border-bottom-left-radius: 3px; }
+.tp-nb-win:hover .tp-nb-edge-ne::after, .tp-nb-win:hover .tp-nb-edge-nw::after, .tp-nb-win:hover .tp-nb-edge-sw::after { opacity: .7; }
+.tp-nb-edge:hover::after, .tp-nb-win .tp-nb-edge:hover::after { opacity: 1; }
+.tp-nb-grip { z-index: 6; }
+.tp-nb-grip:hover::before { border-color: var(--foreground-2); }
+.tp-nb-max .tp-nb-edge { display: none; }
+@media (prefers-reduced-motion: reduce) { .tp-nb-win-grab, .tp-nb-edge::after { transition-duration: 1ms; } }
 
 /* Notes in the task panel. */
 .tp-nb-sec .tp-td-h em { margin-left: auto; font-style: normal; font-weight: 400; font-size: 12px; color: var(--ghost); }
@@ -2796,6 +2829,23 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 .tp-nb-body .tp-rte-notes.tp-compact .tp-rte-bar { align-self: stretch; width: auto; max-width: none; }
 .tp-nb-body .tp-rte-notes.tp-compact .tp-rte-bar { margin: 12px -14px 0; gap: 0; }
 .tp-nb-body .tp-rte-notes.tp-compact .tp-rte-bar button { min-width: 34px; }
+
+/* The Notebook page and the note window: the formatting bar is a fixed strip above the writing, under the title and
+   linked tasks. Only the words under it scroll, cut off at its lower edge, so no text shows above or behind it, and
+   nothing moves when you click in. Away from the note only its controls dim; the strip stays solid. Phones keep the
+   bar at the foot (above). */
+:is(.tp-nb-ed:not(.tp-compact), .tp-nb-win .tp-nb-ed) .tp-nb-body { overflow: hidden; padding-bottom: 0; }
+:is(.tp-nb-ed:not(.tp-compact), .tp-nb-win .tp-nb-ed) .tp-nb-body > .tp-rte-notes { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+:is(.tp-nb-ed:not(.tp-compact), .tp-nb-win .tp-nb-ed) .tp-nb-body .tp-rte-notes .tp-rte-bar { order: 0; position: relative; top: auto; bottom: auto; z-index: 3; display: flex; flex: none; align-self: stretch; flex-wrap: wrap; width: auto; max-width: none; min-height: 40px; height: auto; margin: 0 -40px; padding: 0 34px; gap: 2px; overflow: visible; border-radius: 0; background: var(--card); box-shadow: none; border-bottom: 1px solid var(--hair); opacity: 1; transform: none; pointer-events: auto; animation: none; }
+:is(.tp-nb-ed:not(.tp-compact), .tp-nb-win .tp-nb-ed) .tp-nb-body .tp-rte-notes .tp-rte-bar > * { transition: opacity var(--dur-menu) var(--ease-change); }
+:is(.tp-nb-ed:not(.tp-compact), .tp-nb-win .tp-nb-ed) .tp-nb-body .tp-rte-notes:not(.tp-on) .tp-rte-bar > * { opacity: .5; }
+:is(.tp-nb-ed:not(.tp-compact), .tp-nb-win .tp-nb-ed) .tp-nb-body .tp-rte-notes .tp-rte-bar button { min-height: 0; min-width: 28px; }
+:is(.tp-nb-ed:not(.tp-compact), .tp-nb-win .tp-nb-ed) .tp-nb-body .tp-rte-notes .tp-rte-pop { top: calc(100% + 8px); bottom: auto; }
+:is(.tp-nb-ed:not(.tp-compact), .tp-nb-win .tp-nb-ed) .tp-nb-body .tp-rte-notes > .tp-rte-host { display: block; flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0 -40px; padding: 16px 40px 28px; scrollbar-width: thin; }
+:is(.tp-nb-ed:not(.tp-compact), .tp-nb-win .tp-nb-ed) .tp-nb-body .tp-rte-notes .tp-rte-area { min-height: 100%; }
+.tp-nb-win .tp-nb-ed .tp-nb-body .tp-rte-notes .tp-rte-bar { margin: 0 -22px; padding: 0 16px; }
+.tp-nb-win .tp-nb-ed .tp-nb-body .tp-rte-notes > .tp-rte-host { margin: 0 -22px; padding: 14px 22px 18px; }
+@media (prefers-reduced-motion: reduce) { .tp-nb-ed:not(.tp-compact) .tp-nb-body .tp-rte-notes .tp-rte-bar > *, .tp-nb-win .tp-nb-ed .tp-nb-body .tp-rte-notes .tp-rte-bar > * { transition-duration: 1ms; } }
 
 
 /* A linked note's count and time sit at the row's right edge; on hover the time gives its place to Unlink (×). */

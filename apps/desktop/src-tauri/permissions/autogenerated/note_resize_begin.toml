@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-note-resize-begin"
+description = "Enables the note_resize_begin command without any pre-configured scope."
+commands.allow = ["note_resize_begin"]
+
+[[permission]]
+identifier = "deny-note-resize-begin"
+description = "Denies the note_resize_begin command without any pre-configured scope."
+commands.deny = ["note_resize_begin"]

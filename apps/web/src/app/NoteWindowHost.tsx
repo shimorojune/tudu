@@ -1,12 +1,14 @@
 import { useNavigate } from '@tanstack/react-router';
-import { NoteFloat } from '@tudu/ui';
+import { NoteFloat, type NoteResizeEdge } from '@tudu/ui';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { desktop } from './desktop';
 import {
   closeNoteWindow,
   fitFrame,
   NOTE_WINDOW_MIN,
+  noteWindowFallback,
   readFrame,
+  resizeFrame,
   saveFrame,
   useNoteWindow,
   type WindowFrame,
@@ -14,18 +16,11 @@ import {
 import { NoteWindowView } from './NoteWindowView';
 import { useViewport } from './viewport';
 
-/** The popup a note opens in (↗): the bare note window page, at a size to write in. */
-export function popOut(id: string | null): void {
-  const url = `/note-window${id ? `/${encodeURIComponent(id)}` : ''}`;
-  const w = window.open(url, 'tudu-note', 'popup,width=640,height=520');
-  // Popups blocked: a tab of its own.
-  if (!w) window.open(url, '_blank');
-}
-
 /**
  * The note window over the page, on the desk in the browser: it opens from a note in the task panel, from Search and
- * from New note, floats over everything (an open task panel too), drags by its bar and keeps its place and size per
- * browser. The Mac app has its own window instead, and phones open the note's page.
+ * from New note, floats over everything (an open task panel too), drags by its bar, resizes from any edge or corner
+ * and keeps its place and size per browser. The Tudu mark takes the tab to the note on the Notebook page. The Mac app
+ * has its own window instead (unless it's too old to, then this one), and phones open the note's page.
  */
 export function NoteWindowHost() {
   const vp = useViewport();
@@ -43,22 +38,19 @@ export function NoteWindowHost() {
     window.addEventListener('resize', on);
     return () => window.removeEventListener('resize', on);
   }, []);
-  if (vp === 'phone' || desktop()) return null;
+  if (vp === 'phone' || (desktop() && !noteWindowFallback())) return null;
 
-  const start = (e: PointerEvent<HTMLElement>) => {
-    if (e.button !== 0 || (e.target as Element).closest('button')) return;
+  /** Follow the pointer from here until it lets go, then keep where it ended. */
+  const track = (
+    e: PointerEvent<HTMLElement>,
+    to: (from: WindowFrame, dx: number, dy: number) => WindowFrame,
+  ) => {
     e.preventDefault();
     drag.current = { sx: e.clientX, sy: e.clientY, from: frame };
     const move = (ev: globalThis.PointerEvent) => {
       const d = drag.current;
       if (!d) return;
-      setFrame(
-        fitFrame(
-          { ...d.from, x: d.from.x + ev.clientX - d.sx, y: d.from.y + ev.clientY - d.sy },
-          window.innerWidth,
-          window.innerHeight,
-        ),
-      );
+      setFrame(to(d.from, ev.clientX - d.sx, ev.clientY - d.sy));
     };
     const up = () => {
       drag.current = null;
@@ -71,6 +63,17 @@ export function NoteWindowHost() {
     };
     document.addEventListener('pointermove', move);
     document.addEventListener('pointerup', up);
+  };
+  const start = (e: PointerEvent<HTMLElement>) => {
+    if (e.button !== 0 || (e.target as Element).closest('button')) return;
+    track(e, (from, dx, dy) =>
+      fitFrame({ ...from, x: from.x + dx, y: from.y + dy }, window.innerWidth, window.innerHeight),
+    );
+  };
+  const resize = (e: PointerEvent<HTMLElement>, edge: NoteResizeEdge) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    track(e, (from, dx, dy) => resizeFrame(from, edge, dx, dy, window.innerWidth, window.innerHeight));
   };
 
   return (
@@ -87,8 +90,12 @@ export function NoteWindowHost() {
       <NoteWindowView
         variant="web"
         onDragStart={start}
+        onResizeStart={resize}
         onClose={closeNoteWindow}
-        onOpenApp={popOut}
+        onOpenApp={(id) => {
+          closeNoteWindow();
+          void navigate({ href: id ? `/notebook/${encodeURIComponent(id)}` : '/notebook' });
+        }}
         openPath={(href) => void navigate({ href })}
       />
     </NoteFloat>

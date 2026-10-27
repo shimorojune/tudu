@@ -62,6 +62,10 @@ impl Track {
 pub const SUMMON: &str = "CommandOrControl+Shift+N";
 /// The summon as the web app (and the menu bar's New task) shows it.
 pub const SUMMON_LABEL: &str = "⌘⇧N";
+/// The note window's shortcut: a blank note over whatever app you are in, as the menu bar's New note does.
+pub const NOTES: &str = "CommandOrControl+Alt+N";
+/// It as the menu bar's New note tooltip shows it.
+pub const NOTES_LABEL: &str = "⌥⌘N";
 
 #[cfg(test)]
 mod tests {
@@ -76,6 +80,17 @@ mod tests {
             Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyN)
         );
         assert_eq!(SUMMON_LABEL, "⌘⇧N");
+    }
+
+    #[test]
+    fn c11_u43_the_note_window_shortcut_is_option_command_n() {
+        let s: Shortcut = NOTES.parse().expect("the note window's shortcut parses");
+        assert_eq!(
+            s,
+            Shortcut::new(Some(Modifiers::SUPER | Modifiers::ALT), Code::KeyN)
+        );
+        assert_ne!(s, SUMMON.parse::<Shortcut>().unwrap());
+        assert_eq!(NOTES_LABEL, "⌥⌘N");
     }
 
     #[test]

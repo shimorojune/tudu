@@ -17,9 +17,9 @@ use tauri::{
     tray::{TrayIcon, TrayIconBuilder, TrayIconEvent},
     Manager, RunEvent, WindowEvent,
 };
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
-pub use track::{Track, SUMMON, SUMMON_LABEL};
+pub use track::{Track, NOTES, NOTES_LABEL, SUMMON, SUMMON_LABEL};
 
 /// What the app knows about itself, shared by the commands, the tray and the control channel.
 pub struct App {
@@ -56,6 +56,8 @@ macro_rules! handlers {
             notes::set_note_expanded,
             notes::open_in_notebook,
             notes::hide_note,
+            notes::note_resize_begin,
+            notes::note_resize_to,
             $($extra),*
         ]
     };
@@ -68,9 +70,9 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, _shortcut, event| {
+                .with_handler(|app, shortcut, event| {
                     if event.state == ShortcutState::Pressed {
-                        windows::summon(app, true);
+                        pressed(app, shortcut);
                     }
                 })
                 .build(),
@@ -113,6 +115,10 @@ pub fn run() {
             if let Err(e) = app.global_shortcut().register(SUMMON) {
                 eprintln!("tudu: the summon {SUMMON} could not be registered: {e}");
             }
+            // Taken by another app: logged, and the menu bar's New note shows no shortcut.
+            if let Err(e) = app.global_shortcut().register(NOTES) {
+                eprintln!("tudu: the note window's shortcut {NOTES} could not be registered: {e}");
+            }
             #[cfg(feature = "control")]
             control::start(app.handle());
             Ok(())
@@ -127,6 +133,16 @@ pub fn run() {
             windows::show_main(app, None);
         }
     });
+}
+
+/// A global shortcut pressed: ⌥⌘N opens the note window on a blank note (as the sheet's New note does), anything
+/// else is the summon.
+pub fn pressed(app: &tauri::AppHandle, shortcut: &Shortcut) {
+    if NOTES.parse::<Shortcut>().ok().as_ref() == Some(shortcut) {
+        notes::open(app, None, None);
+    } else {
+        windows::summon(app, true);
+    }
 }
 
 /// The menu-bar icon: the bare ink tick as a template image. It has no menu: a click, left or right, opens today from the
