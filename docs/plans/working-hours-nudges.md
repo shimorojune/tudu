@@ -32,7 +32,10 @@ during working hours that says what is done and what is still left today. Short 
    - Errors: `The end needs to be after the start.` and `Pick at least one day.` (red line, the field edge red, nothing
      saved). `Couldn't save. Tudu will try again when you're back online.` when the server refuses or is unreachable; the
      change stays on screen and nudges follow it.
-   - Loading: skeleton rows in the shape of the section, while `/api/me` has not answered yet.
+   - Loading, while `/api/me` has not answered yet: the section itself in its final shape (default hours), with every
+     word and control shimmering in place. The boxes are the same before and after, so nothing moves or changes height when
+     the hours arrive; the content then fades up (240 ms). Any later change of height (hours per day, nudges unfolding)
+     eases over 200 ms instead of snapping. WH-U11 checks the section's height is equal loading and loaded.
 2. **Nudges** (Mac app only, in the same section):
    - `Nudge me in my hours` switch, off by default. On unfolds **How often** (`30 min`, `Hourly`, `2 hours`, `3 hours`;
      Hourly is the default), **Next at 11:00** with **Pause for today**, and **Send a test nudge** with **Send now**.
