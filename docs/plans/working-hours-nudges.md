@@ -39,9 +39,13 @@ during working hours that says what is done and what is still left today. Short 
 2. **Nudges** (Mac app only, in the same section):
    - `Nudge me in my hours` switch, off by default. On unfolds **How often** (`30 min`, `Hourly`, `2 hours`, `3 hours`;
      Hourly is the default), **Next at 11:00** with **Pause for today**, and **Send a test nudge** with **Send now**.
-   - The first time it is turned on, macOS asks for permission (`Allow Tudu in the box macOS just showed.`). Denied, or
-     switched off later in System Settings: the switch slides back with `macOS isn't letting Tudu notify you. Allow it
-     in System Settings › Notifications.` and an **Open Notifications** button. Read again each time Settings opens.
+   - The first time it is turned on, Tudu asks macOS (`Allow Tudu in the box macOS just showed.`). On Rohit's Mac
+     (macOS 26, ad hoc signed) macOS shows **no prompt**: it refuses at once and lists Tudu in System Settings ›
+     Notifications with notifications off. So the refused state is the usual first-run path, not an edge case: the
+     switch stays on with `macOS has Tudu's notifications off.` and one line `Turn on Allow notifications for Tudu,
+     then come back.` and an **Open Notification settings** button that opens that page. When Tudu comes to the front
+     again it re-reads the status by itself; once allowed it reads `On` and sends one test nudge so you see it work.
+     Also read again each time Settings opens, and if it is switched off later in System Settings.
    - Paused: the row reads `Paused until Wednesday 09:00` with **Resume**. A pause ends on its own at the start of your
      next working day.
    - Send now: `Sent. It shows at the top right of your screen.` Works outside your hours and while paused. Failure:
@@ -212,6 +216,7 @@ run on Rohit's Mac, not in the cloud container.
 | WH-M02 | A real hourly nudge reads as drawn in light and dark; the click opens Today; Pause for today works          |
 | WH-M03 | With Focus on, nudges stay silent and wait in Notification Center                                           |
 | WH-M04 | Close the lid over a slot, open after → behaves per the half-interval rule; no pile-up                     |
+| WH-M05 | Fresh install, switch Nudges on → macOS refuses silently → the off-in-macOS step shows; Open Notification settings opens the Notifications page; allow Tudu, come back → On + one test nudge, no restart |
 
 ## Out of scope
 
@@ -222,9 +227,11 @@ run on Rohit's Mac, not in the cloud container.
 
 ## Risks
 
-- **UserNotifications with an ad hoc signed app.** It needs a bundle identifier; it should work ad hoc but has not been
-  tried here. First build step: a spike on Rohit's Mac (post one notification from Tudu Staging). If it fails, the
-  fallback is `tauri-plugin-notification` without click routing, the action, or replacement, and Rohit decides again.
+- **UserNotifications with an ad hoc signed app (spike done 27 Oct on macOS 26.5.2).** Works once the person allows
+  Tudu in System Settings › Notifications: banner, replace by id, Pause for today all checked on Rohit's Mac. macOS
+  shows no permission prompt for the ad hoc app, hence the guided off-in-macOS step above. The older
+  NSUserNotificationCenter route (what `tauri-plugin-notification` uses) accepts posts and silently drops them, so it
+  is not a fallback. Signing with a Developer ID would bring the normal prompt back; not needed for this feature.
 - **CI can't grant notification permission** on the GitHub macOS runner. Mac e2e reads what Tudu posted through the
   control channel; delivery is checked by hand (WH-M01..M04) and on Rohit's Mac where Tudu Test is allowed once.
 - **Webview timers while hidden.** The App Nap opt-out keeps the main webview running; the 30 s clock check plus the
