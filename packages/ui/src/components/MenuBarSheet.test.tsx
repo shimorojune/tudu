@@ -198,7 +198,13 @@ describe('C20-U07 MenuBarSheet', () => {
 describe('C20-U20 MenuBarSheet', () => {
   it('C20-U20 New note shows the note window’s shortcut in its tooltip, above, when the app has one', async () => {
     render(
-      <MenuBarSheet state="day" heading={heading} groups={[personal]} noteShortcut="⌥⌘N" onNewNote={vi.fn()} />,
+      <MenuBarSheet
+        state="day"
+        heading={heading}
+        groups={[personal]}
+        noteShortcut="⌥⌘N"
+        onNewNote={vi.fn()}
+      />,
     );
     const note = screen.getByRole('button', { name: 'New note' });
     expect(note).toHaveAttribute('aria-keyshortcuts', 'Alt+Meta+N');

@@ -2845,7 +2845,7 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 :is(.tp-nb-ed:not(.tp-compact), .tp-nb-win .tp-nb-ed) .tp-nb-body .tp-rte-notes .tp-rte-area { min-height: 100%; }
 .tp-nb-win .tp-nb-ed .tp-nb-body .tp-rte-notes .tp-rte-bar { margin: 0 -22px; padding: 0 16px; }
 .tp-nb-win .tp-nb-ed .tp-nb-body .tp-rte-notes > .tp-rte-host { margin: 0 -22px; padding: 14px 22px 18px; }
-@media (prefers-reduced-motion: reduce) { :is(.tp-nb-ed:not(.tp-compact), .tp-nb-win .tp-nb-ed) .tp-nb-body .tp-rte-notes .tp-rte-bar > * { transition-duration: 1ms; } }
+@media (prefers-reduced-motion: reduce) { .tp-nb-ed:not(.tp-compact) .tp-nb-body .tp-rte-notes .tp-rte-bar > *, .tp-nb-win .tp-nb-ed .tp-nb-body .tp-rte-notes .tp-rte-bar > * { transition-duration: 1ms; } }
 
 
 /* A linked note's count and time sit at the row's right edge; on hover the time gives its place to Unlink (×). */

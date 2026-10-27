@@ -81,7 +81,9 @@ describe('C22-U60 the note window resizes from every edge and corner', () => {
   for (const variant of ['mac', 'web'] as const)
     it(`C22-U60 ${variant}: the grip and seven edge handles, each says its direction`, () => {
       const onResizeStart = vi.fn();
-      const { container } = render(<NoteWindow variant={variant} active="new" onResizeStart={onResizeStart} />);
+      const { container } = render(
+        <NoteWindow variant={variant} active="new" onResizeStart={onResizeStart} />,
+      );
       expect(container.querySelector('.tp-nb-grip')).not.toBeNull();
       expect(container.querySelectorAll('.tp-nb-edge')).toHaveLength(7);
       for (const d of EDGES) {
@@ -111,6 +113,9 @@ describe('C22-U61 the browser note window', () => {
     expect(screen.queryByRole('button', { name: 'Open in its own window' })).toBeNull();
     fireEvent.click(open);
     expect(onOpenApp).toHaveBeenCalledOnce();
-    expect(screen.getByRole('banner').querySelector('.tp-nb-win-grab')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByRole('banner').querySelector('.tp-nb-win-grab')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
   });
 });

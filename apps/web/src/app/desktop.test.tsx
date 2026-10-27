@@ -5,7 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { switchSpaces } from './AppShell';
 import { desktop, resetDesktop, type DesktopFake } from './desktop';
 import { interceptLinks, linkKind, openOutside } from './links';
-import { FALLBACK_TOAST, openNoteWindow, resetNoteWindowFallback, setOpenUpdates, useNoteWindow, closeNoteWindow } from './notebook';
+import {
+  FALLBACK_TOAST,
+  openNoteWindow,
+  resetNoteWindowFallback,
+  setOpenUpdates,
+  useNoteWindow,
+  closeNoteWindow,
+} from './notebook';
 import {
   appEntry,
   CHECK_FAILED,
@@ -410,7 +417,11 @@ describe('C11-U40 what failed, said plainly', () => {
     // A version ready still wins.
     expect(
       updatesRow(
-        st({ errorKind: 'signature', errorVersion: '0.37.2', ready: { version: '0.37.1', notes: '', date: null } }),
+        st({
+          errorKind: 'signature',
+          errorVersion: '0.37.2',
+          ready: { version: '0.37.1', notes: '', date: null },
+        }),
         APP,
         NOW,
       ).state,

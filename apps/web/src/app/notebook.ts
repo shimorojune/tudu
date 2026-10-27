@@ -233,7 +233,8 @@ export function noteWindowFallback(): boolean {
   return fallback;
 }
 
-export const FALLBACK_TOAST = 'This version of Tudu can’t float notes over other apps, so this one opens here.';
+export const FALLBACK_TOAST =
+  'This version of Tudu can’t float notes over other apps, so this one opens here.';
 
 /**
  * Open the note window on a note, or on a blank one. On the desk in the browser it is the panel over the page; in

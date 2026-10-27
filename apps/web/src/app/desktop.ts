@@ -51,7 +51,6 @@ export type DesktopWindow = 'main' | 'floating' | 'menubar' | 'note';
 /** Where a resize of the note window starts: an edge or a corner. */
 export type ResizeEdge = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
 
-
 /** The note window (chunk 22): what it was last asked to show, and whether it is pinned or fills the screen. */
 export interface NoteWindowState {
   pinned: boolean;

@@ -88,7 +88,9 @@ describe('C22-U70 resizing the Mac note window from an edge', () => {
     // jsdom has no PointerEvent: mouse events of the pointer's types carry the screen position.
     const ptr = (type: string, el: EventTarget, screenX: number, screenY: number) =>
       act(() => {
-        el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, screenX, screenY }));
+        el.dispatchEvent(
+          new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, screenX, screenY }),
+        );
       });
     ptr('pointerdown', h, 500, 400);
     ptr('pointerup', document, 470, 380);

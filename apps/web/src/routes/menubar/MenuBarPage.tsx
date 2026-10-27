@@ -116,13 +116,7 @@ export function MenuBarPage({ me: first }: { me: MeResponse | null }) {
     >
       {me ? (
         <WorkingDayProvider>
-          <Today
-            me={me}
-            app={app}
-            shortcut={info?.shortcut}
-            noteShortcut={info?.noteShortcut}
-            {...common}
-          />
+          <Today me={me} app={app} shortcut={info?.shortcut} noteShortcut={info?.noteShortcut} {...common} />
         </WorkingDayProvider>
       ) : (
         <MenuBarSheet state="signed-out" {...common} />

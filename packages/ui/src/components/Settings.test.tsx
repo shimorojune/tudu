@@ -521,7 +521,10 @@ describe('C11-U41 Settings › This Mac › Updates, an error retrying can’t f
   it('C11-U41 without it: Try again, as before', () => {
     settings({
       section: 'mac',
-      mac: { ...base, updates: { name: 'Tudu', current: '0.37.0', state: 'error', error: 'Couldn’t check.' } },
+      mac: {
+        ...base,
+        updates: { name: 'Tudu', current: '0.37.0', state: 'error', error: 'Couldn’t check.' },
+      },
     });
     expect(button()).toHaveTextContent('Try again');
   });

@@ -44,7 +44,7 @@ Status column is kept by `pnpm test:status` in [STATUS.md](STATUS.md). Run this 
 
 ## The note window's shortcut ([docs/plans/note-window-fixes.md](../plans/note-window-fixes.md))
 
-| ID      | Where                       | Case                                                                                       |
-| ------- | --------------------------- | ------------------------------------------------------------------------------------------ |
-| C20-U20 | ui `MenuBarSheet.test.tsx`  | New note's tooltip shows "New note ⌥⌘N" above, with `aria-keyshortcuts`; without it, New note |
-| C20-E20 | e2e `menubar`               | The sheet with `noteShortcut` shows ⌥⌘N on New note; from an older app, New note alone        |
+| ID      | Where                      | Case                                                                                          |
+| ------- | -------------------------- | --------------------------------------------------------------------------------------------- |
+| C20-U20 | ui `MenuBarSheet.test.tsx` | New note's tooltip shows "New note ⌥⌘N" above, with `aria-keyshortcuts`; without it, New note |
+| C20-E20 | e2e `menubar`              | The sheet with `noteShortcut` shows ⌥⌘N on New note; from an older app, New note alone        |

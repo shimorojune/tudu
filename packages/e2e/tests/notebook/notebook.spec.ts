@@ -938,7 +938,11 @@ test.describe('notebook', () => {
       await floatNote(page);
       const win = noteWindow(page);
       await expect(win.locator('.tp-nb-win-bar .tp-nb-win-grab')).toBeVisible();
-      const bg = (sel: string) => win.locator(sel).first().evaluate((el) => getComputedStyle(el).backgroundColor);
+      const bg = (sel: string) =>
+        win
+          .locator(sel)
+          .first()
+          .evaluate((el) => getComputedStyle(el).backgroundColor);
       expect(await bg('.tp-nb-rail')).toBe(await win.evaluate((el) => getComputedStyle(el).backgroundColor));
       const cursors: Record<string, string> = {
         n: 'ns-resize',
@@ -993,7 +997,9 @@ test.describe('notebook', () => {
     await floatNote(page);
     await expect(title(noteWindow(page))).toHaveValue('Venue shortlist');
     expect((await calls(page, 'openNote')).length).toBe(1);
-    const toast = page.getByText('This version of Tudu can’t float notes over other apps, so this one opens here.');
+    const toast = page.getByText(
+      'This version of Tudu can’t float notes over other apps, so this one opens here.',
+    );
     await expect(toast).toBeVisible();
     await page.getByRole('button', { name: 'Update Tudu' }).click();
     await expect(page).toHaveURL(/[?&]settings=mac/);

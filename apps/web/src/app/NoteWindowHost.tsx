@@ -41,7 +41,10 @@ export function NoteWindowHost() {
   if (vp === 'phone' || (desktop() && !noteWindowFallback())) return null;
 
   /** Follow the pointer from here until it lets go, then keep where it ended. */
-  const track = (e: PointerEvent<HTMLElement>, to: (from: WindowFrame, dx: number, dy: number) => WindowFrame) => {
+  const track = (
+    e: PointerEvent<HTMLElement>,
+    to: (from: WindowFrame, dx: number, dy: number) => WindowFrame,
+  ) => {
     e.preventDefault();
     drag.current = { sx: e.clientX, sy: e.clientY, from: frame };
     const move = (ev: globalThis.PointerEvent) => {
