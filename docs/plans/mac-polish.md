@@ -53,7 +53,7 @@ In the week's tiles (`brief`) and on phones (`compact`), `TaskRow` shows a row's
 - `TaskRow.tsx`: the space signal's `SpaceTile` gets `size={bare ? 16 : 13}`.
 - `components.css`: `.tp-sg .tp-sg-tile` forces `font-size: 7.5px` and `border-radius: 4px` (both `!important`). A
   bare variant overrides them: `.tp-sg-bare .tp-sg-tile { border-radius: 5px !important; font-size: 9px !important;
-  vertical-align: calc(12.5px * .355 - 8px); }`. That sits the 16px tile on the middle of the words the way the 13px
+vertical-align: calc(12.5px * .355 - 8px); }`. That sits the 16px tile on the middle of the words the way the 13px
   one sits now. Personal's person comes out 11px (`SpaceTile`'s small rule, `size * 0.7`).
 - Pills that show the name (Today, Backlog, the task panel's byline) stay 13px, matched to their 12.5px words.
 - The byline keeps its 22px height. Hover still names the space and a click still filters to it.
