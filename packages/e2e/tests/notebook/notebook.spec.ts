@@ -398,6 +398,12 @@ test.describe('notebook', () => {
     const more = page.locator('.tp-nb-ed-top .tp-nb-more');
     await expect(more).toHaveClass(/tp-nb-more-hide/);
     await expect(more).toBeHidden();
+    // Hidden and out of reach: Tab never lands on it.
+    await page.locator('.tp-nb-ed-top').click({ position: { x: 4, y: 4 } });
+    for (let i = 0; i < 4; i++) {
+      await page.keyboard.press('Tab');
+      await expect(more.locator(':focus')).toHaveCount(0);
+    }
     await title(page).click();
     await title(page).pressSequentially('V');
     await expect(more).not.toHaveClass(/tp-nb-more-hide/);
