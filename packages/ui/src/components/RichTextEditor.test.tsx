@@ -1,8 +1,16 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { Editor } from '@tiptap/core';
+import { NodeSelection, TextSelection } from '@tiptap/pm/state';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { DrawingContext, type NoteDrawingHost } from './NoteDrawing';
-import { RichTextContent, RichTextEditor, toHtml, type RichTextDrawings } from './RichTextEditor';
+import {
+  editorExtensions,
+  RichTextContent,
+  RichTextEditor,
+  toHtml,
+  type RichTextDrawings,
+} from './RichTextEditor';
 import { ToastHost } from './Toast';
 
 describe('RichTextEditor', () => {
@@ -531,7 +539,45 @@ describe('C22-U93 drawing blocks in the Notebook’s editor', () => {
     expect(html).toContain('!');
   });
 
-  // Backspace and the arrows over a block need layout (ProseMirror measures the caret): C22-E88 runs them in a browser.
+  it('C22-U93 the keys at a block: Backspace and ← from the line after select it, → from the line before; the default block stays a paragraph', () => {
+    const el = document.createElement('div');
+    const e = new Editor({
+      element: el,
+      extensions: editorExtensions('', { onOpen: () => {} }),
+      content: '<p>above</p><div data-drawing="k1"></div><p>below</p>',
+    });
+    expect(e.schema.topNodeType.contentMatch.defaultType?.name).toBe('paragraph');
+    const caret = (words: string, end: boolean) => {
+      let at = -1;
+      e.state.doc.descendants((n, pos) => {
+        if (n.isTextblock && n.textContent === words) at = pos + 1 + (end ? n.content.size : 0);
+      });
+      e.view.dispatch(e.state.tr.setSelection(TextSelection.create(e.state.doc, at)));
+    };
+    const press = (key: string) => {
+      const ev = new KeyboardEvent('keydown', { key, bubbles: true });
+      return e.view.someProp('handleKeyDown', (f) => f(e.view, ev)) ?? false;
+    };
+    const onBlock = () =>
+      e.state.selection instanceof NodeSelection && e.state.selection.node.type.name === 'drawing';
+    for (const [words, end, key] of [
+      ['below', false, 'Backspace'],
+      ['below', false, 'ArrowLeft'],
+      ['above', true, 'ArrowRight'],
+    ] as const) {
+      caret(words, end);
+      expect(press(key)).toBe(true);
+      expect(onBlock()).toBe(true);
+    }
+    // Not at the line's edge: the keys are the editor's own.
+    caret('below', true);
+    press('ArrowLeft');
+    expect(onBlock()).toBe(false);
+    expect(e.getHTML()).toBe('<p>above</p><div data-drawing="k1"></div><p>below</p>');
+    e.destroy();
+  });
+
+  // Where the caret lands after a click needs layout: C22-E88 runs the keys in a browser too.
 
   it('C22-U93 only the Notebook’s editor has Draw; it drops a block at the caret and opens it', async () => {
     const user = userEvent.setup();

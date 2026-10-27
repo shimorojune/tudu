@@ -200,26 +200,29 @@ function DrawingBlockView(props: NodeViewProps) {
 }
 
 /**
- * Backspace just after a drawing selects it, so a second one deletes it. Its own extension, above the core keymap
- * (whose joinBackward deletes an atom outright): a priority on the node itself would put it first in the schema and
- * make it the default block.
+ * Backspace just after a drawing selects it, so a second one deletes it; the arrows step onto it. Its own extension,
+ * above the core keymap (whose joinBackward deletes an atom outright): a priority on the node itself would put it
+ * first in the schema and make it the default block.
  */
 export const DrawingKeys = Extension.create({
   name: 'drawingKeys',
   priority: 1000,
   addKeyboardShortcuts() {
-    return {
-      Backspace: ({ editor }) =>
-        editor.commands.command(({ tr, dispatch }) => {
-          const { $cursor } = tr.selection as TextSelection;
-          if (!$cursor || $cursor.parentOffset > 0 || $cursor.depth < 1) return false;
-          const at = $cursor.before();
-          const before = tr.doc.resolve(at).nodeBefore;
-          if (before?.type.name !== 'drawing') return false;
-          if (dispatch) tr.setSelection(NodeSelection.create(tr.doc, at - before.nodeSize));
-          return true;
-        }),
-    };
+    /** From the caret at the very start (or end) of a line, onto the drawing just before (or after) it. */
+    const onto = (dir: -1 | 1) => () =>
+      this.editor.commands.command(({ tr, dispatch }) => {
+        const { $cursor } = tr.selection as TextSelection;
+        if (!$cursor || $cursor.depth < 1) return false;
+        if (dir < 0 ? $cursor.parentOffset > 0 : $cursor.parentOffset < $cursor.parent.content.size)
+          return false;
+        const at = dir < 0 ? $cursor.before() : $cursor.after();
+        const $at = tr.doc.resolve(at);
+        const next = dir < 0 ? $at.nodeBefore : $at.nodeAfter;
+        if (next?.type.name !== 'drawing') return false;
+        if (dispatch) tr.setSelection(NodeSelection.create(tr.doc, dir < 0 ? at - next.nodeSize : at));
+        return true;
+      });
+    return { Backspace: onto(-1), ArrowLeft: onto(-1), ArrowRight: onto(1) };
   },
 });
 

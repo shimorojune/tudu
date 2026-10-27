@@ -1646,6 +1646,8 @@ test.describe('notebook drawings', () => {
     const startOfBelow = async () => {
       await words(page).locator('p', { hasText: 'below' }).click();
       await page.keyboard.press('ControlOrMeta+ArrowLeft');
+      // The editor takes the caret from the page's selectionchange, a moment later: a person never types that fast.
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 50))));
     };
     await startOfBelow();
     await page.keyboard.press('Backspace');
