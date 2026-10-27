@@ -516,7 +516,12 @@ describe('C22-U93 drawing blocks in the Notebook’s editor', () => {
   it('C22-U93 a block round-trips through the HTML and shows its picture', async () => {
     const user = userEvent.setup();
     const { container, onInput, area } = drawn('<p>Two rooms</p><div data-drawing="d1"></div><p>Coffee</p>');
-    const block = await waitFor(() => container.querySelector('[data-drawing-id="d1"]')!);
+    // The node view draws after the editor mounts: wait until it is in.
+    const block = await waitFor(() => {
+      const b = container.querySelector('[data-drawing-id="d1"]');
+      expect(b).not.toBeNull();
+      return b!;
+    });
     expect(block.querySelector('img')).toHaveAttribute('src', '/pic/d1.png');
     await user.click(area);
     await user.keyboard('!');
