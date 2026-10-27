@@ -527,10 +527,12 @@ const sheetReady = (a: App) =>
 async function startDrawing(app: App): Promise<string> {
   await app.eval(`T.click(T.get('button', 'Draw'))`, 'note');
   await sheetReady(app);
-  return app.eval<string>(
-    `return [...document.querySelectorAll('.tp-nb-draw')].at(-1).dataset.drawingId`,
+  const id = await app.eval<string>(
+    `return document.querySelector('.tp-nb-sheet').dataset.drawingSheet`,
     'note',
   );
+  expect(id).toBeTruthy();
+  return id;
 }
 
 /** The rectangle tool from Excalidraw's toolbar, then a mouse drag on its canvas, as WebKit hands the page a mouse. */
