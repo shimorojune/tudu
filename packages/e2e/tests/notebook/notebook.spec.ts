@@ -1355,7 +1355,7 @@ async function startDrawing(page: Page, noteId: string, firstWords: string): Pro
 /** An empty spot on the canvas, clear of Excalidraw's own controls: the welcome menu in the middle, Help and the
  * zoom in the corners, the shape properties on the left, a phone's tools at the foot. Right of what drawSomething draws. */
 const awayFrom = (b: { x: number; y: number; width: number; height: number }) => ({
-  x: b.x + b.width * 0.7,
+  x: b.x + b.width * 0.85,
   y: b.y + b.height * 0.3,
 });
 
@@ -1368,11 +1368,12 @@ async function drawSomething(page: Page, text: string): Promise<void> {
   const phoneTools = /excalidraw--mobile/.test(
     (await sheet(page).locator('.excalidraw').getAttribute('class')) ?? '',
   );
-  const left = b.x + (phoneTools ? 40 : 260);
+  const left = b.x + (phoneTools ? 40 : Math.max(b.width * 0.45, 240));
+  const right = Math.min(left + 160, b.x + b.width * 0.75);
   await page.keyboard.press('r');
   await page.mouse.move(left, b.y + 120);
   await page.mouse.down();
-  await page.mouse.move(left + 160, b.y + 220, { steps: 6 });
+  await page.mouse.move(right, b.y + 220, { steps: 6 });
   await page.mouse.up();
   await page.keyboard.press('t');
   await page.mouse.click(left + 20, b.y + 280);
@@ -1641,11 +1642,10 @@ test.describe('notebook drawings', () => {
     await page.goto(`/notebook/${id}`);
     const blk = drawingBlock(page, 'k1');
     await expect(blk).toBeVisible();
-    // A click at the line's left edge, not Home: on a Mac, Home scrolls and leaves the caret where it was.
+    // ⌘← on a Mac, Ctrl+← elsewhere (a word back: the line is one word). Home doesn't move the caret on a Mac.
     const startOfBelow = async () => {
-      await words(page)
-        .locator('p', { hasText: 'below' })
-        .click({ position: { x: 1, y: 4 } });
+      await words(page).locator('p', { hasText: 'below' }).click();
+      await page.keyboard.press('ControlOrMeta+ArrowLeft');
     };
     await startOfBelow();
     await page.keyboard.press('Backspace');

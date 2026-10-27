@@ -140,6 +140,25 @@ describe('C22-U89 images hold the save', () => {
     expect(s.saves()).toHaveLength(1);
   });
 
+  it('C22-U89 Done saves the scene at once; the note’s pictures, uploaded after it, go in a save of their own', async () => {
+    const s = setup();
+    const id = s.notebook.newDrawing('n1');
+    await s.notebook.openDrawing(id, 'n1');
+    s.notebook.editDrawing(id, scene('arrow'));
+    s.notebook.closeDrawing(id);
+    await tick(10);
+    expect(s.saves()).toHaveLength(1);
+    // The web's Done, after closing: hold, upload both pictures, set them, let go.
+    const release = s.notebook.holdDrawing(id);
+    s.notebook.setDrawingPictures(id, 'light-2', 'dark-2');
+    release();
+    await tick(10);
+    expect(s.saves().map((m) => [m.payload.previewLight ?? null, m.payload.previewDark ?? null])).toEqual([
+      [null, null],
+      ['light-2', 'dark-2'],
+    ]);
+  });
+
   it('C22-U89 a failed upload lets go too: the drawing saves without that image', async () => {
     const s = setup();
     const id = s.notebook.newDrawing('n1');

@@ -587,7 +587,9 @@ export class NotebookStore {
       if (done) return;
       done = true;
       s.holds = Math.max(0, s.holds - 1);
-      if (!s.holds && s.owed) {
+      // Done already went out while this was held (the note's pictures upload after it): the save it owes, or the
+      // pictures that landed since, go now.
+      if (!s.holds && (s.owed || s.pictures)) {
         s.owed = false;
         this.flushDrawing(id, true);
       }

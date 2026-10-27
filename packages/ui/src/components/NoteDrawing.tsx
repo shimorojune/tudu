@@ -209,17 +209,16 @@ const DrawingKeys = Extension.create({
   priority: 1000,
   addKeyboardShortcuts() {
     return {
-      Backspace: ({ editor }) => {
-        const { $cursor } = editor.state.selection as TextSelection;
-        if (!$cursor || $cursor.parentOffset > 0 || $cursor.depth < 1) return false;
-        const at = $cursor.before();
-        const before = editor.state.doc.resolve(at).nodeBefore;
-        if (before?.type.name !== 'drawing') return false;
-        editor.view.dispatch(
-          editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, at - before.nodeSize)),
-        );
-        return true;
-      },
+      Backspace: ({ editor }) =>
+        editor.commands.command(({ tr, dispatch }) => {
+          const { $cursor } = tr.selection as TextSelection;
+          if (!$cursor || $cursor.parentOffset > 0 || $cursor.depth < 1) return false;
+          const at = $cursor.before();
+          const before = tr.doc.resolve(at).nodeBefore;
+          if (before?.type.name !== 'drawing') return false;
+          if (dispatch) tr.setSelection(NodeSelection.create(tr.doc, at - before.nodeSize));
+          return true;
+        }),
     };
   },
 });
