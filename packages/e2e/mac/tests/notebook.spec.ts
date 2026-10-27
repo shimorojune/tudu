@@ -163,7 +163,13 @@ test.describe('chunk 22 · the note window', () => {
     await app.until(`return T.all('button', 'Pinned on top · click to unpin').length > 0`, 'note');
     const was = s.windows.note;
     await app.eval(`T.click(T.get('button', 'Fill the screen'))`, 'note');
-    s = await app.waitState((x) => x.note.state.expanded && x.windows.note.width > was.width + 100);
+    // It glides there: wait for the end of the glide, not a frame on the way.
+    s = await app.waitState(
+      (x) =>
+        x.note.state.expanded &&
+        !!x.windows.note.screen &&
+        near(x.windows.note.width, x.windows.note.screen.width - 16),
+    );
     // The whole screen but a small margin (the menu bar and the Dock may take some of its height).
     const scr = s.windows.note.screen!;
     expect(near(s.windows.note.width, scr.width - 16)).toBe(true);

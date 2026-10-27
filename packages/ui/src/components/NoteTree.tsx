@@ -473,6 +473,8 @@ export function NoteTree(p: NoteTreeProps) {
   const nav = useRef<HTMLElement | null>(null);
   const scroller = useRef<HTMLDivElement | null>(null);
   const stop = useRef<(() => void) | null>(null);
+  /** Takes away the guard that eats the click after a drag. */
+  const unswallowing = useRef<(() => void) | null>(null);
   useEffect(
     () => () => {
       if (lt.current) clearTimeout(lt.current);
@@ -626,6 +628,8 @@ export function NoteTree(p: NoteTreeProps) {
     const target = e.target as Element;
     if (target.closest?.('.tp-nb-fadd, .tp-nb-menuw, input')) return;
     if (!nav.current || carry.current.drag) return;
+    // A new press: the click after the last drag has had its chance.
+    unswallowing.current?.();
     stop.current?.();
     const row = e.currentTarget as HTMLElement;
     const touch = e.pointerType !== 'mouse';
@@ -696,12 +700,17 @@ export function NoteTree(p: NoteTreeProps) {
     const swallow = (ev: MouseEvent) => {
       ev.stopPropagation();
       ev.preventDefault();
+      unswallow();
+    };
+    const unswallow = () => {
       document.removeEventListener('click', swallow, true);
+      if (unswallowing.current === unswallow) unswallowing.current = null;
     };
     const up = () => {
       if (!lifted) return end();
       document.addEventListener('click', swallow, true);
-      setTimeout(() => document.removeEventListener('click', swallow, true), 60);
+      unswallowing.current = unswallow;
+      setTimeout(unswallow, 60);
       finish(false);
     };
     const cancel = () => (lifted ? finish(true) : end());

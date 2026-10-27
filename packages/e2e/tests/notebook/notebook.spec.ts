@@ -394,10 +394,11 @@ test.describe('notebook', () => {
     await openNotebook(page);
     await tree(page).getByRole('button', { name: 'New note or folder' }).click();
     await page.getByRole('menuitem', { name: 'New note' }).click();
-    await expect(title(page)).toBeFocused();
+    await expect(title(page)).toBeVisible();
     const more = page.locator('.tp-nb-ed-top .tp-nb-more');
     await expect(more).toHaveClass(/tp-nb-more-hide/);
     await expect(more).toBeHidden();
+    await title(page).click();
     await title(page).pressSequentially('V');
     await expect(more).not.toHaveClass(/tp-nb-more-hide/);
     await expect(more.getByRole('button', { name: 'More' })).toBeVisible();

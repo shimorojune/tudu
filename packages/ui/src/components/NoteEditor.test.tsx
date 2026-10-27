@@ -234,16 +234,13 @@ describe('C22-U31 the Make a task bubble sits on whole pixels', () => {
 
 describe('C22-U49 a new note nobody has written in', () => {
   it('C22-U49 keeps ⋯ in place but hidden, out of reach, and shows the same one once it is kept', async () => {
-    const { user, rerender } = setup({ note: { ...NOTE, draft: true } });
+    const { rerender } = setup({ note: { ...NOTE, draft: true } });
     const more = document.querySelector('.tp-nb-more')!;
     expect(more).toHaveClass('tp-nb-more-hide');
     expect(more).toHaveAttribute('aria-hidden', 'true');
     expect(more).toHaveAttribute('inert');
+    // jsdom has no `inert`, so Tab can't be checked here; C22-E43 checks it is out of reach in a browser.
     expect(screen.queryByRole('button', { name: 'More' })).toBeNull();
-    for (let i = 0; i < 8; i++) {
-      await user.tab();
-      expect(more.contains(document.activeElement)).toBe(false);
-    }
     rerender(<NoteEditor note={{ ...NOTE, draft: false }} folders={FOLDERS} tasks={[]} />);
     // The same node, in the same spot: nothing beside it moves.
     expect(document.querySelector('.tp-nb-more')).toBe(more);
