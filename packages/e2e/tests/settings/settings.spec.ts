@@ -430,7 +430,8 @@ test.describe('settings', () => {
     const box = (await d.boundingBox())!;
     expect(box.width).toBeGreaterThan(760);
     const find = d.getByRole('searchbox', { name: 'Find someone' });
-    await find.fill('gi');
+    // Long enough that no member's random e-mail (base36 time, hex) matches too.
+    await find.fill('gita');
     await expect(d.getByRole('list', { name: 'Members' }).getByRole('listitem')).toHaveCount(1);
     await find.fill('zed');
     await expect(d.getByText('No one called “zed” in Harbour.')).toBeVisible();
