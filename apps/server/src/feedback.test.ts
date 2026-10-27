@@ -454,6 +454,14 @@ describe('the screenshot on the public issue', () => {
   /** GET a public screenshot link the way GitHub's image proxy does: no cookie. */
   const fetchShot = (url: string) => server.app.request(url.replace(LINKS.base, ''));
 
+  // The hourly cap counts every issue the file has filed so far; age those out so these cases always file.
+  beforeEach(async () => {
+    await server.db
+      .update(schema.feedback)
+      .set({ issueClaimedAt: sql`now() - interval '2 hours'` })
+      .where(eq(schema.feedback.issueState, 'filed'));
+  });
+
   it('C19-A12 shown: the issue embeds a signed link under the words, and the link serves the image to anyone', async () => {
     const { jar } = await signIn(server);
     const marker = `A12 ${uuid()}`;
