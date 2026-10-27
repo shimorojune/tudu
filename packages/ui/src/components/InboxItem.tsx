@@ -1,4 +1,4 @@
-import { addDays, formatDay, textOf, toHtml, type IsoDate } from '@tudu/core';
+import { addDays, formatDay, stripTags, textOf, toHtml, type IsoDate } from '@tudu/core';
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
@@ -632,7 +632,7 @@ export function InboxItem(p: InboxItemProps) {
             {open || full ? (
               <RichTextContent html={it.quote} fileBase={p.fileBase} />
             ) : (
-              it.quote.replace(/<[^>]+>/g, ' ')
+              stripTags(it.quote, ' ')
             )}
           </span>
         ) : null}

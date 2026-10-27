@@ -73,7 +73,7 @@ const PAGES: Record<string, string> = {
 
 /** "macOS", "Windows", "iOS 18.1", "Android 15", "Linux". The browser freezes macOS's own version, so none there. */
 export function osOf(ua: string): string {
-  const ios = /(?:iPhone|iPad|iPod).*? OS (\d+)[_.](\d+)/.exec(ua);
+  const ios = /iPhone|iPad|iPod/.test(ua) ? / OS (\d+)[_.](\d+)/.exec(ua) : null;
   if (ios) return `iOS ${ios[1]}.${ios[2]}`;
   const android = /Android (\d+(?:\.\d+)?)/.exec(ua);
   if (android) return `Android ${android[1]}`;
@@ -94,7 +94,7 @@ export function browserOf(ua: string): string {
     pick(/Edg\/(\d+)/, 'Edge') ??
     pick(/Firefox\/(\d+)/, 'Firefox') ??
     pick(/(?:Chrome|CriOS)\/(\d+)/, 'Chrome') ??
-    pick(/Version\/(\d+(?:\.\d+)?).*Safari/, 'Safari') ??
+    (/Safari/.test(ua) ? pick(/Version\/(\d+(?:\.\d+)?)/, 'Safari') : null) ??
     'Unknown'
   );
 }

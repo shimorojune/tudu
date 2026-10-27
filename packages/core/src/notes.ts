@@ -41,7 +41,7 @@ const DROP_WITH_CONTENT = new Set([
 ]);
 
 const TAG_RE =
-  /<\/?([a-zA-Z][a-zA-Z0-9]*)((?:\s+[^\s"'<>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>`]+))?)*)\s*\/?>|<!--[\s\S]*?-->|<[!?/][^>]*>/g;
+  /<\/?([a-zA-Z][a-zA-Z0-9]*)((?:\s+[^\s"'<>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>`]+))?)*)\s*\/?>|<!--[\s\S]*?(?:-->|$)|<[!?/][^<>]*>/g;
 const ATTR_RE = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'<>`]+)))?/g;
 const SAFE_URL = /^(https?:|mailto:)/i;
 /** An attachment chip links to the API's own file route. */
@@ -160,7 +160,7 @@ export function cleanHtml(html: string): string {
 /** Plain words become paragraphs; HTML stays HTML. Older notes (and request notes before 0.39) are plain words. */
 export function toHtml(v: string | undefined | null): string {
   if (!v) return '';
-  if (/<\/?[a-z][\s\S]*>/i.test(v)) return v;
+  if (/<\/?[a-z][^<>]*>/i.test(v)) return v;
   return v
     .split(/\n{2,}/)
     .map(
@@ -173,7 +173,8 @@ export function toHtml(v: string | undefined | null): string {
 /** A note as stored: cleaned HTML, or nothing when it holds no words. */
 export function noteHtml(v: string | undefined | null): string {
   // The editor keeps an empty paragraph after a list (so there is a line to write on); it is not part of the note.
-  const h = cleanHtml(toHtml(v?.trim())).replace(/(<p><\/p>)+$/, '');
+  let h = cleanHtml(toHtml(v?.trim()));
+  while (h.endsWith('<p></p>')) h = h.slice(0, -'<p></p>'.length);
   return isEmptyHtml(h) ? '' : h;
 }
 
@@ -185,11 +186,22 @@ export function drawingIds(html: string): string[] {
 /** True when the HTML holds no words and nothing to look at (an empty paragraph is empty; a drawing is something). */
 export function isEmptyHtml(html: string): boolean {
   if (drawingIds(html).length) return false;
-  return !html
-    .replace(/<br\s*\/?>/gi, '')
-    .replace(/<[^>]*>/g, '')
+  return !stripTags(html)
     .replace(/&nbsp;/g, ' ')
     .trim();
+}
+
+/**
+ * Every tag gone, again until none is left (a tag split by another, "<scr<b>ipt>", is still a tag once the inner one
+ * goes). A tag never spans a "<", so a long run of them is quick.
+ */
+export function stripTags(html: string, by = ''): string {
+  let s = html;
+  for (let prev = ''; s !== prev;) {
+    prev = s;
+    s = s.replace(/<[^<>]*>/g, by);
+  }
+  return s;
 }
 
 /**
@@ -204,15 +216,15 @@ export function isBlankHtml(html: string): boolean {
 
 /** The words alone, for a search index or a short preview. */
 export function textOf(html: string): string {
-  return html
-    .replace(/<\/(p|li|h2|h3|blockquote|pre|div)>/gi, '\n')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/\n{2,}/g, '\n')
-    .trim();
+  return (
+    stripTags(html.replace(/<\/(p|li|h2|h3|blockquote|pre|div)>/gi, '\n').replace(/<br\s*\/?>/gi, '\n'))
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      // Last, so "&amp;lt;" reads "&lt;" and is not unescaped twice.
+      .replace(/&amp;/g, '&')
+      .replace(/\n{2,}/g, '\n')
+      .trim()
+  );
 }

@@ -606,10 +606,10 @@ test.describe('desktop', () => {
     await app.eval(
       `[...document.querySelectorAll('[role=dialog] a')].find((a) => a.textContent === 'The brief').click()`,
     );
-    await app.waitState((x) => x.seen.opened.includes('https://example.com/brief'));
+    await app.waitState((x) => x.seen.opened.some((u) => u === 'https://example.com/brief'));
     // Even a page moving itself elsewhere is handed out, and the window stays put.
     await app.eval(`location.href = 'https://example.com/elsewhere'`).catch(() => {});
-    const s = await app.waitState((x) => x.seen.opened.includes('https://example.com/elsewhere'));
+    const s = await app.waitState((x) => x.seen.opened.some((u) => u === 'https://example.com/elsewhere'));
     expect(new URL(s.windows.main.url).origin).toBe(new URL(before).origin);
   });
 

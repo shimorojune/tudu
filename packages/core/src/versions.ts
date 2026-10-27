@@ -35,7 +35,7 @@ export function parseVersion(v: string): Parsed | null {
 
 /** The version in a tag or a release name: "tudu-0.37.0" → "0.37.0", "Tudu Staging 0.37.1-staging.4" → that. */
 export function versionIn(text: string): string | null {
-  const m = /(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)/.exec(text);
+  const m = /(?<!\d)(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)/.exec(text);
   return m && parseVersion(m[1]!) ? m[1]! : null;
 }
 
@@ -112,10 +112,11 @@ function escapeHtml(s: string): string {
 function inline(s: string): string {
   const text = s
     // "([abc1234](https://…/commit/abc1234))" and "(#12)" after a line
-    .replace(/\s*\(\[[0-9a-f]{7,40}\]\([^)]*\)\)/g, '')
-    .replace(/\s*\(\[#\d+\]\([^)]*\)\)/g, '')
+    .replace(/\(\[[0-9a-f]{7,40}\]\([^)]*\)\)/g, '')
+    .replace(/\(\[#\d+\]\([^)]*\)\)/g, '')
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
     .replace(/`([^`]+)`/g, '$1')
+    .replace(/\s+/g, ' ')
     .trim();
   return escapeHtml(text).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 }
@@ -142,16 +143,16 @@ export function notesHtml(markdown: string | null | undefined): string {
       flushPara();
       continue;
     }
-    const h = /^#{1,6}\s+(.*)$/.exec(line);
+    const h = /^#{1,6}\s(.*)$/.exec(line);
     if (h) {
       flushPara();
       flushList();
       // The release's own heading ("## [0.38.0](…) (2026-10-30)") says nothing the item does not.
-      if (/^\[?\d+\.\d+\.\d+/.test(h[1]!)) continue;
+      if (/^\[?\d+\.\d+\.\d+/.test(h[1]!.trim())) continue;
       out.push(`<p><strong>${inline(h[1]!.replace(/\*\*/g, ''))}</strong></p>`);
       continue;
     }
-    const b = /^[*-]\s+(.*)$/.exec(line);
+    const b = /^[*-]\s(.*)$/.exec(line);
     if (b) {
       flushPara();
       list.push(inline(b[1]!));

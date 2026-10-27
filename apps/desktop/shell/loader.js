@@ -4,7 +4,9 @@
 // again once you are back.
 (function () {
   var web = String(window.__TUDU_WEB__ || '').replace(/\/$/, '');
-  var path = document.documentElement.getAttribute('data-go') || '/';
+  // Only one of the app's own pages: never another host or a scheme, whatever the page says.
+  var PAGES = ['/', '/menubar', '/quick-add', '/note-window'];
+  var path = PAGES[PAGES.indexOf(document.documentElement.getAttribute('data-go'))] || '/';
   var page = document.getElementById('offline');
   var again = document.getElementById('again');
   // The desk's launch mark: offline, it stops hopping and the words come up beneath it.

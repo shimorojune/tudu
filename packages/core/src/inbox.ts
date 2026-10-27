@@ -1,6 +1,6 @@
 import { formatDay, type IsoDate } from './dates';
 import { dayWord } from './carried';
-import { textOf, toHtml } from './notes';
+import { stripTags, textOf, toHtml } from './notes';
 
 /** Someone on an Inbox item: the sender, the receiver, a comment's author. */
 export interface InboxPerson {
@@ -247,7 +247,7 @@ export function inboxText(item: InboxItem): string {
     c?.author.name,
     c?.author.email,
     c?.task.title,
-    c ? c.html.replace(/<[^>]+>/g, ' ') : '',
+    c ? stripTags(c.html, ' ') : '',
   ]
     .filter(Boolean)
     .join(' ')

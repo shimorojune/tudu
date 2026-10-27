@@ -146,7 +146,8 @@ export function membersWords(count: number): string {
 /** Invites work this long. */
 export const INVITE_DAYS = 7;
 
-export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Each part after the @ is split on its dots, so the pattern never retries a long run (no slow inputs).
+export const EMAIL_PATTERN = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]*)*\.[^\s@.]+$/;
 
 /** A space as `/api/me` lists it. */
 export interface SpaceSummary {
