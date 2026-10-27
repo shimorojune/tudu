@@ -526,7 +526,9 @@ describe('C22-U93 drawing blocks in the Notebook’s editor', () => {
     await user.click(area);
     await user.keyboard('!');
     const html = onInput.mock.calls.at(-1)![0] as string;
-    expect(html).toContain('<p>Two rooms</p><div data-drawing="d1"></div><p>Coffee');
+    // Wherever jsdom puts the caret, the block stays between the two lines, with nothing else on it.
+    expect(html).toMatch(/Two rooms!?<\/p><div data-drawing="d1"><\/div><p>!?Coffee/);
+    expect(html).toContain('!');
   });
 
   // Backspace and the arrows over a block need layout (ProseMirror measures the caret): C22-E88 runs them in a browser.
