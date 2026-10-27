@@ -1,5 +1,5 @@
 import { mergeAttributes, Node } from '@tiptap/core';
-import { NodeSelection } from '@tiptap/pm/state';
+import { NodeSelection, type TextSelection } from '@tiptap/pm/state';
 import { NodeViewWrapper, ReactNodeViewRenderer, type NodeViewProps } from '@tiptap/react';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { cx } from '../lib/cx';
@@ -206,6 +206,8 @@ function DrawingBlockView(props: NodeViewProps) {
  */
 export const DrawingNode = Node.create<{ onOpen: (id: string) => void }>({
   name: 'drawing',
+  // Above the core keymap, whose Backspace (joinBackward) deletes an atom outright.
+  priority: 1000,
   group: 'block',
   atom: true,
   draggable: true,
@@ -237,6 +239,17 @@ export const DrawingNode = Node.create<{ onOpen: (id: string) => void }>({
         const sel = editor.state.selection;
         if (!(sel instanceof NodeSelection) || sel.node.type.name !== this.name) return false;
         this.options.onOpen(String(sel.node.attrs.id));
+        return true;
+      },
+      Backspace: ({ editor }) => {
+        const { $cursor } = editor.state.selection as TextSelection;
+        if (!$cursor || $cursor.parentOffset > 0 || $cursor.depth < 1) return false;
+        const at = $cursor.before();
+        const before = editor.state.doc.resolve(at).nodeBefore;
+        if (before?.type.name !== this.name) return false;
+        editor.view.dispatch(
+          editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, at - before.nodeSize)),
+        );
         return true;
       },
     };
