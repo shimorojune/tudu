@@ -332,9 +332,12 @@ export function saveFrame(f: WindowFrame): void {
   }
 }
 
+/** How close the window comes to the page's edges. */
+const EDGE_GAP = 8;
+
 /**
  * Resizing from an edge or corner: the edges it names follow the pointer by dx/dy while the opposite ones stay put,
- * never smaller than the least and never past the page.
+ * never smaller than the least and never closer than 8px to the page's edges (where `fitFrame` keeps it on a reload).
  */
 export function resizeFrame(
   f: WindowFrame,
@@ -347,14 +350,14 @@ export function resizeFrame(
   let { x, y, w, h } = f;
   const right = x + w;
   const bottom = y + h;
-  if (edge.includes('e')) w = Math.max(NOTE_WINDOW_MIN.w, Math.min(w + dx, vw - x));
-  if (edge.includes('s')) h = Math.max(NOTE_WINDOW_MIN.h, Math.min(h + dy, vh - y));
+  if (edge.includes('e')) w = Math.max(NOTE_WINDOW_MIN.w, Math.min(w + dx, vw - EDGE_GAP - x));
+  if (edge.includes('s')) h = Math.max(NOTE_WINDOW_MIN.h, Math.min(h + dy, vh - EDGE_GAP - y));
   if (edge.includes('w')) {
-    x = Math.max(0, Math.min(x + dx, right - NOTE_WINDOW_MIN.w));
+    x = Math.max(EDGE_GAP, Math.min(x + dx, right - NOTE_WINDOW_MIN.w));
     w = right - x;
   }
   if (edge.includes('n')) {
-    y = Math.max(0, Math.min(y + dy, bottom - NOTE_WINDOW_MIN.h));
+    y = Math.max(EDGE_GAP, Math.min(y + dy, bottom - NOTE_WINDOW_MIN.h));
     h = bottom - y;
   }
   return { x, y, w, h };

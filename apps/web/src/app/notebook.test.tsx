@@ -88,13 +88,13 @@ describe('C22-U62 resizing the browser note window', () => {
     expect(r('sw', -40, 40)).toEqual({ x: 160, y: 100, w: 640, h: 500 });
   });
 
-  it('C22-U62 never smaller than 420×320, never past the page', () => {
+  it("C22-U62 never smaller than 420×320, never closer than 8px to the page's edges", () => {
     expect(r('se', -900, -900)).toEqual({ ...f, w: NOTE_WINDOW_MIN.w, h: NOTE_WINDOW_MIN.h });
     const w = r('w', 900, 0);
     expect([w.x + w.w, w.w]).toEqual([800, 420]);
     const n = r('n', 0, 900);
     expect([n.y + n.h, n.h]).toEqual([560, 320]);
-    expect(r('nw', -900, -900)).toEqual({ x: 0, y: 0, w: 800, h: 560 });
-    expect(r('se', 5000, 5000)).toEqual({ x: 200, y: 100, w: VW - 200, h: VH - 100 });
+    expect(r('nw', -900, -900)).toEqual({ x: 8, y: 8, w: 792, h: 552 });
+    expect(r('se', 5000, 5000)).toEqual({ x: 200, y: 100, w: VW - 8 - 200, h: VH - 8 - 100 });
   });
 });

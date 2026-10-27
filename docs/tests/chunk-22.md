@@ -96,7 +96,7 @@ The frame and fill-the-screen rules also have Rust tests under the same ids (`pl
 | ------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | C22-U60 | ui `NoteWindow.test.tsx`      | Both variants: the grip and seven edge handles, each calls `onResizeStart` with its direction; none while expanded                           |
 | C22-U61 | ui `NoteWindow.test.tsx`      | Web: the open button is the Tudu mark, "Open in your Notebook" (no ↗); the bar holds the drag mark                                           |
-| C22-U62 | web `notebook.test.tsx`       | `resizeFrame`: each edge moves only its edges; never below 420×320, never past the page                                                      |
+| C22-U62 | web `notebook.test.tsx`       | `resizeFrame`: each edge moves only its edges; never below 420×320, stops 8px inside the page                                                |
 | C22-U63 | web `desktop.test.tsx`        | An app that refuses `open_note`: the note opens over the page, the toast's Update Tudu checks and opens This Mac, once                       |
 | C22-U64 | web `NoteWindowPage.test.tsx` | The Mac note window paints a theme stored by the desk, and one picked while hidden on `note:open`                                            |
 | C22-U65 | web `NoteWindowPage.test.tsx` | After pin and close, `note:open` with pinned false shows "Keep on top of other windows", not pressed                                         |

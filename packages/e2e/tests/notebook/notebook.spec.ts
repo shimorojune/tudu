@@ -903,16 +903,16 @@ test.describe('notebook', () => {
     let f = await floatBox(page);
     expect(Math.round(f.width)).toBe(420);
     expect(Math.round(f.height)).toBe(320);
-    // Never past the page.
+    // Never past the page: it stops 8px from its edges, where a reload keeps it.
     await dragBy(page, win.locator('[data-edge="nw"]'), -3000, -3000);
     f = await floatBox(page);
-    expect(Math.round(f.x)).toBe(0);
-    expect(Math.round(f.y)).toBe(0);
+    expect(Math.round(f.x)).toBe(8);
+    expect(Math.round(f.y)).toBe(8);
     const vp = page.viewportSize()!;
     await dragBy(page, win.locator('[data-edge="se"]'), 3000, 3000);
     f = await floatBox(page);
-    expect(Math.round(f.x + f.width)).toBeLessThanOrEqual(vp.width);
-    expect(Math.round(f.y + f.height)).toBeLessThanOrEqual(vp.height);
+    expect(Math.round(f.x + f.width)).toBe(vp.width - 8);
+    expect(Math.round(f.y + f.height)).toBe(vp.height - 8);
     await dragBy(page, win.locator('[data-edge="se"]'), -200, -150);
     const kept = await floatBox(page);
     // The same frame after a reload.
