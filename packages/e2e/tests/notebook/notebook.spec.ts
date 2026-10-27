@@ -1370,12 +1370,15 @@ async function drawSomething(page: Page, text: string): Promise<void> {
   );
   const left = b.x + (phoneTools ? 40 : Math.max(b.width * 0.45, 240));
   const right = Math.min(left + 160, b.x + b.width * 0.75);
+  // Each tool is on before the pointer goes down (a key Excalidraw hasn't taken yet draws nothing).
   await page.keyboard.press('r');
+  await expect(sheet(page).getByTestId('toolbar-rectangle').first()).toBeChecked();
   await page.mouse.move(left, b.y + 120);
   await page.mouse.down();
   await page.mouse.move(right, b.y + 220, { steps: 6 });
   await page.mouse.up();
   await page.keyboard.press('t');
+  await expect(sheet(page).getByTestId('toolbar-text').first()).toBeChecked();
   await page.mouse.click(left + 20, b.y + 280);
   await expect(sheet(page).locator('textarea.excalidraw-wysiwyg')).toBeVisible();
   await page.keyboard.type(text);
