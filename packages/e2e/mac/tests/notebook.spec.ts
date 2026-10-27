@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import {
+  API,
   asPage,
   expect,
   go,
@@ -510,5 +511,166 @@ test.describe('chunk 22 · the note window', () => {
     }
     await app.eval(dragEdge('se', -2000, -2000), 'note');
     await app.waitState((x) => near(x.windows.note.width, 420) && near(x.windows.note.height, 320));
+  });
+});
+
+/** The drawing open full size in the note window: Excalidraw's canvas is drawn. */
+const sheetReady = (a: App) =>
+  a.until(
+    `return !!document.querySelector('.tp-nb-sheet canvas.excalidraw__canvas.interactive')`,
+    'note',
+    20_000,
+  );
+
+/** Draw at the end of the note's words: the block goes in and its sheet opens. Answers the drawing's id. */
+async function startDrawing(app: App): Promise<string> {
+  await app.eval(`T.click(T.get('button', 'Draw'))`, 'note');
+  await sheetReady(app);
+  return app.eval<string>(
+    `return [...document.querySelectorAll('.tp-nb-draw')].at(-1).dataset.drawingId`,
+    'note',
+  );
+}
+
+/** The rectangle tool from Excalidraw's toolbar, then a mouse drag on its canvas, as WebKit hands the page a mouse. */
+const drawRect = `
+  T.click(document.querySelector('.tp-nb-sheet [data-testid="toolbar-rectangle"]'));
+  const c = document.querySelector('.tp-nb-sheet canvas.excalidraw__canvas.interactive');
+  const r = c.getBoundingClientRect();
+  const o = (x, y, buttons) => ({ bubbles: true, cancelable: true, view: window, button: 0, buttons, pointerType: 'mouse',
+    isPrimary: true, pointerId: 1, clientX: r.left + x, clientY: r.top + y });
+  const frame = () => new Promise((res) => requestAnimationFrame(res));
+  c.dispatchEvent(new PointerEvent('pointerdown', o(120, 120, 1)));
+  for (let i = 1; i <= 6; i++) {
+    c.dispatchEvent(new PointerEvent('pointermove', o(120 + i * 30, 120 + i * 18, 1)));
+    await frame();
+  }
+  c.dispatchEvent(new PointerEvent('pointerup', o(300, 228, 0)));
+  await frame();
+  return true;`;
+
+const done = (app: App) => app.eval(`T.click(document.querySelector('.tp-nb-sheet-done'))`, 'note');
+
+async function drawingOf(app: App, id: string) {
+  return asPage<{
+    scene: {
+      elements: Array<{ type: string; isDeleted?: boolean }>;
+      files: Record<string, { attachmentId: string }>;
+    };
+  }>(app, 'GET', `/api/notebook/drawings/${id}`);
+}
+const shapes = async (app: App, id: string) =>
+  (await drawingOf(app, id)).scene.elements.filter((e) => !e.isDeleted).map((e) => e.type);
+
+test.describe('chunk 22 · drawings in the note window', () => {
+  test('C22-D40 Draw in the note window fills the whole window; a drag draws in WKWebView; Done shows the picture; ⌥⌘N still reaches Tudu', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const id = await writeNote(app, 'Desk layout', '<p>Two monitors</p>');
+    await openNote(app, id);
+    const did = await startDrawing(app);
+    const fills = await app.eval<boolean>(
+      `const s = document.querySelector('.tp-nb-sheet').getBoundingClientRect();
+       const w = document.querySelector('.tp-nb-win').getBoundingClientRect();
+       return [s.left - w.left, s.top - w.top, s.right - w.right, s.bottom - w.bottom].every((d) => Math.abs(d) <= 1);`,
+      'note',
+    );
+    expect(fills).toBe(true);
+    await app.eval(drawRect, 'note');
+    await expect.poll(() => shapes(app, did).catch(() => []), { timeout: 15_000 }).toEqual(['rectangle']);
+    // ⌥⌘N while drawing: the shortcut is still Tudu's, and the note window goes to a blank note.
+    expect((await app.state()).shortcuts.notes.registered).toBe(true);
+    await app.act('notes-shortcut');
+    await app.until(`return document.querySelector('.tp-nb-win-title')?.textContent === 'New note'`, 'note');
+    // Back on the note: Done there shows the picture.
+    await openNote(app, id);
+    await app.eval(
+      `T.click(document.querySelector('.tp-nb-draw[data-drawing-id="${did}"] .tp-nb-draw-pic'))`,
+      'note',
+    );
+    await sheetReady(app);
+    await done(app);
+    await app.until(
+      `const i = document.querySelector('.tp-nb-draw[data-drawing-id="${did}"] img'); return !!i && i.complete && i.naturalWidth > 0;`,
+      'note',
+      15_000,
+    );
+  });
+
+  test('C22-D41 offline: draw and Done with the server gone; back up, the save goes through and the picture shows', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const id = await writeNote(app, 'Train sketch', '<p>On the way</p>');
+    await openNote(app, id);
+    const did = await startDrawing(app);
+    await fetch(`${API}/__test/net/down`, { method: 'POST', body: JSON.stringify({ down: true }) });
+    try {
+      await app.eval(drawRect, 'note');
+      await done(app);
+      await app.until(`return !document.querySelector('.tp-nb-sheet')`, 'note');
+      await app.until(`return document.body.innerText.includes('Not saved yet')`, 'note', 20_000);
+    } finally {
+      await fetch(`${API}/__test/net/down`, { method: 'POST', body: JSON.stringify({ down: false }) });
+    }
+    await app.eval(`window.dispatchEvent(new Event('online')); return true;`, 'note');
+    await expect.poll(() => shapes(app, did).catch(() => []), { timeout: 30_000 }).toEqual(['rectangle']);
+    await app.until(`return !!document.querySelector('.tp-nb-draw[data-drawing-id="${did}"] img')`, 'note');
+    const n = await asPage<{ html: string }>(app, 'GET', `/api/notebook/notes/${id}`);
+    expect(n.html).toContain(`data-drawing="${did}"`);
+  });
+
+  test('C22-D42 an image pasted into a drawing in the Mac app uploads, and stays after a reload', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const id = await writeNote(app, 'Receipt', '<p>Lunch</p>');
+    await openNote(app, id);
+    const did = await startDrawing(app);
+    // WebKit's own paste event, carrying a PNG file as the pasteboard hands one over.
+    await app.eval(
+      `const c = document.createElement('canvas');
+       c.width = 40; c.height = 30;
+       const g = c.getContext('2d'); g.fillStyle = '#c33'; g.fillRect(0, 0, 40, 30);
+       const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+       const dt = new DataTransfer();
+       dt.items.add(new File([blob], 'receipt.png', { type: 'image/png' }));
+       const cv = document.querySelector('.tp-nb-sheet canvas.excalidraw__canvas.interactive');
+       const r = cv.getBoundingClientRect();
+       const at = { bubbles: true, view: window, pointerType: 'mouse', isPrimary: true, pointerId: 1, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+       cv.dispatchEvent(new PointerEvent('pointermove', at));
+       document.querySelector('.tp-nb-sheet .excalidraw').focus();
+       document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+       return true;`,
+      'note',
+    );
+    await expect
+      .poll(
+        async () =>
+          Object.values((await drawingOf(app, did).catch(() => ({ scene: { files: {} } }))).scene.files)
+            .length,
+        {
+          timeout: 20_000,
+        },
+      )
+      .toBe(1);
+    await done(app);
+    await app.until(`return !!document.querySelector('.tp-nb-draw[data-drawing-id="${did}"] img')`, 'note');
+    await app.eval(`location.reload(); return true;`, 'note');
+    await noteReady(app);
+    await app.until(
+      `return !!document.querySelector('.tp-nb-draw[data-drawing-id="${did}"] img')`,
+      'note',
+      15_000,
+    );
+    const d = await drawingOf(app, did);
+    expect(JSON.stringify(d.scene)).not.toContain('dataURL');
+    const att = Object.values(d.scene.files)[0]!.attachmentId;
+    const file = await app.eval<number>(
+      `return (await fetch(${JSON.stringify(`${API}/api/files/`)} + ${JSON.stringify(att)}, { credentials: 'include' })).status`,
+      'note',
+    );
+    expect(file).toBe(200);
   });
 });

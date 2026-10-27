@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { NotebookFolder } from '@tudu/core';
 import { readStylesheet } from '../test-utils/stylesheet';
-import { NoteEditor, bubbleSpot, type NoteEditorNote } from './NoteEditor';
+import { NoteEditor, bubbleSpot, type NoteEditorDrawings, type NoteEditorNote } from './NoteEditor';
 
 const FOLDERS: NotebookFolder[] = [
   { id: 'nw', parentId: null, name: 'Northwind', position: 1 },
@@ -254,5 +254,65 @@ describe('C22-U50 the crumb', () => {
   it('C22-U50 a note in no folder reads Notebook', () => {
     setup({ note: { ...NOTE, folderId: null, path: [] } });
     expect(document.querySelector('.tp-nb-crumb')).toHaveTextContent(/^Notebook$/);
+  });
+});
+
+describe('C22-U96 Draw in the note', () => {
+  function drawings(extra: Partial<NoteEditorDrawings> = {}): NoteEditorDrawings {
+    return {
+      picture: () => undefined,
+      newId: () => 'd7',
+      open: null,
+      onOpen: vi.fn(),
+      onDone: vi.fn(() => false),
+      ...extra,
+    };
+  }
+
+  it('C22-U96 Draw is the last item of the strip before More; it puts a block at the caret and opens it', async () => {
+    const d = drawings();
+    const { user, container } = setup({ drawings: d });
+    const bar = screen.getByRole('toolbar', { name: 'Note formatting' });
+    const buttons = within(bar).getAllByRole('button');
+    expect(buttons.at(-1)).toHaveAccessibleName('More formatting');
+    expect(buttons.at(-2)).toHaveAccessibleName('Draw');
+    await user.click(screen.getByRole('textbox', { name: 'Note' }));
+    await user.click(within(bar).getByRole('button', { name: 'Draw' }));
+    await waitFor(() => expect(d.onOpen).toHaveBeenCalledWith('d7', expect.anything()));
+    expect(container.querySelector('[data-drawing-id="d7"]')).not.toBeNull();
+  });
+
+  it('C22-U96 without drawings (a task’s notes) there is no Draw', () => {
+    setup();
+    expect(screen.queryByRole('button', { name: 'Draw' })).toBeNull();
+  });
+
+  it('C22-U96 the open drawing’s sheet is named for the note and its place; an empty Done takes the block out', async () => {
+    const user = userEvent.setup();
+    const onDone = vi.fn(() => true);
+    const d = drawings({
+      open: { id: 'd2', from: null },
+      onDone,
+      sheet: {
+        drawing: { id: 'd2', scene: { elements: [], files: {} }, gen: 0 },
+        loadImage: async () => '',
+        upload: async () => ({ id: 'x' }),
+        hold: () => () => {},
+        onChange: () => {},
+        load: () => new Promise(() => {}),
+      },
+    });
+    const { container } = render(
+      <NoteEditor
+        note={{ ...NOTE, html: '<p>a</p><div data-drawing="d1"></div><div data-drawing="d2"></div>' }}
+        drawings={d}
+      />,
+    );
+    expect(screen.getByRole('dialog', { name: 'Drawing 2' })).toBeInTheDocument();
+    expect(screen.getByText('Onboarding interview notes')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    await waitFor(() => expect(onDone).toHaveBeenCalledWith('d2', { empty: true, pictures: null }));
+    await waitFor(() => expect(container.querySelector('[data-drawing-id="d2"]')).toBeNull());
+    expect(container.querySelector('[data-drawing-id="d1"]')).not.toBeNull();
   });
 });

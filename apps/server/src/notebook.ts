@@ -1,6 +1,8 @@
 import {
   canHoldFolder,
   canNest,
+  drawingIds,
+  drawingText,
   firstLine,
   folderPath,
   nameTaken,
@@ -15,6 +17,8 @@ import {
   TRASH_DAYS,
   wordCount,
   type Note,
+  type NoteDrawing,
+  type NoteDrawingInfo,
   type NotebookFolder,
   type NotebookResponse,
   type NoteHeader,
@@ -34,6 +38,7 @@ import {
   isNotNull,
   isNull,
   lt,
+  notInArray,
   or,
   schema,
   sql,
@@ -49,7 +54,7 @@ type Executor = Db | Tx;
 
 export type NotebookMutation = Extract<
   SyncMutation,
-  { type: `note.${string}` | `folder.${string}` | 'trash.empty' }
+  { type: `note.${string}` | `folder.${string}` | `drawing.${string}` | 'trash.empty' }
 >;
 
 const NOTE_GONE = 'That note isn’t there any more.';
@@ -58,10 +63,13 @@ const IN_TRASH = 'That note is in Trash.';
 const TOO_DEEP = 'Folders go three levels deep.';
 const TASK_GONE = 'That task isn’t there any more.';
 export const STALE = 'This note changed in another window.';
+export const DRAWING_STALE = 'This drawing changed in another window.';
+const DRAWING_GONE = 'That drawing isn’t there any more.';
 
 const N = schema.notes;
 const F = schema.notebookFolders;
 const L = schema.noteLinks;
+const D = schema.noteDrawings;
 
 // ---- reading ----------------------------------------------------------------------------------------------------
 
@@ -199,6 +207,51 @@ export async function noteRead(db: Executor, userId: string, id: string): Promis
     words: wordCount(r.html),
     linked,
     createdAt: r.createdAt.toISOString(),
+    drawings: await drawingsOf(db, id),
+  };
+}
+
+function wordsIn(text: string): number {
+  const t = text.trim();
+  return t ? t.split(/\s+/).length : 0;
+}
+
+/** Every drawing a note has held (orphaned ones too, so Undo finds its picture), oldest first. */
+async function drawingsOf(db: Executor, noteId: string): Promise<NoteDrawingInfo[]> {
+  const rows = await db
+    .select({ id: D.id, rev: D.rev, previewLight: D.previewLight, previewDark: D.previewDark, text: D.text })
+    .from(D)
+    .where(eq(D.noteId, noteId))
+    .orderBy(asc(D.createdAt));
+  return rows.map(({ text, ...r }) => ({ ...r, words: wordsIn(text) }));
+}
+
+/** One of your drawings in full, or null: someone else's, or one in a note in Trash, is not there for you. */
+export async function drawingRead(db: Executor, userId: string, id: string): Promise<NoteDrawing | null> {
+  const [r] = await db
+    .select({
+      id: D.id,
+      noteId: D.noteId,
+      userId: D.userId,
+      scene: D.scene,
+      text: D.text,
+      rev: D.rev,
+      previewLight: D.previewLight,
+      previewDark: D.previewDark,
+      deletedAt: N.deletedAt,
+    })
+    .from(D)
+    .innerJoin(N, eq(N.id, D.noteId))
+    .where(eq(D.id, id));
+  if (!r || r.userId !== userId || r.deletedAt) return null;
+  return {
+    id: r.id,
+    noteId: r.noteId,
+    scene: r.scene,
+    rev: r.rev,
+    previewLight: r.previewLight,
+    previewDark: r.previewDark,
+    words: wordsIn(r.text),
   };
 }
 
@@ -448,6 +501,44 @@ async function claimFiles(tx: Tx, userId: string, noteId: string, html: string):
     );
 }
 
+/** Notebook files a drawing names (its images, its pictures) become its note's. */
+async function claimIds(tx: Tx, userId: string, noteId: string, ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  await tx
+    .update(schema.attachments)
+    .set({ noteId })
+    .where(
+      and(
+        inArray(schema.attachments.id, ids),
+        eq(schema.attachments.ownerId, userId),
+        isNull(schema.attachments.noteId),
+      ),
+    );
+}
+
+/**
+ * The note's search text: its words, then the words typed in its live drawings (the ones its words still hold).
+ * A drawing taken out of the words is marked orphaned; one put back (Undo) is live again.
+ */
+async function noteText(tx: Tx, noteId: string, html: string): Promise<string> {
+  const ids = drawingIds(html);
+  await tx
+    .update(D)
+    .set({ orphanedAt: new Date() })
+    .where(and(eq(D.noteId, noteId), isNull(D.orphanedAt), ids.length ? notInArray(D.id, ids) : undefined));
+  if (!ids.length) return textOf(html);
+  await tx
+    .update(D)
+    .set({ orphanedAt: null })
+    .where(and(eq(D.noteId, noteId), inArray(D.id, ids), isNotNull(D.orphanedAt)));
+  const rows = await tx
+    .select({ id: D.id, text: D.text })
+    .from(D)
+    .where(and(eq(D.noteId, noteId), inArray(D.id, ids)));
+  const byId = new Map(rows.map((r) => [r.id, r.text]));
+  return [textOf(html), ...ids.map((id) => byId.get(id) ?? '')].filter(Boolean).join('\n');
+}
+
 /** A task you can read, for a link. */
 async function readableTask(tx: Tx, userId: string, taskId: string): Promise<boolean> {
   const [t] = await tx
@@ -531,7 +622,7 @@ export async function applyNotebook(tx: Tx, userId: string, m: NotebookMutation)
       const html = noteHtml(m.payload.html);
       await tx
         .update(N)
-        .set({ html, text: textOf(html), rev: n.rev + 1, updatedAt: new Date() })
+        .set({ html, text: await noteText(tx, n.id, html), rev: n.rev + 1, updatedAt: new Date() })
         .where(eq(N.id, n.id));
       await claimFiles(tx, userId, n.id, html);
       return done([n.id]);
@@ -770,6 +861,85 @@ export async function applyNotebook(tx: Tx, userId: string, m: NotebookMutation)
         files,
       );
     }
+    case 'drawing.save': {
+      const p = m.payload;
+      const n = await lockNote(tx, userId, p.noteId);
+      if (n.deletedAt) throw new Rejected(410, IN_TRASH);
+      const [d] = await tx
+        .select({
+          noteId: D.noteId,
+          userId: D.userId,
+          rev: D.rev,
+          previewLight: D.previewLight,
+          previewDark: D.previewDark,
+        })
+        .from(D)
+        .where(eq(D.id, p.id))
+        .for('update');
+      if (d && (d.userId !== userId || d.noteId !== n.id)) throw new Rejected(404, DRAWING_GONE);
+      // A scene written on an older rev would wipe newer strokes: turned down, like a note's words.
+      if ((d?.rev ?? 0) !== p.baseRev) throw new Rejected(409, DRAWING_STALE, 'stale');
+      const text = drawingText(p.scene);
+      const pictures = {
+        ...(p.previewLight !== undefined ? { previewLight: p.previewLight } : {}),
+        ...(p.previewDark !== undefined ? { previewDark: p.previewDark } : {}),
+      };
+      if (d)
+        await tx
+          .update(D)
+          .set({ scene: p.scene, text, rev: d.rev + 1, updatedAt: new Date(), ...pictures })
+          .where(eq(D.id, p.id));
+      else
+        await tx.insert(D).values({
+          id: p.id,
+          noteId: n.id,
+          userId,
+          scene: p.scene,
+          text,
+          rev: 1,
+          createdAt: at,
+          updatedAt: at,
+          ...pictures,
+        });
+      await claimIds(tx, userId, n.id, [
+        ...Object.values(p.scene.files).map((f) => f.attachmentId),
+        ...[p.previewLight, p.previewDark].filter((x): x is string => !!x),
+      ]);
+      // Pictures it no longer shows go for good.
+      const old = [
+        p.previewLight !== undefined && d?.previewLight !== p.previewLight ? d?.previewLight : null,
+        p.previewDark !== undefined && d?.previewDark !== p.previewDark ? d?.previewDark : null,
+      ].filter((x): x is string => !!x);
+      const files = old.length
+        ? await tx
+            .delete(schema.attachments)
+            .where(and(inArray(schema.attachments.id, old), eq(schema.attachments.ownerId, userId)))
+            .returning({ key: schema.attachments.key })
+        : [];
+      const [now] = await tx.select({ html: N.html }).from(N).where(eq(N.id, n.id));
+      await tx
+        .update(N)
+        .set({ text: await noteText(tx, n.id, now?.html ?? ''), updatedAt: new Date() })
+        .where(eq(N.id, n.id));
+      return done(
+        [n.id],
+        [],
+        files.map((f) => f.key),
+      );
+    }
+    case 'drawing.delete': {
+      const [d] = await tx
+        .select({ noteId: D.noteId, userId: D.userId })
+        .from(D)
+        .where(eq(D.id, m.payload.id));
+      // Never saved, or not yours: nothing to take out.
+      if (!d || d.userId !== userId) return done();
+      await tx
+        .update(D)
+        .set({ orphanedAt: at })
+        .where(and(eq(D.id, m.payload.id), isNull(D.orphanedAt)));
+      return done([d.noteId]);
+    }
   }
 }
 
@@ -799,8 +969,41 @@ export async function sweepNotebook(db: Db, storage: Storage, now = new Date()):
       old.map((r) => r.id),
     );
     await tx.delete(F).where(and(isNotNull(F.deletedAt), lt(F.deletedAt, cutoff)));
-    return { keys, n: old.length };
+    return { keys: [...keys, ...(await sweepDrawings(tx, cutoff))], n: old.length };
   });
   for (const k of keys) await storage.delete(k).catch(() => {});
   return n;
+}
+
+/**
+ * Drawings taken out of their notes over 30 days ago go for good, with their pictures and the images no other
+ * drawing of that note still shows. Returns the files' keys, for the bucket.
+ */
+async function sweepDrawings(tx: Tx, cutoff: Date): Promise<string[]> {
+  const gone = await tx
+    .delete(D)
+    .where(and(isNotNull(D.orphanedAt), lt(D.orphanedAt, cutoff)))
+    .returning({
+      noteId: D.noteId,
+      scene: D.scene,
+      previewLight: D.previewLight,
+      previewDark: D.previewDark,
+    });
+  if (!gone.length) return [];
+  const notes = [...new Set(gone.map((g) => g.noteId))];
+  const kept = await tx.select({ scene: D.scene }).from(D).where(inArray(D.noteId, notes));
+  const still = new Set(kept.flatMap((k) => Object.values(k.scene.files).map((f) => f.attachmentId)));
+  const ids = gone
+    .flatMap((g) => [
+      ...Object.values(g.scene.files).map((f) => f.attachmentId),
+      g.previewLight,
+      g.previewDark,
+    ])
+    .filter((x): x is string => !!x && !still.has(x));
+  if (!ids.length) return [];
+  const files = await tx
+    .delete(schema.attachments)
+    .where(inArray(schema.attachments.id, ids))
+    .returning({ key: schema.attachments.key });
+  return files.map((f) => f.key);
 }

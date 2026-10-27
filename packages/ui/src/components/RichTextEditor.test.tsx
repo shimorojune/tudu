@@ -1,7 +1,8 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { RichTextContent, RichTextEditor, toHtml } from './RichTextEditor';
+import { DrawingContext, type NoteDrawingHost } from './NoteDrawing';
+import { RichTextContent, RichTextEditor, toHtml, type RichTextDrawings } from './RichTextEditor';
 import { ToastHost } from './Toast';
 
 describe('RichTextEditor', () => {
@@ -485,5 +486,87 @@ describe('C03-U29 the placeholder only on a truly blank editor', () => {
     await user.keyboard('- ');
     expect(container.querySelector('.tp-rte-area ul')).not.toBeNull();
     expect(container.querySelector('.tp-rte')).not.toHaveClass('tp-rte-blank');
+  });
+});
+
+describe('C22-U93 drawing blocks in the Notebook’s editor', () => {
+  function drawn(value: string, extra: Partial<RichTextDrawings> = {}) {
+    const onOpen = vi.fn();
+    const onInput = vi.fn();
+    const host: NoteDrawingHost = {
+      picture: (id) => ({ light: `/pic/${id}.png`, dark: null, words: 2 }),
+      onOpen,
+    };
+    const drawings: RichTextDrawings = { newId: () => 'd-new', onOpen, ...extra };
+    const r = render(
+      <DrawingContext.Provider value={host}>
+        <RichTextEditor
+          variant="notes"
+          label="Note"
+          value={value}
+          autoFocus
+          onInput={onInput}
+          drawings={drawings}
+        />
+      </DrawingContext.Provider>,
+    );
+    return { ...r, onOpen, onInput, area: screen.getByRole('textbox', { name: 'Note' }) };
+  }
+
+  it('C22-U93 a block round-trips through the HTML and shows its picture', async () => {
+    const user = userEvent.setup();
+    const { container, onInput, area } = drawn('<p>Two rooms</p><div data-drawing="d1"></div><p>Coffee</p>');
+    const block = await waitFor(() => container.querySelector('[data-drawing-id="d1"]')!);
+    expect(block.querySelector('img')).toHaveAttribute('src', '/pic/d1.png');
+    await user.click(area);
+    await user.keyboard('!');
+    const html = onInput.mock.calls.at(-1)![0] as string;
+    expect(html).toContain('<p>Two rooms</p><div data-drawing="d1"></div><p>Coffee');
+  });
+
+  it('C22-U93 Backspace next to it selects it, a second Backspace deletes it', async () => {
+    const { container, onInput, area } = drawn('<p>a</p><div data-drawing="d1"></div><p></p>');
+    await waitFor(() => expect(container.querySelector('[data-drawing-id="d1"]')).not.toBeNull());
+    act(() => {
+      fireEvent.keyDown(area, { key: 'Backspace' });
+    });
+    await waitFor(() => expect(container.querySelector('.tp-nb-draw')).toHaveClass('tp-sel'));
+    act(() => {
+      fireEvent.keyDown(area, { key: 'Backspace' });
+    });
+    await waitFor(() => expect(container.querySelector('.tp-nb-draw')).toBeNull());
+    expect(onInput.mock.calls.at(-1)![0]).not.toContain('data-drawing');
+  });
+
+  it('C22-U93 arrows step onto it and past it; Enter on it opens it', async () => {
+    const { container, onOpen, area } = drawn('<p>a</p><div data-drawing="d1"></div><p></p>');
+    await waitFor(() => expect(container.querySelector('[data-drawing-id="d1"]')).not.toBeNull());
+    act(() => {
+      fireEvent.keyDown(area, { key: 'ArrowLeft' });
+    });
+    await waitFor(() => expect(container.querySelector('.tp-nb-draw')).toHaveClass('tp-sel'));
+    act(() => {
+      fireEvent.keyDown(area, { key: 'Enter' });
+    });
+    expect(onOpen).toHaveBeenCalledWith('d1', expect.anything());
+    act(() => {
+      fireEvent.keyDown(area, { key: 'ArrowLeft' });
+    });
+    await waitFor(() => expect(container.querySelector('.tp-nb-draw')).not.toHaveClass('tp-sel'));
+  });
+
+  it('C22-U93 only the Notebook’s editor has Draw; it drops a block at the caret and opens it', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<RichTextEditor variant="notes" label="Notes" />);
+    expect(screen.queryByRole('button', { name: 'Draw' })).toBeNull();
+    unmount();
+    const c = render(<RichTextEditor variant="comment" label="Comment" />);
+    expect(screen.queryByRole('button', { name: 'Draw' })).toBeNull();
+    c.unmount();
+    const { container, onOpen, onInput } = drawn('<p>Plan</p>');
+    await user.click(screen.getByRole('button', { name: 'Draw' }));
+    await waitFor(() => expect(onOpen).toHaveBeenCalledWith('d-new', expect.anything()));
+    expect(container.querySelector('[data-drawing-id="d-new"]')).not.toBeNull();
+    expect(onInput.mock.calls.at(-1)![0]).toContain('<div data-drawing="d-new"></div>');
   });
 });

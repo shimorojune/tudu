@@ -3,7 +3,7 @@ import type { NoteListResponse, TrashResponse } from '@tudu/core';
 import type { Db } from '@tudu/db';
 import { FILE_MAX_BYTES, storeNoteFile } from '../files';
 import { requireSession, type SessionVars } from '../middleware/session';
-import { notebookTree, notesOfTask, noteRead, recentNotes, trashOf } from '../notebook';
+import { drawingRead, notebookTree, notesOfTask, noteRead, recentNotes, trashOf } from '../notebook';
 import type { Storage } from '../storage';
 
 /**
@@ -23,6 +23,14 @@ export function notebookRoutes(db: Db, storage: Storage) {
     const note = await noteRead(db, userId, c.req.param('id'));
     if (!note) return c.json({ error: 'That note isn’t there any more.' }, 404);
     return c.json(note);
+  });
+
+  /** A drawing in full (its scene), for its editor. */
+  r.get('/notebook/drawings/:id', requireSession, async (c) => {
+    const userId = c.get('session')!.user.id;
+    const drawing = await drawingRead(db, userId, c.req.param('id'));
+    if (!drawing) return c.json({ error: 'That drawing isn’t there any more.' }, 404);
+    return c.json(drawing);
   });
 
   r.get('/notebook/recent', requireSession, async (c) => {

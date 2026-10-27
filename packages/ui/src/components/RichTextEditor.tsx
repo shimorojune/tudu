@@ -9,6 +9,7 @@ import {
 } from '@tudu/core';
 import type { Node as PmNode } from '@tiptap/pm/model';
 import { Attachment, AttachmentUpload, withFileBase, withoutFileBase, withoutUploads } from './attachment';
+import { DrawingNode, drawingFrame, PenIcon } from './NoteDrawing';
 import { showToast, TOAST_WITH_ACTION_MS } from './Toast';
 import Highlight from '@tiptap/extension-highlight';
 import Subscript from '@tiptap/extension-subscript';
@@ -69,7 +70,21 @@ export interface RichTextEditorProps {
   fileBase?: string;
   /** No connection: a file would never arrive, so none is taken. */
   offline?: boolean;
+  /**
+   * Drawings (the Notebook's editor only): Draw at the end of the strip puts a drawing block at the caret and opens
+   * it. The blocks' pictures come from a DrawingContext around the editor.
+   */
+  drawings?: RichTextDrawings;
   className?: string;
+}
+
+export interface RichTextDrawings {
+  /** A new drawing's id. */
+  newId: () => string;
+  /** Open a drawing full size, from its block's frame. */
+  onOpen: (id: string, from: DOMRect | null) => void;
+  /** The editor's own handle on its blocks: take one out (an empty drawing on Done). */
+  bind?: (fns: { remove: (id: string) => void }) => void;
 }
 
 export { toHtml };
@@ -151,16 +166,17 @@ interface BProps {
   wide?: boolean;
   toggle?: boolean;
   expanded?: boolean;
+  className?: string;
   onClick: () => void;
   children: ReactNode;
 }
 
 /** A toolbar button: pressing it never takes the selection away from the words. */
-function RTB({ label, on, wide, toggle, expanded, onClick, children }: BProps) {
+function RTB({ label, on, wide, toggle, expanded, className, onClick, children }: BProps) {
   return (
     <button
       type="button"
-      className={cx('tp-rte-b', on && 'tp-on', wide && 'tp-wide')}
+      className={cx('tp-rte-b', on && 'tp-on', wide && 'tp-wide', className)}
       aria-label={label}
       title={label}
       aria-pressed={toggle ? (on ? 'true' : 'false') : undefined}
@@ -181,9 +197,13 @@ const STYLES = [
   { v: 'pre', label: 'Code block' },
 ] as const;
 
-/** The editor's extensions: exactly what the cleaner keeps, and the chip of a file on its way up. */
-export function editorExtensions(fileBase = '') {
+/**
+ * The editor's extensions: exactly what the cleaner keeps, and the chip of a file on its way up. The Notebook's
+ * editor also takes drawing blocks.
+ */
+export function editorExtensions(fileBase = '', drawings?: { onOpen: (id: string) => void }) {
   return [
+    ...(drawings ? [DrawingNode.configure({ onOpen: drawings.onOpen })] : []),
     Attachment.configure({ base: fileBase }),
     AttachmentUpload,
     StarterKit.configure({
@@ -252,9 +272,15 @@ export function RichTextEditor(p: RichTextEditorProps) {
     cb.current = p;
   });
 
+  const drawingsOn = !!p.drawings;
+  /** A block's picture, where it sits now. */
+  const frameOf = (id: string): DOMRect | null => drawingFrame(wrap.current, id);
   const editor = useEditor(
     {
-      extensions: editorExtensions(p.fileBase),
+      extensions: editorExtensions(
+        p.fileBase,
+        drawingsOn ? { onOpen: (id) => cb.current.drawings?.onOpen(id, frameOf(id)) } : undefined,
+      ),
       content: withFileBase(toHtml(p.value), p.fileBase),
       editable: !p.readOnly,
       autofocus: p.autoFocus ? 'end' : false,
@@ -313,11 +339,35 @@ export function RichTextEditor(p: RichTextEditorProps) {
         cb.current.onBlur?.(em ? '' : html, em);
       },
     },
-    [p.resetKey],
+    [p.resetKey, drawingsOn],
   );
   useLayoutEffect(() => {
     edRef.current = editor;
   });
+  useEffect(() => {
+    p.drawings?.bind?.({
+      remove: (id) => {
+        const e = edRef.current;
+        if (!e || e.isDestroyed) return;
+        let at = -1;
+        e.state.doc.descendants((n, pos) => {
+          if (n.type.name === 'drawing' && n.attrs.id === id) at = pos;
+          return at < 0;
+        });
+        // Not an undo step: the empty drawing was never kept.
+        if (at >= 0) e.view.dispatch(e.state.tr.delete(at, at + 1).setMeta('addToHistory', false));
+      },
+    });
+  });
+
+  /** Draw: a drawing block at the caret, opened full size once it is in the page. */
+  function draw() {
+    const d = p.drawings;
+    if (!editor || !d) return;
+    const id = d.newId();
+    editor.chain().focus().insertContent({ type: 'drawing', attrs: { id } }).run();
+    requestAnimationFrame(() => d.onOpen(id, frameOf(id)));
+  }
   // A reset loads other words: the blank state follows them.
   const [seenReset, setSeenReset] = useState(p.resetKey);
   if (p.resetKey !== seenReset) {
@@ -674,6 +724,15 @@ export function RichTextEditor(p: RichTextEditorProps) {
             e.target.value = '';
           }}
         />
+      ) : null}
+      {p.drawings && !lean ? (
+        <>
+          <i className="tp-rte-sep" />
+          <RTB label="Draw" wide className="tp-rte-draw" onClick={draw}>
+            <PenIcon size={15} />
+            <span>Draw</span>
+          </RTB>
+        </>
       ) : null}
       {quick ? null : <span className="tp-rte-sp" />}
       {lean ? null : (

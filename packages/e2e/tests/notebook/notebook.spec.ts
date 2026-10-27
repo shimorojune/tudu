@@ -1306,3 +1306,322 @@ test.describe('notebook', () => {
     expect(sides[0]).toBe(phone() ? '20px' : '36px');
   });
 });
+
+/** Drawings in notes (Excalidraw), C22-E80 to E87. */
+const sheet = (page: Page) => page.getByRole('dialog', { name: /^Drawing \d+$/ });
+const drawCanvas = (page: Page) => sheet(page).locator('canvas.excalidraw__canvas.interactive');
+const drawingBlock = (page: Page, id: string) => page.locator(`.tp-nb-draw[data-drawing-id="${id}"]`);
+
+async function noteNow(page: Page, id: string) {
+  return (await (await page.request.get(`${API_URL}/api/notebook/notes/${id}`)).json()) as {
+    html: string;
+    drawings: Array<{
+      id: string;
+      rev: number;
+      previewLight: string | null;
+      previewDark: string | null;
+      words: number;
+    }>;
+  };
+}
+
+async function drawingNow(page: Page, id: string) {
+  const res = await page.request.get(`${API_URL}/api/notebook/drawings/${id}`);
+  expect(res.status()).toBe(200);
+  return (await res.json()) as {
+    rev: number;
+    scene: {
+      elements: Array<{ type: string; text?: string; isDeleted?: boolean }>;
+      files: Record<string, { attachmentId: string }>;
+    };
+  };
+}
+
+/** Open a seeded note, put the caret at the end of its words, press Draw: the sheet opens on the new drawing. */
+async function startDrawing(page: Page, noteId: string, firstWords: string): Promise<string> {
+  await page.goto(`/notebook/${noteId}`);
+  await expect(words(page)).toContainText(firstWords);
+  await words(page).click();
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.locator('.tp-nb-body').getByRole('button', { name: 'Draw', exact: true }).click();
+  await expect(sheet(page)).toBeVisible();
+  await expect(drawCanvas(page)).toBeVisible({ timeout: 15_000 });
+  return (await page.locator('.tp-nb-draw').last().getAttribute('data-drawing-id'))!;
+}
+
+/** A rectangle (r, then drag) and a line of text (t, click, type), the way a person draws them. */
+async function drawSomething(page: Page, text: string): Promise<void> {
+  const b = (await drawCanvas(page).boundingBox())!;
+  await page.mouse.click(b.x + b.width - 40, b.y + b.height - 40);
+  await page.keyboard.press('r');
+  await page.mouse.move(b.x + 120, b.y + 120);
+  await page.mouse.down();
+  await page.mouse.move(b.x + 300, b.y + 220, { steps: 6 });
+  await page.mouse.up();
+  await page.keyboard.press('t');
+  await page.mouse.click(b.x + 140, b.y + 280);
+  await expect(sheet(page).locator('textarea.excalidraw-wysiwyg')).toBeVisible();
+  await page.keyboard.type(text);
+  // A click away keeps the text and goes back to selecting.
+  await page.mouse.click(b.x + b.width - 40, b.y + b.height - 40);
+  await expect(sheet(page).locator('textarea.excalidraw-wysiwyg')).toHaveCount(0);
+}
+
+async function done(page: Page): Promise<void> {
+  await sheet(page).getByRole('button', { name: 'Done' }).click();
+  await expect(sheet(page)).toBeHidden();
+}
+
+/** A small red PNG, made in the page, in a DataTransfer as a person's paste or drop carries it. */
+const imageTransfer = (page: Page) =>
+  page.evaluateHandle(async () => {
+    const c = document.createElement('canvas');
+    c.width = 40;
+    c.height = 30;
+    const g = c.getContext('2d')!;
+    g.fillStyle = '#c33';
+    g.fillRect(0, 0, 40, 30);
+    const blob = await new Promise<Blob>((r) => c.toBlob((b) => r(b!), 'image/png'));
+    const dt = new DataTransfer();
+    dt.items.add(new File([blob], 'red.png', { type: 'image/png' }));
+    return dt;
+  });
+
+/** The image went up as an attachment and the scene names it by id: no picture data in the scene itself. */
+async function imageKept(page: Page, drawingId: string): Promise<void> {
+  await expect
+    .poll(async () => Object.values((await drawingNow(page, drawingId)).scene.files).length, {
+      timeout: 15_000,
+    })
+    .toBe(1);
+  const d = await drawingNow(page, drawingId);
+  expect(JSON.stringify(d.scene)).not.toContain('dataURL');
+  const att = Object.values(d.scene.files)[0]!.attachmentId;
+  expect(att).toBeTruthy();
+  expect(d.scene.elements.some((e) => e.type === 'image' && !e.isDeleted)).toBe(true);
+  expect((await page.request.get(`${API_URL}/api/files/${att}`)).status()).toBe(200);
+}
+
+test.describe('notebook drawings', () => {
+  test('C22-E80 Draw, a rectangle and a text, Done: the block shows a picture, the server has the scene, a reload shows it again', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    const id = await seedNote(page, 'Offsite floor plan', { html: '<p>Rough layout</p>' });
+    const did = await startDrawing(page, id, 'Rough layout');
+    await expect(sheet(page)).toHaveAccessibleName('Drawing 1');
+    await expect(sheet(page).locator('.tp-nb-sheet-where')).toHaveText('Offsite floor plan · Drawing 1');
+    await drawSomething(page, 'tables in a U');
+    await done(page);
+    const img = drawingBlock(page, did).getByRole('img');
+    await expect(img).toHaveAttribute('alt', /^Drawing, \d+ words?$/);
+    await idle(page);
+    const n = await noteNow(page, id);
+    expect(n.html).toContain(`data-drawing="${did}"`);
+    expect(n.drawings).toHaveLength(1);
+    expect(n.drawings[0]).toMatchObject({ id: did });
+    expect(n.drawings[0]!.previewLight).toBeTruthy();
+    expect(n.drawings[0]!.previewDark).toBeTruthy();
+    const d = await drawingNow(page, did);
+    expect(
+      d.scene.elements
+        .filter((e) => !e.isDeleted)
+        .map((e) => e.type)
+        .sort(),
+    ).toEqual(['rectangle', 'text']);
+    expect(d.scene.elements.find((e) => e.type === 'text')?.text).toBe('tables in a U');
+    await page.reload();
+    await expect(img).toHaveAttribute('src', `${API_URL}/api/files/${n.drawings[0]!.previewLight}`);
+    await expect
+      .poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0))
+      .toBe(true);
+    // Opened again, the same scene.
+    await img.click();
+    await expect(drawCanvas(page)).toBeVisible({ timeout: 15_000 });
+    await done(page);
+    await idle(page);
+    expect((await drawingNow(page, did)).scene.elements.filter((e) => !e.isDeleted)).toHaveLength(2);
+  });
+
+  test('C22-E81 an image pasted into a drawing uploads, stays after a reload, and the scene holds no picture data', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    const id = await seedNote(page, 'Whiteboard photo', { html: '<p>From the session</p>' });
+    const did = await startDrawing(page, id, 'From the session');
+    const c = mid((await drawCanvas(page).boundingBox())!);
+    await page.mouse.click(c.x, c.y);
+    const dt = await imageTransfer(page);
+    await page.evaluate(
+      (d) =>
+        document.dispatchEvent(
+          new ClipboardEvent('paste', { clipboardData: d, bubbles: true, cancelable: true }),
+        ),
+      dt,
+    );
+    await imageKept(page, did);
+    await done(page);
+    await idle(page);
+    await page.reload();
+    await expect(drawingBlock(page, did).getByRole('img')).toBeVisible();
+    await imageKept(page, did);
+  });
+
+  test('C22-E82 an image file dropped into a drawing uploads and stays, the same as a paste', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    const id = await seedNote(page, 'Venue map', { html: '<p>Mark the exits</p>' });
+    const did = await startDrawing(page, id, 'Mark the exits');
+    const dt = await imageTransfer(page);
+    await drawCanvas(page).evaluate((el, d) => {
+      const r = el.getBoundingClientRect();
+      const at = {
+        clientX: r.left + r.width / 2,
+        clientY: r.top + r.height / 2,
+        bubbles: true,
+        cancelable: true,
+      };
+      el.dispatchEvent(new DragEvent('dragover', { ...at, dataTransfer: d }));
+      el.dispatchEvent(new DragEvent('drop', { ...at, dataTransfer: d }));
+    }, dt);
+    await imageKept(page, did);
+    // Still in Tudu: the drop did not open the file in place of the app.
+    await expect(page).toHaveURL(new RegExp(`/notebook/${id}`));
+    await done(page);
+    await idle(page);
+    await page.reload();
+    await imageKept(page, did);
+  });
+
+  test('C22-E83 Search finds a note by a word written only in its drawing', async ({ page }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    const id = await seedNote(page, 'Seating plan', { html: '<p>Two rooms</p>' });
+    await startDrawing(page, id, 'Two rooms');
+    await drawSomething(page, 'quillbrook stage');
+    await done(page);
+    await idle(page);
+    await openSearch(page);
+    await box(page).fill('quillbrook');
+    await expect(panel(page).getByRole('option', { name: /Seating plan/ })).toBeVisible();
+  });
+
+  test('C22-E84 ⋯ › Delete drawing and Undo bring the block back; a note to Trash and Put back keeps its drawing', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    const id = await seedNote(page, 'Stand-up board', { html: '<p>Columns</p>' });
+    const did = await startDrawing(page, id, 'Columns');
+    await drawSomething(page, 'todo doing done');
+    await done(page);
+    await idle(page);
+    const blk = drawingBlock(page, did);
+    await blk.hover();
+    await blk.getByRole('button', { name: 'Drawing options' }).click();
+    await page.getByRole('menuitem', { name: 'Delete drawing' }).click();
+    await expect(blk).toHaveCount(0);
+    await expect(page.getByText('Drawing deleted.')).toBeVisible();
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(blk.getByRole('img')).toBeVisible();
+    await idle(page);
+    expect((await noteNow(page, id)).html).toContain(`data-drawing="${did}"`);
+
+    await noteMenu(page, 'Delete');
+    await page
+      .getByRole('dialog', { name: 'Delete “Stand-up board”?' })
+      .getByRole('button', { name: 'Delete' })
+      .click();
+    await idle(page);
+    expect((await page.request.get(`${API_URL}/api/notebook/drawings/${did}`)).status()).toBe(404);
+    await tree(page)
+      .getByRole('button', { name: /^Trash/ })
+      .click();
+    const row = page.locator('.tp-nb-trrow').filter({ hasText: 'Stand-up board' });
+    await row.hover();
+    await row.getByRole('button', { name: 'Put back' }).click();
+    await idle(page);
+    expect((await drawingNow(page, did)).scene.elements.some((e) => e.text === 'todo doing done')).toBe(true);
+    await page.goto(`/notebook/${id}`);
+    await expect(blk.getByRole('img')).toBeVisible();
+  });
+
+  test('C22-E85 dark mode: the block shows its dark picture; the sheet is in Excalidraw’s dark theme', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await signInFresh(page);
+    const id = await seedNote(page, 'Night shift', { html: '<p>Rota</p>' });
+    const did = await startDrawing(page, id, 'Rota');
+    await expect(sheet(page).locator('.excalidraw')).toHaveClass(/theme--dark/);
+    await drawSomething(page, 'rota');
+    await done(page);
+    await idle(page);
+    const n = await noteNow(page, id);
+    await page.reload();
+    const img = drawingBlock(page, did).getByRole('img');
+    await expect(img).toHaveAttribute('src', `${API_URL}/api/files/${n.drawings[0]!.previewDark}`);
+    await page.emulateMedia({ colorScheme: 'light' });
+    await expect(img).toHaveAttribute('src', `${API_URL}/api/files/${n.drawings[0]!.previewLight}`);
+    await img.click();
+    await expect(sheet(page).locator('.excalidraw')).not.toHaveClass(/theme--dark/);
+  });
+
+  test('C22-E86 Excalidraw is not fetched until a drawing opens; its fonts come from /excalidraw/fonts/, never a CDN', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    const scripts: string[] = [];
+    const fonts: string[] = [];
+    const hosts = new Set<string>();
+    page.on('request', (r) => {
+      hosts.add(new URL(r.url()).host);
+      if (r.resourceType() === 'script') scripts.push(r.url());
+      if (r.resourceType() === 'font' || /\.woff2?(\?|$)/.test(r.url())) fonts.push(r.url());
+    });
+    await signInFresh(page);
+    const id = await seedNote(page, 'Light page', { html: '<p>Only words here</p>' });
+    await page.goto(`/notebook/${id}`);
+    await expect(words(page)).toContainText('Only words here');
+    await idle(page);
+    const before = [...scripts];
+    const holds = async (u: string) =>
+      (await (await page.request.get(u)).text()).includes('excalidraw__canvas');
+    for (const u of before) expect(await holds(u), u).toBe(false);
+    await startDrawing(page, id, 'Only words here');
+    await drawSomething(page, 'fonts please');
+    const after = scripts.slice(before.length);
+    expect((await Promise.all(after.map(holds))).some(Boolean)).toBe(true);
+    const origin = new URL(page.url()).origin;
+    const drawFonts = fonts.filter((u) =>
+      /excalidraw|Excalifont|Virgil|Nunito|Cascadia|Lilita|Comic/i.test(u),
+    );
+    expect(drawFonts.length).toBeGreaterThan(0);
+    for (const u of drawFonts) expect(u.startsWith(`${origin}/excalidraw/fonts/`), u).toBe(true);
+    expect([...hosts].filter((h) => /unpkg|jsdelivr|esm\.sh|excalidraw\.com/.test(h))).toEqual([]);
+  });
+
+  test('C22-E87 on a phone the drawing fills the screen with Excalidraw’s phone tools at the foot; Done returns to the note', async ({
+    page,
+  }) => {
+    test.skip(!phone(), 'phones');
+    await signInFresh(page);
+    const id = await seedNote(page, 'Kitchen layout', { html: '<p>Measure first</p>' });
+    const did = await startDrawing(page, id, 'Measure first');
+    const vp = page.viewportSize()!;
+    const s = (await sheet(page).boundingBox())!;
+    expect([s.x, s.y, s.width, s.height].map(Math.round)).toEqual([0, 0, vp.width, vp.height]);
+    await expect(sheet(page).locator('.excalidraw')).toHaveClass(/excalidraw--mobile/);
+    const tools = (await sheet(page).locator('.App-bottom-bar').boundingBox())!;
+    expect(tools.y + tools.height).toBeGreaterThan(vp.height - 80);
+    await drawSomething(page, 'sink');
+    await done(page);
+    await expect(words(page)).toContainText('Measure first');
+    await expect(drawingBlock(page, did).getByRole('img')).toBeVisible();
+  });
+});

@@ -6,7 +6,15 @@ import { Banner, showToast, type NoteEditorProps, type NoteTaskItem, type PickIt
 import { useState } from 'react';
 import { API_URL } from './config';
 import { openQuickAdd, type QuickAddSeed } from './dayView';
-import { editorNote, movedWords, notebookStore, taskPick, todayIso, useSaveState } from './notebook';
+import {
+  editorNote,
+  movedWords,
+  notebookStore,
+  taskPick,
+  todayIso,
+  useNoteDrawings,
+  useSaveState,
+} from './notebook';
 import { getRecentTasks } from './search';
 import { api, meQuery, queryClient } from './session';
 import { useOnline } from './tasks';
@@ -69,6 +77,7 @@ export function useNoteEditor(
   const [taskQ, setTaskQ] = useState('');
   const picks = useTaskPicks(taskQ, !!id);
   const view = q.data;
+  const drawings = useNoteDrawings(id, view);
   if (!id) return { loading: true };
   if (q.isPending) return { loading: true, compact: o.compact };
   if (q.isError || !view)
@@ -167,5 +176,6 @@ export function useNoteEditor(
     },
     fileBase: API_URL,
     offline: !online,
+    drawings,
   };
 }

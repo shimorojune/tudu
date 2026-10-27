@@ -1,8 +1,9 @@
-import { NotebookStore, type NoteView, type SaveState } from '@tudu/client';
+import { NotebookStore, type DrawingView, type NoteView, type SaveState } from '@tudu/client';
 import {
   buildTree,
   daysLeft,
   daysLeftWords,
+  drawingText,
   editedAgo,
   folderPath,
   isoToday,
@@ -19,6 +20,9 @@ import {
 } from '@tudu/core';
 import {
   showToast,
+  TOAST_WITH_ACTION_MS,
+  type DrawingPictures,
+  type NoteEditorDrawings,
   type NoteEditorNote,
   type NoteFolderItem,
   type NoteHitItem,
@@ -27,7 +31,8 @@ import {
   type NoteTrashItem,
   type PickItem,
 } from '@tudu/ui';
-import { useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { API_URL } from './config';
 import { desktop } from './desktop';
 import { api, queryClient } from './session';
 import { taskStore } from './tasks';
@@ -45,6 +50,8 @@ export const notebookStore = new NotebookStore({
           onAction: move.retry,
         })
       : showToast(message),
+  onDrawingStale: (message, openMine) =>
+    showToast(message, { action: 'Open mine', onAction: openMine, duration: TOAST_WITH_ACTION_MS }),
 });
 
 // Words still waiting for quiet save as the page goes (a reload, a closed tab or popup).
@@ -53,6 +60,130 @@ if (typeof window !== 'undefined') {
   // For end-to-end tests: words waiting for quiet are not saved yet either.
   const hook = (window as unknown as { __tudu?: { idle?: () => Promise<boolean> } }).__tudu;
   if (hook) hook.idle = async () => !notebookStore.isBusy() && (await taskStore.idle());
+}
+
+/** A picture of a drawing for its block: the Notebook file's address. */
+const fileUrl = (id: string | null) => (id ? `${API_URL}/api/files/${encodeURIComponent(id)}` : null);
+
+function wordsOf(text: string): number {
+  const t = text.trim();
+  return t ? t.split(/\s+/).length : 0;
+}
+
+/**
+ * Drawings in a note, for its NoteEditor: each block's picture (the one made here on Done until the server has
+ * its own), Draw, and the open drawing's sheet with its scene, saves and uploads.
+ */
+export function useNoteDrawings(
+  noteId: string | null,
+  view: NoteView | undefined,
+): NoteEditorDrawings | undefined {
+  const [open, setOpen] = useState<{ id: string; from: DOMRect | null } | null>(null);
+  const [drawing, setDrawing] = useState<DrawingView | null>(null);
+  const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  // Another note: whatever was open there closes.
+  const [seen, setSeen] = useState(noteId);
+  if (seen !== noteId) {
+    setSeen(noteId);
+    setOpen(null);
+    setDrawing(null);
+  }
+  const live = useSyncExternalStore(
+    (l) => notebookStore.subscribe(l),
+    () =>
+      open
+        ? `${notebookStore.drawingSaveState(open.id)}:${notebookStore.isDrawingSlow(open.id) ? 1 : 0}:${notebookStore.drawingNow(open.id)?.gen ?? 0}:${notebookStore.pictureVersion}`
+        : `-:${notebookStore.pictureVersion}`,
+    () => '',
+  );
+  const [save, slow] = live.split(':');
+  useEffect(() => {
+    if (!open || !noteId) return;
+    let gone = false;
+    notebookStore.openDrawing(open.id, noteId).then(
+      (d) => !gone && setDrawing(d),
+      () => !gone && setError(true),
+    );
+    return () => {
+      gone = true;
+    };
+  }, [open, noteId, attempt]);
+
+  return useMemo(() => {
+    if (!noteId || !view) return undefined;
+    const info = notebookStore.drawingInfo(view);
+    // Once it has loaded, the store's is the one to show: a newer scene from another window moves its gen.
+    const sheetDrawing =
+      drawing && open && drawing.id === open.id ? (notebookStore.drawingNow(open.id) ?? drawing) : null;
+    return {
+      picture: (id) => {
+        const d = info.get(id);
+        if (!d) return undefined;
+        return {
+          light: d.local?.light ?? fileUrl(d.previewLight),
+          dark: d.local?.dark ?? fileUrl(d.previewDark),
+          words: d.local?.words ?? d.words,
+        };
+      },
+      newId: () => notebookStore.newDrawing(noteId),
+      open,
+      onOpen: (id, from) => {
+        setDrawing(null);
+        setError(false);
+        setOpen({ id, from });
+      },
+      sheet: open
+        ? {
+            drawing: sheetDrawing
+              ? { id: sheetDrawing.id, scene: sheetDrawing.scene, gen: sheetDrawing.gen }
+              : null,
+            error,
+            onRetry: () => {
+              setError(false);
+              setAttempt((n) => n + 1);
+            },
+            loadImage: (attachmentId) => notebookStore.drawingImage(attachmentId),
+            upload: (file) => notebookStore.upload(file),
+            hold: () => notebookStore.holdDrawing(open.id),
+            onChange: (scene) => notebookStore.editDrawing(open.id, scene),
+            save: (save as SaveState) || 'saved',
+            slow: slow === '1',
+          }
+        : undefined,
+      onDone: (id, out) => {
+        setOpen(null);
+        setDrawing(null);
+        if (notebookStore.closeDrawing(id)) return true;
+        if (out.pictures) sendPictures(id, out.pictures);
+        return false;
+      },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noteId, view, open, drawing, error, save, slow, live]);
+}
+
+/** The note's pictures of a drawing: shown here at once, uploaded, then sent with its save (which waits for them). */
+function sendPictures(id: string, pictures: DrawingPictures): void {
+  const scene = notebookStore.drawingNow(id)?.scene;
+  notebookStore.setLocalPicture(id, {
+    light: URL.createObjectURL(pictures.light),
+    dark: URL.createObjectURL(pictures.dark),
+    words: scene ? wordsOf(drawingText(scene)) : 0,
+  });
+  const release = notebookStore.holdDrawing(id);
+  const file = (b: Blob, name: string) => new File([b], name, { type: 'image/png' });
+  Promise.all([
+    notebookStore.upload(file(pictures.light, 'Drawing.png')),
+    notebookStore.upload(file(pictures.dark, 'Drawing (dark).png')),
+  ]).then(
+    ([light, dark]) => {
+      notebookStore.setDrawingPictures(id, light.id, dark.id);
+      release();
+    },
+    // Offline or it failed: the drawing saves without, and the picture is made the next time it opens.
+    () => release(),
+  );
 }
 
 /** A note's save state and whether its save is taking a while, kept live. */
