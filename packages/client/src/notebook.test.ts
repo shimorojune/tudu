@@ -26,6 +26,7 @@ const serverNote = (id: string, extra: Partial<Note> = {}): Note => ({
   words: 2,
   linked: [],
   createdAt: '2026-10-20T09:00:00.000Z',
+  drawings: [],
   ...extra,
 });
 

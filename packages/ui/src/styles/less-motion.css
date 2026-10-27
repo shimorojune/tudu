@@ -286,6 +286,12 @@
 :root[data-motion='less'] .tp-nb-float.tp-nb-float-out {
   animation-duration: 1ms;
 }
+:root[data-motion='less'] .tp-nb-draw-new {
+  animation: none;
+}
+:root[data-motion='less'] .tp-nb-sheet-tools {
+  animation: none;
+}
 
 /* app.css */
 :root[data-motion='less'] .tp-tip-pop,

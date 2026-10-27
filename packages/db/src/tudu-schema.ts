@@ -16,7 +16,7 @@ import {
   uniqueIndex,
   vector,
 } from 'drizzle-orm/pg-core';
-import { CONNECTOR_PROVIDERS, type ConnectorProvider } from '@tudu/core';
+import { CONNECTOR_PROVIDERS, type ConnectorProvider, type DrawingScene } from '@tudu/core';
 import { user } from './auth-schema';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 
@@ -656,6 +656,38 @@ export const notes = pgTable(
     index('notes_user_updated').on(t.userId, t.updatedAt.desc()),
     index('notes_user_deleted').on(t.userId, t.deletedAt),
   ],
+);
+
+/**
+ * A drawing in a note (an Excalidraw scene without its pixels: images are Notebook files). The note's words hold a
+ * block naming it; the drawing has its own rev, so drawing and typing never turn each other down. A block taken out
+ * of the words marks it orphaned, and the sweep removes it 30 days later (Undo puts the block back meanwhile).
+ */
+export const noteDrawings = pgTable(
+  'note_drawings',
+  {
+    id: text('id').primaryKey(),
+    noteId: text('note_id')
+      .notNull()
+      .references(() => notes.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    scene: jsonb('scene').$type<DrawingScene>().notNull(),
+    /** The words typed in it, for search. */
+    text: text('text').notNull().default(''),
+    /** The note's pictures of it: PNG Notebook files, light and dark. */
+    previewLight: text('preview_light').references((): AnyPgColumn => attachments.id, {
+      onDelete: 'set null',
+    }),
+    previewDark: text('preview_dark').references((): AnyPgColumn => attachments.id, { onDelete: 'set null' }),
+    /** +1 for every save; a save written on an older rev is turned down (stale). */
+    rev: integer('rev').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    orphanedAt: timestamp('orphaned_at', { withTimezone: true }),
+  },
+  (t) => [index('note_drawings_note').on(t.noteId), index('note_drawings_orphaned').on(t.orphanedAt)],
 );
 
 /**

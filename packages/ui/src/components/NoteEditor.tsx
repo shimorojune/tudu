@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { moveTargets, type NotebookFolder } from '@tudu/core';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { drawingIds, moveTargets, type NotebookFolder } from '@tudu/core';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -19,7 +20,9 @@ import {
   type NoteTaskItem,
   type PickItem,
 } from './NoteParts';
-import { RichTextEditor } from './RichTextEditor';
+import { DrawingSheet, type DrawingPictures, type DrawingSheetProps } from './DrawingSheet';
+import { DrawingContext, drawingFrame, type NoteDrawingHost, type NoteDrawingPicture } from './NoteDrawing';
+import { RichTextEditor, type RichTextDrawings } from './RichTextEditor';
 import { Skeleton } from './Skeleton';
 
 /** One note, as the editor shows it. */
@@ -40,6 +43,24 @@ export interface NoteEditorNote {
   words?: number;
   /** Bumped when the words change under the editor: it starts again with them. */
   gen?: number;
+}
+
+/** Drawings in the note (the Notebook's editor only). */
+export interface NoteEditorDrawings {
+  /** Each block's picture, by drawing id. */
+  picture: (id: string) => NoteDrawingPicture | undefined;
+  /** A new drawing's id. */
+  newId: () => string;
+  /** The drawing open full size, and the block's frame it opened from. */
+  open: { id: string; from: DOMRect | null } | null;
+  onOpen: (id: string, from: DOMRect | null) => void;
+  /** The open drawing's sheet: its scene, saves and uploads. */
+  sheet?: Pick<
+    DrawingSheetProps,
+    'drawing' | 'error' | 'onRetry' | 'loadImage' | 'upload' | 'hold' | 'onChange' | 'save' | 'slow' | 'load'
+  >;
+  /** Done on the open drawing. True when it was empty: its block leaves the note. */
+  onDone: (id: string, out: { empty: boolean; pictures: DrawingPictures | null }) => boolean;
 }
 
 export interface NoteEditorProps {
@@ -84,13 +105,23 @@ export interface NoteEditorProps {
   ) => Promise<{ id: string; name: string; size: number }>;
   fileBase?: string;
   offline?: boolean;
+  drawings?: NoteEditorDrawings;
   className?: string;
+}
+
+/** Which drawing of the note this is, counted from the top (a new one not in the words yet is the next). */
+function drawingNumber(html: string, id: string): number {
+  const ids = drawingIds(html);
+  const at = ids.indexOf(id);
+  return at >= 0 ? at + 1 : ids.length + 1;
 }
 
 /** The note leaves the page this long before the next one takes its place. */
 export const NOTE_GOING_MS = 180;
 /** An unlinked chip shrinks away this long before it leaves. */
 export const CHIP_OUT_MS = 170;
+/** Where the drawing sheet fills the screen (the phone rule for .tp-nb-sheet in components.css). */
+const PHONE_SHEET = '(max-width: 640px)';
 
 /**
  * Where the Make a task bubble goes, in whole pixels: centred on `x`, its foot on `y`, never closer than 8px to the
@@ -161,6 +192,41 @@ export function NoteEditor(p: NoteEditorProps) {
   const wrap = useRef<HTMLDivElement | null>(null);
   const id = note?.id;
   const gen = note?.gen ?? 0;
+  const blocks = useRef<{ remove: (id: string) => void } | null>(null);
+  const [fresh, setFresh] = useState<ReadonlySet<string>>(() => new Set());
+  const d = p.drawings;
+  const open = d?.open ?? null;
+  const host = useMemo<NoteDrawingHost | null>(
+    () => (d ? { picture: d.picture, onOpen: d.onOpen, openId: open?.id ?? null, fresh } : null),
+    [d, open?.id, fresh],
+  );
+  const rteDrawings = useMemo<RichTextDrawings | undefined>(
+    () =>
+      d
+        ? {
+            newId: () => {
+              const nid = d.newId();
+              setFresh((f) => new Set([...f, nid]));
+              return nid;
+            },
+            onOpen: d.onOpen,
+            bind: (fns) => {
+              blocks.current = fns;
+            },
+          }
+        : undefined,
+    [d],
+  );
+  // The sheet covers the note window when there is one (the Mac's, the floating note), else the note's own pane. On a
+  // phone it covers the whole screen, so it goes on the page itself, above the app's bars.
+  const [sheetHost, setSheetHost] = useState<HTMLElement | null>(null);
+  const setWrap = useCallback((el: HTMLDivElement | null) => {
+    wrap.current = el;
+    const phone = typeof window !== 'undefined' && window.matchMedia?.(PHONE_SHEET).matches;
+    setSheetHost(
+      el ? (phone ? document.body : ((el.closest('.tp-nb-win') as HTMLElement | null) ?? el)) : null,
+    );
+  }, []);
 
   // Another note (or the same one changed elsewhere): start clean.
   const [seen, setSeen] = useState(`${id}:${gen}`);
@@ -269,7 +335,7 @@ export function NoteEditor(p: NoteEditorProps) {
 
   return (
     <div
-      ref={wrap}
+      ref={setWrap}
       className={cx('tp-root tp-nb-ed', p.compact && 'tp-compact', going && 'tp-nb-ed-going', p.className)}
     >
       <ConfirmDialog
@@ -284,6 +350,21 @@ export function NoteEditor(p: NoteEditorProps) {
         {`It goes to Trash for 30 days, then it’s gone for good. Until then you can put it back from Trash.${links.length ? ' Its links to tasks come back with it.' : ''}`}
       </ConfirmDialog>
       {p.banner ?? null}
+      {d && open && d.sheet && sheetHost
+        ? createPortal(
+            <DrawingSheet
+              {...d.sheet}
+              noteName={title.trim() || note.first?.trim() || 'Untitled'}
+              number={drawingNumber(note.html, open.id)}
+              from={open.from}
+              closeTo={() => drawingFrame(wrap.current, open.id)}
+              onDone={(out) => {
+                if (d.onDone(open.id, out)) blocks.current?.remove(open.id);
+              }}
+            />,
+            sheetHost,
+          )
+        : null}
       {bubble && p.onMakeTask ? (
         <div ref={bubbleEl} className="tp-nb-bubble">
           <button
@@ -428,21 +509,24 @@ export function NoteEditor(p: NoteEditorProps) {
             </span>
           ) : null}
         </LinkRow>
-        <div className="tp-nb-body">
-          <RichTextEditor
-            variant="notes"
-            label="Note"
-            resetKey={`${note.id}:${gen}`}
-            value={note.html}
-            placeholder="Write anything. It saves as you go."
-            compact={p.compact}
-            autoFocus={p.autoFocus}
-            onInput={(html) => p.onBody?.(html)}
-            onBlur={() => p.onLeave?.()}
-            onAttach={p.onAttach}
-            fileBase={p.fileBase}
-            offline={p.offline}
-          />
+        <div className="tp-nb-body" aria-hidden={open ? 'true' : undefined}>
+          <DrawingContext.Provider value={host}>
+            <RichTextEditor
+              variant="notes"
+              label="Note"
+              resetKey={`${note.id}:${gen}`}
+              value={note.html}
+              placeholder="Write anything. It saves as you go."
+              compact={p.compact}
+              autoFocus={p.autoFocus}
+              onInput={(html) => p.onBody?.(html)}
+              onBlur={() => p.onLeave?.()}
+              onAttach={p.onAttach}
+              fileBase={p.fileBase}
+              offline={p.offline}
+              drawings={rteDrawings}
+            />
+          </DrawingContext.Provider>
         </div>
       </div>
       {p.compact ? null : <div className="tp-nb-ed-foot">{foot}</div>}

@@ -2936,3 +2936,48 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 @keyframes tp-nb-float-in { from { opacity: 0; transform: scale(.97) translateY(6px); } }
 @keyframes tp-nb-float-out { to { opacity: 0; transform: scale(.97) translateY(6px); } }
 @media (prefers-reduced-motion: reduce) { .tp-nb-float, .tp-nb-float.tp-nb-float-out { animation-duration: 1ms; } }
+/* A drawing in a note (Excalidraw): a block between the paragraphs showing its picture, as wide as the words and up
+   to 360px tall. Pointing at it shows Edit and its ⋯; a selected block has a ring. A new one grows into place. */
+.tp-nb-draw-node { margin: 10px 0; }
+.tp-nb-draw { position: relative; border-radius: 12px; }
+.tp-nb-draw-pic { position: relative; display: flex; align-items: center; justify-content: center; min-height: 120px; max-height: 360px; overflow: hidden; border-radius: 12px; background: color-mix(in srgb, var(--foreground) 2.5%, transparent); box-shadow: inset 0 0 0 1px var(--hair); cursor: pointer; outline: none; transition: box-shadow var(--dur-menu) var(--ease-change), background-color var(--dur-menu) var(--ease-change); }
+.tp-nb-draw-pic img { display: block; max-width: 100%; max-height: 360px; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+.tp-nb-draw:hover .tp-nb-draw-pic { box-shadow: inset 0 0 0 1px var(--border-strong); }
+.tp-nb-draw-pic:focus-visible, .tp-nb-draw.tp-sel .tp-nb-draw-pic { box-shadow: 0 0 0 2px var(--ring); }
+.tp-nb-draw-none { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 24px; text-align: center; font-size: 13px; color: var(--muted-foreground); }
+.tp-nb-draw-none > span:first-child { font-weight: 600; color: var(--foreground-2); }
+.tp-nb-draw-sub { font-size: 12px; }
+.tp-nb-draw-ctl { position: absolute; top: 8px; right: 8px; display: inline-flex; gap: 4px; opacity: 0; transform: translateY(-2px); transition: opacity var(--dur-menu) var(--ease-change), transform var(--dur-menu) var(--ease-change); }
+.tp-nb-draw:hover .tp-nb-draw-ctl, .tp-nb-draw:focus-within .tp-nb-draw-ctl, .tp-nb-draw.tp-sel .tp-nb-draw-ctl { opacity: 1; transform: none; }
+@media (hover: none) { .tp-nb-draw-ctl { opacity: 1; transform: none; } }
+.tp-nb-draw-btn { height: 28px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border: 0; border-radius: 8px; background: var(--card); box-shadow: var(--shadow-pop); font: inherit; font-size: 12.5px; font-weight: 600; color: var(--foreground-2); cursor: pointer; }
+.tp-nb-draw-btn:hover { color: var(--foreground); }
+.tp-nb-draw-btn:focus-visible { outline: none; box-shadow: var(--shadow-pop), 0 0 0 2px var(--ring); }
+.tp-nb-draw-ic { width: 28px; padding: 0; justify-content: center; }
+.tp-nb-draw-menuw { position: relative; }
+.tp-nb-draw-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; min-width: 170px; }
+.tp-nb-draw-open .tp-nb-draw-pic { visibility: hidden; }
+.tp-nb-draw-new { animation: tp-nb-draw-grow 200ms var(--ease-arrive) both; overflow: hidden; }
+@keyframes tp-nb-draw-grow { from { max-height: 0; opacity: 0; } to { max-height: 380px; opacity: 1; } }
+.tp-nb-draw-node.ProseMirror-selectednode { outline: none; }
+/* Draw, at the end of the formatting strip. */
+.tp-rte-b.tp-wide.tp-rte-draw span { min-width: 0; }
+/* The drawing full size, over the note pane (or the whole note window): a thin Tudu bar, Excalidraw under it. It
+   clips out from its block and back onto it; it is never scaled, since Excalidraw measures its own box. */
+.tp-nb-sheet.tp-root { position: absolute; inset: 0; z-index: 70; display: flex; flex-direction: column; background: var(--card); color: var(--foreground); }
+.tp-nb-sheet-leaving { pointer-events: none; }
+/* Phones: the whole screen, over the top bar and the tabs. Excalidraw then picks its phone layout, tools at the foot. */
+@media (max-width: 640px) { .tp-nb-sheet.tp-root { position: fixed; z-index: 90; } }
+.tp-nb-sheet-bar { flex: none; display: flex; align-items: center; gap: 6px; height: 48px; padding: 0 10px 0 6px; border-bottom: 1px solid var(--hair); }
+.tp-nb-sheet-bar .tp-ib { width: 34px; height: 34px; }
+.tp-nb-sheet-where { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; color: var(--muted-foreground); }
+.tp-nb-sheet-where b { font-weight: 600; color: var(--foreground); }
+.tp-nb-sheet-done { flex: none; }
+.tp-nb-sheet-canvas { position: relative; flex: 1; min-height: 0; }
+.tp-nb-sheet-canvas > .excalidraw, .tp-nb-sheet-canvas > div:not(.tp-nb-sheet-err):not(.tp-nb-sheet-opening) { position: absolute; inset: 0; }
+.tp-nb-sheet-opening { position: absolute; inset: 0; display: flex; justify-content: center; padding-top: 16px; }
+.tp-nb-sheet-tools { width: min(420px, 80%); height: 40px; border-radius: 10px; background: linear-gradient(90deg, var(--hair) 0%, color-mix(in srgb, var(--foreground) 7%, transparent) 50%, var(--hair) 100%); background-size: 200% 100%; animation: tp-nb-shimmer 1.2s linear infinite; }
+@keyframes tp-nb-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.tp-nb-sheet-err { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px; text-align: center; font-size: 13px; color: var(--muted-foreground); }
+.tp-nb-sheet-err-t { font-family: var(--font-serif); font-size: 22px; color: var(--foreground); }
+@media (prefers-reduced-motion: reduce) { .tp-nb-draw-new { animation: none; } .tp-nb-sheet-tools { animation: none; } }

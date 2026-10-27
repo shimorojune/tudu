@@ -4,7 +4,7 @@
  * untitled note's first line, the days left in Trash and the rule that an empty new note is never kept.
  */
 import { z } from 'zod';
-import { NOTES_MAX, textOf } from './notes';
+import { drawingIds, NOTES_MAX, textOf } from './notes';
 
 /** Folders go three levels deep (Northwind / Planning / Offsite). */
 export const NOTEBOOK_DEPTH = 3;
@@ -18,6 +18,11 @@ export const FIRST_LINE_MAX = 80;
 export const NOTE_SEARCH_LIMIT = 5;
 /** The window's Recent list. */
 export const RECENT_NOTES = 8;
+/** A drawing's scene may be this much JSON. Its pictures live in file storage, never in the scene. */
+export const DRAWING_MAX = 2_000_000;
+export const DRAWING_TOO_BIG = 'This drawing is too big to save. Split it into two drawings.';
+/** What a note with no words but a drawing shows as its first line. */
+export const DRAWING_LINE = 'Drawing';
 
 export const NOTEBOOK_CHANGED = 'notebook.changed';
 
@@ -67,6 +72,36 @@ export interface NoteTask {
   space: { name: string; color: string | null; personal: boolean };
 }
 
+/** An image in a drawing: the Notebook file holding its pixels. */
+export interface DrawingImage {
+  attachmentId: string;
+  mimeType: string;
+}
+
+/**
+ * A drawing as stored: Excalidraw's elements and, for each image in it, the file that holds it. No view state, and
+ * no pixels: those are fetched from the file when the drawing opens.
+ */
+export interface DrawingScene {
+  elements: Array<{ id: string; type: string; [k: string]: unknown }>;
+  files: Record<string, DrawingImage>;
+}
+
+/** A drawing block as the note shows it: its pictures (light and dark, as file ids) and how many words it holds. */
+export interface NoteDrawingInfo {
+  id: string;
+  rev: number;
+  previewLight: string | null;
+  previewDark: string | null;
+  words: number;
+}
+
+/** `GET /api/notebook/drawings/:id`: one drawing in full. */
+export interface NoteDrawing extends NoteDrawingInfo {
+  noteId: string;
+  scene: DrawingScene;
+}
+
 /** `GET /api/notebook/notes/:id`: one note in full. */
 export interface Note extends NoteHeader {
   html: string;
@@ -77,6 +112,8 @@ export interface Note extends NoteHeader {
   words: number;
   linked: NoteTask[];
   createdAt: string;
+  /** Every drawing that has been in it (a block taken out stays a while, for Undo). */
+  drawings: NoteDrawingInfo[];
 }
 
 /** A note with where it lives, for the task panel and Recent. */
@@ -138,6 +175,15 @@ const folderName = z
   .max(FOLDER_NAME_MAX, 'That name is too long.');
 const noteTitle = z.string().trim().max(NOTE_TITLE_MAX, 'That title is too long.');
 const noteHtml = z.string().max(NOTES_MAX, 'That note is too long.');
+const drawingScene = z
+  .object({
+    elements: z.array(z.looseObject({ id: z.string().min(1).max(100), type: z.string().min(1).max(40) })),
+    files: z.record(
+      z.string().min(1).max(100),
+      z.object({ attachmentId: id, mimeType: z.string().max(100) }),
+    ),
+  })
+  .refine((s) => JSON.stringify(s).length <= DRAWING_MAX, DRAWING_TOO_BIG);
 
 /**
  * The Notebook's changes, sent through the same sync batch as tasks (so they queue offline and never double):
@@ -152,6 +198,8 @@ const noteHtml = z.string().max(NOTES_MAX, 'That note is too long.');
  * | note.link      | a link to a task you can read; note.unlink takes it off      |
  * | folder.*       | a folder's name, place, Trash (with everything in it)        |
  * | trash.empty    | everything in Trash, for good                                |
+ * | drawing.save   | a drawing's scene (and pictures), only on its rev, else stale |
+ * | drawing.delete | a drawing out of its note (kept 30 days, for Undo)           |
  */
 export const notebookMutationSchema = z.discriminatedUnion('type', [
   z.object({
@@ -195,13 +243,32 @@ export const notebookMutationSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('folder.purge'), payload: z.object({ id }) }),
   /** `id` is the change's own: everything in Trash goes. */
   z.object({ type: z.literal('trash.empty'), payload: z.object({ id }) }),
+  z.object({
+    type: z.literal('drawing.save'),
+    payload: z.object({
+      id,
+      noteId: id,
+      scene: drawingScene,
+      /** New pictures for the note (light and dark), uploaded as Notebook files; left out to keep the old ones. */
+      previewLight: id.nullable().optional(),
+      previewDark: id.nullable().optional(),
+      /** 0 makes it. */
+      baseRev: z.number().int().min(0),
+    }),
+  }),
+  z.object({ type: z.literal('drawing.delete'), payload: z.object({ id }) }),
 ]);
 
 export type NotebookMutationBody = z.infer<typeof notebookMutationSchema>;
 
 /** A Notebook change: yours alone, no task or space list changes (a link is the note's, not the task's). */
 export function isNotebookMutation(m: { type: string }): boolean {
-  return m.type.startsWith('note.') || m.type.startsWith('folder.') || m.type === 'trash.empty';
+  return (
+    m.type.startsWith('note.') ||
+    m.type.startsWith('folder.') ||
+    m.type.startsWith('drawing.') ||
+    m.type === 'trash.empty'
+  );
 }
 
 /** Why the server turned a Notebook change down, when the client acts on it. */
@@ -426,19 +493,33 @@ export function nameTakenWords(folders: NotebookFolder[], parentId: string | nul
 
 // ---- notes ------------------------------------------------------------------------------------------------------
 
-/** The first line of a note's words, tags stripped, cut at 80 characters. */
+/** The first line of a note's words, tags stripped, cut at 80 characters. A note of drawings alone says Drawing. */
 export function firstLine(html: string): string {
   const line =
     textOf(html)
       .split('\n')
       .map((l) => l.trim())
-      .find(Boolean) ?? '';
+      .find(Boolean) ?? (drawingIds(html).length ? DRAWING_LINE : '');
   return line.length > FIRST_LINE_MAX ? `${line.slice(0, FIRST_LINE_MAX - 1).trimEnd()}…` : line;
 }
 
-/** A note with neither a title nor a word: it is never kept. */
+/** A note with neither a title nor a word nor a drawing: it is never kept. */
 export function isBlankNote(title: string, html: string): boolean {
-  return !title.trim() && !textOf(html).trim();
+  return !title.trim() && !textOf(html).trim() && !drawingIds(html).length;
+}
+
+/** The words typed in a drawing (text, and labels in shapes), for search. Handwriting and images aren't read. */
+export function drawingText(scene: Pick<DrawingScene, 'elements'>): string {
+  return scene.elements
+    .filter((e) => e.type === 'text' && !e.isDeleted)
+    .map((e) => String(e.originalText ?? e.text ?? '').trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** A drawing with nothing left on it (every element erased). */
+export function isEmptyDrawing(scene: Pick<DrawingScene, 'elements'> | null | undefined): boolean {
+  return !scene || !scene.elements.some((e) => !e.isDeleted);
 }
 
 /** How many words a note holds. */

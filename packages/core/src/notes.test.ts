@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanHtml, isBlankHtml, isEmptyHtml, textOf } from './notes';
+import { cleanHtml, drawingIds, isBlankHtml, isEmptyHtml, noteHtml, textOf } from './notes';
 
 describe('C03-U24 cleaning notes', () => {
   it('C03-U24 keeps the tags the editor makes', () => {
@@ -65,9 +65,9 @@ describe('C04-U13 attachment chips survive the cleaner', () => {
 });
 
 describe('C22-U06 a note body is cleaned like task notes', () => {
-  it('C22-U06 keeps checklists, files and links and drops scripts, handlers and unknown tags', () => {
+  it('C22-U06 keeps checklists, files, links and drawing blocks and drops scripts, handlers and unknown tags', () => {
     const body =
-      '<h2>Five interviews</h2><ul data-type="taskList" class="tp-checks"><li data-type="taskItem" data-checked="false"><p>Draft it</p></li></ul>' +
+      '<div data-drawing="d1"></div><h2>Five interviews</h2><ul data-type="taskList" class="tp-checks"><li data-type="taskItem" data-checked="false"><p>Draft it</p></li></ul>' +
       '<p><a class="tp-att" data-id="f1" data-name="notes.pdf" data-size="2048" href="/api/files/f1">notes.pdf</a> ' +
       '<a href="https://tudu.app" onclick="x()">site</a></p><script>steal()</script><img src=x onerror="alert(1)"><marquee>hi</marquee>';
     const out = cleanHtml(body);
@@ -78,6 +78,32 @@ describe('C22-U06 a note body is cleaned like task notes', () => {
     expect(out).toContain('href="https://tudu.app" rel="noopener noreferrer" target="_blank"');
     expect(out).not.toMatch(/script|onerror|onclick|<img|marquee|steal/);
     expect(out).toContain('hi');
+    expect(out.startsWith('<div data-drawing="d1"></div><h2>')).toBe(true);
+  });
+});
+
+describe('C22-U80 drawing blocks survive the cleaner', () => {
+  it('C22-U80 keeps div[data-drawing] with a good id and nothing else on it', () => {
+    expect(cleanHtml('<div data-drawing="d1"></div>')).toBe('<div data-drawing="d1"></div>');
+    expect(cleanHtml('<div data-drawing="d1" class="x" onclick="steal()" style="color:red"></div>')).toBe(
+      '<div data-drawing="d1"></div>',
+    );
+    // A bad id: the div stays (it is a block) but names no drawing.
+    expect(cleanHtml('<div data-drawing="../../x"></div>')).toBe('<div></div>');
+    expect(cleanHtml('<div data-drawing="a b"></div>')).toBe('<div></div>');
+    expect(cleanHtml('<div onmouseover="x()">hi</div>')).toBe('<div>hi</div>');
+  });
+
+  it('C22-U80 lists a note’s drawings once each, and a note of a drawing alone is not empty', () => {
+    expect(
+      drawingIds(
+        '<p>a</p><div data-drawing="d1"></div><div data-drawing="d2"></div><div data-drawing="d1"></div>',
+      ),
+    ).toEqual(['d1', 'd2']);
+    expect(drawingIds('<p data-drawing="d1">x</p>')).toEqual([]);
+    expect(isEmptyHtml('<div data-drawing="d1"></div>')).toBe(false);
+    expect(noteHtml('<div data-drawing="d1"></div><p></p>')).toBe('<div data-drawing="d1"></div>');
+    expect(textOf('<p>Two rooms</p><div data-drawing="d1"></div><p>Coffee</p>')).toBe('Two rooms\nCoffee');
   });
 });
 
