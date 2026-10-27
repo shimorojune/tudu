@@ -47,7 +47,10 @@ async function nudgesOn(app: App): Promise<NotifyStatus['permission']> {
   await clock(app, workday(), '07:00');
   await app.until(`return T.all('switch', 'Nudge me in my hours').length > 0`);
   await app.eval(`T.click(T.get('switch', 'Nudge me in my hours'))`);
-  await app.until(`return !document.body.textContent.includes('Allow Tudu in the box macOS just showed.')`);
+  // Where nobody answers macOS's box (CI's Mac), it can stay up for Tudu's whole two-minute wait: still unknown.
+  await app
+    .until(`return !document.body.textContent.includes('Allow Tudu in the box macOS just showed.')`)
+    .catch(() => {});
   return (await status(app)).permission;
 }
 
@@ -62,7 +65,7 @@ test.describe('working hours and nudges', () => {
       await app.until(`return T.all('button', 'Send now').length > 0`);
       await app.until(`return T.all('group', 'How often').length > 0`);
     } else if (permission === 'unknown') {
-      // macOS's box is up and nobody answers it (CI's Mac): the switch is on, and neither the rows nor the guide show.
+      // macOS's box is up, or went, unanswered (CI's Mac): the switch is on, and neither the rows nor the guide show.
       expect(
         await app.eval(`return T.get('switch', 'Nudge me in my hours').getAttribute('aria-checked')`),
       ).toBe('true');
