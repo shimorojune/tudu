@@ -31,7 +31,8 @@ function between(text: string, open: string, close: string): string {
 
 /** The page's own head script (the theme, Less motion and the launch mark), run as the browser would. */
 function runHeadScript(look?: unknown, path = '/'): void {
-  const script = /<script>([\s\S]*?)<\/script>/.exec(WEB)![1]!;
+  const open = WEB.indexOf('<script>') + '<script>'.length;
+  const script = WEB.slice(open, WEB.indexOf('</script>', open));
   window.history.replaceState(null, '', path);
   (window as Window & { __TUDU_LOOK__?: unknown }).__TUDU_LOOK__ = look;
   new Function(script)();
