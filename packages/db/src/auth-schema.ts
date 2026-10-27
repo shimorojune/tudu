@@ -1,5 +1,6 @@
 import { relations } from 'drizzle-orm';
 import { pgTable, text, timestamp, boolean, index, jsonb } from 'drizzle-orm/pg-core';
+import type { WorkHours } from '@tudu/core';
 
 export const user = pgTable('user', {
   id: text('id').primaryKey(),
@@ -14,6 +15,8 @@ export const user = pgTable('user', {
    * session that made the account, so that sign-in is told apart from every later one.
    */
   firstRun: jsonb('first_run').$type<{ themeAt?: string; hiddenAt?: string; firstSession?: string }>(),
+  /** Tudu's own: working hours (`WorkHours` in @tudu/core); null is the default, Monday to Friday 09:00 to 18:00. */
+  workHours: jsonb('work_hours').$type<WorkHours>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at')
     .defaultNow()

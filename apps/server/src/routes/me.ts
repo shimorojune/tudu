@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { stream } from 'hono/streaming';
-import { PHOTO_MAX_BYTES } from '@tudu/core';
+import { HOURS_PROBLEM_WORDS, ME_CHANGED, PHOTO_MAX_BYTES, parseWorkHours, workHoursOf } from '@tudu/core';
 import { eq, schema, type Db } from '@tudu/db';
 import { clearPhoto, confirmEmailChange, readPhoto, setPhoto, startEmailChange } from '../account';
 import type { Mailer } from '../email';
@@ -27,7 +27,12 @@ export function meRoutes(db: Db, hub: EventHub, mailer: Mailer, storage: Storage
   r.get('/me', requireSession, async (c) => {
     const session = c.get('session')!;
     const [row] = await db
-      .select({ color: schema.user.color, image: schema.user.image, createdAt: schema.user.createdAt })
+      .select({
+        color: schema.user.color,
+        image: schema.user.image,
+        createdAt: schema.user.createdAt,
+        workHours: schema.user.workHours,
+      })
       .from(schema.user)
       .where(eq(schema.user.id, session.user.id));
     // Someone from before colours were given gets theirs the first time they ask.
@@ -44,6 +49,8 @@ export function meRoutes(db: Db, hub: EventHub, mailer: Mailer, storage: Storage
       /** This session is the sign-in that made the account: a new person, not a returning one. */
       firstSignIn: await isFirstSession(db, session.user.id, session.session.id),
       gettingStarted: await gettingStarted(db, session.user.id),
+      /** Your working hours: the default (Monday to Friday, 09:00 to 18:00) until you change them. */
+      workHours: workHoursOf(row?.workHours),
       ...(await (async () => {
         const counts = await inboxCounts(db, session.user);
         return {
@@ -64,6 +71,17 @@ export function meRoutes(db: Db, hub: EventHub, mailer: Mailer, storage: Storage
     const userId = c.get('session')!.user.id;
     await recordFirstRun(db, userId, rec);
     return c.json({ gettingStarted: await gettingStarted(db, userId) });
+  });
+
+  /** The whole value each time, so a retry or a second tab simply puts the same hours again. */
+  r.post('/me/hours', requireSession, async (c) => {
+    const parsed = parseWorkHours(await c.req.json().catch(() => null));
+    if (!parsed.ok)
+      return c.json({ error: HOURS_PROBLEM_WORDS[parsed.problem], problem: parsed.problem }, 400);
+    const userId = c.get('session')!.user.id;
+    await db.update(schema.user).set({ workHours: parsed.hours }).where(eq(schema.user.id, userId));
+    hub.publish(userId, ME_CHANGED, {});
+    return c.json({ workHours: parsed.hours });
   });
 
   r.post('/me/photo', requireSession, async (c) => {

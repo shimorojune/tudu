@@ -1,6 +1,6 @@
 import { createAuthClient } from 'better-auth/react';
 import { emailOTPClient } from 'better-auth/client/plugins';
-import type { GettingStarted, InboxCounts, SpaceSummary } from '@tudu/core';
+import type { GettingStarted, InboxCounts, SpaceSummary, WorkHours } from '@tudu/core';
 
 /** The sign-in client: send a code to an email, then sign in with it. Cookies carry the session. */
 export function createAuthClientFor(baseUrl: string) {
@@ -36,4 +36,6 @@ export interface MeResponse {
   gettingStarted?: GettingStarted;
   /** The one Inbox's count: every space, plus invites and notices. */
   inbox?: InboxCounts;
+  /** Your working hours (the default until changed). */
+  workHours?: WorkHours;
 }

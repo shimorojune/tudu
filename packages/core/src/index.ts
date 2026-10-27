@@ -22,3 +22,5 @@ export * from './feedback';
 export * from './menubar';
 export * from './allSpaces';
 export * from './notebook';
+export * from './hours';
+export * from './nudges';
