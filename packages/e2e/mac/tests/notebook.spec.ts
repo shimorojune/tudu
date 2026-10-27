@@ -550,7 +550,10 @@ const drawRect = `
   await frame();
   return true;`;
 
-const done = (app: App) => app.eval(`T.click(document.querySelector('.tp-nb-sheet-done'))`, 'note');
+async function done(app: App) {
+  await app.until(`return !!document.querySelector('.tp-nb-sheet-done')`, 'note');
+  await app.eval(`T.click(document.querySelector('.tp-nb-sheet-done'))`, 'note');
+}
 
 async function drawingOf(app: App, id: string) {
   return asPage<{

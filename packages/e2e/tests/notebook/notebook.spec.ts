@@ -1350,7 +1350,7 @@ async function startDrawing(page: Page, noteId: string, firstWords: string): Pro
 }
 
 /** An empty spot on the canvas, clear of Excalidraw's own controls: the welcome menu in the middle, Help and the
- * zoom in the corners, the shape properties on the left, a phone's tools at the foot. */
+ * zoom in the corners, the shape properties on the left, a phone's tools at the foot. Right of what drawSomething draws. */
 const awayFrom = (b: { x: number; y: number; width: number; height: number }) => ({
   x: b.x + b.width * 0.7,
   y: b.y + b.height * 0.3,
@@ -1361,13 +1361,18 @@ async function drawSomething(page: Page, text: string): Promise<void> {
   const b = (await drawCanvas(page).boundingBox())!;
   const away = awayFrom(b);
   await page.mouse.click(away.x, away.y);
+  // Wider than a phone, the shape properties stand over the left of the canvas (about 215px) once a tool is on.
+  const phoneTools = /excalidraw--mobile/.test(
+    (await sheet(page).locator('.excalidraw').getAttribute('class')) ?? '',
+  );
+  const left = b.x + (phoneTools ? 40 : 260);
   await page.keyboard.press('r');
-  await page.mouse.move(b.x + 120, b.y + 120);
+  await page.mouse.move(left, b.y + 120);
   await page.mouse.down();
-  await page.mouse.move(b.x + 300, b.y + 220, { steps: 6 });
+  await page.mouse.move(left + 160, b.y + 220, { steps: 6 });
   await page.mouse.up();
   await page.keyboard.press('t');
-  await page.mouse.click(b.x + 140, b.y + 280);
+  await page.mouse.click(left + 20, b.y + 280);
   await expect(sheet(page).locator('textarea.excalidraw-wysiwyg')).toBeVisible();
   await page.keyboard.type(text);
   // A click away keeps the text and goes back to selecting.
@@ -1398,9 +1403,15 @@ const imageTransfer = (page: Page) =>
 /** The image went up as an attachment and the scene names it by id: no picture data in the scene itself. */
 async function imageKept(page: Page, drawingId: string): Promise<void> {
   await expect
-    .poll(async () => Object.values((await drawingNow(page, drawingId)).scene.files).length, {
-      timeout: 15_000,
-    })
+    .poll(
+      async () => {
+        // The drawing is made by its first save, a moment after the image lands: a 404 until then.
+        const res = await page.request.get(`${API_URL}/api/notebook/drawings/${drawingId}`);
+        if (res.status() !== 200) return res.status();
+        return Object.values(((await res.json()) as { scene: { files: object } }).scene.files).length;
+      },
+      { timeout: 15_000 },
+    )
     .toBe(1);
   const d = await drawingNow(page, drawingId);
   expect(JSON.stringify(d.scene)).not.toContain('dataURL');
@@ -1627,9 +1638,11 @@ test.describe('notebook drawings', () => {
     await page.goto(`/notebook/${id}`);
     const blk = drawingBlock(page, 'k1');
     await expect(blk).toBeVisible();
+    // A click at the line's left edge, not Home: on a Mac, Home scrolls and leaves the caret where it was.
     const startOfBelow = async () => {
-      await words(page).locator('p', { hasText: 'below' }).click();
-      await page.keyboard.press('Home');
+      await words(page)
+        .locator('p', { hasText: 'below' })
+        .click({ position: { x: 1, y: 4 } });
     };
     await startOfBelow();
     await page.keyboard.press('Backspace');

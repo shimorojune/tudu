@@ -120,6 +120,8 @@ function drawingNumber(html: string, id: string): number {
 export const NOTE_GOING_MS = 180;
 /** An unlinked chip shrinks away this long before it leaves. */
 export const CHIP_OUT_MS = 170;
+/** Where the drawing sheet fills the screen (the phone rule for .tp-nb-sheet in components.css). */
+const PHONE_SHEET = '(max-width: 640px)';
 
 /**
  * Where the Make a task bubble goes, in whole pixels: centred on `x`, its foot on `y`, never closer than 8px to the
@@ -215,11 +217,15 @@ export function NoteEditor(p: NoteEditorProps) {
         : undefined,
     [d],
   );
-  // The sheet covers the note window when there is one (the Mac's, the floating note), else the note's own pane.
+  // The sheet covers the note window when there is one (the Mac's, the floating note), else the note's own pane. On a
+  // phone it covers the whole screen, so it goes on the page itself, above the app's bars.
   const [sheetHost, setSheetHost] = useState<HTMLElement | null>(null);
   const setWrap = useCallback((el: HTMLDivElement | null) => {
     wrap.current = el;
-    setSheetHost(el ? ((el.closest('.tp-nb-win') as HTMLElement | null) ?? el) : null);
+    const phone = typeof window !== 'undefined' && window.matchMedia?.(PHONE_SHEET).matches;
+    setSheetHost(
+      el ? (phone ? document.body : ((el.closest('.tp-nb-win') as HTMLElement | null) ?? el)) : null,
+    );
   }, []);
 
   // Another note (or the same one changed elsewhere): start clean.
