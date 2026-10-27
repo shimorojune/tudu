@@ -122,7 +122,7 @@ export function NoteTrash(p: NoteTrashProps) {
                     {noteLabel(x)}
                   </span>
                   <span className="tp-nb-row-s">
-                    {x.where ? `From ${x.where}` : 'Not in a folder'}
+                    {`From ${x.where || 'Notebook'}`}
                     {x.kind === 'folder' ? ` · ${x.notes === 1 ? '1 note' : `${x.notes ?? 0} notes`}` : ''}
                   </span>
                 </span>

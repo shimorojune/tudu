@@ -37,7 +37,14 @@ export const notebookStore = new NotebookStore({
   api,
   queryClient,
   tasks: taskStore,
-  onRejected: (message) => showToast(message),
+  // A move the server turned down: the tree has put it back already; say so, with a way to send it again.
+  onRejected: (message, move) =>
+    move
+      ? showToast(`Couldn’t move “${move.name}”. It’s back where it was.`, {
+          action: 'Try again',
+          onAction: move.retry,
+        })
+      : showToast(message),
 });
 
 // Words still waiting for quiet save as the page goes (a reload, a closed tab or popup).
@@ -64,7 +71,7 @@ export function noteItem(h: NoteHeader & { where?: string | null }, now = new Da
     id: h.id,
     title: h.title,
     first: h.first,
-    where: h.where === undefined ? undefined : (h.where ?? 'Not in a folder'),
+    where: h.where === undefined ? undefined : (h.where ?? 'Notebook'),
     edited: editedAgo(h.updatedAt, now),
     links: h.links,
   };
@@ -107,7 +114,7 @@ export function notePicks(data: NotebookResponse | undefined, now = new Date()):
   return notesInOrder(data).map((n) => ({
     key: n.id,
     title: noteName(n),
-    sub: `${folderPath(data.folders, n.folderId).join(' / ') || 'Not in a folder'} · ${editedAgo(n.updatedAt, now)}`,
+    sub: `${folderPath(data.folders, n.folderId).join(' / ') || 'Notebook'} · ${editedAgo(n.updatedAt, now)}`,
   }));
 }
 
@@ -130,6 +137,7 @@ export function editorNote(v: NoteView, now = new Date()): NoteEditorNote {
     path: v.path,
     linked: v.linked.map(taskItem),
     edited: v.draft ? null : editedAgo(v.updatedAt, now),
+    draft: !!v.draft,
     words: v.words,
     gen: v.gen,
   };

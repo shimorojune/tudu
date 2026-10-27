@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { canDrop, type DropTarget, type NotebookFolder, type NoteHeader } from '@tudu/core';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
@@ -7,7 +7,15 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { FilterField } from './FilterField';
 import { IconButton } from './IconButton';
 import { MenuList } from './Menu';
-import { NoteIcon, NotePop, NoteRow, noteLabel, useCloseOnOutside, type NoteItem } from './NoteParts';
+import {
+  NoteIcon,
+  NotePop,
+  NoteRow,
+  noteLabel,
+  reducedMotion,
+  useCloseOnOutside,
+  type NoteItem,
+} from './NoteParts';
 import { Skeleton } from './Skeleton';
 import { showToast } from './Toast';
 
@@ -55,6 +63,18 @@ interface Drag {
 }
 interface Over extends DropTarget {
   bad?: boolean;
+}
+/** The row you carry, drawn as a small card that follows the pointer, then flies to where it lands (or back home). */
+interface Ghost {
+  kind: Drag['kind'];
+  label: string;
+  x: number;
+  y: number;
+  w: number;
+  touch: boolean;
+  /** Set once you let go: the row it flies to, measured after the list redraws. */
+  to?: { kind: Drag['kind']; id: string; sink?: boolean };
+  placed?: boolean;
 }
 
 /** The tree as flat lists, for the depth rule. */
@@ -111,6 +131,17 @@ function ancestors(folders: NoteFolderItem[], id: string, above: string[] = []):
 
 /** How long a row that landed keeps its glow. */
 export const LANDED_MS = 700;
+/** Touch: how long you hold a row before it lifts. Moving further than HOLD_SLOP first means you're scrolling. */
+export const HOLD_MS = 380;
+const HOLD_SLOP = 8;
+/** Mouse: how far you move with the button down before the row lifts (less is a click). */
+const LIFT_PX = 4;
+/** Hold a row over a closed folder this long and the folder opens. */
+export const SPRING_MS = 600;
+/** How long the card takes to fly to its row. */
+export const GLIDE_MS = 220;
+/** Near the list's top or bottom edge, it scrolls by itself. */
+const EDGE_PX = 36;
 
 interface Common {
   openIds: Record<string, boolean>;
@@ -124,13 +155,10 @@ interface Common {
   landed: string | null;
   adding: string | null | undefined;
   setAdding: (parent: string | null | undefined) => void;
-  dnd: {
-    start: (e: DragEvent, kind: Drag['kind'], id: string) => void;
-    end: () => void;
-    overRow: (e: DragEvent, kind: 'folder' | 'note', id: string) => void;
-    leave: (e: DragEvent, id: string) => void;
-    drop: (e: DragEvent) => void;
-  };
+  /** Press on a row: a mouse lifts it after a few pixels, a finger after a short hold. */
+  down: (e: ReactPointerEvent, kind: Drag['kind'], id: string, label: string) => void;
+  /** The row the card is flying to: hidden until it lands. */
+  flying: string | null;
 }
 
 /** A name typed in place: a new folder's, or a rename. Enter keeps it, Esc goes back. */
@@ -282,17 +310,15 @@ function Folder({ folder: f, depth, c }: { folder: NoteFolderItem; depth: number
             zone,
             over?.bad && 'tp-nb-nodrop',
             c.landed === f.id && 'tp-nb-landed',
+            c.flying === f.id && 'tp-nb-flying',
           )}
           style={{ '--nb-depth': depth } as React.CSSProperties}
           role="treeitem"
           aria-expanded={open}
           aria-level={depth + 1}
-          draggable={!c.filtering}
-          onDragStart={(e) => c.dnd.start(e, 'folder', f.id)}
-          onDragEnd={c.dnd.end}
-          onDragOver={(e) => c.dnd.overRow(e, 'folder', f.id)}
-          onDragLeave={(e) => c.dnd.leave(e, f.id)}
-          onDrop={c.dnd.drop}
+          data-nb-kind="folder"
+          data-nb-id={f.id}
+          onPointerDown={c.filtering ? undefined : (e) => c.down(e, 'folder', f.id, f.name)}
         >
           <button
             type="button"
@@ -372,7 +398,13 @@ function Folder({ folder: f, depth, c }: { folder: NoteFolderItem; depth: number
             <TreeNote key={n.id} note={n} depth={depth + 1} c={c} />
           ))}
           {!count && c.adding !== f.id ? (
-            <p className="tp-nb-fempty" style={{ '--nb-depth': depth + 1 } as React.CSSProperties}>
+            <p
+              className="tp-nb-fempty"
+              data-nb-kind="folder"
+              data-nb-id={f.id}
+              data-nb-into=""
+              style={{ '--nb-depth': depth + 1 } as React.CSSProperties}
+            >
               Empty folder
             </p>
           ) : null}
@@ -392,16 +424,14 @@ function TreeNote({ note, depth, c }: { note: NoteItem; depth: number; c: Common
         over && `tp-nb-drop-${over.zone}`,
         c.drag?.id === note.id && 'tp-nb-dragging',
         c.landed === note.id && 'tp-nb-landed',
+        c.flying === note.id && 'tp-nb-flying',
       )}
       style={{ '--nb-depth': depth } as React.CSSProperties}
       role="treeitem"
       aria-level={depth + 1}
-      draggable={!c.filtering}
-      onDragStart={(e) => c.dnd.start(e, 'note', note.id)}
-      onDragEnd={c.dnd.end}
-      onDragOver={(e) => c.dnd.overRow(e, 'note', note.id)}
-      onDragLeave={(e) => c.dnd.leave(e, note.id)}
-      onDrop={c.dnd.drop}
+      data-nb-kind="note"
+      data-nb-id={note.id}
+      onPointerDown={c.filtering ? undefined : (e) => c.down(e, 'note', note.id, noteLabel(note))}
     >
       <NoteRow
         note={note}
@@ -417,10 +447,14 @@ function TreeNote({ note, depth, c }: { note: NoteItem; depth: number; c: Common
 }
 
 /**
- * The left side of the Notebook page: folders first (three levels at most), then notes in no folder, then Trash.
- * "Find a note" narrows it as you type, opening the folders that hold a match. Every row drags: a note onto a
- * folder goes into it, between notes it slots in; a folder goes into another or between folders, as long as
- * nothing ends up deeper than three levels.
+ * The left side of the Notebook page: folders first (three levels at most), then the notes in no folder (they sit at
+ * the top of the Notebook, after a hairline), then Trash. "Find a note" narrows it as you type, opening the folders
+ * that hold a match. Every row drags: a note onto a folder goes into it, between notes it slots in; a folder goes into
+ * another or between folders, as long as nothing ends up deeper than three levels.
+ *
+ * The tree carries rows itself with pointer events, not the browser's drag and drop: the Mac app's window never hands
+ * those to the page, and touch has none. The row lifts as a card that follows the pointer, then glides to where it
+ * lands, which glows once. Esc, or a drop nothing takes, glides it home.
  */
 export function NoteTree(p: NoteTreeProps) {
   const [openIds, setOpenIds] = useState<Record<string, boolean>>(p.defaultOpen ?? {});
@@ -432,10 +466,20 @@ export function NoteTree(p: NoteTreeProps) {
   const [drag, setDrag] = useState<Drag | null>(null);
   const [over, setOver] = useState<Over | null>(null);
   const [landed, setLanded] = useState<string | null>(null);
+  const [ghost, setGhost] = useState<Ghost | null>(null);
   // undefined: not adding; null: a new folder at the top; an id: inside that folder.
   const [adding, setAdding] = useState<string | null | undefined>(undefined);
   const lt = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => void (lt.current && clearTimeout(lt.current)), []);
+  const nav = useRef<HTMLElement | null>(null);
+  const scroller = useRef<HTMLDivElement | null>(null);
+  const stop = useRef<(() => void) | null>(null);
+  useEffect(
+    () => () => {
+      if (lt.current) clearTimeout(lt.current);
+      stop.current?.();
+    },
+    [],
+  );
 
   // The folders holding the open note open by themselves.
   const active = p.active;
@@ -454,95 +498,243 @@ export function NoteTree(p: NoteTreeProps) {
 
   /** Where a drop lands: the new parent and the index among its rows. */
   function place(d: Drag, o: Over): { parent: string | null; index?: number } {
+    const fl = live.current.flat;
     if (o.kind === 'root') return { parent: null };
     if (o.kind === 'folder' && o.zone === 'into') return { parent: o.id };
     if (o.kind === 'folder') {
-      const parent = flat.fs.find((f) => f.id === o.id)?.parentId ?? null;
-      const sibs = flat.fs.filter((f) => f.parentId === parent && f.id !== d.id);
+      const parent = fl.fs.find((f) => f.id === o.id)?.parentId ?? null;
+      const sibs = fl.fs.filter((f) => f.parentId === parent && f.id !== d.id);
       const i = sibs.findIndex((f) => f.id === o.id);
       return { parent, index: i + (o.zone === 'after' ? 1 : 0) };
     }
-    const target = flat.ns.find((n) => n.id === o.id);
+    const target = fl.ns.find((n) => n.id === o.id);
     const parent = target?.folderId ?? null;
-    const sibs = flat.ns.filter((n) => n.folderId === parent && n.id !== d.id);
+    const sibs = fl.ns.filter((n) => n.folderId === parent && n.id !== d.id);
     const i = sibs.findIndex((n) => n.id === o.id);
     return { parent, index: i + (o.zone === 'after' ? 1 : 0) };
   }
 
-  const dnd: Common['dnd'] = {
-    start: (e, kind, id) => {
-      e.stopPropagation();
-      try {
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', id);
-      } catch {
-        /* some browsers keep the data to themselves */
-      }
-      setDrag({ kind, id });
-    },
-    end: () => {
-      setDrag(null);
-      setOver(null);
-    },
-    overRow: (e, kind, id) => {
-      if (!drag) return;
-      e.stopPropagation();
-      const r = e.currentTarget.getBoundingClientRect();
-      const y = r.height ? (e.clientY - r.top) / r.height : 0.5;
-      let zone: Over['zone'];
-      if (kind === 'folder')
-        zone = drag.kind === 'note' ? 'into' : y < 0.28 ? 'before' : y > 0.72 ? 'after' : 'into';
-      else {
-        if (drag.kind === 'folder') {
-          setOver(null);
-          return;
-        }
-        zone = y < 0.5 ? 'before' : 'after';
-      }
-      let o: Over | null = { kind, id, zone };
-      const ok = canDrop(flat.fs, flat.ns, drag, o);
-      if (ok) {
-        e.preventDefault();
-        try {
-          e.dataTransfer.dropEffect = 'move';
-        } catch {
-          /* fine */
-        }
-      } else if (kind === 'folder' && zone === 'into' && drag.id !== id) {
-        // Too deep: the folder says so and takes nothing.
-        e.preventDefault();
-        o = { ...o, bad: true };
-      } else o = null;
-      if (!over || !o || over.id !== o.id || over.zone !== o.zone || !!over.bad !== !!o.bad) setOver(o);
-    },
-    leave: (e, id) => {
-      if (over && over.id === id && !e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(null);
-    },
-    drop: (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (drag && over) {
-        if (over.bad) showToast('Folders go three levels deep.');
-        else if (canDrop(flat.fs, flat.ns, drag, over)) {
-          const at = place(drag, over);
-          if (drag.kind === 'note') p.onMoveNote?.(drag.id, at.parent, at.index);
-          else p.onMoveFolder?.(drag.id, at.parent, at.index);
-          if (over.zone === 'into' && over.id) open(over.id);
-          setLanded(drag.id);
-          if (lt.current) clearTimeout(lt.current);
-          lt.current = setTimeout(() => setLanded(null), LANDED_MS);
-        }
-      }
-      setDrag(null);
-      setOver(null);
-    },
+  // What the listeners read: always the latest render's.
+  const live = useRef({ flat, openIds, p });
+  useLayoutEffect(() => {
+    live.current = { flat, openIds, p };
+  });
+  // What is being carried and where it would land, as the listeners set it.
+  const carry = useRef<{ drag: Drag | null; over: Over | null }>({ drag: null, over: null });
+
+  /** The tree's own pixels: a board may draw it scaled. */
+  const scale = () => {
+    const n = nav.current;
+    return n ? n.getBoundingClientRect().width / (n.offsetWidth || 1) || 1 : 1;
   };
-  const overRoot = (e: DragEvent) => {
-    if (!drag) return;
-    const o: Over = { kind: 'root', id: null, zone: 'root' };
-    if (canDrop(flat.fs, flat.ns, drag, o)) {
-      e.preventDefault();
-      if (!over || over.kind !== 'root') setOver(o);
+  const local = (x: number, y: number) => {
+    const r = nav.current!.getBoundingClientRect();
+    const k = scale();
+    return { x: (x - r.left) / k, y: (y - r.top) / k };
+  };
+  const boxOf = (el: Element) => {
+    const r = el.getBoundingClientRect();
+    const at = local(r.left, r.top);
+    return { x: at.x, y: at.y, w: r.width / scale() };
+  };
+
+  /** What the pointer is over and where in it, or null when nothing there takes the row. */
+  function aim(x: number, y: number): Over | null {
+    const d = carry.current.drag;
+    const fl = live.current.flat;
+    if (!d || !nav.current) return null;
+    const el = document.elementFromPoint(x, y);
+    const t = el?.closest<HTMLElement>('[data-nb-kind]');
+    if (!t || !nav.current.contains(t)) return null;
+    const kind = t.dataset.nbKind as Over['kind'];
+    const id = t.dataset.nbId ?? null;
+    const r = t.getBoundingClientRect();
+    const f = r.height ? (y - r.top) / r.height : 0.5;
+    let zone: Over['zone'];
+    if (kind === 'root') zone = 'root';
+    else if (kind === 'folder')
+      zone =
+        d.kind === 'note' || t.dataset.nbInto !== undefined
+          ? 'into'
+          : f < 0.28
+            ? 'before'
+            : f > 0.72
+              ? 'after'
+              : 'into';
+    else {
+      if (d.kind === 'folder') return null;
+      zone = f < 0.5 ? 'before' : 'after';
+    }
+    const o: Over = { kind, id, zone };
+    if (canDrop(fl.fs, fl.ns, d, o)) return o;
+    // Too deep: the folder says so and takes nothing.
+    if (kind === 'folder' && zone === 'into' && d.id !== id) return { ...o, bad: true };
+    return null;
+  }
+  const same = (a: Over | null, b: Over | null) =>
+    a === b || (!!a && !!b && a.id === b.id && a.zone === b.zone && !!a.bad === !!b.bad);
+
+  /** Let go (or Esc): move it, or send the card home. */
+  function finish(home: boolean) {
+    stop.current?.();
+    stop.current = null;
+    const { drag: d, over: o } = carry.current;
+    const { flat: fl, p: props } = live.current;
+    carry.current = { drag: null, over: null };
+    setDrag(null);
+    setOver(null);
+    if (!d) return;
+    if (!home && o?.bad) showToast('Folders go three levels deep.');
+    const ok = !home && !!o && !o.bad && canDrop(fl.fs, fl.ns, d, o);
+    if (!ok || !o) {
+      setGhost((g) => (g ? { ...g, to: { kind: d.kind, id: d.id } } : g));
+      return;
+    }
+    const at = place(d, o);
+    if (d.kind === 'note') props.onMoveNote?.(d.id, at.parent, at.index);
+    else props.onMoveFolder?.(d.id, at.parent, at.index);
+    const into = o.zone === 'into' && !!o.id;
+    if (into) open(o.id!);
+    // Into a folder: the card glides onto the folder and sinks in. Anywhere else it glides to the row's new place.
+    setGhost((g) =>
+      g ? { ...g, to: into ? { kind: 'folder', id: o.id!, sink: true } : { kind: d.kind, id: d.id } } : g,
+    );
+    setLanded(into ? o.id : d.id);
+    if (lt.current) clearTimeout(lt.current);
+    lt.current = setTimeout(() => setLanded(null), LANDED_MS + GLIDE_MS);
+  }
+
+  // Once the list has redrawn, the card flies to its row, then goes.
+  useLayoutEffect(() => {
+    if (!ghost?.to || ghost.placed) return;
+    const el = nav.current?.querySelector(
+      `[data-nb-kind="${ghost.to.kind}"][data-nb-id="${CSS.escape(ghost.to.id)}"]:not(.tp-nb-fempty)`,
+    );
+    const b = el ? boxOf(el) : null;
+    setGhost({ ...ghost, placed: true, ...(b ?? {}) });
+    const t = setTimeout(() => setGhost(null), reducedMotion() ? 0 : GLIDE_MS + 10);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the card gets somewhere to go
+  }, [ghost]);
+
+  const down: Common['down'] = (e, kind, id, label) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const target = e.target as Element;
+    if (target.closest?.('.tp-nb-fadd, .tp-nb-menuw, input')) return;
+    if (!nav.current || carry.current.drag) return;
+    stop.current?.();
+    const row = e.currentTarget as HTMLElement;
+    const touch = e.pointerType !== 'mouse';
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    const b = boxOf(row);
+    const p0 = local(x0, y0);
+    const off = { x: p0.x - b.x, y: p0.y - b.y };
+    let lifted = false;
+    let px = x0;
+    let py = y0;
+    let hold: ReturnType<typeof setTimeout> | null = null;
+    let spring: ReturnType<typeof setTimeout> | null = null;
+    let raf = 0;
+
+    const aimHere = () => {
+      const o = aim(px, py);
+      if (same(o, carry.current.over)) return;
+      carry.current = { ...carry.current, over: o };
+      setOver(o);
+      if (spring) clearTimeout(spring);
+      spring = null;
+      if (o && o.kind === 'folder' && o.zone === 'into' && !o.bad && o.id && !live.current.openIds[o.id]) {
+        const fid = o.id;
+        spring = setTimeout(() => open(fid), SPRING_MS);
+      }
+    };
+    const tick = () => {
+      raf = requestAnimationFrame(() => {
+        const sc = scroller.current;
+        if (!sc || !lifted) return;
+        const r = sc.getBoundingClientRect();
+        let v = 0;
+        if (py < r.top + EDGE_PX) v = -Math.ceil((r.top + EDGE_PX - py) / 3);
+        else if (py > r.bottom - EDGE_PX) v = Math.ceil((py - (r.bottom - EDGE_PX)) / 3);
+        if (v) {
+          sc.scrollTop += v;
+          aimHere();
+        }
+        tick();
+      });
+    };
+    const lift = () => {
+      lifted = true;
+      row.classList.remove('tp-nb-pressing');
+      const d = { kind, id };
+      carry.current = { drag: d, over: null };
+      setDrag(d);
+      const at = local(px, py);
+      setGhost({ kind, label, w: b.w, x: at.x - off.x, y: at.y - off.y, touch });
+      tick();
+    };
+    const move = (ev: PointerEvent) => {
+      px = ev.clientX;
+      py = ev.clientY;
+      const dist = Math.abs(px - x0) + Math.abs(py - y0);
+      if (!lifted) {
+        if (!touch && dist > LIFT_PX) lift();
+        else if (touch && dist > HOLD_SLOP) end();
+        return;
+      }
+      ev.preventDefault();
+      const at = local(px, py);
+      setGhost((g) => (g ? { ...g, x: at.x - off.x, y: at.y - off.y } : g));
+      aimHere();
+    };
+    // A drag isn't a click: the click that follows it is swallowed.
+    const swallow = (ev: MouseEvent) => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      document.removeEventListener('click', swallow, true);
+    };
+    const up = () => {
+      if (!lifted) return end();
+      document.addEventListener('click', swallow, true);
+      setTimeout(() => document.removeEventListener('click', swallow, true), 60);
+      finish(false);
+    };
+    const cancel = () => (lifted ? finish(true) : end());
+    const key = (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape' && lifted) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        finish(true);
+      }
+    };
+    // While a finger carries a row, the page doesn't scroll under it.
+    const still = (ev: TouchEvent) => {
+      if (lifted) ev.preventDefault();
+    };
+    function end() {
+      stop.current?.();
+      stop.current = null;
+    }
+    stop.current = () => {
+      if (hold) clearTimeout(hold);
+      if (spring) clearTimeout(spring);
+      cancelAnimationFrame(raf);
+      row.classList.remove('tp-nb-pressing');
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      document.removeEventListener('pointercancel', cancel);
+      document.removeEventListener('keydown', key, true);
+      document.removeEventListener('touchmove', still);
+    };
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+    document.addEventListener('pointercancel', cancel);
+    document.addEventListener('keydown', key, true);
+    document.addEventListener('touchmove', still, { passive: false });
+    if (touch) {
+      row.classList.add('tp-nb-pressing');
+      hold = setTimeout(lift, HOLD_MS);
     }
   };
 
@@ -561,7 +753,8 @@ export function NoteTree(p: NoteTreeProps) {
     landed,
     adding,
     setAdding,
-    dnd,
+    down,
+    flying: ghost?.to && !ghost.to.sink ? ghost.to.id : null,
   };
   const startFolder = () => {
     setNewOpen(false);
@@ -620,21 +813,16 @@ export function NoteTree(p: NoteTreeProps) {
             }}
           />
         ) : null}
-        <div
-          className={cx('tp-nb-root', over?.kind === 'root' && 'tp-nb-drop-root')}
-          onDragOver={overRoot}
-          onDragLeave={(e) => {
-            if (over?.kind === 'root' && !e.currentTarget.contains(e.relatedTarget as Node | null))
-              setOver(null);
-          }}
-          onDrop={dnd.drop}
-        >
-          {loose.length || drag ? <div className="tp-nb-loose-h">Not in a folder</div> : null}
+        <div className={cx('tp-nb-root', over?.kind === 'root' && 'tp-nb-drop-root')} data-nb-kind="root">
+          {/* Notes in no folder sit at the top of the Notebook: after the folders, below a hairline. */}
+          {(loose.length || drag) && folders.length ? (
+            <div className="tp-nb-loose-sep" aria-hidden="true" />
+          ) : null}
           {loose.map((n) => (
             <TreeNote key={n.id} note={n} depth={0} c={c} />
           ))}
           {drag && !loose.length ? (
-            <p className="tp-nb-fempty">Drop here to take it out of its folder</p>
+            <p className="tp-nb-root-hint">Drop here to take it out of its folder</p>
           ) : null}
         </div>
         {none ? (
@@ -650,15 +838,43 @@ export function NoteTree(p: NoteTreeProps) {
       <FilterField placeholder="Find a note" value={q} onChange={setQ} />
     </div>
   );
+  const card = ghost ? (
+    <div
+      className={cx(
+        'tp-nb-ghost',
+        ghost.placed && 'tp-nb-ghost-placed',
+        ghost.to?.sink && 'tp-nb-ghost-sink',
+        ghost.touch && 'tp-nb-ghost-touch',
+      )}
+      aria-hidden="true"
+      style={{ left: ghost.x, top: ghost.y, width: ghost.w }}
+    >
+      <span className="tp-nb-row-ic">
+        <NoteIcon name={ghost.kind === 'folder' ? 'folder' : 'note'} size={14} />
+      </span>
+      <span className="tp-nb-ghost-t">{ghost.label}</span>
+    </div>
+  ) : null;
   if (p.bare)
     return (
-      <nav className={cx('tp-root tp-nb-tree tp-nb-tree-bare', p.className)} aria-label="Notebook">
+      <nav
+        ref={nav}
+        className={cx('tp-root tp-nb-tree tp-nb-tree-bare', drag && 'tp-nb-carrying', p.className)}
+        aria-label="Notebook"
+      >
         {find}
-        <div className="tp-nb-tree-scroll">{body}</div>
+        <div ref={scroller} className="tp-nb-tree-scroll">
+          {body}
+        </div>
+        {card}
       </nav>
     );
   return (
-    <nav className={cx('tp-root tp-nb-tree', p.className)} aria-label="Notebook">
+    <nav
+      ref={nav}
+      className={cx('tp-root tp-nb-tree', drag && 'tp-nb-carrying', p.className)}
+      aria-label="Notebook"
+    >
       <div className="tp-nb-tree-h">
         <h2>Notebook</h2>
         {/* One quiet New button: a note (the usual thing, first) or a folder. */}
@@ -689,7 +905,10 @@ export function NoteTree(p: NoteTreeProps) {
         </span>
       </div>
       {find}
-      <div className="tp-nb-tree-scroll">{body}</div>
+      <div ref={scroller} className="tp-nb-tree-scroll">
+        {body}
+      </div>
+      {card}
       <div className="tp-nb-tree-f">
         <button
           type="button"

@@ -179,7 +179,7 @@ export interface NoteItem {
   title: string;
   /** The first line of its words, for an untitled note (shown in grey). */
   first?: string;
-  /** "Northwind / Planning", or "Not in a folder". */
+  /** "Northwind / Planning", or "Notebook" for a note in no folder. */
   where?: string | null;
   /** "4m", "Yesterday", "12 Oct". */
   edited?: string | null;

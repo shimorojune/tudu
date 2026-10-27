@@ -237,6 +237,13 @@
 :root[data-motion='less'] .tp-nb-save-saving .tp-nb-save-dot {
   animation: none;
 }
+:root[data-motion='less'] .tp-nb-ghost,
+:root[data-motion='less'] .tp-nb-ghost-placed,
+:root[data-motion='less'] .tp-nb-pressing,
+:root[data-motion='less'] .tp-nb-more {
+  animation: none;
+  transition: none;
+}
 :root[data-motion='less'] .tp-nb-landed > .tp-nb-row.tp-root,
 :root[data-motion='less'] .tp-nb-frow.tp-nb-landed {
   animation-duration: 1ms;

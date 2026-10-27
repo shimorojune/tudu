@@ -103,6 +103,10 @@ fn builder<'a>(
     let look = looks.look.lock().map(|l| *l).unwrap_or_default();
     #[allow(unused_mut)]
     let mut b = WebviewWindowBuilder::new(app, label, url)
+        // Tauri's own file-drop handling takes every drag in the window and the page never sees it: no drag and drop
+        // in the Notebook tree, no files dropped into a note or comment. Nothing here listens to Tauri's drop
+        // events, so the page gets them all (it ignores a file dropped where nothing takes it).
+        .disable_drag_drop_handler()
         .initialization_script(format!(
             "window.__TUDU_WEB__ = {};",
             serde_json::Value::String(web.to_string())

@@ -43,6 +43,7 @@ covers the Mac app, every browser and touch:
   - the area after the folders takes a note out of its folder.
 
   "Too deep" and the toast "Folders go three levels deep." are unchanged.
+
 - **Opening a closed folder.** Hold over it for 600 ms and it opens.
 - **Scrolling.** Within 36 px of the list's top or bottom edge, the list scrolls on each frame, faster the closer you
   are to the edge. On touch the page doesn't scroll while you carry a row: a non-passive `touchmove` listener calls
@@ -116,17 +117,17 @@ Rohit's pick:
 
 ## 4. Files
 
-| Area | Change |
-| --- | --- |
-| `packages/ui/src/components/NoteTree.tsx` | Pointer drag replaces HTML5 drag and drop; ghost card; spring-open; edge scroll; separator instead of the heading |
-| `packages/ui/src/components/NoteEditor.tsx` | `draft` hides ⋯ in place; crumb says Notebook |
-| `packages/ui/src/components/NoteTrash.tsx`, `NoteHit.tsx`, `NoteParts.tsx` | "Notebook" wording |
-| `packages/ui/src/styles/components.css`, `less-motion.css` | `.tp-nb-ghost`, `.tp-nb-pressing`, `.tp-nb-flying`, `.tp-nb-loose-sep`, `.tp-nb-root-hint`, `.tp-nb-more(-hide)`; reduced-motion rules |
-| `packages/core/src/notebook.ts` | `moveTargets` first row titled "Notebook"; comments |
-| `packages/client/src/notebook.ts` | Rejected move: `onRejected` gets `{ kind: 'move', name, retry }` so the app can word the toast |
-| `apps/web/src/app/notebook.ts` | `editorNote` passes `draft`; "Notebook" in `where` and `sub`; move toast with Try again |
-| `apps/web/src/app/dropGuard.ts` (new) + startup | Page file-drop guard |
-| `apps/desktop/src-tauri/src/windows.rs` | `.disable_drag_drop_handler()` in `builder()` |
+| Area                                                                       | Change                                                                                                                                 |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/ui/src/components/NoteTree.tsx`                                  | Pointer drag replaces HTML5 drag and drop; ghost card; spring-open; edge scroll; separator instead of the heading                      |
+| `packages/ui/src/components/NoteEditor.tsx`                                | `draft` hides ⋯ in place; crumb says Notebook                                                                                          |
+| `packages/ui/src/components/NoteTrash.tsx`, `NoteHit.tsx`, `NoteParts.tsx` | "Notebook" wording                                                                                                                     |
+| `packages/ui/src/styles/components.css`, `less-motion.css`                 | `.tp-nb-ghost`, `.tp-nb-pressing`, `.tp-nb-flying`, `.tp-nb-loose-sep`, `.tp-nb-root-hint`, `.tp-nb-more(-hide)`; reduced-motion rules |
+| `packages/core/src/notebook.ts`                                            | `moveTargets` first row titled "Notebook"; comments                                                                                    |
+| `packages/client/src/notebook.ts`                                          | Rejected move: `onRejected` gets `{ kind: 'move', name, retry }` so the app can word the toast                                         |
+| `apps/web/src/app/notebook.ts`                                             | `editorNote` passes `draft`; "Notebook" in `where` and `sub`; move toast with Try again                                                |
+| `apps/web/src/app/dropGuard.ts` (new) + startup                            | Page file-drop guard                                                                                                                   |
+| `apps/desktop/src-tauri/src/windows.rs`                                    | `.disable_drag_drop_handler()` in `builder()`                                                                                          |
 
 ## 5. Test scenarios
 
@@ -134,36 +135,36 @@ Other open threads are numbering new C22 tests at the same time, so these start 
 
 ### New
 
-| ID | Where | Scenario |
-| --- | --- | --- |
-| C22-U40 | ui `NoteTree.test.tsx` | Mouse: pointerdown then a 3 px move doesn't lift; a 5 px move lifts (ghost shown, source row dimmed); pointerup over a folder calls `onMoveNote(id, folderId)` |
-| C22-U41 | ui `NoteTree.test.tsx` | A click with no movement still calls `onPick`; the click right after a drag doesn't |
-| C22-U42 | ui `NoteTree.test.tsx` | Touch: 380 ms hold lifts (fake timers); moving 9 px before then cancels and nothing moves |
-| C22-U43 | ui `NoteTree.test.tsx` | Over a note: upper half gives `before`, lower half `after`, and the index passed to `onMoveNote` matches |
-| C22-U44 | ui `NoteTree.test.tsx` | Esc mid-drag and dropping on nothing call no move handler; the ghost is gone after the glide |
-| C22-U45 | ui `NoteTree.test.tsx` | A folder onto a third-level folder shows "Too deep" and on drop toasts "Folders go three levels deep." with no `onMoveFolder` |
-| C22-U46 | ui `NoteTree.test.tsx` | Holding 600 ms over a closed folder opens it |
-| C22-U47 | ui `NoteTree.test.tsx` | No heading for notes in no folder; a separator only when folders exist; dragging a filed note with none unfiled shows "Drop here to take it out of its folder"; dropping there calls `onMoveNote(id, null)` |
-| C22-U48 | ui `NoteTree.test.tsx` | Rows don't lift while Find a note is filtering |
-| C22-U49 | ui `NoteEditor.test.tsx` | `draft: true`: ⋯ is in the DOM, hidden (`aria-hidden`, `inert`, `tp-nb-more-hide`) and not reachable by Tab; the crumb's box doesn't move when `draft` turns false and ⋯ shows |
-| C22-U50 | ui `NoteEditor.test.tsx` | Crumb for a note in no folder reads "Notebook" |
-| C22-U51 | client `notebook.test.ts` | A rejected `note.move` calls `onRejected` with the move kind, the note's name and a retry that resends the same move |
-| C22-U52 | web `dropGuard.test.ts` | A file `drop` nobody handled is prevented; one an editor handled is left alone; a drag with no files is ignored |
-| C22-E40 | e2e web `notebook.spec.ts` | Mouse drag (`page.mouse` down/move/up, not `dragTo`) of a note in no folder onto a folder: the crumb shows the folder and the server agrees |
-| C22-E41 | e2e web `notebook.spec.ts` | Drag a note out of its folder to below the separator: the crumb says Notebook and the server has `folderId: null` |
-| C22-E42 | e2e web `notebook.spec.ts`, phone project | Touch hold 0.5 s then move onto a folder moves the note; a quick swipe scrolls the list and moves nothing |
-| C22-E43 | e2e web `notebook.spec.ts` | New note: no visible ⋯; type one letter and ⋯ shows; Move and Delete then work |
-| C22-D20 | mac `notebook.spec.ts` | In the real WKWebView, a pointer-event drag of a note onto a folder moves it (the Mac case that was broken) |
+| ID      | Where                                     | Scenario                                                                                                                                                                                                    |
+| ------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C22-U40 | ui `NoteTree.test.tsx`                    | Mouse: pointerdown then a 3 px move doesn't lift; a 5 px move lifts (ghost shown, source row dimmed); pointerup over a folder calls `onMoveNote(id, folderId)`                                              |
+| C22-U41 | ui `NoteTree.test.tsx`                    | A click with no movement still calls `onPick`; the click right after a drag doesn't                                                                                                                         |
+| C22-U42 | ui `NoteTree.test.tsx`                    | Touch: 380 ms hold lifts (fake timers); moving 9 px before then cancels and nothing moves                                                                                                                   |
+| C22-U43 | ui `NoteTree.test.tsx`                    | Over a note: upper half gives `before`, lower half `after`, and the index passed to `onMoveNote` matches                                                                                                    |
+| C22-U44 | ui `NoteTree.test.tsx`                    | Esc mid-drag and dropping on nothing call no move handler; the ghost is gone after the glide                                                                                                                |
+| C22-U45 | ui `NoteTree.test.tsx`                    | A folder onto a third-level folder shows "Too deep" and on drop toasts "Folders go three levels deep." with no `onMoveFolder`                                                                               |
+| C22-U46 | ui `NoteTree.test.tsx`                    | Holding 600 ms over a closed folder opens it                                                                                                                                                                |
+| C22-U47 | ui `NoteTree.test.tsx`                    | No heading for notes in no folder; a separator only when folders exist; dragging a filed note with none unfiled shows "Drop here to take it out of its folder"; dropping there calls `onMoveNote(id, null)` |
+| C22-U48 | ui `NoteTree.test.tsx`                    | Rows don't lift while Find a note is filtering                                                                                                                                                              |
+| C22-U49 | ui `NoteEditor.test.tsx`                  | `draft: true`: ⋯ is in the DOM, hidden (`aria-hidden`, `inert`, `tp-nb-more-hide`) and not reachable by Tab; the crumb's box doesn't move when `draft` turns false and ⋯ shows                              |
+| C22-U50 | ui `NoteEditor.test.tsx`                  | Crumb for a note in no folder reads "Notebook"                                                                                                                                                              |
+| C22-U51 | client `notebook.test.ts`                 | A rejected `note.move` calls `onRejected` with the move kind, the note's name and a retry that resends the same move                                                                                        |
+| C22-U52 | web `dropGuard.test.ts`                   | A file `drop` nobody handled is prevented; one an editor handled is left alone; a drag with no files is ignored                                                                                             |
+| C22-E40 | e2e web `notebook.spec.ts`                | Mouse drag (`page.mouse` down/move/up, not `dragTo`) of a note in no folder onto a folder: the crumb shows the folder and the server agrees                                                                 |
+| C22-E41 | e2e web `notebook.spec.ts`                | Drag a note out of its folder to below the separator: the crumb says Notebook and the server has `folderId: null`                                                                                           |
+| C22-E42 | e2e web `notebook.spec.ts`, phone project | Touch hold 0.5 s then move onto a folder moves the note; a quick swipe scrolls the list and moves nothing                                                                                                   |
+| C22-E43 | e2e web `notebook.spec.ts`                | New note: no visible ⋯; type one letter and ⋯ shows; Move and Delete then work                                                                                                                              |
+| C22-D20 | mac `notebook.spec.ts`                    | In the real WKWebView, a pointer-event drag of a note onto a folder moves it (the Mac case that was broken)                                                                                                 |
 
 ### Updated
 
-| ID | Change |
-| --- | --- |
-| C22-E02 | Uses the mouse helper instead of `dragTo` for both the note into Planning and Planning onto Offsite |
-| C22-U03 | `moveTargets` first row is "Notebook" (was "Not in a folder") |
-| C22-U01 | Wording only: a note whose folder is gone sits at the top of the Notebook |
-| NoteTrash / NoteWindow tests | "From Notebook" / "Notebook" instead of "Not in a folder" |
-| `docs/tests/chunk-22.md` | Add the rows above; reword U01, U03, E02 |
+| ID                           | Change                                                                                              |
+| ---------------------------- | --------------------------------------------------------------------------------------------------- |
+| C22-E02                      | Uses the mouse helper instead of `dragTo` for both the note into Planning and Planning onto Offsite |
+| C22-U03                      | `moveTargets` first row is "Notebook" (was "Not in a folder")                                       |
+| C22-U01                      | Wording only: a note whose folder is gone sits at the top of the Notebook                           |
+| NoteTrash / NoteWindow tests | "From Notebook" / "Notebook" instead of "Not in a folder"                                           |
+| `docs/tests/chunk-22.md`     | Add the rows above; reword U01, U03, E02                                                            |
 
 ### Manual (can't be scripted)
 

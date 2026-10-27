@@ -231,3 +231,31 @@ describe('C22-U31 the Make a task bubble sits on whole pixels', () => {
     expect(css).toContain('@keyframes tp-nb-bubble-in { from { opacity: 0; transform: translateY(4px); } }');
   });
 });
+
+describe('C22-U49 a new note nobody has written in', () => {
+  it('C22-U49 keeps ⋯ in place but hidden, out of reach, and shows the same one once it is kept', async () => {
+    const { user, rerender } = setup({ note: { ...NOTE, draft: true } });
+    const more = document.querySelector('.tp-nb-more')!;
+    expect(more).toHaveClass('tp-nb-more-hide');
+    expect(more).toHaveAttribute('aria-hidden', 'true');
+    expect(more).toHaveAttribute('inert');
+    expect(screen.queryByRole('button', { name: 'More' })).toBeNull();
+    for (let i = 0; i < 8; i++) {
+      await user.tab();
+      expect(more.contains(document.activeElement)).toBe(false);
+    }
+    rerender(<NoteEditor note={{ ...NOTE, draft: false }} folders={FOLDERS} tasks={[]} />);
+    // The same node, in the same spot: nothing beside it moves.
+    expect(document.querySelector('.tp-nb-more')).toBe(more);
+    expect(more).not.toHaveClass('tp-nb-more-hide');
+    expect(more).not.toHaveAttribute('inert');
+    expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument();
+  });
+});
+
+describe('C22-U50 the crumb', () => {
+  it('C22-U50 a note in no folder reads Notebook', () => {
+    setup({ note: { ...NOTE, folderId: null, path: [] } });
+    expect(document.querySelector('.tp-nb-crumb')).toHaveTextContent(/^Notebook$/);
+  });
+});

@@ -80,12 +80,21 @@ interface Writing {
   error: boolean;
 }
 
+/** A move the server turned down: the note's or folder's name, and the same move sent again. */
+export interface RejectedMove {
+  name: string;
+  retry: () => void;
+}
+
 export interface NotebookStoreOptions {
   api: Api;
   queryClient: QueryClient;
   tasks: TaskStore;
-  /** A Notebook change turned down for another reason than a stale save: tell the person. */
-  onRejected?: (message: string) => void;
+  /**
+   * A Notebook change turned down for another reason than a stale save: tell the person. A turned-down move also says
+   * what moved and how to send it again (the tree has already put it back).
+   */
+  onRejected?: (message: string, move?: RejectedMove) => void;
   newId?: () => string;
   now?: () => Date;
   quietMs?: number;
@@ -698,6 +707,7 @@ export class NotebookStore {
     this.hook();
     const mid = this.o.tasks.enqueue(body);
     this.sent.set(mid, body.type);
+    if (body.type === 'note.move' || body.type === 'folder.move') this.moves.set(mid, body);
     if (body.type.startsWith('note.')) this.about.set(mid, body.payload.id);
     const at = (this.o.now?.() ?? new Date()).toISOString();
     const m = { ...body, id: mid, at } as Change;
@@ -730,6 +740,8 @@ export class NotebookStore {
     for (const r of ours) {
       const type = this.sent.get(r.id)!;
       this.sent.delete(r.id);
+      const moved = this.moves.get(r.id);
+      this.moves.delete(r.id);
       // A link or a move: the note reads again for what the server knows (the task's ID, the folder's path).
       const about = this.about.get(r.id);
       this.about.delete(r.id);
@@ -753,8 +765,11 @@ export class NotebookStore {
       // A stale save is the banner's to explain; anything else says why in a toast.
       if (r.reason === 'stale' && w) w.conflict = true;
       else {
-        if (w) w.error = true;
-        this.o.onRejected?.(r.error ?? 'That change couldn’t be saved.');
+        if (w && !moved) w.error = true;
+        this.o.onRejected?.(
+          r.error ?? 'That change couldn’t be saved.',
+          moved ? this.rejectedMove(moved) : undefined,
+        );
       }
     }
     void this.qc.invalidateQueries({ queryKey: recentKey(), exact: true });
@@ -764,8 +779,24 @@ export class NotebookStore {
     this.notify();
   }
 
+  /** What a turned-down move was called, and how to send it again. */
+  private rejectedMove(body: NB): RejectedMove {
+    const tree = this.cachedTree();
+    const id = body.payload.id;
+    const name =
+      body.type === 'folder.move'
+        ? (tree?.folders.find((f) => f.id === id)?.name ?? 'the folder')
+        : (() => {
+            const n = tree?.notes.find((x) => x.id === id);
+            return n?.title.trim() || n?.first.trim() || 'the note';
+          })();
+    return { name, retry: () => this.send(body.type === 'note.move' ? id : null, body) };
+  }
+
   /** Notebook changes this tab sent that the server hasn't answered, by their type, and the note each is about. */
   private readonly sent = new Map<string, string>();
+  /** The moves among them, kept whole so a turned-down one can be sent again. */
+  private readonly moves = new Map<string, NB>();
   private readonly about = new Map<string, string>();
 
   private waitingChanges(): Change[] {

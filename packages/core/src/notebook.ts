@@ -39,7 +39,7 @@ export interface NotebookFolder {
 /** A note as a list shows it: never its body. */
 export interface NoteHeader {
   id: string;
-  /** Null is "Not in a folder". */
+  /** Null is the top of the Notebook (no folder). */
   folderId: string | null;
   title: string;
   /** The first line of its words, for an untitled note. */
@@ -231,7 +231,7 @@ type MaybeTrashed = { deletedAt?: string | null };
 
 /**
  * Folders and notes nested by parent and position. Anything trashed is left out; a note whose folder is not there
- * shows as not in a folder, and a folder whose parent is not there sits at the top.
+ * sits at the top of the Notebook, and a folder whose parent is not there sits at the top.
  */
 export function buildTree<N extends NoteHeader>(
   folders: Array<NotebookFolder & MaybeTrashed>,
@@ -375,7 +375,7 @@ export function whereOf(folders: NotebookFolder[], id: string | null): string | 
 
 export interface MoveTarget {
   key: string;
-  /** Null is "Not in a folder". */
+  /** Null is the top of the Notebook (no folder). */
   folderId: string | null;
   title: string;
   /** The path above it, "Northwind / Planning". */
@@ -383,11 +383,11 @@ export interface MoveTarget {
   here: boolean;
 }
 
-/** The Move list: "Not in a folder" first, then every folder in tree order with its path; the current one is Here. */
+/** The Move list: the Notebook itself (no folder) first, then every folder in tree order with its path; the current one is Here. */
 export function moveTargets(folders: NotebookFolder[], current: string | null): MoveTarget[] {
   const tree = buildTree(folders, []);
   const out: MoveTarget[] = [
-    { key: '-', folderId: null, title: 'Not in a folder', sub: null, here: current === null },
+    { key: '-', folderId: null, title: 'Notebook', sub: null, here: current === null },
   ];
   const walk = (list: TreeFolder[], above: string[]) => {
     for (const f of list) {
