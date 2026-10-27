@@ -1,4 +1,4 @@
-/* The loader's offline page, in the Paper theme's colours. */
+/* The loader's pages in the Paper theme's colours, light or dark as look.js set from the app's saved look. */
 :root {
   color-scheme: light dark;
   --background: #eeece6;
@@ -11,18 +11,16 @@
   --check-border: #b5b2aa;
   --border: rgba(24, 24, 27, 0.09);
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #111211;
-    --card: #1d1c1a;
-    --foreground: #f2efe8;
-    --muted-foreground: #a39f96;
-    --primary: #f2efe8;
-    --primary-foreground: #1d1c1a;
-    --brand: #ff6a4a;
-    --check-border: #6f6b64;
-    --border: rgba(242, 239, 232, 0.1);
-  }
+:root.dark {
+  --background: #111211;
+  --card: #1d1c1a;
+  --foreground: #f2efe8;
+  --muted-foreground: #a39f96;
+  --primary: #f2efe8;
+  --primary-foreground: #1d1c1a;
+  --brand: #ff6a4a;
+  --check-border: #6f6b64;
+  --border: rgba(242, 239, 232, 0.1);
 }
 html,
 body {
@@ -43,7 +41,8 @@ body.desk {
 body.floating {
   background: transparent;
 }
-main {
+main,
+.tl-off {
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -99,4 +98,13 @@ body.menubar main {
   width: 312px;
   margin: 0;
   border-radius: 12px;
+}
+/* The desk's offline words, under the launch mark that is already there. */
+.tl-off {
+  height: auto;
+  margin-top: 8px;
+  animation: tl-rise 240ms var(--tl-arrive) both;
+}
+.tl-off[hidden] {
+  display: none;
 }

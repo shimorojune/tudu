@@ -44,6 +44,7 @@
             "allow-set-open-at-login",
             "allow-open-login-items",
             "allow-set-dock",
+            "allow-set-appearance",
             "allow-open-note",
             "allow-note-state",
             "allow-set-note-pinned",

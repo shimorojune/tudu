@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useRouter } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
+import { keepAppearance } from './appearance';
 import { desktop, FEEDBACK_GO, UPDATES_GO, type AppInfo, type UpdateReady } from './desktop';
 import { openFeedback } from './feedback';
 import { interceptLinks } from './links';
@@ -84,6 +85,9 @@ export function DesktopHost() {
       window.removeEventListener('storage', onStorage);
     };
   }, [d, main]);
+
+  // The app keeps Settings › Appearance and Less motion for its windows (the desk tells it for all of them).
+  useEffect(() => (d && main ? keepAppearance(d) : undefined), [d, main]);
 
   // The dock badge is the Inbox's count, the same as the top bar's.
   const count = me ? inboxTotal(me, update.unread) : 0;

@@ -72,6 +72,8 @@ type Listener = (choice: ThemeChoice) => void;
 const listeners = new Set<Listener>();
 /** Picks made in this page only; a choice taken up from another window is not a pick here. */
 const pickListeners = new Set<Listener>();
+/** Every change of the choice: a pick here, or one taken up from another window. */
+const changeListeners = new Set<Listener>();
 let current: ThemeChoice | null = null;
 
 function choice(): ThemeChoice {
@@ -86,6 +88,7 @@ export function setThemeChoice(next: ThemeChoice): void {
   fadeTheme(() => paintTheme(resolveTheme(next)));
   listeners.forEach((l) => l(next));
   pickListeners.forEach((l) => l(next));
+  changeListeners.forEach((l) => l(next));
 }
 
 /**
@@ -98,6 +101,7 @@ export function syncThemeChoice(): void {
   current = next;
   paintTheme(resolveTheme(next));
   listeners.forEach((l) => l(next));
+  changeListeners.forEach((l) => l(next));
 }
 
 function onStorage(e: StorageEvent): void {
@@ -109,6 +113,20 @@ function onStorage(e: StorageEvent): void {
 export function onThemeChoice(l: (choice: ThemeChoice) => void): () => void {
   pickListeners.add(l);
   return () => pickListeners.delete(l);
+}
+
+/**
+ * Hear every change of the choice, a pick here or one taken up from another window (the Mac app keeps it for its
+ * windows). Returns the way to stop listening.
+ */
+export function onThemeChange(l: (choice: ThemeChoice) => void): () => void {
+  changeListeners.add(l);
+  return () => changeListeners.delete(l);
+}
+
+/** The choice as this page holds it now. */
+export function currentThemeChoice(): ThemeChoice {
+  return choice();
 }
 
 /** Keep the painted theme in step with the system while the choice is `system`. */
@@ -151,6 +169,7 @@ export function resetThemeForTests(): void {
   current = null;
   listeners.clear();
   pickListeners.clear();
+  changeListeners.clear();
 }
 
 export { CROSS_FADE_MS };
@@ -184,6 +203,12 @@ export function setLessMotion(on: boolean): void {
   }
   paintMotion(on);
   motionListeners.forEach((l) => l(on));
+}
+
+/** Hear the Less motion switch flipped in this page. Returns the way to stop listening. */
+export function onLessMotion(l: (on: boolean) => void): () => void {
+  motionListeners.add(l);
+  return () => motionListeners.delete(l);
 }
 
 /** The Less motion switch, shared by every caller. */

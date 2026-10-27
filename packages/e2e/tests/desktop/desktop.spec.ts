@@ -107,9 +107,15 @@ test.describe('desktop', () => {
     await expect(appRow(page)).toBeVisible();
     await expect(appRow(page).getByLabel('New')).toHaveCount(0);
     await expect.poll(() => inboxPip(page)).toBe(0);
-    // What's new keeps you on the item.
-    await pane(page).getByRole('button', { name: 'What’s new' }).click();
+    // What's new opens the version's release in the browser; the item stays picked and read.
+    const notes = pane(page).getByRole('button', { name: 'What’s new' });
+    await expect(notes.locator('.tp-ix-notes-arrow')).toBeVisible();
+    await notes.click();
+    await expect
+      .poll(async () => (await calls(page, 'openExternal')).map((c) => c.args[0]))
+      .toContain('https://github.com/shimorojune/tudu/releases/tag/tudu-0.38.0');
     await expect(pane(page)).toContainText(ITEM);
+    await expect(appRow(page).getByLabel('New')).toHaveCount(0);
   });
 
   test('C11-E03 Restart to update says Restarting… and relaunches once; a refused restart toasts and frees the button', async ({
@@ -269,6 +275,63 @@ test.describe('desktop', () => {
     await page.goto(page.url().replace(/\/inbox.*$/, ''));
     const f = await floatingAdd(page, 'Water the plants');
     await expect(f.locator('.tp-desk')).toHaveAttribute('data-theme', 'dark');
+  });
+
+  test('C11-E18 the desk tells the app the look: on load, Dark, System and Less motion; the floating page does not', async ({
+    page,
+  }) => {
+    await fixClock(page);
+    await installFake(page);
+    await page.addInitScript(() => {
+      if (!localStorage.getItem('tudu.theme')) localStorage.setItem('tudu.theme', 'light');
+    });
+    await signInFresh(page);
+    const looks = async () => (await calls(page, 'setAppearance')).map((c) => c.args[0]);
+    await expect.poll(looks).toContainEqual({ theme: 'light', lessMotion: false });
+
+    const pick = async (name: 'Light' | 'Dark' | 'System') => {
+      await page.getByRole('button', { name: /^You: / }).click();
+      await page.getByRole('group', { name: 'Theme' }).getByRole('button', { name }).click();
+      await page.keyboard.press('Escape');
+    };
+    await pick('Dark');
+    await expect.poll(async () => (await looks()).at(-1)).toEqual({ theme: 'dark', lessMotion: false });
+    await pick('System');
+    await expect.poll(async () => (await looks()).at(-1)).toEqual({ theme: 'system', lessMotion: false });
+
+    await page.getByRole('button', { name: /^You: / }).click();
+    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    const d = page.getByRole('dialog', { name: 'Settings' });
+    await d
+      .getByRole('navigation', { name: 'Settings' })
+      .getByRole('button', { name: /^Appearance/ })
+      .click();
+    await d.getByRole('switch', { name: 'Less motion' }).click();
+    await expect.poll(async () => (await looks()).at(-1)).toEqual({ theme: 'system', lessMotion: true });
+
+    // The desk speaks for every window: the floating page sends nothing of its own.
+    const f = await floating(page);
+    await expect(f.getByRole('textbox', { name: 'Task title' })).toBeVisible();
+    expect(await calls(f, 'setAppearance')).toHaveLength(0);
+  });
+
+  test('C11-E22 dark: What’s new with its arrow in the reading pane', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.addInitScript(() => {
+      if (!localStorage.getItem('tudu.theme')) localStorage.setItem('tudu.theme', 'dark');
+    });
+    await inAppWithTeam(page, { update: READY });
+    await newVersion(page);
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    const notes = pane(page).getByRole('button', { name: 'What’s new' });
+    await expect(notes.locator('.tp-ix-notes-arrow')).toBeVisible();
+    // Centred on the label: the arrow's middle sits within a pixel of the words' middle.
+    const mid = async (sel: string) =>
+      notes.locator(sel).evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        return r.top + r.height / 2;
+      });
+    expect(Math.abs((await mid('.tp-ix-notes-arrow')) - (await mid('.tp-btn-label')))).toBeLessThanOrEqual(1);
   });
 
   test('C11-E09 the floating page follows the theme picked on the desk: open, and put away until the summon', async ({

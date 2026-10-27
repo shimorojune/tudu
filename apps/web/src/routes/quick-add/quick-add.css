@@ -36,6 +36,9 @@
 html[data-app='floating'],
 html[data-app='floating'] body {
   background: transparent !important;
+  /* Clear from the first frame: no fade from the desk colour, even where Less motion gives everything a 120ms
+     transition. */
+  transition: none !important;
 }
 html[data-app='floating'] .app-floating {
   background: transparent;
