@@ -186,7 +186,9 @@ export function drawingIds(html: string): string[] {
 /** True when the HTML holds no words and nothing to look at (an empty paragraph is empty; a drawing is something). */
 export function isEmptyHtml(html: string): boolean {
   if (drawingIds(html).length) return false;
-  return !stripTags(html).replace(/&nbsp;/g, ' ').trim();
+  return !stripTags(html)
+    .replace(/&nbsp;/g, ' ')
+    .trim();
 }
 
 /**
@@ -195,7 +197,7 @@ export function isEmptyHtml(html: string): boolean {
  */
 export function stripTags(html: string, by = ''): string {
   let s = html;
-  for (let prev = ''; s !== prev; ) {
+  for (let prev = ''; s !== prev;) {
     prev = s;
     s = s.replace(/<[^<>]*>/g, by);
   }

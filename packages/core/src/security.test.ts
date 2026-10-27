@@ -16,8 +16,10 @@ function quick<T>(f: () => T): T {
 
 describe('SEC-U01 email pattern', () => {
   it('SEC-U01 accepts addresses and refuses the rest', () => {
-    for (const ok of ['rohit@tudu.app', 'a.b+c@mail.co.uk', 'x@y.z']) expect(EMAIL_PATTERN.test(ok)).toBe(true);
-    for (const bad of ['a@b', 'a@.b', 'a b@c.d', 'a@b@c.d', '@b.c', 'a@b.c.']) expect(EMAIL_PATTERN.test(bad)).toBe(false);
+    for (const ok of ['rohit@tudu.app', 'a.b+c@mail.co.uk', 'x@y.z'])
+      expect(EMAIL_PATTERN.test(ok)).toBe(true);
+    for (const bad of ['a@b', 'a@.b', 'a b@c.d', 'a@b@c.d', '@b.c', 'a@b.c.'])
+      expect(EMAIL_PATTERN.test(bad)).toBe(false);
   });
   it('SEC-U01 is quick on a long run of dots', () => {
     expect(quick(() => EMAIL_PATTERN.test('!@!' + '!.'.repeat(25000) + ' '))).toBe(false);

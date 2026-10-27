@@ -228,8 +228,7 @@ export function readJql(jql: string): { filter: Filter; sort: (a: FakeIssue, b: 
       default: {
         const words = lv.replace(/\*/g, '').split(/\s+/).filter(Boolean);
         f = (i) => {
-          const hay =
-            `${i.summary} ${field === 'text' ? stripTags(i.description, ' ') : ''}`.toLowerCase();
+          const hay = `${i.summary} ${field === 'text' ? stripTags(i.description, ' ') : ''}`.toLowerCase();
           return words.every((w) => hay.includes(w));
         };
       }
