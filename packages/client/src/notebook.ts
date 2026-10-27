@@ -1,10 +1,12 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { queryOptions } from '@tanstack/react-query';
 import {
+  drawingIds,
   firstLine,
   folderPath,
   foldersBelow,
   isBlankNote,
+  isEmptyDrawing,
   isNotebookMutation,
   nameTaken,
   nameTakenWords,
@@ -13,11 +15,14 @@ import {
   POSITION_STEP,
   RECENT_NOTES,
   wordCount,
+  type DrawingScene,
   type NotebookChangedEvent,
   type NotebookFolder,
   type NotebookMutationBody,
   type NotebookResponse,
   type Note,
+  type NoteDrawing,
+  type NoteDrawingInfo,
   type NoteFile,
   type NoteHeader,
   type NoteListItem,
@@ -45,6 +50,9 @@ export type SaveState = 'saved' | 'saving' | 'offline' | 'conflict' | 'error';
 export const SAVE_QUIET_MS = 600;
 /** A save that takes longer than this shows the small ring. */
 export const SLOW_SAVE_MS = 500;
+/** A drawing saves after this much quiet (Excalidraw changes on every pointer move), and always on Done. */
+export const DRAWING_QUIET_MS = 800;
+export const DRAWING_STALE_WORDS = 'This drawing changed in another window. Showing the newest one.';
 
 /** A note as the editor holds it: the server's note with what you typed on top, and when to start the editor again. */
 export interface NoteView extends Note {
@@ -80,6 +88,45 @@ interface Writing {
   error: boolean;
 }
 
+/** A drawing this tab has open or is saving. */
+interface Sketch {
+  noteId: string;
+  /** The scene as drawn here; null until it has loaded. */
+  scene: DrawingScene | null;
+  /** The rev the next save is written on (0 makes it). */
+  rev: number;
+  dirty: boolean;
+  timer: ReturnType<typeof setTimeout> | null;
+  /** Images (and pictures) still uploading: no save goes out until they land. */
+  holds: number;
+  /** A save was asked for (Done) while something was held: it goes once nothing is. */
+  owed: boolean;
+  /** New pictures for the next save. */
+  pictures: { light: string | null; dark: string | null } | null;
+  waiting: Set<string>;
+  slow: ReturnType<typeof setTimeout> | null;
+  isSlow: boolean;
+  error: boolean;
+  /** Bumped when the scene is replaced under the editor (a newer one from another window). */
+  gen: number;
+}
+
+/** A drawing as its editor opens it. */
+export interface DrawingView {
+  id: string;
+  noteId: string;
+  scene: DrawingScene;
+  rev: number;
+  gen: number;
+}
+
+/** What a drawing block shows before the server has its pictures: local ones, made as Done was pressed. */
+export interface LocalPicture {
+  light: string | null;
+  dark: string | null;
+  words: number;
+}
+
 /** A move the server turned down: the note's or folder's name, and the same move sent again. */
 export interface RejectedMove {
   name: string;
@@ -95,9 +142,12 @@ export interface NotebookStoreOptions {
    * what moved and how to send it again (the tree has already put it back).
    */
   onRejected?: (message: string, move?: RejectedMove) => void;
+  /** A drawing's save was stale: it now shows the newest one; `openMine` puts this tab's back and saves it. */
+  onDrawingStale?: (message: string, openMine: () => void) => void;
   newId?: () => string;
   now?: () => Date;
   quietMs?: number;
+  drawingQuietMs?: number;
 }
 
 const byPlace = (a: { position: number; id: string }, b: { position: number; id: string }) =>
@@ -227,6 +277,10 @@ export class NotebookStore {
   private readonly changes = new Map<string, string>();
   private readonly listeners = new Set<() => void>();
   private readonly quiet: number;
+  private readonly sketches = new Map<string, Sketch>();
+  /** Which drawing each drawing change in the outbox is for. */
+  private readonly sketchChanges = new Map<string, string>();
+  private readonly pictures = new Map<string, LocalPicture>();
 
   constructor(private readonly o: NotebookStoreOptions) {
     this.quiet = o.quietMs ?? SAVE_QUIET_MS;
@@ -396,12 +450,13 @@ export class NotebookStore {
   isBusy(): boolean {
     for (const w of this.writing.values())
       if (w.timer || ((w.titleDirty || w.bodyDirty) && w.created)) return true;
-    return false;
+    return this.isDrawingBusy();
   }
 
   /** Save every note's waiting words now (the page is going away). */
   flushAll(): void {
     for (const id of this.writing.keys()) this.flush(id);
+    for (const id of this.sketches.keys()) this.flushDrawing(id, true);
   }
 
   /**
@@ -480,6 +535,245 @@ export class NotebookStore {
     this.hook();
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
+  }
+
+  // ---- drawings --------------------------------------------------------------------------------------------
+
+  /** A new drawing in a note: nothing reaches the server until something is drawn on it. Returns its id. */
+  newDrawing(noteId: string): string {
+    const id = this.newId();
+    this.sketches.set(id, { ...this.blankSketch(noteId), scene: { elements: [], files: {} } });
+    return id;
+  }
+
+  /** A drawing to open: what this tab has, else the server's. One the server doesn't have yet opens empty. */
+  async openDrawing(id: string, noteId: string): Promise<DrawingView> {
+    const had = this.sketches.get(id);
+    if (had?.scene) return { id, noteId: had.noteId, scene: had.scene, rev: had.rev, gen: had.gen };
+    let server: NoteDrawing | null = null;
+    try {
+      server = await this.o.api.get<NoteDrawing>(`/api/notebook/drawings/${id}`);
+    } catch (err) {
+      if ((err as { status?: number }).status !== 404) throw err;
+    }
+    const s = this.sketches.get(id) ?? this.blankSketch(noteId);
+    if (!s.scene) {
+      s.scene = server?.scene ?? { elements: [], files: {} };
+      s.rev = server?.rev ?? 0;
+    }
+    this.sketches.set(id, s);
+    return { id, noteId: s.noteId, scene: s.scene!, rev: s.rev, gen: s.gen };
+  }
+
+  /** The drawing changed (a stroke, an image landed): saved after quiet. */
+  editDrawing(id: string, scene: DrawingScene): void {
+    const s = this.sketches.get(id);
+    if (!s) return;
+    s.scene = scene;
+    s.dirty = true;
+    if (s.timer) clearTimeout(s.timer);
+    s.timer = setTimeout(() => this.flushDrawing(id), this.o.drawingQuietMs ?? DRAWING_QUIET_MS);
+    this.notify();
+  }
+
+  /** Something in the drawing is uploading: its saves wait. Call what comes back once it has landed or failed. */
+  holdDrawing(id: string): () => void {
+    const s = this.sketches.get(id);
+    if (!s) return () => {};
+    s.holds += 1;
+    this.notify();
+    let done = false;
+    return () => {
+      if (done) return;
+      done = true;
+      s.holds = Math.max(0, s.holds - 1);
+      // Done already went out while this was held (the note's pictures upload after it): the save it owes, or the
+      // pictures that landed since, go now.
+      if (!s.holds && (s.owed || s.pictures)) {
+        s.owed = false;
+        this.flushDrawing(id, true);
+      }
+      this.notify();
+    };
+  }
+
+  /** The note's new pictures of the drawing (Notebook file ids), sent with its next save. */
+  setDrawingPictures(id: string, light: string | null, dark: string | null): void {
+    const s = this.sketches.get(id);
+    if (!s) return;
+    s.pictures = { light, dark };
+    s.dirty = true;
+  }
+
+  /** What the block shows until the server has the drawing's pictures (object URLs made on Done). */
+  setLocalPicture(id: string, picture: LocalPicture): void {
+    const was = this.pictures.get(id);
+    for (const u of [was?.light, was?.dark]) if (u && !Object.values(picture).includes(u)) revoke(u);
+    this.pictures.set(id, picture);
+    this.pictureVersion += 1;
+    this.notify();
+  }
+
+  /** Moves whenever a block's local picture changes (for useSyncExternalStore). */
+  pictureVersion = 0;
+
+  localPicture(id: string): LocalPicture | undefined {
+    return this.pictures.get(id);
+  }
+
+  /**
+   * Save the drawing now. A save waits while an image is uploading (and goes when it lands), and one already on its
+   * way goes first unless `now` (Done, closing) says to queue this one behind it.
+   */
+  flushDrawing(id: string, now = false): void {
+    const s = this.sketches.get(id);
+    if (!s) return;
+    if (s.timer) clearTimeout(s.timer);
+    s.timer = null;
+    if (!s.dirty || !s.scene) return;
+    if (s.holds) {
+      if (now) s.owed = true;
+      return;
+    }
+    // A brand-new drawing nobody drew on is never kept.
+    if (s.rev === 0 && isEmptyDrawing(s.scene)) return;
+    if (s.waiting.size && !now) return;
+    s.dirty = false;
+    const baseRev = s.rev;
+    s.rev += 1;
+    const pictures = s.pictures;
+    s.pictures = null;
+    this.send(null, {
+      type: 'drawing.save',
+      payload: {
+        id,
+        noteId: s.noteId,
+        scene: s.scene,
+        baseRev,
+        ...(pictures ? { previewLight: pictures.light, previewDark: pictures.dark } : {}),
+      },
+    });
+  }
+
+  /**
+   * Done (or back) on a drawing. Anything waiting saves; an empty drawing is not kept: it comes out of its note,
+   * and the server forgets it. Returns true when it was empty (the block should leave the note).
+   */
+  closeDrawing(id: string): boolean {
+    const s = this.sketches.get(id);
+    if (!s) return false;
+    if (isEmptyDrawing(s.scene)) {
+      if (s.timer) clearTimeout(s.timer);
+      s.timer = null;
+      s.dirty = false;
+      if (s.rev > 0) this.send(null, { type: 'drawing.delete', payload: { id } });
+      this.pictures.delete(id);
+      if (!s.waiting.size && !s.holds) this.sketches.delete(id);
+      this.notify();
+      return true;
+    }
+    this.flushDrawing(id, true);
+    return false;
+  }
+
+  /** How a drawing's saves are doing, for the ring in its bar. */
+  drawingSaveState(id: string): SaveState {
+    const s = this.sketches.get(id);
+    if (!s) return 'saved';
+    if (s.error) return 'error';
+    if (!s.waiting.size && !s.holds && !s.timer && !s.owed) return 'saved';
+    const online = this.o.tasks.isReachable && (typeof navigator === 'undefined' || navigator.onLine);
+    return online ? 'saving' : 'offline';
+  }
+
+  isDrawingSlow(id: string): boolean {
+    return !!this.sketches.get(id)?.isSlow;
+  }
+
+  /** True while a drawing's changes wait for quiet or an upload. Tests wait on it. */
+  isDrawingBusy(): boolean {
+    for (const s of this.sketches.values()) if (s.timer || s.holds || s.owed) return true;
+    return false;
+  }
+
+  /** The drawings the note's words hold, as each block shows it: the server's, with local pictures on top. */
+  drawingInfo(
+    note: Pick<Note, 'html' | 'drawings'>,
+  ): Map<string, NoteDrawingInfo & { local?: LocalPicture }> {
+    const known = new Map((note.drawings ?? []).map((d) => [d.id, d]));
+    const out = new Map<string, NoteDrawingInfo & { local?: LocalPicture }>();
+    for (const id of drawingIds(note.html)) {
+      const d = known.get(id) ?? { id, rev: 0, previewLight: null, previewDark: null, words: 0 };
+      out.set(id, { ...d, local: this.pictures.get(id) });
+    }
+    return out;
+  }
+
+  /** The drawing went stale: show the server's, and offer this tab's back. */
+  private async staleDrawing(id: string): Promise<void> {
+    const s = this.sketches.get(id);
+    if (!s) return;
+    const mine = s.scene;
+    let server: NoteDrawing;
+    try {
+      server = await this.o.api.get<NoteDrawing>(`/api/notebook/drawings/${id}`);
+    } catch {
+      s.error = true;
+      this.notify();
+      return;
+    }
+    Object.assign(s, { scene: server.scene, rev: server.rev, dirty: false, pictures: null, gen: s.gen + 1 });
+    if (s.timer) clearTimeout(s.timer);
+    s.timer = null;
+    void this.qc.invalidateQueries({ queryKey: noteKey(s.noteId), exact: true });
+    this.notify();
+    this.o.onDrawingStale?.(DRAWING_STALE_WORDS, () => {
+      if (!mine) return;
+      s.scene = mine;
+      s.dirty = true;
+      s.gen += 1;
+      this.notify();
+      this.flushDrawing(id, true);
+    });
+  }
+
+  /** The drawing as this tab has it now (its editor reloads when `gen` moves). */
+  drawingNow(id: string): DrawingView | null {
+    const s = this.sketches.get(id);
+    return s?.scene ? { id, noteId: s.noteId, scene: s.scene, rev: s.rev, gen: s.gen } : null;
+  }
+
+  /** Read a drawing's image from your Notebook files, as a data URL for the editor. */
+  async drawingImage(attachmentId: string): Promise<string> {
+    const res = await fetch(`${this.o.api.baseUrl}/api/files/${encodeURIComponent(attachmentId)}`, {
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error('That image didn’t load.');
+    const blob = await res.blob();
+    return new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = () => reject(new Error('That image didn’t load.'));
+      r.readAsDataURL(blob);
+    });
+  }
+
+  private blankSketch(noteId: string): Sketch {
+    return {
+      noteId,
+      scene: null,
+      rev: 0,
+      dirty: false,
+      timer: null,
+      holds: 0,
+      owed: false,
+      pictures: null,
+      waiting: new Set(),
+      slow: null,
+      isSlow: false,
+      error: false,
+      gen: 0,
+    };
   }
 
   // ---- the rest ---------------------------------------------------------------------------------------------
@@ -667,6 +961,7 @@ export class NotebookStore {
       words: 0,
       linked: [],
       createdAt: now,
+      drawings: [],
       gen: 0,
       draft: true,
     };
@@ -709,6 +1004,21 @@ export class NotebookStore {
     this.sent.set(mid, body.type);
     if (body.type === 'note.move' || body.type === 'folder.move') this.moves.set(mid, body);
     if (body.type.startsWith('note.')) this.about.set(mid, body.payload.id);
+    if (body.type.startsWith('drawing.')) {
+      const s = this.sketches.get(body.payload.id);
+      this.sketchChanges.set(mid, body.payload.id);
+      if (s) {
+        s.waiting.add(mid);
+        if (!s.slow)
+          s.slow = setTimeout(() => {
+            s.slow = null;
+            if (s.waiting.size) {
+              s.isSlow = true;
+              this.notify();
+            }
+          }, SLOW_SAVE_MS);
+      }
+    }
     const at = (this.o.now?.() ?? new Date()).toISOString();
     const m = { ...body, id: mid, at } as Change;
     const tree = this.cachedTree();
@@ -749,6 +1059,12 @@ export class NotebookStore {
         void this.qc.invalidateQueries({ queryKey: noteKey(about), exact: true });
       // What comes back from Trash, and where, is the server's word.
       if (/\.(restore|purge)$|^trash\./.test(type)) refresh = true;
+      const drawingId = this.sketchChanges.get(r.id);
+      this.sketchChanges.delete(r.id);
+      if (drawingId) {
+        this.drawingAnswered(drawingId, r);
+        continue;
+      }
       const noteId = this.changes.get(r.id);
       this.changes.delete(r.id);
       const w = noteId ? this.writing.get(noteId) : undefined;
@@ -777,6 +1093,30 @@ export class NotebookStore {
     void this.qc.invalidateQueries({ queryKey: ['notebook', 'task'] });
     if (refresh) void this.qc.invalidateQueries({ queryKey: notebookKey(), exact: true });
     this.notify();
+  }
+
+  /** A drawing's save came back: settle its ring, send what waited behind it, or deal with a turn-down. */
+  private drawingAnswered(id: string, r: SyncResult): void {
+    const s = this.sketches.get(id);
+    if (!s) return;
+    s.waiting.delete(r.id);
+    if (!s.waiting.size) {
+      if (s.slow) clearTimeout(s.slow);
+      s.slow = null;
+      s.isSlow = false;
+    }
+    if (r.status === 'rejected') {
+      if (r.reason === 'stale') void this.staleDrawing(id);
+      else {
+        s.error = true;
+        this.o.onRejected?.(r.error ?? 'That drawing couldn’t be saved.');
+      }
+      return;
+    }
+    s.error = false;
+    // The note reads again for the drawing's new pictures and words.
+    void this.qc.invalidateQueries({ queryKey: noteKey(s.noteId), exact: true });
+    if (s.dirty && !s.timer) this.flushDrawing(id);
   }
 
   /** What a turned-down move was called, and how to send it again. */
@@ -878,4 +1218,8 @@ export class NotebookStore {
         trashCount: Math.max(0, tree.trashCount - 1),
       });
   }
+}
+
+function revoke(url: string): void {
+  if (url.startsWith('blob:') && typeof URL !== 'undefined' && URL.revokeObjectURL) URL.revokeObjectURL(url);
 }

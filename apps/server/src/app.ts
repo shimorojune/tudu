@@ -74,6 +74,15 @@ export function createApp(deps: AppDeps) {
     }),
   );
 
+  // Tests only: the network gone (C22-D41). Each /api call has its connection dropped, as a server that went away.
+  const net = { down: false };
+  if (env.TEST_ROUTES === '1')
+    app.use('/api/*', async (c, next) => {
+      if (!net.down) return next();
+      (c.env as { incoming?: { socket?: { destroy(): void } } } | undefined)?.incoming?.socket?.destroy();
+      return c.body(null, 503);
+    });
+
   app.get('/health', (c) => c.json({ ok: true, at: new Date().toISOString() }));
 
   // The macOS app's updates, from the track's GitHub release.
@@ -155,6 +164,11 @@ export function createApp(deps: AppDeps) {
           })
         : 0;
       return c.json({ filed });
+    });
+    app.post('/__test/net/down', async (c) => {
+      const { down } = ((await c.req.json().catch(() => null)) ?? {}) as { down?: boolean };
+      net.down = down !== false;
+      return c.body(null, 204);
     });
     app.post('/__test/updates/reset', (c) => {
       feed?.reset();

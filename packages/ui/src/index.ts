@@ -173,6 +173,7 @@ export {
   editorExtensions,
   type RichTextEditorProps,
   type RichTextContentProps,
+  type RichTextDrawings,
 } from './components/RichTextEditor';
 
 // Quick Add (chunk 04)
@@ -381,7 +382,27 @@ export {
   CHIP_OUT_MS,
   type NoteEditorProps,
   type NoteEditorNote,
+  type NoteEditorDrawings,
 } from './components/NoteEditor';
+export {
+  NoteDrawing,
+  DrawingNode,
+  DrawingContext,
+  DRAWING_DELETED,
+  type NoteDrawingProps,
+  type NoteDrawingPicture,
+  type NoteDrawingHost,
+} from './components/NoteDrawing';
+export {
+  DrawingSheet,
+  loadExcalidraw,
+  EXCALIDRAW_ASSETS,
+  SHEET_OPEN_MS,
+  SHEET_CLOSE_MS,
+  type DrawingSheetProps,
+  type DrawingPictures,
+  type ExcalidrawModule,
+} from './components/DrawingSheet';
 export {
   NoteWindow,
   NoteFloat,

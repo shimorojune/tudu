@@ -48,6 +48,8 @@ const SAFE_URL = /^(https?:|mailto:)/i;
 const FILE_URL = /^\/api\/files\/[A-Za-z0-9_-]+$/;
 const ATT_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const ALIGN = /^\s*text-align:\s*(left|center|right)\s*;?\s*$/;
+/** A drawing block in a Notebook note: an empty div naming its drawing, which lives in its own row. */
+const DRAWING_RE = /<div\s+data-drawing="([A-Za-z0-9_-]{1,64})"\s*>/g;
 
 function cleanAttrs(tag: string, raw: string): string {
   const out: string[] = [];
@@ -65,6 +67,8 @@ function cleanAttrs(tag: string, raw: string): string {
       out.push('class="tp-att" data-type="attachment" contenteditable="false"');
     } else if (tag === 'a' && name === 'data-id' && ATT_ID.test(v)) {
       out.push(`data-id="${v}"`);
+    } else if (tag === 'div' && name === 'data-drawing' && ATT_ID.test(v)) {
+      out.push(`data-drawing="${v}"`);
     } else if (tag === 'a' && name === 'data-name') {
       out.push(`data-name="${esc(v.slice(0, 255))}"`);
     } else if (tag === 'a' && name === 'data-size' && /^\d{1,12}$/.test(v)) {
@@ -173,8 +177,14 @@ export function noteHtml(v: string | undefined | null): string {
   return isEmptyHtml(h) ? '' : h;
 }
 
-/** True when the HTML holds no words and nothing to look at (an empty paragraph is empty). */
+/** The drawings a note's words hold, in order (each id once). */
+export function drawingIds(html: string): string[] {
+  return [...new Set([...html.matchAll(DRAWING_RE)].map((m) => m[1]!))];
+}
+
+/** True when the HTML holds no words and nothing to look at (an empty paragraph is empty; a drawing is something). */
 export function isEmptyHtml(html: string): boolean {
+  if (drawingIds(html).length) return false;
   return !html
     .replace(/<br\s*\/?>/gi, '')
     .replace(/<[^>]*>/g, '')

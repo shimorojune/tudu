@@ -4,8 +4,13 @@ import {
   canDrop,
   canHoldFolder,
   daysLeft,
+  DRAWING_MAX,
+  DRAWING_TOO_BIG,
+  drawingText,
   firstLine,
   isBlankNote,
+  isEmptyDrawing,
+  notebookMutationSchema,
   moveTargets,
   nameTaken,
   nameTakenWords,
@@ -149,6 +154,59 @@ describe('C22-U04 an untitled note', () => {
     expect(isBlankNote('  ', '<p></p><p><br></p>')).toBe(true);
     expect(isBlankNote('Only a title', '')).toBe(false);
     expect(isBlankNote('', '<p>a word</p>')).toBe(false);
+  });
+});
+
+describe('C22-U81 a drawing on the wire', () => {
+  const scene = {
+    elements: [
+      { id: 'r1', type: 'rectangle', version: 3 },
+      { id: 't1', type: 'text', text: 'tables in a U', originalText: 'tables in a U', version: 2 },
+    ],
+    files: { f1: { attachmentId: 'att1', mimeType: 'image/png' } },
+  };
+  const save = (payload: Record<string, unknown>) =>
+    notebookMutationSchema.safeParse({ type: 'drawing.save', payload });
+
+  it('C22-U81 drawing.save needs its note and the rev it was drawn on', () => {
+    expect(save({ id: 'd1', noteId: 'n1', scene, baseRev: 0 }).success).toBe(true);
+    expect(
+      save({ id: 'd1', noteId: 'n1', scene, baseRev: 2, previewLight: 'p1', previewDark: null }).success,
+    ).toBe(true);
+    expect(save({ id: 'd1', scene, baseRev: 0 }).success).toBe(false);
+    expect(save({ id: 'd1', noteId: 'n1', scene }).success).toBe(false);
+    expect(
+      save({ id: 'd1', noteId: 'n1', scene: { elements: [{ type: 'rectangle' }], files: {} }, baseRev: 0 })
+        .success,
+    ).toBe(false);
+    expect(notebookMutationSchema.safeParse({ type: 'drawing.delete', payload: { id: 'd1' } }).success).toBe(
+      true,
+    );
+  });
+
+  it('C22-U81 a scene over 2 MB is turned down with the split-it message', () => {
+    const big = { elements: [{ id: 't', type: 'text', text: 'x'.repeat(DRAWING_MAX) }], files: {} };
+    const r = save({ id: 'd1', noteId: 'n1', scene: big, baseRev: 0 });
+    expect(r.success).toBe(false);
+    expect(r.error!.issues[0]!.message).toBe(DRAWING_TOO_BIG);
+    expect(DRAWING_TOO_BIG).toBe('This drawing is too big to save. Split it into two drawings.');
+  });
+
+  it('C22-U81 its words are its text elements (not erased ones); an erased drawing is empty', () => {
+    expect(
+      drawingText({
+        elements: [...scene.elements, { id: 't2', type: 'text', text: 'gone', isDeleted: true }],
+      }),
+    ).toBe('tables in a U');
+    expect(isEmptyDrawing({ elements: [] })).toBe(true);
+    expect(isEmptyDrawing({ elements: [{ id: 'a', type: 'line', isDeleted: true }] })).toBe(true);
+    expect(isEmptyDrawing(scene)).toBe(false);
+  });
+
+  it('C22-U81 a note of a drawing alone is kept, and its first line says Drawing', () => {
+    expect(isBlankNote('', '<div data-drawing="d1"></div>')).toBe(false);
+    expect(firstLine('<div data-drawing="d1"></div>')).toBe('Drawing');
+    expect(firstLine('<div data-drawing="d1"></div><p>Floor plan</p>')).toBe('Floor plan');
   });
 });
 

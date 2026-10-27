@@ -13,7 +13,7 @@ on a Mac, `pnpm e2e:mac -g C22` and `cargo test --features control` in `apps/des
 | C22-U03 | core `notebook.test.ts`                  | `moveTargets` lists every folder with its path, "Notebook" first, and marks the current one Here                                                                                 |
 | C22-U04 | core `notebook.test.ts`                  | First line of an untitled note: tags stripped, cut at 80 chars; a note with neither title nor words is "empty" and isn't kept                                                    |
 | C22-U05 | core `notebook.test.ts`                  | Days left in Trash: 30 on the day, 1 on the last day, never below 1; folder delete counts every note below it; folder names unique in a place                                    |
-| C22-U06 | core `notes.test.ts`                     | `cleanHtml` on a note body keeps checklists, files and links and drops scripts, handlers and unknown tags (the task notes' rules)                                                |
+| C22-U06 | core `notes.test.ts`                     | `cleanHtml` on a note body keeps checklists, files, links and drawing blocks and drops scripts, handlers and unknown tags                                                        |
 | C22-U07 | client `notebook.test.ts`                | A blank new note sends nothing; the first word sends `note.create` then `note.body`; closing it blank leaves the outbox empty                                                    |
 | C22-U08 | client `notebook.test.ts`                | Body saves debounce to one `note.body` per 600 ms of quiet and flush on close; each carries the last known `rev`                                                                 |
 | C22-U09 | client `notebook.test.ts`                | Save state: saving while queued (the ring once it has taken 500 ms), saved on ack, offline while disconnected, conflict on `stale`, error when turned down                       |
@@ -110,27 +110,61 @@ The frame and fill-the-screen rules also have Rust tests under the same ids (`pl
 
 ## Note window fixes ([docs/plans/note-window-fixes.md](../plans/note-window-fixes.md))
 
-| ID      | Where                         | Case                                                                                                                                         |
-| ------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| C22-U60 | ui `NoteWindow.test.tsx`      | Both variants: the grip and seven edge handles, each calls `onResizeStart` with its direction; none while expanded                           |
-| C22-U61 | ui `NoteWindow.test.tsx`      | Web: the open button is the Tudu mark, "Open in your Notebook" (no ↗); the bar holds the drag mark                                           |
-| C22-U62 | web `notebook.test.tsx`       | `resizeFrame`: each edge moves only its edges; never below 420×320, stops 8px inside the page                                                |
-| C22-U63 | web `desktop.test.tsx`        | An app that refuses `open_note`: the note opens over the page, the toast's Update Tudu checks and opens This Mac, once                       |
-| C22-U64 | web `NoteWindowPage.test.tsx` | The Mac note window paints a theme stored by the desk, and one picked while hidden on `note:open`                                            |
-| C22-U65 | web `NoteWindowPage.test.tsx` | After pin and close, `note:open` with pinned false shows "Keep on top of other windows", not pressed                                         |
-| C22-U66 | web `NoteWindowPage.test.tsx` | `/note-window/abc` in a browser goes on to `/notebook/abc`                                                                                   |
-| C22-U67 | Rust `notes.rs`               | `on_close` unpins and leaves expanded and the last ask alone                                                                                 |
-| C22-U68 | Rust `place.rs`               | `cocoa_rect` flips a top-left physical frame to Cocoa points, on a 2× primary and on a screen above it                                       |
-| C22-U69 | Rust `place.rs`               | `resize` moves only the named edges, never below the least size                                                                              |
-| C22-U70 | web `NoteWindowPage.test.tsx` | An edge's pointer down asks the app to begin, then to resize by how far the pointer moved on the screen                                      |
-| C22-U71 | Rust `place.rs`               | `between` eases a glide from one frame to the other (slow at the ends), on whole pixels, and stops at the end                                |
-| C22-E15 | e2e `notebook`                | (Replaces the popup steps.) The window drags; the Tudu mark opens the note on the Notebook page and closes it; no popup                      |
-| C22-E60 | e2e `notebook`                | Every edge and corner resizes the window; never below 420×320 or past the page; the frame is kept across a reload                            |
-| C22-E61 | e2e `notebook`                | Light and dark: the drag mark shows, the rail is the note's own paper, each handle has its cursor                                            |
-| C22-E62 | e2e `notebook`                | (Replaces C22-E24.) The formatting bar is a solid strip above the writing on the Notebook page and in the window; phones keep it at the foot |
-| C22-E63 | e2e `notebook`                | An older Mac app: the note opens over the page with the toast; Update Tudu opens This Mac and checks                                         |
-| C22-D30 | mac `notebook.spec.ts`        | ⌥⌘N is registered and opens the note window on a blank note over another app; with the sheet open the sheet goes first                       |
-| C22-D31 | mac `notebook.spec.ts`        | Pinned, closed (its button or ⌘W) and opened again: unpinned, not on top, and the button says so                                             |
-| C22-D32 | mac `notebook.spec.ts`        | Fill the screen glides there and back (widths in between), ending where C22-D03 does                                                         |
-| C22-D33 | mac `notebook.spec.ts`        | The note window paints Dark picked on the desk while hidden, and Light picked while open within a second                                     |
-| C22-D34 | mac `notebook.spec.ts`        | Every edge and corner resizes the real window, its far edges staying put, never below 420×320                                                |
+| ID      | Where                         | Case                                                                                                                                                           |
+| ------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C22-U60 | ui `NoteWindow.test.tsx`      | Both variants: the grip and seven edge handles, each calls `onResizeStart` with its direction; none while expanded                                             |
+| C22-U61 | ui `NoteWindow.test.tsx`      | Web: the open button is the Tudu mark, "Open in your Notebook" (no ↗); the bar holds the drag mark                                                             |
+| C22-U62 | web `notebook.test.tsx`       | `resizeFrame`: each edge moves only its edges; never below 420×320, stops 8px inside the page                                                                  |
+| C22-U63 | web `desktop.test.tsx`        | An app that refuses `open_note`: the note opens over the page, the toast's Update Tudu checks and opens This Mac, once                                         |
+| C22-U64 | web `NoteWindowPage.test.tsx` | The Mac note window paints a theme stored by the desk, and one picked while hidden on `note:open`                                                              |
+| C22-U65 | web `NoteWindowPage.test.tsx` | After pin and close, `note:open` with pinned false shows "Keep on top of other windows", not pressed                                                           |
+| C22-U66 | web `NoteWindowPage.test.tsx` | `/note-window/abc` in a browser goes on to `/notebook/abc`                                                                                                     |
+| C22-U67 | Rust `notes.rs`               | `on_close` unpins and leaves expanded and the last ask alone                                                                                                   |
+| C22-U68 | Rust `place.rs`               | `cocoa_rect` flips a top-left physical frame to Cocoa points, on a 2× primary and on a screen above it                                                         |
+| C22-U69 | Rust `place.rs`               | `resize` moves only the named edges, never below the least size                                                                                                |
+| C22-U70 | web `NoteWindowPage.test.tsx` | An edge's pointer down asks the app to begin, then to resize by how far the pointer moved on the screen                                                        |
+| C22-U71 | Rust `place.rs`               | `between` eases a glide from one frame to the other (slow at the ends), on whole pixels, and stops at the end                                                  |
+| C22-E15 | e2e `notebook`                | (Replaces the popup steps.) The window drags; the Tudu mark opens the note on the Notebook page and closes it; no popup                                        |
+| C22-E60 | e2e `notebook`                | Every edge and corner resizes the window; never below 420×320 or past the page; the frame is kept across a reload                                              |
+| C22-E61 | e2e `notebook`                | Light and dark: the drag mark shows, the rail is the note's own paper, each handle has its cursor                                                              |
+| C22-E62 | e2e `notebook`                | (Replaces C22-E24.) The formatting bar is a solid strip above the writing on the Notebook page and in the window, ending with Draw; phones keep it at the foot |
+| C22-E63 | e2e `notebook`                | An older Mac app: the note opens over the page with the toast; Update Tudu opens This Mac and checks                                                           |
+| C22-D30 | mac `notebook.spec.ts`        | ⌥⌘N is registered and opens the note window on a blank note over another app; with the sheet open the sheet goes first                                         |
+| C22-D31 | mac `notebook.spec.ts`        | Pinned, closed (its button or ⌘W) and opened again: unpinned, not on top, and the button says so                                                               |
+| C22-D32 | mac `notebook.spec.ts`        | Fill the screen glides there and back (widths in between), ending where C22-D03 does                                                                           |
+| C22-D33 | mac `notebook.spec.ts`        | The note window paints Dark picked on the desk while hidden, and Light picked while open within a second                                                       |
+| C22-D34 | mac `notebook.spec.ts`        | Every edge and corner resizes the real window, its far edges staying put, never below 420×320                                                                  |
+
+## Drawings in notes ([docs/plans/notebook-drawing.md](../plans/notebook-drawing.md))
+
+| ID      | Where                             | Case                                                                                                                                                            |
+| ------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C22-U80 | core `notes.test.ts`              | `cleanHtml` keeps `<div data-drawing="d1">`, drops any other attribute on it, drops a bad id, and still drops a plain `div` with handlers                       |
+| C22-U81 | core `notebook.test.ts`           | `drawing.save` schema: needs `noteId` and `baseRev`; a scene over `DRAWING_MAX` fails with the split-it message                                                 |
+| C22-U82 | server `drawings.test.ts`         | `drawing.save` on `baseRev: 0` creates the row for your own note; on someone else's note it is turned down (404 wording)                                        |
+| C22-U83 | server `drawings.test.ts`         | A save on an old rev is `stale`; on the current rev it bumps `rev`; a `note.body` save at the same time succeeds (separate revs)                                |
+| C22-U84 | server `drawings.test.ts`         | The note's `text` includes the drawing's words; `searchNotes` finds the note by a word typed only in a drawing                                                  |
+| C22-U85 | server `drawings.test.ts`         | A `note.body` without the block sets `orphaned_at`; putting the block back clears it; the sweep removes a drawing orphaned over 30 days, with its images        |
+| C22-U86 | server `drawings.test.ts`         | Images named in the scene are claimed for the note; note to Trash and back keeps drawing and images; purge removes both                                         |
+| C22-U87 | server `drawings.test.ts`         | `GET /notebook/drawings/:id` returns the scene to its owner and 404 to anyone else; `GET /notebook/notes/:id` lists its drawings with preview ids               |
+| C22-U88 | client `drawings.test.ts`         | Drawing saves debounce to one `drawing.save` per 800 ms of quiet and flush on close; each carries the last rev                                                  |
+| C22-U89 | client `drawings.test.ts`         | A save waits while an image is uploading and goes once it lands; a failed upload lets go too, and the sheet offers Try again                                    |
+| C22-U90 | client `drawings.test.ts`         | `stale`: loads the newer scene and raises the toast; Open mine resends the local scene on the new rev                                                           |
+| C22-U91 | client `drawings.test.ts`         | Done on an empty drawing sends no save and its block goes; one erased back to nothing sends `drawing.delete`                                                    |
+| C22-U92 | ui `NoteDrawing.test.tsx`         | Shows the light or dark picture by theme; "Picture not ready" without one; Edit, click and Enter all call `onOpen`; ⋯ › Delete calls `onDelete`                 |
+| C22-U93 | ui `RichTextEditor.test.tsx`      | The drawing node round-trips through HTML; only the notes editor has Draw; Backspace, ← and → at a line's edge select the block (C22-E88 in a browser)          |
+| C22-U94 | ui `DrawingSheet.test.tsx`        | Bar shows "<note> · Drawing N", the save ring and Done; Excalidraw is imported lazily (mocked), with a loading state and the "didn't open" state with Try again |
+| C22-U95 | ui `DrawingSheet.test.tsx`        | Opening animates `clip-path` and never `transform`; with Less motion there is no animation                                                                      |
+| C22-U96 | ui `NoteEditor.test.tsx`          | Draw is the last item in the strip; it inserts a block at the cursor and opens its sheet ("Drawing N"); an empty Done takes the block out                       |
+| C22-E80 | e2e web `notebook`                | Draw in a note, add a rectangle and a text, Done: the block shows a picture, the server has the scene, and a reload shows the same picture                      |
+| C22-E81 | e2e web `notebook`                | Paste an image into a drawing (clipboard with a PNG): it uploads, survives a reload, and the scene holds no `dataURL`                                           |
+| C22-E82 | e2e web `notebook`                | Drop an image file into a drawing (DataTransfer): same as E81                                                                                                   |
+| C22-E83 | e2e web `notebook`                | Search finds the note by a word typed in its drawing                                                                                                            |
+| C22-E84 | e2e web `notebook`                | Delete a block from ⋯, Undo brings it back; delete the note and Put back, the drawing comes back                                                                |
+| C22-E85 | e2e web `notebook`                | Dark mode: the block swaps to its dark picture; the open sheet is in Excalidraw's dark theme                                                                    |
+| C22-E86 | e2e web `notebook`                | The drawing chunk isn't requested until a drawing opens; fonts load from `/excalidraw/fonts/`, never from a CDN                                                 |
+| C22-E87 | e2e web `notebook`, phone project | Open a drawing on the phone: full screen, tools at the foot, Done returns to the note                                                                           |
+| C22-E88 | e2e web `notebook`                | Over a block: Backspace selects it, a second deletes it, Undo brings it back; ArrowLeft steps onto it; Enter opens it                                           |
+| C22-D40 | mac `notebook.spec.ts`            | In the note window, Draw opens the sheet over the whole window; drawing and Done work in WKWebView; ⌥⌘N still reaches Tudu while drawing                        |
+| C22-D41 | mac `notebook.spec.ts`            | Offline (the server drops every connection): draw, Done, back up: the save goes through and the picture shows                                                   |
+| C22-D42 | mac `notebook.spec.ts`            | An image pasted into a drawing (WebKit paste event with a PNG) uploads, survives a reload, and the scene holds no `dataURL`                                     |

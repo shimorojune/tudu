@@ -1,7 +1,16 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { Editor } from '@tiptap/core';
+import { NodeSelection, TextSelection } from '@tiptap/pm/state';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { RichTextContent, RichTextEditor, toHtml } from './RichTextEditor';
+import { DrawingContext, type NoteDrawingHost } from './NoteDrawing';
+import {
+  editorExtensions,
+  RichTextContent,
+  RichTextEditor,
+  toHtml,
+  type RichTextDrawings,
+} from './RichTextEditor';
 import { ToastHost } from './Toast';
 
 describe('RichTextEditor', () => {
@@ -485,5 +494,103 @@ describe('C03-U29 the placeholder only on a truly blank editor', () => {
     await user.keyboard('- ');
     expect(container.querySelector('.tp-rte-area ul')).not.toBeNull();
     expect(container.querySelector('.tp-rte')).not.toHaveClass('tp-rte-blank');
+  });
+});
+
+describe('C22-U93 drawing blocks in the Notebook’s editor', () => {
+  function drawn(value: string, extra: Partial<RichTextDrawings> = {}) {
+    const onOpen = vi.fn();
+    const onInput = vi.fn();
+    const host: NoteDrawingHost = {
+      picture: (id) => ({ light: `/pic/${id}.png`, dark: null, words: 2 }),
+      onOpen,
+    };
+    const drawings: RichTextDrawings = { newId: () => 'd-new', onOpen, ...extra };
+    const r = render(
+      <DrawingContext.Provider value={host}>
+        <RichTextEditor
+          variant="notes"
+          label="Note"
+          value={value}
+          autoFocus
+          onInput={onInput}
+          drawings={drawings}
+        />
+      </DrawingContext.Provider>,
+    );
+    return { ...r, onOpen, onInput, area: screen.getByRole('textbox', { name: 'Note' }) };
+  }
+
+  it('C22-U93 a block round-trips through the HTML and shows its picture', async () => {
+    const user = userEvent.setup();
+    const { container, onInput, area } = drawn('<p>Two rooms</p><div data-drawing="d1"></div><p>Coffee</p>');
+    // The node view draws after the editor mounts: wait until it is in.
+    const block = await waitFor(() => {
+      const b = container.querySelector('[data-drawing-id="d1"]');
+      expect(b).not.toBeNull();
+      return b!;
+    });
+    expect(block.querySelector('img')).toHaveAttribute('src', '/pic/d1.png');
+    await user.click(area);
+    await user.keyboard('!');
+    const html = onInput.mock.calls.at(-1)![0] as string;
+    // Wherever jsdom puts the caret, the block stays between the two lines, with nothing else on it.
+    expect(html).toMatch(/Two rooms!?<\/p><div data-drawing="d1"><\/div><p>!?Coffee/);
+    expect(html).toContain('!');
+  });
+
+  it('C22-U93 the keys at a block: Backspace and ← from the line after select it, → from the line before; the default block stays a paragraph', () => {
+    const el = document.createElement('div');
+    const e = new Editor({
+      element: el,
+      extensions: editorExtensions('', { onOpen: () => {} }),
+      content: '<p>above</p><div data-drawing="k1"></div><p>below</p>',
+    });
+    expect(e.schema.topNodeType.contentMatch.defaultType?.name).toBe('paragraph');
+    const caret = (words: string, end: boolean) => {
+      let at = -1;
+      e.state.doc.descendants((n, pos) => {
+        if (n.isTextblock && n.textContent === words) at = pos + 1 + (end ? n.content.size : 0);
+      });
+      e.view.dispatch(e.state.tr.setSelection(TextSelection.create(e.state.doc, at)));
+    };
+    const press = (key: string) => {
+      const ev = new KeyboardEvent('keydown', { key, bubbles: true });
+      return e.view.someProp('handleKeyDown', (f) => f(e.view, ev)) ?? false;
+    };
+    const onBlock = () =>
+      e.state.selection instanceof NodeSelection && e.state.selection.node.type.name === 'drawing';
+    for (const [words, end, key] of [
+      ['below', false, 'Backspace'],
+      ['below', false, 'ArrowLeft'],
+      ['above', true, 'ArrowRight'],
+    ] as const) {
+      caret(words, end);
+      expect(press(key)).toBe(true);
+      expect(onBlock()).toBe(true);
+    }
+    // Not at the line's edge: the keys are the editor's own.
+    caret('below', true);
+    press('ArrowLeft');
+    expect(onBlock()).toBe(false);
+    expect(e.getHTML()).toBe('<p>above</p><div data-drawing="k1"></div><p>below</p>');
+    e.destroy();
+  });
+
+  // Where the caret lands after a click needs layout: C22-E88 runs the keys in a browser too.
+
+  it('C22-U93 only the Notebook’s editor has Draw; it drops a block at the caret and opens it', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<RichTextEditor variant="notes" label="Notes" />);
+    expect(screen.queryByRole('button', { name: 'Draw' })).toBeNull();
+    unmount();
+    const c = render(<RichTextEditor variant="comment" label="Comment" />);
+    expect(screen.queryByRole('button', { name: 'Draw' })).toBeNull();
+    c.unmount();
+    const { container, onOpen, onInput } = drawn('<p>Plan</p>');
+    await user.click(screen.getByRole('button', { name: 'Draw' }));
+    await waitFor(() => expect(onOpen).toHaveBeenCalledWith('d-new', expect.anything()));
+    expect(container.querySelector('[data-drawing-id="d-new"]')).not.toBeNull();
+    expect(onInput.mock.calls.at(-1)![0]).toContain('<div data-drawing="d-new"></div>');
   });
 });
