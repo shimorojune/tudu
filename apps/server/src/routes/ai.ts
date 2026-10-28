@@ -114,7 +114,10 @@ export function aiRoutes(
   });
 
   const finish = async (headers: Headers, query: string, accept: boolean) => {
-    const out = (await auth.api.oauth2Consent({ body: { accept, oauth_query: query }, headers })) as {
+    // Asked for JSON, the OAuth server answers where to go instead of throwing a redirect.
+    const asJson = new Headers(headers);
+    asJson.set('accept', 'application/json');
+    const out = (await auth.api.oauth2Consent({ body: { accept, oauth_query: query }, headers: asJson })) as {
       url?: string;
     };
     if (!out?.url) return Response.json(BAD_LINK, { status: 400 });
