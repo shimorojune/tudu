@@ -11,6 +11,8 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       AUTH_SECRET: ${AUTH_SECRET}
       BASE_URL: https://api.tudu.ezdev.net
+      # The MCP server below (AI access): OAuth tokens are issued for it alone, and Settings shows it.
+      MCP_URL: https://mcp.tudu.ezdev.net/mcp
       CORS_ORIGINS: https://tudu.ezdev.net
       EMAIL_TRANSPORT: resend
       RESEND_API_KEY: ${RESEND_API_KEY}
@@ -34,6 +36,19 @@ services:
   web:
     image: tudu-web:production
     pull_policy: never
+    networks:
+      - dokploy-network
+    restart: unless-stopped
+  # Tudu's MCP server (apps/mcp), at https://mcp.tudu.ezdev.net. It keeps no data and calls the API by its public
+  # address with each caller's own key or app token.
+  mcp:
+    image: tudu-mcp:production
+    pull_policy: never
+    environment:
+      TUDU_API_URL: https://api.tudu.ezdev.net
+      TUDU_ISSUER: https://api.tudu.ezdev.net/api/auth
+      MCP_URL: https://mcp.tudu.ezdev.net/mcp
+      TUDU_TIME_ZONE: ${TUDU_TIME_ZONE:-Asia/Kolkata}
     networks:
       - dokploy-network
     restart: unless-stopped

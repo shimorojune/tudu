@@ -17,4 +17,4 @@ const app = createMcp({
   version,
 });
 await app.run();
-console.log(`Tudu MCP on port ${process.env.__PORT ?? 3000}, talking to ${apiUrl}`);
+console.log(`Tudu MCP on port ${process.env.__PORT ?? 3457}, talking to ${apiUrl}`);
