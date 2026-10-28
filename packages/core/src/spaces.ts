@@ -319,6 +319,9 @@ export interface Ask {
   title: string;
   body: string;
   confirm: string;
+  /** The button while it works and once it's done: "Revoking…", "Revoked". */
+  busy?: string;
+  done?: string;
 }
 
 /** Leave asks once; the last admin is told to make someone else admin first. */

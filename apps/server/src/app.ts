@@ -151,7 +151,10 @@ export function createApp(deps: AppDeps) {
   app.use('/api/*', sessionMiddleware(auth, db, { resource: env.MCP_URL }));
   // Keys and apps reach only what they were allowed (docs/plans/mcp-server.md).
   app.use('/api/*', keyAccess(db));
-  app.route('/api', aiRoutes(db, auth, { secret: env.AUTH_SECRET, baseUrl: env.BASE_URL }));
+  app.route(
+    '/api',
+    aiRoutes(db, auth, { secret: env.AUTH_SECRET, baseUrl: env.BASE_URL, mcpUrl: env.MCP_URL }),
+  );
   app.route('/api', meRoutes(db, hub, mailer, storage));
   app.route('/api', taskRoutes(db, hub, deps.embeddings, storage));
   app.route('/api', notebookRoutes(db, storage));

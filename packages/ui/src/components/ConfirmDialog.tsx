@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { Icon } from '../lib/icons';
 import { Button } from './Button';
 import { Dialog } from './Dialog';
 
@@ -25,6 +26,8 @@ export interface ConfirmDialogProps {
   /** For state boards: pre-typed text and a busy state (1 working, 2 done). */
   typed?: string;
   busy?: 0 | 1 | 2;
+  /** For state boards: why it didn't happen. A rejected `onConfirm` shows its own message here. */
+  error?: string;
 }
 
 const DONE_SHOWN_MS = 420;
@@ -48,7 +51,7 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
   } = props;
   const [typed, setTyped] = useState(props.typed ?? '');
   const [busy, setBusy] = useState<0 | 1 | 2>(props.busy ?? 0);
-  const [failed, setFailed] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(props.error ?? null);
 
   // Each time it opens, start clean.
   const [wasOpen, setWasOpen] = useState(open);
@@ -80,13 +83,7 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
 
   const footer = (
     <>
-      <span className="tp-cs-sp">
-        {failed ? (
-          <span className="tp-cf-err" role="alert">
-            {failed}
-          </span>
-        ) : null}
-      </span>
+      <span className="tp-cs-sp" />
       <Button variant="quiet" size="sm" onClick={onClose}>
         {cancelLabel}
       </Button>
@@ -116,6 +113,13 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
       noFocus
     >
       <div className="tp-cf-b">{children}</div>
+      {/* Why it didn't happen, under the ask; the button is ready to try again. */}
+      {failed ? (
+        <div className="tp-help tp-cf-err" role="alert">
+          <Icon name="error" size={13} stroke={2.2} />
+          {failed}
+        </div>
+      ) : null}
       {typeToConfirm ? (
         <label className="tp-cf-type">
           <span>

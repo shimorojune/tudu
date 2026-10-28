@@ -15,7 +15,7 @@ import { requireSession, requireSignIn, type SessionVars } from '../middleware/s
 export function aiRoutes(
   db: Db,
   auth: Auth,
-  { secret, baseUrl }: { secret: string; baseUrl: string },
+  { secret, baseUrl, mcpUrl }: { secret: string; baseUrl: string; mcpUrl: string },
   keyLimiter = new Limiter(KEYS_PER_HOUR, 3_600_000),
 ) {
   const r = new Hono<{ Variables: SessionVars }>();
@@ -44,7 +44,9 @@ export function aiRoutes(
     return done ? c.body(null, 204) : c.json({ error: 'That key isn’t there any more.' }, 404);
   });
 
-  r.get('/apps', requireSignIn, async (c) => c.json({ apps: await listApps(db, c.get('session')!.user.id) }));
+  r.get('/apps', requireSignIn, async (c) =>
+    c.json({ apps: await listApps(db, c.get('session')!.user.id), url: mcpUrl }),
+  );
 
   r.delete('/apps/:clientId', requireSignIn, async (c) => {
     const done = await revokeApp(db, c.get('session')!.user.id, c.req.param('clientId'));
@@ -84,6 +86,7 @@ export function aiRoutes(
         id: sp.id,
         kind: sp.kind,
         name: sp.name,
+        color: sp.color,
       })),
     });
   });

@@ -1,7 +1,9 @@
 import { useNavigate, useSearch } from '@tanstack/react-router';
+import { useRef } from 'react';
 import { ApiError, type MeResponse } from '@tudu/client';
 import { welcomeBack } from '@tudu/core';
 import { showToast, SignIn, SignInError } from '@tudu/ui';
+import { OAUTH_QUERY } from '../../app/oauth';
 import { api, authClient, refreshMe } from '../../app/session';
 import { useViewport } from '../../app/viewport';
 
@@ -28,6 +30,8 @@ export function SignInPage() {
   const navigate = useNavigate();
   const search = useSearch({ strict: false }) as { next?: string };
   const vp = useViewport();
+  // An app sent you here (OAuth): where the API says to go once you're in.
+  const oauthNext = useRef<string | null>(null);
 
   async function sendCode(email: string): Promise<void> {
     // Through the API client so the plain server message (bad address, too many codes) comes back as is.
@@ -40,11 +44,25 @@ export function SignInPage() {
   }
 
   async function verifyCode(email: string, otp: string): Promise<void> {
+    if (OAUTH_QUERY) {
+      // The app's signed request rides along; the API answers with the consent page (or the app) to go to.
+      const { data, error } = await authClient.$fetch<{ url?: string }>('/sign-in/email-otp', {
+        method: 'POST',
+        body: { email, otp, oauth_query: OAUTH_QUERY },
+      });
+      if (error) throw toSignInError((error as { code?: string }).code, error.message);
+      oauthNext.current = data?.url ?? null;
+      return;
+    }
     const { error } = await authClient.signIn.emailOtp({ email, otp });
     if (error) throw toSignInError(error.code, error.message);
   }
 
   async function done() {
+    if (oauthNext.current) {
+      window.location.assign(oauthNext.current);
+      return;
+    }
     greet(await refreshMe());
     const next =
       search.next && search.next.startsWith('/') && !search.next.startsWith('//') ? search.next : '/';

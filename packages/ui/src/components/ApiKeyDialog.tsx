@@ -42,6 +42,8 @@ export interface ApiKeyDialogProps {
   secret?: string;
   tool?: 'claude' | 'cursor';
   copied?: boolean;
+  /** Phones: a sheet from the bottom. */
+  variant?: 'dialog' | 'sheet';
   inline?: boolean;
 }
 
@@ -142,6 +144,7 @@ export function ApiKeyDialog(p: ApiKeyDialogProps) {
         open={p.open}
         inline={p.inline}
         onClose={p.onClose}
+        variant={p.variant}
         title="Copy your key"
         sub={name.trim() || init.name || 'New key'}
         className="tp-ak-dlg"
@@ -202,6 +205,7 @@ export function ApiKeyDialog(p: ApiKeyDialogProps) {
       open={p.open}
       inline={p.inline}
       onClose={busy ? undefined : p.onClose}
+      variant={p.variant}
       title="New API key"
       className="tp-ak-dlg"
       noFocus
