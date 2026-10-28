@@ -482,7 +482,8 @@ describe('AI access: apps (OAuth)', () => {
 
     // Within 30 s a client racing itself gets the same answer again; past that, the old refresh token is spent, and
     // using it again ends the tokens that followed it too (a stolen token was replayed).
-    const second = await connect(p, { level: 'write' }, c);
+    // A second app: the first one is already allowed, so it would skip the consent page.
+    const second = await connect(p, { level: 'write' });
     const again = await refresh(second.tokens.refresh_token!);
     expect(again.status, await again.clone().text()).toBe(200);
     const after = (await again.json()) as Tokens;
