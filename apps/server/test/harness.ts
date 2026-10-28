@@ -1,13 +1,17 @@
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { inject } from 'vitest';
+import type { ClientMetadataResourceFetch } from '@better-auth/oauth-provider';
 import { OutboxMailer } from '../src/email';
 import { readEnv } from '../src/env';
 import { bootstrap, type Server } from '../src/bootstrap';
 import { localModelDir } from '../src/embeddings/modelDir';
 
 /** The app in-process on the run's database, with the outbox mailer, test routes on and a short heartbeat. */
-export function startServer(overrides: Partial<NodeJS.ProcessEnv> = {}): Server & { outbox: OutboxMailer } {
+export function startServer(
+  overrides: Partial<NodeJS.ProcessEnv> = {},
+  options: { fetchClientMetadata?: ClientMetadataResourceFetch } = {},
+): Server & { outbox: OutboxMailer } {
   const outbox = new OutboxMailer();
   const env = readEnv({
     NODE_ENV: 'test',
@@ -34,7 +38,14 @@ export function startServer(overrides: Partial<NodeJS.ProcessEnv> = {}): Server 
     if (url.host !== GITHUB_TEST_HOST) return Promise.reject(new TypeError('fetch failed'));
     return Promise.resolve(app!.request(`http://${GITHUB_TEST_HOST}${url.pathname}${url.search}`, init));
   };
-  const server = bootstrap(env, { mailer: outbox, heartbeatMs: 50, quiet: true, jiraFetch, githubFetch });
+  const server = bootstrap(env, {
+    mailer: outbox,
+    heartbeatMs: 50,
+    quiet: true,
+    jiraFetch,
+    githubFetch,
+    fetchClientMetadata: options.fetchClientMetadata,
+  });
   app = server.app;
   return { ...server, outbox };
 }

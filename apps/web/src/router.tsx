@@ -53,6 +53,8 @@ import { NotebookPage } from './routes/notebook/NotebookPage';
 import { NoteWindowPage } from './routes/notebook/NoteWindowPage';
 import { desktop } from './app/desktop';
 import { SignInPage } from './routes/sign-in/SignInPage';
+import { ConsentPage } from './routes/oauth/ConsentPage';
+import { OAUTH_QUERY } from './app/oauth';
 import { TodayPage } from './routes/today/TodayPage';
 import { WeekPage } from './routes/week/WeekPage';
 
@@ -77,9 +79,31 @@ const signInRoute = createRoute({
     typeof s.next === 'string' ? { next: s.next } : {},
   beforeLoad: async ({ context, search }) => {
     const me = await loadMe(context.queryClient);
-    if (me) throw redirect({ href: search.next ?? homePath(me.spaces), replace: true });
+    // An app asking you to sign in again (OAuth prompt=login) keeps the form.
+    if (me && !OAUTH_QUERY) throw redirect({ href: search.next ?? homePath(me.spaces), replace: true });
   },
   component: SignInPage,
+});
+
+/** An app asking to use your Tudu (OAuth): Allow or Cancel, signed in first. */
+const consentRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/oauth/consent',
+  validateSearch: (s: Record<string, unknown>) => s,
+  beforeLoad: async ({ context, location }) => {
+    const me = await loadMe(context.queryClient);
+    if (!me)
+      throw redirect({
+        to: '/sign-in',
+        search: { next: location.pathname + location.searchStr },
+        replace: true,
+      });
+    return { me };
+  },
+  component: function ConsentRoute() {
+    const { me } = consentRoute.useRouteContext();
+    return <ConsentPage me={me} />;
+  },
 });
 
 /** An invite's link: Join Northwind, with sign in under it when you are not in yet. */
@@ -614,6 +638,7 @@ function WebQuickAdd({ me }: { me: MeResponse }) {
 
 export const router = createRouter({
   routeTree: rootRoute.addChildren([
+    consentRoute,
     signInRoute,
     joinRoute,
     appRoute.addChildren([

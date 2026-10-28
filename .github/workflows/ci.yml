@@ -79,6 +79,7 @@ jobs:
             api:
               - *shared
               - 'apps/server/**'
+              - 'apps/mcp/**'
               - 'packages/core/**'
               - 'packages/db/**'
             mac:
@@ -214,7 +215,7 @@ jobs:
   # The API image builds and starts (chunk 13 bundles the close-matches model into it, on a Debian base): proved
   # here on a GitHub runner, since staging builds it on the Dokploy host only after a merge.
   api-image:
-    name: API Docker image
+    name: API and MCP Docker images
     needs: changes
     if: needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
@@ -233,6 +234,17 @@ jobs:
             sleep 2
           done
           docker logs api
+          exit 1
+      # The MCP server's image (AI access) starts and answers its health check; it needs no database.
+      - run: docker build -f apps/mcp/Dockerfile -t tudu-mcp:ci .
+      - name: The MCP server answers
+        run: |
+          docker run -d --name mcp -p 3457:3457 tudu-mcp:ci
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:3457/health; then exit 0; fi
+            sleep 2
+          done
+          docker logs mcp
           exit 1
 
   # The desktop group: Tudu Test, the real macOS app, built twice (this version and one up, signed with a key made

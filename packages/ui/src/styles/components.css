@@ -3034,3 +3034,56 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
   .tp-wh-shown { animation: tp-fade-in 160ms linear both; }
   .tp-wh-fold { transition: opacity 160ms linear; }
 }
+
+/* AI access (design system v53): Settings › AI access, the key dialog, the consent page. */
+.tp-set-ai .tp-ai-kic { width: 22px; height: 22px; border-radius: 7px; }
+.tp-set-ai .tp-ai-unv { color: var(--warning); background: var(--warning-soft); }
+.tp-set-sprow.tp-ai-leaving { opacity: .35; transform: translateX(6px); transition: opacity 200ms var(--ease-leave), transform 200ms var(--ease-leave); }
+.tp-set-ai .tp-ai-none { margin: 4px 0 0; }
+.tp-ai-copy { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 14px; border-radius: var(--radius-md); background: var(--muted); box-shadow: 0 0 0 1px var(--line); }
+.tp-ai-val { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 12.5px; color: var(--foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: all; }
+.tp-ai-block { align-items: flex-start; }
+.tp-ai-block .tp-ai-val { white-space: pre-wrap; word-break: break-all; line-height: 1.55; padding: 4px 0; font-size: 11.5px; color: var(--foreground-2); }
+.tp-ai-secret { background: var(--card); box-shadow: 0 0 0 1px var(--border-strong); animation: tp-ai-reveal 320ms var(--ease-arrive) both; }
+.tp-ai-secret .tp-ai-val { font-size: 13.5px; letter-spacing: .01em; }
+@keyframes tp-ai-reveal { from { opacity: 0; transform: translateY(4px); filter: blur(3px); } }
+.tp-ai-mark { display: inline-grid; place-items: center; flex: none; border-radius: 30%; background: var(--accent); box-shadow: inset 0 0 0 1px var(--line); font-family: var(--font-serif); color: var(--foreground); line-height: 1; }
+.tp-ai-kic { display: inline-grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: 8px; background: var(--accent); color: var(--foreground-2); }
+.tp-ai-unv { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--warning); }
+.tp-ai-exp { color: var(--warning); }
+.tp-ai-none { margin: 0; padding: 8px 0 2px; font-size: 13px; line-height: 1.5; color: var(--muted-foreground); }
+.tp-ak-dlg { width: 480px; }
+.tp-ak .tp-cs-l:first-child { margin-top: 2px; }
+.tp-ak .tp-seg, .tp-oc-box .tp-seg { display: flex; margin-left: 0; }
+.tp-ak .tp-seg > button, .tp-oc-box .tp-seg > button { flex: 1; }
+.tp-ak-sum { display: flex; align-items: baseline; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.5; color: var(--muted-foreground); }
+.tp-ak-sum > span { flex: 1; min-width: 0; }
+.tp-ak-more { animation: tp-set-in 220ms var(--ease-arrive) both; }
+.tp-ak-sw { padding: 12px 0 0; }
+.tp-ak-sw + .tp-ak-sw { border-top: 0; }
+.tp-ak-spaces { margin-top: 8px; padding: 0 12px; border-radius: var(--radius-md); background: var(--muted); box-shadow: 0 0 0 1px var(--line); animation: tp-set-in 220ms var(--ease-arrive) both; }
+.tp-ak-spaces .tp-setrow { padding: 10px 0; }
+.tp-ak-err { margin-top: 14px; }
+.tp-ak-reveal { display: flex; flex-direction: column; }
+.tp-ak-reveal .tp-cs-l { margin-top: 20px; }
+.tp-oc { width: 440px; }
+.tp-oc h1 { margin-top: 18px; font-size: 40px; }
+.tp-oc .tp-auth-lead { margin-bottom: 20px; }
+.tp-oc-unv { color: var(--warning); }
+.tp-oc-who { display: flex; align-items: center; gap: 12px; }
+.tp-oc-link { width: 32px; height: 2px; border-radius: 2px; background: repeating-linear-gradient(90deg, var(--border-strong) 0 4px, transparent 4px 8px); animation: tp-oc-dash 1.2s linear infinite; }
+@keyframes tp-oc-dash { to { background-position: 16px 0; } }
+.tp-oc-sum { margin-top: 18px; padding-top: 0; border-top: 0; }
+.tp-oc-box { margin-top: 14px; padding: 2px 0 4px; animation: tp-set-in 220ms var(--ease-arrive) both; }
+.tp-oc-acts { display: flex; align-items: center; gap: 10px; margin-top: 24px; }
+.tp-oc-tick { display: inline-grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: var(--success-soft); color: var(--success); }
+.tp-oc-tick path { stroke-dasharray: 24; stroke-dashoffset: 24; animation: tp-draw 420ms var(--ease-settle) 120ms both; }
+@media (prefers-reduced-motion: reduce) { .tp-ai-secret, .tp-ak-more, .tp-ak-spaces, .tp-oc-box, .tp-oc-link { animation: none; } .tp-oc-tick path { animation: none; stroke-dashoffset: 0; } .tp-set-sprow.tp-ai-leaving { transform: none; } }
+.tp-set-phone .tp-set-body > .tp-set-apps > .tp-ssec, .tp-set-phone .tp-set-body > .tp-set-apps > .tp-set-note, .tp-set-phone .tp-set-body > .tp-set-apps > .tp-banner-wrap { padding-left: 18px; padding-right: 16px; }
+.tp-ai-mark-img { display: inline-flex; align-items: center; justify-content: center; }
+.tp-ai-mark-img img { display: block; }
+.tp-ak-reveal .tp-seg { margin-bottom: 12px; }
+.tp-ak-how { margin: 0 0 8px; font-size: 12.5px; line-height: 1.5; color: var(--muted-foreground); }
+.tp-ak-how code { font-family: var(--font-mono); font-size: 11.5px; color: var(--foreground-2); }
+.tp-ak-tool { animation: tp-label-in var(--dur-arrive) var(--ease-arrive); }
+@media (prefers-reduced-motion: reduce) { .tp-ak-tool { animation: none; } }

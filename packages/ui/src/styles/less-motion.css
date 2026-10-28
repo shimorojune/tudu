@@ -301,6 +301,23 @@
 :root[data-motion='less'] .tp-wh-fold {
   transition: opacity 160ms linear;
 }
+:root[data-motion='less'] .tp-ai-secret,
+:root[data-motion='less'] .tp-ak-more,
+:root[data-motion='less'] .tp-ak-spaces,
+:root[data-motion='less'] .tp-oc-box,
+:root[data-motion='less'] .tp-oc-link {
+  animation: none;
+}
+:root[data-motion='less'] .tp-oc-tick path {
+  animation: none;
+  stroke-dashoffset: 0;
+}
+:root[data-motion='less'] .tp-set-sprow.tp-ai-leaving {
+  transform: none;
+}
+:root[data-motion='less'] .tp-ak-tool {
+  animation: none;
+}
 
 /* app.css */
 :root[data-motion='less'] .tp-tip-pop,

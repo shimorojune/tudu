@@ -57,6 +57,7 @@ import {
 import { readableBy } from './closeMatches';
 import { applyNotebook, type NotebookMutation } from './notebook';
 import { linkKeyLike, linksColumn } from './taskLinks';
+import { currentVia } from './ai/access';
 import type { SubtaskClocks, TaskClocks } from '@tudu/db/schema';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -674,7 +675,8 @@ async function record(
   actorId: string | null = null,
   at: Date = new Date(),
 ): Promise<void> {
-  await tx.insert(schema.taskEvents).values({ taskId, kind, data, actorId, at });
+  // Through a key or app, history says which (`via`); the stamp follows the call that is running now.
+  await tx.insert(schema.taskEvents).values({ taskId, kind, data, actorId, via: currentVia(), at });
 }
 
 /**

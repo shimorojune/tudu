@@ -11,6 +11,11 @@ const schema = z.object({
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
   /** Where the web app lives, for links in emails (a join link). The first CORS origin when left out. */
   WEB_URL: z.string().url().optional(),
+  /**
+   * The Tudu MCP server's address (AI access). OAuth tokens are issued for it alone, and Settings shows it as the
+   * link to add in Claude and other apps.
+   */
+  MCP_URL: z.string().url().default('http://localhost:3457/mcp'),
   /** `resend` sends real mail; `outbox` keeps it in memory for tests and local work. */
   EMAIL_TRANSPORT: z.enum(['resend', 'outbox']).default('outbox'),
   RESEND_API_KEY: z.string().optional(),

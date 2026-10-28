@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { personColor } from '@tudu/core';
 import { createDb, eq, schema, type Db } from '@tudu/db';
 import { markNewAccount, takeFirstSession } from './firstRun';
+import type { ClientMetadataResourceFetch } from '@better-auth/oauth-provider';
 import { createAuth, type Auth } from './auth';
 import { EventHub } from './events';
 import { OutboxMailer, signInCodeMail, type Mailer } from './email';
@@ -16,6 +17,7 @@ import { EMBED_EVERY_MS, Embeddings } from './closeMatches';
 import { LocalEmbedder, localModelDir, type Embedder } from './embeddings';
 import { MemoryStorage, S3Storage, type Storage } from './storage';
 import { sweepCleared } from './inbox';
+import { sweepAccessLog } from './ai/log';
 import { ISSUE_SWEEP_EVERY_MS, sweepIssues } from './feedback/filing';
 import { GithubIssues } from './feedback/github';
 
@@ -45,6 +47,8 @@ export function bootstrap(
     githubFetch?: typeof fetch;
     /** Tests pass a fake; `null` is the model off. Left out, the model inside the API (EMBEDDINGS). */
     embedder?: Embedder | null;
+    /** How Client ID Metadata Documents are fetched (AI access); tests serve fixtures. */
+    fetchClientMetadata?: ClientMetadataResourceFetch;
   } = {},
 ): Server {
   const { db, close: closeDb } = createDb(env.DATABASE_URL);
@@ -72,6 +76,8 @@ export function bootstrap(
           void sweepNotebook(db, storage).catch(() => {});
           // Inbox items cleared over 30 days ago: Undo is long past.
           void sweepCleared(db).catch(() => {});
+          // AI access: calls by keys and apps are kept 90 days.
+          void sweepAccessLog(db).catch(() => {});
         }, SWEEP_EVERY_MS);
   // Close matches: the model inside the API, unless told off; the tick picks up what a batch missed.
   const embedder =
@@ -153,6 +159,9 @@ export function bootstrap(
       await markNewAccount(db, user.id);
     },
     onSessionCreated: (session) => takeFirstSession(db, session.userId, session.id),
+    webUrl: env.WEB_URL!,
+    mcpUrl: env.MCP_URL,
+    fetchClientMetadata: options.fetchClientMetadata,
   });
   const app = createApp({
     env,

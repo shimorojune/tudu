@@ -30,6 +30,8 @@ jobs:
           echo "Staging web $VERSION" >> "$GITHUB_STEP_SUMMARY"
       - name: Build the API image
         run: docker build -f apps/server/Dockerfile -t tudu-api:staging -t tudu-api:${{ github.sha }} .
+      - name: Build the MCP image
+        run: docker build -f apps/mcp/Dockerfile -t tudu-mcp:staging -t tudu-mcp:${{ github.sha }} .
       - name: Build the web image
         run: docker build -f apps/web/Dockerfile --build-arg VITE_API_URL=https://api.staging.tudu.ezdev.net --build-arg VITE_TUDU_TRACK=staging --build-arg VITE_TUDU_VERSION=${{ steps.v.outputs.version }} -t tudu-web:staging -t tudu-web:${{ github.sha }} .
       - name: Deploy through Dokploy

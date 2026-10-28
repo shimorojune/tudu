@@ -29,6 +29,7 @@ import {
   type SettingsSectionName,
 } from '@tudu/ui';
 import { useEffect, useState } from 'react';
+import { useAiAccess } from './aiAccess';
 import { useNudgeSettings } from './NudgeClock';
 import { useWorkHours } from './workHours';
 import { openCreateSpace } from './dayView';
@@ -52,6 +53,7 @@ export const SECTIONS: SettingsSectionName[] = [
   'space',
   'members',
   'apps',
+  'ai',
 ];
 
 /** A section this space has: Personal has no Members, and This Mac is only in the Mac app. */
@@ -243,6 +245,7 @@ export function SettingsView({
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [asking, setAsking] = useState<Asking | null>(null);
+  const ai = useAiAccess(me.spaces, setAsking, layout === 'phone');
   const online = useOnline();
   const jira = useJira(space.id);
   const jiraSpaces = useQuery({ ...jiraClient.spacesQuery(), enabled: !!jira.connected });
@@ -505,6 +508,10 @@ export function SettingsView({
           )
         }
         onRetry={() => void jiraSpaces.refetch()}
+        aiAccess={ai.access}
+        onAiCreate={ai.onCreate}
+        onAiRevoke={ai.onRevoke}
+        onAiRetry={ai.onRetry}
         onJiraReconnect={() => {
           askJiraReconnect();
           openJira();
@@ -527,11 +534,14 @@ export function SettingsView({
           openJira();
         }}
       />
+      {ai.dialog}
       <ConfirmDialog
         open={!!asking}
         variant={layout === 'phone' ? 'sheet' : 'dialog'}
         title={asking?.ask.title ?? ''}
         confirmLabel={asking?.ask.confirm ?? ''}
+        busyLabel={asking?.ask.busy}
+        doneLabel={asking?.ask.done}
         typeToConfirm={asking?.typeToConfirm}
         onClose={() => setAsking(null)}
         onConfirm={async () => {

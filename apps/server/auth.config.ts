@@ -9,4 +9,6 @@ export const auth = createAuth({
   secret: 'generate-only',
   trustedOrigins: [],
   sendCode: () => {},
+  webUrl: 'http://localhost:5173',
+  mcpUrl: 'http://localhost:3457/mcp',
 });

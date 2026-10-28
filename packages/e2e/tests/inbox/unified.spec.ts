@@ -1,4 +1,4 @@
-import type { Browser, Page } from '@playwright/test';
+import type { Browser, Page, Request } from '@playwright/test';
 import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
 import { goInbox, inboxButton, inboxPip, pane, rows, section, sendRequest } from '../../fixtures/inbox';
 import {
@@ -311,7 +311,23 @@ test.describe('the one Inbox', () => {
   }) => {
     test.skip(phone(), 'the same notice on every size');
     const w = await world(page, browser);
+    // Opening the Inbox drops the live stream the page load opened and opens a new one; a removal sent in that gap
+    // is never heard. So wait for a stream that started after the drop to connect.
+    const started = new Map<Request, number>();
+    const connected = new Set<Request>();
+    let dropped = 0;
+    page.on('request', (r) => void (r.url().includes('/api/events') && started.set(r, Date.now())));
+    page.on('response', (r) => void (started.has(r.request()) && connected.add(r.request())));
+    page.on('requestfailed', (r) => {
+      if (!started.has(r)) return;
+      connected.delete(r);
+      dropped = Date.now();
+    });
     await goInbox(page);
+    await expect
+      .poll(() => dropped > 0 && [...connected].some((r) => started.get(r)! >= dropped), { timeout: 5_000 })
+      .toBe(true)
+      .catch(() => {}); // No drop on this size: the stream stayed open.
     const res = await w.b.page.request.delete(`${API_URL}/api/spaces/${w.pf.id}/members/${w.aId}`);
     expect(res.status()).toBe(204);
     const notice = row(page, 'Pilot Farm');

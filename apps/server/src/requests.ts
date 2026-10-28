@@ -14,6 +14,7 @@ import {
 import { and, asc, desc, eq, inArray, isNull, schema, sql, type Db } from '@tudu/db';
 import type { TaskClocks } from '@tudu/db/schema';
 import { Rejected, roleIn, type Applied } from './tasks';
+import { currentVia } from './ai/access';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 export type Executor = Db | Tx;
@@ -116,6 +117,7 @@ async function taskFromRequest(
     kind: history.kind,
     data: history.kind === 'accepted' ? { from: history.from } : { to: history.to },
     actorId: ownerId,
+    via: currentVia(),
     at,
   });
   if (files.length)
