@@ -127,6 +127,7 @@ test.describe('settings', () => {
       'Appearance',
       'Working hours',
       'Apps',
+      'AI access',
       'Space',
     ]);
     await expect(dialog(page).getByRole('heading', { level: 1 })).toHaveText('Account');

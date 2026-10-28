@@ -459,11 +459,11 @@ describe('AI access: apps (OAuth)', () => {
       .where(eq(schema.oauthAccessToken.id, row!.id));
     expect((await getAs('/api/me', tokens.access_token)).status).toBe(401);
 
-    const refresh = (rt: string) =>
+    const refresh = (rt: string, clientId = client.clientId) =>
       tokenCall({
         grant_type: 'refresh_token',
         refresh_token: rt,
-        client_id: client.clientId,
+        client_id: clientId,
         resource: MCP_URL,
       });
     const res = await refresh(tokens.refresh_token!);
@@ -484,15 +484,15 @@ describe('AI access: apps (OAuth)', () => {
     // using it again ends the tokens that followed it too (a stolen token was replayed).
     // A second app: the first one is already allowed, so it would skip the consent page.
     const second = await connect(p, { level: 'write' });
-    const again = await refresh(second.tokens.refresh_token!);
+    const again = await refresh(second.tokens.refresh_token!, second.client.clientId);
     expect(again.status, await again.clone().text()).toBe(200);
     const after = (await again.json()) as Tokens;
     await server.db
       .update(schema.oauthRefreshToken)
       .set({ rotationReplayExpiresAt: new Date(Date.now() - 1000) })
       .where(sql`${schema.oauthRefreshToken.rotatedAt} is not null`);
-    expect((await refresh(second.tokens.refresh_token!)).status).toBe(400);
-    expect((await refresh(after.refresh_token!)).status).toBe(400);
+    expect((await refresh(second.tokens.refresh_token!, second.client.clientId)).status).toBe(400);
+    expect((await refresh(after.refresh_token!, second.client.clientId)).status).toBe(400);
   });
 
   it('MCP-A05 open registration makes an unverified app; the 11th in an hour from one address is 429', async () => {
