@@ -345,3 +345,31 @@ cloud container.
   only. It is reworked to this plan, with tests, after approval.
 - **The migration number** may clash with parallel work. Take the next free number at build time, and back up the
   production database before releasing it.
+
+## As built (28 Oct 2026)
+
+Where the build differs from the plan above, and why.
+
+- **CIMD** uses the official `@better-auth/cimd` plugin (profile `mcp-2026-07-28`) with its SSRF-safe fetch, not our
+  own code. The private-address and redirect checks are the library's; it caps a document at 5 KB, not 64 KB.
+- **What an app may do** lives in a new `oauth_grants` row per person and app, not on the plugin's consent row.
+- **No purge stream.** Every tool calls the API with the caller's bearer, so a revoked key or app is refused on its
+  very next call. The MCP server's 30 s check only guards its own door.
+- **A key calling the key routes** (`/api/keys`, `/api/apps`) gets 403, not 401: it is a valid bearer that may not do
+  this.
+- **The MCP server** has its own small client over `fetch`, not `@tudu/client`, and calls the API by its public
+  address. Its default time zone comes from `TUDU_TIME_ZONE` (the composes set `Asia/Kolkata`).
+- **Settings gets the MCP address** from `GET /api/apps` (`url`), so the web build needs no new variable.
+- **Signing in for an app** sends the signed request with the code itself (read as the page loads), instead of the
+  `oauthProviderClient` plugin reading the address at request time.
+- **Key dialog:** Create with Only some and no space picked says "Pick at least one space, or choose All my spaces."
+  (as the design does) rather than turning Create off. On phones the dialog is a sheet.
+- **ConfirmDialog** shows why it failed under the ask, with the icon, as the design system (v53) has it, for every
+  ask, not only revoking.
+- **A new key's row glows once;** a newly connected app does not (it is connected from another tab). MCP-E03 checks
+  the row instead.
+- **Icon `spark`** was not needed.
+- **Not built here:** the reviewer sign-in (`REVIEW_ACCOUNTS`) and the directory listings. They belong to the
+  Publishing PR.
+- **Before releasing:** back up the production database, since migration 0020 adds tables and a column. Add the
+  Dokploy domains `mcp.staging.tudu.ezdev.net` and `mcp.tudu.ezdev.net` (port 3457) for the new `mcp` service.
