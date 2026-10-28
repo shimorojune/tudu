@@ -16,8 +16,10 @@ import type { IssueTracker } from './feedback/github';
 import { fileRoutes } from './routes/files';
 import { meRoutes } from './routes/me';
 import { inboxRoutes } from './routes/inbox';
-import { keyRoutes } from './routes/keys';
+import { aiRoutes } from './routes/ai';
 import { keyAccess } from './middleware/keyAccess';
+import { Limiter, REGISTERS_PER_HOUR } from './ai/limits';
+import { oauthProviderAuthServerMetadata } from '@better-auth/oauth-provider';
 import { connectorRoutes } from './routes/connectors';
 import { fakeJira } from './connectors/jira/fake';
 import { TokenSeal } from './connectors/seal';
@@ -131,12 +133,25 @@ export function createApp(deps: AppDeps) {
     await next();
   });
 
+  // AI access (OAuth): where apps find the authorization server. RFC 8414 puts the issuer's path after the name.
+  const metadata = oauthProviderAuthServerMetadata(auth, { headers: { 'Access-Control-Allow-Origin': '*' } });
+  app.get('/.well-known/oauth-authorization-server', (c) => metadata(c.req.raw));
+  app.get('/.well-known/oauth-authorization-server/api/auth', (c) => metadata(c.req.raw));
+  // Apps registering themselves (DCR): ten an hour from one address. Better Auth's own limit runs only in production.
+  const registers = new Limiter(REGISTERS_PER_HOUR, 3_600_000);
+  app.post('/api/auth/oauth2/register', async (c, next) => {
+    const wait = registers.take(clientAddress(c.req.raw.headers));
+    if (wait === null) return next();
+    c.header('Retry-After', String(wait));
+    return c.json({ error: 'slow_down', error_description: 'Too many registrations. Try again later.' }, 429);
+  });
+
   app.on(['GET', 'POST'], '/api/auth/*', (c) => auth.handler(c.req.raw));
 
-  app.use('/api/*', sessionMiddleware(auth, db));
-  // API keys reach only what they were made for (PROTOTYPE, MCP try-out).
+  app.use('/api/*', sessionMiddleware(auth, db, { resource: env.MCP_URL }));
+  // Keys and apps reach only what they were allowed (docs/plans/mcp-server.md).
   app.use('/api/*', keyAccess(db));
-  app.route('/api', keyRoutes(db));
+  app.route('/api', aiRoutes(db, auth, env.AUTH_SECRET));
   app.route('/api', meRoutes(db, hub, mailer, storage));
   app.route('/api', taskRoutes(db, hub, deps.embeddings, storage));
   app.route('/api', notebookRoutes(db, storage));
@@ -192,3 +207,14 @@ export function createApp(deps: AppDeps) {
 }
 
 export type App = ReturnType<typeof createApp>;
+
+/** The caller's address as the proxy in front saw it: the last `X-Forwarded-For` entry is the one it added. */
+function clientAddress(headers: Headers): string {
+  const hops =
+    headers
+      .get('x-forwarded-for')
+      ?.split(',')
+      .map((h) => h.trim())
+      .filter(Boolean) ?? [];
+  return hops.at(-1) ?? headers.get('x-real-ip') ?? 'local';
+}

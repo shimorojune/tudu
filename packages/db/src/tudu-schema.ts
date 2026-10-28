@@ -314,6 +314,8 @@ export const taskEvents = pgTable(
     /** The event's facts: { due }, { from, to }. */
     data: jsonb('data').$type<Record<string, unknown>>().notNull().default({}),
     actorId: text('actor_id').references(() => user.id, { onDelete: 'set null' }),
+    /** AI access: made through an app or a key ("app:Claude", "key:Claude Code"); null when made in Tudu. */
+    via: text('via'),
     at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('task_events_task').on(t.taskId, t.id)],
@@ -736,4 +738,46 @@ export const apiKeys = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('api_keys_hash').on(t.hash), index('api_keys_user').on(t.userId)],
+);
+
+/**
+ * What you let an app do when you allowed it on the consent page (AI access): one row per person and app. Its OAuth
+ * tokens (Better Auth's `oauth_access_token`) say who and which app; this says how far, like a key's columns.
+ */
+export const oauthGrants = pgTable(
+  'oauth_grants',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    /** The app's OAuth client id (a metadata URL for apps that name themselves by one). */
+    clientId: text('client_id').notNull(),
+    level: text('level').$type<'read' | 'write'>().notNull(),
+    canDelete: boolean('can_delete').notNull().default(false),
+    spaces: jsonb('spaces').$type<string[] | null>(),
+    notebook: boolean('notebook').notNull().default(true),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('oauth_grants_user_client').on(t.userId, t.clientId)],
+);
+
+/** Every call an app or key made, kept 90 days for support and abuse checks. Not shown in the app. */
+export const accessLog = pgTable(
+  'access_log',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    grantKind: text('grant_kind').$type<'key' | 'app'>().notNull(),
+    /** The key's id, or the app's client id. */
+    grantId: text('grant_id').notNull(),
+    method: text('method').notNull(),
+    path: text('path').notNull(),
+    status: integer('status').notNull(),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('access_log_at').on(t.at), index('access_log_user').on(t.userId, t.at)],
 );

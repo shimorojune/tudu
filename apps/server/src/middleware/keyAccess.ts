@@ -1,14 +1,17 @@
 import type { Context, MiddlewareHandler } from 'hono';
 import { eq, schema, type Db } from '@tudu/db';
-import type { KeyAccess } from '../apiKeys';
+import { withVia, type Access } from '../ai/access';
+import { logCall } from '../ai/log';
+import { CALLS_PER_MINUTE, Limiter } from '../ai/limits';
 import type { SessionVars } from './session';
 
 /**
- * What a key may reach. A cookie session is untouched; a key gets only the routes listed here, and only within its
- * level, spaces, Notebook and delete. Account routes (keys, email, photo, members, invites, Jira) are never open to
- * a key: a leaked key can't make more keys or take the account.
+ * What a key or app may reach. A cookie session is untouched; a key or app gets only the routes listed here, and only
+ * within its level, spaces, Notebook and delete. Account routes (keys, apps, email, photo, members, invites, Jira)
+ * are never open to them: a leaked key can't make more keys or take the account.
  *
- * PROTOTYPE (MCP try-out branch).
+ * Every call is counted (120 a minute), logged in `access_log`, and changes it makes are recorded in history as
+ * made through it (`via`).
  */
 type Need = 'space' | 'notebook' | 'all-spaces' | 'any';
 const READS: Array<[RegExp, Need]> = [
@@ -43,68 +46,95 @@ const NEVER = new Set(['me.rename', 'space.update']);
 const isNotebook = (t: string) => /^(note|folder|drawing|trash)\./.test(t);
 
 const no = (c: Context, why: string) => c.json({ error: why }, 403);
+/** "This key", "This app": how refusals name the caller. */
+const self = (a: Access) => (a.kind === 'key' ? 'This key' : 'This app');
 
-export function keyAccess(db: Db): MiddlewareHandler<{ Variables: SessionVars }> {
+export function keyAccess(
+  db: Db,
+  limiter = new Limiter(CALLS_PER_MINUTE, 60_000),
+): MiddlewareHandler<{ Variables: SessionVars }> {
   return async (c, next) => {
     const a = c.get('access');
     if (!a) return next();
     const path = new URL(c.req.url).pathname;
     const method = c.req.method;
+    const userId = c.get('session')!.user.id;
 
-    if (method === 'POST' && path === '/api/sync') {
-      if (a.level !== 'write') return no(c, 'This key can only read.');
-      const body = (await c.req.json().catch(() => null)) as { mutations?: unknown[] } | null;
-      for (const m of body?.mutations ?? []) {
-        const why = await refuseMutation(db, a, m);
-        if (why) return no(c, why);
-      }
-      return next();
+    const wait = limiter.take(`${a.kind}:${a.id}:${userId}`);
+    if (wait !== null) {
+      c.header('Retry-After', String(wait));
+      await logCall(db, userId, a, method, path, 429);
+      return c.json({ error: `Too many calls. Try again in ${wait} seconds.` }, 429);
     }
-    if (method !== 'GET') return no(c, 'A key can’t do that. Sign in to Tudu to do it.');
-    const hit = READS.find(([re]) => re.test(path));
-    if (!hit) return no(c, 'A key can’t do that. Sign in to Tudu to do it.');
-    const need = hit[1];
-    if (need === 'space') {
-      const spaceId = path.split('/')[3]!;
-      if (a.spaces && !a.spaces.includes(spaceId)) return no(c, 'This key can’t reach that space.');
-    }
-    if (need === 'notebook' && !a.notebook) return no(c, 'This key can’t read your Notebook.');
-    if (need === 'all-spaces' && a.spaces) return no(c, 'This key reaches only some spaces, so not this.');
-    await next();
-
-    // Answers that cross spaces are narrowed to the key's.
-    if (c.res.status !== 200) return;
-    if (path === '/api/me' && a.spaces) {
-      const body = (await c.res.clone().json()) as { spaces?: Array<{ id: string }> };
-      body.spaces = body.spaces?.filter((s) => a.spaces!.includes(s.id));
-      c.res = Response.json(body, { headers: c.res.headers });
-    }
-    if (path === '/api/search' && (a.spaces || !a.notebook)) {
-      const body = (await c.res.clone().json()) as { hits?: Array<{ spaceId?: string }>; notes?: unknown };
-      if (a.spaces) body.hits = body.hits?.filter((h) => h.spaceId && a.spaces!.includes(h.spaceId));
-      if (!a.notebook) delete body.notes;
-      c.res = Response.json(body, { headers: c.res.headers });
-    }
-    if (path.startsWith('/api/tasks/ref/') && a.spaces) {
-      const body = (await c.res.clone().json()) as { spaceId?: string };
-      if (!body.spaceId || !a.spaces.includes(body.spaceId))
-        c.res = Response.json({ error: 'No task with that ID.' }, { status: 404 });
-    }
+    // A refusal sets `c.res` itself; anything else ran the route.
+    await guard(db, a, c, path, method, () => withVia(a, next));
+    await logCall(db, userId, a, method, path, c.res.status);
   };
 }
 
-/** Why a key may not send this change, or null when it may. */
-async function refuseMutation(db: Db, a: KeyAccess, raw: unknown): Promise<string | null> {
+async function guard(
+  db: Db,
+  a: Access,
+  c: Context<{ Variables: SessionVars }>,
+  path: string,
+  method: string,
+  next: () => Promise<void>,
+): Promise<Response | void> {
+  if (method === 'POST' && path === '/api/sync') {
+    if (a.level !== 'write') return (c.res = no(c, `${self(a)} can only read.`));
+    const body = (await c.req.json().catch(() => null)) as { mutations?: unknown[] } | null;
+    for (const m of body?.mutations ?? []) {
+      const why = await refuseMutation(db, a, m);
+      if (why) return (c.res = no(c, why));
+    }
+    return next();
+  }
+  const cant = `${a.kind === 'key' ? 'A key' : 'An app'} can’t do that. Sign in to Tudu to do it.`;
+  if (method !== 'GET') return (c.res = no(c, cant));
+  const hit = READS.find(([re]) => re.test(path));
+  if (!hit) return (c.res = no(c, cant));
+  const need = hit[1];
+  if (need === 'space') {
+    const spaceId = path.split('/')[3]!;
+    if (a.spaces && !a.spaces.includes(spaceId)) return (c.res = no(c, `${self(a)} can’t reach that space.`));
+  }
+  if (need === 'notebook' && !a.notebook) return (c.res = no(c, `${self(a)} can’t read your Notebook.`));
+  if (need === 'all-spaces' && a.spaces)
+    return (c.res = no(c, `${self(a)} reaches only some spaces, so not this.`));
+  await next();
+
+  // Answers that cross spaces are narrowed to the grant's.
+  if (c.res.status !== 200) return;
+  if (path === '/api/me' && a.spaces) {
+    const body = (await c.res.clone().json()) as { spaces?: Array<{ id: string }> };
+    body.spaces = body.spaces?.filter((s) => a.spaces!.includes(s.id));
+    c.res = Response.json(body, { headers: c.res.headers });
+  }
+  if (path === '/api/search' && (a.spaces || !a.notebook)) {
+    const body = (await c.res.clone().json()) as { hits?: Array<{ spaceId?: string }>; notes?: unknown };
+    if (a.spaces) body.hits = body.hits?.filter((h) => h.spaceId && a.spaces!.includes(h.spaceId));
+    if (!a.notebook) delete body.notes;
+    c.res = Response.json(body, { headers: c.res.headers });
+  }
+  if (path.startsWith('/api/tasks/ref/') && a.spaces) {
+    const body = (await c.res.clone().json()) as { spaceId?: string };
+    if (!body.spaceId || !a.spaces.includes(body.spaceId))
+      c.res = Response.json({ error: 'No task with that ID.' }, { status: 404 });
+  }
+}
+
+/** Why a key or app may not send this change, or null when it may. */
+async function refuseMutation(db: Db, a: Access, raw: unknown): Promise<string | null> {
   const m = raw as { type?: unknown; payload?: Record<string, unknown> } | null;
   const type = typeof m?.type === 'string' ? m.type : '';
   const p = m?.payload ?? {};
-  if (NEVER.has(type)) return 'A key can’t change account or space settings.';
-  if (DELETES.has(type) && !a.canDelete) return 'This key can’t delete.';
+  if (NEVER.has(type)) return `${self(a)} can’t change account or space settings.`;
+  if (DELETES.has(type) && !a.canDelete) return `${self(a)} can’t delete.`;
   if (isNotebook(type)) {
-    if (!a.notebook) return 'This key can’t change your Notebook.';
+    if (!a.notebook) return `${self(a)} can’t change your Notebook.`;
     const taskId = type === 'note.create' ? p.linkTo : /^note\.(link|unlink)$/.test(type) ? p.taskId : null;
     if (a.spaces && typeof taskId === 'string' && !(await taskInSpaces(db, taskId, a.spaces)))
-      return 'This key can’t reach that space.';
+      return `${self(a)} can’t reach that space.`;
     return null;
   }
   if (!a.spaces) return null;
@@ -116,7 +146,7 @@ async function refuseMutation(db: Db, a: KeyAccess, raw: unknown): Promise<strin
     ok = await taskInSpaces(db, str(p.taskId), a.spaces);
   // Requests, the Inbox and All spaces' order cross spaces: only keys for every space send them.
   else ok = false;
-  return ok ? null : 'This key can’t reach that space.';
+  return ok ? null : `${self(a)} can’t reach that space.`;
 }
 
 async function taskInSpaces(db: Db, taskId: string, spaces: string[]): Promise<boolean> {

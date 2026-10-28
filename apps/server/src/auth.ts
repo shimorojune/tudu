@@ -1,6 +1,9 @@
 import { betterAuth } from 'better-auth';
 import { emailOTP } from 'better-auth/plugins';
 import { drizzleAdapter } from '@better-auth/drizzle-adapter';
+import { oauthProvider, type ClientMetadataResourceFetch } from '@better-auth/oauth-provider';
+import { cimd } from '@better-auth/cimd';
+import { fetchClientMetadataResource } from '@better-auth/cimd/node';
 import type { Db } from '@tudu/db';
 import { schema } from '@tudu/db';
 
@@ -17,6 +20,15 @@ export interface AuthDeps {
   onUserCreated?: (user: { id: string; email: string; name: string }) => Promise<void>;
   /** Runs after every sign-in's session is made (the first one tells a new account from a returning one). */
   onSessionCreated?: (session: { id: string; userId: string }) => Promise<void>;
+  /** The web app's origin: the sign-in and consent pages an app's OAuth request is sent to. */
+  webUrl: string;
+  /** The Tudu MCP server's address: the one resource Tudu's OAuth tokens are for (RFC 8707). */
+  mcpUrl: string;
+  /**
+   * How a Client ID Metadata Document is fetched. The default resolves the host once, refuses private addresses and
+   * never follows redirects; tests serve fixture documents instead.
+   */
+  fetchClientMetadata?: ClientMetadataResourceFetch;
 }
 
 /** Codes work for ten minutes. */
@@ -25,6 +37,12 @@ export const CODE_TTL_SECONDS = 600;
 export const CODE_ATTEMPTS = 4;
 /** Sessions last thirty days and are refreshed daily while in use. */
 export const SESSION_SECONDS = 60 * 60 * 24 * 30;
+/** An app's access token lasts an hour; its refresh token thirty days, and is replaced each time it is used. */
+export const APP_TOKEN_SECONDS = 60 * 60;
+export const APP_REFRESH_SECONDS = 60 * 60 * 24 * 30;
+/** Prefixes on what Tudu hands an app, so a token is told from an API key (`tudu_`) and secret scanners know it. */
+export const APP_TOKEN_PREFIX = 'tuduat_';
+export const APP_REFRESH_PREFIX = 'tudurt_';
 
 /**
  * Sign in is your email, then a 6-digit code we email you. No passwords; new people take the same two steps
@@ -69,6 +87,35 @@ export function createAuth(deps: AuthDeps) {
           if (type !== 'sign-in') return;
           await deps.sendCode(email, otp);
         },
+      }),
+      // AI access: Tudu is the authorization server for apps that use the MCP server (Claude, ChatGPT…). Tokens are
+      // opaque and looked up on every call, so a disconnect takes effect at once. What an app may do is its grant
+      // (`oauth_grants`), chosen on the consent page; the OAuth scopes stay plain.
+      oauthProvider({
+        loginPage: `${deps.webUrl}/sign-in`,
+        consentPage: `${deps.webUrl}/oauth/consent`,
+        disableJwtPlugin: true,
+        scopes: ['profile', 'email', 'offline_access'],
+        grantTypes: ['authorization_code', 'refresh_token'],
+        resources: [deps.mcpUrl],
+        enforcePerClientResources: false,
+        accessTokenExpiresIn: APP_TOKEN_SECONDS,
+        refreshTokenExpiresIn: APP_REFRESH_SECONDS,
+        // A client that refreshes twice at once gets the same answer for 30 seconds instead of being cut off.
+        refreshTokenReuseInterval: 30,
+        prefix: { opaqueAccessToken: APP_TOKEN_PREFIX, refreshToken: APP_REFRESH_PREFIX },
+        // Older clients still register themselves (DCR); Cursor and some Claude Code builds omit application_type.
+        allowDynamicClientRegistration: true,
+        allowUnauthenticatedClientRegistration: true,
+        clientRegistrationDefaultApplicationType: 'infer',
+        // Ten registrations an hour per address is plenty for real clients (Better Auth's limiter, production only;
+        // the API's own limiter in app.ts covers every environment).
+        rateLimit: { register: { window: 3600, max: 10 } },
+      }),
+      // Clients that name themselves by a metadata URL (MCP's preferred way): fetched, checked, cached an hour.
+      cimd({
+        fetchClientMetadataResource: deps.fetchClientMetadata ?? fetchClientMetadataResource,
+        metadataProfile: 'mcp-2026-07-28',
       }),
     ],
   });

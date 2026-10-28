@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1154.0",
+    "@better-auth/cimd": "^1.7.12",
     "@better-auth/drizzle-adapter": "^1.7.12",
+    "@better-auth/oauth-provider": "^1.7.12",
     "@hono/node-server": "^2.1.5",
     "@huggingface/transformers": "4.3.1",
     "@tudu/core": "workspace:^",
