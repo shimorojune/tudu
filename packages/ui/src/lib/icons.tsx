@@ -14,10 +14,12 @@ import {
   CircleCheck,
   CircleDot,
   Clock,
+  Copy,
   CornerDownRight,
   Ellipsis,
   Globe,
   House,
+  Key,
   Inbox,
   Laptop,
   Layers,
@@ -101,6 +103,10 @@ export const ICONS = {
   globe: Globe,
   /** An idea, in Your reports. */
   idea: Lightbulb,
+  /** An API key, in Settings › AI access. */
+  key: Key,
+  /** Copy a value (a key, a command). */
+  copy: Copy,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

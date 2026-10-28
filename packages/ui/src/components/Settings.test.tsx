@@ -28,7 +28,7 @@ describe('Settings', () => {
     const items = within(nav())
       .getAllByRole('button')
       .map((b) => b.textContent);
-    expect(items).toEqual(['Account', 'Appearance', 'Apps', 'Space', 'Members19']);
+    expect(items).toEqual(['Account', 'Appearance', 'Apps', 'AI access', 'Space', 'Members19']);
     expect(within(nav()).getByRole('button', { name: 'Account' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Account');
     expect(screen.getByText('rohit@x.y', { selector: '.tp-set-h p' })).toBeInTheDocument();
@@ -48,7 +48,7 @@ describe('Settings', () => {
       within(nav())
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['Account', 'Appearance', 'Apps', 'Space']);
+    ).toEqual(['Account', 'Appearance', 'Apps', 'AI access', 'Space']);
     expect(screen.getByText('Yours alone. Nothing here is shared.')).toBeInTheDocument();
 
     // phones: the list is the page, with your mark; rows carry their line; a section has ‹ Settings
@@ -63,6 +63,7 @@ describe('Settings', () => {
       'Accountrohit@x.y',
       'AppearanceDark',
       'AppsNone yet',
+      'AI accessNone yet',
       'SpaceName, colour, leaving',
       'Members19 people',
     ]);
@@ -388,7 +389,7 @@ describe('C16-U04 Settings › This Mac', () => {
       within(nav())
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['Account', 'Appearance', 'This Mac', 'Apps', 'Space', 'Members19']);
+    ).toEqual(['Account', 'Appearance', 'This Mac', 'Apps', 'AI access', 'Space', 'Members19']);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('This Mac');
     expect(screen.getByText('How Tudu runs on this Mac.')).toBeInTheDocument();
   });

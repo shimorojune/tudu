@@ -1,5 +1,6 @@
 import { DEFAULT_HOURS, deleteWords, hoursLine, membersWords, spaceInitials, spaceLine } from '@tudu/core';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { AiAccess, type AiAccessData, type AiGrant } from './AiAccess';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
 import type { ThemeChoice } from '../lib/theme';
@@ -23,7 +24,8 @@ import { SpaceTile } from './SpaceTile';
 import { Switch } from './Switch';
 import { ThemePick } from './ThemePick';
 
-export type SettingsSectionName = 'account' | 'appearance' | 'hours' | 'mac' | 'space' | 'members' | 'apps';
+export type SettingsSectionName =
+  'account' | 'appearance' | 'hours' | 'mac' | 'space' | 'members' | 'apps' | 'ai';
 
 /** Open at login, as macOS has it: `approval` waits for your OK in Login Items, `refused` is macOS saying no. */
 export type SettingsLogin = 'off' | 'on' | 'approval' | 'refused';
@@ -182,6 +184,15 @@ export interface SettingsProps {
   onJiraReconnect?: () => void;
   /** Read the spaces again after they couldn't be read. */
   onRetry?: () => void;
+
+  // AI access: listed under You on every device.
+  aiAccess?: AiAccessData;
+  /** New key. */
+  onAiCreate?: () => void;
+  /** Disconnect an app, revoke a key, or remove one that expired. */
+  onAiRevoke?: (x: AiGrant, kind: 'app' | 'key') => void;
+  /** Read the apps and keys again after they couldn't be read. */
+  onAiRetry?: () => void;
 
   /** Which Tudu this is, at the foot of the list: a link to its release on GitHub. */
   version?: VersionLinkProps;
@@ -701,6 +712,16 @@ function UpdatesSection({ u }: { u: SettingsUpdates }) {
   );
 }
 
+/** Settings › AI access in the list: "None yet", "1 app · 2 keys". */
+function aiSub(a: AiAccessData | undefined): string {
+  const apps = a?.apps?.length ?? 0;
+  const keys = a?.keys?.length ?? 0;
+  if (!apps && !keys) return 'None yet';
+  return [apps ? plural(apps, 'app', 'apps') : null, keys ? plural(keys, 'key', 'keys') : null]
+    .filter(Boolean)
+    .join(' · ');
+}
+
 const TITLES = (p: SettingsProps): Record<SettingsSectionName, [string, string]> => ({
   account: ['Account', p.me.email],
   appearance: ['Appearance', 'How Tudu looks on this computer.'],
@@ -722,6 +743,7 @@ const TITLES = (p: SettingsProps): Record<SettingsSectionName, [string, string]>
           'Apps',
           `What you’ve connected in ${p.space.name}.${p.space.personal ? '' : ' Each person connects their own.'}`,
         ],
+  ai: ['AI access', 'Use Tudu from Claude, ChatGPT and your own tools.'],
 });
 
 /**
@@ -785,6 +807,7 @@ export function Settings(p: SettingsProps) {
             ]
           : []),
         ...(acct ? [appsItem] : []),
+        { value: 'ai', label: 'AI access', icon: 'link', sub: aiSub(p.aiAccess) },
       ],
     },
     {
@@ -1062,6 +1085,15 @@ export function Settings(p: SettingsProps) {
       />
     );
   else if (sec === 'apps' && acct) body = <AccountApps p={p} />;
+  else if (sec === 'ai')
+    body = (
+      <AiAccess
+        access={p.aiAccess ?? { url: '', loading: true }}
+        onCreate={p.onAiCreate}
+        onRevoke={p.onAiRevoke}
+        onRetry={p.onAiRetry}
+      />
+    );
   else if (sec === 'apps') {
     const j = p.jira;
     body = (
