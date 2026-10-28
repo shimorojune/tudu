@@ -1,14 +1,15 @@
 /**
  * The Tudu API, as the caller. The MCP server keeps no data and no secrets of its own: every call carries the
- * caller's key (or, later, their OAuth token), so the API decides what it may see and change.
+ * caller's key or app token, so the API decides what it may see and change.
  */
 export interface Access {
   user: { id: string; name: string; email: string };
   access:
     | { kind: 'session' }
     | {
-        kind: 'key';
-        keyId: string;
+        kind: 'key' | 'app';
+        /** The key's id, or the app's OAuth client id. */
+        id: string;
         name: string;
         level: 'read' | 'write';
         canDelete: boolean;
