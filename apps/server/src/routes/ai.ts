@@ -15,7 +15,7 @@ import { requireSession, requireSignIn, type SessionVars } from '../middleware/s
 export function aiRoutes(
   db: Db,
   auth: Auth,
-  secret: string,
+  { secret, baseUrl }: { secret: string; baseUrl: string },
   keyLimiter = new Limiter(KEYS_PER_HOUR, 3_600_000),
 ) {
   const r = new Hono<{ Variables: SessionVars }>();
@@ -113,14 +113,33 @@ export function aiRoutes(
     return finish(c.req.raw.headers, query, false);
   });
 
+  /**
+   * Lets the OAuth server finish as if the page had posted to it: through its handler with a real request (the
+   * allow path runs its authorize step, which reads the request), the browser's cookie and origin carried over.
+   */
   const finish = async (headers: Headers, query: string, accept: boolean) => {
-    // Asked for JSON, the OAuth server answers where to go instead of throwing a redirect.
-    const asJson = new Headers(headers);
-    asJson.set('accept', 'application/json');
-    const out = (await auth.api.oauth2Consent({ body: { accept, oauth_query: query }, headers: asJson })) as {
+    const h = new Headers();
+    for (const name of ['cookie', 'origin', 'user-agent']) {
+      const v = headers.get(name);
+      if (v) h.set(name, v);
+    }
+    // Asked for JSON, it answers where to go instead of redirecting.
+    h.set('accept', 'application/json');
+    h.set('content-type', 'application/json');
+    const res = await auth.handler(
+      new Request(new URL('/api/auth/oauth2/consent', baseUrl), {
+        method: 'POST',
+        headers: h,
+        body: JSON.stringify({ accept, oauth_query: query }),
+      }),
+    );
+    const out = (await res.json().catch(() => null)) as {
       url?: string;
-    };
-    if (!out?.url) return Response.json(BAD_LINK, { status: 400 });
+      error_description?: string;
+      message?: string;
+    } | null;
+    if (!res.ok || !out?.url)
+      return Response.json({ ...BAD_LINK, detail: out?.error_description ?? out?.message }, { status: 400 });
     return Response.json({ url: out.url });
   };
 

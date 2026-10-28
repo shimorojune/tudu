@@ -26,8 +26,16 @@ export async function startMcp(cfg: Pick<McpConfig, 'fetch'> & Partial<McpConfig
     version: '0.0.0-test',
     ...cfg,
   });
+  // Skybridge reads these as it starts: production leaves its dev tools out. Only while it starts, so the API in
+  // the same process keeps running as a test (its sign-in limits are off there).
+  const env = process.env.NODE_ENV;
   process.env.__PORT = String(port);
-  await app.run();
+  process.env.NODE_ENV = 'production';
+  try {
+    await app.run();
+  } finally {
+    process.env.NODE_ENV = env;
+  }
   return { url };
 }
 

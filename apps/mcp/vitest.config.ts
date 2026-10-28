@@ -11,6 +11,6 @@ export default defineConfig({
     fileParallelism: false,
     testTimeout: 20_000,
     hookTimeout: 60_000,
-    env: { SKYBRIDGE_TELEMETRY_DISABLED: '1', NODE_ENV: 'production' },
+    env: { SKYBRIDGE_TELEMETRY_DISABLED: '1' },
   },
 });
