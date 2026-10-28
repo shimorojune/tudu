@@ -64,13 +64,23 @@ export const htmlOf = (text: string) =>
     .split(/\n{2,}/)
     .map((p) => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`)
     .join('');
+/** Drops tags until none are left, so a tag split around another (`<scr<b>ipt>`) can't come back together. */
+function untag(html: string): string {
+  let out = html;
+  for (let prev = ''; prev !== out;) {
+    prev = out;
+    out = out.replace(/<[^>]*>/g, '');
+  }
+  return out;
+}
 /** Tudu's HTML out, as plain text the model reads easily. */
 export const textOf = (html: string) =>
-  html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(p|li|h\d|blockquote)>/gi, '\n')
-    .replace(/<li[^>]*>/gi, '- ')
-    .replace(/<[^>]+>/g, '')
+  untag(
+    html
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|li|h\d|blockquote)>/gi, '\n')
+      .replace(/<li[^>]*>/gi, '- '),
+  )
     .replace(/&nbsp;/g, ' ')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
