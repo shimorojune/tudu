@@ -311,7 +311,12 @@ test.describe('the one Inbox', () => {
   }) => {
     test.skip(phone(), 'the same notice on every size');
     const w = await world(page, browser);
+    // Opening the Inbox drops and reopens the live stream; a removal sent in that gap is never heard.
+    const live = page
+      .waitForResponse((r) => r.url().includes('/api/events'), { timeout: 5_000 })
+      .catch(() => null);
     await goInbox(page);
+    await live;
     const res = await w.b.page.request.delete(`${API_URL}/api/spaces/${w.pf.id}/members/${w.aId}`);
     expect(res.status()).toBe(204);
     const notice = row(page, 'Pilot Farm');
