@@ -707,3 +707,33 @@ export const noteLinks = pgTable(
   },
   (t) => [primaryKey({ columns: [t.noteId, t.taskId] }), index('note_links_task').on(t.taskId)],
 );
+
+/**
+ * Your keys for using Tudu from other tools (an MCP client, a script). Only the key's SHA-256 is kept; the key is
+ * shown once, when it is made. A key can do what you can, narrowed by its level, spaces, Notebook and delete.
+ */
+export const apiKeys = pgTable(
+  'api_keys',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    /** The key's first characters ("tudu_3fK9"), so you can tell keys apart. */
+    start: text('start').notNull(),
+    hash: text('hash').notNull(),
+    /** `read`: GET only. `write`: changes too. */
+    level: text('level').$type<'read' | 'write'>().notNull(),
+    /** Write keys only: may delete tasks, notes and the rest. */
+    canDelete: boolean('can_delete').notNull().default(false),
+    /** The spaces it may reach; null is every space you are in, now and later. */
+    spaces: jsonb('spaces').$type<string[] | null>(),
+    notebook: boolean('notebook').notNull().default(true),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('api_keys_hash').on(t.hash), index('api_keys_user').on(t.userId)],
+);

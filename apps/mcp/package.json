@@ -1,0 +1,21 @@
+{
+  "name": "@tudu/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tudu's MCP server (PROTOTYPE): tools over the Tudu API, with the caller's own key.",
+  "scripts": {
+    "dev": "SKYBRIDGE_TELEMETRY_DISABLED=1 NODE_ENV=production __PORT=${MCP_PORT:-3457} tsx watch src/index.ts",
+    "start": "SKYBRIDGE_TELEMETRY_DISABLED=1 NODE_ENV=production __PORT=${MCP_PORT:-3457} node --import tsx src/index.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "skybridge": "2.1.0",
+    "tsx": "^4.23.15",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.5"
+  }
+}

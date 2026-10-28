@@ -16,6 +16,8 @@ import type { IssueTracker } from './feedback/github';
 import { fileRoutes } from './routes/files';
 import { meRoutes } from './routes/me';
 import { inboxRoutes } from './routes/inbox';
+import { keyRoutes } from './routes/keys';
+import { keyAccess } from './middleware/keyAccess';
 import { connectorRoutes } from './routes/connectors';
 import { fakeJira } from './connectors/jira/fake';
 import { TokenSeal } from './connectors/seal';
@@ -131,7 +133,10 @@ export function createApp(deps: AppDeps) {
 
   app.on(['GET', 'POST'], '/api/auth/*', (c) => auth.handler(c.req.raw));
 
-  app.use('/api/*', sessionMiddleware(auth));
+  app.use('/api/*', sessionMiddleware(auth, db));
+  // API keys reach only what they were made for (PROTOTYPE, MCP try-out).
+  app.use('/api/*', keyAccess(db));
+  app.route('/api', keyRoutes(db));
   app.route('/api', meRoutes(db, hub, mailer, storage));
   app.route('/api', taskRoutes(db, hub, deps.embeddings, storage));
   app.route('/api', notebookRoutes(db, storage));
