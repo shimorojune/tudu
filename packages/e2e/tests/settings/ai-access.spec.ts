@@ -143,7 +143,7 @@ test.describe('AI access', () => {
 
     await expect(page).toHaveURL(/\/oauth\/consent\?/, { timeout: 10_000 });
     await expect(page.getByRole('heading', { name: 'Allow Claude?' })).toBeVisible();
-    await expect(page.getByText(email)).toBeVisible();
+    await expect(page.locator('.tp-auth-as')).toContainText(email);
     await expect(page.getByText('Read and write · All spaces · Notebook')).toBeVisible();
     await page.getByRole('button', { name: 'Change' }).click();
     await page.getByRole('button', { name: 'Only some' }).click();
@@ -202,7 +202,7 @@ test.describe('AI access', () => {
     const sheet = page.getByRole('dialog', { name: 'New API key' });
     await expect(sheet).toHaveClass(/tp-dlg-sheet/);
     await sheet.getByRole('button', { name: 'Cancel' }).click();
-    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.locator('.tp-set-back').click();
     await expect(page).toHaveURL(/\/me\/settings$/);
     await page.getByRole('navigation', { name: 'Settings' }).getByRole('button', { name: /^Apps/ }).click();
     const appsLeft = (await page.locator('.tp-set-apps .tp-setrow').first().boundingBox())!.x;

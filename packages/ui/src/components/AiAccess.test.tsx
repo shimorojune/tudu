@@ -148,7 +148,7 @@ describe('AI access', () => {
     let done: () => void = () => {};
     const onAllow = vi.fn(() => new Promise<void>((r) => (done = r)));
     const onDeny = vi.fn();
-    const { rerender } = render(
+    const first = render(
       <OAuthConsent
         inline
         state="ask"
@@ -181,7 +181,9 @@ describe('AI access', () => {
     });
     expect(screen.getByRole('button', { name: /Allowed/ })).toHaveClass('tp-ok');
 
-    rerender(
+    // A fresh page: the one above is still Allowed, with Cancel off.
+    first.unmount();
+    const { rerender } = render(
       <OAuthConsent inline state="ask" client={{ name: 'Helper', verified: false }} onDeny={onDeny} />,
     );
     expect(screen.getByText('Tudu can’t confirm who made this app.')).toBeInTheDocument();

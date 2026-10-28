@@ -471,20 +471,27 @@ describe('AI access: apps (OAuth)', () => {
     const next = (await res.json()) as Tokens;
     expect(next.refresh_token).not.toBe(tokens.refresh_token);
     expect((await getAs('/api/me', next.access_token)).status).toBe(200);
-    // Within 30 s a client racing itself gets the same answer again; past that, the old refresh token is spent.
-    await server.db
-      .update(schema.oauthRefreshToken)
-      .set({ rotationReplayExpiresAt: new Date(Date.now() - 1000) })
-      .where(sql`${schema.oauthRefreshToken.rotatedAt} is not null`);
-    expect((await refresh(tokens.refresh_token!)).status).toBe(400);
-
+    // Revoking the refresh token ends it.
     const revoke = await server.app.request('/api/auth/oauth2/revoke', {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ token: next.refresh_token!, client_id: client.clientId }).toString(),
     });
-    expect(revoke.status).toBe(200);
+    expect(revoke.status, await revoke.clone().text()).toBe(200);
     expect((await refresh(next.refresh_token!)).status).toBe(400);
+
+    // Within 30 s a client racing itself gets the same answer again; past that, the old refresh token is spent, and
+    // using it again ends the tokens that followed it too (a stolen token was replayed).
+    const second = await connect(p, { level: 'write' }, c);
+    const again = await refresh(second.tokens.refresh_token!);
+    expect(again.status, await again.clone().text()).toBe(200);
+    const after = (await again.json()) as Tokens;
+    await server.db
+      .update(schema.oauthRefreshToken)
+      .set({ rotationReplayExpiresAt: new Date(Date.now() - 1000) })
+      .where(sql`${schema.oauthRefreshToken.rotatedAt} is not null`);
+    expect((await refresh(second.tokens.refresh_token!)).status).toBe(400);
+    expect((await refresh(after.refresh_token!)).status).toBe(400);
   });
 
   it('MCP-A05 open registration makes an unverified app; the 11th in an hour from one address is 429', async () => {
