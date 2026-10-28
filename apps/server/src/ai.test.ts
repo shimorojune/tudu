@@ -471,10 +471,10 @@ describe('AI access: apps (OAuth)', () => {
     const next = (await res.json()) as Tokens;
     expect(next.refresh_token).not.toBe(tokens.refresh_token);
     expect((await getAs('/api/me', next.access_token)).status).toBe(200);
-    // Past the 30 s grace for clients racing themselves, the old refresh token is spent.
+    // Within 30 s a client racing itself gets the same answer again; past that, the old refresh token is spent.
     await server.db
       .update(schema.oauthRefreshToken)
-      .set({ rotatedAt: new Date(Date.now() - 60_000) })
+      .set({ rotationReplayExpiresAt: new Date(Date.now() - 1000) })
       .where(sql`${schema.oauthRefreshToken.rotatedAt} is not null`);
     expect((await refresh(tokens.refresh_token!)).status).toBe(400);
 
