@@ -1,0 +1,38 @@
+name: 'Phase 0: Dokploy reachable from hosted runners'
+
+# Throwaway check for docs/plans/hosted-deploy-runners.md: can a GitHub-hosted runner call Dokploy's API?
+# Read-only (compose.one). Deleted again once it has answered.
+on:
+  push:
+    branches: [claude/project-thread-c5zjfp]
+    paths: [.github/workflows/dokploy-reachability.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  reach:
+    name: Reach Dokploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call compose.one for staging
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          COMPOSE_ID: ${{ secrets.DOKPLOY_STAGING_COMPOSE_ID }}
+        run: |
+          node -e '
+            const u = new URL(process.env.DOKPLOY_URL);
+            const host = u.hostname;
+            const shape = /^\d+\.\d+\.\d+\.\d+$/.test(host) ? "ip" : host.includes(".") ? "dns" : "single-label (internal)";
+            console.log(`scheme=${u.protocol} host-shape=${shape} port=${u.port || "default"}`);
+          '
+          code=$(curl -sS -o body.json -w '%{http_code}' --max-time 20 \
+            -H "x-api-key: $DOKPLOY_API_KEY" -H 'accept: application/json' \
+            "$DOKPLOY_URL/api/compose.one?composeId=$COMPOSE_ID" || echo "curl-failed")
+          echo "http=$code"
+          if [ "$code" = "200" ]; then
+            node -e 'const b=require("./body.json"); console.log("composeStatus=" + b.composeStatus + " sourceType=" + b.sourceType + " autoDeploy=" + b.autoDeploy)'
+          fi
+          test "$code" = "200"
