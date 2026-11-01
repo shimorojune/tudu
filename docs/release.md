@@ -77,10 +77,10 @@ by logging in with GitHub's OIDC token (docs/plans/infisical-secrets.md). GitHub
 | `prod`        | `/release` | `RELEASE_DEPLOY_KEY` (step 7)                                     |
 
 Machine identities, OIDC auth (issuer and discovery URL `https://token.actions.githubusercontent.com`, audience
-`https://github.com/shimorojune`, claim `repository` = `shimorojune/tudu`), each with a role that only reads its env:
+`https://github.com/shimorojune`, claim `repository` = `shimorojune/tudu`), each the project's Viewer role (per-environment roles need Infisical Enterprise; the subject is the boundary):
 
-- `gha-staging`, subject `repo:shimorojune@44432182/tudu@1426778877:environment:staging`, reads `staging`
-- `gha-release`, subject `repo:shimorojune@44432182/tudu@1426778877:environment:release`, reads `prod`
+- `gha-staging`, subject `repo:shimorojune@44432182/tudu@1426778877:environment:staging`
+- `gha-release`, subject `repo:shimorojune@44432182/tudu@1426778877:environment:release`
 
 GitHub's subject for this repo carries the owner and repo ids; the plain `repo:shimorojune/tudu:...` form is refused.
 

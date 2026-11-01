@@ -98,7 +98,9 @@ Two identities in Infisical, each OIDC auth with:
   form is refused with "OIDC subject not allowed".
 - Bound claims: `repository: shimorojune/tudu` (belt and braces)
 - Access token TTL: 15 min, max TTL 30 min
-- Project role: read-only on **one** Infisical environment (`gha-staging` → `staging`, `gha-release` → `prod`)
+- Project role: built-in **Viewer** for both (custom per-environment roles need Infisical Enterprise, found 1 Nov
+  2026). So either identity could read both environments; the boundary that matters is the subject, which only
+  master-only GitHub environments match. Strict separation would mean one Infisical project per environment.
 
 ### Fallback: Universal Auth (client id + secret)
 
