@@ -61,7 +61,7 @@ jobs:
       - name: Token claims
         run: |
           jwt=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL" | jq -r .value)
-          echo "$jwt" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | jq '{sub, aud, iss, repository, repository_owner_id, environment, ref}' || true
+          JWT="$jwt" python3 -c 'import os,json,base64;p=os.environ["JWT"].split(".")[1];c=json.loads(base64.urlsafe_b64decode(p+"="*(-len(p)%4)));print(json.dumps({k:c.get(k) for k in ["sub","aud","iss","repository","repository_owner_id","environment","ref"]},indent=2))'
       - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
         with:
           method: oidc
