@@ -29,8 +29,15 @@ one throwaway database per run; end-to-end tests read sign-in codes from the tes
 | C01-U20 | Hosted deploy runners       | No job in any workflow runs on a self-hosted runner; the repo as it is passes every deploy rule (scripts/deploy-runners.mjs)                                                                   |
 | C01-U21 | Registry images             | Staging and production compose pull ghcr.io/shimorojune/tudu-{api,web,mcp}:<track> with pull_policy: always; a local image, the wrong track or pull_policy: never is named                     |
 | C01-U22 | arm64 images                | Every docker/build-push-action step builds linux/arm64 on an -arm runner                                                                                                                       |
-| C01-U23 | Dokploy key behind an env   | A job that reads a DOKPLOY_ secret declares an environment                                                                                                                                     |
+| C01-U23 | Dokploy key behind an env   | A job that reads a DOKPLOY\_ secret or loads Infisical's /dokploy declares an environment                                                                                                      |
 | C01-U24 | Rehearsal never pushes      | In release.yml the GHCR login is skipped and push is off when REHEARSAL is true                                                                                                                |
+| C01-U25 | No GitHub secrets           | No workflow reads a GitHub secret other than GITHUB_TOKEN; every secret inside a ${{ }} expression is named                                                                                    |
+| C01-U26 | Infisical step pinned       | Every Infisical/secrets-action step is pinned to a commit, logs in with OIDC, and takes identity, domain and project from vars                                                                 |
+| C01-U27 | Infisical behind an env     | A job with an Infisical step declares an environment and job-level id-token: write; id-token: write at workflow level is refused                                                               |
+| C01-U28 | Infisical env matches       | prod secrets only in a release job, staging secrets only in a staging job; an Infisical step in a rehearsal-capable job is skipped on PRs                                                      |
+| C01-U29 | Secrets forgotten           | Infisical secrets are blanked in GITHUB_ENV after their step, before any pnpm install                                                                                                          |
+| C01-U30 | Updater signature           | scripts/verify-updater-sig.mjs passes the configured key's signature, names both key ids for another key, fails a tampered file or malformed input                                             |
+| C01-U31 | Rehearsal signing key       | In release.yml the throwaway updater key runs only on rehearsals and the Infisical signing key only on real releases                                                                           |
 
 ## API (`apps/server`)
 

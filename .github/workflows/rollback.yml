@@ -66,6 +66,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ inputs.target == 'production' && 'release' || 'staging' }}
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
     container:
       image: mcr.microsoft.com/playwright:v1.64.1-noble
       options: --ipc=host
@@ -74,12 +77,20 @@ jobs:
       API: ${{ inputs.target == 'production' && 'https://api.tudu.ezdev.net' || 'https://api.staging.tudu.ezdev.net' }}
     steps:
       - uses: actions/checkout@v4
+      - name: Secrets from Infisical (/dokploy)
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
+          domain: ${{ vars.INFISICAL_URL }}
+          project-id: ${{ vars.INFISICAL_PROJECT }}
+          env-slug: ${{ inputs.target == 'production' && 'prod' || 'staging' }}
+          secret-path: /dokploy
       - name: Deploy through Dokploy
-        env:
-          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
-          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-          COMPOSE_ID: ${{ inputs.target == 'production' && secrets.DOKPLOY_PRODUCTION_COMPOSE_ID || secrets.DOKPLOY_STAGING_COMPOSE_ID }}
-        run: node scripts/dokploy-deploy.mjs "$COMPOSE_ID" "rollback to ${{ inputs.tag }}"
+        run: node scripts/dokploy-deploy.mjs "$DOKPLOY_COMPOSE_ID" "rollback to ${{ inputs.tag }}"
+      # pnpm install and the smoke test follow: third-party code must not see Dokploy's key.
+      - name: Forget the Infisical secrets
+        run: printf '%s=\n' DOKPLOY_URL DOKPLOY_API_KEY DOKPLOY_COMPOSE_ID >> "$GITHUB_ENV"
       - name: Wait until ready
         run: node scripts/wait-ready.mjs "$WEB" "$API"
       - uses: pnpm/action-setup@v4

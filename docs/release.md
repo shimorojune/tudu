@@ -63,16 +63,34 @@ Project Tudu › environment production › Create Service › Compose.
 
 5. Copy the compose id from the URL (`.../compose/<id>`).
 
-### 4. GitHub: the Dokploy secrets
+### 4. Infisical: the CI secrets
 
-Settings › Secrets and variables › Actions › New repository secret: `DOKPLOY_PRODUCTION_COMPOSE_ID` = the id from
-step 3.5. The other release secrets (`DOKPLOY_URL`, `DOKPLOY_API_KEY`, `TAURI_SIGNING_PRIVATE_KEY`,
-`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) are already set.
+CI holds no secrets of its own: every job reads them from Infisical (https://infisical.rraj.dev, project `tudu-ci`)
+by logging in with GitHub's OIDC token (docs/plans/infisical-secrets.md). GitHub keeps only variables.
 
-Every job that calls Dokploy runs in an environment: `staging` (deploy-staging.yml, Roll back) or `release`. Keep the
-Dokploy secrets (`DOKPLOY_URL`, `DOKPLOY_API_KEY`, `DOKPLOY_STAGING_COMPOSE_ID`, `DOKPLOY_PRODUCTION_COMPOSE_ID`) as
-environment secrets of `staging` and `release`, both limited to the `master` branch, and not as repository secrets,
-so no pull request job can read them.
+| Infisical env | Folder     | Secrets                                                           |
+| ------------- | ---------- | ----------------------------------------------------------------- |
+| `staging`     | `/dokploy` | `DOKPLOY_URL`, `DOKPLOY_API_KEY`, `DOKPLOY_COMPOSE_ID` (staging)  |
+| `staging`     | `/signing` | `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` |
+| `prod`        | `/dokploy` | the same three, `DOKPLOY_COMPOSE_ID` = the id from step 3.5       |
+| `prod`        | `/signing` | the same key as staging                                           |
+| `prod`        | `/release` | `RELEASE_DEPLOY_KEY` (step 7)                                     |
+
+Machine identities, OIDC auth (issuer and discovery URL `https://token.actions.githubusercontent.com`, audience
+`https://github.com/shimorojune`, claim `repository` = `shimorojune/tudu`), each with a role that only reads its env:
+
+- `gha-staging`, subject `repo:shimorojune@44432182/tudu@1426778877:environment:staging`, reads `staging`
+- `gha-release`, subject `repo:shimorojune@44432182/tudu@1426778877:environment:release`, reads `prod`
+
+GitHub's subject for this repo carries the owner and repo ids; the plain `repo:shimorojune/tudu:...` form is refused.
+
+GitHub variables (Settings › Secrets and variables › Actions › Variables): `INFISICAL_URL` and `INFISICAL_PROJECT`
+(the project id) on the repository; `INFISICAL_IDENTITY_ID` on the `staging` and `release` environments, both limited
+to the `master` branch, so no pull request job can get a token either identity accepts.
+
+**If Infisical is down:** deploys, releases and Roll back stop at their first step. To roll production back by hand,
+Dokploy › tudu-production-app › set the three images to the previous `sha-<sha>` tag › Deploy. Keep an offline copy
+of the signing key, its password and the deploy key in a password manager.
 
 `TAURI_SIGNING_PRIVATE_KEY` must be the secret half of the key whose public half is `plugins.updater.pubkey` in
 apps/desktop/src-tauri/tauri.conf.json (now key id 7120FCBE917C11ED, `~/.tauri/tudu.key` on Rohit's Mac). If they
@@ -100,8 +118,8 @@ its `chore(release): X.Y.Z` commit straight to master, so the release job checks
 that the ruleset lets through (docs/plans/release-deploy-key.md):
 
 - Settings › Deploy keys: `Release push`, with write access (the public half of an ed25519 key made for this).
-- Settings › Environments › `release`, limited to the `master` branch: the secret `RELEASE_DEPLOY_KEY` = the
-  private half. Pull request rehearsals run in `rehearsal` and never see it.
+- Infisical `prod` › `/release`: `RELEASE_DEPLOY_KEY` = the private half (step 4). Only jobs in the `release`
+  environment (master only) can read it; pull request rehearsals run in `rehearsal` and never see it.
 - Settings › Rules › the `master` ruleset › Bypass list: Deploy keys, and Repository admin for an emergency push.
 
 If a release fails in "Version and notes" with "push declined due to repository rule violations", one of these three

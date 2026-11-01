@@ -1,6 +1,9 @@
 # Move GitHub Actions secrets to Infisical (infisical.rraj.dev)
 
-Status: **proposal, awaiting Rohit's approval.** Nothing is implemented. Builds on PR #68
+Status: **approved by Rohit 1 Nov 2026** ("start step by step"), canvas not applicable. Being rolled out on PR #69.
+Changes while implementing: secrets live in folders (`/dokploy`, `/signing`, `/release`) so each job fetches only
+its own; the forget step is an inline `run:` (no composite action); `INFISICAL_PROJECT` holds the project id
+(`project-id:`); GitHub's OIDC subject for this repo is the ID-pinned form (§2). Builds on PR #68
 (`docs/plans/hosted-deploy-runners.md`: deploys from GitHub-hosted runners, `staging` / `release` environments).
 
 Design canvas: **not applicable.** This changes CI plumbing only; no screen, state or copy in the app or on the
