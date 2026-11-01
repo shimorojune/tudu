@@ -1,0 +1,42 @@
+name: 'Temporary: Infisical probe'
+
+# Phase 0 of docs/plans/infisical-secrets.md: can GitHub-hosted runners reach infisical.rraj.dev, and does it speak
+# OIDC machine-identity auth? Holds and reads no secrets. Removed before the real change merges.
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/infisical-probe.yml
+
+permissions:
+  contents: read
+
+jobs:
+  reach:
+    name: Reach Infisical (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    env:
+      URL: https://infisical.rraj.dev
+    steps:
+      - name: DNS and TLS
+        run: |
+          host=${URL#https://}
+          (getent hosts "$host" || dscacheutil -q host -a name "$host") || true
+          curl -sS -o /dev/null -m 20 -w 'ip %{remote_ip}, http %{http_code}, tls verify %{ssl_verify_result}, %{time_total}s\n' "$URL/"
+      - name: Status endpoint
+        run: |
+          code=$(curl -sS -m 20 -o status.json -w '%{http_code}' "$URL/api/status")
+          echo "HTTP $code"; head -c 1500 status.json; echo
+          test "$code" = 200
+      - name: OIDC login route exists
+        # A junk token must be refused (400/401/403); a 404 means this Infisical has no OIDC machine-identity auth.
+        run: |
+          code=$(curl -sS -m 20 -o oidc.json -w '%{http_code}' -X POST "$URL/api/v1/auth/oidc-auth/login" \
+            -H 'content-type: application/json' -d '{"identityId":"00000000-0000-0000-0000-000000000000","jwt":"x"}')
+          echo "HTTP $code"; head -c 800 oidc.json; echo
+          case "$code" in 400|401|403|422) echo "OIDC route present" ;; *) exit 1 ;; esac
