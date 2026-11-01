@@ -1,0 +1,94 @@
+name: 'Roll back web + API'
+
+# Points staging's or production's moving tag (`staging` / `production`) back at an earlier build's images in GHCR,
+# then redeploys, waits until ready and smoke-tests. No rebuild. Database migrations are not undone (docs/release.md).
+# The tag is one every build pushes: `sha-<full commit sha>` (staging and production) or `v<version>` (production).
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Which deployment
+        type: choice
+        options: [staging, production]
+        default: staging
+      tag:
+        description: Image tag to go back to (sha-<full commit sha> or v<version>)
+        type: string
+        required: true
+
+concurrency:
+  # Shares the deploy's group, so a rollback never races a deploy of the same target.
+  group: ${{ inputs.target == 'production' && 'release-refs/heads/master' || 'deploy-staging' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  retag:
+    name: Point ${{ inputs.target }} at ${{ inputs.tag }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: The tag looks like one we push
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if ! echo "$TAG" | grep -Eq '^(sha-[0-9a-f]{40}|v[0-9]+\.[0-9]+\.[0-9]+)$'; then
+            echo "::error::tag must be sha-<full commit sha> or v<version>, got $TAG"; exit 1
+          fi
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Retag the three images
+        env:
+          TAG: ${{ inputs.tag }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          # Check all three exist before moving any, so a typo never leaves a mixed set.
+          for img in tudu-api tudu-mcp tudu-web; do
+            docker buildx imagetools inspect "ghcr.io/shimorojune/$img:$TAG" > /dev/null
+          done
+          for img in tudu-api tudu-mcp tudu-web; do
+            docker buildx imagetools create -t "ghcr.io/shimorojune/$img:$TARGET" "ghcr.io/shimorojune/$img:$TAG"
+          done
+          echo "$TARGET now runs $TAG" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Deploy, wait, smoke
+    needs: retag
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target == 'production' && 'release' || 'staging' }}
+    timeout-minutes: 30
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --ipc=host
+    env:
+      WEB: ${{ inputs.target == 'production' && 'https://tudu.ezdev.net' || 'https://staging.tudu.ezdev.net' }}
+      API: ${{ inputs.target == 'production' && 'https://api.tudu.ezdev.net' || 'https://api.staging.tudu.ezdev.net' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy through Dokploy
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          COMPOSE_ID: ${{ inputs.target == 'production' && secrets.DOKPLOY_PRODUCTION_COMPOSE_ID || secrets.DOKPLOY_STAGING_COMPOSE_ID }}
+        run: node scripts/dokploy-deploy.mjs "$COMPOSE_ID" "rollback to ${{ inputs.tag }}"
+      - name: Wait until ready
+        run: node scripts/wait-ready.mjs "$WEB" "$API"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+      - run: pnpm install --frozen-lockfile
+      - name: Smoke test
+        run: pnpm e2e smoke
+        env:
+          E2E_BASE_URL: ${{ env.WEB }}
+          E2E_API_URL: ${{ env.API }}
+          CI: 'true'

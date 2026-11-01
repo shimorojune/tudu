@@ -1,10 +1,11 @@
 # Staging, as deployed by Dokploy (project Tudu, environment staging, service tudu-staging-app).
-# Images are built on the Dokploy host by the CI runner (.github/workflows/deploy-staging.yml) and used
-# straight from the host's image store: no registry, no pull.
+# Images are built for arm64 on GitHub's runner and pushed to GHCR (public packages) by
+# .github/workflows/deploy-staging.yml; every deploy pulls the moving `staging` tag. To roll back, point `staging` at
+# an older `sha-<sha>` with the Roll back workflow (docs/release.md).
 services:
   api:
-    image: tudu-api:staging
-    pull_policy: never
+    image: ghcr.io/shimorojune/tudu-api:staging
+    pull_policy: always
     environment:
       NODE_ENV: production
       PORT: '3456'
@@ -38,16 +39,16 @@ services:
       - dokploy-network
     restart: unless-stopped
   web:
-    image: tudu-web:staging
-    pull_policy: never
+    image: ghcr.io/shimorojune/tudu-web:staging
+    pull_policy: always
     networks:
       - dokploy-network
     restart: unless-stopped
   # Tudu's MCP server (apps/mcp), at https://mcp.staging.tudu.ezdev.net. It keeps no data and calls the API by its public
   # address with each caller's own key or app token.
   mcp:
-    image: tudu-mcp:staging
-    pull_policy: never
+    image: ghcr.io/shimorojune/tudu-mcp:staging
+    pull_policy: always
     environment:
       TUDU_API_URL: https://api.staging.tudu.ezdev.net
       TUDU_ISSUER: https://api.staging.tudu.ezdev.net/api/auth

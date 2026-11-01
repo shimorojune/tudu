@@ -2,12 +2,12 @@ name: 'Production: release'
 
 # A release, by hand: the next version from the conventional commits (semantic-release: tag tudu-X, the changelog,
 # a draft GitHub release), Tudu for macOS built against production and signed for the updater, its dmg, update bundle
-# and signature on the release, the production images built on the Dokploy host and deployed, then the release
-# published (only then does the update feed offer it).
+# and signature on the release, the production images built on GitHub's arm64 runner, pushed to GHCR and deployed by
+# Dokploy, then the release published (only then does the update feed offer it).
 #
 # Rehearsal (every pull request that touches the release path, or by hand with `rehearsal`): everything up to
 # publishing and deploying. The version is worked out without tagging, the app is built and signed and kept as
-# the run's artifacts, the images are built under a rehearsal tag.
+# the run's artifacts, the images are built but not pushed.
 
 on:
   workflow_dispatch:
@@ -142,22 +142,71 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "tudu-${{ needs.version.outputs.version }}" dist/*.dmg dist/Tudu.app.tar.gz dist/Tudu.app.tar.gz.sig --clobber
 
-  production:
-    name: 'Web + API: build and deploy'
+  # Built on GitHub's arm64 runner for the arm64 Dokploy host. A rehearsal only builds: no registry login, no push,
+  # no secrets. A release pushes `production`, `sha-<sha>` and `v<version>` to GHCR.
+  images:
+    name: 'Image (${{ matrix.image }})'
     needs: version
-    runs-on: [self-hosted, dokploy-deploy]
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - image: tudu-api
+            dockerfile: apps/server/Dockerfile
+          - image: tudu-mcp
+            dockerfile: apps/mcp/Dockerfile
+          - image: tudu-web
+            dockerfile: apps/web/Dockerfile
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.version.outputs.sha }}
-      - name: Images
-        run: |
-          TAG=${{ env.REHEARSAL == 'true' && 'rehearsal' || 'production' }}
-          docker build -f apps/server/Dockerfile -t tudu-api:$TAG .
-          docker build -f apps/mcp/Dockerfile -t tudu-mcp:$TAG .
-          docker build -f apps/web/Dockerfile --build-arg VITE_API_URL=https://api.tudu.ezdev.net --build-arg VITE_TUDU_TRACK=production --build-arg VITE_TUDU_VERSION=${{ needs.version.outputs.version }} -t tudu-web:$TAG .
-      - name: Deploy through Dokploy
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
         if: env.REHEARSAL != 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/arm64
+          push: ${{ env.REHEARSAL != 'true' }}
+          tags: |
+            ghcr.io/shimorojune/${{ matrix.image }}:production
+            ghcr.io/shimorojune/${{ matrix.image }}:sha-${{ needs.version.outputs.sha }}
+            ghcr.io/shimorojune/${{ matrix.image }}:v${{ needs.version.outputs.version }}
+          labels: org.opencontainers.image.source=https://github.com/shimorojune/tudu
+          # Only the web image reads these; the others ignore them.
+          build-args: |
+            VITE_API_URL=https://api.tudu.ezdev.net
+            VITE_TUDU_TRACK=production
+            VITE_TUDU_VERSION=${{ needs.version.outputs.version }}
+          cache-from: type=gha,scope=${{ matrix.image }}-production
+          cache-to: type=gha,scope=${{ matrix.image }}-production,mode=max
+
+  production:
+    name: 'Web + API: deploy'
+    needs: [version, images]
+    if: ${{ github.event_name != 'pull_request' && !inputs.rehearsal }}
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 30
+    # Playwright's own image for the smoke test, as the web end-to-end jobs; C01-U16 keeps its tag equal to the lockfile's.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --ipc=host
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+      - name: Deploy through Dokploy
         env:
           DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
@@ -165,11 +214,13 @@ jobs:
         run: node scripts/dokploy-deploy.mjs "$COMPOSE_ID" "release ${{ needs.version.outputs.version }}" infra/production/compose.yaml
       # Web and API both, several passes in a row: Dokploy reports done while the containers are still swapping.
       - name: Wait until production is ready
-        if: env.REHEARSAL != 'true'
         run: node scripts/wait-ready.mjs https://tudu.ezdev.net https://api.tudu.ezdev.net
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - run: pnpm install --frozen-lockfile
       - name: Smoke test production
-        if: env.REHEARSAL != 'true'
-        run: pnpm install --frozen-lockfile && pnpm e2e smoke
+        run: pnpm e2e smoke
         env:
           E2E_BASE_URL: https://tudu.ezdev.net
           E2E_API_URL: https://api.tudu.ezdev.net

@@ -1,5 +1,5 @@
 # The API, run from its TypeScript sources with tsx (no bundling, so the workspace packages resolve as in development).
-# Built for the host's own architecture (arm64 on the Dokploy box). Debian rather than Alpine since chunk 13: the
+# Built for linux/arm64 (the Dokploy host) on GitHub's arm64 runner. Debian rather than Alpine since chunk 13: the
 # embedding model runs on ONNX Runtime, whose Linux builds need glibc.
 FROM node:22-bookworm-slim
 ENV NODE_ENV=production
