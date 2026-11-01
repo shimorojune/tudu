@@ -34,9 +34,34 @@ jobs:
           echo "HTTP $code"; head -c 1500 status.json; echo
           test "$code" = 200
       - name: OIDC login route exists
-        # A junk token must be refused (400/401/403); a 404 means this Infisical has no OIDC machine-identity auth.
+        # A junk identity must be refused: 400/401/403, or the route's own 404 "OIDC auth method not found for
+        # identity". A bare 404 (no such route) means this Infisical has no OIDC machine-identity auth.
         run: |
           code=$(curl -sS -m 20 -o oidc.json -w '%{http_code}' -X POST "$URL/api/v1/auth/oidc-auth/login" \
             -H 'content-type: application/json' -d '{"identityId":"00000000-0000-0000-0000-000000000000","jwt":"x"}')
           echo "HTTP $code"; head -c 800 oidc.json; echo
-          case "$code" in 400|401|403|422) echo "OIDC route present" ;; *) exit 1 ;; esac
+          case "$code" in 400|401|403|422) echo "OIDC route present" ;; 404) grep -q 'OIDC auth method not found' oidc.json && echo "OIDC route present" ;; *) exit 1 ;; esac
+
+  oidc:
+    name: OIDC login end to end
+    # Phase 0b: a throwaway identity `gha-probe` bound to subject repo:shimorojune/tudu:pull_request, read-only on an
+    # Infisical environment `probe` holding PROBE=ok. Skipped until the repository variable INFISICAL_PROBE_IDENTITY_ID
+    # is set.
+    if: ${{ vars.INFISICAL_PROBE_IDENTITY_ID != '' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: ${{ vars.INFISICAL_PROBE_IDENTITY_ID }}
+          domain: https://infisical.rraj.dev
+          project-slug: ${{ vars.INFISICAL_PROJECT }}
+          env-slug: probe
+      - name: The value arrived and is masked
+        run: |
+          test "$PROBE" = ok
+          echo "PROBE prints as: $PROBE"
