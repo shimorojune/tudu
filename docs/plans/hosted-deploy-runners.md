@@ -1,7 +1,14 @@
 # Deploy from GitHub-hosted runners and drop the self-hosted runner
 
-Status: proposal, awaiting Rohit's approval. Canvas: not applicable (CI and infra only, nothing visible changes in the
-app); skipping it is asked separately.
+Status: approved by Rohit 1 Nov 2026 ("go ahead"), with the canvas skipped (CI and infra only). Implemented on branch
+`claude/project-thread-c5zjfp`. Changes from the proposal while implementing:
+
+- Phase 0 passed on 1 Nov 2026: `DOKPLOY_URL` is a public HTTPS DNS name and `compose.one` answered 200 from
+  `ubuntu-latest`. It also showed staging's compose is sourced from GitHub with **auto-deploy already off**, so the
+  overlap in §3 no longer exists.
+- Immutable tags use the full commit sha (`sha-<40 hex>`), not 7 characters, so a tag can never collide.
+- One PR for phases 1 to 4 (repo side), with a temporary seed job on the branch that creates the three GHCR packages
+  first, so they can be made public before the merge switches staging.
 
 ## Why
 

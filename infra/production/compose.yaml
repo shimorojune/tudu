@@ -1,10 +1,11 @@
 # Production, as deployed by Dokploy (project Tudu, environment production, service tudu-production-app), with the
-# domains tudu.ezdev.net (web) and api.tudu.ezdev.net (api). The Production: release workflow builds the images on the
-# Dokploy host (no registry) and deploys this file (.github/workflows/release.yml). Secret values live in Dokploy's env.
+# domains tudu.ezdev.net (web) and api.tudu.ezdev.net (api). The Production: release workflow builds the images on
+# GitHub's arm64 runner, pushes them to GHCR (public packages) and deploys this file (.github/workflows/release.yml);
+# every deploy pulls the moving `production` tag. Secret values live in Dokploy's env.
 services:
   api:
-    image: tudu-api:production
-    pull_policy: never
+    image: ghcr.io/shimorojune/tudu-api:production
+    pull_policy: always
     environment:
       NODE_ENV: production
       PORT: '3456'
@@ -34,16 +35,16 @@ services:
       - dokploy-network
     restart: unless-stopped
   web:
-    image: tudu-web:production
-    pull_policy: never
+    image: ghcr.io/shimorojune/tudu-web:production
+    pull_policy: always
     networks:
       - dokploy-network
     restart: unless-stopped
   # Tudu's MCP server (apps/mcp), at https://mcp.tudu.ezdev.net. It keeps no data and calls the API by its public
   # address with each caller's own key or app token.
   mcp:
-    image: tudu-mcp:production
-    pull_policy: never
+    image: ghcr.io/shimorojune/tudu-mcp:production
+    pull_policy: always
     environment:
       TUDU_API_URL: https://api.tudu.ezdev.net
       TUDU_ISSUER: https://api.tudu.ezdev.net/api/auth

@@ -2,7 +2,8 @@
 
 The Production: release workflow (`.github/workflows/release.yml`) does the release itself: the version and changelog from the
 conventional commits (semantic-release, tag `tudu-X.Y.Z`), Tudu for macOS built against production and signed for
-the updater, the production images built on the Dokploy host, the deploy of `infra/production/compose.yaml`, a smoke
+the updater, the production images built for arm64 on GitHub's runner and pushed to GHCR, the deploy of
+`infra/production/compose.yaml` (Dokploy pulls the images), a smoke
 test against production, then the GitHub release published (only then does the update feed offer it).
 
 This page is what has to be true before the first real run, and how to run one.
@@ -62,11 +63,16 @@ Project Tudu › environment production › Create Service › Compose.
 
 5. Copy the compose id from the URL (`.../compose/<id>`).
 
-### 4. GitHub: the last secret
+### 4. GitHub: the Dokploy secrets
 
 Settings › Secrets and variables › Actions › New repository secret: `DOKPLOY_PRODUCTION_COMPOSE_ID` = the id from
 step 3.5. The other release secrets (`DOKPLOY_URL`, `DOKPLOY_API_KEY`, `TAURI_SIGNING_PRIVATE_KEY`,
 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) are already set.
+
+Every job that calls Dokploy runs in an environment: `staging` (deploy-staging.yml, Roll back) or `release`. Keep the
+Dokploy secrets (`DOKPLOY_URL`, `DOKPLOY_API_KEY`, `DOKPLOY_STAGING_COMPOSE_ID`, `DOKPLOY_PRODUCTION_COMPOSE_ID`) as
+environment secrets of `staging` and `release`, both limited to the `master` branch, and not as repository secrets,
+so no pull request job can read them.
 
 `TAURI_SIGNING_PRIVATE_KEY` must be the secret half of the key whose public half is `plugins.updater.pubkey` in
 apps/desktop/src-tauri/tauri.conf.json (now key id 7120FCBE917C11ED, `~/.tauri/tudu.key` on Rohit's Mac). If they
@@ -77,7 +83,17 @@ than the one provided"). That happened from 23 to 26 Oct 2026; apps from before 
 
 `tudu.ezdev.net` and `api.tudu.ezdev.net` resolve to the Dokploy host (as `staging.` and `api.staging.` do).
 
-### 6. GitHub: the release push past the master ruleset
+### 6. GitHub: public images on GHCR
+
+The images live at `ghcr.io/shimorojune/tudu-api`, `tudu-web` and `tudu-mcp`, pushed by the workflows with their own
+token. Each package must be **public** (github.com › your profile › Packages › the package › Package settings ›
+Change visibility), so Dokploy pulls without credentials and the pulls cost nothing. Nothing secret is in an image:
+the API and MCP read everything from Dokploy's env at runtime, and the web image holds only the public API URL.
+
+Tags: `staging` and `production` move with each deploy; `sha-<full commit sha>` (every build) and `v<version>`
+(releases) never move, and are what a rollback goes back to.
+
+### 7. GitHub: the release push past the master ruleset
 
 `master` has a ruleset that requires the `CI passed` check, and that blocks direct pushes. semantic-release pushes
 its `chore(release): X.Y.Z` commit straight to master, so the release job checks out over SSH with a deploy key
@@ -99,6 +115,20 @@ is missing.
 3. Download the dmg from the GitHub release. The app is signed ad hoc (no Apple Developer ID): the first open needs
    right-click › Open (macOS 15: System Settings › Privacy & Security › Open Anyway). Later versions install
    themselves through the updater.
+
+### Rolling back
+
+Actions › Roll back web + API › Run workflow: target `staging` or `production`, and the tag to go back to
+(`v0.39.0`, or `sha-<full commit sha>` from an earlier staging or release run). It moves the target's tag to those
+images in GHCR, redeploys, waits until ready and smoke-tests: a couple of minutes, no rebuild. It does not undo
+migrations (below). Builds from before 1 Nov 2026 were never pushed to GHCR and can't be rolled back to.
+
+If Actions itself is down: in Dokploy, edit the production compose's three `image:` lines to `:v<version>` (or
+`:sha-<sha>`) and Deploy; put them back to `:production` once Actions is back, since the next release's deploy replaces
+the file anyway. Staging takes its compose from GitHub, so there a revert commit on master is the fallback.
+
+If a deploy fails with an image pull error, a package is private again or GHCR is down: check §6, then re-run the
+failed job.
 
 ### A release whose migration drops something
 

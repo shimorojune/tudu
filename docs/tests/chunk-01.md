@@ -26,6 +26,11 @@ one throwaway database per run; end-to-end tests read sign-in codes from the tes
 | C01-U17 | Playwright image            | A stale tag is reported with the file and both versions                                                                                                                                        |
 | C01-U18 | Playwright image            | No workflow using the image at all is a failure                                                                                                                                                |
 | C01-U19 | Playwright image            | The version comes from the lockfile's resolved entry, not the package.json range                                                                                                               |
+| C01-U20 | Hosted deploy runners       | No job in any workflow runs on a self-hosted runner; the repo as it is passes every deploy rule (scripts/deploy-runners.mjs)                                                                   |
+| C01-U21 | Registry images             | Staging and production compose pull ghcr.io/shimorojune/tudu-{api,web,mcp}:<track> with pull_policy: always; a local image, the wrong track or pull_policy: never is named                     |
+| C01-U22 | arm64 images                | Every docker/build-push-action step builds linux/arm64 on an -arm runner                                                                                                                       |
+| C01-U23 | Dokploy key behind an env   | A job that reads a DOKPLOY_ secret declares an environment                                                                                                                                     |
+| C01-U24 | Rehearsal never pushes      | In release.yml the GHCR login is skipped and push is off when REHEARSAL is true                                                                                                                |
 
 ## API (`apps/server`)
 

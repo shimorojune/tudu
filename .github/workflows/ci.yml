@@ -213,7 +213,7 @@ jobs:
           if-no-files-found: ignore
 
   # The API image builds and starts (chunk 13 bundles the close-matches model into it, on a Debian base): proved
-  # here on a GitHub runner, since staging builds it on the Dokploy host only after a merge.
+  # here on every PR, since staging builds and pushes it only after a merge.
   api-image:
     name: API and MCP Docker images
     needs: changes
