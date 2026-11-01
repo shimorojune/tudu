@@ -55,7 +55,7 @@ I could not check this: both the cloud container and the sandbox on your Mac ref
 1. A throwaway PR adds `.github/workflows/infisical-probe.yml` (`pull_request` trigger, `ubuntu-latest` and
    `macos-latest`) that runs `curl -fsS https://infisical.rraj.dev/api/status` and prints the version it reports.
 2. Same probe, OIDC end to end: you create a temporary machine identity `gha-probe` (OIDC auth, subject
-   `repo:shimorojune/tudu:pull_request`, see §2) with read on a throwaway Infisical environment `probe` holding
+   `repo:shimorojune@44432182/tudu@1426778877:pull_request`, see §2) with read on a throwaway Infisical environment `probe` holding
    `PROBE=ok`. The probe job (`permissions: id-token: write`) logs in with it and asserts `PROBE` is `ok`, and that
    echoing it prints `***`.
 3. Delete `gha-probe`, the `probe` environment and the probe workflow afterwards; the PR is closed, not merged.
@@ -88,10 +88,12 @@ Two identities in Infisical, each OIDC auth with:
 - OIDC discovery URL and issuer: `https://token.actions.githubusercontent.com`
 - Audience: `https://github.com/shimorojune` (the default `aud` GitHub puts in the token; or set `oidc-audience` and
   match it)
-- Bound subject: `repo:shimorojune/tudu:environment:staging` for `gha-staging`,
-  `repo:shimorojune/tudu:environment:release` for `gha-release`
-- Bound claims: `repository_owner_id: 44432182` and `repository: shimorojune/tudu` (guards against a renamed or
-  transferred repo reusing the subject)
+- Bound subject: `repo:shimorojune@44432182/tudu@1426778877:environment:staging` for `gha-staging`,
+  `repo:shimorojune@44432182/tudu@1426778877:environment:release` for `gha-release`
+  GitHub issues this repo's tokens with the ID-pinned subject format (owner and repo carry their numeric IDs, seen in
+  phase 0b on 1 Nov 2026), so a renamed or re-created repo can never match. The plain `repo:shimorojune/tudu:...`
+  form is refused with "OIDC subject not allowed".
+- Bound claims: `repository: shimorojune/tudu` (belt and braces)
 - Access token TTL: 15 min, max TTL 30 min
 - Project role: read-only on **one** Infisical environment (`gha-staging` → `staging`, `gha-release` → `prod`)
 
@@ -110,7 +112,7 @@ Three layers, each enough on its own for its case:
 1. **GitHub environments limited to `master`.** `staging` and `release` must have "Deployment branches: master only"
    (PR #68 assumed this; please confirm both). A PR job cannot enter them, so it can never get a token whose subject
    ends in `environment:staging` / `environment:release`.
-2. **Infisical subject binding.** A PR job's token says `repo:shimorojune/tudu:pull_request`, which matches neither
+2. **Infisical subject binding.** A PR job's token says `repo:shimorojune@44432182/tudu@1426778877:pull_request`, which matches neither
    identity, so Infisical refuses it even if a workflow is edited to call it.
 3. **Fork PRs get no OIDC token at all** (GitHub does not grant `id-token: write` to fork PR runs), and fork workflows
    already need your approval.
