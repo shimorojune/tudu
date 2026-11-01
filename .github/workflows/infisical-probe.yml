@@ -33,8 +33,9 @@ jobs:
           code=$(curl -sS -m 20 -o status.json -w '%{http_code}' "$URL/api/status")
           echo "HTTP $code"; head -c 1500 status.json; echo
           test "$code" = 200
-          # Infisical will hold the app's signing key: nobody may sign themselves up.
-          grep -q '"inviteOnlySignup":true' status.json || { echo "::error::Open signups on infisical.rraj.dev"; exit 1; }
+          # Infisical will hold the app's signing key: nobody may sign themselves up. The status field is misnamed:
+          # Infisical sets inviteOnlySignup = Boolean(allowSignUp), so false means sign-ups are off.
+          grep -q '"inviteOnlySignup":false' status.json || { echo "::error::Sign-ups are open on infisical.rraj.dev"; exit 1; }
       - name: OIDC login route exists
         # A junk identity must be refused: 400/401/403, or the route's own 404 "OIDC auth method not found for
         # identity". A bare 404 (no such route) means this Infisical has no OIDC machine-identity auth.
@@ -56,12 +57,17 @@ jobs:
       contents: read
       id-token: write
     steps:
+      # The claims Infisical matches the identity against (not the token itself, which is a credential).
+      - name: Token claims
+        run: |
+          jwt=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL" | jq -r .value)
+          echo "$jwt" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | jq '{sub, aud, iss, repository, repository_owner_id, environment, ref}' || true
       - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
         with:
           method: oidc
           identity-id: ${{ vars.INFISICAL_PROBE_IDENTITY_ID }}
           domain: https://infisical.rraj.dev
-          project-slug: ${{ vars.INFISICAL_PROJECT }}
+          project-id: ${{ vars.INFISICAL_PROJECT }}
           env-slug: probe
       - name: The value arrived and is masked
         run: |
