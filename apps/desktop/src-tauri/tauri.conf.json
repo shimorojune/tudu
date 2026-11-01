@@ -83,7 +83,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDcxMjBGQ0JFOTE3QzExRUQKUldUdEVYeVJ2dndnY1RQODZmek9ZWFdhazVSN3AyRmxQdTZCbVFYd3hMd0VqMC9JeUdlZVFmNEwK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI4ODYyNjhBNzkzNkQ1NUUKUldSZTFUWjVpaWFHS01UckxLVVZkYjVTcFFBTDk3Yzl0V1NzY3RlVllnRDlrY2dad2JWS0ovLzEK",
       "endpoints": ["https://api.tudu.ezdev.net/updates/latest.json"]
     }
   }

@@ -62,6 +62,6 @@ describe('scripts/verify-updater-sig', () => {
     const conf = JSON.parse(
       readFileSync(new URL('../apps/desktop/src-tauri/tauri.conf.json', import.meta.url), 'utf8'),
     );
-    expect(parsePubkey(conf.plugins.updater.pubkey).id).toBe('7120FCBE917C11ED');
+    expect(parsePubkey(conf.plugins.updater.pubkey).id).toBe('2886268A7936D55E');
   });
 });

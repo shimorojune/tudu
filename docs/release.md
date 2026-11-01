@@ -93,9 +93,12 @@ Dokploy › tudu-production-app › set the three images to the previous `sha-<s
 of the signing key, its password and the deploy key in a password manager.
 
 `TAURI_SIGNING_PRIVATE_KEY` must be the secret half of the key whose public half is `plugins.updater.pubkey` in
-apps/desktop/src-tauri/tauri.conf.json (now key id 7120FCBE917C11ED, `~/.tauri/tudu.key` on Rohit's Mac). If they
-differ, every installed app downloads each update and then refuses it ("The signature was created with a different key
-than the one provided"). That happened from 23 to 26 Oct 2026; apps from before the switch must be installed by hand once.
+apps/desktop/src-tauri/tauri.conf.json (now key id 2886268A7936D55E, `~/.tauri/tudu-2026-11.key` on Rohit's Mac, made
+1 Nov 2026 when the old key's password was lost). If they differ, every installed app downloads each update and then
+refuses it ("The signature was created with a different key than the one provided"); CI's "The update signature
+matches the app's pubkey" step now fails the build first. Keys so far: 219C948D20DD1BF5 (until 23 Oct 2026),
+7120FCBE917C11ED (until the Infisical switch, PR #69), 2886268A7936D55E. Apps from before each switch must be installed
+by hand once.
 
 ### 5. DNS
 

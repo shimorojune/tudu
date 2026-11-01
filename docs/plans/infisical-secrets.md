@@ -169,16 +169,15 @@ Infisical project `tudu-ci`, two environments:
 
 ## 5. Tauri signing key: handle with care
 
-- The key CI must use is the one whose public half is in `apps/desktop/src-tauri/tauri.conf.json`
-  (`plugins.updater.pubkey`). Today that is **key id `7120FCBE917C11ED`** (verified on master: the pubkey decodes to
-  `minisign public key: 7120FCBE917C11ED`). That is `~/.tauri/tudu.key` on your Mac.
-- Before pasting, confirm the id: `cat ~/.tauri/tudu.key.pub | base64 -d | head -1` must print `7120FCBE917C11ED`.
-  Paste the private key file's content **exactly as is** (it is one base64 line; no trailing newline changes, no
-  re-encoding). The password is the one you set when generating it on 23 Oct.
-- **Never regenerate the key, never run `tauri signer generate --force` over `~/.tauri/tudu.key`.** A new key means
-  every installed Tudu (prod and staging) rejects every update until users reinstall by hand.
-- The migration is a copy, not a rotation. If you ever want to rotate, that is its own plan (ship an app that trusts
-  both keys first).
+- **Changed on 1 Nov 2026:** the old key's (`7120FCBE917C11ED`) password was lost, so GitHub's copy could not be moved.
+  Rohit chose a new key over copying GitHub's secrets across with a temporary workflow: `~/.tauri/tudu-2026-11.key`,
+  key id **`2886268A7936D55E`**, password in his password manager. PR #69 switches `plugins.updater.pubkey` to it, in
+  the same merge that moves signing to Infisical, so one revert undoes both.
+- Cost: apps built before the switch trust the old key, so each installed Tudu (staging now, production at the next
+  release) is reinstalled by hand once from the dmg. Updates are automatic again after that.
+- Infisical `staging` and `prod` › `/signing` hold the new key file's content exactly as is, and its password.
+- **Never run `tauri signer generate --force` over an existing key file.** A new key always costs a reinstall
+  everywhere. Rotating without one would need an app that trusts both keys first (its own plan).
 
 ## 6. Workflow changes (phase 2)
 
