@@ -41,8 +41,8 @@ jobs:
   version:
     name: Version and notes
     runs-on: ubuntu-latest
-    # RELEASE_DEPLOY_KEY lives in the `release` environment, which only master may use; PR rehearsals get `rehearsal`,
-    # which holds no secrets.
+    # RELEASE_DEPLOY_KEY is a `release` environment secret (synced from Infisical), and only master may use `release`.
+    # PR rehearsals get `rehearsal`, which holds no secrets.
     environment: ${{ github.event_name == 'pull_request' && 'rehearsal' || 'release' }}
     outputs:
       version: ${{ steps.v.outputs.version }}
@@ -106,6 +106,9 @@ jobs:
     name: Mac app
     needs: version
     runs-on: macos-latest
+    # The real updater key is a `release` environment secret, read only on real runs. A rehearsal signs with a key made
+    # in the job, so no PR code ever runs next to the real one.
+    environment: ${{ github.event_name == 'pull_request' && 'rehearsal' || 'release' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -122,13 +125,22 @@ jobs:
         with:
           workspaces: apps/desktop/src-tauri
       - run: pnpm install --frozen-lockfile
+      - name: A throwaway updater key for the rehearsal
+        if: env.REHEARSAL == 'true'
+        working-directory: apps/desktop
+        run: |
+          pnpm exec tauri signer generate --ci -p '' -w "$RUNNER_TEMP/rehearsal.key"
+          { echo 'REHEARSAL_SIGNING_KEY<<KEY'; cat "$RUNNER_TEMP/rehearsal.key"; echo; echo KEY; } >> "$GITHUB_ENV"
+          echo "REHEARSAL_PUBKEY=$(tr -d '\n' < "$RUNNER_TEMP/rehearsal.key.pub")" >> "$GITHUB_ENV"
       - name: Build and sign
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: node apps/desktop/scripts/desktop.mjs build --track production --version ${{ needs.version.outputs.version }} --out dist
+          TAURI_SIGNING_PRIVATE_KEY: ${{ env.REHEARSAL == 'true' && env.REHEARSAL_SIGNING_KEY || secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ env.REHEARSAL != 'true' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
+        run: node apps/desktop/scripts/desktop.mjs build --track production --version ${{ needs.version.outputs.version }} --out dist ${{ env.REHEARSAL == 'true' && '--pubkey "$REHEARSAL_PUBKEY"' || '' }}
       - name: The bundle is signed for the updater
         run: test -s "dist/Tudu.app.tar.gz.sig" && ls -la dist
+      - name: The update signature matches the app's pubkey
+        run: node scripts/verify-updater-sig.mjs dist/Tudu.app.tar.gz dist/Tudu.app.tar.gz.sig ${{ env.REHEARSAL == 'true' && '--pubkey "$REHEARSAL_PUBKEY"' || '' }}
       - uses: actions/upload-artifact@v4
         with:
           name: tudu-${{ needs.version.outputs.version }}-macos
@@ -210,8 +222,8 @@ jobs:
         env:
           DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-          COMPOSE_ID: ${{ secrets.DOKPLOY_PRODUCTION_COMPOSE_ID }}
-        run: node scripts/dokploy-deploy.mjs "$COMPOSE_ID" "release ${{ needs.version.outputs.version }}" infra/production/compose.yaml
+          DOKPLOY_COMPOSE_ID: ${{ secrets.DOKPLOY_COMPOSE_ID }}
+        run: node scripts/dokploy-deploy.mjs "$DOKPLOY_COMPOSE_ID" "release ${{ needs.version.outputs.version }}" infra/production/compose.yaml
       # Web and API both, several passes in a row: Dokploy reports done while the containers are still swapping.
       - name: Wait until production is ready
         run: node scripts/wait-ready.mjs https://tudu.ezdev.net https://api.tudu.ezdev.net

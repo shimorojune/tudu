@@ -63,21 +63,38 @@ Project Tudu › environment production › Create Service › Compose.
 
 5. Copy the compose id from the URL (`.../compose/<id>`).
 
-### 4. GitHub: the Dokploy secrets
+### 4. Infisical: the CI secrets
 
-Settings › Secrets and variables › Actions › New repository secret: `DOKPLOY_PRODUCTION_COMPOSE_ID` = the id from
-step 3.5. The other release secrets (`DOKPLOY_URL`, `DOKPLOY_API_KEY`, `TAURI_SIGNING_PRIVATE_KEY`,
-`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) are already set.
+The CI secrets live in Infisical (https://infisical.rraj.dev, project `tudu-ci`), which pushes them into the GitHub
+environments `staging` and `release` with Secret Syncs (docs/plans/infisical-secrets.md). Change a secret in Infisical,
+never in GitHub: the next sync overwrites GitHub. Workflows read them as ordinary environment secrets, so CI does not
+need Infisical to be up.
 
-Every job that calls Dokploy runs in an environment: `staging` (deploy-staging.yml, Roll back) or `release`. Keep the
-Dokploy secrets (`DOKPLOY_URL`, `DOKPLOY_API_KEY`, `DOKPLOY_STAGING_COMPOSE_ID`, `DOKPLOY_PRODUCTION_COMPOSE_ID`) as
-environment secrets of `staging` and `release`, both limited to the `master` branch, and not as repository secrets,
-so no pull request job can read them.
+| Infisical env | Folder     | Secrets                                                           | GitHub environment |
+| ------------- | ---------- | ----------------------------------------------------------------- | ------------------ |
+| `staging`     | `/dokploy` | `DOKPLOY_URL`, `DOKPLOY_API_KEY`, `DOKPLOY_COMPOSE_ID` (staging)  | `staging`          |
+| `staging`     | `/signing` | `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | `staging`          |
+| `prod`        | `/dokploy` | the same three, `DOKPLOY_COMPOSE_ID` = the id from step 3.5       | `release`          |
+| `prod`        | `/signing` | the same key as staging                                           | `release`          |
+| `prod`        | `/release` | `RELEASE_DEPLOY_KEY` (step 7)                                     | `release`          |
+
+Setup: Infisical › Integrations › App Connections › GitHub, method GitHub App, through the self-registered app
+`infisical-connector-rraj` (Server Admin › Integrations), installed on `shimorojune/tudu` only. Then one Secret Sync per
+row above: destination that connection, scope Repository Environment, repo `shimorojune/tudu`, auto-sync on and
+**Disable Secret Deletion ticked** (several syncs write to one GitHub environment; without it each deletes the others'
+secrets). Both GitHub environments are limited to the `master` branch, so no pull request job reads them;
+`scripts/deploy-runners.mjs` refuses any other secret, a secret outside those environments or outside a step, and a
+secret read on a release rehearsal.
+
+Keep an offline copy of the signing key, its password and the deploy key in a password manager.
 
 `TAURI_SIGNING_PRIVATE_KEY` must be the secret half of the key whose public half is `plugins.updater.pubkey` in
-apps/desktop/src-tauri/tauri.conf.json (now key id 7120FCBE917C11ED, `~/.tauri/tudu.key` on Rohit's Mac). If they
-differ, every installed app downloads each update and then refuses it ("The signature was created with a different key
-than the one provided"). That happened from 23 to 26 Oct 2026; apps from before the switch must be installed by hand once.
+apps/desktop/src-tauri/tauri.conf.json (now key id 2886268A7936D55E, `~/.tauri/tudu-2026-11.key` on Rohit's Mac, made
+1 Nov 2026 when the old key's password was lost). If they differ, every installed app downloads each update and then
+refuses it ("The signature was created with a different key than the one provided"); CI's "The update signature
+matches the app's pubkey" step now fails the build first. Keys so far: 219C948D20DD1BF5 (until 23 Oct 2026),
+7120FCBE917C11ED (until PR #69), 2886268A7936D55E. Apps from before each switch must be installed
+by hand once.
 
 ### 5. DNS
 
@@ -100,8 +117,9 @@ its `chore(release): X.Y.Z` commit straight to master, so the release job checks
 that the ruleset lets through (docs/plans/release-deploy-key.md):
 
 - Settings › Deploy keys: `Release push`, with write access (the public half of an ed25519 key made for this).
-- Settings › Environments › `release`, limited to the `master` branch: the secret `RELEASE_DEPLOY_KEY` = the
-  private half. Pull request rehearsals run in `rehearsal` and never see it.
+- Infisical `prod` › `/release`: `RELEASE_DEPLOY_KEY` = the private half, synced to the `release` environment
+  (step 4). Only jobs in `release` (master only) can read it; pull request rehearsals run in `rehearsal` and never
+  see it.
 - Settings › Rules › the `master` ruleset › Bypass list: Deploy keys, and Repository admin for an emergency push.
 
 If a release fails in "Version and notes" with "push declined due to repository rule violations", one of these three

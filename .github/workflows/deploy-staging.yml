@@ -83,14 +83,16 @@ jobs:
     needs: images
     runs-on: ubuntu-latest
     environment: staging
+    # Dokploy's key is a `staging` environment secret that Infisical keeps in sync (docs/plans/infisical-secrets.md);
+    # only master may use `staging`.
     steps:
       - uses: actions/checkout@v4
       - name: Deploy through Dokploy
         env:
           DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-          COMPOSE_ID: ${{ secrets.DOKPLOY_STAGING_COMPOSE_ID }}
-        run: node scripts/dokploy-deploy.mjs "$COMPOSE_ID" "staging ${{ github.sha }}" infra/staging/compose.yaml
+          DOKPLOY_COMPOSE_ID: ${{ secrets.DOKPLOY_COMPOSE_ID }}
+        run: node scripts/dokploy-deploy.mjs "$DOKPLOY_COMPOSE_ID" "staging ${{ github.sha }}" infra/staging/compose.yaml
       # The same readiness wait the release uses, so staging exercises production's path.
       - name: Wait until staging is ready
         run: node scripts/wait-ready.mjs https://staging.tudu.ezdev.net https://api.staging.tudu.ezdev.net

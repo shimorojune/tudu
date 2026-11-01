@@ -78,8 +78,8 @@ jobs:
         env:
           DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-          COMPOSE_ID: ${{ inputs.target == 'production' && secrets.DOKPLOY_PRODUCTION_COMPOSE_ID || secrets.DOKPLOY_STAGING_COMPOSE_ID }}
-        run: node scripts/dokploy-deploy.mjs "$COMPOSE_ID" "rollback to ${{ inputs.tag }}"
+          DOKPLOY_COMPOSE_ID: ${{ secrets.DOKPLOY_COMPOSE_ID }}
+        run: node scripts/dokploy-deploy.mjs "$DOKPLOY_COMPOSE_ID" "rollback to ${{ inputs.tag }}"
       - name: Wait until ready
         run: node scripts/wait-ready.mjs "$WEB" "$API"
       - uses: pnpm/action-setup@v4
