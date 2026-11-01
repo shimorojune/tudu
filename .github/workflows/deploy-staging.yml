@@ -83,26 +83,16 @@ jobs:
     needs: images
     runs-on: ubuntu-latest
     environment: staging
-    # Dokploy's key comes from Infisical through OIDC (docs/plans/infisical-secrets.md): only a job in `staging`, which
-    # only master may use, gets a token Infisical's gha-staging identity accepts.
-    permissions:
-      contents: read
-      id-token: write
+    # Dokploy's key is a `staging` environment secret that Infisical keeps in sync (docs/plans/infisical-secrets.md);
+    # only master may use `staging`.
     steps:
       - uses: actions/checkout@v4
-      - name: Secrets from Infisical (/dokploy)
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
-          domain: ${{ vars.INFISICAL_URL }}
-          project-id: ${{ vars.INFISICAL_PROJECT }}
-          env-slug: staging
-          secret-path: /dokploy
       - name: Deploy through Dokploy
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          DOKPLOY_COMPOSE_ID: ${{ secrets.DOKPLOY_COMPOSE_ID }}
         run: node scripts/dokploy-deploy.mjs "$DOKPLOY_COMPOSE_ID" "staging ${{ github.sha }}" infra/staging/compose.yaml
-      - name: Forget the Infisical secrets
-        run: printf '%s=\n' DOKPLOY_URL DOKPLOY_API_KEY DOKPLOY_COMPOSE_ID >> "$GITHUB_ENV"
       # The same readiness wait the release uses, so staging exercises production's path.
       - name: Wait until staging is ready
         run: node scripts/wait-ready.mjs https://staging.tudu.ezdev.net https://api.staging.tudu.ezdev.net

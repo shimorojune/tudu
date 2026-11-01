@@ -2,8 +2,9 @@
 // Deploys run on GitHub's own runners and Dokploy pulls the images from GHCR (docs/plans/hosted-deploy-runners.md).
 // `node scripts/deploy-runners.mjs` fails when a workflow or compose file drifts back: a self-hosted job, a local
 // image, an image built for the wrong architecture, Dokploy's key outside an environment, or a rehearsal that pushes.
-// CI secrets come from Infisical through OIDC (docs/plans/infisical-secrets.md): no workflow reads a GitHub secret but
-// GITHUB_TOKEN, and every Infisical step is pinned, scoped to a master-only environment and forgotten after use.
+// CI secrets live in Infisical, which syncs them into the master-only GitHub environments `staging` and `release`
+// (docs/plans/infisical-secrets.md): a workflow reads only those synced secrets, only in a job in one of those
+// environments, only in a step's own env or with, and never on a rehearsal.
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -41,10 +42,7 @@ export function checkWorkflows(workflows) {
     for (const [name, job] of Object.entries(jobsOf(text))) {
       const where = `${file} › ${name}`;
       if (/self-hosted/.test(runsOn(job))) problems.push(`${where}: runs on a self-hosted runner`);
-      const loadsDokploy = stepsOf(job).some(
-        (st) => INFISICAL.test(st) && /secret-path:\s*\/dokploy\b/.test(st),
-      );
-      if ((/secrets\.DOKPLOY_/.test(job) || loadsDokploy) && !/^ {4}environment:/m.test(job))
+      if (/secrets\.DOKPLOY_/.test(job) && !/^ {4}environment:/m.test(job))
         problems.push(`${where}: uses Dokploy secrets without an environment`);
       for (const step of stepsOf(job)) {
         if (!/uses:\s*docker\/build-push-action/.test(step)) continue;
@@ -57,61 +55,46 @@ export function checkWorkflows(workflows) {
   return problems;
 }
 
-const INFISICAL = /uses:\s*Infisical\/secrets-action@/;
-const field = (step, key) => new RegExp(`^\\s*${key}:\\s*(.+?)\\s*$`, 'm').exec(step)?.[1] ?? '';
+/** What Infisical syncs into the `staging` and `release` environments; GITHUB_TOKEN is GitHub's own. */
+export const SYNCED = [
+  'DOKPLOY_URL',
+  'DOKPLOY_API_KEY',
+  'DOKPLOY_COMPOSE_ID',
+  'TAURI_SIGNING_PRIVATE_KEY',
+  'TAURI_SIGNING_PRIVATE_KEY_PASSWORD',
+  'RELEASE_DEPLOY_KEY',
+];
 
-/** No workflow reads a GitHub secret other than GITHUB_TOKEN (the rest live in Infisical). */
+/** The secrets an expression reads, GITHUB_TOKEN aside, as [expression, name] pairs. */
+const secretsIn = (text) =>
+  [...text.matchAll(/\$\{\{[\s\S]*?\}\}/g)].flatMap(([expr]) =>
+    [...expr.matchAll(/\bsecrets\.(\w+)/g)]
+      .map(([, name]) => [expr, name])
+      .filter(([, n]) => n !== 'GITHUB_TOKEN'),
+  );
+
+/** Every secret read is a synced one, in a step of a job in `staging` or `release`, and skipped on rehearsals. */
 export function checkSecrets(workflows) {
-  const problems = [];
-  for (const [file, text] of Object.entries(workflows))
-    for (const [expr] of text.matchAll(/\$\{\{[\s\S]*?\}\}/g))
-      for (const [, name] of expr.matchAll(/\bsecrets\.(\w+)/g))
-        if (name !== 'GITHUB_TOKEN') problems.push(`${file}: reads the GitHub secret ${name}`);
-  return [...new Set(problems)];
-}
-
-/** Every Infisical step: pinned, OIDC, configured from variables, in a master-only environment, forgotten after. */
-export function checkInfisical(workflows) {
   const problems = [];
   for (const [file, text] of Object.entries(workflows)) {
     const top = text.slice(0, Math.max(0, text.search(/^jobs:\s*$/m)));
-    if (/id-token:\s*write/.test(top)) problems.push(`${file}: id-token: write at workflow level`);
-    for (const [name, job] of Object.entries(jobsOf(text))) {
-      const where = `${file} › ${name}`;
-      const steps = stepsOf(job);
-      const environment = /^ {4}environment:\s*(.+)$/m.exec(job)?.[1] ?? '';
-      steps.forEach((step, i) => {
-        if (!INFISICAL.test(step)) return;
-        if (!/Infisical\/secrets-action@[0-9a-f]{40}\b/.test(step))
-          problems.push(`${where}: Infisical action not pinned to a commit`);
-        if (field(step, 'method') !== 'oidc') problems.push(`${where}: Infisical login is not OIDC`);
-        for (const [key, v] of [
-          ['identity-id', 'INFISICAL_IDENTITY_ID'],
-          ['domain', 'INFISICAL_URL'],
-          ['project-id', 'INFISICAL_PROJECT'],
-        ])
-          if (field(step, key) !== `\${{ vars.${v} }}`)
-            problems.push(`${where}: Infisical ${key} is not vars.${v}`);
-        if (!environment) problems.push(`${where}: loads Infisical secrets without an environment`);
-        if (!/^ {4}permissions:\s*$[\s\S]*?^ {6}id-token:\s*write/m.test(job))
-          problems.push(`${where}: Infisical step without job-level id-token: write`);
-        const slug = field(step, 'env-slug');
-        if (slug === 'prod' && !/release/.test(environment))
-          problems.push(`${where}: prod secrets outside release`);
-        if (slug === 'staging' && !/staging/.test(environment))
-          problems.push(`${where}: staging secrets outside staging`);
-        if (/rehearsal/.test(environment) && !/^\s*if:.*(pull_request|REHEARSAL != 'true')/m.test(step))
-          problems.push(`${where}: Infisical step also runs on rehearsals`);
-        const forget = steps.findIndex((st, j) => j > i && /name:\s*Forget the Infisical secrets/.test(st));
-        const rest = forget < 0 ? steps.slice(i + 2) : steps.slice(i + 1, forget);
-        if (forget < 0 && rest.length) problems.push(`${where}: Infisical secrets not forgotten after use`);
-        const code = (st) => st.replace(/^\s*#.*$/gm, '');
-        if (forget >= 0 && rest.some((st) => /pnpm install/.test(code(st))))
-          problems.push(`${where}: pnpm install runs before the Infisical secrets are forgotten`);
-      });
+    for (const [, name] of secretsIn(top)) problems.push(`${file}: reads ${name} outside a step`);
+    for (const [job, body] of Object.entries(jobsOf(text))) {
+      const where = `${file} › ${job}`;
+      const environment = /^ {4}environment:\s*(.+)$/m.exec(body)?.[1] ?? '';
+      const head = body.split(/^ {4}steps:\s*$/m)[0];
+      for (const [, name] of secretsIn(head)) problems.push(`${where}: reads ${name} outside a step`);
+      for (const step of stepsOf(body))
+        for (const [expr, name] of secretsIn(step)) {
+          if (!SYNCED.includes(name)) problems.push(`${where}: reads ${name}, which Infisical does not sync`);
+          if (!/\b(staging|release)\b/.test(environment))
+            problems.push(`${where}: reads ${name} outside the staging and release environments`);
+          if (/rehearsal/.test(environment) && !/pull_request|REHEARSAL/.test(expr))
+            problems.push(`${where}: reads ${name} on rehearsals`);
+        }
     }
   }
-  return problems;
+  return [...new Set(problems)];
 }
 
 /** Rehearsals of the release never log in to or push to the registry. */
@@ -128,12 +111,10 @@ export function checkRehearsal(release) {
         problems.push(`release.yml › ${name}: image pushed on rehearsals`);
       if (/name:\s*A throwaway updater key/.test(step) && !/if:\s*env\.REHEARSAL == 'true'/.test(step))
         problems.push(`release.yml › ${name}: throwaway updater key outside rehearsals`);
-      if (
-        INFISICAL.test(step) &&
-        /secret-path:\s*\/signing\b/.test(step) &&
-        !/if:\s*env\.REHEARSAL != 'true'/.test(step)
-      )
-        problems.push(`release.yml › ${name}: real updater key loaded on rehearsals`);
+      // A dispatched rehearsal runs on master in `release`, so pull_request alone does not keep the real key out.
+      for (const [expr, secret] of secretsIn(step))
+        if (/^TAURI_SIGNING_/.test(secret) && !/env\.REHEARSAL [!=]= 'true'/.test(expr))
+          problems.push(`release.yml › ${name}: real updater key read on rehearsals`);
     }
   return problems;
 }
@@ -166,7 +147,6 @@ export function checkRepo(root) {
   return [
     ...checkWorkflows(workflows),
     ...checkSecrets(workflows),
-    ...checkInfisical(workflows),
     ...checkRehearsal(workflows['release.yml'] ?? ''),
     ...['staging', 'production'].flatMap((t) =>
       checkCompose(t, readFileSync(join(root, `infra/${t}/compose.yaml`), 'utf8')),

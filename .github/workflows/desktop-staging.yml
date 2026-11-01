@@ -24,11 +24,8 @@ jobs:
   build:
     name: Build, sign and publish
     runs-on: macos-latest
-    # The updater key comes from Infisical through OIDC; `staging` (master only) is what gha-staging accepts.
+    # The updater key is a `staging` environment secret (synced from Infisical); only master may use `staging`.
     environment: staging
-    permissions:
-      contents: write
-      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -52,19 +49,11 @@ jobs:
           VERSION=$(node -e "const [a,b,c]=process.argv[1].split('.').map(Number);console.log(a+'.'+b+'.'+(c+1)+'-staging.'+process.argv[2])" "$LAST" "${{ github.run_number }}")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Tudu Staging $VERSION" >> "$GITHUB_STEP_SUMMARY"
-      - name: Secrets from Infisical (/signing)
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
-          domain: ${{ vars.INFISICAL_URL }}
-          project-id: ${{ vars.INFISICAL_PROJECT }}
-          env-slug: staging
-          secret-path: /signing
       - name: Build and sign
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: node apps/desktop/scripts/desktop.mjs build --track staging --version ${{ steps.v.outputs.version }} --out dist
-      - name: Forget the Infisical secrets
-        run: printf '%s=\n' TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD >> "$GITHUB_ENV"
       - name: The update signature matches the app's pubkey
         run: node scripts/verify-updater-sig.mjs dist/Tudu.app.tar.gz dist/Tudu.app.tar.gz.sig
       - name: The rolling staging pre-release

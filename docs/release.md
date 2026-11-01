@@ -65,39 +65,35 @@ Project Tudu › environment production › Create Service › Compose.
 
 ### 4. Infisical: the CI secrets
 
-CI holds no secrets of its own: every job reads them from Infisical (https://infisical.rraj.dev, project `tudu-ci`)
-by logging in with GitHub's OIDC token (docs/plans/infisical-secrets.md). GitHub keeps only variables.
+The CI secrets live in Infisical (https://infisical.rraj.dev, project `tudu-ci`), which pushes them into the GitHub
+environments `staging` and `release` with Secret Syncs (docs/plans/infisical-secrets.md). Change a secret in Infisical,
+never in GitHub: the next sync overwrites GitHub. Workflows read them as ordinary environment secrets, so CI does not
+need Infisical to be up.
 
-| Infisical env | Folder     | Secrets                                                           |
-| ------------- | ---------- | ----------------------------------------------------------------- |
-| `staging`     | `/dokploy` | `DOKPLOY_URL`, `DOKPLOY_API_KEY`, `DOKPLOY_COMPOSE_ID` (staging)  |
-| `staging`     | `/signing` | `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` |
-| `prod`        | `/dokploy` | the same three, `DOKPLOY_COMPOSE_ID` = the id from step 3.5       |
-| `prod`        | `/signing` | the same key as staging                                           |
-| `prod`        | `/release` | `RELEASE_DEPLOY_KEY` (step 7)                                     |
+| Infisical env | Folder     | Secrets                                                           | GitHub environment |
+| ------------- | ---------- | ----------------------------------------------------------------- | ------------------ |
+| `staging`     | `/dokploy` | `DOKPLOY_URL`, `DOKPLOY_API_KEY`, `DOKPLOY_COMPOSE_ID` (staging)  | `staging`          |
+| `staging`     | `/signing` | `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | `staging`          |
+| `prod`        | `/dokploy` | the same three, `DOKPLOY_COMPOSE_ID` = the id from step 3.5       | `release`          |
+| `prod`        | `/signing` | the same key as staging                                           | `release`          |
+| `prod`        | `/release` | `RELEASE_DEPLOY_KEY` (step 7)                                     | `release`          |
 
-Machine identities, OIDC auth (issuer and discovery URL `https://token.actions.githubusercontent.com`, audience
-`https://github.com/shimorojune`, claim `repository` = `shimorojune/tudu`), each the project's Viewer role (per-environment roles need Infisical Enterprise; the subject is the boundary):
+Setup: Infisical › Integrations › App Connections › GitHub, method GitHub App, through the self-registered app
+`infisical-connector-rraj` (Server Admin › Integrations), installed on `shimorojune/tudu` only. Then one Secret Sync per
+row above: destination that connection, scope Repository Environment, repo `shimorojune/tudu`, auto-sync on and
+**Disable Secret Deletion ticked** (several syncs write to one GitHub environment; without it each deletes the others'
+secrets). Both GitHub environments are limited to the `master` branch, so no pull request job reads them;
+`scripts/deploy-runners.mjs` refuses any other secret, a secret outside those environments or outside a step, and a
+secret read on a release rehearsal.
 
-- `gha-staging`, subject `repo:shimorojune@44432182/tudu@1426778877:environment:staging`
-- `gha-release`, subject `repo:shimorojune@44432182/tudu@1426778877:environment:release`
-
-GitHub's subject for this repo carries the owner and repo ids; the plain `repo:shimorojune/tudu:...` form is refused.
-
-GitHub variables (Settings › Secrets and variables › Actions › Variables): `INFISICAL_URL` and `INFISICAL_PROJECT`
-(the project id) on the repository; `INFISICAL_IDENTITY_ID` on the `staging` and `release` environments, both limited
-to the `master` branch, so no pull request job can get a token either identity accepts.
-
-**If Infisical is down:** deploys, releases and Roll back stop at their first step. To roll production back by hand,
-Dokploy › tudu-production-app › set the three images to the previous `sha-<sha>` tag › Deploy. Keep an offline copy
-of the signing key, its password and the deploy key in a password manager.
+Keep an offline copy of the signing key, its password and the deploy key in a password manager.
 
 `TAURI_SIGNING_PRIVATE_KEY` must be the secret half of the key whose public half is `plugins.updater.pubkey` in
 apps/desktop/src-tauri/tauri.conf.json (now key id 2886268A7936D55E, `~/.tauri/tudu-2026-11.key` on Rohit's Mac, made
 1 Nov 2026 when the old key's password was lost). If they differ, every installed app downloads each update and then
 refuses it ("The signature was created with a different key than the one provided"); CI's "The update signature
 matches the app's pubkey" step now fails the build first. Keys so far: 219C948D20DD1BF5 (until 23 Oct 2026),
-7120FCBE917C11ED (until the Infisical switch, PR #69), 2886268A7936D55E. Apps from before each switch must be installed
+7120FCBE917C11ED (until PR #69), 2886268A7936D55E. Apps from before each switch must be installed
 by hand once.
 
 ### 5. DNS
@@ -121,8 +117,9 @@ its `chore(release): X.Y.Z` commit straight to master, so the release job checks
 that the ruleset lets through (docs/plans/release-deploy-key.md):
 
 - Settings › Deploy keys: `Release push`, with write access (the public half of an ed25519 key made for this).
-- Infisical `prod` › `/release`: `RELEASE_DEPLOY_KEY` = the private half (step 4). Only jobs in the `release`
-  environment (master only) can read it; pull request rehearsals run in `rehearsal` and never see it.
+- Infisical `prod` › `/release`: `RELEASE_DEPLOY_KEY` = the private half, synced to the `release` environment
+  (step 4). Only jobs in `release` (master only) can read it; pull request rehearsals run in `rehearsal` and never
+  see it.
 - Settings › Rules › the `master` ruleset › Bypass list: Deploy keys, and Repository admin for an emergency push.
 
 If a release fails in "Version and notes" with "push declined due to repository rule violations", one of these three

@@ -6,6 +6,16 @@ its own; the forget step is an inline `run:` (no composite action); `INFISICAL_P
 (`project-id:`); GitHub's OIDC subject for this repo is the ID-pinned form (§2). Builds on PR #68
 (`docs/plans/hosted-deploy-runners.md`: deploys from GitHub-hosted runners, `staging` / `release` environments).
 
+**Changed 1 Nov 2026 (Rohit's pick): Secret Sync instead of pulling at run time.** Custom Infisical roles need
+Enterprise, so per-environment OIDC identities were not least privilege anyway. Infisical now pushes each folder into
+a GitHub environment through a GitHub App connection (free plan: GitHub sync is a Regular-plan sync with no limit):
+`staging` /dokploy and /signing into `staging`; `prod` /dokploy, /signing and /release into `release`, each with
+Disable Secret Deletion ticked. Workflows read plain `secrets.X` in step env again. Gone: the OIDC identities, the
+`INFISICAL_*` variables, `id-token: write`, the Infisical action and the forget steps; CI no longer stops when
+Infisical is down. Kept: the new updater key (§5), verify-updater-sig, the throwaway rehearsal key and the `staging` /
+`rehearsal` environments on the Mac jobs. The compose id is `DOKPLOY_COMPOSE_ID` in both environments. Sections 2, 6,
+8 and the OIDC rows of §9 below describe the pull design and are superseded; §9 "After Secret Sync" holds the tests.
+
 Design canvas: **not applicable.** This changes CI plumbing only; no screen, state or copy in the app or on the
 canvas changes. Rohit to confirm skipping the canvas step.
 
@@ -288,6 +298,22 @@ test file; IDs continue chunk 01 (`docs/tests/chunk-01.md`).
 | INF-08 | `INFISICAL_URL` pointed at a wrong host on a test branch run (or Infisical briefly stopped) | fails at the Infisical step with a clear error; no deploy started           |
 | INF-09 | First real release after merge                                                              | green; prod app offers the update; audit log shows `gha-release` reads only |
 | INF-10 | After step 6: repo and environment secret lists                                             | empty; only the four variables remain; next master push still green         |
+
+### After Secret Sync (replaces C01-U25..U29 and U31 above)
+
+| ID      | What it checks                                                                                                     |
+| ------- | ------------------------------------------------------------------------------------------------------------------ |
+| C01-U25 | A workflow reads only the six synced secrets and `GITHUB_TOKEN`; the old `DOKPLOY_*_COMPOSE_ID` names are refused  |
+| C01-U26 | A secret is read only by a job whose environment is `staging` or `release`                                         |
+| C01-U27 | A secret is read only in a step's own `env` / `with`, never in workflow- or job-level `env`                        |
+| C01-U28 | In a job that can run as a rehearsal, every secret expression is guarded by `pull_request` or `REHEARSAL`          |
+| C01-U29 | Retired: nothing is exported to `GITHUB_ENV`, so nothing to forget                                                 |
+| C01-U31 | Throwaway updater key only on rehearsals; the real key's expression is guarded by `env.REHEARSAL` (dispatch too)   |
+| INF-S1  | After the syncs: GitHub › Environments lists the five secrets in `staging` and six in `release`                    |
+| INF-S2  | Edit a value in Infisical: it appears in GitHub within a minute, and the other syncs' secrets are still there      |
+| INF-S3  | Merge → `deploy-staging` and `desktop-staging` green; staging app installs once by hand, then updates on its own   |
+| INF-S4  | Roll back staging to the current sha: green                                                                        |
+| INF-S5  | First real release green; then the old repo-level secrets and `INFISICAL_*` variables are deleted, next push green |
 
 ## 10. Open questions for Rohit
 
