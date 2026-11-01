@@ -33,6 +33,8 @@ jobs:
           code=$(curl -sS -m 20 -o status.json -w '%{http_code}' "$URL/api/status")
           echo "HTTP $code"; head -c 1500 status.json; echo
           test "$code" = 200
+          # Infisical will hold the app's signing key: nobody may sign themselves up.
+          grep -q '"inviteOnlySignup":true' status.json || { echo "::error::Open signups on infisical.rraj.dev"; exit 1; }
       - name: OIDC login route exists
         # A junk identity must be refused: 400/401/403, or the route's own 404 "OIDC auth method not found for
         # identity". A bare 404 (no such route) means this Infisical has no OIDC machine-identity auth.
