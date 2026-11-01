@@ -1,3 +1,19 @@
+## [0.41.0](https://github.com/shimorojune/tudu/compare/tudu-0.40.0...tudu-0.41.0) (2026-11-01)
+
+### Features
+
+* **desktop:** trust the new updater key 2886268A7936D55E ([1b3e2d0](https://github.com/shimorojune/tudu/commit/1b3e2d0e67f2db56f4f9d0be865fe2e12a0190a3))
+* **mcp:** MCP service on the new access check, append_to_note, metadata; API tests for AI access ([7e591c3](https://github.com/shimorojune/tudu/commit/7e591c3efda48b5115ad43bcd02c46a81607a78a))
+* **server:** AI access API (keys, OAuth apps, access check, limits, log) ([e60c5fe](https://github.com/shimorojune/tudu/commit/e60c5fefb0e4d87e0ae0e3a446ec89c4e7ceb183))
+* **ui:** Settings › AI access, the key dialog and the consent page ([d47cbfa](https://github.com/shimorojune/tudu/commit/d47cbfa78314bc72835b61363f112b2969972b7b))
+* **web:** Settings › AI access, the consent page and signing in for an app ([0497ad8](https://github.com/shimorojune/tudu/commit/0497ad85f9c87cc0c6083037486ff45921f414a6))
+
+### Bug Fixes
+
+* **mcp:** textOf drops tags until none are left (CodeQL incomplete sanitization) ([96cb086](https://github.com/shimorojune/tudu/commit/96cb0863a9ec112d50cf4351de55b7ab0042233b))
+* **server:** consent asks the OAuth server for JSON; tests for the MCP service ([7a245eb](https://github.com/shimorojune/tudu/commit/7a245ebb15d80bcd455794fa94c67d7fa9d35788))
+* **server:** finish consent through the auth handler; MCP tests keep the API in test mode ([dbb5b47](https://github.com/shimorojune/tudu/commit/dbb5b4762116a24acf5d9eaaedca3045eb340aa6))
+
 ## [0.40.0](https://github.com/shimorojune/tudu/compare/tudu-0.39.0...tudu-0.40.0) (2026-10-27)
 
 ### Features
