@@ -1,7 +1,8 @@
 # Staging, as deployed by Dokploy (project Tudu, environment staging, service tudu-staging-app).
 # Images are built for arm64 on GitHub's runner and pushed to GHCR (public packages) by
 # .github/workflows/deploy-staging.yml; every deploy pulls the moving `staging` tag. To roll back, point `staging` at
-# an older `sha-<sha>` with the Roll back workflow (docs/release.md).
+# an older `sha-<sha>` with the Roll back workflow (docs/release.md). Each ${VAR} comes from Dokploy's env, which references
+# Infisical through Dokploy's vault provider (docs/release.md step 3): change a secret in Infisical, then Deploy.
 services:
   api:
     image: ghcr.io/shimorojune/tudu-api:staging
@@ -19,7 +20,7 @@ services:
       EMAIL_TRANSPORT: resend
       RESEND_API_KEY: ${RESEND_API_KEY}
       EMAIL_FROM: Tudu <sign-in@mail.tudu.ezdev.net>
-      # Send feedback mails each report here (set in Dokploy's environment); empty saves reports without mail.
+      # Send feedback mails each report here (a plain value in Dokploy's environment); empty saves reports without mail.
       FEEDBACK_TO: ${FEEDBACK_TO:-}
       # Each report also becomes a public issue with this fine-grained token; empty means email only.
       FEEDBACK_GITHUB_TOKEN: ${FEEDBACK_GITHUB_TOKEN:-}

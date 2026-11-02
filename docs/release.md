@@ -35,21 +35,29 @@ Project Tudu › environment production › Create Service › Compose.
 1. Name `tudu-production-app`. Source: **Raw** (the Production: release workflow writes `infra/production/compose.yaml` into it
    on each release; staging's Git source is not needed here). Paste the file once so the services exist.
 2. Turn **Autodeploy off** (the workflow deploys; a second build would race it).
-3. **Environment** tab, the secret values (the rest is in the compose file). Secrets are not pasted here: they live in
-   Infisical and the tab references them through Dokploy's vault provider, for example
-   `RESEND_API_KEY=${{vault.tudu-app-prod.RESEND_API_KEY}}` (production's vault is `tudu-app-prod`; `DATABASE_URL` and
-   `AUTH_SECRET` are referenced the same way). Plain settings such as `FEEDBACK_TO` can stay as values. The variables:
+3. **Environment** tab (the rest is in the compose file). Secret values are never pasted here: they live in
+   Infisical and the tab references them through Dokploy's vault provider, which reads Infisical when it deploys.
+   Production's vault is `tudu-app-prod`; staging's compose (`tudu-staging-app`) has its own vault with the same keys.
 
    ```
-   DATABASE_URL=postgresql://<user>:<password>@tudu-production-postgres:5432/tudu
-   AUTH_SECRET=<openssl rand -base64 48, not staging's>
-   RESEND_API_KEY=<the Resend key; mail.tudu.ezdev.net is already verified>
-   FEEDBACK_TO=<where feedback reports go, or leave empty>
-   FEEDBACK_GITHUB_TOKEN=<fine-grained, Issues: read and write on shimorojune/tudu only; empty = email only>
-   S3_ACCESS_KEY_ID=<from step 2>
-   S3_SECRET_ACCESS_KEY=<from step 2>
-   UPDATES_GITHUB_TOKEN=<fine-grained, Contents: read on shimorojune/tudu; staging's works>
+   DATABASE_URL=${{vault.tudu-app-prod.DATABASE_URL}}
+   AUTH_SECRET=${{vault.tudu-app-prod.AUTH_SECRET}}
+   RESEND_API_KEY=${{vault.tudu-app-prod.RESEND_API_KEY}}
+   FEEDBACK_TO=<where feedback reports go, or leave empty; a plain value, not a secret>
+   FEEDBACK_GITHUB_TOKEN=${{vault.tudu-app-prod.FEEDBACK_GITHUB_TOKEN}}
+   S3_ACCESS_KEY_ID=${{vault.tudu-app-prod.S3_ACCESS_KEY_ID}}
+   S3_SECRET_ACCESS_KEY=${{vault.tudu-app-prod.S3_SECRET_ACCESS_KEY}}
+   UPDATES_GITHUB_TOKEN=${{vault.tudu-app-prod.UPDATES_GITHUB_TOKEN}}
    ```
+
+   What goes in Infisical under each key:
+
+   - `DATABASE_URL`: `postgresql://<user>:<password>@tudu-production-postgres:5432/tudu`
+   - `AUTH_SECRET`: `openssl rand -base64 48`, not staging's
+   - `RESEND_API_KEY`: the Resend key (`mail.tudu.ezdev.net` is already verified)
+   - `FEEDBACK_GITHUB_TOKEN`: fine-grained, Issues: read and write on shimorojune/tudu only; empty = email only
+   - `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`: from step 2
+   - `UPDATES_GITHUB_TOKEN`: fine-grained, Contents: read on shimorojune/tudu; staging's works
 
    `FEEDBACK_GITHUB_TOKEN` makes each Send feedback report a public issue on shimorojune/tudu (labels `bug` or
    `enhancement`, plus `from-app`). Create it at github.com › Settings › Developer settings › Fine-grained tokens with
@@ -57,8 +65,8 @@ Project Tudu › environment production › Create Service › Compose.
    an expired token is logged and reports go by email only). Staging can set `FEEDBACK_GITHUB_REPO` to a scratch
    repository so test reports stay off the real one.
 
-   **Rotating one of these** (a new Resend key, say): change it in Infisical, then press **Deploy** on
-   `tudu-production-app` and on `tudu-staging-app`. Dokploy resolves `${{vault.…}}` when it deploys, so a running
+   **Rotating one of these** (a new Resend key, say): change it in Infisical (never in Dokploy), then press **Deploy**
+   on `tudu-production-app` and on `tudu-staging-app`. Dokploy resolves `${{vault.…}}` when it deploys, so a running
    container keeps the old value until it is redeployed. Deploy pulls the same `production` / `staging` images, so
    it does not change the version. A failed lookup leaves the variable empty, and the API then refuses to start
    (for example `RESEND_API_KEY is needed for the resend transport`).
@@ -74,7 +82,8 @@ Project Tudu › environment production › Create Service › Compose.
 
 ### 4. Infisical: the CI secrets
 
-The CI secrets live in Infisical (https://infisical.rraj.dev, project `tudu-ci`), which pushes them into the GitHub
+Infisical holds two separate sets: the app's runtime secrets, which Dokploy reads through its vault provider (step 3),
+and the CI secrets below, which Infisical syncs into GitHub. The CI secrets live in Infisical (https://infisical.rraj.dev, project `tudu-ci`), which pushes them into the GitHub
 environments `staging` and `release` with Secret Syncs (docs/plans/infisical-secrets.md). Change a secret in Infisical,
 never in GitHub: the next sync overwrites GitHub. Workflows read them as ordinary environment secrets, so CI does not
 need Infisical to be up.
@@ -114,7 +123,7 @@ by hand once.
 The images live at `ghcr.io/shimorojune/tudu-api`, `tudu-web` and `tudu-mcp`, pushed by the workflows with their own
 token. Each package must be **public** (github.com › your profile › Packages › the package › Package settings ›
 Change visibility), so Dokploy pulls without credentials and the pulls cost nothing. Nothing secret is in an image:
-the API and MCP read everything from Dokploy's env at runtime, and the web image holds only the public API URL.
+the API and MCP read everything from Dokploy's env at runtime (secrets resolved from Infisical at deploy, step 3), and the web image holds only the public API URL.
 
 Tags: `staging` and `production` move with each deploy; `sha-<full commit sha>` (every build) and `v<version>`
 (releases) never move, and are what a rollback goes back to.
