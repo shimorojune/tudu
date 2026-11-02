@@ -35,7 +35,10 @@ Project Tudu › environment production › Create Service › Compose.
 1. Name `tudu-production-app`. Source: **Raw** (the Production: release workflow writes `infra/production/compose.yaml` into it
    on each release; staging's Git source is not needed here). Paste the file once so the services exist.
 2. Turn **Autodeploy off** (the workflow deploys; a second build would race it).
-3. **Environment** tab, the secret values (the rest is in the compose file):
+3. **Environment** tab, the secret values (the rest is in the compose file). Secrets are not pasted here: they live in
+   Infisical and the tab references them through Dokploy's vault provider, for example
+   `RESEND_API_KEY=${{vault.tudu-app-prod.RESEND_API_KEY}}` (production's vault is `tudu-app-prod`; `DATABASE_URL` and
+   `AUTH_SECRET` are referenced the same way). Plain settings such as `FEEDBACK_TO` can stay as values. The variables:
 
    ```
    DATABASE_URL=postgresql://<user>:<password>@tudu-production-postgres:5432/tudu
@@ -53,6 +56,12 @@ Project Tudu › environment production › Create Service › Compose.
    repository access to shimorojune/tudu only and **Issues: Read and write**; expiry one year (calendar the renewal:
    an expired token is logged and reports go by email only). Staging can set `FEEDBACK_GITHUB_REPO` to a scratch
    repository so test reports stay off the real one.
+
+   **Rotating one of these** (a new Resend key, say): change it in Infisical, then press **Deploy** on
+   `tudu-production-app` and on `tudu-staging-app`. Dokploy resolves `${{vault.…}}` when it deploys, so a running
+   container keeps the old value until it is redeployed. Deploy pulls the same `production` / `staging` images, so
+   it does not change the version. A failed lookup leaves the variable empty, and the API then refuses to start
+   (for example `RESEND_API_KEY is needed for the resend transport`).
 
 4. **Domains** tab:
    - `tudu.ezdev.net` → service `web`, port 80, HTTPS on, Let's Encrypt.
