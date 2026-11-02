@@ -1,7 +1,8 @@
 # Production, as deployed by Dokploy (project Tudu, environment production, service tudu-production-app), with the
 # domains tudu.ezdev.net (web) and api.tudu.ezdev.net (api). The Production: release workflow builds the images on
 # GitHub's arm64 runner, pushes them to GHCR (public packages) and deploys this file (.github/workflows/release.yml);
-# every deploy pulls the moving `production` tag. Secret values live in Dokploy's env.
+# every deploy pulls the moving `production` tag. Each ${VAR} comes from Dokploy's env, which references Infisical
+# through Dokploy's vault provider (docs/release.md step 3): change a secret in Infisical, then Deploy.
 services:
   api:
     image: ghcr.io/shimorojune/tudu-api:production
@@ -18,7 +19,7 @@ services:
       EMAIL_TRANSPORT: resend
       RESEND_API_KEY: ${RESEND_API_KEY}
       EMAIL_FROM: Tudu <sign-in@mail.tudu.ezdev.net>
-      # Send feedback mails each report here (set in Dokploy's environment); empty saves reports without mail.
+      # Send feedback mails each report here (a plain value in Dokploy's environment); empty saves reports without mail.
       FEEDBACK_TO: ${FEEDBACK_TO:-}
       # Each report also becomes a public issue with this fine-grained token; empty means email only.
       FEEDBACK_GITHUB_TOKEN: ${FEEDBACK_GITHUB_TOKEN:-}

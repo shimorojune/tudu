@@ -324,3 +324,10 @@ test file; IDs continue chunk 01 (`docs/tests/chunk-01.md`).
 4. Do you still have the Dokploy API key and the deploy private key outside GitHub, or rotate both during the move
    (my recommendation: rotate, it costs nothing extra here)?
 5. OK to sign rehearsals with a throwaway key (§3)?
+
+## Later: the app's runtime secrets (2 Nov 2026)
+
+This proposal covered only the CI secrets. The app's runtime secrets (`DATABASE_URL`, `AUTH_SECRET`, `RESEND_API_KEY`,
+the S3 keys and the GitHub tokens) also live in Infisical now, outside this plan: Dokploy's Environment tab for each
+compose references them through Dokploy's vault provider (`${{vault.tudu-app-prod.<KEY>}}` in production). Dokploy
+resolves them on each deploy, so a changed secret needs a Deploy of the compose. docs/release.md step 3 has the details.
