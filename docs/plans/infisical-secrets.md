@@ -329,5 +329,6 @@ test file; IDs continue chunk 01 (`docs/tests/chunk-01.md`).
 
 This proposal covered only the CI secrets. The app's runtime secrets (`DATABASE_URL`, `AUTH_SECRET`, `RESEND_API_KEY`,
 the S3 keys and the GitHub tokens) also live in Infisical now, outside this plan: Dokploy's Environment tab for each
-compose references them through Dokploy's vault provider (`${{vault.tudu-app-prod.<KEY>}}` in production). Dokploy
+compose references them through Dokploy's vault provider (`${{vault.tudu-app-prod.<KEY>}}` in production). They live in
+Infisical project Tudu, folder `/app`, environments Staging and Production. Dokploy
 resolves them on each deploy, so a changed secret needs a Deploy of the compose. docs/release.md step 3 has the details.

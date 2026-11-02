@@ -37,7 +37,8 @@ Project Tudu › environment production › Create Service › Compose.
 2. Turn **Autodeploy off** (the workflow deploys; a second build would race it).
 3. **Environment** tab (the rest is in the compose file). Secret values are never pasted here: they live in
    Infisical and the tab references them through Dokploy's vault provider, which reads Infisical when it deploys.
-   Production's vault is `tudu-app-prod`; staging's compose (`tudu-staging-app`) has its own vault with the same keys.
+   In Infisical they sit in project **Tudu**, folder `/app`, one environment per deployment: **Production** (Dokploy
+   vault `tudu-app-prod`) and **Staging** (the vault that `tudu-staging-app` references), each with the same seven keys.
 
    ```
    DATABASE_URL=${{vault.tudu-app-prod.DATABASE_URL}}
