@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { JiraLink, SpaceSummary, SyncMutation, Task } from '@tudu/core';
 import { applyToLinks, jiraConnectionKey, jiraLinksKey, jiraSpacesKey } from '@tudu/client';
 import { createElement, type ReactNode } from 'react';
@@ -7,10 +7,14 @@ import { showToast } from '@tudu/ui';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { moreItems } from '../routes/more/MorePage';
 import { phoneTab } from './AppShell';
-import { askOf, panelState, toPanelIssue } from './JiraHost';
+import { askOf, countsFor, panelState, toPanelIssue } from './JiraHost';
 import {
   clearJiraGlow,
+  countFromList,
+  followAssignedList,
   glowJiraSpace,
+  JIRA_COUNT_EVERY_MS,
+  JIRA_STALE_MS,
   jiraParam,
   openInJira,
   peekJiraGlow,
@@ -19,6 +23,7 @@ import {
   setJiraPick,
   turnOffHere,
   useJira,
+  useJiraCountOnFocus,
   useJiraPick,
   withJira,
 } from './jira';
@@ -338,5 +343,110 @@ describe('C10-U23 Manage spaces… glows the space you came from, once', () => {
     expect(peekJiraGlow()).toBe('nw');
     clearJiraGlow();
     expect(peekJiraGlow()).toBeNull();
+  });
+});
+
+describe('C10-U24..U28 the count follows the Assigned to me list and coming back to the app (#64)', () => {
+  const CONN = {
+    connected: true as const,
+    site: 'https://jira.northwind.io',
+    who: { name: 'Ada', email: 'ada@x.io' },
+    state: 'ok' as const,
+    syncedAt: null,
+    views: [],
+    assigned: ['A-1'],
+    count: 1,
+    onIn: 1,
+  };
+  const issue = (key: string) => ({ key, summary: key, status: 'To Do', due: null, updated: null });
+  const listOf = (keys: string[], total = keys.length) => ({ issues: keys.map(issue), total, syncedAt: at });
+  const wrap = ({ children }: { children: ReactNode }) =>
+    createElement(QueryClientProvider, { client: queryClient }, children);
+  const seed = (assigned: string[], updatedAt = Date.now()) => {
+    queryClient.setQueryData(jiraConnectionKey(), { ...CONN, assigned, count: assigned.length }, { updatedAt });
+    queryClient.setQueryData(jiraSpacesKey(), {
+      spaces: [{ id: 'me', name: 'Personal', kind: 'personal', color: null, on: true, linked: 0 }],
+    });
+    queryClient.setQueryData(jiraLinksKey(), { links: [] });
+  };
+  afterEach(() => {
+    queryClient.clear();
+    vi.restoreAllMocks();
+    resetJiraForTests();
+  });
+
+  it('C10-U24 a newly assigned issue in the list moves the count at once, with no second read', async () => {
+    seed(['A-1']);
+    const get = vi.spyOn(api, 'get').mockResolvedValue({ ...CONN, assigned: ['A-1'] } as never);
+    const { result } = renderHook(() => useJira('me'), { wrapper: wrap });
+    await waitFor(() => expect(result.current.count).toBe(1));
+    act(() => followAssignedList(listOf(['A-2', 'A-1']), Date.now()));
+    expect(result.current.count).toBe(2);
+    expect(get).not.toHaveBeenCalled();
+    // A list read before the count's own read says nothing: the count is the fresher.
+    act(() => followAssignedList(listOf(['A-1']), Date.now() - 60_000));
+    expect(result.current.count).toBe(2);
+    // An issue that already has an open task still doesn't count.
+    act(() =>
+      queryClient.setQueryData(jiraLinksKey(), {
+        links: [{ key: 'A-2', taskId: 't', spaceId: 'me', ref: 'ME-1', title: 'x', day: null, done: false }],
+      }),
+    );
+    expect(result.current.count).toBe(1);
+  });
+
+  it('C10-U25 a first page never overwrites the count; a total that disagrees asks for it again', async () => {
+    const fifty = Array.from({ length: 50 }, (_, i) => `A-${i + 1}`);
+    // 120 assigned, the count holds the first 100: they agree.
+    expect(countFromList(Array.from({ length: 100 }, (_, i) => `A-${i + 1}`), listOf(fifty, 120))).toBeNull();
+    // 130 assigned, the count holds 80: read the count again, don't write the page's 50.
+    const eighty = Array.from({ length: 80 }, (_, i) => `A-${i + 1}`);
+    expect(countFromList(eighty, listOf(fifty, 130))).toBe('refetch');
+    seed(eighty);
+    const get = vi.spyOn(api, 'get').mockResolvedValue({ ...CONN, assigned: eighty } as never);
+    const { result } = renderHook(() => useJira('me'), { wrapper: wrap });
+    await waitFor(() => expect(result.current.count).toBe(80));
+    act(() => followAssignedList(listOf(fifty, 130), Date.now()));
+    await waitFor(() => expect(get).toHaveBeenCalledTimes(1));
+    expect(result.current.count).toBe(80);
+  });
+
+  it('C10-U26 saved views and your own JQL leave the count alone', () => {
+    expect(countsFor({ view: 'assigned' })).toBe(true);
+    expect(countsFor(askOf({ view: 'assigned' }, []))).toBe(true);
+    expect(countsFor({ view: 'v1' })).toBe(false);
+    expect(countsFor({ jql: 'project = A' })).toBe(false);
+    // The count reads on the list's clock, so the two can't drift far apart.
+    expect(JIRA_COUNT_EVERY_MS).toBe(JIRA_STALE_MS);
+  });
+
+  it('C10-U27 coming back to the app reads a count older than a minute, at most once a minute', async () => {
+    seed(['A-1'], Date.now() - 2 * 60_000);
+    const get = vi.spyOn(api, 'get').mockResolvedValue({ ...CONN, assigned: ['A-1', 'A-2'], count: 2 } as never);
+    const { result } = renderHook(
+      () => {
+        useJiraCountOnFocus();
+        return useJira('me');
+      },
+      { wrapper: wrap },
+    );
+    await waitFor(() => expect(result.current.count).toBe(1));
+    expect(get).not.toHaveBeenCalled();
+    act(() => void window.dispatchEvent(new Event('focus')));
+    await waitFor(() => expect(result.current.count).toBe(2));
+    expect(get).toHaveBeenCalledTimes(1);
+    act(() => void window.dispatchEvent(new Event('focus')));
+    act(() => void document.dispatchEvent(new Event('visibilitychange')));
+    expect(get).toHaveBeenCalledTimes(1);
+  });
+
+  it('C10-U28 an issue no longer assigned drops the count too', async () => {
+    seed(['A-1', 'A-2']);
+    const { result } = renderHook(() => useJira('me'), { wrapper: wrap });
+    await waitFor(() => expect(result.current.count).toBe(2));
+    expect(countFromList(['A-1', 'A-2'], listOf(['A-1']))).toEqual({ write: ['A-1'] });
+    expect(countFromList(['A-1', 'A-2'], listOf(['A-2', 'A-1']))).toBeNull();
+    act(() => followAssignedList(listOf(['A-1']), Date.now()));
+    expect(result.current.count).toBe(1);
   });
 });

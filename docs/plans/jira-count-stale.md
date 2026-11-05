@@ -1,7 +1,21 @@
 # Jira count stuck at 1 when 2 issues are assigned (#64)
 
-Status: draft, awaiting Rohit's approval. Canvas: not applicable (no visible design change; the badge, its tip and
-the panel look exactly as today), pending Rohit's OK to skip it.
+Status: approved by Rohit 5 Nov 2026; implemented (see As built). Canvas: not applicable (no visible design change;
+the badge, its tip and the panel look exactly as today), skipped with Rohit's OK.
+
+## As built (5 Nov)
+
+- `apps/web/src/app/jira.ts`: `countFromList` (pure: write the list's keys, read the count again, or nothing),
+  `followAssignedList` (applies it to the connection query data; a list read before the count's own read is ignored),
+  `refreshJiraCountIfOld` + `useJiraCountOnFocus` (window `focus` and `visibilitychange` to visible, 1 minute floor).
+  `JIRA_COUNT_EVERY_MS` is now `JIRA_STALE_MS` (5 min).
+- `JiraHost.tsx`: `countsFor(ask)` gates it to the Assigned to me view; an effect calls `followAssignedList` whenever
+  that list's data changes. `AppShell.tsx` mounts `useJiraCountOnFocus()` once.
+- C10-U25 as proposed was wrong: a first page of 50 with total 120 against a count holding 100 keys *agrees* (both
+  are capped at 100), so nothing should happen. The test checks that case stays quiet, and that total 130 against
+  a count of 80 reads the count again without writing the page's 50 keys.
+- C10-E27 needed the fake Jira to assign an issue mid-test: `POST /__test/jira/assign {token, key}` (per token, so
+  parallel tests don't see it), with the `assign` fixture in `packages/e2e/fixtures/jira.ts`.
 
 ## The report
 

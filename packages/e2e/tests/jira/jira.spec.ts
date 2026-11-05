@@ -3,6 +3,7 @@ import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
 import {
   addAnApp,
   addTo,
+  assign,
   chipOf,
   connectByApi,
   down,
@@ -1025,5 +1026,23 @@ test.describe('jira', () => {
     await expect(toast).toContainText('Jira is off in Northwind.');
     await toast.getByRole('button', { name: 'Undo' }).click();
     await expect(tabs.getByRole('button', { name: /Jira$/ })).toBeVisible();
+  });
+
+  test('C10-E27 a newly assigned issue: opening the panel shows it and the count follows, no Refresh (#64)', async ({
+    page,
+  }) => {
+    test.skip(phone() || tablet(), 'the top bar’s count is the desk’s');
+    await fixClock(page);
+    await signInFresh(page);
+    const token = await connectByApi(page);
+    await page.reload();
+    await expect(jiraButton(page)).toContainText('7');
+    // Someone assigns you one more in Jira while Tudu is open.
+    await assign(page, token, 'TUDU-240');
+    await openJira(page);
+    await expect.poll(() => issueKeys(page)).toContain('TUDU-240');
+    await expect(issueRow(page, 'TUDU-240')).toBeVisible();
+    await expect(jiraButton(page)).toContainText('8');
+    await expect(jiraButton(page).locator('.tp-jirabtn-n')).toHaveAccessibleName('8 assigned to you, not in Tudu yet');
   });
 });

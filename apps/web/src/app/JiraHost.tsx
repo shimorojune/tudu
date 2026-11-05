@@ -29,6 +29,7 @@ import { useEffect, useState } from 'react';
 import { askBacklogView, flashTask, locateTask, showDay, useShownDay } from './dayView';
 import {
   closeApps,
+  followAssignedList,
   glowJiraSpace,
   hostOf,
   jiraClient,
@@ -57,6 +58,11 @@ import { useWorkingDay } from './workingDay';
 
 /** The spinner on an issue's calendar button shows at least this long, so adding reads as a step. */
 const ADD_BEAT_MS = 450;
+
+/** Only the Assigned to me list says what's assigned to you: saved views and your own JQL leave the count alone. */
+export function countsFor(ask: JiraListAsk): boolean {
+  return 'view' in ask && ask.view === JIRA_ASSIGNED_VIEW;
+}
 
 /** Which space a link's task lives in, when it is not the one you are in: the chip names it. */
 export type SpaceOf = (spaceId: string) => SpaceSummary | undefined;
@@ -212,6 +218,11 @@ export function JiraView({
     ...jiraClient.issueQuery(space.id, issue ?? ''),
     enabled: !!conn && conn.state === 'ok' && !!issue,
   });
+  // The Assigned to me list is the freshest word on what's assigned: the count follows it (#64).
+  const assignedList = countsFor(ask);
+  useEffect(() => {
+    if (assignedList && list.data) followAssignedList(list.data, list.dataUpdatedAt);
+  }, [assignedList, list.data, list.dataUpdatedAt]);
   const byKey = linksByKey(links);
   const err = list.isError ? jiraError(list.error) : null;
   const errorCode = list.isError ? (err?.code ?? 'unreachable') : null;
