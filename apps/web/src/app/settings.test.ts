@@ -2,7 +2,8 @@ import type { SpaceSummary } from '@tudu/core';
 import { describe, expect, it, vi } from 'vitest';
 import { moreItems } from '../routes/more/MorePage';
 import { phoneTab } from './AppShell';
-import { onSpaceGone, sectionFor, settingsHref } from './settings';
+import { ALL_GLOW } from './jira';
+import { jiraRows, onSpaceGone, sectionFor, settingsHref } from './settings';
 import { spaceBySlug, viewOf, withSlug } from './space';
 
 const PERSONAL: SpaceSummary = {
@@ -76,5 +77,24 @@ describe('C09-U09 settings in the web app', () => {
   it('More lists Settings last, in every space', () => {
     expect(moreItems(PERSONAL).at(-1)).toMatchObject({ value: 'settings', label: 'Settings' });
     expect(moreItems(NW).map((i) => i.value)).toEqual(['backlog', 'people', 'notebook', 'apps', 'settings']);
+  });
+});
+
+describe('C10-U28 Settings › Apps rows: here and the glow', () => {
+  const SW = [
+    { id: 'p', kind: 'personal' as const, name: 'Personal', color: null, on: true, linked: 2 },
+    { id: 'n', kind: 'team' as const, name: 'Northwind', color: '#3d5a80', on: false, linked: 0 },
+  ];
+  it('in a space: that row is here and a row sent to glows alone', () => {
+    const rows = jiraRows(SW, 'n', 'n', false);
+    expect(rows.map((r) => [r.id, r.current, r.highlight])).toEqual([
+      ['p', false, false],
+      ['n', true, true],
+    ]);
+    expect(rows[0]).toMatchObject({ personal: true, on: true, linked: 2, color: undefined });
+  });
+  it('in All spaces: no row is here, and the all-rows glow lights no single row', () => {
+    const rows = jiraRows(SW, 'p', ALL_GLOW, true);
+    expect(rows.every((r) => !r.current && !r.highlight)).toBe(true);
   });
 });

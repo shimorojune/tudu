@@ -35,8 +35,8 @@ describe('C10-U13 Settings › Apps is yours', () => {
 
     expect(screen.getByText('Use Jira in')).toBeInTheDocument();
     expect(screen.getByText('1 of 3 on')).toBeInTheDocument();
-    expect(rowOf('Personal')).toHaveTextContent('Personal3 linked tasks');
-    expect(rowOf('Northwind')).toHaveTextContent('NorthwindYou’re hereOff · 2 tasks keep their keys');
+    expect(rowOf('Personal')).toHaveTextContent('Personal3 linked tasksOn');
+    expect(rowOf('Northwind')).toHaveTextContent('NorthwindYou’re here2 tasks keep their Jira keysOff');
     expect(rowOf('Harbour')).toHaveTextContent('HarbourOff');
     expect(screen.getByRole('switch', { name: 'Jira in Personal' })).toHaveAttribute('aria-checked', 'true');
     expect(
@@ -73,7 +73,7 @@ describe('C10-U13 Settings › Apps is yours', () => {
     expect(screen.getByRole('switch', { name: 'Jira in Northwind' })).toBeDisabled();
     await act(async () => answer());
     await act(async () => vi.advanceTimersByTime(JIRA_SWITCH_SETTLE_MS + 10));
-    expect(rowOf('Northwind')).toHaveTextContent('2 linked tasks');
+    expect(rowOf('Northwind')).toHaveTextContent('NorthwindYou’re here2 linked tasksOn');
     expect(screen.getByText('2 of 3 on')).toBeInTheDocument();
     // The server's word arrives: the row speaks for itself again.
     rerender(
@@ -112,5 +112,71 @@ describe('C10-U13 Settings › Apps is yours', () => {
     rerender(apps({ jira: { connected: true, site: 'jira.northwind.io' } }));
     expect(screen.getByRole('switch', { name: 'Jira in Northwind' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByText('1 of 1 on')).toBeInTheDocument();
+  });
+});
+
+const wordOf = (name: string) => rowOf(name).querySelector('.tp-set-state')!;
+
+describe('C10-U24 Use Jira in: On or Off beside the switch', () => {
+  it('the word sits with the switch; the line under the name is only the count; off rows rest quieter', async () => {
+    const user = userEvent.setup({ advanceTimers: (ms) => vi.advanceTimersByTime(ms) });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let answer: (r?: { error?: string }) => void = () => {};
+    const onJiraSpace = vi.fn(() => new Promise<{ error?: string } | void>((r) => (answer = r)));
+    render(apps({ jira: JIRA, onJiraSpace }));
+
+    // The word and the switch share one control, the word first.
+    const sw = screen.getByRole('switch', { name: 'Jira in Personal' });
+    expect(sw.closest('.tp-set-sw')).toBe(wordOf('Personal').closest('.tp-set-sw'));
+    expect(wordOf('Personal')).toHaveTextContent(/^On$/);
+    expect(wordOf('Personal')).toHaveClass('tp-on');
+    expect(wordOf('Personal')).toHaveAttribute('aria-hidden', 'true');
+    expect(wordOf('Northwind')).toHaveTextContent(/^Off$/);
+    // The line under the name: the count, worded for on and off; none without links.
+    expect(rowOf('Personal').querySelector('.tp-setrow-s')).toHaveTextContent(/^3 linked tasks$/);
+    expect(rowOf('Northwind').querySelector('.tp-setrow-s')).toHaveTextContent(
+      /^2 tasks keep their Jira keys$/,
+    );
+    expect(rowOf('Harbour').querySelector('.tp-setrow-s')).toBeNull();
+    // Off rows rest quieter.
+    expect(rowOf('Personal')).not.toHaveClass('tp-off');
+    expect(rowOf('Harbour')).toHaveClass('tp-off');
+
+    // Clicking the word flips the switch: Turning on… with a spinner, then On.
+    await user.click(wordOf('Harbour'));
+    expect(onJiraSpace).toHaveBeenCalledWith(expect.objectContaining({ id: 'hb' }), true);
+    expect(wordOf('Harbour')).toHaveTextContent('Turning on…');
+    expect(wordOf('Harbour')).toHaveClass('tp-busy');
+    expect(wordOf('Harbour').querySelector('svg.tp-spin')).not.toBeNull();
+    expect(rowOf('Harbour')).not.toHaveClass('tp-off');
+    expect(screen.getByRole('switch', { name: 'Jira in Harbour' })).toBeDisabled();
+    await act(async () => answer({ error: 'Couldn’t turn Jira on there.' }));
+    await act(async () => vi.advanceTimersByTime(JIRA_SWITCH_SETTLE_MS + 10));
+    // A refusal: back to Off, and the reason under the row.
+    expect(wordOf('Harbour')).toHaveTextContent(/^Off$/);
+    expect(rowOf('Harbour')).toHaveClass('tp-off');
+    expect(within(rowOf('Harbour') as HTMLElement).getByRole('alert')).toHaveTextContent(
+      'Couldn’t turn Jira on there.',
+    );
+    vi.useRealTimers();
+  });
+});
+
+describe('C10-U25 Use Jira in from All spaces', () => {
+  it('no row says You’re here; glowAll glows every row; skeleton rows draw the word bar', () => {
+    const { rerender } = render(apps({ jira: JIRA, allSpaces: true }));
+    expect(screen.queryByText('You’re here')).toBeNull();
+    expect(document.querySelectorAll('.tp-set-sprow.tp-set-hl')).toHaveLength(0);
+
+    rerender(apps({ jira: { ...JIRA, glowAll: true }, allSpaces: true }));
+    expect(document.querySelectorAll('.tp-set-sprow.tp-set-hl')).toHaveLength(3);
+
+    rerender(apps({ jira: JIRA }));
+    expect(screen.getByText('You’re here')).toBeInTheDocument();
+
+    rerender(apps({ jira: { ...JIRA, loading: true } }));
+    document.querySelectorAll('.tp-set-skl').forEach((r) => {
+      expect(r.querySelectorAll('.tp-set-sw .tp-skel')).toHaveLength(2);
+    });
   });
 });

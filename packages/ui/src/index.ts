@@ -268,7 +268,8 @@ export {
   type SettingsSectionName,
   UP_TO_DATE_MS,
   JIRA_SWITCH_SETTLE_MS,
-  jiraSpaceLine,
+  jiraSpaceCount,
+  jiraSpaceWord,
   type JiraSpaceRow,
 } from './components/Settings';
 export {

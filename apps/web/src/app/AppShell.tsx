@@ -39,7 +39,7 @@ import {
 import { FeedbackHost, openFeedback, useFeedback } from './feedback';
 import { GettingStartedHost } from './firstRun';
 import { SearchHost } from './SearchHost';
-import { AppsHost, JiraHost } from './JiraHost';
+import { AppsHost, JiraConnectHost, JiraHost } from './JiraHost';
 import { jiraParam, openApps, useJira, useJiraCountOnFocus, useJiraFresh, withJira } from './jira';
 import { QuickAddHost } from './quickAdd';
 import { initialsOf, photoSrc, signOut } from './session';
@@ -285,10 +285,10 @@ export function AppShell({
       <SearchHost me={me} />
       <CreateSpaceHost />
       <MembersHost me={me} space={space} />
-      <SettingsHost me={me} space={space} />
-      {all ? null : <JiraHost space={space} />}
+      <SettingsHost me={me} space={space} all={all} />
+      {all ? <JiraConnectHost space={space} /> : <JiraHost space={space} />}
       {all ? null : <AppsHost space={space} />}
-      <GettingStartedHost me={me} space={space} vp={vp} />
+      <GettingStartedHost me={me} space={space} vp={vp} all={all} />
       <FeedbackHost space={space} vp={vp} />
       <NoteWindowHost />
     </>

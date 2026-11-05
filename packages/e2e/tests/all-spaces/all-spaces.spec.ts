@@ -975,4 +975,20 @@ test.describe('all spaces', () => {
     await openAndClose(page, backlog, 'Sort the attic');
     await openAndClose(page, backlog, 'Sort the attic');
   });
+
+  test('C21-E28 Getting started in All spaces: Bring your Jira issues opens Settings › Apps', async ({
+    page,
+  }) => {
+    test.skip(phone(), 'phones keep their Apps page');
+    await signInFresh(page, undefined, { gettingStarted: true });
+    await makeSpace(page, 'Northwind', '#3d5a80');
+    await page.goto('/all');
+    await page
+      .getByRole('region', { name: 'Getting started' })
+      .getByRole('button', { name: /Bring your Jira issues/ })
+      .click();
+    const settings = page.getByRole('dialog', { name: 'Settings' });
+    await expect(settings.getByRole('button', { name: 'Connect' })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Apps' })).toHaveCount(0);
+  });
 });

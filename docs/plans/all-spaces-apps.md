@@ -1,12 +1,21 @@
 # Connect Jira from All spaces, and On/Off beside the switch
 
-Status: proposal, awaiting Rohit's approval. Issues: #59 (Connect apps does nothing in All spaces) and #63 (the
+Status: approved by Rohit 5 Nov 2026; implemented (see As built). Issues: #59 (Connect apps does nothing in All spaces) and #63 (the
 apps' On/Off in the spaces list). Canvas: approved by Rohit 2 Nov 2026 on the Jira page (boards `J-AllApps` and
 `J-AllApps-Dark`, sticky `p04-allapps-draft`; captions on `J-Acct-Settings`, `J-Acct-Settings-Dark` and
 `J-Acct-Motion` updated). Kit: Tudu Paper v54/v55 (`Settings` Use Jira in rows, `JiraPanel` `allSpaces`).
 
 Decided with Rohit (2 Nov): connecting from All spaces turns Jira on **nowhere**; you pick the spaces in Settings ›
 Apps. AI access is unchanged (its rows have no switch).
+
+## As built (5 Nov)
+
+- `SettingsView`'s Use Jira in rows come from a new pure `jiraRows(spaces, here, glow, all)` in `settings.tsx`, so
+  C10-U28 tests it directly instead of rendering all of Settings. `glowAll` is `glow === ALL_GLOW`.
+- `JiraConnectHost` keeps the form up while it connects (`holding`), like `JiraView`, so the reads saying "connected"
+  don't drop `?jira` before the Connected tick. Until the connection is read once, nothing opens.
+- `less-motion.css` is generated (`node scripts/less-motion.mjs`); the new rules came from there.
+- `jiraSpaceLine` is replaced by `jiraSpaceWord` + `jiraSpaceCount` in the kit's exports.
 
 ## #59: what is wrong
 
@@ -92,26 +101,26 @@ New IDs continue each chunk. All run on Rohit's Mac (`pnpm test …` and `pnpm e
 
 ### Unit
 
-| ID | Where | Case |
-| --- | --- | --- |
+| ID      | Where                       | Case                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | C10-U24 | ui `Settings.apps.test.tsx` | Use Jira in rows: the word beside the switch reads On / Off; busy reads Turning on… with a spinner and the switch is disabled; the line under the name is "4 linked tasks" when on, "2 tasks keep their Jira keys" when off, absent with no links; an off row has `tp-off`; clicking the word flips the switch and calls `onJiraSpace`; a refusal puts the word back to Off with the reason under the row |
-| C10-U25 | ui `Settings.apps.test.tsx` | `allSpaces`: no row says You're here even when `current` is set; `jira.glowAll`: every row has `tp-set-hl`; skeleton rows draw the word bar |
-| C10-U26 | ui `JiraPanel.test.tsx` | `allSpaces`: the connect form says you pick the spaces next and names no space; without it the form still names `spaceName` (C10-U15 unchanged) |
-| C10-U27 | web `JiraHost.test.tsx` | `JiraConnectHost`: `?jira` while not connected opens the form; Connect calls `jiraClient.connect` with no space id; after the tick the address has `?settings=apps` and no `jira`, and the glow store holds `*`; expired opens Reconnect; already connected drops `?jira` and renders nothing; × removes `?jira` |
-| C10-U28 | web `settings.test.ts` | `SettingsView` with the `*` glow passes `glowAll` and clears it after the first draw; in All spaces it passes `allSpaces` |
-| C21-U23 | web `firstRun.test.tsx` | In All spaces on the desk, Bring your Jira issues navigates to `?settings=apps` and does not open the Apps panel; in a space it still opens the Apps panel; on a phone it still goes to the space's Apps page |
-| C10-U13 | ui (reworded) | Expectations follow the new row: the word beside the switch, the count-only line |
+| C10-U25 | ui `Settings.apps.test.tsx` | `allSpaces`: no row says You're here even when `current` is set; `jira.glowAll`: every row has `tp-set-hl`; skeleton rows draw the word bar                                                                                                                                                                                                                                                               |
+| C10-U26 | ui `JiraPanel.test.tsx`     | `allSpaces`: the connect form says you pick the spaces next and names no space; without it the form still names `spaceName` (C10-U15 unchanged)                                                                                                                                                                                                                                                           |
+| C10-U27 | web `JiraHost.test.tsx`     | `JiraConnectHost`: `?jira` while not connected opens the form; Connect calls `jiraClient.connect` with no space id; after the tick the address has `?settings=apps` and no `jira`, and the glow store holds `*`; expired opens Reconnect; already connected drops `?jira` and renders nothing; × removes `?jira`                                                                                          |
+| C10-U28 | web `settings.test.ts`      | `SettingsView` with the `*` glow passes `glowAll` and clears it after the first draw; in All spaces it passes `allSpaces`                                                                                                                                                                                                                                                                                 |
+| C21-U23 | web `firstRun.test.tsx`     | In All spaces on the desk, Bring your Jira issues navigates to `?settings=apps` and does not open the Apps panel; in a space it still opens the Apps panel; on a phone it still goes to the space's Apps page                                                                                                                                                                                             |
+| C10-U13 | ui (reworded)               | Expectations follow the new row: the word beside the switch, the count-only line                                                                                                                                                                                                                                                                                                                          |
 
 ### End to end (Playwright, fake Jira at `/__test/jira`)
 
-| ID | Spec | Case |
-| --- | --- | --- |
-| C10-E27 | `jira.spec.ts` | Two spaces, no Jira. In All spaces: avatar › Settings › Apps › Connect opens the token form beside All spaces (no Jira in the top bar); a `good-` token → Checking… → Connected → the panel goes and Settings is open on Apps: every row Off, "0 of 2 on", no You're here. Back in Personal, no Jira in the top bar until its switch is turned on in Settings |
-| C10-E28 | `jira.spec.ts` | In All spaces, a refused token shows the reason under the token field and keeps what was typed; close the panel: `GET /api/connectors/jira` still says not connected |
-| C10-E29 | `jira.spec.ts` | Connected and on in Personal, then the token expires (`/__test/jira/expire`). In All spaces: Settings › Apps › Add a new token opens Reconnect beside All spaces; a new `good-` token brings Personal back on and the other space stays off |
-| C10-E30 | `jira.spec.ts` | Settings › Apps row layout: each row's state word is in the same row as its switch and to its left (bounding boxes), On for Personal and Off for the other; flipping the other shows Turning on… then On; with the PUT aborted (route) it goes back to Off with the reason under the row. Light and dark |
-| C21-E28 | `all-spaces.spec.ts` | A new account with two spaces: in All spaces, Getting started › Bring your Jira issues opens Settings on Apps (not connected, Connect visible) |
-| C10-E17 | `jira.spec.ts` (reworded) | "Off · 1 task keeps its key" becomes the word Off beside the switch and "1 task keeps its Jira key" under the name |
+| ID      | Spec                      | Case                                                                                                                                                                                                                                                                                                                                                          |
+| ------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C10-E27 | `jira.spec.ts`            | Two spaces, no Jira. In All spaces: avatar › Settings › Apps › Connect opens the token form beside All spaces (no Jira in the top bar); a `good-` token → Checking… → Connected → the panel goes and Settings is open on Apps: every row Off, "0 of 2 on", no You're here. Back in Personal, no Jira in the top bar until its switch is turned on in Settings |
+| C10-E28 | `jira.spec.ts`            | In All spaces, a refused token shows the reason under the token field and keeps what was typed; close the panel: `GET /api/connectors/jira` still says not connected                                                                                                                                                                                          |
+| C10-E29 | `jira.spec.ts`            | Connected and on in Personal, then the token expires (`/__test/jira/expire`). In All spaces: Settings › Apps › Add a new token opens Reconnect beside All spaces; a new `good-` token brings Personal back on and the other space stays off                                                                                                                   |
+| C10-E30 | `jira.spec.ts`            | Settings › Apps row layout: each row's state word is in the same row as its switch and to its left (bounding boxes), On for Personal and Off for the other; flipping the other shows Turning on… then On; with the PUT aborted (route) it goes back to Off with the reason under the row. Light and dark                                                      |
+| C21-E28 | `all-spaces.spec.ts`      | A new account with two spaces: in All spaces, Getting started › Bring your Jira issues opens Settings on Apps (not connected, Connect visible)                                                                                                                                                                                                                |
+| C10-E17 | `jira.spec.ts` (reworded) | "Off · 1 task keeps its key" becomes the word Off beside the switch and "1 task keeps its Jira key" under the name                                                                                                                                                                                                                                            |
 
 ## Risks
 
