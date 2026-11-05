@@ -1676,7 +1676,11 @@ test.describe('notebook drawings', () => {
     expect(previewDark).toBeTruthy();
     expect(await inkOf(page, previewLight!)).toBeLessThan(100);
     expect(await inkOf(page, previewDark!)).toBeGreaterThan(150);
+    // Straight after Done the block shows the pictures just made (local until a reload): the dark one, not flipped.
     const img = drawingBlock(page, did).getByRole('img');
+    await expect(img).not.toHaveClass(/tp-nb-draw-flip/);
+    // After a reload, the server's dark picture, still not flipped.
+    await page.reload();
     await expect(img).toHaveAttribute('src', `${API_URL}/api/files/${previewDark}`);
     await expect(img).not.toHaveClass(/tp-nb-draw-flip/);
   });

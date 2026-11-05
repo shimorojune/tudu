@@ -114,7 +114,7 @@ describe('C22-U99 images going into the dark picture', () => {
     const make = document.createElement.bind(document);
     vi.spyOn(document, 'createElement').mockImplementation(((tag: string) => {
       if (tag !== 'canvas') return make(tag);
-      let data = new Uint8ClampedArray([30, 30, 30, 255]);
+      let data: Uint8ClampedArray = new Uint8ClampedArray([30, 30, 30, 255]);
       return {
         width: 0,
         height: 0,
