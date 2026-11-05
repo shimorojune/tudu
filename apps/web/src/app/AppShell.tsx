@@ -40,7 +40,7 @@ import { FeedbackHost, openFeedback, useFeedback } from './feedback';
 import { GettingStartedHost } from './firstRun';
 import { SearchHost } from './SearchHost';
 import { AppsHost, JiraHost } from './JiraHost';
-import { jiraParam, openApps, useJira, useJiraFresh, withJira } from './jira';
+import { jiraParam, openApps, useJira, useJiraCountOnFocus, useJiraFresh, withJira } from './jira';
 import { QuickAddHost } from './quickAdd';
 import { initialsOf, photoSrc, signOut } from './session';
 import { SettingsHost, settingsHref } from './settings';
@@ -213,6 +213,7 @@ export function AppShell({
   // Jira, once connected: the sidebar's Apps section, the top bar's button and a phone tab, each with the count.
   // All spaces has none: Jira is a space's.
   const spaceJira = useJira(space.id);
+  useJiraCountOnFocus();
   const jira = all ? { ...spaceJira, conn: null, count: null } : spaceJira;
   const jiraFresh = useJiraFresh();
   const jiraOpen = jiraParam(loc.searchStr).open;

@@ -5,7 +5,8 @@ import { stripTags } from '@tudu/core';
  * A small Jira Data Center for tests, mounted at /__test/jira when TEST_ROUTES=1. It answers the three endpoints
  * Tudu reads (myself, search, issue) with a fixed set of issues, reads a little JQL, and keeps Jira's own
  * refusals. Tokens say what they are: `good-…` reads, `noread-…` is a token that can't read issues, anything else
- * is refused. POST /expire makes a token stop working; POST /down makes Jira answer 503 for it.
+ * is refused. POST /expire makes a token stop working; POST /down makes Jira answer 503 for it; POST /assign gives
+ * that token's person one more issue (only theirs, so parallel tests don't see it).
  */
 interface FakeIssue {
   key: string;
@@ -274,9 +275,15 @@ function rawIssue(i: FakeIssue, detail: boolean) {
 export function fakeJira() {
   const expired = new Set<string>();
   const down = new Set<string>();
+  const assigned = new Map<string, Set<string>>();
   const r = new Hono();
 
   const who = (h: string | undefined) => /^Bearer\s+(.+)$/i.exec(h ?? '')?.[1]?.trim() ?? '';
+  // The issues as this token's person sees them: those assigned to them since are theirs too.
+  const issuesFor = (t: string): FakeIssue[] => {
+    const more = assigned.get(t);
+    return more ? FAKE_ISSUES.map((i) => (more.has(i.key) ? { ...i, mine: true } : i)) : FAKE_ISSUES;
+  };
   // The token's answer before anything else: refused, expired, down, or which kind it is.
   r.use('/rest/*', async (c, next) => {
     const t = who(c.req.header('authorization'));
@@ -298,7 +305,9 @@ export function fakeJira() {
       return c.json({ errorMessages: [(err as Error).message], errors: {} }, 400);
     }
     const max = Math.min(Number(c.req.query('maxResults') ?? 50) || 50, 100);
-    const all = FAKE_ISSUES.filter(q.filter).sort(q.sort);
+    const all = issuesFor(who(c.req.header('authorization')))
+      .filter(q.filter)
+      .sort(q.sort);
     return c.json({
       startAt: 0,
       maxResults: max,
@@ -310,7 +319,9 @@ export function fakeJira() {
   r.get('/rest/api/2/issue/:key', (c) => {
     if (who(c.req.header('authorization')).startsWith('noread-'))
       return c.json({ errorMessages: ['You do not have the permission to see the specified issue.'] }, 403);
-    const i = FAKE_ISSUES.find((x) => x.key === c.req.param('key').toUpperCase());
+    const i = issuesFor(who(c.req.header('authorization'))).find(
+      (x) => x.key === c.req.param('key').toUpperCase(),
+    );
     if (!i) return c.json({ errorMessages: ['Issue Does Not Exist'], errors: {} }, 404);
     return c.json(rawIssue(i, true));
   });
@@ -322,6 +333,11 @@ export function fakeJira() {
   r.post('/expire', async (c) => {
     const { token } = (await c.req.json()) as { token?: string };
     if (token) expired.add(token);
+    return c.body(null, 204);
+  });
+  r.post('/assign', async (c) => {
+    const { token, key } = (await c.req.json()) as { token?: string; key?: string };
+    if (token && key) assigned.set(token, new Set([...(assigned.get(token) ?? []), key.toUpperCase()]));
     return c.body(null, 204);
   });
   r.post('/down', async (c) => {

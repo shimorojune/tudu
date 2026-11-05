@@ -3,24 +3,31 @@ import {
   issueUrl,
   jiraCount,
   JIRA_ASSIGNED_VIEW,
+  JIRA_PAGE,
   siteHost,
   type ConnectorSpacesResponse,
   type JiraConnectionResponse,
+  type JiraIssuesResponse,
   type JiraLink,
+  type JiraLinksResponse,
 } from '@tudu/core';
-import { JiraClient, jiraConnectionKey, jiraSpacesKey } from '@tudu/client';
+import { JiraClient, jiraConnectionKey, jiraLinksKey, jiraSpacesKey } from '@tudu/client';
 import { showToast } from '@tudu/ui';
-import { useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { openOutside } from './links';
 import { api, queryClient } from './session';
 
 /** Jira, through the API. Every read is online and asked only while you look. */
 export const jiraClient = new JiraClient(api, queryClient);
 
-/** The count is asked with the shell and again this often while the app is open. */
-export const JIRA_COUNT_EVERY_MS = 15 * 60 * 1000;
 /** The list is asked again when it is older than this and the panel is in view. */
 export const JIRA_STALE_MS = 5 * 60 * 1000;
+/** The count is asked with the shell and again this often while the app is open: the list's clock, so they agree. */
+export const JIRA_COUNT_EVERY_MS = JIRA_STALE_MS;
+/** Coming back to the app asks for the count again when it is older than this. */
+export const JIRA_FOCUS_FLOOR_MS = 60 * 1000;
+/** The server reads at most this many assigned keys for the count (`COUNT_PAGE` in the server's connectors). */
+const COUNT_PAGE = 100;
 
 export type Connected = Extract<JiraConnectionResponse, { connected: true }>;
 
@@ -52,6 +59,67 @@ export function useJira(spaceId: string): {
   const links = useQuery({ ...jiraClient.linksQuery(), enabled: !!connected }).data?.links ?? [];
   const count = conn?.assigned ? jiraCount(conn.assigned, links) : null;
   return { conn, connected, known: c.isFetched && (!connected || sp.isFetched), onHere, links, count };
+}
+
+/**
+ * What a fresh Assigned to me list says about the count: `write` its keys (the list holds every assigned issue and
+ * they differ from the count's), `refetch` the count (the list is a first page and its total disagrees), or nothing.
+ */
+export function countFromList(
+  assigned: string[],
+  list: Pick<JiraIssuesResponse, 'issues' | 'total'>,
+): { write: string[] } | 'refetch' | null {
+  const keys = list.issues.map((i) => i.key);
+  if (list.total <= JIRA_PAGE && keys.length === list.total) {
+    const had = new Set(assigned);
+    return keys.length === assigned.length && keys.every((k) => had.has(k)) ? null : { write: keys };
+  }
+  return Math.min(list.total, COUNT_PAGE) === assigned.length ? null : 'refetch';
+}
+
+/**
+ * The Assigned to me list was read at `at`: make the count agree with it. A list older than the count's own read
+ * says nothing (the count is the fresher of the two).
+ */
+export function followAssignedList(list: JiraIssuesResponse, at: number): void {
+  const key = jiraConnectionKey();
+  const c = queryClient.getQueryData<JiraConnectionResponse>(key);
+  if (!c?.connected || !c.assigned || at < queryClient.getQueryState(key)!.dataUpdatedAt) return;
+  const next = countFromList(c.assigned, list);
+  if (next === 'refetch') void queryClient.invalidateQueries({ queryKey: key });
+  else if (next) {
+    const links = queryClient.getQueryData<JiraLinksResponse>(jiraLinksKey())?.links ?? [];
+    const moved: Connected = { ...c, assigned: next.write, count: jiraCount(next.write, links) };
+    queryClient.setQueryData<JiraConnectionResponse>(key, moved);
+  }
+}
+
+/** Ask for the count again when it is older than the floor (coming back to the app). */
+export function refreshJiraCountIfOld(now = Date.now()): void {
+  const key = jiraConnectionKey();
+  const s = queryClient.getQueryState(key);
+  if (!s || s.fetchStatus === 'fetching' || now - s.dataUpdatedAt < JIRA_FOCUS_FLOOR_MS) return;
+  if (!queryClient.getQueryData<JiraConnectionResponse>(key)?.connected) return;
+  void queryClient.invalidateQueries({ queryKey: key });
+}
+
+/**
+ * Once, in the shell: coming back to the app (its window takes the focus, or the tab shows again) asks for a count
+ * older than a minute. The Mac app's page doesn't hide when you switch apps, so focus is the signal there.
+ */
+export function useJiraCountOnFocus(): void {
+  useEffect(() => {
+    const back = () => refreshJiraCountIfOld();
+    const vis = () => {
+      if (document.visibilityState === 'visible') back();
+    };
+    window.addEventListener('focus', back);
+    document.addEventListener('visibilitychange', vis);
+    return () => {
+      window.removeEventListener('focus', back);
+      document.removeEventListener('visibilitychange', vis);
+    };
+  }, []);
 }
 
 /** Jira is on in this space, as far as this tab has read. */
