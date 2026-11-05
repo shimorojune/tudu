@@ -70,6 +70,18 @@ const N = schema.notes;
 const F = schema.notebookFolders;
 const L = schema.noteLinks;
 const D = schema.noteDrawings;
+const A = schema.attachments;
+
+/**
+ * A drawing's dark picture, or null where it is only a copy of the light one (#55: the Mac app and Safari saved the
+ * light picture twice, their canvas ignoring Excalidraw's dark filter). Copies are the same render, so the same size;
+ * the note then shows the light one flipped.
+ */
+const PREVIEW_DARK = sql<
+  string | null
+>`case when ${D.previewDark} is not null and ${D.previewLight} is not null and
+  (select ${A.size} from ${A} where ${A.id} = ${D.previewDark}) =
+  (select ${A.size} from ${A} where ${A.id} = ${D.previewLight}) then null else ${D.previewDark} end`;
 
 // ---- reading ----------------------------------------------------------------------------------------------------
 
@@ -219,7 +231,7 @@ function wordsIn(text: string): number {
 /** Every drawing a note has held (orphaned ones too, so Undo finds its picture), oldest first. */
 async function drawingsOf(db: Executor, noteId: string): Promise<NoteDrawingInfo[]> {
   const rows = await db
-    .select({ id: D.id, rev: D.rev, previewLight: D.previewLight, previewDark: D.previewDark, text: D.text })
+    .select({ id: D.id, rev: D.rev, previewLight: D.previewLight, previewDark: PREVIEW_DARK, text: D.text })
     .from(D)
     .where(eq(D.noteId, noteId))
     .orderBy(asc(D.createdAt));
@@ -237,7 +249,7 @@ export async function drawingRead(db: Executor, userId: string, id: string): Pro
       text: D.text,
       rev: D.rev,
       previewLight: D.previewLight,
-      previewDark: D.previewDark,
+      previewDark: PREVIEW_DARK,
       deletedAt: N.deletedAt,
     })
     .from(D)

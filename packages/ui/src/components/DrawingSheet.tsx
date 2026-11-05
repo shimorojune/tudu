@@ -9,6 +9,7 @@ import {
   type ComponentType,
 } from 'react';
 import { cx } from '../lib/cx';
+import { darkPicture } from '../lib/drawing-dark';
 import { Icon } from '../lib/icons';
 import { useTheme } from '../lib/theme';
 import { Button } from './Button';
@@ -21,6 +22,7 @@ export const SHEET_OPEN_MS = 240;
 export const SHEET_CLOSE_MS = 220;
 /** The note's pictures are at most this wide, at twice the block's size. */
 export const PICTURE_MAX_PX = 1600;
+const PICTURE_PADDING = 16;
 
 const IMAGE_FAILED = 'Couldn’t upload the image. Check your connection and retry.';
 const IMAGE_TOO_BIG = 'That image is too big. Images can be up to 25 MB.';
@@ -51,6 +53,7 @@ interface ExcalidrawApi {
 export interface ExcalidrawModule {
   Excalidraw: ComponentType<Record<string, unknown>>;
   exportToBlob: (opts: Record<string, unknown>) => Promise<Blob>;
+  exportToCanvas: (opts: Record<string, unknown>) => Promise<HTMLCanvasElement>;
   restoreElements: (els: readonly Element[], local: null, opts: Record<string, unknown>) => Element[];
 }
 
@@ -75,7 +78,8 @@ export function loadExcalidraw(): Promise<ExcalidrawModule> {
 
 export interface DrawingPictures {
   light: Blob;
-  dark: Blob;
+  /** None when it couldn't be made: the note then shows the light one, flipped. */
+  dark: Blob | null;
 }
 
 export interface DrawingSheetProps {
@@ -333,24 +337,28 @@ export function DrawingSheet(p: DrawingSheetProps) {
       : live((p.drawing?.scene.elements ?? []) as unknown as Element[]);
     if (!els.length) return { empty: true, pictures: null };
     if (!a || !m) return { empty: false, pictures: null };
-    const make = (dark: boolean) =>
+    const files = a.getFiles();
+    const getDimensions = (w: number, h: number) => {
+      const scale = Math.min(2, PICTURE_MAX_PX / Math.max(1, w));
+      return { width: Math.round(w * scale), height: Math.round(h * scale), scale };
+    };
+    const [light, dark] = await Promise.allSettled([
       m.exportToBlob({
         elements: els,
-        files: a.getFiles(),
+        files,
         mimeType: 'image/png',
-        exportPadding: 16,
-        appState: { exportBackground: false, exportWithDarkMode: dark, viewBackgroundColor: 'transparent' },
-        getDimensions: (w: number, h: number) => {
-          const scale = Math.min(2, PICTURE_MAX_PX / Math.max(1, w));
-          return { width: Math.round(w * scale), height: Math.round(h * scale), scale };
-        },
-      });
-    try {
-      const [light, dark] = await Promise.all([make(false), make(true)]);
-      return { empty: false, pictures: { light, dark } };
-    } catch {
-      return { empty: false, pictures: null };
-    }
+        exportPadding: PICTURE_PADDING,
+        appState: { exportBackground: false, exportWithDarkMode: false, viewBackgroundColor: 'transparent' },
+        getDimensions,
+      }),
+      // Not Excalidraw's dark export: it flips with ctx.filter, which WebKit ignores (#55).
+      darkPicture(m, { elements: els, files, exportPadding: PICTURE_PADDING, getDimensions }),
+    ]);
+    if (light.status === 'rejected') return { empty: false, pictures: null };
+    return {
+      empty: false,
+      pictures: { light: light.value, dark: dark.status === 'fulfilled' ? dark.value : null },
+    };
   }
 
   async function done() {

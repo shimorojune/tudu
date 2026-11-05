@@ -52,6 +52,13 @@ export async function expire(page: Page, token: string): Promise<void> {
   expect((await page.request.post(`${API_URL}/__test/jira/expire`, { data: { token } })).status()).toBe(204);
 }
 
+/** Assign one more issue to the token's person in the fake Jira (only that token sees it). */
+export async function assign(page: Page, token: string, key: string): Promise<void> {
+  expect((await page.request.post(`${API_URL}/__test/jira/assign`, { data: { token, key } })).status()).toBe(
+    204,
+  );
+}
+
 /** Make the fake Jira answer 503 for a token (or answer again). */
 export async function down(page: Page, token: string, on = true): Promise<void> {
   expect(
