@@ -385,10 +385,12 @@ describe('C10-U24..U28 the count follows the Assigned to me list and coming back
     const { result } = renderHook(() => useJira('me'), { wrapper: wrap });
     await waitFor(() => expect(result.current.count).toBe(1));
     act(() => followAssignedList(listOf(['A-2', 'A-1']), Date.now()));
-    expect(result.current.count).toBe(2);
+    expect(queryClient.getQueryData<{ assigned: string[] }>(jiraConnectionKey())?.assigned).toEqual(['A-2', 'A-1']);
+    await waitFor(() => expect(result.current.count).toBe(2));
     expect(get).not.toHaveBeenCalled();
     // A list read before the count's own read says nothing: the count is the fresher.
     act(() => followAssignedList(listOf(['A-1']), Date.now() - 60_000));
+    expect(queryClient.getQueryData<{ assigned: string[] }>(jiraConnectionKey())?.assigned).toEqual(['A-2', 'A-1']);
     expect(result.current.count).toBe(2);
     // An issue that already has an open task still doesn't count.
     act(() =>
@@ -396,7 +398,7 @@ describe('C10-U24..U28 the count follows the Assigned to me list and coming back
         links: [{ key: 'A-2', taskId: 't', spaceId: 'me', ref: 'ME-1', title: 'x', day: null, done: false }],
       }),
     );
-    expect(result.current.count).toBe(1);
+    await waitFor(() => expect(result.current.count).toBe(1));
   });
 
   it('C10-U25 a first page never overwrites the count; a total that disagrees asks for it again', async () => {
@@ -458,6 +460,7 @@ describe('C10-U24..U28 the count follows the Assigned to me list and coming back
     expect(countFromList(['A-1', 'A-2'], listOf(['A-1']))).toEqual({ write: ['A-1'] });
     expect(countFromList(['A-1', 'A-2'], listOf(['A-2', 'A-1']))).toBeNull();
     act(() => followAssignedList(listOf(['A-1']), Date.now()));
-    expect(result.current.count).toBe(1);
+    expect(queryClient.getQueryData<{ assigned: string[] }>(jiraConnectionKey())?.assigned).toEqual(['A-1']);
+    await waitFor(() => expect(result.current.count).toBe(1));
   });
 });

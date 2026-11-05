@@ -89,11 +89,8 @@ export function followAssignedList(list: JiraIssuesResponse, at: number): void {
   if (next === 'refetch') void queryClient.invalidateQueries({ queryKey: key });
   else if (next) {
     const links = queryClient.getQueryData<JiraLinksResponse>(jiraLinksKey())?.links ?? [];
-    queryClient.setQueryData<JiraConnectionResponse>(key, {
-      ...c,
-      assigned: next.write,
-      count: jiraCount(next.write, links),
-    });
+    const moved: Connected = { ...c, assigned: next.write, count: jiraCount(next.write, links) };
+    queryClient.setQueryData<JiraConnectionResponse>(key, moved);
   }
 }
 
