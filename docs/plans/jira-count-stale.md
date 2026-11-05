@@ -11,7 +11,7 @@ the badge, its tip and the panel look exactly as today), skipped with Rohit's OK
   `JIRA_COUNT_EVERY_MS` is now `JIRA_STALE_MS` (5 min).
 - `JiraHost.tsx`: `countsFor(ask)` gates it to the Assigned to me view; an effect calls `followAssignedList` whenever
   that list's data changes. `AppShell.tsx` mounts `useJiraCountOnFocus()` once.
-- C10-U25 as proposed was wrong: a first page of 50 with total 120 against a count holding 100 keys *agrees* (both
+- C10-U25 as proposed was wrong: a first page of 50 with total 120 against a count holding 100 keys _agrees_ (both
   are capped at 100), so nothing should happen. The test checks that case stays quiet, and that total 130 against
   a count of 80 reads the count again without writing the page's 50 keys.
 - C10-E27 needed the fake Jira to assign an issue mid-test: `POST /__test/jira/assign {token, key}` (per token, so
@@ -61,7 +61,7 @@ All in `apps/web` (so web and Mac app alike). No server, schema or kit change.
    - If the list is only the first page (`total > JIRA_PAGE`) and `total` differs from `conn.assigned.length` (capped
      at the count page, 100), invalidate the connection query so it reads again.
    - Saved views and custom JQL never touch the count (they're not "assigned to you").
-   The badge's number change uses the existing badge transition; nothing new to animate.
+     The badge's number change uses the existing badge transition; nothing new to animate.
 2. **The number refreshes on its own every 5 minutes**, not 15: `JIRA_COUNT_EVERY_MS` = `JIRA_STALE_MS` = 5 min. That
    is one extra light Jira search (keys only, 100 max) every 5 minutes per open app.
 3. **Coming back to the app refreshes a stale number.** A `window` `focus` listener (works in browsers and in the Mac

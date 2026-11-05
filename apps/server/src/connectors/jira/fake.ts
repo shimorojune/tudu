@@ -305,7 +305,9 @@ export function fakeJira() {
       return c.json({ errorMessages: [(err as Error).message], errors: {} }, 400);
     }
     const max = Math.min(Number(c.req.query('maxResults') ?? 50) || 50, 100);
-    const all = issuesFor(who(c.req.header('authorization'))).filter(q.filter).sort(q.sort);
+    const all = issuesFor(who(c.req.header('authorization')))
+      .filter(q.filter)
+      .sort(q.sort);
     return c.json({
       startAt: 0,
       maxResults: max,
@@ -317,7 +319,9 @@ export function fakeJira() {
   r.get('/rest/api/2/issue/:key', (c) => {
     if (who(c.req.header('authorization')).startsWith('noread-'))
       return c.json({ errorMessages: ['You do not have the permission to see the specified issue.'] }, 403);
-    const i = issuesFor(who(c.req.header('authorization'))).find((x) => x.key === c.req.param('key').toUpperCase());
+    const i = issuesFor(who(c.req.header('authorization'))).find(
+      (x) => x.key === c.req.param('key').toUpperCase(),
+    );
     if (!i) return c.json({ errorMessages: ['Issue Does Not Exist'], errors: {} }, 404);
     return c.json(rawIssue(i, true));
   });

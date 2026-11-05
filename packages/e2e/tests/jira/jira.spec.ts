@@ -1043,6 +1043,8 @@ test.describe('jira', () => {
     await expect.poll(() => issueKeys(page)).toContain('TUDU-240');
     await expect(issueRow(page, 'TUDU-240')).toBeVisible();
     await expect(jiraButton(page)).toContainText('8');
-    await expect(jiraButton(page).locator('.tp-jirabtn-n')).toHaveAccessibleName('8 assigned to you, not in Tudu yet');
+    await expect(jiraButton(page).locator('.tp-jirabtn-n')).toHaveAccessibleName(
+      '8 assigned to you, not in Tudu yet',
+    );
   });
 });

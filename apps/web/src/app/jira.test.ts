@@ -363,7 +363,11 @@ describe('C10-U24..U28 the count follows the Assigned to me list and coming back
   const wrap = ({ children }: { children: ReactNode }) =>
     createElement(QueryClientProvider, { client: queryClient }, children);
   const seed = (assigned: string[], updatedAt = Date.now()) => {
-    queryClient.setQueryData(jiraConnectionKey(), { ...CONN, assigned, count: assigned.length }, { updatedAt });
+    queryClient.setQueryData(
+      jiraConnectionKey(),
+      { ...CONN, assigned, count: assigned.length },
+      { updatedAt },
+    );
     queryClient.setQueryData(jiraSpacesKey(), {
       spaces: [{ id: 'me', name: 'Personal', kind: 'personal', color: null, on: true, linked: 0 }],
     });
@@ -398,7 +402,12 @@ describe('C10-U24..U28 the count follows the Assigned to me list and coming back
   it('C10-U25 a first page never overwrites the count; a total that disagrees asks for it again', async () => {
     const fifty = Array.from({ length: 50 }, (_, i) => `A-${i + 1}`);
     // 120 assigned, the count holds the first 100: they agree.
-    expect(countFromList(Array.from({ length: 100 }, (_, i) => `A-${i + 1}`), listOf(fifty, 120))).toBeNull();
+    expect(
+      countFromList(
+        Array.from({ length: 100 }, (_, i) => `A-${i + 1}`),
+        listOf(fifty, 120),
+      ),
+    ).toBeNull();
     // 130 assigned, the count holds 80: read the count again, don't write the page's 50.
     const eighty = Array.from({ length: 80 }, (_, i) => `A-${i + 1}`);
     expect(countFromList(eighty, listOf(fifty, 130))).toBe('refetch');
@@ -422,7 +431,9 @@ describe('C10-U24..U28 the count follows the Assigned to me list and coming back
 
   it('C10-U27 coming back to the app reads a count older than a minute, at most once a minute', async () => {
     seed(['A-1'], Date.now() - 2 * 60_000);
-    const get = vi.spyOn(api, 'get').mockResolvedValue({ ...CONN, assigned: ['A-1', 'A-2'], count: 2 } as never);
+    const get = vi
+      .spyOn(api, 'get')
+      .mockResolvedValue({ ...CONN, assigned: ['A-1', 'A-2'], count: 2 } as never);
     const { result } = renderHook(
       () => {
         useJiraCountOnFocus();
