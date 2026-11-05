@@ -1,3 +1,9 @@
+## [0.41.1](https://github.com/shimorojune/tudu/compare/tudu-0.41.0...tudu-0.41.1) (2026-11-05)
+
+### Bug Fixes
+
+* **notebook:** drawings readable in dark mode ([4486791](https://github.com/shimorojune/tudu/commit/448679133a254e9b297131f14a83c68a4b5283c6)), closes [#55](https://github.com/shimorojune/tudu/issues/55)
+
 ## [0.41.0](https://github.com/shimorojune/tudu/compare/tudu-0.40.0...tudu-0.41.0) (2026-11-01)
 
 ### Features
