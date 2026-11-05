@@ -385,12 +385,18 @@ describe('C10-U24..U28 the count follows the Assigned to me list and coming back
     const { result } = renderHook(() => useJira('me'), { wrapper: wrap });
     await waitFor(() => expect(result.current.count).toBe(1));
     act(() => followAssignedList(listOf(['A-2', 'A-1']), Date.now()));
-    expect(queryClient.getQueryData<{ assigned: string[] }>(jiraConnectionKey())?.assigned).toEqual(['A-2', 'A-1']);
+    expect(queryClient.getQueryData<{ assigned: string[] }>(jiraConnectionKey())?.assigned).toEqual([
+      'A-2',
+      'A-1',
+    ]);
     await waitFor(() => expect(result.current.count).toBe(2));
     expect(get).not.toHaveBeenCalled();
     // A list read before the count's own read says nothing: the count is the fresher.
     act(() => followAssignedList(listOf(['A-1']), Date.now() - 60_000));
-    expect(queryClient.getQueryData<{ assigned: string[] }>(jiraConnectionKey())?.assigned).toEqual(['A-2', 'A-1']);
+    expect(queryClient.getQueryData<{ assigned: string[] }>(jiraConnectionKey())?.assigned).toEqual([
+      'A-2',
+      'A-1',
+    ]);
     expect(result.current.count).toBe(2);
     // An issue that already has an open task still doesn't count.
     act(() =>
