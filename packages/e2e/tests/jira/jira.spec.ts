@@ -1059,7 +1059,7 @@ test.describe('jira', () => {
     );
   });
 
-  test('C10-E27 connect from All spaces: the form beside All spaces, then Settings › Apps with every space off', async ({
+  test('C10-E28 connect from All spaces: the form beside All spaces, then Settings › Apps with every space off', async ({
     page,
   }) => {
     test.skip(phone(), 'Settings is a page under a space on phones');
@@ -1098,7 +1098,7 @@ test.describe('jira', () => {
     await expect(jiraButton(page)).toBeVisible();
   });
 
-  test('C10-E28 a refused token in All spaces stays on the form and keeps nothing', async ({ page }) => {
+  test('C10-E29 a refused token in All spaces stays on the form and keeps nothing', async ({ page }) => {
     test.skip(phone(), 'Settings is a page under a space on phones');
     await fixClock(page);
     await signInFresh(page);
@@ -1114,7 +1114,7 @@ test.describe('jira', () => {
     expect(((await read.json()) as { connected: boolean }).connected).toBe(false);
   });
 
-  test('C10-E29 an expired token from All spaces: Reconnect brings back the spaces it was on', async ({
+  test('C10-E30 an expired token from All spaces: Reconnect brings back the spaces it was on', async ({
     page,
   }) => {
     test.skip(phone(), 'Settings is a page under a space on phones');
@@ -1145,7 +1145,7 @@ test.describe('jira', () => {
   });
 
   for (const theme of ['light', 'dark'] as const)
-    test(`C10-E30 Settings › Apps rows: On or Off beside the switch, Turning on…, a refusal (${theme})`, async ({
+    test(`C10-E31 Settings › Apps rows: On or Off beside the switch, Turning on…, a refusal (${theme})`, async ({
       page,
     }) => {
       test.skip(phone(), 'the same row on phones; the desk is enough here');
@@ -1184,10 +1184,14 @@ test.describe('jira', () => {
       await expect(settings.getByText('2 of 2 on')).toBeVisible();
       await page.unroute('**/api/spaces/*/connectors/jira');
 
-      // A refusal: back to Off with the reason under the row.
+      // A refused turn-off: Turning off…, then back to On with the reason under the row.
       await page.route('**/api/spaces/*/connectors/jira', (r) => r.abort());
       await settings.getByRole('switch', { name: 'Jira in Northwind' }).click();
-      await expect(rowOf('Northwind').locator('.tp-set-state')).toHaveText('Off');
       await expect(rowOf('Northwind').getByRole('alert')).toBeVisible();
+      await expect(rowOf('Northwind').locator('.tp-set-state')).toHaveText('On');
+      await expect(settings.getByRole('switch', { name: 'Jira in Northwind' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
     });
 });
