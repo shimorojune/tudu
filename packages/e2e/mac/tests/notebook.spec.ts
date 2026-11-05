@@ -695,4 +695,62 @@ test.describe('chunk 22 · drawings in the note window', () => {
     );
     expect(file).toBe(200);
   });
+
+  test('C22-D43 dark mode in the Mac app: the dark picture has light ink and is not a copy of the light one (#55)', async ({
+    app,
+  }) => {
+    await signIn(app);
+    // Dark, picked in Settings › Appearance, as a person would.
+    await go(app, `/me?settings=appearance`);
+    await app.until(`return T.all('[role=radio]').some((r) => r.innerText.trim().startsWith('Dark'))`);
+    await app.eval(`T.click(T.all('[role=radio]').find((r) => r.innerText.trim().startsWith('Dark')))`);
+    await app.until(`return document.documentElement.classList.contains('dark')`);
+    const id = await writeNote(app, 'Night desk', '<p>Lamp</p>');
+    await openNote(app, id);
+    await app.until(`return document.documentElement.classList.contains('dark')`, 'note');
+    const did = await startDrawing(app);
+    await app.eval(drawRect, 'note');
+    await expect.poll(() => shapes(app, did).catch(() => []), { timeout: 15_000 }).toEqual(['rectangle']);
+    await done(app);
+    let n: { drawings: Array<{ previewLight: string | null; previewDark: string | null }> } = {
+      drawings: [],
+    };
+    await expect
+      .poll(
+        async () => {
+          n = await asPage(app, 'GET', `/api/notebook/notes/${id}`);
+          return !!n.drawings[0]?.previewLight && !!n.drawings[0]?.previewDark;
+        },
+        { timeout: 20_000 },
+      )
+      .toBe(true);
+    // Decoded in WKWebView itself: the mean brightness of each picture's solid pixels, and its size.
+    const ink = (fileId: string) =>
+      app.eval<{ ink: number; size: number }>(
+        `const r = await fetch(${JSON.stringify(API)} + '/api/files/' + ${JSON.stringify(fileId)}, { credentials: 'include' });
+         const blob = await r.blob();
+         const bmp = await createImageBitmap(blob);
+         const c = document.createElement('canvas');
+         c.width = bmp.width;
+         c.height = bmp.height;
+         const g = c.getContext('2d');
+         g.drawImage(bmp, 0, 0);
+         const d = g.getImageData(0, 0, c.width, c.height).data;
+         let sum = 0, k = 0;
+         for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200) { sum += (d[i] + d[i + 1] + d[i + 2]) / 3; k += 1; }
+         return { ink: k ? sum / k : -1, size: blob.size };`,
+        'note',
+      );
+    const light = await ink(n.drawings[0]!.previewLight!);
+    const dark = await ink(n.drawings[0]!.previewDark!);
+    expect(light.ink).toBeLessThan(100);
+    expect(dark.ink).toBeGreaterThan(150);
+    expect(dark.size).not.toBe(light.size);
+    expect(
+      await app.eval<boolean>(
+        `const i = document.querySelector('.tp-nb-draw[data-drawing-id="${did}"] img'); return !!i && !i.classList.contains('tp-nb-draw-flip');`,
+        'note',
+      ),
+    ).toBe(true);
+  });
 });

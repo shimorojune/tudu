@@ -168,17 +168,18 @@ function sendPictures(id: string, pictures: DrawingPictures): void {
   const scene = notebookStore.drawingNow(id)?.scene;
   notebookStore.setLocalPicture(id, {
     light: URL.createObjectURL(pictures.light),
-    dark: URL.createObjectURL(pictures.dark),
+    // None made: the block shows the light one, flipped.
+    dark: pictures.dark ? URL.createObjectURL(pictures.dark) : null,
     words: scene ? wordsOf(drawingText(scene)) : 0,
   });
   const release = notebookStore.holdDrawing(id);
   const file = (b: Blob, name: string) => new File([b], name, { type: 'image/png' });
   Promise.all([
     notebookStore.upload(file(pictures.light, 'Drawing.png')),
-    notebookStore.upload(file(pictures.dark, 'Drawing (dark).png')),
+    pictures.dark ? notebookStore.upload(file(pictures.dark, 'Drawing (dark).png')) : null,
   ]).then(
     ([light, dark]) => {
-      notebookStore.setDrawingPictures(id, light.id, dark.id);
+      notebookStore.setDrawingPictures(id, light.id, dark?.id ?? null);
       release();
     },
     // Offline or it failed: the drawing saves without, and the picture is made the next time it opens.

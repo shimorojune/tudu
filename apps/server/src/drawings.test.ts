@@ -75,9 +75,11 @@ async function note(p: Person, title: string, html = ''): Promise<string> {
   return id;
 }
 
-async function upload(p: Person, name = 'pic.png'): Promise<NoteFile> {
+async function upload(p: Person, name = 'pic.png', bytes = 4): Promise<NoteFile> {
   const form = new FormData();
-  form.append('file', new File([new Uint8Array([137, 80, 78, 71])], name, { type: 'image/png' }));
+  const png = new Uint8Array(bytes);
+  png.set([137, 80, 78, 71].slice(0, bytes));
+  form.append('file', new File([png], name, { type: 'image/png' }));
   const up = await server.app.request('/api/notebook/files', {
     method: 'POST',
     headers: { origin: 'http://localhost:5173', cookie: p.jar.header() },
@@ -283,5 +285,51 @@ describe('C22-U87 reading drawings', () => {
     const n = await read<Note>(you, `/api/notebook/notes/${id}`);
     expect(n.drawings).toEqual([{ id: d, rev: 1, previewLight: light.id, previewDark: null, words: 3 }]);
     expect(n.html).toBe(`<p>Words</p>${block(d)}`);
+  });
+});
+
+describe('C22-U103 a dark picture that is only a copy of the light one (#55)', () => {
+  async function saved(you: Person, light: string | null, dark: string | null) {
+    const d = randomUUID();
+    const id = await note(you, 'Plan', block(d));
+    await sync(you, [
+      m('drawing.save', {
+        id: d,
+        noteId: id,
+        scene: scene('two words'),
+        previewLight: light,
+        previewDark: dark,
+        baseRev: 0,
+      }),
+    ]);
+    const one = await read<NoteDrawing>(you, `/api/notebook/drawings/${d}`);
+    const n = await read<Note>(you, `/api/notebook/notes/${id}`);
+    return { one: one.previewDark, listed: n.drawings[0]!.previewDark, d };
+  }
+
+  it('C22-U103 same size: both reads say there is no dark picture, and the row keeps it', async () => {
+    const you = await person();
+    const light = await upload(you, 'Drawing.png', 40);
+    const dark = await upload(you, 'Drawing (dark).png', 40);
+    const got = await saved(you, light.id, dark.id);
+    expect(got.one).toBeNull();
+    expect(got.listed).toBeNull();
+    expect((await drawingRow(got.d))!.previewDark).toBe(dark.id);
+  });
+
+  it('C22-U103 different sizes: the dark picture is there', async () => {
+    const you = await person();
+    const light = await upload(you, 'Drawing.png', 40);
+    const dark = await upload(you, 'Drawing (dark).png', 41);
+    const got = await saved(you, light.id, dark.id);
+    expect(got.one).toBe(dark.id);
+    expect(got.listed).toBe(dark.id);
+  });
+
+  it('C22-U103 no light picture: the dark one is left as it is', async () => {
+    const you = await person();
+    const dark = await upload(you, 'Drawing (dark).png', 40);
+    const got = await saved(you, null, dark.id);
+    expect(got.one).toBe(dark.id);
   });
 });
