@@ -48,6 +48,16 @@ export interface NoteDrawingProps {
   children?: ReactNode;
 }
 
+const preloaded = new Set<string>();
+/** Load the other theme's picture ahead, so a theme switch swaps pictures without a blank frame. Once per address. */
+function usePreload(url: string | null): void {
+  useEffect(() => {
+    if (!url || preloaded.has(url) || typeof Image === 'undefined') return;
+    preloaded.add(url);
+    new Image().src = url;
+  }, [url]);
+}
+
 /**
  * A drawing in a note: its picture, as wide as the words and up to 360px tall. Pointing at it shows Edit and ⋯
  * (Delete drawing); a click or Enter opens it full size. Without a picture yet it says so, with its word count.
@@ -64,7 +74,14 @@ export function NoteDrawing(p: NoteDrawingProps) {
     document.addEventListener('pointerdown', close);
     return () => document.removeEventListener('pointerdown', close);
   }, [menu]);
-  const src = p.picture ? (p.dark ? (p.picture.dark ?? p.picture.light) : p.picture.light) : null;
+  const light = p.picture?.light ?? null;
+  const darkPic = p.picture?.dark ?? null;
+  // Dark mode without a dark picture of its own (#55: older ones were copies of the light one): the light picture,
+  // flipped the way Excalidraw flips the drawing full size.
+  const flip = !!p.dark && !darkPic && !!light;
+  const src = p.dark ? (darkPic ?? light) : light;
+  const other = p.dark ? light : darkPic;
+  usePreload(other && other !== src ? other : null);
   const words = p.picture?.words ?? 0;
   const open = () => p.onOpen?.(box.current?.getBoundingClientRect() ?? null);
   return (
@@ -96,6 +113,7 @@ export function NoteDrawing(p: NoteDrawingProps) {
         {src ? (
           <img
             src={src}
+            className={flip ? 'tp-nb-draw-flip' : undefined}
             alt={words ? `Drawing, ${words} ${words === 1 ? 'word' : 'words'}` : 'Drawing'}
             draggable={false}
           />

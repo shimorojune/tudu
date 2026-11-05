@@ -253,3 +253,20 @@ describe('C22-U91 an empty drawing', () => {
     expect(s.saves().map((m) => m.type)).toEqual(['drawing.save', 'drawing.delete']);
   });
 });
+
+describe('C22-U104 a drawing saved without its dark picture (#55)', () => {
+  it('C22-U104 previewDark goes as null and previewLight is kept', async () => {
+    const s = setup();
+    const id = s.notebook.newDrawing('n1');
+    await s.notebook.openDrawing(id, 'n1');
+    const release = s.notebook.holdDrawing(id);
+    s.notebook.editDrawing(id, scene('arrow'));
+    s.notebook.closeDrawing(id);
+    s.notebook.setDrawingPictures(id, 'light-1', null);
+    release();
+    await tick(10);
+    expect(s.saves().map((m) => [m.payload.previewLight, m.payload.previewDark])).toEqual([
+      ['light-1', null],
+    ]);
+  });
+});

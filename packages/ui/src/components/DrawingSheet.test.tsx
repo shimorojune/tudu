@@ -9,6 +9,23 @@ const ELEMENTS = [
   { id: 't1', type: 'text', text: 'tables in a U', version: 1 },
 ];
 
+/** A canvas as Excalidraw's export hands it over: two pixels of black ink, and a PNG of whatever it holds. */
+function fakeCanvas() {
+  const data = new Uint8ClampedArray([0x1e, 0x1e, 0x1e, 255, 0, 0, 0, 0]);
+  const ctx = {
+    getImageData: () => ({ data }),
+    putImageData: vi.fn(),
+  };
+  return {
+    width: 2,
+    height: 1,
+    data,
+    getContext: () => ctx,
+    toBlob: (cb: (b: Blob) => void) =>
+      cb(new Blob([`dark:${Array.from(data).join(',')}`], { type: 'image/png' })),
+  };
+}
+
 /** A stand-in for Excalidraw: it hands over its API and draws nothing. */
 function fakeModule(elements: Array<Record<string, unknown>> = ELEMENTS) {
   const api = {
@@ -30,6 +47,7 @@ function fakeModule(elements: Array<Record<string, unknown>> = ELEMENTS) {
       const app = o.appState as { exportWithDarkMode: boolean };
       return new Blob([app.exportWithDarkMode ? 'dark' : 'light'], { type: 'image/png' });
     }),
+    exportToCanvas: vi.fn(async () => fakeCanvas()),
     restoreElements: (els: unknown) => els,
   } as unknown as ExcalidrawModule;
   return { mod, api };
@@ -80,7 +98,8 @@ describe('C22-U94 the drawing full size', () => {
     };
     expect(out.empty).toBe(false);
     expect(await out.pictures.light.text()).toBe('light');
-    expect(await out.pictures.dark.text()).toBe('dark');
+    // Tudu's own flip of the light export: the ink came out light, the see-through pixel stayed see-through.
+    expect(await out.pictures.dark.text()).toBe('dark:211,211,211,255,0,0,0,0');
   });
 
   it('C22-U94 Excalidraw loads lazily: the sheet shows Opening until it is in', async () => {
@@ -142,5 +161,55 @@ describe('C22-U95 how the sheet moves', () => {
     await user.click(screen.getByRole('button', { name: 'Done' }));
     await waitFor(() => expect(p.onDone).toHaveBeenCalled());
     expect(animate).not.toHaveBeenCalled();
+  });
+});
+
+describe('C22-U99 the dark picture is Tudu’s own (#55)', () => {
+  it('C22-U99 Excalidraw is never asked for its dark export; the dark picture comes from its light canvas', async () => {
+    const user = userEvent.setup();
+    const { mod } = fakeModule();
+    const p = props({ load: async () => mod });
+    render(<DrawingSheet {...p} />);
+    await screen.findByTestId('excalidraw');
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    await waitFor(() => expect(p.onDone).toHaveBeenCalledTimes(1));
+    const blob = mod.exportToBlob as ReturnType<typeof vi.fn>;
+    expect(blob).toHaveBeenCalledTimes(1);
+    expect(blob.mock.calls[0]![0].appState.exportWithDarkMode).toBe(false);
+    const canvas = mod.exportToCanvas as ReturnType<typeof vi.fn>;
+    expect(canvas).toHaveBeenCalledTimes(1);
+    expect(canvas.mock.calls[0]![0].appState).toMatchObject({
+      exportWithDarkMode: false,
+      exportBackground: false,
+    });
+  });
+});
+
+describe('C22-U100 when a picture can’t be made', () => {
+  it('C22-U100 no dark picture: the light one still goes, with dark null', async () => {
+    const user = userEvent.setup();
+    const { mod } = fakeModule();
+    (mod.exportToCanvas as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('out of memory'));
+    const p = props({ load: async () => mod });
+    render(<DrawingSheet {...p} />);
+    await screen.findByTestId('excalidraw');
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    await waitFor(() => expect(p.onDone).toHaveBeenCalledTimes(1));
+    const out = (p.onDone as ReturnType<typeof vi.fn>).mock.calls[0]![0] as {
+      pictures: { light: Blob; dark: Blob | null };
+    };
+    expect(await out.pictures.light.text()).toBe('light');
+    expect(out.pictures.dark).toBeNull();
+  });
+
+  it('C22-U100 no light picture: no pictures at all, as before', async () => {
+    const user = userEvent.setup();
+    const { mod } = fakeModule();
+    (mod.exportToBlob as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('no'));
+    const p = props({ load: async () => mod });
+    render(<DrawingSheet {...p} />);
+    await screen.findByTestId('excalidraw');
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    await waitFor(() => expect(p.onDone).toHaveBeenCalledWith({ empty: false, pictures: null }));
   });
 });

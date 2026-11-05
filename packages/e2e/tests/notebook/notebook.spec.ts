@@ -1444,6 +1444,32 @@ async function imageKept(page: Page, drawingId: string): Promise<void> {
   expect((await page.request.get(`${API_URL}/api/files/${att}`)).status()).toBe(200);
 }
 
+/** How light a picture's ink is: the mean brightness (0–255) of its solid pixels, decoded in the page. */
+async function inkOf(page: Page, fileId: string): Promise<number> {
+  const res = await page.request.get(`${API_URL}/api/files/${fileId}`);
+  expect(res.status()).toBe(200);
+  const b64 = (await res.body()).toString('base64');
+  return page.evaluate(async (src) => {
+    const img = new Image();
+    img.src = src;
+    await img.decode();
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    const g = c.getContext('2d')!;
+    g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height).data;
+    let sum = 0;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4)
+      if (d[i + 3]! > 200) {
+        sum += (d[i]! + d[i + 1]! + d[i + 2]!) / 3;
+        n += 1;
+      }
+    return n ? sum / n : -1;
+  }, `data:image/png;base64,${b64}`);
+}
+
 test.describe('notebook drawings', () => {
   test('C22-E80 Draw, a rectangle and a text, Done: the block shows a picture, the server has the scene, a reload shows it again', async ({
     page,
@@ -1629,6 +1655,84 @@ test.describe('notebook drawings', () => {
     await expect(img).toHaveAttribute('src', `${API_URL}/api/files/${n.drawings[0]!.previewLight}`);
     await img.click();
     await expect(sheet(page).locator('.excalidraw')).not.toHaveClass(/theme--dark/);
+    // The dark picture is really dark-themed: light ink (#55), not the light picture again.
+    expect(await inkOf(page, n.drawings[0]!.previewDark!)).toBeGreaterThan(150);
+  });
+
+  test('C22-E89 dark mode, Done: the dark picture has light ink and differs from the light one (#55)', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await signInFresh(page);
+    const id = await seedNote(page, 'Night plan', { html: '<p>Rooms</p>' });
+    const did = await startDrawing(page, id, 'Rooms');
+    await drawSomething(page, 'main room');
+    await done(page);
+    await idle(page);
+    const n = await noteNow(page, id);
+    const { previewLight, previewDark } = n.drawings[0]!;
+    expect(previewLight).toBeTruthy();
+    expect(previewDark).toBeTruthy();
+    expect(await inkOf(page, previewLight!)).toBeLessThan(100);
+    expect(await inkOf(page, previewDark!)).toBeGreaterThan(150);
+    const img = drawingBlock(page, did).getByRole('img');
+    await expect(img).toHaveAttribute('src', `${API_URL}/api/files/${previewDark}`);
+    await expect(img).not.toHaveClass(/tp-nb-draw-flip/);
+  });
+
+  test('C22-E90 a drawing whose dark picture is a copy of the light one shows the light one flipped; one edit saves a real dark one', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    const id = await seedNote(page, 'Old sketch', { html: '<p>Before the fix</p>' });
+    const did = await startDrawing(page, id, 'Before the fix');
+    await drawSomething(page, 'old');
+    await done(page);
+    await idle(page);
+    // The #55 state: the dark picture saved as a copy of the light one, as the Mac app did.
+    const n = await noteNow(page, id);
+    const light = n.drawings[0]!.previewLight!;
+    const bytes = await (await page.request.get(`${API_URL}/api/files/${light}`)).body();
+    const up = await page.request.post(`${API_URL}/api/notebook/files`, {
+      multipart: { file: { name: 'Drawing (dark).png', mimeType: 'image/png', buffer: bytes } },
+    });
+    expect(up.status()).toBe(201);
+    const copy = ((await up.json()) as { id: string }).id;
+    const d = await drawingNow(page, did);
+    await sync(page, [
+      {
+        type: 'drawing.save',
+        payload: {
+          id: did,
+          noteId: id,
+          scene: d.scene,
+          baseRev: d.rev,
+          previewLight: light,
+          previewDark: copy,
+        },
+      },
+    ]);
+    expect((await noteNow(page, id)).drawings[0]!.previewDark).toBeNull();
+
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.reload();
+    const img = drawingBlock(page, did).getByRole('img');
+    await expect(img).toHaveAttribute('src', `${API_URL}/api/files/${light}`);
+    await expect(img).toHaveClass(/tp-nb-draw-flip/);
+    expect(await img.evaluate((el) => getComputedStyle(el).filter)).toContain('invert');
+
+    // One edit and Done: a real dark picture, no flip.
+    await img.click();
+    await expect(drawCanvas(page)).toBeVisible({ timeout: 15_000 });
+    await drawSomething(page, 'new');
+    await done(page);
+    await idle(page);
+    const after = (await noteNow(page, id)).drawings[0]!;
+    expect(after.previewDark).toBeTruthy();
+    expect(await inkOf(page, after.previewDark!)).toBeGreaterThan(150);
+    await expect(img).not.toHaveClass(/tp-nb-draw-flip/);
   });
 
   test('C22-E86 Excalidraw is not fetched until a drawing opens; its fonts come from /excalidraw/fonts/, never a CDN', async ({
