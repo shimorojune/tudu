@@ -23,10 +23,19 @@ export function useLiveEvents(enabled: boolean): void {
   useEffect(() => {
     if (!enabled) return;
     let dropped = false;
+    // A new stream starts "now": anything that happened after this page read who you are and before the stream
+    // opened (a request sent to you as the page loads) never comes down it. Reading `me` once more on the first
+    // hello closes that gap (the server is listening for you by the time it arrives); the Inbox count and the Dock
+    // badge come from it.
+    let first = true;
     const handle = connectEvents({
       url: `${API_URL}/api/events`,
       onEvent: (e) => {
-        if (e.type === 'hello') return;
+        if (e.type === 'hello') {
+          if (first) void queryClient.invalidateQueries({ queryKey: ['me'] });
+          first = false;
+          return;
+        }
         // Your Notebook: only what another window or device changed reads again.
         if (e.type === NOTEBOOK_CHANGED) return notebookStore.onEvent(e);
         // Your own account (your hours) changed elsewhere: only who you are reads again.

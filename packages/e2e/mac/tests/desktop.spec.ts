@@ -547,6 +547,20 @@ test.describe('desktop', () => {
     await app.waitState((x) => x.badge === null);
   });
 
+  test('C11-D21 a request sent while the desk is still loading counts on the Dock without any later event', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const { b, space, meId } = await withSecond(app);
+    // Each round: the desk loads again and, without waiting for it to be listening, a request is sent to you. The
+    // one that lands before the page's live stream is up used to be lost until something else happened.
+    for (let n = 1; n <= 3; n++) {
+      await app.eval(`location.assign(${JSON.stringify(`${WEB}/${space.slug}`)})`).catch(() => {});
+      await sendRequest(b, space.id, meId, `Check the proofs ${n}`);
+      await app.waitState((x) => x.badge === String(n));
+    }
+  });
+
   test('C11-D10 links and files: Open in Jira and an outside link go to the default browser, never the window; a chip lands in Downloads', async ({
     app,
     folder,
