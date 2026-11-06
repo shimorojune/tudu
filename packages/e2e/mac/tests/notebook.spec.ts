@@ -628,6 +628,31 @@ test.describe('chunk 22 · drawings in the note window', () => {
     expect(n.html).toContain(`data-drawing="${did}"`);
   });
 
+  test('C22-D44 offline: the Notebook read again while the server is gone keeps the note and the open drawing', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const id = await writeNote(app, 'Platform notes', '<p>Coach B</p>');
+    await openNote(app, id);
+    const did = await startDrawing(app);
+    await fetch(`${API}/__test/net/down`, { method: 'POST', body: JSON.stringify({ down: true }) });
+    try {
+      await app.eval(drawRect, 'note');
+      // Every read of the note fails now. Before the fix the note window swapped to "This note didn't open".
+      await app.eval(`window.__tudu.refreshNotebook(); await new Promise((r) => setTimeout(r, 1500)); return true;`, 'note');
+      expect(await app.eval<boolean>(`return document.body.textContent.includes('This note didn’t open.')`, 'note')).toBe(
+        false,
+      );
+      await done(app);
+      await app.until(`return !document.querySelector('.tp-nb-sheet')`, 'note');
+      await app.until(`return !!document.querySelector('.tp-nb-draw[data-drawing-id="${did}"] img')`, 'note');
+    } finally {
+      await fetch(`${API}/__test/net/down`, { method: 'POST', body: JSON.stringify({ down: false }) });
+    }
+    await app.eval(`window.dispatchEvent(new Event('online')); return true;`, 'note');
+    await expect.poll(() => shapes(app, did).catch(() => []), { timeout: 30_000 }).toEqual(['rectangle']);
+  });
+
   test('C22-D42 an image pasted into a drawing in the Mac app uploads, and stays after a reload', async ({
     app,
   }) => {

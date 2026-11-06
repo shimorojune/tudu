@@ -808,6 +808,24 @@ test.describe('desktop', () => {
     );
     expect(day.tasks.map((t) => t.title)).toContain('Book the offsite');
   });
+
+  test('C17-D02 a space made a moment ago: the summon at once opens on it, and the desk still remembers it', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const space = await teamSpace(app, 'Harbour');
+    // No wait for the floating window to hear of the new space: its list is behind the desk's.
+    await app.act('summon');
+    await floatingShown(app);
+    await app.until(
+      `const l = document.querySelector('.tp-qa-toline'); return !!l && /^In.*Harbour.*for.*Me$/.test(l.textContent)`,
+      'floating',
+    );
+    // Again hides it.
+    await app.act('summon');
+    await floatingHidden(app);
+    expect(await app.eval<string | null>(`return localStorage.getItem('tudu.space')`)).toBe(space.slug);
+  });
 });
 
 /** Settings › This Mac on the desk. */

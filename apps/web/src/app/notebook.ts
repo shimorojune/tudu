@@ -58,8 +58,14 @@ export const notebookStore = new NotebookStore({
 if (typeof window !== 'undefined') {
   window.addEventListener('pagehide', () => notebookStore.flushAll());
   // For end-to-end tests: words waiting for quiet are not saved yet either.
-  const hook = (window as unknown as { __tudu?: { idle?: () => Promise<boolean> } }).__tudu;
-  if (hook) hook.idle = async () => !notebookStore.isBusy() && (await taskStore.idle());
+  const hook = (
+    window as unknown as { __tudu?: { idle?: () => Promise<boolean>; refreshNotebook?: () => void } }
+  ).__tudu;
+  if (hook) {
+    hook.idle = async () => !notebookStore.isBusy() && (await taskStore.idle());
+    // What a live stream coming back does: read the whole Notebook again (C22-D44 does it with the server gone).
+    hook.refreshNotebook = () => notebookStore.refreshAll();
+  }
 }
 
 /** A picture of a drawing for its block: the Notebook file's address. */
