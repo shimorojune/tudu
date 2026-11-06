@@ -8,13 +8,13 @@ keeps the note on screen where it now shows "This note didn't open"). I'm asking
 Since 5 Nov the "Mac app (macOS)" job in "Tests: PR + master" goes red with exactly one failed test out of 64, and a
 different one each time:
 
-| Run | Failed | What the log says |
-| --- | --- | --- |
-| master `d8e52ce` (#81 merge), run 42088937374 | C11-D09 the Dock badge | `badge` stuck at `"2"`, waiting for `"3"` after the request in the second space (Acme) |
-| PR #82, run 42093559068 attempt 1 | C17-D01 the summon says where | floating bar's line read `In Personal for Me`, not Northwind |
-| PR #82, run 42093559068 attempt 2 | C22-D41 offline drawing | `.tp-nb-sheet-done` never there: the drawing sheet was gone |
-| master, run 41349001302 (1 Nov) | WH-D06 waking at 13:20 | no nudge posted within 10 s at 13:20 |
-| Rohit's Mac (5 Nov) | WH-D01 | `permission` read `unknown` while Settings showed the guide (denied) |
+| Run                                           | Failed                        | What the log says                                                                      |
+| --------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------- |
+| master `d8e52ce` (#81 merge), run 42088937374 | C11-D09 the Dock badge        | `badge` stuck at `"2"`, waiting for `"3"` after the request in the second space (Acme) |
+| PR #82, run 42093559068 attempt 1             | C17-D01 the summon says where | floating bar's line read `In Personal for Me`, not Northwind                           |
+| PR #82, run 42093559068 attempt 2             | C22-D41 offline drawing       | `.tp-nb-sheet-done` never there: the drawing sheet was gone                            |
+| master, run 41349001302 (1 Nov)               | WH-D06 waking at 13:20        | no nudge posted within 10 s at 13:20                                                   |
+| Rohit's Mac (5 Nov)                           | WH-D01                        | `permission` read `unknown` while Settings showed the guide (denied)                   |
 
 Runner image, macOS version and the #81 change are not it: failing and passing runs use both images
 (`macos-26-arm64` 20261026 and 20261102), and #81 only touched Jira code that does nothing without a Jira connection.
@@ -37,7 +37,7 @@ tests' timeouts would hide them.
 ### 1. C22-D41: a failed background read of a note replaces the editor (confirmed in code)
 
 `useNoteEditor` (`apps/web/src/app/noteEditing.tsx`) reads the note with `retry: false` and returns
-`{ error: true }` whenever `q.isError`. In React Query 5, a *background* refetch that fails sets `isError` even though
+`{ error: true }` whenever `q.isError`. In React Query 5, a _background_ refetch that fails sets `isError` even though
 the note is still in the cache. So any read of the open note that fails (offline, a server blip) swaps the whole
 editor for "This note didn't open", and an open drawing sheet goes with it (it's portalled from `NoteEditor`).
 
@@ -60,6 +60,7 @@ So: make a space, press ⌘⇧N within a second or so, and the bar is on Persona
 were too.
 
 **Fix:**
+
 - On `floating:shown`, wait for `refreshMe()` and pick the space from the fresh list. Until it answers (normally tens
   of ms), keep the space the bar already had rather than flashing Personal.
 - `lastSpace()` takes an option not to forget: the floating window never erases the remembered space; only the desk

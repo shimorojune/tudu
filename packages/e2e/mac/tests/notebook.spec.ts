@@ -639,10 +639,16 @@ test.describe('chunk 22 · drawings in the note window', () => {
     try {
       await app.eval(drawRect, 'note');
       // Every read of the note fails now. Before the fix the note window swapped to "This note didn't open".
-      await app.eval(`window.__tudu.refreshNotebook(); await new Promise((r) => setTimeout(r, 1500)); return true;`, 'note');
-      expect(await app.eval<boolean>(`return document.body.textContent.includes('This note didn’t open.')`, 'note')).toBe(
-        false,
+      await app.eval(
+        `window.__tudu.refreshNotebook(); await new Promise((r) => setTimeout(r, 1500)); return true;`,
+        'note',
       );
+      expect(
+        await app.eval<boolean>(
+          `return document.body.textContent.includes('This note didn’t open.')`,
+          'note',
+        ),
+      ).toBe(false);
       await done(app);
       await app.until(`return !document.querySelector('.tp-nb-sheet')`, 'note');
       await app.until(`return !!document.querySelector('.tp-nb-draw[data-drawing-id="${did}"] img')`, 'note');

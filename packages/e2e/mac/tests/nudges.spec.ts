@@ -96,7 +96,9 @@ test.describe('working hours and nudges', () => {
     // CI's Mac leaves macOS's box unanswered, and an allowed Mac shows the rows: nothing to check there.
     test.skip(!refused, `macOS answered ${permission} here`);
     // Settings checks again on every focus: macOS still says "not determined", which must not undo the refusal.
-    await app.eval(`window.dispatchEvent(new Event('focus')); await new Promise((r) => setTimeout(r, 1000)); return true;`);
+    await app.eval(
+      `window.dispatchEvent(new Event('focus')); await new Promise((r) => setTimeout(r, 1000)); return true;`,
+    );
     expect(await app.eval<boolean>(guide)).toBe(true);
     expect((await status(app)).permission).toBe('denied');
   });
