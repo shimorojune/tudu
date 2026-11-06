@@ -175,6 +175,8 @@ test.describe('chunk 22 · the note window', () => {
     const scr = s.windows.note.screen!;
     expect(near(s.windows.note.width, scr.width - 16)).toBe(true);
     expect(s.windows.note.height).toBeGreaterThan(scr.height * 0.7);
+    // The page hears it filled the screen after the window does (as with the pin above): wait for its button.
+    await app.until(`return T.all('button', 'Back to its size').length > 0`, 'note');
     await app.eval(`T.click(T.get('button', 'Back to its size'))`, 'note');
     s = await app.waitState((x) => !x.note.state.expanded && near(x.windows.note.width, was.width));
     expect(near(s.windows.note.x, was.x)).toBe(true);
