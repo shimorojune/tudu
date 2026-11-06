@@ -26,6 +26,9 @@ export function meRoutes(db: Db, hub: EventHub, mailer: Mailer, storage: Storage
 
   r.get('/me', requireSession, async (c) => {
     const session = c.get('session')!;
+    // Taken before anything is read: the page's live stream starts here, so what happens while it loads still
+    // reaches it (an event already reflected below only reads something again).
+    const events = hub.last(session.user.id);
     const [row] = await db
       .select({
         color: schema.user.color,
@@ -51,6 +54,8 @@ export function meRoutes(db: Db, hub: EventHub, mailer: Mailer, storage: Storage
       gettingStarted: await gettingStarted(db, session.user.id),
       /** Your working hours: the default (Monday to Friday, 09:00 to 18:00) until you change them. */
       workHours: workHoursOf(row?.workHours),
+      /** Where this answer stands in your live stream: a stream opened after it asks for what came since. */
+      events,
       ...(await (async () => {
         const counts = await inboxCounts(db, session.user);
         return {

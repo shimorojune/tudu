@@ -76,8 +76,11 @@ at 2 for the whole 10 s.
 
 For a person: the Inbox count (and the Dock badge) can be one behind after a reload until the next event.
 
-**Fix:** on the stream's first `hello`, read `me` again if it was read before the stream opened (one extra `/api/me`
-per page load at most; cached days are already covered by the same logic on reconnect). No server change.
+**Fix (as built, revised 6 Nov):** `/api/me` says where it stands in your live stream (`events`, the hub's last
+event id for you, taken before anything is read), and the page opens its stream after that id, so the server replays
+what came in the gap. The first version (read `me` again on the first `hello`) regressed C11-D09's last step on
+Rohit's Mac (3/25: the extra read raced the Inbox's own updates and put a stale count back; master 25/25), so it was
+replaced. An older server that doesn't send `events` leaves the stream starting now, as before.
 
 **Caveat:** this one I've shown is possible, not that it happened. The run's `app.log` and screenshot would settle it,
 and the cloud session can't download Actions artifacts. I'll pull them on Rohit's Mac (`gh run download
@@ -118,8 +121,10 @@ New (each one fails on today's code and passes with the fix):
   leaves localStorage alone; without `keep` it still forgets (today's behaviour on the desk).
 - **C17-D02** (Mac): make a space through the API from the desk and summon at once (no wait): the line says the new
   space, and after closing the bar the desk's remembered space is still the new one.
-- **C11-U44** (unit, web): `useLiveEvents` with `me` read before the stream opens → on first `hello`, `me` is
-  invalidated once; a later `hello` after a reconnect doesn't double it.
+- **C11-U44** (unit, web): `useLiveEvents` opens the stream after `me.events`; a `hello` reads nothing again;
+  without `events` the stream starts now.
+- **C11-U45** (unit, client): `connectEvents({ after })` asks for `lastEventId` on the first connection.
+- **C11-U46** (unit, server): `EventHub.last` and `since` give what was published after a read.
 - **C11-D21** (Mac): reload the desk and, before the stream is up, send a request to you from another person: the
   Dock badge reaches the new count without any other event.
 - **WH-R03** (Rust unit): `status` after an `ask` that answered not granted reads `denied` when macOS says not
@@ -146,6 +151,7 @@ Updated:
 
 - `apps/web/src/app/noteEditing.tsx` (cause 1)
 - `apps/web/src/routes/quick-add/QuickAddPage.tsx`, `apps/web/src/app/space.tsx` (cause 2)
-- `apps/web/src/app/live.ts` (cause 3)
+- `apps/server/src/events.ts`, `apps/server/src/routes/me.ts`, `packages/client/src/{auth,events}.ts`,
+  `apps/web/src/app/live.ts` (cause 3)
 - `apps/desktop/src-tauri/src/nudges.rs` (cause 4)
 - tests: `apps/web/src/app/*.test.ts(x)`, `packages/e2e/mac/tests/{desktop,notebook,nudges}.spec.ts`

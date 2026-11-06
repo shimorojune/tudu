@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-type Opts = { onEvent: (e: { type: string; data?: unknown }) => void; onStatus?: (s: string) => void };
+type Opts = { after?: string | null; onEvent: (e: { type: string; data?: unknown }) => void };
 const streams: Opts[] = [];
 vi.mock('@tudu/client', async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
@@ -12,32 +12,32 @@ vi.mock('@tudu/client', async (orig) => ({
 }));
 
 const { useLiveEvents } = await import('./live');
-const { queryClient } = await import('./session');
+const { meQuery, queryClient } = await import('./session');
 
 afterEach(() => {
   streams.length = 0;
+  queryClient.clear();
   vi.restoreAllMocks();
 });
 
-describe('C11-U44 the first hello reads who you are again', () => {
-  it('C11-U44 me is read again once, on the first hello only; a hello after a reconnect leaves it to the reconnect', () => {
+describe('C11-U44 the live stream starts where the page read who you are', () => {
+  it('C11-U44 it asks for what came after /api/me’s events; a hello reads nothing again', () => {
+    queryClient.setQueryData(meQuery.queryKey, { user: { id: 'u' }, spaces: [], events: 41 } as never);
     const spy = vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue();
     renderHook(() => useLiveEvents(true));
-    const s = streams[0]!;
-    s.onStatus?.('connecting');
-    s.onStatus?.('open');
+    expect(streams[0]!.after).toBe('41');
+    streams[0]!.onEvent({ type: 'hello', data: {} });
     expect(spy).not.toHaveBeenCalled();
-    s.onEvent({ type: 'hello', data: {} });
-    expect(spy).toHaveBeenCalledTimes(1);
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['me'] });
-    s.onEvent({ type: 'hello', data: {} });
-    expect(spy).toHaveBeenCalledTimes(1);
   });
 
-  it('C11-U44 signed out: no stream, nothing read', () => {
-    const spy = vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue();
+  it('C11-U44 a server that does not say (an older one) starts the stream now, as before', () => {
+    queryClient.setQueryData(meQuery.queryKey, { user: { id: 'u' }, spaces: [] } as never);
+    renderHook(() => useLiveEvents(true));
+    expect(streams[0]!.after).toBeNull();
+  });
+
+  it('C11-U44 signed out: no stream', () => {
     renderHook(() => useLiveEvents(false));
     expect(streams).toHaveLength(0);
-    expect(spy).not.toHaveBeenCalled();
   });
 });
