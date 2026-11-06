@@ -547,6 +547,20 @@ test.describe('desktop', () => {
     await app.waitState((x) => x.badge === null);
   });
 
+  test('C11-D21 a request sent while the desk is still loading counts on the Dock without any later event', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const { b, space, meId } = await withSecond(app);
+    // Each round: the desk loads again and, without waiting for it to be listening, a request is sent to you. The
+    // one that lands before the page's live stream is up used to be lost until something else happened.
+    for (let n = 1; n <= 3; n++) {
+      await app.eval(`location.assign(${JSON.stringify(`${WEB}/${space.slug}`)})`).catch(() => {});
+      await sendRequest(b, space.id, meId, `Check the proofs ${n}`);
+      await app.waitState((x) => x.badge === String(n));
+    }
+  });
+
   test('C11-D10 links and files: Open in Jira and an outside link go to the default browser, never the window; a chip lands in Downloads', async ({
     app,
     folder,
@@ -807,6 +821,24 @@ test.describe('desktop', () => {
       `/api/spaces/${space.id}/days/${today()}`,
     );
     expect(day.tasks.map((t) => t.title)).toContain('Book the offsite');
+  });
+
+  test('C17-D02 a space made a moment ago: the summon at once opens on it, and the desk still remembers it', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const space = await teamSpace(app, 'Harbour');
+    // No wait for the floating window to hear of the new space: its list is behind the desk's.
+    await app.act('summon');
+    await floatingShown(app);
+    await app.until(
+      `const l = document.querySelector('.tp-qa-toline'); return !!l && /^In.*Harbour.*for.*Me$/.test(l.textContent)`,
+      'floating',
+    );
+    // Again hides it.
+    await app.act('summon');
+    await floatingHidden(app);
+    expect(await app.eval<string | null>(`return localStorage.getItem('tudu.space')`)).toBe(space.slug);
   });
 });
 

@@ -90,3 +90,29 @@ describe('C01-U08 the live stream subscriber', () => {
     expect(statuses.at(-1)).toBe('closed');
   });
 });
+
+describe('C11-U45 a stream can start after a given event', () => {
+  beforeEach(() => {
+    FakeSource.instances = [];
+  });
+
+  it('C11-U45 the first connection already asks for what came after it; a later one after the last seen', () => {
+    connectEvents({
+      url: 'http://localhost:3456/api/events',
+      after: '41',
+      onEvent: () => {},
+      EventSource: FakeSource as unknown as typeof EventSource,
+    });
+    const first = FakeSource.instances[0]!;
+    expect(new URL(first.url).searchParams.get('lastEventId')).toBe('41');
+  });
+
+  it('C11-U45 without it the stream starts now, as before', () => {
+    connectEvents({
+      url: 'http://localhost:3456/api/events',
+      onEvent: () => {},
+      EventSource: FakeSource as unknown as typeof EventSource,
+    });
+    expect(new URL(FakeSource.instances[0]!.url).searchParams.has('lastEventId')).toBe(false);
+  });
+});

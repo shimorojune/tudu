@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { addedWords } from '@tudu/core';
 import { Desk, QuickAdd, showToast, syncThemeChoice, useTheme, type QuickAddDraft } from '@tudu/ui';
 import type { MeResponse } from '@tudu/client';
-import { useEffect, useState, type PointerEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import type { QuickAddSeed } from '../../app/dayView';
 import { desktop } from '../../app/desktop';
 import { useLiveEvents } from '../../app/live';
@@ -21,11 +21,11 @@ export function QuickAddPage({ me }: { me: MeResponse }) {
   const { theme } = useTheme();
   const app = desktop();
   // The floating bar starts on the space you were last in on the desk (read again on every summon); its top line
-  // can send it anywhere else.
-  const lastHere = () => {
-    const last = lastSpace(me.spaces);
-    return ((last ? spaceBySlug(me.spaces, last) : undefined) ?? me.spaces.find((s) => s.kind === 'personal'))
-      ?.id;
+  // can send it anywhere else. This window's list of spaces can be behind the desk's (a space made a moment ago): it never forgets the
+  // remembered space, and on a summon it picks from the list read again.
+  const lastHere = (spaces = me.spaces) => {
+    const last = lastSpace(spaces, { keep: true });
+    return ((last ? spaceBySlug(spaces, last) : undefined) ?? spaces.find((s) => s.kind === 'personal'))?.id;
   };
   const [sendTo, setSendTo] = useState<{ spaceId: string; toId: string | null }>(() => ({
     spaceId: lastHere() ?? '',
@@ -39,10 +39,12 @@ export function QuickAddPage({ me }: { me: MeResponse }) {
   const [initial] = useState(() => (app ? readDraft(a.today) : undefined));
   // Make a task in the note window: the words (and the note's pill) it was summoned with, written over the draft.
   const [seed, setSeed] = useState<(QuickAddSeed & { nonce: number }) | null>(null);
+  const seeded = useRef(false);
   const takeSeed = () => {
     if (!app) return;
     void app.quickAddSeed().then((s) => {
       if (!s) return;
+      seeded.current = true;
       const personal = me.spaces.find((x) => x.kind === 'personal');
       setSendTo({ spaceId: s.spaceId ?? personal?.id ?? lastHere() ?? '', toId: null });
       setSeed((was) => ({ ...s, nonce: (was?.nonce ?? 0) + 1 }));
@@ -53,7 +55,15 @@ export function QuickAddPage({ me }: { me: MeResponse }) {
     if (!app) return;
     takeSeed();
     return app.on('floating:shown', () => {
-      setSendTo({ spaceId: lastHere() ?? '', toId: null });
+      // Until the fresh list answers (tens of ms) the bar keeps the space it had, rather than flashing another.
+      void refreshMe()
+        .catch(() => null)
+        .then((now) => {
+          const spaces = now?.spaces ?? me.spaces;
+          // A seed from the note window names its own space; it was set already and wins.
+          setSendTo((was) => (seeded.current ? was : { spaceId: lastHere(spaces) ?? '', toId: null }));
+        });
+      seeded.current = false;
       takeSeed();
       // The theme picked on the desk while the bar was put away (a hidden window may not hear it as it happens).
       syncThemeChoice();

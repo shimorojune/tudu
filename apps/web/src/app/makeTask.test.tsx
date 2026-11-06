@@ -156,3 +156,33 @@ describe('C22-U26 the task made from a note links back to it', () => {
     expect(link.mock.calls[0]![1].space).toEqual({ name: 'Personal', color: null, personal: true });
   });
 });
+
+describe('C22-U105 a read of the open note again that fails keeps the note on screen', () => {
+  it('C22-U105 a cached note stays after a failed refetch; a note that never arrived is still the error', async () => {
+    const view = note();
+    let fail = false;
+    vi.spyOn(notebookStore, 'noteQuery').mockReturnValue({
+      queryKey: ['test-note', view.id],
+      queryFn: async () => {
+        if (fail) throw new Error('offline');
+        return view;
+      },
+      retry: false,
+    } as never);
+    vi.spyOn(notebookStore, 'treeQuery').mockReturnValue({
+      queryKey: ['test-tree'],
+      queryFn: async () => ({ folders: [], notes: [] }),
+    } as never);
+    const { result } = renderHook(() => useNoteEditor(view.id, { openPath: () => {} }), { wrapper });
+    await waitFor(() => expect(result.current.note?.id).toBe('n1'));
+    fail = true;
+    await queryClient.refetchQueries({ queryKey: ['test-note', view.id] });
+    await waitFor(() => expect(queryClient.getQueryState(['test-note', view.id])?.status).toBe('error'));
+    expect(result.current.error).toBeFalsy();
+    expect(result.current.note?.id).toBe('n1');
+
+    queryClient.clear();
+    const gone = renderHook(() => useNoteEditor('n2', { openPath: () => {} }), { wrapper });
+    await waitFor(() => expect(gone.result.current.error).toBe(true));
+  });
+});

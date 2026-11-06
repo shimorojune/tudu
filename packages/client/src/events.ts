@@ -17,6 +17,11 @@ export interface EventsOptions {
   /** Backoff limits in ms. */
   minDelay?: number;
   maxDelay?: number;
+  /**
+   * Where to start: the event id of the last read the page shows (`/api/me`'s `events`). Without it a stream starts
+   * now, and what happened between that read and the stream opening never arrives.
+   */
+  after?: string | null;
 }
 
 export interface EventsHandle {
@@ -30,7 +35,7 @@ export function connectEvents(options: EventsOptions): EventsHandle {
   const min = options.minDelay ?? 1000;
   const max = options.maxDelay ?? 30_000;
   let delay = min;
-  let lastId: string | null = null;
+  let lastId: string | null = options.after ?? null;
   let es: EventSource | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let closed = false;

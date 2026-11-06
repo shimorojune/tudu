@@ -86,6 +86,23 @@ test.describe('working hours and nudges', () => {
     }
   });
 
+  test('WH-D07 refused: the way to allow Tudu stays when the window is focused again (where macOS refuses Tudu Test)', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const permission = await nudgesOn(app);
+    const guide = `return document.body.textContent.includes('macOS has Tudu’s notifications off.')`;
+    const refused = permission === 'denied' && (await app.eval<boolean>(guide));
+    // CI's Mac leaves macOS's box unanswered, and an allowed Mac shows the rows: nothing to check there.
+    test.skip(!refused, `macOS answered ${permission} here`);
+    // Settings checks again on every focus: macOS still says "not determined", which must not undo the refusal.
+    await app.eval(
+      `window.dispatchEvent(new Event('focus')); await new Promise((r) => setTimeout(r, 1000)); return true;`,
+    );
+    expect(await app.eval<boolean>(guide)).toBe(true);
+    expect((await status(app)).permission).toBe('denied');
+  });
+
   test('WH-D02 with the window hidden: 09:00 says the start of the day; three ticked by 10:00 say so', async ({
     app,
   }) => {

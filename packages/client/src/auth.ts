@@ -38,4 +38,6 @@ export interface MeResponse {
   inbox?: InboxCounts;
   /** Your working hours (the default until changed). */
   workHours?: WorkHours;
+  /** The live stream's last event id when this was read: the page's stream starts after it. */
+  events?: number;
 }
