@@ -80,11 +80,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function show(me: MeResponse, vp: 'desktop' | 'phone' = 'desktop') {
+function show(me: MeResponse, vp: 'desktop' | 'phone' = 'desktop', all = false) {
   queryClient.setQueryData(['me'], me);
   return render(
     <QueryClientProvider client={queryClient}>
-      <GettingStartedHost me={me} space={PERSONAL} vp={vp} />
+      <GettingStartedHost me={me} space={PERSONAL} vp={vp} all={all} />
     </QueryClientProvider>,
   );
 }
@@ -269,5 +269,30 @@ describe('C12-U05 sign in, joining and phones', () => {
     location = { pathname: '/me/settings', searchStr: '' };
     show(meWith({ open: true, done: none }), 'phone');
     expect(document.querySelector('.tp-gs')).toBeNull();
+  });
+});
+
+describe('C21-U23 Getting started in All spaces', () => {
+  it('Bring your Jira issues opens Settings › Apps on the desk; a space and phones are unchanged', () => {
+    location = { pathname: '/all', searchStr: '' };
+    const v = show(meWith({ open: true, done: none }), 'desktop', true);
+    fireEvent.click(row(/Bring your Jira issues/));
+    expect(navigate).toHaveBeenLastCalledWith({ href: '/all?settings=apps' });
+    expect(openApps).not.toHaveBeenCalled();
+    v.unmount();
+
+    navigate.mockClear();
+    location = { pathname: '/me', searchStr: '' };
+    const w = show(meWith({ open: true, done: none }));
+    fireEvent.click(row(/Bring your Jira issues/));
+    expect(openApps).toHaveBeenCalledTimes(1);
+    expect(navigate).not.toHaveBeenCalled();
+    w.unmount();
+
+    localStorage.setItem(FOLD_KEY, 'open');
+    location = { pathname: '/all', searchStr: '' };
+    show(meWith({ open: true, done: none }), 'phone', true);
+    fireEvent.click(row(/Bring your Jira issues/));
+    expect(navigate).toHaveBeenLastCalledWith({ href: '/me/apps' });
   });
 });

@@ -531,6 +531,18 @@ describe('the Jira panel (chunk 10)', () => {
     expect(screen.getByText(/^Connect with a personal access token\./)).toBeInTheDocument();
   });
 
+  it('C10-U26 from All spaces the connect form says you pick the spaces next and names none', () => {
+    const { rerender } = render(<JPConnect allSpaces spaceName="Personal" />);
+    expect(
+      screen.getByText(
+        'Connect once for your account with a personal access token. Then pick the spaces it shows in; it starts off everywhere until you do.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Jira turns on in/)).toBeNull();
+    rerender(<JPConnect spaceName="Personal" />);
+    expect(screen.getByText(/Jira turns on in Personal;/)).toBeInTheDocument();
+  });
+
   it('C10-U20 More holds Turn off in {space}, Manage spaces… and a red Disconnect Jira, in that order', async () => {
     const user = userEvent.setup();
     const onTurnOff = vi.fn();

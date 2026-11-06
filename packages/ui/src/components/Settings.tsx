@@ -172,7 +172,11 @@ export interface SettingsProps {
     error?: boolean;
     /** Without it, the space you are in is the one row, on. */
     spaces?: JiraSpaceRow[];
+    /** Every row glows once: you just connected from All spaces, and every space is off. */
+    glowAll?: boolean;
   };
+  /** Opened from All spaces: no row says "You're here". */
+  allSpaces?: boolean;
   /** Connect (not connected) or Disconnect (connected). */
   onJira?: () => void;
   /** Flip your switch in a space; `{ error }` or a rejection puts it back with the reason under the row. */
@@ -252,11 +256,18 @@ const TICK = (
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-/** A row's quiet line: On, "4 linked tasks", Off, "Off · 2 tasks keep their keys", or Turning on… */
-export function jiraSpaceLine(on: boolean, linked: number, busy?: boolean): string {
+/** The word beside a row's switch: On, Off, or Turning on… / Turning off… while it saves. */
+export function jiraSpaceWord(on: boolean, busy?: boolean): string {
   if (busy) return on ? 'Turning on…' : 'Turning off…';
-  if (on) return linked ? plural(linked, 'linked task', 'linked tasks') : 'On';
-  return linked ? `Off · ${plural(linked, 'task keeps its key', 'tasks keep their keys')}` : 'Off';
+  return on ? 'On' : 'Off';
+}
+
+/** The line under a space's name: its linked tasks, or nothing without any. */
+export function jiraSpaceCount(on: boolean, linked: number): string | null {
+  if (!linked) return null;
+  return on
+    ? plural(linked, 'linked task', 'linked tasks')
+    : plural(linked, 'task keeps its Jira key', 'tasks keep their Jira keys');
 }
 
 type SwitchState = { on: boolean; busy: boolean; error: string | null };
@@ -381,16 +392,26 @@ function AccountApps({ p }: { p: SettingsProps }) {
                     <div style={{ height: 6 }} />
                     <Skeleton width={[140, 110, 160][i]} height={8} />
                   </div>
-                  <span className="tp-skel" style={{ width: 36, height: 22, borderRadius: 999 }} />
+                  <span className="tp-set-sw">
+                    <span className="tp-skel" style={{ width: 22, height: 10, borderRadius: 4 }} />
+                    <span className="tp-skel" style={{ width: 36, height: 22, borderRadius: 999 }} />
+                  </span>
                 </div>
               ))
             : spaces.map((x) => {
                 const s = stateOf(x);
-                const line = jiraSpaceLine(s.on, x.linked ?? 0, s.busy);
+                // The switch says its own state beside it; the line under the name is only the linked count.
+                const word = jiraSpaceWord(s.on, s.busy);
+                const count = jiraSpaceCount(s.on, x.linked ?? 0);
                 return (
                   <div
                     key={x.id}
-                    className={cx('tp-set-sprow', x.highlight && 'tp-set-hl', s.error && 'tp-bad')}
+                    className={cx(
+                      'tp-set-sprow tp-set-sp2',
+                      !s.on && !s.busy && 'tp-off',
+                      (x.highlight || j?.glowAll) && 'tp-set-hl',
+                      s.error && 'tp-bad',
+                    )}
                   >
                     <SettingRow
                       title={
@@ -404,23 +425,36 @@ function AccountApps({ p }: { p: SettingsProps }) {
                             }}
                             size={22}
                           />
-                          {x.name}
-                          {x.current ? <span className="tp-set-here">You’re here</span> : null}
+                          <span className="tp-set-spname">{x.name}</span>
+                          {x.current && !p.allSpaces ? (
+                            <span className="tp-set-here">You’re here</span>
+                          ) : null}
                         </span>
                       }
                       sub={
-                        <span key={line} className={cx('tp-set-spsub', s.busy && 'tp-busy')}>
-                          {s.busy ? SPIN : null}
-                          {line}
-                        </span>
+                        count ? (
+                          <span key={count} className="tp-set-spsub">
+                            {count}
+                          </span>
+                        ) : undefined
                       }
                       control={
-                        <Switch
-                          label={`Jira in ${x.name}`}
-                          checked={s.on}
-                          disabled={s.busy || expired}
-                          onChange={(v) => flip(x, v)}
-                        />
+                        <label className="tp-set-sw">
+                          <span
+                            key={word}
+                            className={cx('tp-set-state', s.on && !s.busy && 'tp-on', s.busy && 'tp-busy')}
+                            aria-hidden="true"
+                          >
+                            {s.busy ? SPIN : null}
+                            {word}
+                          </span>
+                          <Switch
+                            label={`Jira in ${x.name}`}
+                            checked={s.on}
+                            disabled={s.busy || expired}
+                            onChange={(v) => flip(x, v)}
+                          />
+                        </label>
                       }
                     />
                     {s.error ? (

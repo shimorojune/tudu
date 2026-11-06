@@ -456,6 +456,8 @@ export interface JPConnectProps {
   account?: boolean;
   /** The space Jira turns on in when you connect from here. */
   spaceName?: string;
+  /** Opened from All spaces: connecting turns Jira on nowhere; you pick the spaces next. */
+  allSpaces?: boolean;
 }
 
 /** How long the Connected tick shows before the panel moves on. */
@@ -563,9 +565,11 @@ export function JPConnect(p: JPConnectProps) {
                 ? 'Jira comes back in every space it was on, with your views and linked tasks.'
                 : 'your views and linked tasks stay as they are.'
             }`
-          : p.account !== false
-            ? `Connect once for your account with a personal access token. Jira turns on in ${p.spaceName || 'this space'}; turn it on in your other spaces from Settings › Apps.`
-            : 'Connect with a personal access token. Tudu reads your issues and adds links; it never changes them without you.'}
+          : p.allSpaces
+            ? 'Connect once for your account with a personal access token. Then pick the spaces it shows in; it starts off everywhere until you do.'
+            : p.account !== false
+              ? `Connect once for your account with a personal access token. Jira turns on in ${p.spaceName || 'this space'}; turn it on in your other spaces from Settings › Apps.`
+              : 'Connect with a personal access token. Tudu reads your issues and adds links; it never changes them without you.'}
       </p>
       {field(
         `${uid}-url`,
@@ -675,6 +679,8 @@ export interface JiraPanelProps {
   account?: boolean;
   /** The space you are in: connecting here turns Jira on in it. */
   spaceName?: string;
+  /** Opened from All spaces: the connect form says you pick the spaces next. */
+  allSpaces?: boolean;
   emptyTitle?: string;
   emptyText?: string;
   /** For the kit: start part-way through a flow. */
@@ -1177,6 +1183,7 @@ export function JiraPanel(p: JiraPanelProps) {
         compact={compact}
         account={p.account}
         spaceName={p.spaceName}
+        allSpaces={p.allSpaces}
       />
     );
   } else if (state === 'loading') {

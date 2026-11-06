@@ -216,6 +216,13 @@
 :root[data-motion='less'] .tp-sswl-it.tp-picked .tp-stile {
   animation: none;
 }
+:root[data-motion='less'] .tp-set-state {
+  animation: none;
+}
+:root[data-motion='less'] .tp-set-sp2 .tp-stile,
+:root[data-motion='less'] .tp-set-sp2 .tp-set-spname {
+  transition: none;
+}
 :root[data-motion='less'] .tp-set-sprow.tp-set-hl,
 :root[data-motion='less'] .tp-set-sprow > .tp-setrow,
 :root[data-motion='less'] .tp-set-spsub,

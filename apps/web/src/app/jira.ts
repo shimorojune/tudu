@@ -253,6 +253,8 @@ export function useFromApps(): boolean {
 
 // ---- Manage spaces… from a space: that space's row in Settings › Apps glows once ------------------------------
 
+/** Glow every row: Jira was just connected from All spaces, so every space is off and you pick where it shows. */
+export const ALL_GLOW = '*';
 let glow: string | null = null;
 /** Settings › Apps is about to open from this space's Jira panel: its row glows when the list first draws. */
 export function glowJiraSpace(spaceId: string): void {
