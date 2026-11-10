@@ -710,7 +710,7 @@ test.describe('already reported? (#76)', () => {
     const plus = f.getByRole('button', { name: `+1 #${n} instead of a new issue` });
     await expect(plus).toBeVisible({ timeout: 10_000 });
     await expect(f.getByText('Already reported?')).toBeVisible();
-    const row = f.locator('.tp-sim-row', { has: plus });
+    const row = f.locator('.tp-sim-row').filter({ hasText: `#${n}` });
     await expect(row.getByRole('img', { name: 'Closed, fixed' })).toBeVisible();
     await expect(row.locator('.tp-sim-badge')).toHaveText('Fixed');
     await plus.click();
@@ -742,7 +742,12 @@ test.describe('already reported? (#76)', () => {
     await words(f).fill(`The week view scrolls back to Monday after each edit ${n} ${marker}`);
     const plus = f.getByRole('button', { name: `+1 #${n} instead of a new issue` });
     await expect(plus).toBeVisible({ timeout: 10_000 });
-    await expect(f.locator('.tp-sim-row', { has: plus }).getByRole('img', { name: 'Open' })).toBeVisible();
+    await expect(
+      f
+        .locator('.tp-sim-row')
+        .filter({ hasText: `#${n}` })
+        .getByRole('img', { name: 'Open' }),
+    ).toBeVisible();
     await plus.click();
     await expect(f.getByRole('button', { name: `+1 on #${n}` })).toBeVisible();
     await f.getByRole('button', { name: 'Undo' }).click();
