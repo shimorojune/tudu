@@ -415,7 +415,7 @@ describe('C03-U22 delete, restore and live events for a task', () => {
     // A flush with nothing to send ends in a sweep; its read of the disk is held open.
     let release!: () => void;
     hold = new Promise((r) => (release = r));
-    heldRead = reads + 2; // the flush's own read, then the sweep's
+    heldRead = reads + 1; // the sweep's (the flush sends from memory)
     await t.store.outbox.flush();
     await new Promise((r) => setTimeout(r, 0));
     t.store.remove('t2');
@@ -903,5 +903,45 @@ describe('C21 All spaces in the store', () => {
     expect(t.read(HOME).map((x) => x.id)).toEqual(['h1']);
     expect(t.store.lastSeen('w1')).toBeUndefined();
     expect(t.store.lastSeen('h1')).toBeDefined();
+  });
+});
+
+describe('C11-U47 a disk that never answers', () => {
+  it('C11-U47 a change is still sent and answered, and the store goes idle', async () => {
+    const never = () => new Promise<never>(() => {});
+    const stuck: OutboxStore = { all: never, put: never, remove: never };
+    const t = setup({ [SUN]: [task('t1', 'One', SUN, 1024)] }, [], stuck);
+    await t.load(SUN);
+    t.store.rename('t1', 'One, renamed');
+    await t.settle();
+    expect(t.calls.filter((c) => c === 'POST /api/sync')).toHaveLength(1);
+    expect(await t.store.idle()).toBe(true);
+    expect(t.read(SUN)[0]!.title).toBe('One, renamed');
+  });
+});
+
+describe('C11-U50 a change left on disk by an earlier page', () => {
+  it('C11-U50 is sent again after a reload and answered once, with nothing turned down', async () => {
+    const disk = new MemoryOutboxStore();
+    await disk.put({
+      id: 'left-1',
+      type: 'task.rename',
+      payload: { id: 't1', title: 'Renamed' },
+      at: '2026-11-10T10:00:00.000Z',
+      seq: 1,
+    });
+    const t = setup({ [SUN]: [task('t1', 'One', SUN, 1024)] }, [], disk);
+    const sent: string[] = [];
+    t.answer((body) => {
+      sent.push(...body.mutations.map((x) => x.id));
+      // The server already applied it: it answers ok and changes nothing.
+      return { results: body.mutations.map((x) => ({ id: x.id, status: 'ok' })), tasks: [], deleted: [] };
+    });
+    await t.store.resume();
+    await t.settle();
+    expect(sent).toEqual(['left-1']);
+    expect(t.rejected).toEqual([]);
+    expect(await t.store.idle()).toBe(true);
+    await vi.waitFor(async () => expect(await disk.all()).toEqual([]));
   });
 });

@@ -63,8 +63,7 @@ The order of changes stays as it is (by clock, then seq). No test gets longer wa
 - **C11-U50** (client unit): after a reload, a change still on disk that was already sent is sent again and
   accepted once (the server's answer for an applied id), with no error toast.
 - **C11-D22** (Mac, deterministic): the test holds a readwrite transaction on the outbox store open (it keeps
-  issuing `get`s in it), then declines a request in the Inbox. The server gets the decline within 2 s, and the
-  badge clears. This fails on today's code every time.
+  issuing `get`s in it), then declines a request in the Inbox. The server gets the decline and the Dock badge clears within 2.5 s. This fails on today's code every time.
 - **C11-D09**: unchanged. It should stop failing.
 
 ## How I'll verify (on Rohit's Mac, screen unlocked)
