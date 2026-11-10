@@ -1518,12 +1518,17 @@ test.describe('a drop on the other day', () => {
     await addToday(app, space.id, ['Pay the electricity bill', 'Call Sam at 3pm', 'Book car service']);
     await go(app, await app.eval<string>(`return location.pathname`));
     await app.until(`return T.all('button', 'Book car service').length > 0`, 'main', 15_000);
-    // the glide is what is under test: this Mac must not be asking for less motion
-    expect(
-      await app.eval(
-        `return matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.dataset.motion === 'less'`,
-      ),
-    ).toBe(false);
+    // CI's Macs have Reduce motion on, and the page reads it through matchMedia, where the drop is instant (C02-E16).
+    // The glide in this engine is what is under test, so the page is told the Mac asks for full motion.
+    await app.eval(`
+      const real = window.matchMedia.bind(window);
+      window.matchMedia = (q) =>
+        /prefers-reduced-motion/.test(q)
+          ? { matches: false, media: q, onchange: null, addEventListener() {}, removeEventListener() {},
+              addListener() {}, removeListener() {}, dispatchEvent: () => false }
+          : real(q);
+      return true`);
+    expect(await app.eval(`return document.documentElement.dataset.motion === 'less'`)).toBe(false);
     await app.eval(`T.click(T.get('button', '2 days'))`);
     await app.until(
       `const s = document.querySelector('.tp-spread-second');
