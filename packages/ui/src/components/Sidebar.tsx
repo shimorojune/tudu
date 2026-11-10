@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { cx } from '../lib/cx';
 import { useControllable } from '../lib/hooks';
 import { Icon, type IconName } from '../lib/icons';
@@ -94,6 +94,41 @@ interface Entry {
   quiet?: boolean;
 }
 
+/** The fallback for a fold whose width transition never reports its end (the fold itself is 260ms). */
+export const SIDE_FOLD_MAX_MS = 400;
+
+/**
+ * True from the press that folds the sidebar into the rail until its width has finished easing. While it's on, the
+ * rail's tips are held at rest with no transition (.tp-side-folding), so none of them shows, or animates into being,
+ * mid-fold (#78; WebKit runs the tips' fade on the new pseudo-elements). A first paint already folded, a fixed rail
+ * and expanding never hold.
+ */
+function useFoldHold(rail: boolean, fixed: boolean) {
+  const ref = useRef<HTMLElement | null>(null);
+  // Set in the same render that folds, so the tips never get a frame without the hold.
+  const [prev, setPrev] = useState(rail);
+  const [hold, setHold] = useState(false);
+  if (prev !== rail) {
+    setPrev(rail);
+    setHold(rail && !fixed);
+  }
+  useLayoutEffect(() => {
+    if (!hold) return;
+    const nav = ref.current;
+    const done = () => setHold(false);
+    const end = (e: TransitionEvent) => {
+      if (e.target === nav && e.propertyName === 'width') done();
+    };
+    const timer = setTimeout(done, SIDE_FOLD_MAX_MS);
+    nav?.addEventListener('transitionend', end);
+    return () => {
+      clearTimeout(timer);
+      nav?.removeEventListener('transitionend', end);
+    };
+  }, [hold]);
+  return [hold && rail && !fixed, ref] as const;
+}
+
 /**
  * The app's left column on the desk, never on paper: the logo, the views, this week's days, spaces and your apps.
  * The active view is a paper chip with its icon in brand; every item keeps one weight, so nothing reflows.
@@ -124,6 +159,7 @@ export function Sidebar({
   const [current, setCurrent] = useControllable<string | undefined>(active, defaultActive);
   const [folded, setFolded] = useControllable(collapsed, !!defaultCollapsed);
   const rail = !!fixedRail || (!!collapsible && folded);
+  const [folding, navRef] = useFoldHold(rail, !!fixedRail);
 
   const toggleRail = () => {
     const next = !folded;
@@ -214,10 +250,12 @@ export function Sidebar({
 
   return (
     <nav
+      ref={navRef}
       className={cx(
         'tp-root tp-sidebar',
         rail && 'tp-rail',
         fixedRail && 'tp-rail-fixed',
+        folding && 'tp-side-folding',
         collapsible && 'tp-side-c',
         sheet && 'tp-side-sheet',
         className,

@@ -419,6 +419,8 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 .tp-rail-fixed .tp-nav { height: 44px; }
 .tp-rail-fixed .tp-nav-fold { display: none; }
 .tp-rail-fixed, .tp-rail-fixed * { transition: none !important; }
+/* While the sidebar folds, the rail's tips stay at rest and never animate into being; they work once it has settled. */
+.tp-side-folding .tp-tip::after { opacity: 0 !important; transition: none !important; }
 
 /* Top bar */
 .tp-topbar { display: flex; align-items: center; gap: 10px; height: 64px; padding: 0 4px; }
@@ -1943,7 +1945,7 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 .tp-sswl-ok { width: 14px; height: 14px; color: var(--foreground); }
 .tp-sswl-foot { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 4px; }
 .tp-root .tp-sswl-foot .tp-mi { display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; padding-left: 16px; }
-.tp-side-custom { padding-left: 6px; overflow: visible; }
+.tp-side-custom { padding-left: 9px; overflow: visible; }
 .tp-ssw-sheet .tp-ssw-b { font-size: 16px; }
 .tp-sswsheet { position: absolute; inset: 0; z-index: 80; }
 .tp-sswsheet-veil { position: absolute; inset: 0; background: var(--veil); animation: tp-veil-in 200ms var(--ease-change) both; }
@@ -2266,7 +2268,8 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 /* SpaceSwitch on the tablet rail: only the tile (the list opens beside it) */
 .tp-ssw-rail .tp-ssw-name, .tp-ssw-rail .tp-ssw-chev { display: none; }
 .tp-ssw-rail .tp-ssw-pip { position: absolute; top: 2px; right: 2px; }
-.tp-ssw-rail .tp-ssw-b { position: relative; padding: 4px; }
+.tp-ssw-rail .tp-ssw-b { position: relative; width: 34px; max-width: none; padding: 4px; }
+.tp-ssw-rail, .tp-ssw-rail .tp-ssw-id, .tp-ssw-rail .tp-stile { flex: none; }
 .tp-ssw-rail .tp-ssw-pop { left: calc(100% + 10px); top: 0; }
 .tp-mrow-pop.tp-mrow-pop-up { top: auto; bottom: calc(100% + 6px); transform-origin: bottom right; }
 .tp-pop-leaving.tp-mrow-pop-up { animation-name: tp-pop-out-up !important; }
