@@ -222,7 +222,7 @@ describe('POST /api/feedback (chunk 19)', () => {
     expect((await send(other.jar, report())).status).toBe(200);
   });
 
-  it('C19-A04 migrations 0011 and 0014 give feedback its columns, the issue ones with their defaults, and the one-report-per-id index', async () => {
+  it('C19-A04 migrations 0011, 0014 and 0021 give feedback its columns, the issue ones with their defaults, and the one-report-per-id index', async () => {
     const cols = (
       await server.db.execute(
         sql`select column_name, is_nullable from information_schema.columns where table_name = 'feedback' order by column_name`,
@@ -238,6 +238,7 @@ describe('POST /api/feedback (chunk 19)', () => {
       'issue_state:NO',
       'issue_url:YES',
       'kind:NO',
+      'plus_one_of:YES',
       'report_id:NO',
       'screenshot_key:YES',
       'screenshot_public:NO',
