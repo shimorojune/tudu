@@ -456,8 +456,10 @@ export class TaskStore {
 
   /** Changes made in an earlier session that never reached the server: send them now. */
   async resume(): Promise<void> {
-    const left = await this.o.store.all();
-    for (const m of left) this.pending.set(m.id, { m: m as SyncMutation, stored: true });
+    const left = await this.o.store.all().catch(() => [] as Mutation[]);
+    for (const m of left)
+      if (!this.pending.has(m.id)) this.pending.set(m.id, { m: m as SyncMutation, stored: true });
+    this.outbox.load(left);
     if (left.length) void this.outbox.flush();
   }
 
@@ -1283,7 +1285,12 @@ export class TaskStore {
   async clear(waitMs = 2000): Promise<void> {
     const until = Date.now() + waitMs;
     while (Date.now() < until && !(await this.idle())) await new Promise((r) => setTimeout(r, 50));
-    for (const m of await this.o.store.all()) await this.o.store.remove(m.id);
+    this.outbox.forget();
+    try {
+      for (const m of await this.o.store.all()) await this.o.store.remove(m.id);
+    } catch {
+      // The disk never answered: what is left there is resent (and applied once) by the next session.
+    }
     this.pending.clear();
     this.unanswered = 0;
     this.known.clear();
@@ -1303,13 +1310,13 @@ export class TaskStore {
     this.unanswered += 1;
     this.pending.set(m.id, { m, stored: false });
     this.applyEverywhere(m);
-    void this.o.store.put(m).then(
+    // Sent from memory at once; on disk for a reload when the write lands.
+    this.outbox.add(m).then(
       () => {
         const p = this.pending.get(m.id);
         if (p) p.stored = true;
-        void this.outbox.flush();
       },
-      () => void this.outbox.flush(),
+      () => {},
     );
     return m.id;
   }
@@ -1514,7 +1521,13 @@ export class TaskStore {
     // Only what was on disk before this look can be gone from it: a change that lands while the read is in flight
     // may be missing from the answer yet still on its way, so it is left for the next sweep.
     const candidates = [...this.pending].filter(([, p]) => p.stored).map(([id]) => id);
-    const left = new Set((await this.o.store.all()).map((m) => m.id));
+    let onDisk: Mutation[];
+    try {
+      onDisk = await this.o.store.all();
+    } catch {
+      return;
+    }
+    const left = new Set(onDisk.map((m) => m.id));
     for (const id of candidates)
       if (this.pending.has(id) && !left.has(id)) {
         this.pending.delete(id);

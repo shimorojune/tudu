@@ -1621,6 +1621,8 @@ test.describe('notebook drawings', () => {
       .getByRole('dialog', { name: 'Delete “Stand-up board”?' })
       .getByRole('button', { name: 'Delete' })
       .click();
+    // The delete is made once the note has gone (NOTE_GOING_MS after the click), as C22-E43 waits for it too.
+    await expect(page.getByText('Moved to Trash. It stays there for 30 days.')).toBeVisible();
     await idle(page);
     expect((await page.request.get(`${API_URL}/api/notebook/drawings/${did}`)).status()).toBe(404);
     await tree(page)
