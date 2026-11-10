@@ -48,6 +48,7 @@ const report = (text = 'The tick came back'): FeedbackReport => ({
   text,
   details: null,
   shotPublic: false,
+  plusOneOf: null,
 });
 const queued = (r = report(), shot = true): QueuedReport => ({
   report: r,

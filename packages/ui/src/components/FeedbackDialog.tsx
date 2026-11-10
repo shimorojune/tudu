@@ -5,6 +5,7 @@ import {
   type FeedbackIssue,
   type FeedbackKind,
   type MyReport,
+  type SimilarIssue,
 } from '@tudu/core';
 import { Popover } from 'radix-ui';
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type ReactNode } from 'react';
@@ -16,6 +17,7 @@ import { FeedbackReports, type FeedbackReportsState } from './FeedbackReports';
 import { IssueLink } from './IssueLink';
 import { Segmented, type SegmentedItem } from './Segmented';
 import { SettingRow } from './SettingsSection';
+import { SimilarReports, type SimilarReportsState } from './SimilarReports';
 import { Switch } from './Switch';
 
 /** The form, then: sending, sent (by email only), filed (with its issue) or pending (the issue follows). */
@@ -31,7 +33,10 @@ export interface FeedbackDialogProps {
   /** The one screenshot, as the person picked, pasted or dropped it. */
   shot: File | null;
   onShot?: (file: File | null) => void;
-  /** "Show it on the public issue" (GitHub filing only): off for each new screenshot, and the caller resets it. */
+  /**
+   * "Show it on the public issue" (GitHub filing only): on for each new screenshot GitHub can show (#75); the caller
+   * sets it when one goes in, and switching it off holds for that screenshot only.
+   */
   shotPublic?: boolean;
   onShotPublic?: (on: boolean) => void;
   details: boolean;
@@ -55,6 +60,11 @@ export interface FeedbackDialogProps {
   onRetryReports?: () => void;
   /** Open on GitHub: a new tab, or the browser from the Mac app. */
   onOpenIssue?: (url: string) => void;
+  /** "Already reported?" (#76, GitHub filing only): issues that mean what is being typed. */
+  similar?: { state: SimilarReportsState; issues: SimilarIssue[]; stale?: boolean };
+  /** The issue picked for "+1 that one instead": Send adds the report to it as a comment. */
+  picked?: SimilarIssue | null;
+  onPick?: (issue: SimilarIssue | null) => void;
   /** A sheet from the bottom on phones. */
   variant?: 'dialog' | 'sheet';
   /** Drawn in place without the veil (the kit). */
@@ -125,6 +135,9 @@ export function FeedbackDialog({
   onBack,
   onRetryReports,
   onOpenIssue,
+  similar,
+  picked = null,
+  onPick,
 }: FeedbackDialogProps) {
   // Each of these belongs to one screenshot, so a new one starts over without resetting anything.
   const [read, setRead] = useState<{ file: File; url: string } | null>(null);
@@ -198,6 +211,7 @@ export function FeedbackDialog({
       : 'What you’d like Tudu to do, and what it would save you.') +
     (github ? ' Leave out anything private.' : '');
   const busy = phase === 'sending' || phase === 'sent';
+  const plusOne = github && picked ? picked : null;
   const mineCount = reportsState === 'ready' && reports.length > 0 ? ` · ${reports.length}` : '';
 
   let head: { title: string; sub: string };
@@ -218,7 +232,12 @@ export function FeedbackDialog({
     );
     body = <FeedbackReports state={reportsState} reports={reports} onRetry={onRetryReports} />;
   } else if (phase === 'filed' && issue) {
-    head = { title: 'Thanks, it’s filed', sub: 'Follow it on GitHub for replies and the fix.' };
+    head = plusOne
+      ? {
+          title: `Thanks, it’s on #${issue.number}`,
+          sub: 'Your words are on the issue as a comment. Follow it there.',
+        }
+      : { title: 'Thanks, it’s filed', sub: 'Follow it on GitHub for replies and the fix.' };
     footer = (
       <>
         {sheet || !onReports ? null : (
@@ -258,7 +277,9 @@ export function FeedbackDialog({
         </span>
         <div className="tp-fb-num">
           #{issue.number}
-          <small>{kind === 'bug' ? 'Something’s wrong' : 'An idea'}</small>
+          <small>
+            {plusOne ? `+1 · ${plusOne.title}` : kind === 'bug' ? 'Something’s wrong' : 'An idea'}
+          </small>
         </div>
         {sheet ? null : <p className="tp-fb-gist">{text.trim()}</p>}
         <IssueLink url={issue.url} />
@@ -266,7 +287,12 @@ export function FeedbackDialog({
       </div>
     );
   } else if (phase === 'pending') {
-    head = { title: 'Thanks, it’s sent', sub: 'The GitHub issue follows in a few minutes.' };
+    head = {
+      title: 'Thanks, it’s sent',
+      sub: plusOne
+        ? 'The GitHub comment follows in a few minutes.'
+        : 'The GitHub issue follows in a few minutes.',
+    };
     footer = (
       <>
         {onReports ? (
@@ -307,17 +333,17 @@ export function FeedbackDialog({
         </Button>
         <Button
           size="sm"
-          icon={<Icon name="send" size={14} />}
+          icon={<Icon name={plusOne ? 'check' : 'send'} size={14} />}
           disabled={!text.trim() && phase === 'idle'}
           loading={phase === 'sending'}
-          loadingLabel={github ? 'Filing…' : 'Sending…'}
+          loadingLabel={plusOne ? 'Adding…' : github ? 'Filing…' : 'Sending…'}
           success={phase === 'sent'}
           successLabel="Sent"
           onClick={() => {
             if (phase === 'idle' && text.trim()) onSend?.();
           }}
         >
-          Send
+          {plusOne ? `+1 on #${plusOne.number}` : 'Send'}
         </Button>
       </>
     );
@@ -365,6 +391,16 @@ export function FeedbackDialog({
                 autoFocus={!inline}
               />
             </div>
+            {github && similar ? (
+              <SimilarReports
+                state={similar.state}
+                issues={similar.issues}
+                stale={similar.stale}
+                picked={picked}
+                onPick={onPick}
+                onOpen={onOpenIssue}
+              />
+            ) : null}
             <div className={cx('tp-fb-slot', !shown && 'tp-hide')} aria-hidden={!shown} inert={!shown}>
               <div>
                 {shot ? (
@@ -404,7 +440,10 @@ export function FeedbackDialog({
                           <span className="tp-fb-sub-off">
                             Private. Only the Tudu team sees it, with your report.
                           </span>
-                          <span className="tp-fb-sub-on">Public. Anyone can see it on the GitHub issue.</span>
+                          <span className="tp-fb-sub-on">
+                            Public. Anyone can see it on GitHub.{' '}
+                            <span className="tp-fb-check">Check it shows nothing private.</span>
+                          </span>
                         </span>
                       ) : (
                         'GitHub can’t show this kind of image. It stays with the team.'
@@ -432,8 +471,8 @@ export function FeedbackDialog({
                     {hint ??
                       (github ? (
                         <>
-                          <Icon name="lock" size={12} />
-                          Private unless you show it
+                          <Icon name="globe" size={12} />
+                          Shown on the issue unless you hide it
                         </>
                       ) : (
                         'or paste or drop one'
@@ -467,6 +506,17 @@ export function FeedbackDialog({
                 Your reports{mineCount}
                 <Icon name="right" size={12} />
               </button>
+            ) : null}
+            {plusOne ? (
+              <div className="tp-fb-inst" role="status">
+                <span>
+                  Adds your words to <b>#{plusOne.number}</b>
+                  {sheet ? '' : ' as a comment'}. No new issue.
+                </span>
+                <button type="button" className="tp-fb-undo" onClick={() => onPick?.(null)}>
+                  Undo
+                </button>
+              </div>
             ) : null}
             {error ? (
               <div className="tp-fb-err" role="alert">
@@ -512,14 +562,17 @@ function PublicNotice() {
             <li>What you write</li>
             <li>Bug or idea</li>
             <li>App details, when switched on: version, system, page, window, theme</li>
-            <li>The screenshot, only when you show it</li>
+            <li>The screenshot, unless you hide it</li>
           </ul>
           <h4>Only the Tudu team</h4>
           <ul className="tp-fb-priv">
             <li>Your name and email (so we can reply)</li>
-            <li>The screenshot, unless you show it</li>
+            <li>The screenshot, when you hide it</li>
           </ul>
-          <p>Never sent anywhere: your tasks, notes, people or space names.</p>
+          <p>
+            Never sent anywhere: your tasks, notes, people or space names, except what a public screenshot
+            shows.
+          </p>
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

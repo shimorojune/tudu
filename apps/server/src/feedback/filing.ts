@@ -60,9 +60,7 @@ export interface FileOptions {
 
 /** GitHub's answers that mean the issue can't take a comment now: locked (403), gone (404, 410), refused (422). */
 function cantTakeComment(err: unknown): boolean {
-  return (
-    err instanceof IssueError && !err.retryable && [403, 404, 410, 422].includes(err.status ?? 0)
-  );
+  return err instanceof IssueError && !err.retryable && [403, 404, 410, 422].includes(err.status ?? 0);
 }
 
 /**

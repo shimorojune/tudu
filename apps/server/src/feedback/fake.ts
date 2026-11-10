@@ -53,7 +53,9 @@ export function fakeGithubIssues() {
   });
   // Issues for the mirror to read (#76): `{ issues: [{ title, body?, state?, state_reason?, locked?, pull_request? }] }`.
   r.post('/seed', async (c) => {
-    const { issues: seed } = (await c.req.json()) as { issues: Array<Partial<FakeIssue> & { title: string }> };
+    const { issues: seed } = (await c.req.json()) as {
+      issues: Array<Partial<FakeIssue> & { title: string }>;
+    };
     const out = seed.map((x) => {
       const at = stamp();
       const issue: FakeIssue = {
@@ -143,7 +145,14 @@ export function fakeGithubIssues() {
     if (mode === 'final') return c.json({ message: 'Bad credentials' }, 401);
     const repo = `${c.req.param('owner')}/${c.req.param('repo')}`;
     const at = stamp();
-    const issue: FakeIssue = { number: nextNumber(), repo, state: 'open', created_at: at, updated_at: at, ...draft };
+    const issue: FakeIssue = {
+      number: nextNumber(),
+      repo,
+      state: 'open',
+      created_at: at,
+      updated_at: at,
+      ...draft,
+    };
     issues.push(issue);
     return c.json(
       { number: issue.number, html_url: `https://github.com/${repo}/issues/${issue.number}` },

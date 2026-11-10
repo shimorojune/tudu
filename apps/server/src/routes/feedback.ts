@@ -63,7 +63,9 @@ export function feedbackMail(x: {
       x.shot
         ? `Screenshot: ${x.shot.name} (attached, ${x.shot.public ? 'shown on the issue' : 'private'})`
         : 'No screenshot.',
-      ...(plusOne ? [`+1 on #${plusOne} (${x.report.kind === 'bug' ? 'something’s wrong' : 'an idea'})`] : []),
+      ...(plusOne
+        ? [`+1 on #${plusOne} (${x.report.kind === 'bug' ? 'something’s wrong' : 'an idea'})`]
+        : []),
       ...(x.issue === 'pending'
         ? [
             plusOne

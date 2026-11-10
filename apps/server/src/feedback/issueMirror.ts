@@ -6,7 +6,19 @@ import {
   SIMILAR_QUERY_MAX,
   type SimilarIssue,
 } from '@tudu/core';
-import { and, asc, count, cosineDistance, eq, inArray, isNotNull, isNull, schema, sql, type Db } from '@tudu/db';
+import {
+  and,
+  asc,
+  count,
+  cosineDistance,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  schema,
+  sql,
+  type Db,
+} from '@tudu/db';
 import type { Embeddings } from '../closeMatches';
 import type { IssueTracker, ListedIssue } from './github';
 

@@ -229,7 +229,9 @@ export const ISSUE_TEXT_MAX = 4000;
 export function issueBodyText(body: string | null | undefined): string {
   if (!body) return '';
   const lines = body.replace(/\r\n/g, '\n').split('\n');
-  const footer = lines.findIndex((l, i) => l.trim() === '---' && /sent from the Tudu app/.test(lines[i + 1] ?? ''));
+  const footer = lines.findIndex(
+    (l, i) => l.trim() === '---' && /sent from the Tudu app/.test(lines[i + 1] ?? ''),
+  );
   const kept = (footer >= 0 ? lines.slice(0, footer) : lines).filter(
     (l) => l.trim() !== '**Screenshot**' && l.trim() !== PLUS_ONE_LINE,
   );
@@ -269,7 +271,7 @@ export interface MyReport {
   state: 'none' | 'pending' | 'filed' | 'failed';
   issue: FeedbackIssue | null;
   /** A "+1 that one instead": the issue it joined (its title is then the issue's). */
-  plusOneOf: number | null;
+  plusOneOf?: number | null;
 }
 
 // ---------------------------------------------------------------------------------------------------------------
