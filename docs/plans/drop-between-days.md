@@ -165,7 +165,9 @@ Other open threads are numbering tests too; if a number is taken at build time, 
   canvas "Try it" demo. No flash of the row before the card lands.
 - MC-2: with a trackpad, drop and immediately start another drag: nothing sticks.
 
-All tests run on Rohit's Mac, not in the cloud.
+Unit and browser tests run headless on Rohit's Mac, not in the cloud. The Mac webview test (the `C-D` row) runs on
+the PR's CI instead: since 10 Nov the desktop app tests are not run locally, because their windows pop up over his
+work.
 
 ## 6. Risks
 
