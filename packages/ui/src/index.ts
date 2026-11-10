@@ -336,6 +336,13 @@ export {
 } from './components/GettingStarted';
 export { FeedbackDialog, type FeedbackDialogProps, type FeedbackPhase } from './components/FeedbackDialog';
 export {
+  SimilarReports,
+  SIMILAR_SHIMMER_MS,
+  similarMeta,
+  type SimilarReportsProps,
+  type SimilarReportsState,
+} from './components/SimilarReports';
+export {
   FeedbackReports,
   reportDay,
   reportMeta,

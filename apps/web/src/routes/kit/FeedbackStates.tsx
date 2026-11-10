@@ -1,5 +1,5 @@
 import { FeedbackDialog, type FeedbackDialogProps, type FeedbackPhase } from '@tudu/ui';
-import type { FeedbackKind, MyReport } from '@tudu/core';
+import { shotCanBePublic, type FeedbackKind, type MyReport, type SimilarIssue } from '@tudu/core';
 import { useEffect, useState } from 'react';
 import { Pair, Section } from './Pair';
 
@@ -7,7 +7,37 @@ const LINE = 'Tudu 0.38.0, macOS, the Today page. Never your tasks.';
 const LINE_ISSUE = 'Tudu 0.38.0, macOS, the Today page. Shown on the issue. Never your tasks.';
 const ISSUE = { number: 142, url: 'https://github.com/shimorojune/tudu/issues/142' };
 const day = (ago: number) => new Date(Date.now() - ago * 86_400_000).toISOString();
+const SIMILAR: SimilarIssue[] = [
+  {
+    number: 64,
+    title: 'Jira count stuck at 1 with 2 assigned',
+    url: 'https://github.com/shimorojune/tudu/issues/64',
+    state: 'fixed',
+    createdAt: day(12),
+    closedAt: day(5),
+    plusOnes: 2,
+  },
+  {
+    number: 62,
+    title: 'Jira pane should close on an outside click',
+    url: 'https://github.com/shimorojune/tudu/issues/62',
+    state: 'open',
+    createdAt: day(14),
+    closedAt: null,
+    plusOnes: 0,
+  },
+];
+const PLUS_ONE = { number: 64, url: 'https://github.com/shimorojune/tudu/issues/64#issuecomment-9001' };
 const REPORTS: MyReport[] = [
+  {
+    id: 'k0',
+    kind: 'bug',
+    title: 'Jira count stuck at 1 with 2 assigned',
+    createdAt: day(0),
+    state: 'filed',
+    issue: PLUS_ONE,
+    plusOneOf: 64,
+  },
   {
     id: 'k1',
     kind: 'bug',
@@ -101,6 +131,7 @@ function Form({
   const [file, setFile] = useState<File | null>(() => (shot === true ? kitShot() : null));
   const [details, setDetails] = useState(true);
   const [shotPublic, setShotPublic] = useState(shown);
+  const [picked, setPicked] = useState<SimilarIssue | null>(more.picked ?? null);
   useEffect(() => {
     if (shot !== 'png' && shot !== 'heic') return;
     let live = true;
@@ -120,7 +151,7 @@ function Form({
       shot={file}
       onShot={(f) => {
         setFile(f);
-        setShotPublic(false);
+        setShotPublic(!!f && shotCanBePublic(f.type));
       }}
       shotPublic={shotPublic}
       onShotPublic={setShotPublic}
@@ -129,11 +160,14 @@ function Form({
       detailsLine={more.filing === 'github' ? LINE_ISSUE : LINE}
       phase={phase}
       {...more}
+      picked={picked}
+      onPick={setPicked}
     />
   );
 }
 
 const WORDS = 'I ticked off “Call the venue” and it came back after a reload.';
+const JIRA_WORDS = 'The Jira count in the sidebar says 1 but I have two tickets';
 
 /** Send feedback: empty, with a screenshot, sending and sent, light and dark. Offline is the toast alone. */
 export function FeedbackStates() {
@@ -155,14 +189,49 @@ export function FeedbackStates() {
         )}
       />
       <Pair
+        title="Send feedback, screenshot shown on the issue"
+        note="A screenshot in, the switch under it starts on (#75): the Public pill and the accent ring say so on the preview, and the line asks to check it shows nothing private."
+        render={() => <Form filing="github" text={WORDS} shot="png" shown />}
+      />
+      <Pair
         title="Send feedback, screenshot kept private"
-        note="A screenshot in, the switch under it starts off: it goes to the team with the report, never on the issue."
+        note="Switched off: it goes to the team with the report, never on the issue. It holds for this screenshot only."
         render={() => <Form filing="github" text={WORDS} shot="png" />}
       />
       <Pair
-        title="Send feedback, screenshot shown on the issue"
-        note="Switched on: the Public pill and the accent ring say so on the preview, and the line under the switch changes."
-        render={() => <Form filing="github" text={WORDS} shot="png" shown />}
+        title="Send feedback, checking for similar reports"
+        note="The first look, 450ms after typing stops with three words or more: two shimmer rows."
+        render={() => <Form filing="github" text={JIRA_WORDS} similar={{ state: 'loading', issues: [] }} />}
+      />
+      <Pair
+        title="Send feedback, already reported?"
+        note="Up to three issues, open and closed, closest first. +1 picks one; the arrow opens it on GitHub."
+        render={() => (
+          <Form
+            filing="github"
+            text={JIRA_WORDS}
+            similar={{ state: 'ready', issues: SIMILAR }}
+            onOpenIssue={() => {}}
+          />
+        )}
+      />
+      <Pair
+        title="Send feedback, +1 that one instead"
+        note="Picked: the row lifts with an ink ring, the bar says what happens, Send reads “+1 on #64”. Undo puts it back."
+        render={() => (
+          <Form
+            filing="github"
+            text={JIRA_WORDS}
+            similar={{ state: 'ready', issues: SIMILAR }}
+            picked={SIMILAR[0]}
+            onOpenIssue={() => {}}
+          />
+        )}
+      />
+      <Pair
+        title="Send feedback, couldn’t check for similar reports"
+        note="The model is off or the issues haven’t been read yet: one quiet line; sending works as usual."
+        render={() => <Form filing="github" text={JIRA_WORDS} similar={{ state: 'error', issues: [] }} />}
       />
       <Pair
         title="Send feedback, screenshot GitHub can’t show"
@@ -189,6 +258,26 @@ export function FeedbackStates() {
       <Pair
         title="Send feedback, issue to follow"
         render={() => <Form filing="github" text={WORDS} phase="pending" onReports={() => {}} />}
+      />
+      <Pair
+        title="Send feedback, +1 sent"
+        render={() => (
+          <Form
+            filing="github"
+            text={JIRA_WORDS}
+            phase="filed"
+            issue={PLUS_ONE}
+            picked={SIMILAR[0]}
+            onReports={() => {}}
+            onOpenIssue={() => {}}
+          />
+        )}
+      />
+      <Pair
+        title="Send feedback, +1 to follow"
+        render={() => (
+          <Form filing="github" text={JIRA_WORDS} phase="pending" picked={SIMILAR[0]} onReports={() => {}} />
+        )}
       />
       <Pair
         title="Send feedback, couldn’t send"

@@ -20,6 +20,7 @@ import { sweepCleared } from './inbox';
 import { sweepAccessLog } from './ai/log';
 import { ISSUE_SWEEP_EVERY_MS, sweepIssues } from './feedback/filing';
 import { GithubIssues } from './feedback/github';
+import { IssueMirror, MIRROR_EVERY_MS } from './feedback/issueMirror';
 
 export interface Server {
   app: App;
@@ -29,6 +30,8 @@ export interface Server {
   mailer: Mailer;
   storage: Storage;
   embeddings: Embeddings;
+  /** The GitHub issues the feedback form matches against; null without a token. */
+  issueMirror: IssueMirror | null;
   close: () => Promise<void>;
 }
 
@@ -113,6 +116,11 @@ export function bootstrap(
         fetch: options.githubFetch,
       })
     : null;
+  // The issues the form matches against (#76): read on boot and every ten minutes.
+  const issueMirror = issues ? new IssueMirror(db, issues, embeddings, { quiet: options.quiet }) : null;
+  const mirrorTick =
+    env.NODE_ENV === 'test' || !issueMirror ? null : setInterval(() => issueMirror.kick(), MIRROR_EVERY_MS);
+  if (issueMirror && env.NODE_ENV !== 'test') issueMirror.kick();
   const issueTick =
     env.NODE_ENV === 'test' || !issues
       ? null
@@ -120,6 +128,7 @@ export function bootstrap(
           void sweepIssues(db, issues, {
             quiet: options.quiet,
             shots: { base: env.BASE_URL, secret: env.AUTH_SECRET },
+            mirror: issueMirror,
           }).catch((err) => {
             if (!options.quiet) console.error('feedback: the issue sweep failed', err);
           });
@@ -127,6 +136,7 @@ export function bootstrap(
   const close = async () => {
     if (sweeper) clearInterval(sweeper);
     if (issueTick) clearInterval(issueTick);
+    if (mirrorTick) clearInterval(mirrorTick);
     if (embedTick) clearInterval(embedTick);
     await closeDb();
   };
@@ -176,6 +186,7 @@ export function bootstrap(
     githubFetch: options.githubFetch,
     embeddings,
     issues,
+    issueMirror,
   });
-  return { app, db, auth, hub, mailer, storage, embeddings, close };
+  return { app, db, auth, hub, mailer, storage, embeddings, issueMirror, close };
 }

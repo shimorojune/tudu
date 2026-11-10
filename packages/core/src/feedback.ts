@@ -53,8 +53,13 @@ export const feedbackReportSchema = z.object({
     .min(1, 'Say what happened first.')
     .max(FEEDBACK_TEXT_MAX, 'That is too long. Keep it under 5000 characters.'),
   details: feedbackDetailsSchema.nullable(),
-  /** "Show it on the public issue": the screenshot goes on the GitHub issue too. Off unless asked for. */
+  /**
+   * "Show it on the public issue": the screenshot goes on the GitHub issue too. The form switches it on for each new
+   * screenshot (#75); missing (a report queued by an older app) still reads as private, as its sender saw it.
+   */
   shotPublic: z.boolean().default(false),
+  /** "+1 that one instead": the issue this report joins as a comment, rather than a new issue (#76). */
+  plusOneOf: z.number().int().positive().nullable().default(null),
 });
 export type FeedbackReport = z.infer<typeof feedbackReportSchema>;
 
@@ -188,11 +193,17 @@ export function issueBody(x: {
   details: FeedbackDetails | null;
   ref: string;
   shot?: string | null;
+  /** A comment joining an issue ("+1 that one instead"): the same body, under a first line saying so. */
+  plusOne?: boolean;
+  /** Filed as a new issue after a +1 couldn't go on its issue: the issue it meant to join. */
+  similarTo?: number | null;
 }): string {
   const details = x.details
     ? feedbackDetailsLines(x.details).map((l) => `- ${l}`)
     : ['_App details were switched off._'];
   return [
+    ...(x.plusOne ? [PLUS_ONE_LINE, ''] : []),
+    ...(x.similarTo ? [`Similar to #${x.similarTo}`, ''] : []),
     noMentions(x.text.trim()),
     '',
     ...(x.shot ? ['**Screenshot**', '', `![Screenshot](${x.shot})`, ''] : []),
@@ -203,6 +214,34 @@ export function issueBody(x: {
     '',
     `<sub>Filed from the Tudu app · ref ${x.ref}</sub>`,
   ].join('\n');
+}
+
+/** The first line of a +1 comment. */
+export const PLUS_ONE_LINE = '**+1 from the Tudu app**';
+
+/** The mirror keeps this much of an issue's words to match against. */
+export const ISSUE_TEXT_MAX = 4000;
+
+/**
+ * An issue's words for matching: the body up to the app's `---` footer (its details and ref say nothing about what
+ * the report means), without the Screenshot block or any image, capped. A hand-written issue keeps its text.
+ */
+export function issueBodyText(body: string | null | undefined): string {
+  if (!body) return '';
+  const lines = body.replace(/\r\n/g, '\n').split('\n');
+  const footer = lines.findIndex(
+    (l, i) => l.trim() === '---' && /sent from the Tudu app/.test(lines[i + 1] ?? ''),
+  );
+  const kept = (footer >= 0 ? lines.slice(0, footer) : lines).filter(
+    (l) => l.trim() !== '**Screenshot**' && l.trim() !== PLUS_ONE_LINE,
+  );
+  return kept
+    .join('\n')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/<img\b[^>]*>/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, ISSUE_TEXT_MAX);
 }
 
 /** The report's short reference on its issue: the start of the saved row's id, enough for the team to find it. */
@@ -231,6 +270,49 @@ export interface MyReport {
   createdAt: string;
   state: 'none' | 'pending' | 'filed' | 'failed';
   issue: FeedbackIssue | null;
+  /** A "+1 that one instead": the issue it joined (its title is then the issue's). */
+  plusOneOf?: number | null;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Similar reports (#76): existing GitHub issues, open and closed, that mean what is being typed.
+
+/** At most this many are offered. */
+export const SIMILAR_LIMIT = 3;
+/** The form looks once the words have this many words, and this many characters. */
+export const SIMILAR_MIN_WORDS = 3;
+export const SIMILAR_MIN_CHARS = 12;
+/** How long after the last key the form looks. */
+export const SIMILAR_DEBOUNCE_MS = 450;
+/**
+ * The closeness an issue needs. Issue bodies are longer and noisier than task titles, so stricter than
+ * MEANING_FLOOR; tuned against the real issues (C19-A24).
+ */
+export const SIMILAR_FLOOR = 0.5;
+/** The words searched with are cut to this. */
+export const SIMILAR_QUERY_MAX = 1000;
+
+/** Whether the words are enough to look for similar reports. */
+export function similarReady(text: string): boolean {
+  const t = text.trim();
+  return t.length >= SIMILAR_MIN_CHARS && t.split(/\s+/).length >= SIMILAR_MIN_WORDS;
+}
+
+/** One similar issue: `fixed` is closed as done, `closed` closed as not planned (or a duplicate). */
+export interface SimilarIssue {
+  number: number;
+  title: string;
+  url: string;
+  state: 'open' | 'fixed' | 'closed';
+  createdAt: string;
+  closedAt: string | null;
+  /** +1s from the app so far. */
+  plusOnes: number;
+}
+
+/** GET /api/feedback/similar. */
+export interface SimilarIssues {
+  issues: SimilarIssue[];
 }
 
 /** GET /api/feedback/mine: where reports go (GitHub, or email only) and your last ones. */
