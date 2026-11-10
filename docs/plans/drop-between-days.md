@@ -24,14 +24,14 @@ So the eye loses the task between the two days. Reorders inside one day are fine
 
 Everything starts on release, together. All values are existing Tudu Paper tokens.
 
-| Part                                              | Motion                                                    |
-| ------------------------------------------------- | --------------------------------------------------------- |
-| The lifted card glides to its slot, straightens (−0.6° to 0), its shadow eases off | `--dur-fold` 300ms, `--ease-settle` |
-| The gap opens in the day it lands on              | `--dur-row-open` 360ms, `--ease-arrive` (today's `openRow`) |
-| The gap folds shut in the day it left             | 240ms, `--ease-arrive` (same as `closeRow`)               |
-| The ink line and the day's tint fade              | 120ms, `--ease-leave`                                     |
-| The row's wash, once the card lands               | 1.2s, `--ease-change` (today's wash)                      |
-| Counts in both day headers                        | change on release, as today                               |
+| Part                                                                               | Motion                                                      |
+| ---------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| The lifted card glides to its slot, straightens (−0.6° to 0), its shadow eases off | `--dur-fold` 300ms, `--ease-settle`                         |
+| The gap opens in the day it lands on                                               | `--dur-row-open` 360ms, `--ease-arrive` (today's `openRow`) |
+| The gap folds shut in the day it left                                              | 240ms, `--ease-arrive` (same as `closeRow`)                 |
+| The ink line and the day's tint fade                                               | 120ms, `--ease-leave`                                       |
+| The row's wash, once the card lands                                                | 1.2s, `--ease-change` (today's wash)                        |
+| Counts in both day headers                                                         | change on release, as today                                 |
 
 ### 2.1 The hand-over ("flight")
 
@@ -108,17 +108,17 @@ No new tokens and no new components.
 
 ## 4. Files
 
-| Area                                          | Change                                                                                   |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `packages/ui/src/lib/reorder.ts`              | `Flight` record; `up()` hands the card over; source-side fold; `landFlight`; line fade   |
-| `packages/ui/src/lib/motion.ts`               | `foldGap()`; `easeSettle`; a frame-driven glide helper                                   |
-| `packages/ui/src/components/TaskList.tsx`     | Drop handler calls `landFlight` after `openRow`                                          |
-| `packages/ui/src/components/WeekDay.tsx`      | Empty line folds out and fades in around a hand-over                                     |
-| `packages/ui/src/components/DayHeader.tsx`    | Only if E2E shows the shift: reserve the ring's slot                                     |
-| `packages/ui/src/styles/components.css`       | `.tp-drop-off`, `.tp-flying` (card straightening, shadow off), empty-line fold           |
-| `packages/ui/src/styles/less-motion.css`      | Reduced-motion rules for the above                                                       |
-| `packages/ui/src/index.ts`                    | Export the new helpers the design system bundle needs                                    |
-| `docs/tests/chunk-02.md`, `chunk-05.md`       | The rows below                                                                           |
+| Area                                       | Change                                                                                 |
+| ------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `packages/ui/src/lib/reorder.ts`           | `Flight` record; `up()` hands the card over; source-side fold; `landFlight`; line fade |
+| `packages/ui/src/lib/motion.ts`            | `foldGap()`; `easeSettle`; a frame-driven glide helper                                 |
+| `packages/ui/src/components/TaskList.tsx`  | Drop handler calls `landFlight` after `openRow`                                        |
+| `packages/ui/src/components/WeekDay.tsx`   | Empty line folds out and fades in around a hand-over                                   |
+| `packages/ui/src/components/DayHeader.tsx` | Only if E2E shows the shift: reserve the ring's slot                                   |
+| `packages/ui/src/styles/components.css`    | `.tp-drop-off`, `.tp-flying` (card straightening, shadow off), empty-line fold         |
+| `packages/ui/src/styles/less-motion.css`   | Reduced-motion rules for the above                                                     |
+| `packages/ui/src/index.ts`                 | Export the new helpers the design system bundle needs                                  |
+| `docs/tests/chunk-02.md`, `chunk-05.md`    | The rows below                                                                         |
 
 No server, database or API change. No migration.
 
@@ -126,38 +126,38 @@ No server, database or API change. No migration.
 
 ### New
 
-| ID      | Where                         | Scenario                                                                                                                                                                                            |
-| ------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C02-U29 | ui `TaskList.test.tsx`        | Drop on another list: right after `pointerup` the card is still in the page (`.tp-drag-ghost.tp-flying`), `onReceive` was called once with the key and index, and the new row is hidden under it    |
-| C02-U30 | ui `TaskList.test.tsx`        | After the glide (fake timers / frames) the card is gone, the row is visible with `tp-dropped`, and no inline `transform`, `margin` or `visibility` is left on any row of either list                |
-| C02-U31 | ui `TaskList.test.tsx`        | The day it left: the row that moved up starts one row lower (inline start value equals the dragged row's height) and ends with no inline style; rows above the gap never get one                    |
-| C02-U32 | ui `TaskList.test.tsx`        | The last row leaves: the fold is applied to the list's bottom edge, not to a row                                                                                                                    |
-| C02-U33 | ui `TaskList.test.tsx`        | On drop the ink line and `tp-drop-on` get `tp-drop-off` and are gone 120ms later; leaving the list mid-drag still clears them at once                                                               |
-| C02-U34 | ui `TaskList.test.tsx`        | Less motion (`data-motion='less'`): no card after `pointerup`, no inline fold styles, the row is visible at once and still gets the wash                                                            |
-| C02-U35 | ui `TaskList.test.tsx`        | A second drag started during the glide: the first card is removed and its row shown before the new card lifts; only one `.tp-drag-ghost` exists                                                     |
-| C02-U36 | ui `TaskList.test.tsx`        | The receiving list never renders the row (move refused) or unmounts mid-flight: the card is removed within 600ms and nothing throws                                                                 |
-| C02-U37 | ui `motion.test.ts` (new)     | `foldGap`: start and end values, cleans up its inline styles, returns at once under less motion                                                                                                     |
-| C05-U16 | ui `WeekDay.test.tsx`         | A task lands on an empty tile: the empty line stays mounted with its leaving class during the fold, then unmounts; a tile that becomes empty shows its line only after the fold                     |
-| C02-E15 | e2e web `today.spec.ts`       | Two days: drag a task from today onto tomorrow with the mouse. Sampled each frame after release: the row under the gap in today moves up over more than 100ms (several distinct positions, never one jump); the card reaches the new row's box; then the row is in tomorrow, washed, and the server agrees |
-| C02-E16 | e2e web `today.spec.ts`       | Same drag with reduced motion emulated: no intermediate positions, the task is in tomorrow at once                                                                                                  |
-| C05-E16 | e2e web `week.spec.ts`        | Week: drag from one tile to another and onto the empty Backlog: the source rows glide (sampled as in C02-E15), the empty line folds away, both counts follow                                        |
-| C05-E17 | e2e web `week.spec.ts`        | A very full tile: drop on its end while it is scrolled to the top; the tile scrolls the row into view and the card lands on it (card box equals row box at the end)                                 |
-| C02-E17 | e2e web `today.spec.ts`       | A day gets its first task by drop: the top of its list is at the same y before and after, at 1440 and 834 wide                                                                                      |
-| C14-E   | e2e web `all-spaces` spec     | All spaces, two days: the same drop glides and each task keeps its space pill (next free C14 E number at build time)                                                                                |
-| C-D     | mac `desktop.spec.ts`         | In the real WKWebView: the two-day drop from C02-E15, sampled the same way (next free D number at build time)                                                                                       |
+| ID      | Where                     | Scenario                                                                                                                                                                                                                                                                                                   |
+| ------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C02-U29 | ui `TaskList.test.tsx`    | Drop on another list: right after `pointerup` the card is still in the page (`.tp-drag-ghost.tp-flying`), `onReceive` was called once with the key and index, and the new row is hidden under it                                                                                                           |
+| C02-U30 | ui `TaskList.test.tsx`    | After the glide (fake timers / frames) the card is gone, the row is visible with `tp-dropped`, and no inline `transform`, `margin` or `visibility` is left on any row of either list                                                                                                                       |
+| C02-U31 | ui `TaskList.test.tsx`    | The day it left: the row that moved up starts one row lower (inline start value equals the dragged row's height) and ends with no inline style; rows above the gap never get one                                                                                                                           |
+| C02-U32 | ui `TaskList.test.tsx`    | The last row leaves: the fold is applied to the list's bottom edge, not to a row                                                                                                                                                                                                                           |
+| C02-U33 | ui `TaskList.test.tsx`    | On drop the ink line and `tp-drop-on` get `tp-drop-off` and are gone 120ms later; leaving the list mid-drag still clears them at once                                                                                                                                                                      |
+| C02-U34 | ui `TaskList.test.tsx`    | Less motion (`data-motion='less'`): no card after `pointerup`, no inline fold styles, the row is visible at once and still gets the wash                                                                                                                                                                   |
+| C02-U35 | ui `TaskList.test.tsx`    | A second drag started during the glide: the first card is removed and its row shown before the new card lifts; only one `.tp-drag-ghost` exists                                                                                                                                                            |
+| C02-U36 | ui `TaskList.test.tsx`    | The receiving list never renders the row (move refused) or unmounts mid-flight: the card is removed within 600ms and nothing throws                                                                                                                                                                        |
+| C02-U37 | ui `motion.test.ts` (new) | `foldGap`: start and end values, cleans up its inline styles, returns at once under less motion                                                                                                                                                                                                            |
+| C05-U16 | ui `WeekDay.test.tsx`     | A task lands on an empty tile: the empty line stays mounted with its leaving class during the fold, then unmounts; a tile that becomes empty shows its line only after the fold                                                                                                                            |
+| C02-E15 | e2e web `today.spec.ts`   | Two days: drag a task from today onto tomorrow with the mouse. Sampled each frame after release: the row under the gap in today moves up over more than 100ms (several distinct positions, never one jump); the card reaches the new row's box; then the row is in tomorrow, washed, and the server agrees |
+| C02-E16 | e2e web `today.spec.ts`   | Same drag with reduced motion emulated: no intermediate positions, the task is in tomorrow at once                                                                                                                                                                                                         |
+| C05-E16 | e2e web `week.spec.ts`    | Week: drag from one tile to another and onto the empty Backlog: the source rows glide (sampled as in C02-E15), the empty line folds away, both counts follow                                                                                                                                               |
+| C05-E17 | e2e web `week.spec.ts`    | A very full tile: drop on its end while it is scrolled to the top; the tile scrolls the row into view and the card lands on it (card box equals row box at the end)                                                                                                                                        |
+| C02-E17 | e2e web `today.spec.ts`   | A day gets its first task by drop: the top of its list is at the same y before and after, at 1440 and 834 wide                                                                                                                                                                                             |
+| C14-E   | e2e web `all-spaces` spec | All spaces, two days: the same drop glides and each task keeps its space pill (next free C14 E number at build time)                                                                                                                                                                                       |
+| C-D     | mac `desktop.spec.ts`     | In the real WKWebView: the two-day drop from C02-E15, sampled the same way (next free D number at build time)                                                                                                                                                                                              |
 
 Other open threads are numbering tests too; if a number is taken at build time, the next free one is used and
 `docs/tests` says which.
 
 ### Updated
 
-| ID       | Change                                                                                                                         |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| C02-U12  | The card is no longer gone on `pointerup`: assert it is flying, then gone after the glide; `tp-drop-on` goes after the fade    |
-| C05-U08  | Same for its three drops; the refused drop into the locked list still removes the card (glides home) as today                 |
-| C05-E02, C05-E03, C05-E14, C05-E15 | Wait for the card to land before reading the tile (helper `landed(page)` in `fixtures/week.ts`)      |
-| C02 two-day drag E2E (today.spec) | Same wait, via `fixtures/today.ts`                                                                    |
-| `docs/tests/chunk-02.md`, `chunk-05.md` | Add the new rows; reword the updated ones                                                       |
+| ID                                      | Change                                                                                                                      |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| C02-U12                                 | The card is no longer gone on `pointerup`: assert it is flying, then gone after the glide; `tp-drop-on` goes after the fade |
+| C05-U08                                 | Same for its three drops; the refused drop into the locked list still removes the card (glides home) as today               |
+| C05-E02, C05-E03, C05-E14, C05-E15      | Wait for the card to land before reading the tile (helper `landed(page)` in `fixtures/week.ts`)                             |
+| C02 two-day drag E2E (today.spec)       | Same wait, via `fixtures/today.ts`                                                                                          |
+| `docs/tests/chunk-02.md`, `chunk-05.md` | Add the new rows; reword the updated ones                                                                                   |
 
 ### Manual (can't be scripted)
 
@@ -165,9 +165,13 @@ Other open threads are numbering tests too; if a number is taken at build time, 
   canvas "Try it" demo. No flash of the row before the card lands.
 - MC-2: with a trackpad, drop and immediately start another drag: nothing sticks.
 
-Unit and browser tests run headless on Rohit's Mac, not in the cloud. The Mac webview test (the `C-D` row) runs on
-the PR's CI instead: since 10 Nov the desktop app tests are not run locally, because their windows pop up over his
-work.
+All of it runs on the PR's CI, not on Rohit's Mac: since 10 Nov the app tests are not run locally, because their
+windows pop up over his work.
+
+As built: the All spaces test is C21-E28 and the Mac test is C02-D01. C02-E15 also runs on Safari's engine (the
+`webkit` project). The existing drag tests (C02-E07, C05-E02, E03, E14, E15) run with reduced motion, where the task
+lands at once, so they needed no `landed` wait. C02-E17 found no shift in the app's header, so `DayHeader` is
+unchanged.
 
 ## 6. Risks
 

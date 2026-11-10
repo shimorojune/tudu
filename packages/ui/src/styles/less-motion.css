@@ -142,6 +142,12 @@
 :root[data-motion='less'] .tp-wd-peek {
   transition: none;
 }
+:root[data-motion='less'] .tp-item.tp-new {
+  animation: tp-fade-in 120ms linear both;
+}
+:root[data-motion='less'] .tp-wd-none.tp-wd-none-in {
+  animation-delay: 0ms;
+}
 :root[data-motion='less'] .tp-sp-wrap {
   transition: none;
 }

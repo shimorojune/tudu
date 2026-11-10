@@ -159,3 +159,101 @@ export function expectFolds(heights: number[], frames = 3): void {
     `frames between open and closed: ${heights.map(Math.round).join(' ')}`,
   ).toBeGreaterThanOrEqual(frames);
 }
+
+/** Where something is on one frame; `hidden` while it keeps its place but is not painted. */
+export interface FrameBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  hidden: boolean;
+}
+export type Frame<K extends string> = Record<K, FrameBox | null>;
+
+/**
+ * The box of the first element matching each selector (null while nothing matches), on every animation frame from
+ * just before `act` until `ms` after it. For a drop: what the lifted copy, the row it lands on and the rows it left
+ * behind do between letting go and rest.
+ */
+export async function sampleBoxes<K extends string>(
+  page: Page,
+  selectors: Record<K, string>,
+  act: () => Promise<void>,
+  ms = 900,
+): Promise<Frame<K>[]> {
+  await page.evaluate((selectors) => {
+    const w = window as unknown as { __frames: unknown[]; __framing: boolean };
+    w.__frames = [];
+    w.__framing = true;
+    const tick = () => {
+      const frame: Record<string, unknown> = {};
+      for (const [name, sel] of Object.entries(selectors as Record<string, string>)) {
+        const el = document.querySelector(sel);
+        if (!el) {
+          frame[name] = null;
+          continue;
+        }
+        const r = el.getBoundingClientRect();
+        frame[name] = {
+          x: r.x,
+          y: r.y,
+          width: r.width,
+          height: r.height,
+          hidden: getComputedStyle(el).visibility === 'hidden',
+        };
+      }
+      w.__frames.push(frame);
+      if (w.__framing) requestAnimationFrame(tick);
+    };
+    tick();
+  }, selectors);
+  await act();
+  await page.waitForTimeout(ms);
+  return page.evaluate(() => {
+    const w = window as unknown as { __frames: unknown[]; __framing: boolean };
+    w.__framing = false;
+    return w.__frames;
+  }) as Promise<Frame<K>[]>;
+}
+
+/**
+ * A dropped row's flight, read from frames with `card` (the lifted copy) and `row` (the row it lands on): the copy
+ * is still there once the row exists, the row waits unpainted under it, the copy passes through at least `frames`
+ * places on its way and ends on the row's own box, and then the copy is gone and the row shows.
+ */
+export function expectLands(frames: Frame<'card' | 'row'>[], min = 3): void {
+  const flying = frames.filter((f) => f.card && f.row);
+  expect(flying.length, 'frames with the copy over its new row').toBeGreaterThanOrEqual(min);
+  expect(
+    flying.every((f) => f.row!.hidden),
+    'the row is unpainted while the copy flies',
+  ).toBe(true);
+  const places = new Set(flying.map((f) => `${Math.round(f.card!.x)},${Math.round(f.card!.y)}`));
+  expect(places.size, `places the copy passed through: ${[...places].join(' ')}`).toBeGreaterThanOrEqual(min);
+  const last = flying[flying.length - 1]!;
+  // the last frame before it lands: within the final few percent of the glide, and straight again
+  expect(Math.abs(last.card!.x - last.row!.x), 'the copy ends on the row, across').toBeLessThan(6);
+  expect(Math.abs(last.card!.y - last.row!.y), 'the copy ends on the row, down').toBeLessThan(6);
+  const end = frames[frames.length - 1]!;
+  expect(end.card, 'the copy is gone at rest').toBeNull();
+  expect(end.row?.hidden, 'the row shows at rest').toBe(false);
+}
+
+/**
+ * A y series glides from where it started to where it ends through at least `frames` places in between, never
+ * leaving that range; a snap has none.
+ */
+export function expectGlides(ys: number[], frames = 3): void {
+  const start = ys[0]!;
+  const end = ys[ys.length - 1]!;
+  expect(Math.abs(start - end), 'it moved').toBeGreaterThan(8);
+  const lo = Math.min(start, end);
+  const hi = Math.max(start, end);
+  const between = new Set(ys.filter((y) => y > lo + 0.5 && y < hi - 0.5).map((y) => Math.round(y * 2)));
+  const trail = ys.map(Math.round).join(' ');
+  expect(between.size, `places between start and end: ${trail}`).toBeGreaterThanOrEqual(frames);
+  expect(
+    ys.every((y) => y > lo - 1 && y < hi + 1),
+    `never outside its start and end: ${trail}`,
+  ).toBe(true);
+}

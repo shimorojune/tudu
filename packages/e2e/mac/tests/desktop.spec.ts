@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { HOLD_PORT } from '../playwright.config';
+import { expectGlides, expectLands, type Frame } from '../../fixtures/motion';
 import {
   alive,
   API,
@@ -1431,5 +1432,77 @@ test.describe('the look', () => {
     } finally {
       await web.down();
     }
+  });
+});
+
+test.describe('a drop on the other day', () => {
+  test('C02-D01 two days in the real app: a task let go over tomorrow glides onto its new row and the row under the gap glides up', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const space = await personal(app);
+    await addToday(app, space.id, ['Pay the electricity bill', 'Call Sam at 3pm', 'Book car service']);
+    await go(app, await app.eval<string>(`return location.pathname`));
+    await app.until(`return T.all('button', 'Book car service').length > 0`, 'main', 15_000);
+    // the glide is what is under test: this Mac must not be asking for less motion
+    expect(
+      await app.eval(
+        `return matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.dataset.motion === 'less'`,
+      ),
+    ).toBe(false);
+    await app.eval(`T.click(T.get('button', '2 days'))`);
+    await app.until(
+      `const s = document.querySelector('.tp-spread-second');
+       return !!s && s.classList.contains('tp-on') && !s.classList.contains('tp-moving')`,
+    );
+    // Pick the middle row up, carry it over tomorrow's list, let go, and read every frame until rest.
+    const frames = await app.eval<Frame<'card' | 'row' | 'below'>[]>(`
+      const [sun, mon] = [...document.querySelectorAll('[role=list][aria-label^="Tasks for "]')];
+      const rows = [...sun.querySelectorAll('[data-reorder]')];
+      const moved = rows[1], below = rows[2];
+      const key = moved.getAttribute('data-key');
+      const fire = (target, type, x, y) =>
+        target.dispatchEvent(new PointerEvent(type, {
+          bubbles: true, cancelable: true, view: window, button: 0, buttons: type === 'pointerup' ? 0 : 1,
+          pointerId: 1, pointerType: 'mouse', isPrimary: true, clientX: x, clientY: y,
+        }));
+      const next = () => new Promise((r) => requestAnimationFrame(r));
+      const from = moved.getBoundingClientRect();
+      const to = mon.getBoundingClientRect();
+      const x0 = from.left + 120, y0 = from.top + from.height / 2;
+      const x1 = to.left + 120, y1 = to.top + 8;
+      fire(moved.querySelector('.tp-strike'), 'pointerdown', x0, y0);
+      fire(window, 'pointermove', x0, y0 + 6);
+      for (let i = 1; i <= 12; i++) {
+        fire(window, 'pointermove', x0 + ((x1 - x0) * i) / 12, y0 + 6 + ((y1 - y0 - 6) * i) / 12);
+        await next();
+      }
+      if (!mon.classList.contains('tp-drop-on')) throw new Error('tomorrow never took the row');
+      const box = (el) => {
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { x: r.x, y: r.y, width: r.width, height: r.height, hidden: getComputedStyle(el).visibility === 'hidden' };
+      };
+      const read = () => ({
+        card: box(document.querySelector('.tp-drag-ghost')),
+        row: box(mon.querySelector('[data-reorder][data-key="' + key + '"]')),
+        below: box(below),
+      });
+      const frames = [read()];
+      fire(window, 'pointerup', x1, y1);
+      const end = performance.now() + 900;
+      while (performance.now() < end) {
+        await next();
+        frames.push(read());
+      }
+      return frames;`);
+    expectLands(frames);
+    expectGlides(frames.map((f) => f.below!.y));
+    expect(
+      await app.eval(
+        `return [...document.querySelectorAll('[role=list][aria-label^="Tasks for "]')].map((l) =>
+           [...l.querySelectorAll('[data-reorder] .tp-strike')].map((t) => t.textContent))`,
+      ),
+    ).toEqual([['Pay the electricity bill', 'Book car service'], ['Call Sam at 3pm']]);
   });
 });

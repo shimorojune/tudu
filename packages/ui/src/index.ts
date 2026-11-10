@@ -151,7 +151,17 @@ export { TaskList, FRESH_MS, type TaskListProps, type TaskItem, type TaskMove } 
 export { AddTask, type AddTaskProps } from './components/AddTask';
 export { DatePop, DATEPOP_LEAVE_MS, type DatePopProps } from './components/DatePop';
 export { Spread, SpreadPage, SPREAD_MS, type SpreadProps, type SpreadPageProps } from './components/Spread';
-export { useReorder, useDropGroup, moveItem, itemByKey, DRAG_START_PX, TOUCH_HOLD_MS } from './lib/reorder';
+export {
+  useReorder,
+  useDropGroup,
+  moveItem,
+  itemByKey,
+  isFlying,
+  stopFlight,
+  DRAG_START_PX,
+  TOUCH_HOLD_MS,
+  FLIGHT_MS,
+} from './lib/reorder';
 export { openRow, closeRow, dropFlash, settleFrom, easeArrive, bezier } from './lib/motion';
 
 // Task detail (chunk 03)

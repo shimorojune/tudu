@@ -1,7 +1,9 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { cx } from '../lib/cx';
 import { useControllable } from '../lib/hooks';
 import { Icon } from '../lib/icons';
+import { closeRow } from '../lib/motion';
+import { isFlying } from '../lib/reorder';
 
 export interface WeekDayProps {
   /** `tile`: a small sheet in the desk's grid. `section`: a day that folds, on tablets and phones. */
@@ -39,7 +41,8 @@ export interface WeekDayProps {
  * One day of the week. On the desk a tile: a small sheet with the day's header and a list that scrolls inside it.
  * On tablets and phones a section of one sheet: tapping its header turns the chevron and folds the list open by its
  * real height, and shut again; the one-line preview shows while it is shut. The week has no writing line: an empty
- * day says "Nothing planned" and still takes a dropped task.
+ * day says "Nothing planned" and still takes a dropped task. When a task is dropped on an empty day that line folds
+ * away under it; when a drop takes a day's last task the line comes in after the gap has folded.
  */
 export function WeekDay({
   variant = 'section',
@@ -64,6 +67,25 @@ export function WeekDay({
   const tile = variant === 'tile';
   const [own, setOwn] = useControllable(openProp, defaultOpen);
   const open = tile ? true : own;
+  // The empty line around a drop from or onto this day (see lib/reorder's hand-over).
+  const [wasEmpty, setWasEmpty] = useState(!!empty);
+  const [none, setNone] = useState<'out' | 'in' | null>(null);
+  const noneRef = useRef<HTMLParagraphElement | null>(null);
+  if (!!empty !== wasEmpty) {
+    setWasEmpty(!!empty);
+    setNone(isFlying() ? (empty ? 'in' : 'out') : null);
+  }
+  useLayoutEffect(() => {
+    if (none !== 'out') return;
+    let live = true;
+    closeRow(noneRef.current, () => {
+      if (live) setNone(null);
+    });
+    return () => {
+      live = false;
+    };
+  }, [none]);
+  const leaving = !empty && none === 'out';
   const toggle = () => {
     const next = !open;
     setOwn(next);
@@ -83,7 +105,16 @@ export function WeekDay({
   );
   const body = (
     <div className="tp-wd-body">
-      {empty ? <p className="tp-wd-none">{emptyText}</p> : null}
+      {empty || leaving ? (
+        <p
+          key={leaving ? 'leaving' : 'none'}
+          ref={noneRef}
+          className={cx('tp-wd-none', empty && none === 'in' && 'tp-wd-none-in')}
+          aria-hidden={leaving ? 'true' : undefined}
+        >
+          {emptyText}
+        </p>
+      ) : null}
       {children}
     </div>
   );

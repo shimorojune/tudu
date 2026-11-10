@@ -5,7 +5,8 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react';
-import { settleFrom } from './motion';
+import { prefersReducedMotion } from './hooks';
+import { dropFlash, easeSettle, foldGap, settleFrom } from './motion';
 
 /**
  * Reordering by drag, as the Tudu Paper design system does it. Drag the grip that fades into the left margin on
@@ -16,7 +17,8 @@ import { settleFrom } from './motion';
  *
  * Lists that share a `group` (the two days side by side) accept each other's rows: over another list the row
  * travels as a lifted copy on a layer above the page, that list washes faintly with a thin ink line where it will
- * land, and letting go hands the row over.
+ * land, and letting go hands the row over: the copy straightens and glides into the gap that opens for it, the list
+ * it left folds its gap shut, and the row washes once where it landed.
  */
 
 export const DRAG_START_PX = 4;
@@ -30,6 +32,111 @@ interface GroupEntry {
 }
 
 const GROUPS: Record<string, GroupEntry[]> = {};
+
+/** How long the lifted copy takes to glide into its new list (dur-fold). */
+export const FLIGHT_MS = 300;
+/** A hand-over whose row never shows up in the other list (the move was refused, the list went away) ends here. */
+export const FLIGHT_CAP_MS = 600;
+/** How long the ink line and the list's wash take to fade after a drop. */
+export const DROP_FADE_MS = 120;
+
+/** A row on its way from one list to another: the lifted copy outlives the drag until it lands. */
+interface Flight {
+  key: string;
+  ghost: HTMLElement;
+  /** The copy's translate when it was let go. */
+  x: number;
+  y: number;
+  /** The gap it leaves, until the list it left has rendered without the row. */
+  from: { c: HTMLElement; h: number; afterKey: string | null } | null;
+  /** The row it lands on, hidden under the copy until then. */
+  row: HTMLElement | null;
+  raf: number;
+  timer: ReturnType<typeof setTimeout>;
+  stopFold: (() => void) | null;
+}
+
+let flight: Flight | null = null;
+
+/** True while a dropped row is gliding into another list. */
+export function isFlying(): boolean {
+  return !!flight;
+}
+
+/** Finish a hand-over at once: the copy goes, the row shows, the gap is shut. Safe to call any time. */
+export function stopFlight(): void {
+  const f = flight;
+  if (!f) return;
+  flight = null;
+  cancelAnimationFrame(f.raf);
+  clearTimeout(f.timer);
+  f.ghost.remove();
+  if (f.row) f.row.style.visibility = '';
+  f.stopFold?.();
+}
+
+function startFlight(
+  key: string,
+  ghost: HTMLElement,
+  x: number,
+  y: number,
+  from: NonNullable<Flight['from']>,
+): void {
+  stopFlight();
+  ghost.classList.add('tp-flying');
+  flight = {
+    key,
+    ghost,
+    x,
+    y,
+    from,
+    row: null,
+    raf: 0,
+    stopFold: null,
+    timer: setTimeout(stopFlight, FLIGHT_CAP_MS),
+  };
+}
+
+/**
+ * The list a row was dropped on has rendered it as `el`: glide the lifted copy onto it. The row stays hidden under
+ * the copy until it lands, then shows with the wash. The row's box is read every frame, so the glide stays true
+ * while its gap opens or its list scrolls it into view.
+ */
+export function landFlight(el: HTMLElement): void {
+  const f = flight;
+  if (!f || f.row || f.key !== el.getAttribute('data-key')) return;
+  f.row = el;
+  el.style.visibility = 'hidden';
+  const g = f.ghost;
+  // measured straight, then tilted again until the first frame
+  g.style.transform = `translate(${f.x}px, ${f.y}px)`;
+  const r0 = g.getBoundingClientRect();
+  g.style.transform = `translate(${f.x}px, ${f.y}px) rotate(-0.6deg)`;
+  let t0 = 0;
+  const frame = (now: number) => {
+    if (flight !== f) return;
+    if (!el.isConnected) {
+      stopFlight();
+      return;
+    }
+    if (!t0) t0 = now;
+    const q = Math.min(1, (now - t0) / FLIGHT_MS);
+    if (q >= 1) {
+      stopFlight();
+      dropFlash(el);
+      return;
+    }
+    const e = easeSettle(q);
+    const r = el.getBoundingClientRect();
+    const x = f.x + (r.left - r0.left) * e;
+    const y = f.y + (r.top - r0.top) * e;
+    g.style.transform = `translate(${x}px, ${y}px) rotate(${-0.6 * (1 - e)}deg)`;
+    f.raf = requestAnimationFrame(frame);
+  };
+  f.raf = requestAnimationFrame(frame);
+  clearTimeout(f.timer);
+  f.timer = setTimeout(stopFlight, FLIGHT_MS + FLIGHT_CAP_MS);
+}
 
 /** Join a drop group: rows dragged over `el` from another list in the group land here through `insert`. */
 export function useDropGroup(
@@ -134,10 +241,17 @@ export function useReorder(
     move.current = onMove;
   });
 
-  // After a reorder the row renders in its new slot; glide it there from where it was dropped.
+  // After a reorder the row renders in its new slot; glide it there from where it was dropped. And when a row
+  // of this list was dropped on another one, fold the gap it left as soon as this list renders without it.
   useLayoutEffect(() => {
-    const f = flip.current;
     const c = containerRef.current;
+    const gone = flight?.from;
+    if (flight && gone && c && gone.c === c && !itemByKey(c, flight.key)) {
+      flight.from = null;
+      const next = gone.afterKey ? itemByKey(c, gone.afterKey) : null;
+      flight.stopFold = foldGap(next ?? c, next ? 'marginTop' : 'paddingBottom', gone.h);
+    }
+    const f = flip.current;
     if (!f || !c) return;
     flip.current = null;
     const el = itemByKey(c, f.key);
@@ -154,10 +268,24 @@ export function useReorder(
 
   function clearTarget(s: DragState) {
     if (s.target) {
-      s.target.el.classList.remove('tp-drop-on');
+      s.target.el.classList.remove('tp-drop-on', 'tp-drop-off');
       s.target.el.querySelector(':scope > .tp-drop-line')?.remove();
     }
     s.target = null;
+  }
+
+  /** After a drop the list's wash and the ink line fade instead of vanishing. */
+  function fadeTarget(s: DragState) {
+    const el = s.target?.el;
+    s.target = null;
+    if (!el) return;
+    el.classList.add('tp-drop-off');
+    setTimeout(() => {
+      // a new drag over this list in the meantime took the fade back
+      if (!el.classList.contains('tp-drop-off')) return;
+      el.classList.remove('tp-drop-on', 'tp-drop-off');
+      el.querySelector(':scope > .tp-drop-line')?.remove();
+    }, DROP_FADE_MS);
   }
 
   function findTarget(s: DragState, x: number, y: number): GroupEntry | null {
@@ -215,6 +343,8 @@ export function useReorder(
 
   function begin(s: DragState) {
     if (s.active) return;
+    // a row still gliding from the last drop lands at once, so this drag measures a settled page
+    stopFlight();
     s.active = true;
     dragging = true;
     s.list = items(s.c);
@@ -310,6 +440,7 @@ export function useReorder(
           if (s.target !== tgt) {
             clearTarget(s);
             s.target = tgt;
+            tgt.el.classList.remove('tp-drop-off');
             tgt.el.classList.add('tp-drop-on');
             s.list.forEach((n, j) => {
               if (j !== s.from) n.style.transform = '';
@@ -364,6 +495,19 @@ export function useReorder(
           const at = s.dropAt;
           resetRows();
           swallowNextClick();
+          const ghost = s.ghost;
+          if (ghost && !prefersReducedMotion()) {
+            // The copy outlives the drag: it glides onto the row once the other list has rendered it.
+            let after = s.item.nextElementSibling;
+            while (after && !after.hasAttribute('data-reorder')) after = after.nextElementSibling;
+            s.ghost = undefined;
+            fadeTarget(s);
+            startFlight(s.item.getAttribute('data-key') ?? '', ghost, s.dx + s.gx, s.dy + s.gy, {
+              c: s.c,
+              h: s.h,
+              afterKey: after?.getAttribute('data-key') ?? null,
+            });
+          }
           cleanup(s);
           tgt.insert(s.item, at);
           return;

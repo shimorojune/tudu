@@ -1,6 +1,18 @@
 import type { Locator, Page } from '@playwright/test';
 import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
-import { dayList, drag, fixClock, idle, ring, row, rowsOf, titlesOf, writeTasks } from '../../fixtures/today';
+import { expectFolds, expectGlides, expectLands, sampleBoxes } from '../../fixtures/motion';
+import {
+  carry,
+  dayList,
+  drag,
+  fixClock,
+  idle,
+  ring,
+  row,
+  rowsOf,
+  titlesOf,
+  writeTasks,
+} from '../../fixtures/today';
 import {
   WEDNESDAY,
   backlogList,
@@ -548,5 +560,122 @@ test.describe('week', () => {
       'aria-checked',
       'true',
     );
+  });
+});
+
+/** The key a row is known by in every list it visits. */
+const keyOf = async (list: Locator, title: string) => (await row(list, title).getAttribute('data-key'))!;
+
+test.describe('week, a drop on another day, with motion', () => {
+  // The rest of the suite runs with reduced motion; these are about what moves after the drop, and how.
+  test.use({ contextOptions: { reducedMotion: 'no-preference' } });
+
+  test.beforeEach(async ({ page }) => {
+    test.skip(!desktop(), 'dragging between tiles is the desk');
+    await fixClock(page);
+  });
+
+  test('C05-E16 tile to tile and onto the empty Backlog: the card glides onto its row, the rows it left glide shut, the empty line folds away, the counts follow', async ({
+    page,
+  }) => {
+    await fixClock(page, WEDNESDAY);
+    await signInFresh(page);
+    await writeTasks(page, THREE);
+    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
+    await idle(page);
+    await goWeek(page);
+    const wed = tileList(page, 'Wednesday 14 October');
+    const moved = await keyOf(wed, 'Call Sam at 3pm');
+    const below = await keyOf(wed, 'Book car service');
+    await expect(nothing(page, 'Thursday 15 October', 'Nothing planned')).toBeVisible();
+
+    // Wednesday to Thursday, an empty day
+    await carry(page, row(wed, 'Call Sam at 3pm'), await dropPoint(page, 'Thursday 15 October'));
+    await expect(tile(page, 'Thursday 15 October').locator('.tp-list')).toHaveClass(/tp-drop-on/);
+    let frames = await sampleBoxes(
+      page,
+      {
+        card: '.tp-drag-ghost',
+        row: `[aria-label="Tasks for Thursday 15 October"] [data-reorder][data-key="${moved}"]`,
+        below: `[aria-label="Tasks for Wednesday 14 October"] [data-reorder][data-key="${below}"]`,
+        none: 'section[aria-label="Thursday 15 October"] .tp-wd-none',
+      },
+      () => page.mouse.up(),
+    );
+    expectLands(frames);
+    expectGlides(frames.map((f) => f.below!.y));
+    // "Nothing planned" folds shut under the arriving row, then leaves the page
+    expectFolds(frames.map((f) => f.none?.height ?? 0));
+    expect(frames[frames.length - 1]!.none).toBeNull();
+    await expect.poll(() => titlesOf(tileList(page, 'Thursday 15 October'))).toEqual(['Call Sam at 3pm']);
+    await expect(tileCount(page, 'Today, Wednesday 14 October')).toHaveText('2 tasks');
+    await expect(tileCount(page, 'Thursday 15 October')).toHaveText('1 task');
+
+    // Thursday's only task onto the empty Backlog: Thursday is empty again, its line comes back
+    await expect(nothing(page, 'Backlog', 'Nothing waiting')).toBeVisible();
+    await carry(
+      page,
+      row(tileList(page, 'Thursday 15 October'), 'Call Sam at 3pm'),
+      await dropPoint(page, 'Backlog'),
+    );
+    await expect(tile(page, 'Backlog').locator('.tp-list')).toHaveClass(/tp-drop-on/);
+    frames = await sampleBoxes(
+      page,
+      {
+        card: '.tp-drag-ghost',
+        row: `[aria-label="Tasks in the Backlog"] [data-reorder][data-key="${moved}"]`,
+        below: 'section[aria-label="Thursday 15 October"] .tp-list',
+        none: 'section[aria-label="Backlog"] .tp-wd-none',
+      },
+      () => page.mouse.up(),
+    );
+    expectLands(frames);
+    expectFolds(frames.map((f) => f.none?.height ?? 0));
+    await expect.poll(() => titlesOf(backlogList(page))).toEqual(['Call Sam at 3pm']);
+    await expect(nothing(page, 'Thursday 15 October', 'Nothing planned')).toBeVisible();
+    await expect(tileCount(page, 'Backlog')).toHaveText('1 task');
+    await expect(page.locator('.tp-drag-ghost, .tp-drop-line, .tp-drop-on')).toHaveCount(0);
+    await idle(page);
+    expect(await serverDay(page, null)).toEqual(['Call Sam at 3pm']);
+    expect(await serverDay(page, '2026-10-15')).toEqual([]);
+  });
+
+  test('C05-E17 a very full tile: a row dropped at its lower edge is scrolled into view and the card lands on it', async ({
+    page,
+  }) => {
+    await signInFresh(page);
+    const twelve = Array.from({ length: 12 }, (_, i) => `Task number ${i + 1}`);
+    await writeTasks(page, twelve);
+    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
+    await quickAdd(page, 'Renew passport', async (b) => {
+      await b.getByRole('button', { name: 'Planned for: Today' }).click();
+      await b.locator('.tp-qa-pop').getByRole('button', { name: 'Backlog' }).click();
+    });
+    await idle(page);
+    await goWeek(page);
+    const moved = await keyOf(backlogList(page), 'Renew passport');
+    const body = tile(page, SUNDAY_TILE).locator('.tp-wd-body');
+    expect(await body.evaluate((el) => el.scrollHeight > el.clientHeight && el.scrollTop === 0)).toBe(true);
+    const edge = (await body.boundingBox())!;
+    await carry(page, row(backlogList(page), 'Renew passport'), {
+      x: edge.x + Math.min(120, edge.width / 2),
+      y: edge.y + edge.height - 4,
+    });
+    await expect(tile(page, SUNDAY_TILE).locator('.tp-list')).toHaveClass(/tp-drop-on/);
+    const frames = await sampleBoxes(
+      page,
+      {
+        card: '.tp-drag-ghost',
+        row: `[aria-label="Tasks for ${SUNDAY_LIST}"] [data-reorder][data-key="${moved}"]`,
+      },
+      () => page.mouse.up(),
+    );
+    expectLands(frames);
+    await expect(rowsOf(tileList(page, SUNDAY_LIST))).toHaveCount(13);
+    // the whole row is inside the tile's body at rest
+    const at = frames[frames.length - 1]!.row!;
+    const view = (await body.boundingBox())!;
+    expect(at.y).toBeGreaterThanOrEqual(view.y - 1);
+    expect(at.y + at.height).toBeLessThanOrEqual(view.y + view.height + 1);
   });
 });

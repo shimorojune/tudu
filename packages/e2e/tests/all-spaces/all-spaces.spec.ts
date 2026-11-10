@@ -12,7 +12,20 @@ import {
   switchTo,
   switcher,
 } from '../../fixtures/spaces';
-import { dayList, drag, fixClock, idle, ring, row, rowsOf, SUNDAY, titlesOf } from '../../fixtures/today';
+import { expectGlides, expectLands, sampleBoxes } from '../../fixtures/motion';
+import {
+  carry,
+  dayList,
+  drag,
+  fixClock,
+  idle,
+  ring,
+  row,
+  rowsOf,
+  SUNDAY,
+  titlesOf,
+  twoDays,
+} from '../../fixtures/today';
 
 const phone = () => test.info().project.name === 'phone';
 const tablet = () => test.info().project.name === 'tablet';
@@ -974,5 +987,48 @@ test.describe('all spaces', () => {
     const backlog = await goBacklog(page);
     await openAndClose(page, backlog, 'Sort the attic');
     await openAndClose(page, backlog, 'Sort the attic');
+  });
+});
+
+test.describe('all spaces, a drop on the other day, with motion', () => {
+  // The rest of the suite runs with reduced motion; this is about what moves after the drop, and how.
+  test.use({ contextOptions: { reducedMotion: 'no-preference' } });
+
+  test('C21-E28 two days: a Northwind task dropped on tomorrow glides there, keeps its pill, and is on tomorrow in Northwind', async ({
+    page,
+    browser,
+  }) => {
+    test.skip(phone() || tablet(), 'two days side by side is the desk');
+    await fixClock(page);
+    const w = await world(page, browser);
+    await goAll(page);
+    const sunday = allDay(page);
+    await expect.poll(() => titlesOf(sunday)).toEqual(ALL_SUNDAY);
+    const monday = await twoDays(page);
+    const moved = (await row(sunday, 'Review the Northwind roadmap').getAttribute('data-key'))!;
+    const below = (await row(sunday, 'Order seed for the north field').getAttribute('data-key'))!;
+    const box = (await monday.locator('.tp-list').boundingBox())!;
+    await carry(page, row(sunday, 'Review the Northwind roadmap'), { x: box.x + 120, y: box.y + 8 });
+    await expect(monday.locator('.tp-list')).toHaveClass(/tp-drop-on/);
+    const frames = await sampleBoxes(
+      page,
+      {
+        card: '.tp-drag-ghost',
+        row: `[aria-label="Tasks for Monday 19 October"] [data-reorder][data-key="${moved}"]`,
+        below: `[aria-label="Tasks for Sunday 18 October"] [data-reorder][data-key="${below}"]`,
+      },
+      () => page.mouse.up(),
+    );
+    expectLands(frames);
+    expectGlides(frames.map((f) => f.below!.y));
+    const tomorrow = dayList(page, 'Tasks for Monday 19 October');
+    await expect.poll(() => titlesOf(tomorrow)).toEqual(['Review the Northwind roadmap']);
+    await expect(pill(tomorrow, 'Review the Northwind roadmap', 'Northwind')).toBeVisible();
+    await expect(pill(sunday, 'Order seed for the north field', 'Pilot Farm')).toBeVisible();
+    await idle(page);
+    expect((await dayOf(page, w.nw.id, '2026-10-19')).map((t) => t.title)).toEqual([
+      'Review the Northwind roadmap',
+    ]);
+    expect((await dayOf(page, w.nw.id)).map((t) => t.title)).not.toContain('Review the Northwind roadmap');
   });
 });

@@ -29,6 +29,9 @@ export function bezier(x1: number, y1: number, x2: number, y2: number): (x: numb
 /** ease-arrive */
 export const easeArrive = bezier(0.2, 0.7, 0.2, 1);
 
+/** ease-settle */
+export const easeSettle = bezier(0.25, 0.8, 0.25, 1);
+
 /** The box that scrolls a list: the sheet body or the page's scroll column. */
 export function scrollerOf(el: Element): HTMLElement | null {
   for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) {
@@ -118,6 +121,39 @@ export function closeRow(el: HTMLElement | null, done: () => void): void {
     else done();
   };
   requestAnimationFrame(frame);
+}
+
+/**
+ * A row left this list for another one: the gap it leaves folds shut instead of snapping (240ms, ease-arrive, as a
+ * row that leaves). `el` is the row that moved up into the gap (`marginTop`) or, when the last row left, the list
+ * itself (`paddingBottom`). It starts `h` lower and eases to nothing; being layout, everything under it follows.
+ * Returns a function that finishes at once.
+ */
+export function foldGap(el: HTMLElement, side: 'marginTop' | 'paddingBottom', h: number): () => void {
+  if (prefersReducedMotion() || h < 1) return () => {};
+  const dur = 240;
+  let t0 = 0;
+  let raf = 0;
+  let done = false;
+  el.style[side] = `${h}px`;
+  const frame = (now: number) => {
+    if (!t0) t0 = now;
+    const q = Math.min(1, (now - t0) / dur);
+    if (q < 1) {
+      el.style[side] = `${h * (1 - easeArrive(q))}px`;
+      raf = requestAnimationFrame(frame);
+    } else {
+      el.style[side] = '';
+      done = true;
+    }
+  };
+  raf = requestAnimationFrame(frame);
+  return () => {
+    if (done) return;
+    done = true;
+    cancelAnimationFrame(raf);
+    el.style[side] = '';
+  };
 }
 
 const dropTimers = new WeakMap<Element, ReturnType<typeof setTimeout>>();

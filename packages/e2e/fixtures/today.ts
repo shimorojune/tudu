@@ -69,8 +69,8 @@ export function ring(page: Page, name: string | RegExp): Locator {
   return page.getByRole('img', { name });
 }
 
-/** Drag with the mouse from one element to a point, in small steps, as a person does. */
-export async function drag(page: Page, from: Locator, to: { x: number; y: number }): Promise<void> {
+/** Pick a row up and carry it to a point, in small steps, without letting go: `page.mouse.up()` drops it. */
+export async function carry(page: Page, from: Locator, to: { x: number; y: number }): Promise<void> {
   const box = (await from.boundingBox())!;
   const x = box.x + Math.min(120, box.width / 2);
   const y = box.y + box.height / 2;
@@ -78,5 +78,20 @@ export async function drag(page: Page, from: Locator, to: { x: number; y: number
   await page.mouse.down();
   await page.mouse.move(x, y + 6, { steps: 2 });
   await page.mouse.move(to.x, to.y, { steps: 12 });
+}
+
+/** Drag with the mouse from one element to a point, in small steps, as a person does. */
+export async function drag(page: Page, from: Locator, to: { x: number; y: number }): Promise<void> {
+  await carry(page, from, to);
   await page.mouse.up();
+}
+
+/** Show two days side by side (the desk) and wait for the second page to finish sliding out. */
+export async function twoDays(page: Page): Promise<Locator> {
+  await page.getByRole('group', { name: 'Days to show' }).getByRole('button', { name: '2 days' }).click();
+  const second = page.getByRole('region', { name: 'The second day' });
+  await expect(second).toBeVisible();
+  await expect(page.locator('.tp-spread-second')).toHaveClass(/tp-on/);
+  await expect(page.locator('.tp-spread-second')).not.toHaveClass(/tp-moving/);
+  return second;
 }
