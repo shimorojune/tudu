@@ -8,6 +8,8 @@ import {
   feedbackReportSchema,
   issueTitle,
   shotCanBePublic,
+  similarReady,
+  type SimilarIssues,
   type FeedbackIssue,
   type FeedbackReport,
   type FeedbackSent,
@@ -15,8 +17,10 @@ import {
 } from '@tudu/core';
 import { and, count, desc, eq, gt, like, schema, type Db } from '@tudu/db';
 import type { Mail, Mailer } from '../email';
+import type { Embeddings } from '../closeMatches';
 import { fileReport } from '../feedback/filing';
 import type { IssueTracker } from '../feedback/github';
+import { searchSimilarIssues, SimilarUnavailable, type IssueMirror } from '../feedback/issueMirror';
 import { shotSigMatches, type ShotLinks } from '../feedback/shots';
 import { cleanFileName } from '../files';
 import { requireSession, type SessionVars } from '../middleware/session';
@@ -25,6 +29,10 @@ import type { Storage } from '../storage';
 const HOUR_MS = 60 * 60 * 1000;
 /** Your reports lists this many, newest first. */
 export const MY_REPORTS_MAX = 20;
+/** Similar looks one person may make in a minute (the form looks once per pause in typing). */
+export const SIMILAR_PER_MINUTE = 30;
+/** What a +1 to an issue that can't take one answers: the words stay, and it can go as a new report. */
+export const CANT_PLUS_ONE = 'That issue can’t take comments now. Send it as a new report instead.';
 
 /** The mail to whoever reads reports: the words first, then who sent it and the details; the screenshot attached. */
 export function feedbackMail(x: {
@@ -38,13 +46,14 @@ export function feedbackMail(x: {
 }): Mail {
   const first = x.report.text.split('\n')[0]!.trim();
   const gist = first.length > 60 ? `${first.slice(0, 59)}…` : first;
+  const plusOne = x.report.plusOneOf;
   const details = x.report.details
     ? feedbackDetailsLines(x.report.details)
     : ['No app details: they switched them off.'];
   return {
     to: x.to,
     replyTo: x.from.email,
-    subject: `${x.report.kind === 'bug' ? 'Something’s wrong' : 'An idea'}: ${gist}`,
+    subject: `${plusOne ? `+1 on #${plusOne}` : x.report.kind === 'bug' ? 'Something’s wrong' : 'An idea'}: ${gist}`,
     text: [
       x.report.text,
       '',
@@ -54,10 +63,15 @@ export function feedbackMail(x: {
       x.shot
         ? `Screenshot: ${x.shot.name} (attached, ${x.shot.public ? 'shown on the issue' : 'private'})`
         : 'No screenshot.',
+      ...(plusOne ? [`+1 on #${plusOne} (${x.report.kind === 'bug' ? 'something’s wrong' : 'an idea'})`] : []),
       ...(x.issue === 'pending'
-        ? ['GitHub issue: waiting for GitHub; it is filed later.']
+        ? [
+            plusOne
+              ? 'GitHub comment: waiting for GitHub; it is posted later.'
+              : 'GitHub issue: waiting for GitHub; it is filed later.',
+          ]
         : x.issue
-          ? [`GitHub issue: #${x.issue.number} ${x.issue.url}`]
+          ? [plusOne ? `GitHub comment: ${x.issue.url}` : `GitHub issue: #${x.issue.number} ${x.issue.url}`]
           : []),
       `Report ${x.report.id}`,
     ].join('\n'),
@@ -89,8 +103,37 @@ export function feedbackRoutes(
   to: string | undefined,
   tracker: IssueTracker | null = null,
   shots?: ShotLinks,
+  similar: { mirror?: IssueMirror | null; embeddings?: Embeddings } = {},
 ) {
   const r = new Hono<{ Variables: SessionVars }>();
+  const mirror = tracker ? (similar.mirror ?? null) : null;
+  const looks = new Map<string, number[]>();
+
+  // Similar reports (#76): existing issues, open and closed, that mean what is being typed. Only with GitHub
+  // filing; 503 when it can't tell, so an empty list always means "nothing similar".
+  if (mirror && similar.embeddings) {
+    const embeddings = similar.embeddings;
+    r.get('/feedback/similar', requireSession, async (c) => {
+      const user = c.get('session')!.user;
+      const q = c.req.query('q') ?? '';
+      if (!similarReady(q)) return c.json({ issues: [] } satisfies SimilarIssues, 200);
+      const now = Date.now();
+      const recent = (looks.get(user.id) ?? []).filter((t) => t > now - 60_000);
+      if (recent.length >= SIMILAR_PER_MINUTE) {
+        looks.set(user.id, recent);
+        return c.json({ error: 'That’s a lot of looks in a minute. Try again shortly.' }, 429);
+      }
+      recent.push(now);
+      looks.set(user.id, recent);
+      try {
+        const issues = await searchSimilarIssues(db, embeddings, mirror, user.id, q);
+        return c.json({ issues } satisfies SimilarIssues, 200);
+      } catch (err) {
+        if (err instanceof SimilarUnavailable) return c.json({ error: err.message }, 503);
+        throw err;
+      }
+    });
+  }
 
   // A screenshot its sender chose to show on the public issue, for GitHub's image proxy: no session, only the
   // signed link. Anything else (unknown, unsigned, private, gone) is the same 404, so a link can't be probed.
@@ -126,12 +169,16 @@ export function feedbackRoutes(
       .where(eq(schema.feedback.userId, user.id))
       .orderBy(desc(schema.feedback.createdAt))
       .limit(MY_REPORTS_MAX);
+    const titles = mirror
+      ? await mirror.titleOf([...new Set(rows.flatMap((x) => (x.plusOneOf != null ? [x.plusOneOf] : [])))])
+      : new Map<number, string>();
     const out: MyReports = {
       filing: tracker ? 'github' : 'email',
       reports: rows.map((row) => ({
         id: row.id,
         kind: row.kind,
-        title: issueTitle(row.text),
+        plusOneOf: row.plusOneOf,
+        title: (row.plusOneOf != null ? titles.get(row.plusOneOf) : undefined) ?? issueTitle(row.text),
         createdAt: row.createdAt.toISOString(),
         state: row.issueState,
         issue: sentOf(row).issue,
@@ -189,6 +236,10 @@ export function feedbackRoutes(
         429,
       );
 
+    // A +1 goes on an issue the mirror knows and that isn't locked; anything else is said before anything is saved.
+    if (report.plusOneOf != null && (!tracker || !mirror || !(await mirror.canTakePlusOne(report.plusOneOf))))
+      return c.json({ error: CANT_PLUS_ONE }, 409);
+
     const id = randomUUID();
     let shot: { name: string; type: string; body: Uint8Array; key: string; public: boolean } | null = null;
     if (file && file.size) {
@@ -211,6 +262,7 @@ export function feedbackRoutes(
         screenshotKey: shot?.key ?? null,
         screenshotPublic: shot?.public ?? false,
         issueState: tracker ? 'pending' : 'none',
+        plusOneOf: report.plusOneOf,
       })
       .onConflictDoNothing()
       .returning({ id: schema.feedback.id });
@@ -226,7 +278,14 @@ export function feedbackRoutes(
 
     let sent: FeedbackSent = { id, issue: null, pending: false };
     if (tracker) {
-      const out = await fileReport(db, tracker, id, { quiet: true, shots });
+      const out = await fileReport(db, tracker, id, { quiet: true, shots, mirror, refuse: true });
+      if (out.state === 'refused') {
+        // GitHub won't take it on that issue (locked or gone since the mirror read it): nothing is kept, so the
+        // person can send the same words as a new report.
+        await db.delete(schema.feedback).where(eq(schema.feedback.id, id));
+        if (shot) await storage.delete(shot.key).catch(() => {});
+        return c.json({ error: CANT_PLUS_ONE }, 409);
+      }
       sent =
         out.state === 'filed'
           ? { id, issue: out.issue, pending: false }

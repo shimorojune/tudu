@@ -71,6 +71,7 @@ function report(over: Partial<FeedbackReport> = {}): FeedbackReport {
     text: 'The tick did not stick.\nIt came back after a reload.',
     details: DETAILS,
     shotPublic: false,
+    plusOneOf: null,
     ...over,
   };
 }

@@ -592,12 +592,43 @@ export const feedback = pgTable(
     issueAttempts: integer('issue_attempts').notNull().default(0),
     /** When a request or the sweep last took it to file, so two never file it at once. */
     issueClaimedAt: timestamp('issue_claimed_at', { withTimezone: true }),
+    /**
+     * "+1 that one instead" (#76): the issue this report joins as a comment. Once filed, `issue_number` is that issue
+     * and `issue_url` the comment. Cleared if GitHub refuses it for good in the sweep and it is filed as new instead.
+     */
+    plusOneOf: integer('plus_one_of'),
   },
   (t) => [
     uniqueIndex('feedback_report').on(t.userId, t.reportId),
     index('feedback_user_created').on(t.userId, t.createdAt),
     index('feedback_issue_pending').on(t.issueState, t.issueClaimedAt),
   ],
+);
+
+/**
+ * The public GitHub issues reports go to, mirrored every few minutes (#76), so the feedback form can offer the ones
+ * that mean what is being typed: open and closed, never pull requests. `body_text` is the words only (no app footer,
+ * no images); the vector is made from the title and it, like a task's.
+ */
+export const githubIssues = pgTable(
+  'github_issues',
+  {
+    number: integer('number').primaryKey(),
+    title: text('title').notNull(),
+    bodyText: text('body_text').notNull().default(''),
+    state: text('state', { enum: ['open', 'closed'] }).notNull(),
+    /** GitHub's: `completed`, `not_planned`, `reopened`, `duplicate`, or none. */
+    stateReason: text('state_reason'),
+    locked: boolean('locked').notNull().default(false),
+    url: text('url').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    /** GitHub's last change, where the next sync starts from. */
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+    embedding: vector('embedding', { dimensions: EMBEDDING_DIMENSIONS }),
+    embeddedText: text('embedded_text'),
+  },
+  (t) => [index('github_issues_updated').on(t.updatedAt)],
 );
 
 /** The clock of the last write to each field of a folder or a note (last write wins per field). */

@@ -13,6 +13,7 @@ import { feedbackRoutes } from './routes/feedback';
 import { fakeGithubIssues } from './feedback/fake';
 import { sweepIssues } from './feedback/filing';
 import type { IssueTracker } from './feedback/github';
+import type { IssueMirror } from './feedback/issueMirror';
 import { fileRoutes } from './routes/files';
 import { meRoutes } from './routes/me';
 import { inboxRoutes } from './routes/inbox';
@@ -48,6 +49,8 @@ export interface AppDeps {
   embeddings: Embeddings;
   /** Send feedback's public GitHub issues; null when no token is set. */
   issues?: IssueTracker | null;
+  /** The GitHub issues the feedback form matches against (#76); null without a token. */
+  issueMirror?: IssueMirror | null;
   /** For the live stream heartbeat in tests. */
   heartbeatMs?: number;
   quiet?: boolean;
@@ -162,7 +165,13 @@ export function createApp(deps: AppDeps) {
   app.route('/api', inboxRoutes(db));
   app.route('/api', fileRoutes(db, storage));
   const shots = { base: env.BASE_URL, secret: env.AUTH_SECRET };
-  app.route('/api', feedbackRoutes(db, storage, mailer, env.FEEDBACK_TO, deps.issues ?? null, shots));
+  app.route(
+    '/api',
+    feedbackRoutes(db, storage, mailer, env.FEEDBACK_TO, deps.issues ?? null, shots, {
+      mirror: deps.issueMirror ?? null,
+      embeddings: deps.embeddings,
+    }),
+  );
   app.route(
     '/api',
     connectorRoutes(db, hub, {
@@ -184,9 +193,17 @@ export function createApp(deps: AppDeps) {
             quiet: true,
             now: new Date(Date.now() + 10 * 60 * 1000),
             shots,
+            mirror: deps.issueMirror ?? null,
           })
         : 0;
       return c.json({ filed });
+    });
+    // The issue mirror on demand (it reads GitHub every ten minutes): read the fake's issues and embed them.
+    app.post('/__test/feedback/mirror', async (c) => {
+      if (!deps.issueMirror) return c.json({ read: 0 });
+      const read = await deps.issueMirror.sync();
+      await deps.issueMirror.embedAll(deps.embeddings);
+      return c.json({ read });
     });
     app.post('/__test/net/down', async (c) => {
       const { down } = ((await c.req.json().catch(() => null)) ?? {}) as { down?: boolean };

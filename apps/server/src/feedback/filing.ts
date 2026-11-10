@@ -9,6 +9,7 @@ import {
 } from '@tudu/core';
 import { and, asc, count, eq, gt, isNull, lt, or, schema, sql, type Db } from '@tudu/db';
 import { IssueError, type IssueTracker } from './github';
+import type { IssueMirror } from './issueMirror';
 import { shotUrl, type ShotLinks } from './shots';
 
 /** Issues the whole app files in an hour; past it reports wait (saved and mailed) and go later. */
@@ -23,7 +24,10 @@ export const ISSUE_SWEEP_BATCH = 10;
 
 const HOUR_MS = 60 * 60 * 1000;
 
-export type FileOutcome = { state: 'filed'; issue: FeedbackIssue } | { state: 'pending' | 'failed' | 'busy' };
+export type FileOutcome =
+  | { state: 'filed'; issue: FeedbackIssue }
+  /** `refused`: a +1 GitHub won't take for good, with `refuse` on: the caller tells the person and drops the row. */
+  | { state: 'pending' | 'failed' | 'busy' | 'refused' };
 
 /** Issues filed in the last hour, across everyone. */
 async function filedThisHour(db: Db, now: Date): Promise<number> {
@@ -45,6 +49,20 @@ export interface FileOptions {
   quiet?: boolean;
   /** Without it no screenshot is embedded, whatever its sender chose. */
   shots?: ShotLinks;
+  /** A new issue goes into the mirror at once, so the similar search finds it (#76). */
+  mirror?: IssueMirror | null;
+  /**
+   * The request that saved the row: a +1 GitHub refuses for good (locked, gone) answers `refused`, so the person can
+   * send it as a new report. Without it (the sweep, nobody waiting) such a +1 is filed as a new issue instead.
+   */
+  refuse?: boolean;
+}
+
+/** GitHub's answers that mean the issue can't take a comment now: locked (403), gone (404, 410), refused (422). */
+function cantTakeComment(err: unknown): boolean {
+  return (
+    err instanceof IssueError && !err.retryable && [403, 404, 410, 422].includes(err.status ?? 0)
+  );
 }
 
 /**
@@ -77,21 +95,49 @@ export async function fileReport(
   if (!row) return { state: 'busy' };
 
   const details = feedbackDetailsSchema.nullable().safeParse(row.details ?? null);
-  try {
-    const issue = await tracker.file({
-      title: issueTitle(row.text),
-      body: issueBody({
-        kind: row.kind as FeedbackKind,
-        text: row.text,
-        details: details.success ? details.data : null,
-        ref: feedbackRef(row.id),
-        shot: row.screenshotPublic && row.screenshotKey && opts.shots ? shotUrl(opts.shots, row.id) : null,
-      }),
-      labels: issueLabels(row.kind as FeedbackKind),
+  const body = (extra: { plusOne?: boolean; similarTo?: number | null }) =>
+    issueBody({
+      kind: row.kind as FeedbackKind,
+      text: row.text,
+      details: details.success ? details.data : null,
+      ref: feedbackRef(row.id),
+      shot: row.screenshotPublic && row.screenshotKey && opts.shots ? shotUrl(opts.shots, row.id) : null,
+      ...extra,
     });
+  const fileNew = async (similarTo: number | null): Promise<FeedbackIssue> => {
+    const draft = {
+      title: issueTitle(row.text),
+      body: body({ similarTo }),
+      labels: issueLabels(row.kind as FeedbackKind),
+    };
+    const issue = await tracker.file(draft);
+    await opts.mirror?.filed(issue, draft.title, draft.body).catch((err) => {
+      if (!opts.quiet) console.warn('feedback: the new issue did not go into the mirror', err);
+    });
+    return issue;
+  };
+  try {
+    let issue: FeedbackIssue;
+    let plusOneOf = row.plusOneOf;
+    if (plusOneOf != null) {
+      try {
+        issue = await tracker.comment(plusOneOf, body({ plusOne: true }));
+      } catch (err) {
+        if (!cantTakeComment(err)) throw err;
+        if (opts.refuse) {
+          await db.update(schema.feedback).set({ issueClaimedAt: null }).where(eq(schema.feedback.id, id));
+          return { state: 'refused' };
+        }
+        // Nobody is waiting: the report still gets filed, as a new issue that says which one it meant.
+        issue = await fileNew(plusOneOf);
+        plusOneOf = null;
+      }
+    } else {
+      issue = await fileNew(null);
+    }
     await db
       .update(schema.feedback)
-      .set({ issueState: 'filed', issueNumber: issue.number, issueUrl: issue.url })
+      .set({ issueState: 'filed', issueNumber: issue.number, issueUrl: issue.url, plusOneOf })
       .where(eq(schema.feedback.id, id));
     return { state: 'filed', issue };
   } catch (err) {
