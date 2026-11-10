@@ -427,7 +427,8 @@ export function FeedbackHost({ space, vp }: { space: Pick<SpaceSummary, 'kind'> 
   const github = filing === 'github';
   const view0 = viewOf(pathname);
   const line = feedbackDetailsLine(currentDetails(view0, space?.kind ?? null, app), github);
-  const similar = useSimilarIssues(d.text, isOpen && github && view === 'form' && phase === 'idle');
+  // Kept through a send, so a refused +1 comes back to the same rows.
+  const similar = useSimilarIssues(d.text, isOpen && github && view === 'form');
   const plusOne = github ? d.plusOne : null;
 
   const send = async () => {

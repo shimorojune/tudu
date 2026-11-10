@@ -36,7 +36,13 @@ export function fakeGithubIssues() {
   let issues: FakeIssue[] = [];
   let comments: FakeComment[] = [];
   let modes = new Map<string, Mode>();
-  const nextNumber = () => issues.reduce((n, i) => Math.max(n, i.number), 0) + 1;
+  // Filed issues count up from 1; seeded ones bring their own numbers (tests use a high range), never reused.
+  let filedCount = 0;
+  const nextNumber = () => {
+    do filedCount += 1;
+    while (issues.some((i) => i.number === filedCount));
+    return filedCount;
+  };
   const stamp = () => new Date().toISOString();
 
   r.post('/mode', async (c) => {
@@ -48,6 +54,7 @@ export function fakeGithubIssues() {
   r.post('/reset', (c) => {
     issues = [];
     comments = [];
+    filedCount = 0;
     modes = new Map();
     return c.json({ ok: true });
   });

@@ -1712,6 +1712,25 @@
    (.tp-fb-slot); the first look shimmers, later ones dim the rows (160ms) and the new set rises in 40ms apart. A
    picked row lifts onto the card with an ink ring and its +1 turns into a tick; the "instead" bar rises above the
    footer. #75's warning sentence on the public screenshot line lives here too. */
+.tp-root.tp-sim-fold {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 280ms var(--ease-change),
+    opacity 200ms var(--ease-change),
+    margin-top 280ms var(--ease-change);
+}
+.tp-root.tp-sim-fold > div {
+  min-height: 0;
+  overflow: hidden;
+}
+.tp-root.tp-sim-fold.tp-hide {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  margin-top: -14px;
+  pointer-events: none;
+}
 .tp-root .tp-sim {
   box-sizing: border-box;
   padding: 10px 10px 8px;
@@ -1942,6 +1961,7 @@
   color: var(--foreground);
 }
 @media (prefers-reduced-motion: reduce) {
+  .tp-root.tp-sim-fold,
   .tp-root .tp-sim ul,
   .tp-root .tp-sim-row,
   .tp-root .tp-sim-plus,

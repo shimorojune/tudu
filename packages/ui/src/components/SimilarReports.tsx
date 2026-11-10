@@ -96,7 +96,7 @@ export function SimilarReports({ state, issues, stale, picked = null, onPick, on
   const [wasState, setWasState] = useState(state);
   if (state !== wasState) {
     setWasState(state);
-    if (wasState === 'loading' && state !== 'loading' && since.current !== null) setHeld(true);
+    if (wasState === 'loading' && state !== 'loading') setHeld(true);
   }
   useEffect(() => {
     if (state === 'loading') since.current = Date.now();
@@ -117,7 +117,7 @@ export function SimilarReports({ state, issues, stale, picked = null, onPick, on
 
   return (
     <div
-      className={cx('tp-root tp-fb-slot tp-sim-fold', !open && 'tp-hide')}
+      className={cx('tp-root tp-sim-fold', !open && 'tp-hide')}
       aria-hidden={!open}
       inert={!open}
       data-testid="similar-reports"

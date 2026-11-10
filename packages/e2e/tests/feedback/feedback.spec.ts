@@ -1,5 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
+import { me } from '../../fixtures/spaces';
 
 /**
  * Chunk 19 · Send feedback. Group `feedback`. The API mails each report to reports@tudu.test, which the tests read
@@ -161,7 +162,7 @@ async function shotFlow(page: Page) {
   await expect(f.locator('.tp-fb-shot-img')).toHaveClass(/tp-ready/);
   await f.getByRole('button', { name: 'Remove the screenshot' }).click();
   await expect(caption(f)).toHaveCount(0);
-  await expect(f.getByText('Private unless you show it')).toBeVisible();
+  await expect(f.getByText('Shown on the issue unless you hide it')).toBeVisible();
   await pickShot(page, f, 'Board.png');
   await sendIt(page, f, `With a picture ${marker}`);
   const mail = await oneMail(page, marker);
@@ -345,6 +346,17 @@ test.describe('send feedback', () => {
           expect(l.getByRole('button', { name: 'Public on GitHub: what’s shared' })).toBeVisible(),
       ],
       [
+        'Send feedback, screenshot shown on the issue',
+        async (l: Locator) => {
+          await expect(
+            l.getByRole('switch', { name: 'Show the screenshot on the public issue' }),
+          ).toBeChecked();
+          await expect(l.locator('.tp-fb-shot')).toHaveClass(/tp-shown/);
+          await expect(l.locator('.tp-fb-shot-img')).toHaveClass(/tp-ready/);
+          await expect(l.getByText('Check it shows nothing private.')).toBeVisible();
+        },
+      ],
+      [
         'Send feedback, screenshot kept private',
         async (l: Locator) => {
           const sw = l.getByRole('switch', { name: 'Show the screenshot on the public issue' });
@@ -354,14 +366,36 @@ test.describe('send feedback', () => {
         },
       ],
       [
-        'Send feedback, screenshot shown on the issue',
+        'Send feedback, checking for similar reports',
+        async (l: Locator) => {
+          await expect(l.getByText('Checking for similar reports…')).toBeVisible();
+          await expect(l.locator('.tp-sim-skel')).toHaveCount(2);
+        },
+      ],
+      [
+        'Send feedback, already reported?',
+        async (l: Locator) => {
+          await expect(l.getByText('Already reported?')).toBeVisible();
+          await expect(l.getByRole('list', { name: 'Similar reports' }).getByRole('listitem')).toHaveCount(2);
+          await expect(l.getByRole('button', { name: '+1 #64 instead of a new issue' })).toBeVisible();
+          await expect(l.getByRole('link', { name: 'Open #64 on GitHub' })).toBeVisible();
+          await expect(l.getByRole('button', { name: 'Send', exact: true })).toBeVisible();
+        },
+      ],
+      [
+        'Send feedback, +1 that one instead',
         async (l: Locator) => {
           await expect(
-            l.getByRole('switch', { name: 'Show the screenshot on the public issue' }),
-          ).toBeChecked();
-          await expect(l.locator('.tp-fb-shot')).toHaveClass(/tp-shown/);
-          await expect(l.locator('.tp-fb-shot-img')).toHaveClass(/tp-ready/);
+            l.getByRole('button', { name: '+1 #64 instead of a new issue, picked' }),
+          ).toHaveAttribute('aria-pressed', 'true');
+          await expect(l.locator('.tp-fb-inst')).toContainText('Adds your words to #64');
+          await expect(l.getByRole('button', { name: '+1 on #64' })).toBeVisible();
         },
+      ],
+      [
+        'Send feedback, couldn’t check for similar reports',
+        (l: Locator) =>
+          expect(l.getByText('Couldn’t check for similar reports. Sending works as usual.')).toBeVisible(),
       ],
       [
         'Send feedback, screenshot GitHub can’t show',
@@ -385,10 +419,25 @@ test.describe('send feedback', () => {
           expect(l.getByText('The GitHub issue follows in a few minutes.').first()).toBeVisible(),
       ],
       [
+        'Send feedback, +1 sent',
+        (l: Locator) => expect(l.getByText('Thanks, it’s on #64').first()).toBeVisible(),
+      ],
+      [
+        'Send feedback, +1 to follow',
+        (l: Locator) =>
+          expect(l.getByText('The GitHub comment follows in a few minutes.').first()).toBeVisible(),
+      ],
+      [
         'Send feedback, couldn’t send',
         (l: Locator) => expect(l.getByRole('alert')).toContainText('That’s a lot of reports in an hour.'),
       ],
-      ['Your reports', (l: Locator) => expect(l.locator('.tp-fbr-row')).toHaveCount(4)],
+      [
+        'Your reports',
+        async (l: Locator) => {
+          await expect(l.locator('.tp-fbr-row')).toHaveCount(5);
+          await expect(l.getByRole('link', { name: /^\+1 on issue #64: / })).toBeVisible();
+        },
+      ],
       ['Your reports, loading', (l: Locator) => expect(l.locator('.tp-fbr-skel')).toHaveCount(4)],
       ['Your reports, empty', (l: Locator) => expect(l.getByText('Nothing sent yet')).toBeVisible()],
       [
@@ -404,7 +453,7 @@ test.describe('send feedback', () => {
     const over = await page.evaluate(() => {
       const past: string[] = [];
       for (const el of document.querySelectorAll(
-        '#send-feedback :is(.tp-fb, .tp-fb-done, .tp-fbr-list, .tp-fbr-empty, .tp-dlg-f) *',
+        '#send-feedback :is(.tp-fb, .tp-fb-done, .tp-fbr-list, .tp-fbr-empty, .tp-sim, .tp-dlg-f) *',
       )) {
         const r = el.getBoundingClientRect();
         const box = el.closest('.kit-desk')!.getBoundingClientRect();
@@ -473,7 +522,7 @@ test.describe('send feedback', () => {
     test.skip(!desktop(), 'the same form on every size');
     await signInFresh(page);
     const f = await openByBug(page);
-    await expect(f.getByText('Private unless you show it')).toBeVisible();
+    await expect(f.getByText('Shown on the issue unless you hide it')).toBeVisible();
     await expect(words(f)).toHaveAttribute('placeholder', /Leave out anything private\.$/);
     await words(f).fill('Kept while I look');
     await f.getByRole('button', { name: 'Public on GitHub: what’s shared' }).click();
@@ -483,11 +532,13 @@ test.describe('send feedback', () => {
       'What you write',
       'Bug or idea',
       'App details, when switched on: version, system, page, window, theme',
-      'The screenshot, only when you show it',
+      'The screenshot, unless you hide it',
       'Your name and email (so we can reply)',
-      'The screenshot, unless you show it',
+      'The screenshot, when you hide it',
     ]);
-    await expect(pop).toContainText('Never sent anywhere: your tasks, notes, people or space names.');
+    await expect(pop).toContainText(
+      'Never sent anywhere: your tasks, notes, people or space names, except what a public screenshot shows.',
+    );
     await page.keyboard.press('Escape');
     await expect(pop).toHaveCount(0);
     await expect(form(page)).toBeVisible();
@@ -529,7 +580,7 @@ test.describe('send feedback', () => {
     if (copied !== null) expect(copied).toBe(`https://github.com/shimorojune/tudu/issues/${n}`);
   });
 
-  test('C19-E15 switched on, the issue shows the screenshot: its link serves the same bytes to a cookieless request', async ({
+  test('C19-E15 switched off and on again, the issue shows the screenshot: its link serves the same bytes to a cookieless request', async ({
     page,
   }) => {
     test.skip(!desktop(), 'the same form on every size');
@@ -538,13 +589,15 @@ test.describe('send feedback', () => {
     const f = await openByBug(page);
     await pickShot(page, f, 'Public.png');
     const sw = f.getByRole('switch', { name: 'Show the screenshot on the public issue' });
+    await expect(sw).toBeChecked();
+    await sw.click();
     await expect(sw).not.toBeChecked();
     await expect(f.getByText('Private. Only the Tudu team sees it, with your report.')).toBeVisible();
     await sw.click();
     await expect(sw).toBeChecked();
     await expect(f.locator('.tp-fb-shot')).toHaveClass(/tp-shown/);
     await expect(f.locator('.tp-fb-pill')).toHaveText('Public');
-    await expect(f.getByText('Public. Anyone can see it on the GitHub issue.')).toBeVisible();
+    await expect(f.getByText(/^Public\. Anyone can see it on GitHub\./)).toBeVisible();
     await sendIt(page, f, `Shown on the issue ${marker}`);
     const issue = await oneIssue(page, marker);
     const link = /!\[Screenshot\]\(([^)]+)\)/.exec(issue.body)?.[1];
@@ -561,15 +614,16 @@ test.describe('send feedback', () => {
     expect(mail.attachments?.map((a) => a.filename)).toEqual(['Public.png']);
   });
 
-  test('C19-E16 left off, the issue has no screenshot; the mail still attaches it', async ({ page }) => {
+  test('C19-E16 switched off, the issue has no screenshot; the mail still attaches it', async ({ page }) => {
     test.skip(!desktop(), 'the same form on every size');
     await signInFresh(page);
     const marker = `e16-${crypto.randomUUID()}`;
     const f = await openByBug(page);
     await pickShot(page, f, 'Private.png');
-    await expect(
-      f.getByRole('switch', { name: 'Show the screenshot on the public issue' }),
-    ).not.toBeChecked();
+    const sw = f.getByRole('switch', { name: 'Show the screenshot on the public issue' });
+    await expect(sw).toBeChecked();
+    await sw.click();
+    await expect(sw).not.toBeChecked();
     await sendIt(page, f, `Kept private ${marker}`);
     const issue = await oneIssue(page, marker);
     expect(issue.body).not.toContain('Screenshot');
@@ -581,7 +635,7 @@ test.describe('send feedback', () => {
     ]);
   });
 
-  test('C19-E17 switched on, then the screenshot removed and another added: the switch is off again', async ({
+  test('C19-E17 switched off, then the screenshot removed and another added: the switch is on again', async ({
     page,
   }) => {
     test.skip(!desktop(), 'the same form on every size');
@@ -591,11 +645,167 @@ test.describe('send feedback', () => {
     await pickShot(page, f, 'First.png');
     const sw = f.getByRole('switch', { name: 'Show the screenshot on the public issue' });
     await sw.click();
-    await expect(sw).toBeChecked();
+    await expect(sw).not.toBeChecked();
     await f.getByRole('button', { name: 'Remove the screenshot' }).click();
     await expect(caption(f)).toHaveCount(0);
     await pickShot(page, f, 'Second.png');
-    await expect(sw).not.toBeChecked();
-    await expect(f.locator('.tp-fb-shot')).not.toHaveClass(/tp-shown/);
+    await expect(sw).toBeChecked();
+    await expect(f.locator('.tp-fb-shot')).toHaveClass(/tp-shown/);
+  });
+});
+
+/** A seeded issue's number: high and random, so it never meets one the app files or another test seeds. */
+const seedNumber = () => 200_000 + Math.floor(Math.random() * 700_000);
+
+/** Puts issues on the fake GitHub and has the mirror read and embed them now. */
+async function seedIssues(
+  page: Page,
+  issues: Array<{
+    number: number;
+    title: string;
+    body?: string;
+    state?: 'open' | 'closed';
+    state_reason?: string;
+  }>,
+) {
+  await page.request.post(`${API_URL}/__test/github-issues/seed`, { data: { issues } });
+  const res = await page.request.post(`${API_URL}/__test/feedback/mirror`);
+  expect(res.ok()).toBe(true);
+}
+
+async function commentsAbout(page: Page, marker: string): Promise<Array<{ issue: number; body: string }>> {
+  const res = await page.request.get(
+    `${API_URL}/__test/github-issues/comments?has=${encodeURIComponent(marker)}`,
+  );
+  return ((await res.json()) as { comments: Array<{ issue: number; body: string }> }).comments;
+}
+
+const similarBox = (f: Locator) => f.getByTestId('similar-reports');
+const lookDone = (page: Page) =>
+  page.waitForResponse((r) => r.url().includes('/api/feedback/similar') && r.request().method() === 'GET');
+
+test.describe('already reported? (#76)', () => {
+  test.beforeEach(() => {
+    // The mirror is one table for the whole run: seeded on desktop only, so two projects never seed the same words.
+    test.skip(!desktop(), 'the same form on every size');
+  });
+
+  test('C19-E18 words close to a closed issue: it shows with Fixed; +1 it and Send: a comment, no new issue; Your reports shows the +1', async ({
+    page,
+  }) => {
+    await signInFresh(page);
+    const n = seedNumber();
+    const marker = `e18-${crypto.randomUUID()}`;
+    await seedIssues(page, [
+      {
+        number: n,
+        title: `Calendar export to ICS drops recurring events ${n}`,
+        body: 'Exporting the week to an .ics file leaves out every recurring event.',
+        state: 'closed',
+        state_reason: 'completed',
+      },
+    ]);
+    const f = await openByBug(page);
+    await words(f).fill(`The calendar export to ICS drops my recurring events ${n}`);
+    const plus = f.getByRole('button', { name: `+1 #${n} instead of a new issue` });
+    await expect(plus).toBeVisible({ timeout: 10_000 });
+    await expect(f.getByText('Already reported?')).toBeVisible();
+    const row = f.locator('.tp-sim-row', { has: plus });
+    await expect(row.getByRole('img', { name: 'Closed, fixed' })).toBeVisible();
+    await expect(row.locator('.tp-sim-badge')).toHaveText('Fixed');
+    await plus.click();
+    await expect(f.getByRole('button', { name: `+1 #${n} instead of a new issue, picked` })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(f.locator('.tp-fb-inst')).toContainText(`Adds your words to #${n}`);
+    await words(f).fill(`The calendar export to ICS drops my recurring events ${n} ${marker}`);
+    await f.getByRole('button', { name: `+1 on #${n}` }).click();
+    const done = page.getByRole('dialog', { name: `Thanks, it’s on #${n}` });
+    await expect(done).toBeVisible();
+    await expect.poll(async () => (await commentsAbout(page, marker)).length, { timeout: 10_000 }).toBe(1);
+    expect((await commentsAbout(page, marker))[0]!.issue).toBe(n);
+    expect(await issuesAbout(page, marker)).toEqual([]);
+    const mail = await oneMail(page, marker);
+    expect(mail.subject).toMatch(new RegExp(`^\\+1 on #${n}: `));
+    await done.getByRole('button', { name: 'Your reports' }).click();
+    const list = page.getByRole('dialog', { name: 'Your reports' });
+    await expect(list.getByRole('link', { name: new RegExp(`^\\+1 on issue #${n}: `) })).toBeVisible();
+  });
+
+  test('C19-E19 pick, then Undo, then Send: a new issue is filed as usual', async ({ page }) => {
+    await signInFresh(page);
+    const n = seedNumber();
+    const marker = `e19-${crypto.randomUUID()}`;
+    await seedIssues(page, [{ number: n, title: `Week view scrolls back to Monday after every edit ${n}` }]);
+    const f = await openByBug(page);
+    await words(f).fill(`The week view scrolls back to Monday after each edit ${n} ${marker}`);
+    const plus = f.getByRole('button', { name: `+1 #${n} instead of a new issue` });
+    await expect(plus).toBeVisible({ timeout: 10_000 });
+    await expect(f.locator('.tp-sim-row', { has: plus }).getByRole('img', { name: 'Open' })).toBeVisible();
+    await plus.click();
+    await expect(f.getByRole('button', { name: `+1 on #${n}` })).toBeVisible();
+    await f.getByRole('button', { name: 'Undo' }).click();
+    await expect(f.locator('.tp-fb-inst')).toHaveCount(0);
+    await expect(plus).toHaveAttribute('aria-pressed', 'false');
+    const filedAs = await fileIt(
+      page,
+      f,
+      `The week view scrolls back to Monday after each edit ${n} ${marker}`,
+    );
+    expect(filedAs).not.toBe(n);
+    expect((await oneIssue(page, marker)).number).toBe(filedAs);
+    expect(await commentsAbout(page, marker)).toEqual([]);
+  });
+
+  test('C19-E20 words unlike any issue: no box shows; the form is as before', async ({ page }) => {
+    await signInFresh(page);
+    const marker = `e20-${crypto.randomUUID()}`;
+    const f = await openByBug(page);
+    const look = lookDone(page);
+    await words(f).fill('Purple giraffes hum old jazz tunes beside the frozen harbour');
+    await look;
+    await expect(similarBox(f)).toHaveClass(/tp-hide/);
+    await expect(f.getByText('Already reported?')).toHaveCount(0);
+    await expect(f.getByRole('button', { name: 'Send', exact: true })).toBeEnabled();
+    await sendIt(page, f, `Purple giraffes hum old jazz tunes beside the frozen harbour ${marker}`);
+    await oneIssue(page, marker);
+  });
+
+  test('C19-E21 the similar search down: one quiet line; Send still files', async ({ page }) => {
+    await signInFresh(page);
+    const { userId } = await me(page);
+    expect(
+      (await page.request.post(`${API_URL}/__test/embeddings/down`, { data: { userId } })).status(),
+    ).toBeLessThan(300);
+    try {
+      const marker = `e21-${crypto.randomUUID()}`;
+      const f = await openByBug(page);
+      await words(f).fill('The menu bar count stays at three after I finish everything');
+      await expect(f.getByText('Couldn’t check for similar reports. Sending works as usual.')).toBeVisible({
+        timeout: 10_000,
+      });
+      await sendIt(page, f, `The menu bar count stays at three after I finish everything ${marker}`);
+      await oneIssue(page, marker);
+    } finally {
+      await page.request.post(`${API_URL}/__test/embeddings/up`, { data: { userId } });
+    }
+  });
+
+  test('C19-E22 a PNG starts public: the switch is on and the pill shows; the issue embeds it', async ({
+    page,
+  }) => {
+    await signInFresh(page);
+    const marker = `e22-${crypto.randomUUID()}`;
+    const f = await openByBug(page);
+    await pickShot(page, f, 'Default.png');
+    await expect(f.getByRole('switch', { name: 'Show the screenshot on the public issue' })).toBeChecked();
+    await expect(f.locator('.tp-fb-pill')).toHaveText('Public');
+    await expect(f.getByText('Check it shows nothing private.')).toBeVisible();
+    await sendIt(page, f, `Public by default ${marker}`);
+    const issue = await oneIssue(page, marker);
+    expect(issue.body).toMatch(/!\[Screenshot\]\([^)]+\/api\/feedback\/shots\//);
+    const mail = await oneMail(page, marker);
+    expect(mail.text).toContain('Screenshot: Default.png (attached, shown on the issue)');
   });
 });

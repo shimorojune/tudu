@@ -85,4 +85,23 @@ describe('FeedbackReports (chunk 19)', () => {
     expect(reportDay(at(19), NOW)).toBe('19 Oct');
     expect(reportDay(at(20), NOW)).toBe('Tue');
   });
+
+  it('C19-U31 a +1 is a row like any other, with the +1 pill and the issue it joined', () => {
+    const plusOne: MyReport = {
+      id: 'p',
+      kind: 'bug',
+      title: 'Jira count stuck at 1 with 2 assigned',
+      createdAt: at(1),
+      state: 'filed',
+      issue: { number: 64, url: 'https://github.com/shimorojune/tudu/issues/64#issuecomment-9001' },
+      plusOneOf: 64,
+    };
+    render(<FeedbackReports state="ready" reports={[plusOne, REPORTS[0]!]} now={NOW} />);
+    const link = screen.getByRole('link', {
+      name: /^\+1 on issue #64: Jira count stuck at 1 with 2 assigned/,
+    });
+    expect(link).toHaveAttribute('href', plusOne.issue!.url);
+    expect(link.querySelector('.tp-fbr-plus')).toHaveTextContent('+1');
+    expect(document.querySelectorAll('.tp-fbr-plus')).toHaveLength(1);
+  });
 });
