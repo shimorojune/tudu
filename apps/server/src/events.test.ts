@@ -13,4 +13,16 @@ describe('EventHub', () => {
     hub.publish('u', 'task.changed', {});
     expect(seen).toEqual(['task.changed']);
   });
+
+  it('C11-U46 last is where a stream opened after a read starts: what was published since comes back', () => {
+    const hub = new EventHub();
+    expect(hub.last('u')).toBe(0);
+    hub.publish('u', 'inbox.changed', {});
+    const at = hub.last('u');
+    expect(at).toBe(1);
+    hub.publish('u', 'members.changed', {});
+    hub.publish('v', 'inbox.changed', {});
+    expect(hub.since('u', at).map((e) => e.type)).toEqual(['members.changed']);
+    expect(hub.last('v')).toBe(1);
+  });
 });

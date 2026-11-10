@@ -988,13 +988,29 @@ test.describe('all spaces', () => {
     await openAndClose(page, backlog, 'Sort the attic');
     await openAndClose(page, backlog, 'Sort the attic');
   });
+
+  test('C21-E28 Getting started in All spaces: Bring your Jira issues opens Settings › Apps', async ({
+    page,
+  }) => {
+    test.skip(phone(), 'phones keep their Apps page');
+    await signInFresh(page, undefined, { gettingStarted: true });
+    await makeSpace(page, 'Northwind', '#3d5a80');
+    await page.goto('/all');
+    await page
+      .getByRole('region', { name: 'Getting started' })
+      .getByRole('button', { name: /Bring your Jira issues/ })
+      .click();
+    const settings = page.getByRole('dialog', { name: 'Settings' });
+    await expect(settings.getByRole('button', { name: 'Connect' })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Apps' })).toHaveCount(0);
+  });
 });
 
 test.describe('all spaces, a drop on the other day, with motion', () => {
   // The rest of the suite runs with reduced motion; this is about what moves after the drop, and how.
   test.use({ contextOptions: { reducedMotion: 'no-preference' } });
 
-  test('C21-E28 two days: a Northwind task dropped on tomorrow glides there, keeps its pill, and is on tomorrow in Northwind', async ({
+  test('C21-E29 two days: a Northwind task dropped on tomorrow glides there, keeps its pill, and is on tomorrow in Northwind', async ({
     page,
     browser,
   }) => {

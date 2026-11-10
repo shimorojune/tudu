@@ -115,8 +115,11 @@ export function rememberSpace(slug: string): void {
   }
 }
 
-/** The last space you were in, or null. A space you are no longer in is dropped. */
-export function lastSpace(spaces?: SpaceSummary[]): string | null {
+/**
+ * The last space you were in, or null. A space you are no longer in is dropped, unless `keep`: a window whose list of
+ * spaces may be behind the desk's (the floating bar) answers null without forgetting a space it hasn't heard of yet.
+ */
+export function lastSpace(spaces?: SpaceSummary[], o: { keep?: boolean } = {}): string | null {
   let slug: string | null;
   try {
     slug = localStorage.getItem(KEY);
@@ -126,7 +129,7 @@ export function lastSpace(spaces?: SpaceSummary[]): string | null {
   if (!slug) return null;
   const known = !spaces || (slug === ALL_SLUG ? hasAllSpaces(spaces) : !!spaceBySlug(spaces, slug));
   if (!known) {
-    forgetSpace();
+    if (!o.keep) forgetSpace();
     return null;
   }
   return slug;

@@ -70,6 +70,16 @@ async function factsOf(detail: Locator): Promise<string[]> {
   return detail.locator('.tp-td-prop dt').allTextContents();
 }
 
+/** All spaces (desk): avatar › Settings › Apps. */
+async function allSpacesApps(page: Page): Promise<Locator> {
+  await page.goto('/all');
+  await page.getByRole('button', { name: /^You: / }).click();
+  await page.getByRole('menuitem', { name: 'Settings' }).click();
+  const settings = page.getByRole('dialog', { name: 'Settings' });
+  await settings.getByRole('navigation', { name: 'Settings' }).getByRole('button', { name: /^Apps/ }).click();
+  return settings;
+}
+
 /** The connect form: the address and the token, then Connect. */
 async function fillConnect(page: Page, site: string, token: string): Promise<void> {
   const form = jiraPanel(page);
@@ -713,7 +723,8 @@ test.describe('jira', () => {
     await expect(sw).toHaveAttribute('aria-checked', 'true');
     await sw.click();
     const nwRow = settings.locator('.tp-set-sprow').filter({ hasText: 'Northwind' });
-    await expect(nwRow).toContainText('Off · 1 task keeps its key');
+    await expect(nwRow).toContainText('1 task keeps its Jira key');
+    await expect(nwRow.locator('.tp-set-state')).toHaveText('Off');
     await expect(settings.getByText('0 of 2 on')).toBeVisible();
     const read = await page.request.get(`${API_URL}/api/connectors/jira/spaces`);
     const body = (await read.json()) as { spaces: Array<{ id: string; on: boolean }> };
@@ -1047,4 +1058,140 @@ test.describe('jira', () => {
       '8 assigned to you, not in Tudu yet',
     );
   });
+
+  test('C10-E28 connect from All spaces: the form beside All spaces, then Settings › Apps with every space off', async ({
+    page,
+  }) => {
+    test.skip(phone(), 'Settings is a page under a space on phones');
+    await fixClock(page);
+    await signInFresh(page);
+    await createSpace(page, 'Northwind');
+    let settings = await allSpacesApps(page);
+    await settings.getByRole('button', { name: 'Connect' }).click();
+    await expect(settings).toHaveCount(0);
+    await expect(jiraPanel(page)).toContainText(
+      'Connect once for your account with a personal access token. Then pick the spaces it shows in',
+    );
+    await expect(jiraButton(page)).toHaveCount(0);
+    await fillConnect(page, JIRA_SITE, goodToken());
+    await expect(jiraPanel(page).getByRole('button', { name: 'Connected' })).toBeVisible();
+    settings = page.getByRole('dialog', { name: 'Settings' });
+    await expect(settings.getByText('Use Jira in')).toBeVisible();
+    await expect(jiraPanel(page)).toHaveCount(0);
+    await expect(settings.getByText('0 of 2 on')).toBeVisible();
+    await expect(settings.locator('.tp-set-sprow.tp-set-hl')).toHaveCount(2);
+    await expect(settings.getByText('You’re here')).toHaveCount(0);
+    for (const name of ['Personal', 'Northwind'])
+      await expect(settings.getByRole('switch', { name: `Jira in ${name}` })).toHaveAttribute(
+        'aria-checked',
+        'false',
+      );
+    const read = await page.request.get(`${API_URL}/api/connectors/jira/spaces`);
+    const body = (await read.json()) as { spaces: Array<{ on: boolean }> };
+    expect(body.spaces.every((x) => !x.on)).toBe(true);
+
+    // Personal shows no Jira until its switch is on.
+    await page.goto('/me');
+    await expect(jiraButton(page)).toHaveCount(0);
+    await switchByApi(page, await personalId(page), true);
+    await page.reload();
+    await expect(jiraButton(page)).toBeVisible();
+  });
+
+  test('C10-E29 a refused token in All spaces stays on the form and keeps nothing', async ({ page }) => {
+    test.skip(phone(), 'Settings is a page under a space on phones');
+    await fixClock(page);
+    await signInFresh(page);
+    await createSpace(page, 'Northwind');
+    const settings = await allSpacesApps(page);
+    await settings.getByRole('button', { name: 'Connect' }).click();
+    await fillConnect(page, JIRA_SITE, 'nope-123');
+    await expect(jiraPanel(page).getByRole('alert')).toBeVisible();
+    await expect(jiraPanel(page).getByLabel('Personal access token')).toHaveValue('nope-123');
+    await jiraPanel(page).getByRole('button', { name: 'Close Jira' }).click();
+    await expect(jiraPanel(page)).toHaveCount(0);
+    const read = await page.request.get(`${API_URL}/api/connectors/jira`);
+    expect(((await read.json()) as { connected: boolean }).connected).toBe(false);
+  });
+
+  test('C10-E30 an expired token from All spaces: Reconnect brings back the spaces it was on', async ({
+    page,
+  }) => {
+    test.skip(phone(), 'Settings is a page under a space on phones');
+    await fixClock(page);
+    await signInFresh(page);
+    await createSpace(page, 'Northwind');
+    const token = await connectByApi(page);
+    await expire(page, token);
+    // Jira notices on its next read.
+    await page.goto('/me');
+    await openJira(page);
+    await expect(jiraPanel(page).getByRole('button', { name: 'Add a new token' })).toBeVisible();
+
+    const settings = await allSpacesApps(page);
+    await settings.getByRole('button', { name: 'Add a new token' }).click();
+    await expect(jiraPanel(page).getByRole('heading', { name: 'Add a new token' })).toBeVisible();
+    await fillConnect(page, JIRA_SITE, goodToken());
+    const back = page.getByRole('dialog', { name: 'Settings' });
+    await expect(back.getByText('1 of 2 on')).toBeVisible();
+    await expect(back.getByRole('switch', { name: 'Jira in Personal' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await expect(back.getByRole('switch', { name: 'Jira in Northwind' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+  });
+
+  for (const theme of ['light', 'dark'] as const)
+    test(`C10-E31 Settings › Apps rows: On or Off beside the switch, Turning on…, a refusal (${theme})`, async ({
+      page,
+    }) => {
+      test.skip(phone(), 'the same row on phones; the desk is enough here');
+      await page.emulateMedia({ colorScheme: theme });
+      await fixClock(page);
+      await signInFresh(page);
+      await createSpace(page, 'Northwind');
+      await connectByApi(page);
+      await page.goto('/me?settings=apps');
+      const settings = page.getByRole('dialog', { name: 'Settings' });
+      const rowOf = (name: string) => settings.locator('.tp-set-sprow').filter({ hasText: name });
+      for (const [name, word] of [
+        ['Personal', 'On'],
+        ['Northwind', 'Off'],
+      ] as const) {
+        const w = rowOf(name).locator('.tp-set-state');
+        await expect(w).toHaveText(word);
+        const wb = (await w.boundingBox())!;
+        const sb = (await settings.getByRole('switch', { name: `Jira in ${name}` }).boundingBox())!;
+        expect(wb.x + wb.width).toBeLessThanOrEqual(sb.x);
+        expect(Math.abs(wb.y + wb.height / 2 - (sb.y + sb.height / 2))).toBeLessThan(4);
+      }
+      await expect(rowOf('Northwind')).toHaveClass(/tp-off/);
+
+      // Slow yes: Turning on…, then On.
+      let release: () => void = () => {};
+      const held = new Promise<void>((r) => (release = r));
+      await page.route('**/api/spaces/*/connectors/jira', async (r) => {
+        await held;
+        await r.continue();
+      });
+      await settings.getByRole('switch', { name: 'Jira in Northwind' }).click();
+      await expect(rowOf('Northwind').locator('.tp-set-state')).toHaveText('Turning on…');
+      release();
+      await expect(rowOf('Northwind').locator('.tp-set-state')).toHaveText('On');
+      await expect(settings.getByText('2 of 2 on')).toBeVisible();
+      await page.unroute('**/api/spaces/*/connectors/jira');
+
+      // A refused turn-off: Turning off…, then back to On with the reason under the row.
+      await page.route('**/api/spaces/*/connectors/jira', (r) => r.abort());
+      await settings.getByRole('switch', { name: 'Jira in Northwind' }).click();
+      await expect(rowOf('Northwind').getByRole('alert')).toBeVisible();
+      await expect(rowOf('Northwind').locator('.tp-set-state')).toHaveText('On');
+      await expect(settings.getByRole('switch', { name: 'Jira in Northwind' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
+    });
 });

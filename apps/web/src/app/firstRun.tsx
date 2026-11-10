@@ -136,10 +136,13 @@ export function GettingStartedHost({
   me: shellMe,
   space,
   vp,
+  all: allSpaces = false,
 }: {
   me: MeResponse;
   space: SpaceSummary;
   vp: Viewport;
+  /** All spaces has no Apps panel: Jira's step opens Settings › Apps. */
+  all?: boolean;
 }) {
   const me = useQuery({ ...meQuery, initialData: shellMe }).data ?? shellMe;
   const navigate = useNavigate();
@@ -171,7 +174,12 @@ export function GettingStartedHost({
     name: () => void navigate({ href: settingsHref(loc, space.slug, 'account', phone) }),
     task: () => openQuickAdd(),
     theme: () => void navigate({ href: settingsHref(loc, space.slug, 'appearance', phone) }),
-    jira: () => (phone ? void navigate({ href: spacePath(space.slug, 'apps') }) : openApps()),
+    jira: () =>
+      phone
+        ? void navigate({ href: spacePath(space.slug, 'apps') })
+        : allSpaces
+          ? void navigate({ href: settingsHref(loc, space.slug, 'apps', false) })
+          : openApps(),
   };
   const items: GettingStartedItem[] = GETTING_STARTED_STEPS.map((k) => ({
     key: k,

@@ -11,6 +11,7 @@
 //! `UNUserNotificationCenter` aborts the process. So everything here asks `available` first, and answers
 //! `unavailable` instead of touching the center.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use serde::Serialize;
@@ -125,12 +126,28 @@ fn answered(app: &AppHandle, action: &str) {
     }
 }
 
+/// macOS refused the last ask in this run. An ad hoc signed Tudu is refused without macOS ever recording a choice,
+/// so its settings still say "not determined" after the refusal.
+static REFUSED: AtomicBool = AtomicBool::new(false);
+
+/// What the settings say, squared with what the last ask answered: "not determined" after a refusal is a refusal,
+/// or Settings would show the way to allow Tudu and then lose it on the next check.
+pub fn settled(now: Permission, refused: bool) -> Permission {
+    if now == Permission::Unknown && refused {
+        Permission::Denied
+    } else {
+        now
+    }
+}
+
 /// Ask macOS for notifications (it asks you once; later calls answer what you chose).
 pub fn ask() -> Permission {
     if !available() {
         return Permission::Unavailable;
     }
-    mac::ask()
+    let p = mac::ask();
+    REFUSED.store(p == Permission::Denied, Ordering::Relaxed);
+    p
 }
 
 /// Notifications as macOS has them now.
@@ -138,7 +155,7 @@ pub fn status() -> Permission {
     if !available() {
         return Permission::Unavailable;
     }
-    mac::status()
+    settled(mac::status(), REFUSED.load(Ordering::Relaxed))
 }
 
 /// Post a nudge, replacing the one in Notification Center. Err: macOS refused it.
@@ -408,6 +425,15 @@ mod tests {
             serde_json::to_string(&Permission::Unavailable).unwrap(),
             "\"unavailable\""
         );
+    }
+
+    #[test]
+    fn wh_r03_not_determined_after_a_refusal_reads_denied() {
+        assert_eq!(settled(Permission::Unknown, true), Permission::Denied);
+        assert_eq!(settled(Permission::Unknown, false), Permission::Unknown);
+        // Allowed in System Settings since: macOS's word wins.
+        assert_eq!(settled(Permission::Allowed, true), Permission::Allowed);
+        assert_eq!(settled(Permission::Denied, false), Permission::Denied);
     }
 
     #[test]

@@ -1,13 +1,15 @@
 import { randomUUID } from 'node:crypto';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { feedbackDetails, type FeedbackReport } from '@tudu/core';
 import { randomUUID as uuid } from 'node:crypto';
 import { eq, inArray, schema, sql } from '@tudu/db';
 import type { MemoryStorage } from './storage';
 import { GITHUB_TEST_HOST, signIn, startServer, type Jar } from '../test/harness';
 import { fileReport, ISSUE_MAX_ATTEMPTS, ISSUES_PER_HOUR, sweepIssues } from './feedback/filing';
-import { GithubIssues, IssueError } from './feedback/github';
-import type { FakeIssue } from './feedback/fake';
+import { GithubIssues, IssueError, listedIssue, nextLink } from './feedback/github';
+import type { FakeComment, FakeIssue } from './feedback/fake';
+import { IssueMirror, searchSimilarIssues, SimilarUnavailable } from './feedback/issueMirror';
+import { SIMILAR_FLOOR, type MyReports, type SimilarIssues } from '@tudu/core';
 import { shotSig, shotUrl } from './feedback/shots';
 
 const TO = 'reports@tudu.test';
@@ -71,6 +73,7 @@ function report(over: Partial<FeedbackReport> = {}): FeedbackReport {
     text: 'The tick did not stick.\nIt came back after a reload.',
     details: DETAILS,
     shotPublic: false,
+    plusOneOf: null,
     ...over,
   };
 }
@@ -219,7 +222,7 @@ describe('POST /api/feedback (chunk 19)', () => {
     expect((await send(other.jar, report())).status).toBe(200);
   });
 
-  it('C19-A04 migrations 0011 and 0014 give feedback its columns, the issue ones with their defaults, and the one-report-per-id index', async () => {
+  it('C19-A04 migrations 0011, 0014 and 0021 give feedback its columns, the issue ones with their defaults, and the one-report-per-id index', async () => {
     const cols = (
       await server.db.execute(
         sql`select column_name, is_nullable from information_schema.columns where table_name = 'feedback' order by column_name`,
@@ -235,6 +238,7 @@ describe('POST /api/feedback (chunk 19)', () => {
       'issue_state:NO',
       'issue_url:YES',
       'kind:NO',
+      'plus_one_of:YES',
       'report_id:NO',
       'screenshot_key:YES',
       'screenshot_public:NO',
@@ -611,5 +615,399 @@ describe('the screenshot on the public issue', () => {
     const r = report({ text: `Before the switch. ${uuid()}` });
     await send(jar, r, png());
     expect((await rowsOf(r.id))[0]!.screenshotPublic).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// Similar reports and +1 that one instead (#76). The fake GitHub serves seeded issues for the mirror to read; seeded
+// numbers come from a high range of their own, so they never meet the ones the fake files. The model is the real one.
+
+let seedN = 100_000 + Math.floor(Math.random() * 800_000);
+type Seed = Partial<FakeIssue> & { title: string };
+async function seed(...issues: Seed[]): Promise<FakeIssue[]> {
+  const res = await server.app.request('/__test/github-issues/seed', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ issues: issues.map((i) => ({ number: (seedN += 1), ...i })) }),
+  });
+  return ((await res.json()) as { issues: FakeIssue[] }).issues;
+}
+async function mirrorNow(): Promise<number> {
+  const res = await server.app.request('/__test/feedback/mirror', { method: 'POST' });
+  return ((await res.json()) as { read: number }).read;
+}
+async function commentsWith(words: string): Promise<FakeComment[]> {
+  const res = await server.app.request(`/__test/github-issues/comments?has=${encodeURIComponent(words)}`);
+  return ((await res.json()) as { comments: FakeComment[] }).comments;
+}
+function similar(jar: Jar | null, q: string, on = server): Promise<Response> {
+  return Promise.resolve(
+    on.app.request(`/api/feedback/similar?q=${encodeURIComponent(q)}`, {
+      headers: { origin: 'http://localhost:5173', ...(jar ? { cookie: jar.header() } : {}) },
+    }),
+  );
+}
+const mirrorRow = (n: number) =>
+  server.db.select().from(schema.githubIssues).where(eq(schema.githubIssues.number, n));
+/** GitHub, the fake one, through the app, for a tracker of the test's own. */
+/** Where the test server serves public screenshots from (its BASE_URL and AUTH_SECRET, as in the tests above). */
+const SHOT_LINKS = { base: 'http://localhost:3456', secret: 'test-secret-test-secret-test-secret' };
+const viaApp: typeof fetch = (input, init) =>
+  Promise.resolve(server.app.request(String(input).replace(`http://${GITHUB_TEST_HOST}`, ''), init));
+
+describe('similar reports and +1 that one instead (#76)', () => {
+  // The hourly cap counts every issue and comment the file has filed so far; age those out so these cases file.
+  beforeEach(async () => {
+    await server.db
+      .update(schema.feedback)
+      .set({ issueClaimedAt: sql`now() - interval '2 hours'` })
+      .where(eq(schema.feedback.issueState, 'filed'));
+  });
+  it('C19-A20 the mirror reads every page, drops pull requests, asks only for what changed since, and a new title drops the vector', async () => {
+    const many = await seed(
+      ...Array.from({ length: 130 }, (_, i) => ({ title: `Mirror page test ${i}`, body: `Body ${i}` })),
+      { title: 'A pull request, not an issue', pull_request: true },
+    );
+    const urls: string[] = [];
+    const tracker = new GithubIssues({
+      token: 't',
+      repo: 'shimorojune/tudu',
+      api: ISSUES_API,
+      fetch: (input, init) => {
+        urls.push(String(input));
+        return viaApp(input, init);
+      },
+    });
+    const listed = await tracker.list(null);
+    const numbers = new Set(listed.map((i) => i.number));
+    for (const i of many.slice(0, 130)) expect(numbers.has(i.number)).toBe(true);
+    expect(numbers.has(many[130]!.number)).toBe(false);
+    expect(urls.length).toBeGreaterThanOrEqual(2);
+    expect(urls[0]).toContain('state=all');
+    expect(urls[1]).toContain('page=2');
+
+    const mirror = new IssueMirror(server.db, tracker, server.embeddings, { quiet: true });
+    await mirror.sync();
+    const [row] = await mirrorRow(many[0]!.number);
+    expect(row).toMatchObject({
+      title: 'Mirror page test 0',
+      bodyText: 'Body 0',
+      state: 'open',
+      locked: false,
+    });
+    expect(await mirrorRow(many[130]!.number)).toHaveLength(0);
+    await mirror.embedAll(server.embeddings);
+    expect((await mirrorRow(many[0]!.number))[0]!.embedding).not.toBeNull();
+
+    // Changed on GitHub: the next sync asks from the newest change it holds, and new words drop the vector.
+    await new Promise((r) => setTimeout(r, 5));
+    await seed({ number: many[0]!.number, title: 'Mirror page test 0, renamed', body: 'Body 0' });
+    urls.length = 0;
+    await mirror.sync();
+    expect(urls[0]).toContain('since=');
+    const [renamed] = await mirrorRow(many[0]!.number);
+    expect(renamed).toMatchObject({ title: 'Mirror page test 0, renamed', embedding: null });
+    // The same words again keep their vector.
+    await mirror.embedAll(server.embeddings);
+    await seed({ number: many[1]!.number, title: 'Mirror page test 1', body: 'Body 1', state: 'closed' });
+    await mirror.sync();
+    expect((await mirrorRow(many[1]!.number))[0]).toMatchObject({ state: 'closed' });
+    expect((await mirrorRow(many[1]!.number))[0]!.embedding).not.toBeNull();
+    // The pieces: a Link header's next page, and an item that isn't an issue.
+    expect(nextLink('<https://x/a?page=2>; rel="next", <https://x/a?page=9>; rel="last"')).toBe(
+      'https://x/a?page=2',
+    );
+    expect(nextLink('<https://x/a?page=9>; rel="last"')).toBeNull();
+    expect(listedIssue({ number: 1, title: 't', state: 'open', html_url: 'u', pull_request: {} })).toBeNull();
+  });
+
+  it('C19-A21 an issue the app files is in the mirror at once, and the next batch embeds it', async () => {
+    const { jar } = await signIn(server);
+    const marker = `A21 ${uuid()}`;
+    const r = report({ text: `Filed and mirrored. ${marker}` });
+    const sent = (await (await send(jar, r)).json()) as Sent;
+    const [row] = await mirrorRow(sent.issue!.number);
+    expect(row).toMatchObject({ title: `Filed and mirrored. ${marker}`, state: 'open' });
+    expect(row!.bodyText).toBe(`Filed and mirrored. ${marker}`);
+    await server.issueMirror!.embedAll(server.embeddings);
+    expect((await mirrorRow(sent.issue!.number))[0]!.embedding).not.toBeNull();
+  });
+
+  it('C19-A22 similar: closest first, at most three, open and closed, locked and far ones left out; fixed and closed told apart; +1s counted', async () => {
+    const { jar } = await signIn(server);
+    const [fixed, open, far, locked, notPlanned] = await seed(
+      {
+        title: 'Jira count stuck at 1 when two tickets are assigned',
+        body: 'The Jira count in the sidebar shows 1 although two Jira tickets are assigned to me.',
+        state: 'closed',
+        state_reason: 'completed',
+      },
+      { title: 'Sidebar Jira ticket count stays at one after a second ticket is assigned' },
+      { title: 'Notebook drawing pen strokes are dark on the dark background', body: 'Only in dark mode.' },
+      { title: 'Jira count shows 1 but I have two Jira tickets', locked: true },
+      {
+        title: 'Show the Jira ticket count for the whole team',
+        state: 'closed',
+        state_reason: 'not_planned',
+      },
+    );
+    await mirrorNow();
+    const res = await similar(jar, 'The Jira count in the sidebar says 1 but I have two tickets');
+    expect(res.status).toBe(200);
+    const { issues } = (await res.json()) as SimilarIssues;
+    const numbers = issues.map((i) => i.number);
+    expect(issues.length).toBeLessThanOrEqual(3);
+    expect(numbers).toContain(fixed!.number);
+    expect(numbers).toContain(open!.number);
+    expect(numbers).not.toContain(far!.number);
+    expect(numbers).not.toContain(locked!.number);
+    expect(issues.find((i) => i.number === fixed!.number)).toMatchObject({
+      state: 'fixed',
+      url: `https://github.com/shimorojune/tudu/issues/${fixed!.number}`,
+      plusOnes: 0,
+    });
+    expect(issues.find((i) => i.number === open!.number)!.state).toBe('open');
+    // Closest first: the near-copy before the looser one.
+    expect(numbers.indexOf(fixed!.number)).toBeLessThan(numbers.indexOf(open!.number));
+    // Not planned reads as closed, wherever it lands.
+    const np = await searchSimilarIssues(
+      server.db,
+      server.embeddings,
+      server.issueMirror!,
+      'x',
+      notPlanned!.title,
+      0,
+    );
+    expect(np.find((i) => i.number === notPlanned!.number)!.state).toBe('closed');
+    // A +1 from the app counts.
+    const r = report({ text: 'Jira count is 1 for me too', plusOneOf: fixed!.number });
+    expect((await send(jar, r)).status).toBe(200);
+    const again = (await (
+      await similar(jar, 'The Jira count in the sidebar says 1 but I have two tickets')
+    ).json()) as SimilarIssues;
+    expect(again.issues.find((i) => i.number === fixed!.number)!.plusOnes).toBe(1);
+  });
+
+  it('C19-A23 similar: under three words is empty; no session is 401; the model down is 503; past 30 looks a minute is 429', async () => {
+    const { jar, userId } = await signInWithId();
+    expect(((await (await similar(jar, 'Jira count')).json()) as SimilarIssues).issues).toEqual([]);
+    expect((await similar(null, 'The Jira count is wrong')).status).toBe(401);
+    server.embeddings.downFor.add(userId);
+    const down = await similar(jar, 'The Jira count is wrong');
+    expect(down.status).toBe(503);
+    expect(((await down.json()) as { error: string }).error).toBe(
+      'Close matches aren’t available right now.',
+    );
+    server.embeddings.downFor.delete(userId);
+    // A mirror that has never read GitHub can't say "nothing similar" either.
+    const empty = new IssueMirror(server.db, { list: async () => [] } as never, server.embeddings);
+    vi.spyOn(empty, 'synced').mockResolvedValue(false);
+    await expect(
+      searchSimilarIssues(server.db, server.embeddings, empty, userId, 'The Jira count is wrong'),
+    ).rejects.toBeInstanceOf(SimilarUnavailable);
+    // The per-person cap.
+    const other = await signIn(server);
+    let last = 200;
+    for (let i = 0; i < 31; i++) last = (await similar(other.jar, `The Jira count is wrong ${i}`)).status;
+    expect(last).toBe(429);
+    // Email only (no token): not there at all.
+    const p = await signIn(plain);
+    expect((await similar(p.jar, 'The Jira count is wrong', plain)).status).toBe(404);
+  });
+
+  it('C19-A24 the floor, with the real model and the real #64 and #55: a duplicate of #64 matches, an unrelated report doesn’t', async () => {
+    const [jira, drawing] = await seed(
+      {
+        title: 'I have two JIRA’s, but the count still shows 1. A new JIRA was…',
+        body: 'I have two JIRA’s, but the count still shows 1. A new JIRA was assigned to me.\n\n**Screenshot**\n\n![Screenshot](https://api.tudu.ezdev.net/api/feedback/shots/d4650a2d/x)\n\n---\n**Something’s wrong**, sent from the Tudu app.\n\n- App: Tudu 0.40.0 (production)\n\n<sub>Filed from the Tudu app · ref d4650a2d</sub>',
+        state: 'closed',
+        state_reason: 'completed',
+      },
+      {
+        title: 'In dark mode the color of content in draw mode is also dark. Not an…',
+        body: 'In dark mode the color of content in draw mode is also dark. Not an issue in light mode.',
+        state: 'closed',
+        state_reason: 'completed',
+      },
+    );
+    await mirrorNow();
+    const closeness = async (q: string, n: number) => {
+      const [v] = await server.embeddings.embedder!.embed([q.toLowerCase()]);
+      const [row] = await mirrorRow(n);
+      return (row!.embedding as number[]).reduce((a, x, i) => a + x * v![i]!, 0);
+    };
+    const dup = await closeness('Jira count says 1 but two are assigned to me', jira!.number);
+    const unrelated = await closeness('drawing is dark in dark mode', jira!.number);
+    const drawingDup = await closeness('The pen in the drawing is dark in dark mode', drawing!.number);
+    // Printed so a change of floor can be read off the run.
+    console.log(
+      `C19-A24 closeness: #64 dup ${dup.toFixed(3)}, #64 unrelated ${unrelated.toFixed(3)}, #55 dup ${drawingDup.toFixed(3)}`,
+    );
+    expect(dup).toBeGreaterThanOrEqual(SIMILAR_FLOOR);
+    expect(drawingDup).toBeGreaterThanOrEqual(SIMILAR_FLOOR);
+    expect(unrelated).toBeLessThan(SIMILAR_FLOOR);
+  });
+
+  it('C19-A25 a +1 posts a comment on the issue, not a new one; the row and the mail say so', async () => {
+    const { jar } = await signIn(server);
+    const [target] = await seed({ title: 'Week drag puts the task back on Monday' });
+    await mirrorNow();
+    const marker = `A25 ${uuid()}`;
+    const r = report({ text: `Happens to me too. ${marker}`, shotPublic: true, plusOneOf: target!.number });
+    const res = await send(jar, r, png());
+    expect(res.status).toBe(200);
+    const sent = (await res.json()) as Sent;
+    const [c] = await commentsWith(marker);
+    expect(c).toMatchObject({ issue: target!.number, repo: 'shimorojune/tudu' });
+    expect(c!.body.startsWith('**+1 from the Tudu app**\n\n')).toBe(true);
+    expect(c!.body).toContain(`![Screenshot](${shotUrl(SHOT_LINKS, sent.id)})`);
+    expect(await issuesWith(marker)).toHaveLength(0);
+    expect(sent.issue).toEqual({
+      number: target!.number,
+      url: `https://github.com/shimorojune/tudu/issues/${target!.number}#issuecomment-${c!.id}`,
+    });
+    expect((await rowsOf(r.id))[0]).toMatchObject({
+      plusOneOf: target!.number,
+      issueState: 'filed',
+      issueNumber: target!.number,
+      issueUrl: sent.issue!.url,
+    });
+    const [mail] = mailsAbout(r.id);
+    expect(mail!.subject).toBe(`+1 on #${target!.number}: Happens to me too. ${marker}`);
+    expect(mail!.text).toContain(`GitHub comment: ${sent.issue!.url}`);
+  });
+
+  it('C19-A26 a +1 to an issue the mirror doesn’t have, or has locked: 409, nothing saved, mailed or posted', async () => {
+    const { jar } = await signIn(server);
+    const [locked] = await seed({ title: 'Locked one', locked: true });
+    await mirrorNow();
+    for (const n of [locked!.number, 999_999_999]) {
+      const marker = `A26 ${n} ${uuid()}`;
+      const r = report({ text: `Nope. ${marker}`, plusOneOf: n });
+      const res = await send(jar, r);
+      expect(res.status).toBe(409);
+      expect(((await res.json()) as { error: string }).error).toBe(
+        'That issue can’t take comments now. Send it as a new report instead.',
+      );
+      expect(await rowsOf(r.id)).toHaveLength(0);
+      expect(mailsAbout(r.id)).toHaveLength(0);
+      expect(await commentsWith(marker)).toHaveLength(0);
+    }
+    // Email only: a +1 can't go anywhere either.
+    const p = await signIn(plain);
+    expect((await send(p.jar, report({ plusOneOf: locked!.number }), undefined, plain)).status).toBe(409);
+  });
+
+  it('C19-A27 a +1 while GitHub is down waits; the sweep posts the comment once; the same report twice is one comment', async () => {
+    const { jar } = await signIn(server);
+    const [target] = await seed({ title: 'Quick Add loses focus' });
+    await mirrorNow();
+    const marker = `A27 ${uuid()}`;
+    await githubMode(marker, 'down');
+    const r = report({ text: `Me too. ${marker}`, plusOneOf: target!.number });
+    const sent = (await (await send(jar, r)).json()) as Sent;
+    expect(sent).toEqual({ id: sent.id, issue: null, pending: true });
+    expect(mailsAbout(r.id)[0]!.text).toContain('GitHub comment: waiting for GitHub; it is posted later.');
+    expect((await send(jar, r)).status).toBe(200);
+    await githubMode(marker, 'up');
+    await server.app.request('/__test/feedback/sweep', { method: 'POST' });
+    await server.app.request('/__test/feedback/sweep', { method: 'POST' });
+    expect(await commentsWith(marker)).toHaveLength(1);
+    expect(await issuesWith(marker)).toHaveLength(0);
+    expect((await rowsOf(r.id))[0]).toMatchObject({ issueState: 'filed', issueNumber: target!.number });
+  });
+
+  it('C19-A28 refused for good at send: 409 and nothing kept; refused in the sweep: filed as a new issue that says which it meant', async () => {
+    const { jar } = await signIn(server);
+    const [target] = await seed({ title: 'Locks after the mirror read it' });
+    await mirrorNow();
+    // Locked on GitHub after the mirror read it: GitHub says 403.
+    await seed({ number: target!.number, title: 'Locks after the mirror read it', locked: true });
+    const marker = `A28 ${uuid()}`;
+    const r = report({ text: `At send. ${marker}`, plusOneOf: target!.number });
+    const res = await send(jar, r, png());
+    expect(res.status).toBe(409);
+    expect(await rowsOf(r.id)).toHaveLength(0);
+    expect(mailsAbout(r.id)).toHaveLength(0);
+    // The same, in the sweep: nobody to ask, so it's filed as new.
+    const later = report({ text: `In the sweep. ${marker}`, plusOneOf: target!.number });
+    await seed({ number: target!.number, title: 'Locks after the mirror read it', locked: false });
+    await githubMode(`In the sweep. ${marker}`, 'down');
+    await send(jar, later);
+    await githubMode(`In the sweep. ${marker}`, 'up');
+    await seed({ number: target!.number, title: 'Locks after the mirror read it', locked: true });
+    await server.app.request('/__test/feedback/sweep', { method: 'POST' });
+    const [filed] = await issuesWith(`In the sweep. ${marker}`);
+    expect(filed!.body.startsWith(`Similar to #${target!.number}\n\nIn the sweep.`)).toBe(true);
+    expect((await rowsOf(later.id))[0]).toMatchObject({
+      issueState: 'filed',
+      issueNumber: filed!.number,
+      plusOneOf: null,
+    });
+    expect(await commentsWith(marker)).toHaveLength(0);
+  });
+
+  it('C19-A29 Your reports lists a +1 with the issue it joined and that issue’s title', async () => {
+    const { jar } = await signIn(server);
+    const [target] = await seed({ title: 'Menu bar count is off by one' });
+    await mirrorNow();
+    await send(jar, report({ text: 'Mine says 3 with 2 open', plusOneOf: target!.number }));
+    const res = await server.app.request('/api/feedback/mine', { headers: { cookie: jar.header() } });
+    const { reports } = (await res.json()) as MyReports;
+    expect(reports[0]).toMatchObject({
+      plusOneOf: target!.number,
+      title: 'Menu bar count is off by one',
+      state: 'filed',
+      issue: { number: target!.number },
+    });
+  });
+
+  it('C19-A30 migration 0021 adds github_issues and feedback.plus_one_of (null for every older report)', async () => {
+    const cols = (
+      await server.db.execute(
+        sql`select column_name, is_nullable from information_schema.columns where table_name = 'feedback' and column_name = 'plus_one_of'`,
+      )
+    ).rows;
+    expect(cols).toEqual([{ column_name: 'plus_one_of', is_nullable: 'YES' }]);
+    const table = (
+      await server.db.execute(
+        sql`select column_name from information_schema.columns where table_name = 'github_issues'`,
+      )
+    ).rows.map((x) => x.column_name);
+    expect(table).toEqual(
+      expect.arrayContaining([
+        'number',
+        'title',
+        'body_text',
+        'state',
+        'state_reason',
+        'locked',
+        'url',
+        'embedding',
+      ]),
+    );
+    const { jar } = await signIn(server);
+    const r = report({ text: `No +1. ${uuid()}` });
+    await send(jar, r);
+    expect((await rowsOf(r.id))[0]!.plusOneOf).toBeNull();
+  });
+
+  it('C19-A31 with no GitHub token there is no similar search and nothing is read from GitHub', async () => {
+    expect(plain.issueMirror).toBeNull();
+    const p = await signIn(plain);
+    expect((await similar(p.jar, 'The Jira count is wrong', plain)).status).toBe(404);
+  });
+
+  it('C19-A11 (+1) a comment never holds the name, email, user id, space name, storage key or file name', async () => {
+    const { jar, email, userId } = await signInWithId();
+    const [target] = await seed({ title: 'Privacy of a +1' });
+    await mirrorNow();
+    const marker = `A11p ${uuid()}`;
+    const r = report({ text: `Private bits. ${marker}`, plusOneOf: target!.number });
+    await send(jar, r, new File([new Uint8Array(64)], 'Rohit secret.png', { type: 'image/png' }));
+    const [c] = await commentsWith(marker);
+    const [row] = await rowsOf(r.id);
+    for (const bad of [email, userId, 'Personal', row!.screenshotKey!, 'Rohit secret'])
+      expect(c!.body).not.toContain(bad);
   });
 });

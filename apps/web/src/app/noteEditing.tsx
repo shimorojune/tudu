@@ -80,7 +80,9 @@ export function useNoteEditor(
   const drawings = useNoteDrawings(id, view);
   if (!id) return { loading: true };
   if (q.isPending) return { loading: true, compact: o.compact };
-  if (q.isError || !view)
+  // Only a note that never arrived is an error. A read of it again that fails (offline, a blip) keeps the note you
+  // have on screen, and a drawing open over it: the save state already says what's waiting.
+  if (!view)
     return {
       error: true,
       compact: o.compact,

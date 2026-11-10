@@ -168,7 +168,7 @@ Other open threads are numbering tests too; if a number is taken at build time, 
 All of it runs on the PR's CI, not on Rohit's Mac: since 10 Nov the app tests are not run locally, because their
 windows pop up over his work.
 
-As built: the All spaces test is C21-E28 and the Mac test is C02-D01. C02-E15 also runs on Safari's engine (the
+As built: the All spaces test is C21-E29 and the Mac test is C02-D01. C02-E15 also runs on Safari's engine (the
 `webkit` project). The existing drag tests (C02-E07, C05-E02, E03, E14, E15) run with reduced motion, where the task
 lands at once, so they needed no `landed` wait. C02-E17 found no shift in the app's header, so `DayHeader` is
 unchanged.

@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ApiError } from '@tudu/client';
-import type { FeedbackReport, FeedbackSent, MyReports } from '@tudu/core';
+import type { FeedbackReport, FeedbackSent, MyReports, SimilarIssue, SimilarIssues } from '@tudu/core';
 import { dismissToast, ToastHost } from '@tudu/ui';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -28,9 +28,22 @@ const mine = vi.hoisted(() => ({
   answer: { filing: 'email', reports: [] } as MyReports | Error,
   calls: 0,
 }));
+// Similar reports, as GET /api/feedback/similar answers (#76); each look is kept with its words and signal.
+const similar = vi.hoisted(() => ({
+  answer: { issues: [] } as SimilarIssues | Error,
+  looks: [] as Array<{ q: string; signal: AbortSignal | undefined }>,
+}));
 vi.mock('./session', () => ({
   api: {
-    get: vi.fn(async () => {
+    get: vi.fn(async (path: string, init?: RequestInit) => {
+      if (path.startsWith('/api/feedback/similar')) {
+        similar.looks.push({
+          q: new URL(path, 'http://x').searchParams.get('q') ?? '',
+          signal: init?.signal ?? undefined,
+        });
+        if (similar.answer instanceof Error) throw similar.answer;
+        return similar.answer;
+      }
       mine.calls++;
       if (mine.answer instanceof Error) throw mine.answer;
       return mine.answer;
@@ -41,6 +54,15 @@ const opened = vi.hoisted(() => [] as string[]);
 vi.mock('./links', () => ({ openOutside: (url: string) => opened.push(url) }));
 
 const ISSUE = { number: 142, url: 'https://github.com/shimorojune/tudu/issues/142' };
+const JIRA: SimilarIssue = {
+  number: 64,
+  title: 'Jira count stuck at 1 with 2 assigned',
+  url: 'https://github.com/shimorojune/tudu/issues/64',
+  state: 'fixed',
+  createdAt: '2026-10-24T10:00:00.000Z',
+  closedAt: '2026-11-05T10:00:00.000Z',
+  plusOnes: 2,
+};
 
 const report = (text = 'The tick came back'): FeedbackReport => ({
   id: crypto.randomUUID(),
@@ -48,6 +70,7 @@ const report = (text = 'The tick came back'): FeedbackReport => ({
   text,
   details: null,
   shotPublic: false,
+  plusOneOf: null,
 });
 const queued = (r = report(), shot = true): QueuedReport => ({
   report: r,
@@ -165,6 +188,8 @@ describe('C19-U06 the draft and the details switch', () => {
     localStorage.clear();
     mine.answer = { filing: 'email', reports: [] };
     mine.calls = 0;
+    similar.answer = { issues: [] };
+    similar.looks = [];
     opened.length = 0;
     send = vi.fn(async (_q: QueuedReport): Promise<FeedbackSent | void> => {});
     setFeedbackQueue(new FeedbackQueue(new MemoryFeedbackStore(), send));
@@ -259,37 +284,133 @@ describe('C19-U06 the draft and the details switch', () => {
     expect(box()).toHaveValue('');
   });
 
-  it('C19-U22 the report says whether to show the screenshot; a new screenshot starts private; email only never asks', async () => {
+  it('C19-U22 the report says whether to show the screenshot; a new PNG starts public, a HEIC private; off holds for that one; email only never asks', async () => {
     const user = userEvent.setup();
     mine.answer = { filing: 'github', reports: [] };
     send.mockResolvedValue({ id: 'x', issue: ISSUE, pending: false });
     mount();
     act(() => openFeedback());
     await screen.findByRole('button', { name: 'Public on GitHub: what’s shared' });
-    const shot = (name: string) => new File([new Uint8Array(2048)], name, { type: 'image/png' });
+    const shot = (name: string, type = 'image/png') => new File([new Uint8Array(2048)], name, { type });
     const sw = () => screen.getByRole('switch', { name: 'Show the screenshot on the public issue' });
     await user.type(box(), 'Drag puts it back');
     await user.upload(screen.getByLabelText('Choose a screenshot'), shot('One.png'));
     await waitFor(() => expect(sw()).toBeInTheDocument());
-    await user.click(sw());
     expect(sw()).toBeChecked();
-    // Another screenshot: private again.
+    await user.click(sw());
+    expect(sw()).not.toBeChecked();
+    // Another screenshot: public again; off held for the first one only.
     await user.upload(screen.getByLabelText('Choose a screenshot'), shot('Two.png'));
     await waitFor(() => expect(document.querySelector('.tp-fb-nm')).toHaveTextContent('Two.png'));
+    expect(sw()).toBeChecked();
+    // A kind GitHub can't show comes in private, and stays so.
+    await user.upload(screen.getByLabelText('Choose a screenshot'), shot('IMG.heic', 'image/heic'));
+    await waitFor(() => expect(document.querySelector('.tp-fb-nm')).toHaveTextContent('IMG.heic'));
     expect(sw()).not.toBeChecked();
-    await user.click(sw());
+    expect(sw()).toBeDisabled();
+    await user.upload(screen.getByLabelText('Choose a screenshot'), shot('Three.png'));
+    await waitFor(() => expect(document.querySelector('.tp-fb-nm')).toHaveTextContent('Three.png'));
     await user.click(screen.getByRole('button', { name: 'Send' }));
     await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
     expect((send.mock.calls[0]![0] as QueuedReport).report.shotPublic).toBe(true);
     await user.click(await screen.findByRole('button', { name: 'Done' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    // Sent and cleared: the next draft starts private, with no screenshot.
+    // Sent and cleared: the next draft has no screenshot, so nothing to show.
     act(() => openFeedback());
     expect(screen.queryByRole('switch', { name: 'Show the screenshot on the public issue' })).toBeNull();
     await user.type(box(), 'No shot this time');
     await user.click(screen.getByRole('button', { name: 'Send' }));
     await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
     expect((send.mock.calls[1]![0] as QueuedReport).report.shotPublic).toBe(false);
+  });
+
+  it('C19-U32 similar looks: none under three words; one 450ms after the last key; a newer look aborts the older; rows stay dimmed while the next comes', async () => {
+    const user = userEvent.setup();
+    mine.answer = { filing: 'github', reports: [] };
+    similar.answer = { issues: [JIRA] };
+    mount();
+    act(() => openFeedback());
+    await screen.findByRole('button', { name: 'Public on GitHub: what’s shared' });
+    await user.type(box(), 'Jira count');
+    await new Promise((r) => setTimeout(r, 600));
+    expect(similar.looks).toHaveLength(0);
+    await user.type(box(), ' wrong');
+    // Not while the keys are coming; then once.
+    expect(similar.looks).toHaveLength(0);
+    await waitFor(() => expect(similar.looks).toHaveLength(1));
+    expect(similar.looks[0]!.q).toBe('Jira count wrong');
+    expect(await screen.findByText('Already reported?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+1 #64 instead of a new issue' })).toBeInTheDocument();
+    // The next look keeps the rows, dimmed, until it answers.
+    let answer!: (v: SimilarIssues) => void;
+    const { api } = await import('./session');
+    (api.get as ReturnType<typeof vi.fn>).mockImplementationOnce(
+      (path: string, init?: RequestInit) =>
+        new Promise((done) => {
+          similar.looks.push({
+            q: new URL(path, 'http://x').searchParams.get('q') ?? '',
+            signal: init?.signal ?? undefined,
+          });
+          answer = done;
+        }),
+    );
+    await user.type(box(), ' in the sidebar');
+    await waitFor(() => expect(similar.looks).toHaveLength(2));
+    expect(screen.getByRole('list', { name: 'Similar reports' })).toHaveClass('tp-stale');
+    // A newer look before it answers aborts it.
+    similar.answer = { issues: [] };
+    await user.type(box(), ' today');
+    await waitFor(() => expect(similar.looks).toHaveLength(3));
+    expect(similar.looks[1]!.signal?.aborted).toBe(true);
+    act(() => answer({ issues: [JIRA] }));
+    // The newest answer (nothing close) wins: the box folds shut.
+    await waitFor(() => expect(screen.getByTestId('similar-reports')).toHaveClass('tp-hide'));
+  });
+
+  it('C19-U33 a +1 goes as plusOneOf and says it’s on #64; a 409 clears the pick and keeps the words; a queued +1 keeps it, and goes as new if refused', async () => {
+    const user = userEvent.setup();
+    mine.answer = { filing: 'github', reports: [] };
+    similar.answer = { issues: [JIRA] };
+    send.mockRejectedValueOnce(
+      new ApiError(409, 'That issue can’t take comments now. Send it as a new report instead.'),
+    );
+    send.mockResolvedValueOnce({
+      id: 'x',
+      issue: { number: 64, url: 'https://github.com/shimorojune/tudu/issues/64#issuecomment-1' },
+      pending: false,
+    });
+    mount();
+    act(() => openFeedback());
+    await screen.findByRole('button', { name: 'Public on GitHub: what’s shared' });
+    await user.type(box(), 'Jira count says 1');
+    await user.click(await screen.findByRole('button', { name: '+1 #64 instead of a new issue' }));
+    await user.click(screen.getByRole('button', { name: /\+1 on #64/ }));
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+    expect((send.mock.calls[0]![0] as QueuedReport).report.plusOneOf).toBe(64);
+    expect(
+      await screen.findByText('That issue can’t take comments now. Send it as a new report instead.'),
+    ).toBeInTheDocument();
+    expect(box()).toHaveValue('Jira count says 1');
+    expect(screen.getByRole('button', { name: /^Send$/ })).toBeInTheDocument();
+    // Picked again (the issue took comments again): it goes on, and the form says so.
+    await user.click(screen.getByRole('button', { name: '+1 #64 instead of a new issue' }));
+    await user.click(screen.getByRole('button', { name: /\+1 on #64/ }));
+    expect(await screen.findByRole('dialog', { name: 'Thanks, it’s on #64' })).toBeInTheDocument();
+
+    // Queued offline, the pick waits with it; if the issue can't take it by then, it goes as a new report.
+    const store = new MemoryFeedbackStore();
+    const sent: QueuedReport[] = [];
+    const later = vi.fn(async (q: QueuedReport) => {
+      sent.push(q);
+      if (q.report.plusOneOf != null) throw new ApiError(409, 'no');
+      return { id: 'y', issue: ISSUE, pending: false };
+    });
+    const q = new FeedbackQueue(store, later);
+    await q.submit(queued({ ...report('Queued +1'), plusOneOf: 64 }), false);
+    expect((await store.all())[0]!.report.plusOneOf).toBe(64);
+    await new FeedbackQueue(store, later).flush();
+    expect(sent.map((x) => x.report.plusOneOf)).toEqual([64, null]);
+    expect(await store.all()).toHaveLength(0);
   });
 
   it('C19-U15 a pending answer shows Sent with the issue to follow; a refusal shows its line and keeps the words', async () => {

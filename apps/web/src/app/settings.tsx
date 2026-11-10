@@ -10,6 +10,7 @@ import {
   spaceRules,
   whenWords,
   type Ask,
+  type ConnectorSpacesResponse,
   type Invite,
   type InviteResponse,
   type MembersResponse,
@@ -24,6 +25,7 @@ import {
   showToast,
   useLessMotion,
   useTheme,
+  type JiraSpaceRow,
   type MembersBodyMember,
   type SettingsMac,
   type SettingsSectionName,
@@ -41,7 +43,7 @@ import { scrollToProjects, settingsClosed } from './editProjects';
 import { api, initialsOf, photoSrc, queryClient, refreshMe, signOut } from './session';
 import { forgetSpace, spacePath, useSpace as useSpaceFromShell } from './space';
 import { invitedWords } from './spaces';
-import { askJiraReconnect, clearJiraGlow, hostOf, jiraClient, peekJiraGlow, useJira } from './jira';
+import { ALL_GLOW, askJiraReconnect, clearJiraGlow, hostOf, jiraClient, peekJiraGlow, useJira } from './jira';
 import { taskStore, useOnline } from './tasks';
 import { useViewport } from './viewport';
 
@@ -77,6 +79,28 @@ export function settingsHref(
   else q.delete('settings');
   const s = q.toString();
   return `${at.pathname}${s ? `?${s}` : ''}`;
+}
+
+/**
+ * Settings › Apps' rows from the switches: the space you are in is "here" (none in All spaces), and a row you were sent
+ * to glows (every row, with ALL_GLOW, through `glowAll`).
+ */
+export function jiraRows(
+  spaces: ConnectorSpacesResponse['spaces'],
+  here: string,
+  glow: string | null,
+  all: boolean,
+): JiraSpaceRow[] {
+  return spaces.map((x) => ({
+    id: x.id,
+    name: x.name,
+    color: x.color ?? undefined,
+    personal: x.kind === 'personal',
+    on: x.on,
+    linked: x.linked,
+    current: !all && x.id === here,
+    highlight: glow !== ALL_GLOW && x.id === glow,
+  }));
 }
 
 /** Spaces this tab is leaving or deleting itself: their space.gone needs no second toast. */
@@ -216,6 +240,7 @@ export function SettingsView({
   onSection,
   onClose,
   onBack,
+  all = false,
 }: {
   me: MeResponse;
   space: SpaceSummary;
@@ -225,6 +250,8 @@ export function SettingsView({
   onSection: (s: SettingsSectionName) => void;
   onClose?: () => void;
   onBack?: () => void;
+  /** Opened over All spaces: no space is "here". */
+  all?: boolean;
 }) {
   const navigate = useNavigate();
   const { choice, setTheme } = useTheme();
@@ -477,6 +504,7 @@ export function SettingsView({
           )
         }
         onRemove={remove}
+        allSpaces={all}
         jira={
           jira.connected
             ? {
@@ -486,16 +514,8 @@ export function SettingsView({
                 state: jira.connected.state,
                 loading: jiraSpaces.isPending,
                 error: jiraSpaces.isError,
-                spaces: jiraSpaces.data?.spaces.map((x) => ({
-                  id: x.id,
-                  name: x.name,
-                  color: x.color ?? undefined,
-                  personal: x.kind === 'personal',
-                  on: x.on,
-                  linked: x.linked,
-                  current: x.id === space.id,
-                  highlight: x.id === glow,
-                })),
+                spaces: jiraSpaces.data ? jiraRows(jiraSpaces.data.spaces, space.id, glow, all) : undefined,
+                glowAll: glow === ALL_GLOW,
               }
             : { connected: false }
         }
@@ -560,7 +580,15 @@ export function SettingsView({
 }
 
 /** The dialog on the desk and tablets, opened by `?settings=` on whatever page you are on. */
-export function SettingsHost({ me, space }: { me: MeResponse; space: SpaceSummary }) {
+export function SettingsHost({
+  me,
+  space,
+  all = false,
+}: {
+  me: MeResponse;
+  space: SpaceSummary;
+  all?: boolean;
+}) {
   const vp = useViewport();
   const navigate = useNavigate();
   const loc = useRouterState({ select: (s) => s.location });
@@ -592,6 +620,7 @@ export function SettingsHost({ me, space }: { me: MeResponse; space: SpaceSummar
         layout="dialog"
         onSection={(s) => void navigate({ href: settingsHref(loc, space.slug, s, false), replace: true })}
         onClose={close}
+        all={all}
       />
     </Dialog>
   );

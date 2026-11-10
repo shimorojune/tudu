@@ -278,7 +278,8 @@ export {
   type SettingsSectionName,
   UP_TO_DATE_MS,
   JIRA_SWITCH_SETTLE_MS,
-  jiraSpaceLine,
+  jiraSpaceCount,
+  jiraSpaceWord,
   type JiraSpaceRow,
 } from './components/Settings';
 export {
@@ -344,6 +345,13 @@ export {
   type GettingStartedItem,
 } from './components/GettingStarted';
 export { FeedbackDialog, type FeedbackDialogProps, type FeedbackPhase } from './components/FeedbackDialog';
+export {
+  SimilarReports,
+  SIMILAR_SHIMMER_MS,
+  similarMeta,
+  type SimilarReportsProps,
+  type SimilarReportsState,
+} from './components/SimilarReports';
 export {
   FeedbackReports,
   reportDay,

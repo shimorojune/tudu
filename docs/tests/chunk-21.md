@@ -5,27 +5,28 @@ Status column is kept by `pnpm test:status` in [STATUS.md](STATUS.md). The featu
 
 ## Unit (`packages/core`, `packages/client`, `packages/ui`, `apps/web`)
 
-| ID      | Where                     | Case                                                                                                                                                                   |
-| ------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C21-U01 | core `allSpaces.test.ts`  | `gatherAll` merges three spaces into one list; unarranged days follow switcher order then each space's order; Personal first                                           |
-| C21-U02 | core `allSpaces.test.ts`  | Arranged day: places win; a task with no place goes to the end, oldest first; a place whose `day` is stale counts as none                                              |
-| C21-U03 | core `allSpaces.test.ts`  | Isolation: a cached task whose space isn't in the list is dropped; a colleague's task in a shared space is dropped; your "only me" task stays                          |
-| C21-U04 | core `allSpaces.test.ts`  | Filter: `space` narrows to one space; counts (done, total) match the shown list with and without the filter                                                            |
-| C21-U05 | core `spaces.test.ts`     | `all` is reserved: `spaceSlug('All')` gives `all-2`; `spaceForSlug` never matches `all`                                                                                |
-| C21-U06 | client `tasks.test.ts`    | `placeInAll` sends only `all.place` and leaves every space position alone; tight neighbours renumber the day in one batch                                              |
-| C21-U07 | client `tasks.test.ts`    | `moveInAll` sends `task.place` (day, position null) then `all.place`, in order, for the task's own space                                                               |
-| C21-U08 | client `tasks.test.ts`    | Wrong-space guard: cross, rename, due, project and subtask writes from All spaces carry the task's own space; `create` uses the target passed, not the last-used space |
-| C21-U09 | client `tasks.test.ts`    | `ALL_SPACES_CHANGED` from another tab invalidates places; from this tab it does nothing; `forgetSpace` removes that space's cached queries and nothing else            |
-| C21-U10 | ui `TaskRow.test.tsx`     | The space pill: tile and name, bare in brief and compact; a press calls `onSignal(task, 'space')` and not `onOpen`                                                     |
-| C21-U11 | ui `SpaceSwitch.test.tsx` | All spaces row first with a separator; hidden with one space; picking marks the row before `onPick` fires                                                              |
-| C21-U12 | ui `SpaceTile.test.tsx`   | The `all` tile uses `tp-stile-all`; initials render as centred SVG text; Personal's small icon                                                                         |
-| C21-U13 | ui `TaskDetail.test.tsx`  | The Space fact is first, read-only, and calls `onOpenSpace`                                                                                                            |
-| C21-U14 | web `shell.test.ts`       | In All spaces: the sidebar has Today, Week and Backlog only; no Jira button; the Inbox count is unchanged; the All spaces row has no badge                             |
-| C21-U15 | web `space.test.ts`       | `/all?space=northwind` keeps the filter; an unknown slug drops it; `/all` with one space goes to `/me`; `homePath` returns `/all` when it was last                     |
-| C21-U16 | web `search.test.ts`      | Hits outside the open space are labelled; in All spaces all are; old per-space recent and history lists merge into one, newest first, without repeats                  |
-| C21-U17 | core `allSpaces.test.ts`  | `placesFor`: between placed neighbours only the moved task is written; with an unplaced or too-close neighbour the whole day is numbered afresh                        |
-| C21-U18 | web `refOnce.test.ts`     | The task panel tells the page a task's ref once per open task, however often the page re-renders; another task, or the same one reopened after closing, tells it again |
-| C21-U19 | web `allScope.test.ts`    | All spaces' scope keeps its identity while only `?task=` changes, changes once when `?space=` does; `setFilter` edits the address as it is when called                 |
+| ID      | Where                     | Case                                                                                                                                                                                                      |
+| ------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C21-U01 | core `allSpaces.test.ts`  | `gatherAll` merges three spaces into one list; unarranged days follow switcher order then each space's order; Personal first                                                                              |
+| C21-U02 | core `allSpaces.test.ts`  | Arranged day: places win; a task with no place goes to the end, oldest first; a place whose `day` is stale counts as none                                                                                 |
+| C21-U03 | core `allSpaces.test.ts`  | Isolation: a cached task whose space isn't in the list is dropped; a colleague's task in a shared space is dropped; your "only me" task stays                                                             |
+| C21-U04 | core `allSpaces.test.ts`  | Filter: `space` narrows to one space; counts (done, total) match the shown list with and without the filter                                                                                               |
+| C21-U05 | core `spaces.test.ts`     | `all` is reserved: `spaceSlug('All')` gives `all-2`; `spaceForSlug` never matches `all`                                                                                                                   |
+| C21-U06 | client `tasks.test.ts`    | `placeInAll` sends only `all.place` and leaves every space position alone; tight neighbours renumber the day in one batch                                                                                 |
+| C21-U07 | client `tasks.test.ts`    | `moveInAll` sends `task.place` (day, position null) then `all.place`, in order, for the task's own space                                                                                                  |
+| C21-U08 | client `tasks.test.ts`    | Wrong-space guard: cross, rename, due, project and subtask writes from All spaces carry the task's own space; `create` uses the target passed, not the last-used space                                    |
+| C21-U09 | client `tasks.test.ts`    | `ALL_SPACES_CHANGED` from another tab invalidates places; from this tab it does nothing; `forgetSpace` removes that space's cached queries and nothing else                                               |
+| C21-U10 | ui `TaskRow.test.tsx`     | The space pill: tile and name, bare in brief and compact; a press calls `onSignal(task, 'space')` and not `onOpen`                                                                                        |
+| C21-U11 | ui `SpaceSwitch.test.tsx` | All spaces row first with a separator; hidden with one space; picking marks the row before `onPick` fires                                                                                                 |
+| C21-U12 | ui `SpaceTile.test.tsx`   | The `all` tile uses `tp-stile-all`; initials render as centred SVG text; Personal's small icon                                                                                                            |
+| C21-U13 | ui `TaskDetail.test.tsx`  | The Space fact is first, read-only, and calls `onOpenSpace`                                                                                                                                               |
+| C21-U14 | web `shell.test.ts`       | In All spaces: the sidebar has Today, Week and Backlog only; no Jira button; the Inbox count is unchanged; the All spaces row has no badge                                                                |
+| C21-U15 | web `space.test.ts`       | `/all?space=northwind` keeps the filter; an unknown slug drops it; `/all` with one space goes to `/me`; `homePath` returns `/all` when it was last                                                        |
+| C21-U16 | web `search.test.ts`      | Hits outside the open space are labelled; in All spaces all are; old per-space recent and history lists merge into one, newest first, without repeats                                                     |
+| C21-U17 | core `allSpaces.test.ts`  | `placesFor`: between placed neighbours only the moved task is written; with an unplaced or too-close neighbour the whole day is numbered afresh                                                           |
+| C21-U18 | web `refOnce.test.ts`     | The task panel tells the page a task's ref once per open task, however often the page re-renders; another task, or the same one reopened after closing, tells it again                                    |
+| C21-U19 | web `allScope.test.ts`    | All spaces' scope keeps its identity while only `?task=` changes, changes once when `?space=` does; `setFilter` edits the address as it is when called                                                    |
+| C21-U23 | web `firstRun.test.tsx`   | Getting started in All spaces on the desk: Bring your Jira issues opens `?settings=apps`, not the Apps panel; in a space it still opens the Apps panel; on a phone it still goes to the space's Apps page |
 
 ## API (`apps/server/src/allSpaces.test.ts`, against the test database)
 
@@ -73,7 +74,8 @@ Every spec makes its own users and spaces. The multi-user specs use two browser 
 | C21-E22 | A task written in All spaces (every space, filtered to Personal, filtered to Northwind) opens at once while the server holds its answer back; the tab stays responsive and the address gains `?task=` |
 | C21-E23 | A saved task opens, closes and opens again on All spaces Today (unfiltered and filtered), Week and Backlog without freezing                                                                           |
 | C21-E24 | The same two triggers on a space's own Today, Week and Backlog (regression guard for the shared panel)                                                                                                |
-| C21-E28 | Two days, a drop on tomorrow                                                                                                                                                                          | Motion on: a Northwind task glides onto tomorrow, keeps its pill, and is on tomorrow in Northwind (desktop) |
+| C21-E28 | Getting started in All spaces (desk, tablet): Bring your Jira issues opens Settings on Apps (Connect shown), no Apps panel                                                                            |
+| C21-E29 | Two days, a drop on tomorrow                                                                                                                                                                          | Motion on: a Northwind task glides onto tomorrow, keeps its pill, and is on tomorrow in Northwind (desktop) |
 
 Every end-to-end spec makes its own people and spaces. Chunk 07's Search specs keep their IDs; C07-U08 now reads
 one list per browser (Search spans every space), and C07-E11 holds the new `/api/search` route.

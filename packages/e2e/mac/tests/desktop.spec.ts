@@ -548,6 +548,62 @@ test.describe('desktop', () => {
     await app.waitState((x) => x.badge === null);
   });
 
+  test('C11-D21 a request sent while the desk is still loading counts on the Dock without any later event', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const { b, space, meId } = await withSecond(app);
+    // Each round: the desk loads again and, without waiting for it to be listening, a request is sent to you. The
+    // one that lands before the page's live stream is up used to be lost until something else happened.
+    for (let n = 1; n <= 3; n++) {
+      await app.eval(`location.assign(${JSON.stringify(`${WEB}/${space.slug}`)})`).catch(() => {});
+      await sendRequest(b, space.id, meId, `Check the proofs ${n}`);
+      await app.waitState((x) => x.badge === String(n));
+    }
+  });
+
+  test("C11-D22 with the outbox's disk stuck, declining a request still reaches the server and clears the Dock", async ({
+    app,
+  }) => {
+    await signIn(app);
+    const { b, space, meId } = await withSecond(app);
+    await sendRequest(b, space.id, meId, 'Check the stuck disk');
+    await app.waitState((x) => x.badge === '1');
+    await go(app, `/inbox?space=${space.slug}`);
+    await app.until(`return T.all('article', /Check the stuck disk/).length > 0`);
+    // What WebKit did on the Mac (C11-D09): a readwrite transaction on the outbox that never finishes, so every
+    // later write waits behind it. Here the test holds one open by asking for a row in it again and again.
+    await app.eval(`
+      window.__holdOutbox = true;
+      const r = indexedDB.open('tudu');
+      r.onsuccess = () => {
+        const s = r.result.transaction('outbox', 'readwrite').objectStore('outbox');
+        const spin = () => { if (window.__holdOutbox) s.get('held').onsuccess = spin; };
+        spin();
+        window.__outboxHeld = true;
+      };
+    `);
+    await app.until(`return window.__outboxHeld === true`);
+    try {
+      await app.eval(`T.click(T.all('article', /Check the stuck disk/)[0].querySelector('button'))`);
+      await app.until(`return T.all('button', 'Decline').length > 0`);
+      await app.eval(`T.click(T.get('button', 'Decline'))`);
+      await app.until(`return T.all('textbox', 'Reason for declining').length > 0`);
+      await app.eval(
+        `T.fill(T.get('textbox', 'Reason for declining'), 'Not this week'); T.click(T.get('button', 'Send'))`,
+      );
+      // Sent from memory at once: no waiting for the disk (whose writes give up after 3 s).
+      await app.waitState((x) => x.badge === null, 2_500);
+      const out = await b.call<{ sent: Array<{ title: string; state: string }> }>(
+        'GET',
+        '/api/inbox?view=sent',
+      );
+      expect(out.sent.find((r) => r.title === 'Check the stuck disk')?.state).toBe('declined');
+    } finally {
+      await app.eval(`window.__holdOutbox = false`).catch(() => {});
+    }
+  });
+
   test('C11-D10 links and files: Open in Jira and an outside link go to the default browser, never the window; a chip lands in Downloads', async ({
     app,
     folder,
@@ -808,6 +864,24 @@ test.describe('desktop', () => {
       `/api/spaces/${space.id}/days/${today()}`,
     );
     expect(day.tasks.map((t) => t.title)).toContain('Book the offsite');
+  });
+
+  test('C17-D02 a space made a moment ago: the summon at once opens on it, and the desk still remembers it', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const space = await teamSpace(app, 'Harbour');
+    // No wait for the floating window to hear of the new space: its list is behind the desk's.
+    await app.act('summon');
+    await floatingShown(app);
+    await app.until(
+      `const l = document.querySelector('.tp-qa-toline'); return !!l && /^In.*Harbour.*for.*Me$/.test(l.textContent)`,
+      'floating',
+    );
+    // Again hides it.
+    await app.act('summon');
+    await floatingHidden(app);
+    expect(await app.eval<string | null>(`return localStorage.getItem('tudu.space')`)).toBe(space.slug);
   });
 });
 

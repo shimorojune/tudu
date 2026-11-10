@@ -79,6 +79,14 @@ describe('C08-U11 the space in the address', () => {
     expect(localStorage.getItem('tudu.space')).toBeNull();
     expect(homePath(SPACES)).toBe('/me');
   });
+
+  it('C17-U05 keep: a space missing from a list that may be behind answers null and stays remembered', () => {
+    rememberSpace('acme');
+    expect(lastSpace(SPACES, { keep: true })).toBeNull();
+    expect(localStorage.getItem('tudu.space')).toBe('acme');
+    expect(lastSpace(SPACES)).toBeNull();
+    expect(localStorage.getItem('tudu.space')).toBeNull();
+  });
 });
 
 describe('C08-U20 the one Inbox has its own address', () => {

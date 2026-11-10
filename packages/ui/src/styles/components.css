@@ -419,6 +419,8 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 .tp-rail-fixed .tp-nav { height: 44px; }
 .tp-rail-fixed .tp-nav-fold { display: none; }
 .tp-rail-fixed, .tp-rail-fixed * { transition: none !important; }
+/* While the sidebar folds, the rail's tips stay at rest and never animate into being; they work once it has settled. */
+.tp-side-folding .tp-tip::after { opacity: 0 !important; transition: none !important; }
 
 /* Top bar */
 .tp-topbar { display: flex; align-items: center; gap: 10px; height: 64px; padding: 0 4px; }
@@ -1952,7 +1954,7 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 .tp-sswl-ok { width: 14px; height: 14px; color: var(--foreground); }
 .tp-sswl-foot { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 4px; }
 .tp-root .tp-sswl-foot .tp-mi { display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; padding-left: 16px; }
-.tp-side-custom { padding-left: 6px; overflow: visible; }
+.tp-side-custom { padding-left: 9px; overflow: visible; }
 .tp-ssw-sheet .tp-ssw-b { font-size: 16px; }
 .tp-sswsheet { position: absolute; inset: 0; z-index: 80; }
 .tp-sswsheet-veil { position: absolute; inset: 0; background: var(--veil); animation: tp-veil-in 200ms var(--ease-change) both; }
@@ -2275,7 +2277,8 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 /* SpaceSwitch on the tablet rail: only the tile (the list opens beside it) */
 .tp-ssw-rail .tp-ssw-name, .tp-ssw-rail .tp-ssw-chev { display: none; }
 .tp-ssw-rail .tp-ssw-pip { position: absolute; top: 2px; right: 2px; }
-.tp-ssw-rail .tp-ssw-b { position: relative; padding: 4px; }
+.tp-ssw-rail .tp-ssw-b { position: relative; width: 34px; max-width: none; padding: 4px; }
+.tp-ssw-rail, .tp-ssw-rail .tp-ssw-id, .tp-ssw-rail .tp-stile { flex: none; }
 .tp-ssw-rail .tp-ssw-pop { left: calc(100% + 10px); top: 0; }
 .tp-mrow-pop.tp-mrow-pop-up { top: auto; bottom: calc(100% + 6px); transform-origin: bottom right; }
 .tp-pop-leaving.tp-mrow-pop-up { animation-name: tp-pop-out-up !important; }
@@ -2471,6 +2474,16 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 .tp-set-spsub.tp-busy { color: var(--foreground-2); }
 .tp-set-sperr { margin: -4px 0 10px 32px; animation: tp-banner-in 200ms var(--ease-arrive) both; }
 .tp-set-here { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-foreground); padding: 2px 6px; border-radius: 6px; background: var(--accent); }
+.tp-set-sw { display: inline-flex; align-items: center; gap: 12px; cursor: pointer; }
+.tp-set-state { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; min-width: 24px; font-size: 12.5px; font-weight: 500; color: var(--muted-foreground); white-space: nowrap; animation: tp-label-in 160ms linear both; }
+.tp-set-state.tp-on { color: var(--foreground); }
+.tp-set-state.tp-busy { color: var(--foreground-2); }
+.tp-set-sp2 .tp-setrow { padding: 14px 0; }
+.tp-set-sp2 .tp-stile, .tp-set-sp2 .tp-set-spname { transition: opacity 180ms var(--ease-change), color 180ms var(--ease-change); }
+.tp-set-sp2.tp-off .tp-stile { opacity: .5; }
+.tp-set-sp2.tp-off .tp-set-spname { color: var(--foreground-2); }
+.tp-set-sp2 .tp-set-sperr { margin-left: 32px; }
+@media (prefers-reduced-motion: reduce) { .tp-set-state { animation: none; } .tp-set-sp2 .tp-stile, .tp-set-sp2 .tp-set-spname { transition: none; } }
 .tp-set-skl { display: flex; align-items: center; gap: 10px; }
 .tp-set-skl .tp-setrow-t { flex: 1; }
 .tp-set-apps > .tp-banner-wrap { margin-bottom: 14px; }

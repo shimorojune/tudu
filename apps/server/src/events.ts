@@ -30,6 +30,11 @@ export class EventHub {
     return e;
   }
 
+  /** The id of the last event published to a person (0 before any): where a stream opened after a read starts. */
+  last(userId: string): number {
+    return this.seq.get(userId) ?? 0;
+  }
+
   /** Events after `afterId` that are still remembered. */
   since(userId: string, afterId: number): Published[] {
     return (this.recent.get(userId) ?? []).filter((e) => e.id > afterId);

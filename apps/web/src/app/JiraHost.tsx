@@ -28,6 +28,7 @@ import {
 import { useEffect, useState } from 'react';
 import { askBacklogView, flashTask, locateTask, showDay, useShownDay } from './dayView';
 import {
+  ALL_GLOW,
   closeApps,
   followAssignedList,
   glowJiraSpace,
@@ -527,6 +528,86 @@ export function JiraHost({ space }: { space: SpaceSummary }) {
           issue={j.issue}
           onIssue={(key) => void navigate({ href: withJira(loc, key), replace: !!key === !!j.issue })}
           onClose={close}
+        />
+      ) : null}
+    </Drawer>
+  );
+}
+
+/**
+ * All spaces' Jira (desk and tablets): only the token form. All spaces shows no issues, so connecting here turns Jira
+ * on nowhere; after the Connected tick, Settings opens on Apps with every row glowing once, to pick the spaces.
+ * An expired token gets the Reconnect form (its switches come back as they were). A stale ?jira while connected
+ * just goes away.
+ */
+export function JiraConnectHost({ space }: { space: SpaceSummary }) {
+  const vp = useViewport();
+  const navigate = useNavigate();
+  const loc = useRouterState({ select: (s) => s.location });
+  const j = jiraParam(loc.searchStr);
+  const { today } = useWorkingDay();
+  const { connected, known } = useJira(space.id);
+  // Mid-connect the form stays up whatever the reads say, so its Connected tick can finish.
+  const [holding, setHolding] = useState(false);
+  const expired = connected?.state === 'expired';
+  const phone = vp === 'phone';
+  const stale = j.open && known && !!connected && !expired && !holding;
+  useEffect(() => {
+    if (!phone && stale) void navigate({ href: withJira(loc, false), replace: true });
+  }, [phone, stale, loc, navigate]);
+  if (phone) return null;
+  const close = () => {
+    setHolding(false);
+    void navigate({ href: withJira(loc, false) });
+  };
+  const open = j.open && (holding || (known && (!connected || expired)));
+  const connect = async (input: {
+    site: string;
+    token: string;
+  }): Promise<{ error?: JiraConnectError } | void> => {
+    setHolding(true);
+    try {
+      // No space id: nothing turns on by itself. A new token for an expired connection keeps the switches.
+      await jiraClient.connect(input.site, input.token);
+    } catch (e) {
+      setHolding(false);
+      const je = jiraError(e);
+      if (je) return { error: { field: je.field ?? 'site', message: je.error } };
+      return {
+        error: {
+          field: 'site',
+          message: 'Couldn’t reach Jira at this address. Check it, or that you’re on your company network.',
+        },
+      };
+    }
+  };
+  const connectedNow = () => {
+    setHolding(false);
+    glowJiraSpace(ALL_GLOW);
+    const q = new URLSearchParams(loc.searchStr);
+    q.delete('jira');
+    void navigate({
+      href: settingsHref({ pathname: loc.pathname, searchStr: q.toString() }, space.slug, 'apps', false),
+    });
+  };
+  return (
+    <Drawer open={open} onClose={close} label="Jira" modal={false} width={vp === 'tablet' ? 460 : 560}>
+      {open ? (
+        <JiraPanel
+          state={expired && !holding ? 'reconnect' : 'connect'}
+          issues={[]}
+          today={today}
+          site={hostOf(connected)}
+          siteUrl={connected?.site}
+          synced={null}
+          views={[]}
+          view={JIRA_ASSIGNED_VIEW}
+          allSpaces
+          onConnect={connect}
+          onConnected={connectedNow}
+          onCancelReconnect={close}
+          onClose={close}
+          className={vp === 'tablet' ? 'app-jira-tablet' : undefined}
         />
       ) : null}
     </Drawer>

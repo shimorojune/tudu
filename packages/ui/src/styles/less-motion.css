@@ -222,6 +222,13 @@
 :root[data-motion='less'] .tp-sswl-it.tp-picked .tp-stile {
   animation: none;
 }
+:root[data-motion='less'] .tp-set-state {
+  animation: none;
+}
+:root[data-motion='less'] .tp-set-sp2 .tp-stile,
+:root[data-motion='less'] .tp-set-sp2 .tp-set-spname {
+  transition: none;
+}
 :root[data-motion='less'] .tp-set-sprow.tp-set-hl,
 :root[data-motion='less'] .tp-set-sprow > .tp-setrow,
 :root[data-motion='less'] .tp-set-spsub,
@@ -373,4 +380,13 @@
 }
 :root[data-motion='less'] .tp-mb .tp-mb-ibx {
   transition: opacity 160ms var(--ease-change);
+}
+:root[data-motion='less'] .tp-root.tp-sim-fold,
+:root[data-motion='less'] .tp-root .tp-sim ul,
+:root[data-motion='less'] .tp-root .tp-sim-row,
+:root[data-motion='less'] .tp-root .tp-sim-plus,
+:root[data-motion='less'] .tp-root .tp-sim-err,
+:root[data-motion='less'] .tp-root .tp-fb-inst {
+  transition: none;
+  animation: none;
 }

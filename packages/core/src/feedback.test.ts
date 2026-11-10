@@ -8,7 +8,11 @@ import {
   feedbackRef,
   feedbackReportSchema,
   issueBody,
+  issueBodyText,
   issueLabels,
+  ISSUE_TEXT_MAX,
+  PLUS_ONE_LINE,
+  similarReady,
   issueTitle,
   noMentions,
   osOf,
@@ -212,5 +216,60 @@ describe('the screenshot on the public issue', () => {
       expect(shotCanBePublic(t)).toBe(true);
     for (const t of ['image/svg+xml', 'image/heic', 'image/tiff', 'image/bmp', 'text/html', 'toString'])
       expect(shotCanBePublic(t)).toBe(false);
+  });
+});
+
+describe('similar reports and +1 that one instead (#76)', () => {
+  const base = { id: '9b2f7c1e-4a3d-4e5f-8a6b-7c8d9e0f1a2b', kind: 'bug', text: 'It broke.', details: null };
+
+  it('C19-U23 plusOneOf defaults to null and takes only a positive whole number; shotPublic still defaults to false', () => {
+    const parsed = feedbackReportSchema.parse(base);
+    expect(parsed.plusOneOf).toBeNull();
+    expect(parsed.shotPublic).toBe(false);
+    expect(feedbackReportSchema.parse({ ...base, plusOneOf: 64 }).plusOneOf).toBe(64);
+    for (const bad of [0, -3, 1.5, '64', true])
+      expect(feedbackReportSchema.safeParse({ ...base, plusOneOf: bad }).success).toBe(false);
+  });
+
+  it('C19-U24 a +1 comment is the issue body under "+1 from the Tudu app"; a fallback says which issue it meant', () => {
+    const x = {
+      kind: 'bug' as const,
+      text: 'The Jira count says 1.',
+      details: null,
+      ref: 'abcd1234',
+      shot: 'https://api.test/api/feedback/shots/abcd1234/sig',
+    };
+    const body = issueBody(x);
+    const plus = issueBody({ ...x, plusOne: true });
+    expect(plus).toBe(`${PLUS_ONE_LINE}\n\n${body}`);
+    expect(plus).toContain('![Screenshot](https://api.test/api/feedback/shots/abcd1234/sig)');
+    expect(plus).toContain('ref abcd1234');
+    expect(issueBody({ ...x, similarTo: 64 })).toBe(`Similar to #64\n\n${body}`);
+    expect(issueBody({ ...x, plusOne: false, similarTo: null })).toBe(body);
+  });
+
+  it('C19-U25 an issue’s words for matching: no app footer, no screenshot, no images; hand-written ones kept; capped', () => {
+    const filed = issueBody({
+      kind: 'bug',
+      text: 'Jira count stuck at 1.\nTwo are assigned.',
+      details: null,
+      ref: 'abcd1234',
+      shot: 'https://api.test/shot',
+    });
+    expect(issueBodyText(filed)).toBe('Jira count stuck at 1.\nTwo are assigned.');
+    expect(
+      issueBodyText(issueBody({ kind: 'idea', text: 'Pin tasks', details: null, ref: 'x', plusOne: true })),
+    ).toBe('Pin tasks');
+    const hand = 'Steps:\r\n1. Open Week\r\n\r\n---\r\nSomething else ![a](b.png) <img src="c.png">';
+    expect(issueBodyText(hand)).toBe('Steps:\n1. Open Week\n\n---\nSomething else');
+    expect(issueBodyText(null)).toBe('');
+    expect(issueBodyText('a'.repeat(ISSUE_TEXT_MAX + 50))).toHaveLength(ISSUE_TEXT_MAX);
+  });
+
+  it('C19-U25b the form looks only with three words and twelve characters', () => {
+    expect(similarReady('Jira count wrong')).toBe(true);
+    expect(similarReady('Jira count')).toBe(false);
+    expect(similarReady('a b c')).toBe(false);
+    expect(similarReady('   The Jira count   ')).toBe(true);
   });
 });

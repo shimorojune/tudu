@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { connectEvents } from '@tudu/client';
+import { connectEvents, type MeResponse } from '@tudu/client';
 import {
   INBOX_CHANGED,
   ME_CHANGED,
@@ -11,7 +11,7 @@ import {
   TASKS_CHANGED,
 } from '@tudu/core';
 import { API_URL } from './config';
-import { queryClient } from './session';
+import { meQuery, queryClient } from './session';
 import { notebookStore } from './notebook';
 import { taskStore } from './tasks';
 
@@ -23,8 +23,12 @@ export function useLiveEvents(enabled: boolean): void {
   useEffect(() => {
     if (!enabled) return;
     let dropped = false;
+    // The stream starts where this page's read of who you are stands, so a request sent to you while the page
+    // loads still comes down it (else the Inbox count and the Dock badge stay one behind).
+    const after = queryClient.getQueryData<MeResponse | null>(meQuery.queryKey)?.events;
     const handle = connectEvents({
       url: `${API_URL}/api/events`,
+      after: after === undefined ? null : String(after),
       onEvent: (e) => {
         if (e.type === 'hello') return;
         // Your Notebook: only what another window or device changed reads again.

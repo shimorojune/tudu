@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { FeedbackKind } from '@tudu/core';
+import { shotCanBePublic, type FeedbackKind, type SimilarIssue } from '@tudu/core';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { AccountMenu } from './AccountMenu';
@@ -26,9 +26,9 @@ function Form({
       onText={setText}
       shot={shot}
       onShot={(f) => {
-        // As the app does: each new screenshot comes in private.
+        // As the app does: each new screenshot GitHub can show comes in public (#75).
         setShot(f);
-        setShotPublic(false);
+        setShotPublic(!!f && shotCanBePublic(f.type));
       }}
       shotPublic={shotPublic}
       onShotPublic={setShotPublic}
@@ -97,7 +97,7 @@ describe('FeedbackDialog (chunk 19)', () => {
       'placeholder',
       'What you’d like Tudu to do, and what it would save you. Leave out anything private.',
     );
-    expect(screen.getByText('Private unless you show it')).toBeInTheDocument();
+    expect(screen.getByText('Shown on the issue unless you hide it')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Public on GitHub: what’s shared' })).toBeInTheDocument();
     rerender(<Form onSend={onSend} filing="github" phase="sending" />);
     expect(screen.getByRole('button', { name: /Filing…/ })).toBeInTheDocument();
@@ -115,9 +115,11 @@ describe('FeedbackDialog (chunk 19)', () => {
     expect(pop).toHaveTextContent('What you write');
     expect(pop).toHaveTextContent('App details, when switched on: version, system, page, window, theme');
     expect(pop).toHaveTextContent('Your name and email (so we can reply)');
-    expect(pop).toHaveTextContent('The screenshot, only when you show it');
-    expect(pop).toHaveTextContent('The screenshot, unless you show it');
-    expect(pop).toHaveTextContent('Never sent anywhere: your tasks, notes, people or space names.');
+    expect(pop).toHaveTextContent('The screenshot, unless you hide it');
+    expect(pop).toHaveTextContent('The screenshot, when you hide it');
+    expect(pop).toHaveTextContent(
+      'Never sent anywhere: your tasks, notes, people or space names, except what a public screenshot shows.',
+    );
     await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'What’s shared' })).toBeNull());
     expect(screen.getByRole('dialog', { name: 'Send feedback' })).toBeInTheDocument();
@@ -269,7 +271,7 @@ describe('FeedbackDialog (chunk 19)', () => {
     expect(screen.getByText('or paste or drop one')).toBeInTheDocument();
   });
 
-  it('C19-U19 a screenshot brings "Show it on the public issue", off; on shows the Public pill, the ring and says so', async () => {
+  it('C19-U19 a screenshot brings "Show it on the public issue", on (#75): the Public pill, the ring and the check line; off says private', async () => {
     const user = userEvent.setup();
     render(<Form filing="github" />);
     const row = () => screen.queryByRole('switch', { name: 'Show the screenshot on the public issue' });
@@ -279,24 +281,25 @@ describe('FeedbackDialog (chunk 19)', () => {
     expect(row()).toBeNull();
     await user.upload(screen.getByLabelText('Choose a screenshot'), image('Screenshot.png', 12));
     await waitFor(() => expect(row()).not.toBeNull());
-    expect(row()).toHaveAttribute('aria-checked', 'false');
+    expect(row()).toHaveAttribute('aria-checked', 'true');
     expect(row()).toBeEnabled();
+    expect(fig()).toHaveClass('tp-shown');
+    expect(sub()).toHaveClass('tp-on');
+    expect(sub()).toHaveTextContent('Public. Anyone can see it on GitHub. Check it shows nothing private.');
+    expect(document.querySelector('.tp-fb-check')).toHaveTextContent('Check it shows nothing private.');
+    expect(document.querySelector('.tp-fb-pill')).toHaveTextContent('Public');
+    await user.click(row()!);
+    expect(row()).toHaveAttribute('aria-checked', 'false');
     expect(fig()).not.toHaveClass('tp-shown');
     expect(sub()).not.toHaveClass('tp-on');
     expect(sub()).toHaveTextContent('Private. Only the Tudu team sees it, with your report.');
-    await user.click(row()!);
-    expect(row()).toHaveAttribute('aria-checked', 'true');
-    expect(fig()).toHaveClass('tp-shown');
-    expect(sub()).toHaveClass('tp-on');
-    expect(sub()).toHaveTextContent('Public. Anyone can see it on the GitHub issue.');
-    expect(document.querySelector('.tp-fb-pill')).toHaveTextContent('Public');
-    // Another screenshot comes in private again.
+    // Another screenshot comes in public again: off held for that one only.
     act(() => {
       box().dispatchEvent(withFiles('paste', [image('Other.png', 3)]));
     });
     await waitFor(() => expect(caption()).toBe('Other.png3 KB'));
-    expect(row()).toHaveAttribute('aria-checked', 'false');
-    expect(fig()).not.toHaveClass('tp-shown');
+    expect(row()).toHaveAttribute('aria-checked', 'true');
+    expect(fig()).toHaveClass('tp-shown');
     // A kind GitHub can't show keeps the row, off and disabled, saying why.
     act(() => {
       box().dispatchEvent(
@@ -324,9 +327,10 @@ describe('FeedbackDialog (chunk 19)', () => {
     expect(document.querySelector('.tp-fb-shot')).not.toHaveClass('tp-shown');
   });
 
-  it('C19-U21 the hint by Add a screenshot says it’s private unless you show it', () => {
+  it('C19-U21 the hint by Add a screenshot says it’s shown on the issue unless you hide it', () => {
     render(<Form filing="github" />);
-    expect(screen.getByText('Private unless you show it')).toBeInTheDocument();
+    expect(screen.getByText('Shown on the issue unless you hide it')).toBeInTheDocument();
+    expect(screen.queryByText('Private unless you show it')).toBeNull();
     expect(screen.queryByText('Only the Tudu team sees it')).toBeNull();
   });
 
@@ -349,5 +353,65 @@ describe('FeedbackDialog (chunk 19)', () => {
     ]);
     await user.click(screen.getByRole('menuitem', { name: 'Send feedback' }));
     expect(onFeedback).toHaveBeenCalledTimes(1);
+  });
+});
+
+const SIMILAR: SimilarIssue[] = [
+  {
+    number: 64,
+    title: 'Jira count stuck at 1 with 2 assigned',
+    url: 'https://github.com/shimorojune/tudu/issues/64',
+    state: 'fixed',
+    createdAt: '2026-10-24T10:00:00.000Z',
+    closedAt: '2026-11-05T10:00:00.000Z',
+    plusOnes: 2,
+  },
+];
+
+describe('FeedbackDialog, +1 that one instead (#76)', () => {
+  it('C19-U29 a pick shows the bar and turns Send into "+1 on #64"; Undo clears it; sent says it’s on #64', async () => {
+    const user = userEvent.setup();
+    const onPick = vi.fn();
+    const { rerender } = render(
+      <Form filing="github" similar={{ state: 'ready', issues: SIMILAR }} picked={null} onPick={onPick} />,
+    );
+    expect(screen.getByRole('button', { name: /^Send$/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '+1 #64 instead of a new issue' }));
+    expect(onPick).toHaveBeenLastCalledWith(SIMILAR[0]);
+    rerender(
+      <Form
+        filing="github"
+        similar={{ state: 'ready', issues: SIMILAR }}
+        picked={SIMILAR[0]}
+        onPick={onPick}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /\+1 on #64/ })).toBeInTheDocument();
+    expect(document.querySelector('.tp-fb-inst')).toHaveTextContent(
+      'Adds your words to #64 as a comment. No new issue.',
+    );
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(onPick).toHaveBeenLastCalledWith(null);
+    rerender(
+      <Form
+        filing="github"
+        phase="filed"
+        issue={{ number: 64, url: 'https://github.com/shimorojune/tudu/issues/64#issuecomment-1' }}
+        picked={SIMILAR[0]}
+      />,
+    );
+    expect(screen.getAllByText('Thanks, it’s on #64')[0]).toBeVisible();
+    expect(
+      screen.getAllByText('Your words are on the issue as a comment. Follow it there.')[0],
+    ).toBeVisible();
+    expect(screen.getByText('+1 · Jira count stuck at 1 with 2 assigned')).toBeInTheDocument();
+  });
+
+  it('C19-U30 email-only filing: no similar box and no +1, whatever the props', () => {
+    render(<Form filing="email" similar={{ state: 'ready', issues: SIMILAR }} picked={SIMILAR[0]} />);
+    expect(screen.queryByTestId('similar-reports')).toBeNull();
+    expect(screen.queryByText(/Already reported\?/)).toBeNull();
+    expect(screen.getByRole('button', { name: /^Send$/ })).toBeInTheDocument();
+    expect(document.querySelector('.tp-fb-inst')).toBeNull();
   });
 });

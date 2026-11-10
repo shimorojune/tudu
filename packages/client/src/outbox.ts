@@ -44,13 +44,23 @@ export class MemoryOutboxStore implements OutboxStore {
 const DB_NAME = 'tudu';
 const STORE = 'outbox';
 
-/** Keeps the queue in IndexedDB so it survives a reload or a closed laptop. */
+/** How long one outbox transaction may take before it counts as failed. */
+export const TX_LIMIT_MS = 3000;
+
+/**
+ * Keeps the queue in IndexedDB so it survives a reload or a closed laptop. WebKit can leave a readwrite transaction
+ * open for good (no complete, no error, no abort), and every later one waits behind it: a transaction that takes
+ * longer than `limitMs` is given up on, and the next call opens a fresh connection.
+ */
 export class IndexedDbOutboxStore implements OutboxStore {
   private dbp: Promise<IDBDatabase> | null = null;
-  constructor(private readonly name = DB_NAME) {}
+  constructor(
+    private readonly name = DB_NAME,
+    private readonly limitMs = TX_LIMIT_MS,
+  ) {}
   private open(): Promise<IDBDatabase> {
     if (!this.dbp) {
-      this.dbp = new Promise((resolve, reject) => {
+      const p = new Promise<IDBDatabase>((resolve, reject) => {
         const req = indexedDB.open(this.name, 1);
         req.onupgradeneeded = () => {
           if (!req.result.objectStoreNames.contains(STORE))
@@ -59,23 +69,70 @@ export class IndexedDbOutboxStore implements OutboxStore {
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
       });
+      // A failed open is tried again next time.
+      p.catch(() => {
+        if (this.dbp === p) this.dbp = null;
+      });
+      this.dbp = p;
     }
     return this.dbp;
   }
+  /** Drop the connection `from` came from, so the next call opens a new one. */
+  private reset(from: Promise<IDBDatabase>): void {
+    if (this.dbp !== from) return;
+    this.dbp = null;
+    void from.then(
+      (db) => {
+        try {
+          db.close();
+        } catch {
+          // already closing
+        }
+      },
+      () => {},
+    );
+  }
   /** One request in its own transaction, settled when the transaction is through, so a write is on disk. */
-  private async tx<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-    const db = await this.open();
-    return new Promise((resolve, reject) => {
-      const t = db.transaction(STORE, mode);
-      const req = fn(t.objectStore(STORE));
-      let result: T;
-      req.onsuccess = () => {
-        result = req.result;
+  private tx<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
+    const conn = this.open();
+    return new Promise<T>((resolve, reject) => {
+      let done = false;
+      const end = (ok: boolean, value?: T, err?: unknown) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        if (ok) resolve(value as T);
+        else reject(err);
       };
-      req.onerror = () => reject(req.error);
-      t.oncomplete = () => resolve(result);
-      t.onerror = () => reject(t.error);
-      t.onabort = () => reject(t.error ?? new Error('The outbox write was abandoned.'));
+      const timer = setTimeout(() => {
+        this.reset(conn);
+        end(false, undefined, new Error('The outbox write never finished.'));
+      }, this.limitMs);
+      conn.then(
+        (db) => {
+          if (done) return;
+          let t: IDBTransaction;
+          let req: IDBRequest<T>;
+          try {
+            t = db.transaction(STORE, mode);
+            req = fn(t.objectStore(STORE));
+          } catch (err) {
+            // The connection is closing (or closed): the next call opens another.
+            this.reset(conn);
+            end(false, undefined, err);
+            return;
+          }
+          let result: T;
+          req.onsuccess = () => {
+            result = req.result;
+          };
+          req.onerror = () => end(false, undefined, req.error);
+          t.oncomplete = () => end(true, result);
+          t.onerror = () => end(false, undefined, t.error);
+          t.onabort = () => end(false, undefined, t.error ?? new Error('The outbox write was abandoned.'));
+        },
+        (err) => end(false, undefined, err),
+      );
     });
   }
   all() {
@@ -97,21 +154,39 @@ export interface OutboxOptions {
   onError?: (err: unknown) => void;
 }
 
-/** The queue runner: one batch at a time, in order, retrying after a pause when the server is unreachable. */
+/**
+ * The queue runner: one batch at a time, in order, retrying after a pause when the server is unreachable. It sends
+ * from its own queue in memory; the store only keeps that queue across a reload, so a disk write that is slow or
+ * never finishes holds nothing up.
+ */
 export class Outbox {
   private running = false;
   private pending = false;
   private retry: ReturnType<typeof setTimeout> | null = null;
+  private readonly queue = new Map<string, Mutation>();
   constructor(private readonly o: OutboxOptions) {}
 
-  async add(m: Mutation): Promise<void> {
-    await this.o.store.put(m);
+  /** Queue a change and send it. Resolves once it is on disk too; sending never waits for that. */
+  add(m: Mutation): Promise<void> {
+    this.queue.set(m.id, m);
+    const stored = this.o.store.put(m);
     void this.flush();
+    return stored;
+  }
+
+  /** Changes an earlier page left on disk: they go with the rest (the server applies each id once). */
+  load(left: Mutation[]): void {
+    for (const m of left) if (!this.queue.has(m.id)) this.queue.set(m.id, m);
+  }
+
+  /** Forget everything queued (signing out). */
+  forget(): void {
+    this.queue.clear();
   }
 
   /** True when nothing is waiting. Tests wait on this before asserting. */
   async idle(): Promise<boolean> {
-    return !this.running && (await this.o.store.all()).length === 0;
+    return !this.running && this.queue.size === 0;
   }
 
   async flush(): Promise<void> {
@@ -122,10 +197,14 @@ export class Outbox {
     this.running = true;
     try {
       for (;;) {
-        const batch = (await this.o.store.all()).sort(byClock).slice(0, BATCH_SIZE);
+        const batch = [...this.queue.values()].sort(byClock).slice(0, BATCH_SIZE);
         if (!batch.length) break;
         const { done } = await this.o.send(batch);
-        for (const id of done) await this.o.store.remove(id);
+        for (const id of done) {
+          this.queue.delete(id);
+          // Off the disk too, without waiting: a remove that never finishes only means a resend after a reload.
+          this.o.store.remove(id).catch(() => {});
+        }
         if (!done.length) throw new Error('nothing accepted');
       }
       this.o.onIdle?.();

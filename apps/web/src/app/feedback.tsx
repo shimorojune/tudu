@@ -3,6 +3,12 @@ import { ApiError } from '@tudu/client';
 import {
   feedbackDetails,
   feedbackDetailsLine,
+  shotCanBePublic,
+  SIMILAR_DEBOUNCE_MS,
+  SIMILAR_QUERY_MAX,
+  similarReady,
+  type SimilarIssue,
+  type SimilarIssues,
   type FeedbackDetails,
   type FeedbackIssue,
   type FeedbackKind,
@@ -19,6 +25,7 @@ import {
   TOAST_WITH_ACTION_MS,
   type FeedbackPhase,
   type FeedbackReportsState,
+  type SimilarReportsState,
 } from '@tudu/ui';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { desktop, type AppInfo } from './desktop';
@@ -39,11 +46,13 @@ export interface FeedbackDraft {
   kind: FeedbackKind;
   text: string;
   shot: File | null;
-  /** "Show it on the public issue": off for each new screenshot. */
+  /** "Show it on the public issue": on for each new screenshot GitHub can show (#75); off holds for that one. */
   shotPublic: boolean;
+  /** "+1 that one instead" (#76): the issue the report joins as a comment. Kept with the draft, so it survives a close. */
+  plusOne: SimilarIssue | null;
 }
 
-const EMPTY: FeedbackDraft = { kind: 'bug', text: '', shot: null, shotPublic: false };
+const EMPTY: FeedbackDraft = { kind: 'bug', text: '', shot: null, shotPublic: false, plusOne: null };
 let open = false;
 let draft: FeedbackDraft = EMPTY;
 const listeners = new Set<() => void>();
@@ -218,7 +227,16 @@ export class FeedbackQueue {
             issue = (await this.send(q))?.issue ?? null;
           } catch (err) {
             if (worthRetrying(err)) return;
-            // The server refused it for good (too long, not an image): keeping it would retry forever.
+            // A +1 whose issue can't take one now (locked or gone while this waited): nobody is here to choose, so it
+            // goes as a new report rather than being lost.
+            if (err instanceof ApiError && err.status === 409 && q.report.plusOneOf != null) {
+              try {
+                issue = (await this.send({ ...q, report: { ...q.report, plusOneOf: null } }))?.issue ?? null;
+              } catch (again) {
+                if (worthRetrying(again)) return;
+              }
+            }
+            // Otherwise the server refused it for good (too long, not an image): keeping it would retry forever.
           }
           await this.store.remove(q.report.id);
           if (issue) this.landed.forEach((fn) => fn(issue));
@@ -270,6 +288,61 @@ export function toastFiled(issue: FeedbackIssue): void {
     onAction: () => void copyText(issue.url),
     duration: TOAST_WITH_ACTION_MS,
   });
+}
+
+/** What the "Already reported?" box shows, as the form's similar hook keeps it. */
+export interface SimilarLook {
+  state: SimilarReportsState;
+  issues: SimilarIssue[];
+  /** A later look is on its way: the rows dim until it answers. */
+  stale: boolean;
+}
+
+const NO_LOOK: SimilarLook = { state: 'hidden', issues: [], stale: false };
+
+/**
+ * Similar reports while typing (#76): 450ms after the last key, once there are three words, ask the server for
+ * issues that mean the same. Each newer look cancels the older one. The first look shimmers; later ones keep the
+ * rows, dimmed, until the answer swaps them. Nothing close folds the box; a failure says so in one quiet line
+ * (rows already shown stay).
+ */
+export function useSimilarIssues(text: string, on: boolean): SimilarLook {
+  const [look, setLook] = useState<SimilarLook>(NO_LOOK);
+  const ready = on && similarReady(text);
+  const [wasReady, setWasReady] = useState(ready);
+  if (ready !== wasReady) {
+    setWasReady(ready);
+    if (!ready) setLook(NO_LOOK);
+  }
+  useEffect(() => {
+    if (!ready) return;
+    const ctl = new AbortController();
+    const words = text.trim().slice(0, SIMILAR_QUERY_MAX);
+    const t = setTimeout(() => {
+      setLook((l) =>
+        l.issues.length ? { ...l, stale: true } : { state: 'loading', issues: [], stale: false },
+      );
+      api
+        .get<SimilarIssues>(`/api/feedback/similar?q=${encodeURIComponent(words)}`, { signal: ctl.signal })
+        .then(
+          (r) => {
+            if (ctl.signal.aborted) return;
+            setLook({ state: r.issues.length ? 'ready' : 'hidden', issues: r.issues, stale: false });
+          },
+          () => {
+            if (ctl.signal.aborted) return;
+            setLook((l) =>
+              l.issues.length ? { ...l, stale: false } : { state: 'error', issues: [], stale: false },
+            );
+          },
+        );
+    }, SIMILAR_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(t);
+      ctl.abort();
+    };
+  }, [text, ready]);
+  return look;
 }
 
 /** Your reports: fetched when the form first opens and again after each send. */
@@ -354,6 +427,9 @@ export function FeedbackHost({ space, vp }: { space: Pick<SpaceSummary, 'kind'> 
   const github = filing === 'github';
   const view0 = viewOf(pathname);
   const line = feedbackDetailsLine(currentDetails(view0, space?.kind ?? null, app), github);
+  // Kept through a send, so a refused +1 comes back to the same rows.
+  const similar = useSimilarIssues(d.text, isOpen && github && view === 'form');
+  const plusOne = github ? d.plusOne : null;
 
   const send = async () => {
     setPhase('sending');
@@ -364,6 +440,7 @@ export function FeedbackHost({ space, vp }: { space: Pick<SpaceSummary, 'kind'> 
       text: d.text.trim(),
       details: details ? currentDetails(view0, space?.kind ?? null, app) : null,
       shotPublic: github && !!d.shot && d.shotPublic,
+      plusOneOf: plusOne?.number ?? null,
     };
     const shot = d.shot ? { blob: d.shot, name: d.shot.name, type: d.shot.type } : null;
     let out: Submitted;
@@ -371,6 +448,8 @@ export function FeedbackHost({ space, vp }: { space: Pick<SpaceSummary, 'kind'> 
       out = await feedbackQueue().submit({ report, shot });
     } catch (err) {
       setPhase('idle');
+      // The picked issue can't take a +1 now: the pick goes, the words stay, and Send files it as new.
+      if (err instanceof ApiError && err.status === 409) setFeedbackDraft({ plusOne: null });
       setError(err instanceof Error && err.message ? err.message : 'Couldn’t send that. Try again.');
       return;
     }
@@ -422,8 +501,8 @@ export function FeedbackHost({ space, vp }: { space: Pick<SpaceSummary, 'kind'> 
         if (error) setError(null);
       }}
       shot={d.shot}
-      // Each new screenshot (or none) starts private: showing one is asked for every time.
-      onShot={(shot) => setFeedbackDraft({ shot, shotPublic: false })}
+      // Each new screenshot GitHub can show starts public (#75); switching it off holds for that one only.
+      onShot={(shot) => setFeedbackDraft({ shot, shotPublic: !!shot && shotCanBePublic(shot.type) })}
       shotPublic={d.shotPublic}
       onShotPublic={(shotPublic) => setFeedbackDraft({ shotPublic })}
       details={details}
@@ -445,6 +524,12 @@ export function FeedbackHost({ space, vp }: { space: Pick<SpaceSummary, 'kind'> 
       onBack={() => setView('form')}
       onRetryReports={reports.load}
       onOpenIssue={openOutside}
+      similar={similar}
+      picked={plusOne}
+      onPick={(picked) => {
+        setFeedbackDraft({ plusOne: picked });
+        if (error) setError(null);
+      }}
     />
   );
 }

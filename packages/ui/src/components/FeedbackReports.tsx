@@ -47,6 +47,7 @@ function Row({ r, now }: { r: MyReport; now: Date }) {
       <span className="tp-fbr-t">
         <span className="tp-fbr-a">
           {num ? <b>{num}</b> : null}
+          {r.plusOneOf != null ? <i className="tp-fbr-plus">+1</i> : null}
           <span>{r.title}</span>
         </span>
         <span className="tp-fbr-m">{meta}</span>
@@ -66,7 +67,7 @@ function Row({ r, now }: { r: MyReport; now: Date }) {
         href={r.issue.url}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label={`Issue ${num}: ${r.title}, ${meta}`}
+        aria-label={`${r.plusOneOf != null ? `+1 on issue ${num}` : `Issue ${num}`}: ${r.title}, ${meta}`}
       >
         {body}
       </a>

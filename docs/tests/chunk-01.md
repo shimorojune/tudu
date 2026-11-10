@@ -11,7 +11,7 @@ one throwaway database per run; end-to-end tests read sign-in codes from the tes
 | C01-U02 | CodeField completes         | Six digits fire onComplete once; a wrong code nudges the row, edges it red and empties it; disabled while checking                                                                             |
 | C01-U03 | Sign in validates on submit | "rohit@northwind" is refused with "That doesn’t look like an email address." only when you press Continue; a real address sends the code and shows "Check your email" with the address in bold |
 | C01-U04 | Sign in states              | Sending a code…, Checking…, You’re in (then onDone), expired (Send a new code at once), too many tries (boxes rest), wrong (boxes cleared), the resend countdown                               |
-| C01-U05 | Sidebar                     | The active view is the paper chip, never a heavier weight; it folds to the rail and back; picks come back as values                                                                            |
+| C01-U05 | Sidebar                     | The active view is the paper chip, never a heavier weight; it folds to the rail and back, holding the tips until the nav's width transition ends; picks come back as values                    |
 | C01-U06 | Bottom tabs                 | The active tab, the round New task button, badge counts                                                                                                                                        |
 | C01-U07 | Account menu                | Name and email, the theme switch changes the theme, Settings and Sign out call their handlers                                                                                                  |
 | C01-U08 | Live stream client          | Reconnects with backoff (1, 2, 4, 8s, capped) and resumes from the last event id; a good connection resets the wait                                                                            |
@@ -38,6 +38,9 @@ one throwaway database per run; end-to-end tests read sign-in codes from the tes
 | C01-U29 | Retired                     | Was: Infisical secrets forgotten after use. Secret Sync leaves nothing in GITHUB_ENV to forget                                                                                                 |
 | C01-U30 | Updater signature           | scripts/verify-updater-sig.mjs passes the configured key's signature, names both key ids for another key, fails a tampered file or malformed input                                             |
 | C01-U31 | Rehearsal signing key       | In release.yml the throwaway updater key runs only on rehearsals and the real key is guarded by env.REHEARSAL                                                                                  |
+| C01-U32 | Fold settle fallback        | A fold with no width transitionend holds the rail's tips for SIDE_FOLD_MAX_MS (400ms) and not longer; expanding mid-fold ends the hold; unmounting mid-fold leaves no timer                    |
+| C01-U33 | No fold, no hold            | Opening already folded and the fixed tablet rail never hold the tips                                                                                                                           |
+| C01-U34 | Fold and column styles      | `.tp-side-folding .tp-tip::after` is opacity 0 with no transition; `.tp-side-custom` is 9px; the rail switcher button is 34px                                                                  |
 
 ## API (`apps/server`)
 
@@ -57,17 +60,19 @@ one throwaway database per run; end-to-end tests read sign-in codes from the tes
 
 ## End-to-end (`packages/e2e/tests/auth`, `tests/shell`; groups `auth`, `shell`, `smoke`)
 
-| ID      | What it checks                 | Scenario                                                                                                                         |
-| ------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| C01-E01 | New person, desktop            | Email, the code from the outbox, lands on the empty Today                                                                        |
-| C01-E02 | Returning person               | Signs in again with a new code and lands on Today                                                                                |
-| C01-E03 | Wrong code                     | The row nudges and lets you retry; the right code then works                                                                     |
-| C01-E04 | Expired code                   | The message shows and Send a new code works                                                                                      |
-| C01-E05 | Too many tries                 | The code locks and a new one is offered                                                                                          |
-| C01-E06 | Phone sign in                  | The form alone                                                                                                                   |
-| C01-E07 | The shell                      | Desktop: sidebar, top bar, the sheet; tablet: the rail; phone: the tabs and the round button                                     |
-| C01-E08 | Theme                          | Dark survives a reload; System follows the emulated OS theme (desktop and tablet; the phone's theme lives in Settings, chunk 09) |
-| C01-E09 | Sign out                       | Back to sign in; the back button does not reveal the app (desktop and tablet; phones sign out from Settings in chunk 09)         |
-| C01-E10 | Return to where you were going | Visiting /week signed out, then signing in, lands on /week                                                                       |
-| C01-E11 | Dark mode                      | E01 and E07 again in dark                                                                                                        |
-| C01-S01 | Smoke on staging               | The sign-in page loads and the API answers /health (group `smoke`, after every staging deploy)                                   |
+| ID      | What it checks                 | Scenario                                                                                                                                      |
+| ------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| C01-E01 | New person, desktop            | Email, the code from the outbox, lands on the empty Today                                                                                     |
+| C01-E02 | Returning person               | Signs in again with a new code and lands on Today                                                                                             |
+| C01-E03 | Wrong code                     | The row nudges and lets you retry; the right code then works                                                                                  |
+| C01-E04 | Expired code                   | The message shows and Send a new code works                                                                                                   |
+| C01-E05 | Too many tries                 | The code locks and a new one is offered                                                                                                       |
+| C01-E06 | Phone sign in                  | The form alone                                                                                                                                |
+| C01-E07 | The shell                      | Desktop: sidebar, top bar, the sheet; tablet: the rail; phone: the tabs and the round button                                                  |
+| C01-E08 | Theme                          | Dark survives a reload; System follows the emulated OS theme (desktop and tablet; the phone's theme lives in Settings, chunk 09)              |
+| C01-E09 | Sign out                       | Back to sign in; the back button does not reveal the app (desktop and tablet; phones sign out from Settings in chunk 09)                      |
+| C01-E10 | Return to where you were going | Visiting /week signed out, then signing in, lands on /week                                                                                    |
+| C01-E11 | Dark mode                      | E01 and E07 again in dark                                                                                                                     |
+| C01-E12 | Tips during the fold           | Folding the sidebar twice: Today's tip stays at opacity 0 on every frame of the fold; once settled, a hover shows it and moving away hides it |
+| C01-E13 | One icon column                | In both widths the space tile and every nav icon share a centre (0.5px); on the rail the switcher button and the panel button do too          |
+| C01-S01 | Smoke on staging               | The sign-in page loads and the API answers /health (group `smoke`, after every staging deploy)                                                |

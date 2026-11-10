@@ -9,18 +9,35 @@ export async function fixClock(page: Page, at: Date = SUNDAY): Promise<void> {
 }
 
 /**
- * Wait until every change has reached the server (the outbox is empty). Polled through `evaluate`, which awaits
- * the answer: `waitForFunction` takes an async predicate's Promise itself as truthy and returns at once.
+ * A change some controls make only once their leave animation is over (a note's Delete, Put back from Trash, a row
+ * that closes): 130 to 240 ms after the click. The outbox answers from memory, so `idle()` can say true inside that gap,
+ * before the change is even queued. Idle counts only once it has held for longer than that.
+ */
+export const IDLE_QUIET_MS = 300;
+
+/**
+ * Wait until every change has reached the server (the outbox is empty) and it has stayed so for
+ * IDLE_QUIET_MS. Polled through `evaluate`, which awaits the answer: `waitForFunction` takes an async predicate's
+ * Promise itself as truthy and returns at once.
  */
 export async function idle(page: Page): Promise<void> {
+  const now = () =>
+    page.evaluate(
+      async () =>
+        (await (window as unknown as { __tudu?: { idle(): Promise<boolean> } }).__tudu?.idle()) === true,
+    );
+  let since = 0;
   await expect
     .poll(
-      () =>
-        page.evaluate(
-          async () =>
-            (await (window as unknown as { __tudu?: { idle(): Promise<boolean> } }).__tudu?.idle()) === true,
-        ),
-      { intervals: [100], timeout: 15_000 },
+      async () => {
+        if (!(await now())) {
+          since = 0;
+          return false;
+        }
+        if (!since) since = Date.now();
+        return Date.now() - since >= IDLE_QUIET_MS;
+      },
+      { intervals: [50], timeout: 15_000 },
     )
     .toBe(true);
 }
