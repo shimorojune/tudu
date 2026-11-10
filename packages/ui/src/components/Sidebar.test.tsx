@@ -1,8 +1,8 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { parseRules, readStylesheet, rulesWhere } from '../test-utils/stylesheet';
-import { Count, Sidebar, type SidebarProps } from './Sidebar';
+import { Count, SIDE_FOLD_MAX_MS, Sidebar, type SidebarProps } from './Sidebar';
 
 const items: NonNullable<SidebarProps['items']> = [
   { value: 'today', label: 'Today', icon: 'today', count: 4, tone: 'brand' },
@@ -96,9 +96,17 @@ describe('Sidebar', () => {
     expect(button('Today').closest('.tp-navwrap')).not.toHaveClass('tp-tip');
     expect(within(nav).getByText('This week')).not.toHaveAttribute('aria-hidden');
 
+    expect(nav).not.toHaveClass('tp-side-folding');
     await user.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
     expect(nav).toHaveClass('tp-rail');
     expect(nav).not.toHaveClass('tp-rail-fixed');
+    // The tips are held while the width eases; a child's transition ending doesn't end the fold, the nav's width does.
+    expect(nav).toHaveClass('tp-side-folding');
+    fireEvent.transitionEnd(button('Today').querySelector('.tp-nav-l')!, { propertyName: 'opacity' });
+    fireEvent.transitionEnd(nav, { propertyName: 'gap' });
+    expect(nav).toHaveClass('tp-side-folding');
+    fireEvent.transitionEnd(nav, { propertyName: 'width' });
+    expect(nav).not.toHaveClass('tp-side-folding');
     expect(onCollapsedChange).toHaveBeenLastCalledWith(true);
     expect(screen.queryByRole('button', { name: 'Collapse sidebar' })).toBeNull();
     // On the rail each item is named by its label and count, the words are hidden and a CSS tip sits beside the icon.
@@ -121,6 +129,66 @@ describe('Sidebar', () => {
     expect(fold).not.toHaveAttribute('inert');
     expect(button('Today')).not.toHaveAttribute('aria-label');
     expect(button('Today').closest('.tp-navwrap')).not.toHaveAttribute('data-tip');
+  });
+
+  it('C01-U32 a fold that never reports its end lets the tips go after SIDE_FOLD_MAX_MS; expanding or leaving ends it at once', () => {
+    vi.useFakeTimers();
+    try {
+      const { rerender, unmount } = render(
+        <Sidebar items={items} week={week} collapsible collapsed={false} />,
+      );
+      const nav = screen.getByRole('navigation', { name: 'Main' });
+      rerender(<Sidebar items={items} week={week} collapsible collapsed />);
+      expect(nav).toHaveClass('tp-side-folding');
+      act(() => vi.advanceTimersByTime(SIDE_FOLD_MAX_MS - 1));
+      expect(nav).toHaveClass('tp-side-folding');
+      act(() => vi.advanceTimersByTime(1));
+      expect(nav).not.toHaveClass('tp-side-folding');
+
+      // Expanding mid-fold drops the hold with the rail.
+      rerender(<Sidebar items={items} week={week} collapsible collapsed={false} />);
+      rerender(<Sidebar items={items} week={week} collapsible collapsed />);
+      expect(nav).toHaveClass('tp-side-folding');
+      rerender(<Sidebar items={items} week={week} collapsible collapsed={false} />);
+      expect(nav).not.toHaveClass('tp-side-folding');
+
+      // Leaving mid-fold leaves no timer behind.
+      rerender(<Sidebar items={items} week={week} collapsible collapsed />);
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('C01-U33 no fold, no hold: opening already folded and the tablet rail have their tips at once', () => {
+    const { rerender } = render(<Sidebar items={items} week={week} collapsible collapsed />);
+    const nav = screen.getByRole('navigation', { name: 'Main' });
+    expect(nav).toHaveClass('tp-rail');
+    expect(nav).not.toHaveClass('tp-side-folding');
+    expect(within(nav).getByText('Today', { selector: '.tp-nav-l' }).closest('.tp-navwrap')).toHaveClass(
+      'tp-tip',
+    );
+
+    rerender(<Sidebar items={items} week={week} rail />);
+    expect(nav).not.toHaveClass('tp-side-folding');
+    rerender(<Sidebar items={items} week={week} rail />);
+    expect(nav).not.toHaveClass('tp-side-folding');
+    expect(within(nav).getByText('Week', { selector: '.tp-nav-l' }).closest('.tp-navwrap')).toHaveClass(
+      'tp-tip',
+    );
+  });
+
+  it('C01-U34 the stylesheet holds the tips while folding and puts the space tile on the icon column', () => {
+    const rules = parseRules(readStylesheet('components.css'));
+    const hold = rulesWhere(rules, (s) => s === '.tp-side-folding .tp-tip::after')[0];
+    expect(hold?.declarations.opacity).toBe('0 !important');
+    expect(hold?.declarations.transition).toBe('none !important');
+    // 10 (sidebar) + 9 (header) - 4 (the button's margin) + 4 (its padding) + 13 (half the 26px tile) = 32, the icons' middle.
+    expect(rulesWhere(rules, (s) => s === '.tp-side-custom')[0]?.declarations['padding-left']).toBe('9px');
+    const railButton = rulesWhere(rules, (s) => s === '.tp-ssw-rail .tp-ssw-b')[0];
+    expect(railButton?.declarations.width).toBe('34px');
+    expect(railButton?.declarations['max-width']).toBe('none');
   });
 
   it('C01-U05 collapsed is controlled when given; rail is the fixed tablet form without the panel button', () => {

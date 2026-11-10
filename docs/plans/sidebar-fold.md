@@ -1,7 +1,18 @@
 # Sidebar fold polish: quiet tips, one icon column (#78, #79, #80)
 
-Status: proposal, awaiting Rohit's approval. Canvas approved 6 Nov 2026: boards "Sidebar fold" (T-SideFold,
+Status: approved by Rohit 10 Nov 2026; implemented (see As built). Canvas approved 6 Nov 2026: boards "Sidebar fold" (T-SideFold,
 T-SideFold-Dark) on the Today page of the design canvas.
+
+## As built (10 Nov)
+
+- `Sidebar.tsx`: `useFoldHold(rail, fixed)` sets the hold in the same render that folds (state derived from the
+  previous `rail`, so no frame without it), and a layout effect ends it on the nav's own `width` `transitionend` or
+  after `SIDE_FOLD_MAX_MS` (400ms). Measured in Chromium: the hold ends at 260ms on the transition's end.
+- `components.css`: `.tp-side-folding .tp-tip::after`, `.tp-side-custom` 9px, and on the rail
+  `.tp-ssw-rail .tp-ssw-b { width: 34px; max-width: none }` with `.tp-ssw-rail`, its id and tile `flex: none`. The
+  `max-width: none` was needed: the button's `max-width: 100%` resolved against a shrink-to-fit parent and held it at
+  30px. Measured after: tile, nav icons, switcher button (rail) and panel button (rail) all centred on 32.
+- Tests run on CI (Rohit, 10 Nov: no test runs on his Mac), not locally as the proposal said.
 
 ## The reports
 
@@ -101,8 +112,7 @@ End-to-end (`packages/e2e/tests/shell/shell.spec.ts`, desktop project, light and
   and, on the rail, the panel button's icon are within 0.5px of each other on the x axis. On the rail, the switcher
   button's centre is also within 0.5px.
 
-`docs/tests/chunk-01.md` gets the four new rows. As agreed, all of it runs on your Mac: `pnpm test -- --project ui`
-and `pnpm e2e shell`.
+`docs/tests/chunk-01.md` gets the new rows. All of it runs on PR CI.
 
 The WebKit flash itself can't be asserted in CI, because the e2e runs Chromium. C01-E12 checks the rule that prevents
 it. The real check is manual, on the Mac app: **MC-S01** Collapse and expand the sidebar five times with the pointer
