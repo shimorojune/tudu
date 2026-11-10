@@ -170,7 +170,9 @@ windows pop up over his work.
 
 As built: the All spaces test is C21-E29 and the Mac test is C02-D01. C02-E15 also runs on Safari's engine (the
 `webkit` project). The existing drag tests (C02-E07, C05-E02, E03, E14, E15) run with reduced motion, where the task
-lands at once, so they needed no `landed` wait. C02-E17 found no shift in the app's header, so `DayHeader` is
+lands at once, so they needed no `landed` wait. CI's Macs have Reduce motion on, so on CI C02-D01 checks the instant
+path in the real WKWebView; the glide in Safari's engine is C02-E15 on the `webkit` project, and in the real app it
+is MC-1. C02-E17 found no shift in the app's header, so `DayHeader` is
 unchanged.
 
 ## 6. Risks

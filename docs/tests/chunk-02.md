@@ -88,8 +88,8 @@ empty) before reading the server.
 
 ## Desktop (`packages/e2e/mac`, Tudu Test on the macOS runner)
 
-| ID      | What it checks                           | Scenario                                                                                                                                                                               |
-| ------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C02-D01 | A drop on the other day, in the real app | Two days in the WKWebView, the page told the Mac wants full motion (CI's Macs have Reduce motion on): the same frame-by-frame checks as C02-E15, then both lists hold what they should |
+| ID      | What it checks                           | Scenario                                                                                                                                                                                                                                                  |
+| ------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C02-D01 | A drop on the other day, in the real app | Two days in the WKWebView, driven by pointer events: on a Mac with motion on, the frame-by-frame checks of C02-E15; where the Mac has Reduce motion on (CI's do), the checks of C02-E16; then nothing is left behind and both lists hold what they should |
 
 Not automated: the feel of the drag, the sparkle and the reward. Judge those on the day page and the kit.

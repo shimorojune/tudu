@@ -1510,7 +1510,7 @@ test.describe('the look', () => {
 });
 
 test.describe('a drop on the other day', () => {
-  test('C02-D01 two days in the real app: a task let go over tomorrow glides onto its new row and the row under the gap glides up', async ({
+  test('C02-D01 two days in the real app: a task let go over tomorrow glides onto its new row, or lands at once where the Mac asks for less motion', async ({
     app,
   }) => {
     await signIn(app);
@@ -1518,17 +1518,11 @@ test.describe('a drop on the other day', () => {
     await addToday(app, space.id, ['Pay the electricity bill', 'Call Sam at 3pm', 'Book car service']);
     await go(app, await app.eval<string>(`return location.pathname`));
     await app.until(`return T.all('button', 'Book car service').length > 0`, 'main', 15_000);
-    // CI's Macs have Reduce motion on, and the page reads it through matchMedia, where the drop is instant (C02-E16).
-    // The glide in this engine is what is under test, so the page is told the Mac asks for full motion.
-    await app.eval(`
-      const real = window.matchMedia.bind(window);
-      window.matchMedia = (q) =>
-        /prefers-reduced-motion/.test(q)
-          ? { matches: false, media: q, onchange: null, addEventListener() {}, removeEventListener() {},
-              addListener() {}, removeListener() {}, dispatchEvent: () => false }
-          : real(q);
-      return true`);
-    expect(await app.eval(`return document.documentElement.dataset.motion === 'less'`)).toBe(false);
+    // CI's Macs have Reduce motion on and the page follows it (CSS and script both), so there the drop must land at
+    // once, as C02-E16 has it. On a Mac with motion on, the same test checks the glide, as C02-E15 does.
+    const reduced = await app.eval<boolean>(
+      `return matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.dataset.motion === 'less'`,
+    );
     await app.eval(`T.click(T.get('button', '2 days'))`);
     await app.until(
       `const s = document.querySelector('.tp-spread-second');
@@ -1575,8 +1569,21 @@ test.describe('a drop on the other day', () => {
         frames.push(read());
       }
       return frames;`);
-    expectLands(frames);
-    expectGlides(frames.map((f) => f.below!.y));
+    if (reduced) {
+      const landed = frames.filter((f) => f.row);
+      expect(landed.length).toBeGreaterThan(0);
+      // once the row is on tomorrow there is no lifted copy and the row is painted
+      expect(landed.every((f) => !f.card && !f.row!.hidden)).toBe(true);
+      // the row under the gap is in one place before and one after, nowhere in between
+      const ys = new Set(frames.map((f) => Math.round(f.below!.y)));
+      expect(ys.size, `places: ${[...ys].join(' ')}`).toBeLessThanOrEqual(2);
+    } else {
+      expectLands(frames);
+      expectGlides(frames.map((f) => f.below!.y));
+    }
+    expect(
+      await app.eval(`return document.querySelectorAll('.tp-drag-ghost, .tp-drop-line, .tp-drop-on').length`),
+    ).toBe(0);
     expect(
       await app.eval(
         `return [...document.querySelectorAll('[role=list][aria-label^="Tasks for "]')].map((l) =>
