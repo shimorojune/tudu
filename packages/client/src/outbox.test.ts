@@ -104,7 +104,7 @@ describe('C11-U48 a remove that never finishes', () => {
 
 /**
  * Just enough of IndexedDB for the outbox store: each connection's transactions finish (on a later tick) unless
- * the test says that connection is stuck, when they never do — no complete, no error, no abort.
+ * the test says that connection is stuck, when they never do: no complete, no error, no abort.
  */
 function fakeIndexedDb(stuck: (connection: number) => boolean) {
   const rows = new Map<string, Mutation>();
