@@ -336,13 +336,16 @@ describe('theme', () => {
   });
 
   it('C11-U44 syncLook takes up both the theme and Less motion stored while away', () => {
-    const { result } = renderHook(() => useLessMotion());
-    expect(result.current[0]).toBe(false);
+    // A page that has read the choice already (as every window does on mount), then misses the event.
+    const { result } = renderHook(() => ({ look: useLook(), motion: useLessMotion() }));
+    expect(result.current.motion[0]).toBe(false);
+    expect(html).not.toHaveClass('dark');
     localStorage.setItem(THEME_STORAGE_KEY, 'dark');
     localStorage.setItem('tudu.motion', 'less');
     act(() => syncLook());
     expect(html).toHaveClass('dark');
     expect(html.dataset.motion).toBe('less');
-    expect(result.current[0]).toBe(true);
+    expect(result.current.motion[0]).toBe(true);
+    expect(result.current.look).toEqual({ theme: 'dark', lessMotion: true });
   });
 });
