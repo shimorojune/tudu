@@ -9,6 +9,10 @@ import {
   onThemeChange,
   onThemeChoice,
   setLessMotion,
+  syncLessMotion,
+  syncLook,
+  useLessMotion,
+  useLook,
   readThemeChoice,
   resetThemeForTests,
   resolveTheme,
@@ -69,6 +73,7 @@ beforeEach(() => {
   window.matchMedia = fakeMatchMedia;
   html.className = '';
   html.style.colorScheme = '';
+  delete html.dataset.motion;
 });
 
 afterEach(() => {
@@ -291,5 +296,53 @@ describe('theme', () => {
     stop();
     setLessMotion(false);
     expect(heard).toHaveBeenCalledTimes(1);
+  });
+
+  it('C11-U44 syncLessMotion paints and tells listeners only on a real change', () => {
+    syncLessMotion();
+    expect(html.dataset.motion).toBeUndefined();
+    const heard = vi.fn();
+    const stop = onLessMotion(heard);
+    syncLessMotion();
+    expect(heard).not.toHaveBeenCalled();
+    localStorage.setItem('tudu.motion', 'less');
+    syncLessMotion();
+    expect(html.dataset.motion).toBe('less');
+    expect(heard).toHaveBeenCalledTimes(1);
+    expect(heard).toHaveBeenLastCalledWith(true);
+    syncLessMotion();
+    expect(heard).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it('C11-U44 a storage event for Less motion repaints a page using useLessMotion, and cleared storage re-reads both', () => {
+    const { result } = renderHook(() => useLook());
+    expect(result.current).toEqual({ theme: 'light', lessMotion: false });
+    localStorage.setItem('tudu.motion', 'less');
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: 'tudu.motion', newValue: 'less' }));
+    });
+    expect(html.dataset.motion).toBe('less');
+    expect(result.current.lessMotion).toBe(true);
+
+    localStorage.setItem(THEME_STORAGE_KEY, 'dark');
+    localStorage.removeItem('tudu.motion');
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: null }));
+    });
+    expect(html).toHaveClass('dark');
+    expect(html.dataset.motion).toBeUndefined();
+    expect(result.current).toEqual({ theme: 'dark', lessMotion: false });
+  });
+
+  it('C11-U44 syncLook takes up both the theme and Less motion stored while away', () => {
+    const { result } = renderHook(() => useLessMotion());
+    expect(result.current[0]).toBe(false);
+    localStorage.setItem(THEME_STORAGE_KEY, 'dark');
+    localStorage.setItem('tudu.motion', 'less');
+    act(() => syncLook());
+    expect(html).toHaveClass('dark');
+    expect(html.dataset.motion).toBe('less');
+    expect(result.current[0]).toBe(true);
   });
 });

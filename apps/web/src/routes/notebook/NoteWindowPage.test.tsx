@@ -52,8 +52,12 @@ describe('C22-U64 the Mac note window follows the theme', () => {
     expect(document.documentElement).toHaveClass('dark');
     // Picked on the desk while the window was hidden, the event missed.
     localStorage.setItem('tudu.theme', 'light');
+    // Less motion flipped on the desk while hidden too.
+    localStorage.setItem('tudu.motion', 'less');
     emit('note:open', { pinned: false, expanded: false, ask: { id: null, linkTo: null, nonce: 1 } });
     expect(document.documentElement).not.toHaveClass('dark');
+    expect(document.documentElement.dataset.motion).toBe('less');
+    delete document.documentElement.dataset.motion;
   });
 });
 

@@ -109,6 +109,10 @@ function onStorage(e: StorageEvent): void {
   if (e.key === THEME_STORAGE_KEY || e.key === null) syncThemeChoice();
 }
 
+function onMotionStorage(e: StorageEvent): void {
+  if (e.key === MOTION_STORAGE_KEY || e.key === null) syncLessMotion();
+}
+
 /** Hear every theme pick (Light, Dark or System), wherever it was made. Returns the way to stop listening. */
 export function onThemeChoice(l: (choice: ThemeChoice) => void): () => void {
   pickListeners.add(l);
@@ -170,6 +174,7 @@ export function resetThemeForTests(): void {
   listeners.clear();
   pickListeners.clear();
   changeListeners.clear();
+  motionPainted = null;
 }
 
 export { CROSS_FADE_MS };
@@ -187,6 +192,7 @@ export function readLessMotion(): boolean {
 
 /** Put the switch on the page: `data-motion="less"` turns every motion rule into its reduced form. */
 export function paintMotion(less: boolean): void {
+  motionPainted = less;
   const root = document.documentElement;
   if (less) root.dataset.motion = 'less';
   else delete root.dataset.motion;
@@ -205,7 +211,29 @@ export function setLessMotion(on: boolean): void {
   motionListeners.forEach((l) => l(on));
 }
 
-/** Hear the Less motion switch flipped in this page. Returns the way to stop listening. */
+/** The switch as this page painted it last (null: not painted yet, so the next sync paints). */
+let motionPainted: boolean | null = null;
+
+/**
+ * Take up Less motion as stored now, when another window of the same site flipped it (the macOS app's hidden
+ * windows share the desk's storage). Painted and told only on a real change.
+ */
+export function syncLessMotion(): void {
+  const was = motionPainted;
+  const next = readLessMotion();
+  if (next === was) return;
+  paintMotion(next);
+  // The first paint of this page is no change to tell anyone about.
+  if (was !== null) motionListeners.forEach((l) => l(next));
+}
+
+/** A hidden window just shown: take up the theme and Less motion picked on the desk while it was away. */
+export function syncLook(): void {
+  syncThemeChoice();
+  syncLessMotion();
+}
+
+/** Hear the Less motion switch flipped, here or taken up from another window. Returns the way to stop listening. */
 export function onLessMotion(l: (on: boolean) => void): () => void {
   motionListeners.add(l);
   return () => motionListeners.delete(l);
@@ -216,10 +244,25 @@ export function useLessMotion(): [boolean, (on: boolean) => void] {
   const [on, setOn] = useState(readLessMotion);
   useEffect(() => {
     motionListeners.add(setOn);
+    window.addEventListener('storage', onMotionStorage);
+    // A flip in another window since this page first read the switch.
+    syncLessMotion();
     paintMotion(readLessMotion());
     return () => {
       motionListeners.delete(setOn);
+      window.removeEventListener('storage', onMotionStorage);
     };
   }, []);
   return [on, setLessMotion];
+}
+
+/**
+ * For a window that shows the app but has no Appearance controls of its own (the Mac app's menu bar sheet, floating
+ * Quick Add, the note window): follow the theme and Less motion picked anywhere, live (the storage event) and with
+ * the System watcher. Pair it with `syncLook()` when the window is shown, since a hidden window may miss the event.
+ */
+export function useLook(): { theme: Theme; lessMotion: boolean } {
+  const { theme } = useTheme();
+  const [lessMotion] = useLessMotion();
+  return { theme, lessMotion };
 }

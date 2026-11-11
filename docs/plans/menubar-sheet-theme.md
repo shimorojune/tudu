@@ -1,7 +1,8 @@
 # Menu bar sheet keeps an old theme (#74)
 
-Status: proposal, awaiting Rohit's approval. Canvas: not applicable (no design change; the sheet already has light
-and dark boards, K-MenuBar and its dark twin, and the code already draws both). Skipped with Rohit's OK (5 Nov).
+Status: approved by Rohit 11 Nov 2026 (Less motion included); implemented. Canvas: not applicable (no design change;
+the sheet already has light and dark boards, K-MenuBar and its dark twin, and the code already draws both). Skipped
+with Rohit's OK (5 Nov).
 
 ## The report
 

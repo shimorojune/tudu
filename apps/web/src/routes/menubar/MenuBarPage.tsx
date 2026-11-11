@@ -10,7 +10,14 @@ import {
   type SpaceSummary,
   type Task,
 } from '@tudu/core';
-import { MenuBarSheet, type MenuBarGroupItem, type MenuBarRowItem, type MenuBarSheetProps } from '@tudu/ui';
+import {
+  MenuBarSheet,
+  syncLook,
+  useLook,
+  type MenuBarGroupItem,
+  type MenuBarRowItem,
+  type MenuBarSheetProps,
+} from '@tudu/ui';
 import { useEffect, useState } from 'react';
 import { useAppInfo } from '../../app/DesktopHost';
 import { desktop, UPDATES_GO, type DesktopBridge } from '../../app/desktop';
@@ -60,10 +67,14 @@ export function MenuBarPage({ me: first }: { me: MeResponse | null }) {
   const me = data ?? null;
   const info = useAppInfo();
   const [shown, setShown] = useState(startsShown);
+  // The window lives hidden for the whole session: follow the theme and Less motion picked on the desk, live (the
+  // storage event, and macOS itself on System), and again on every show, since a hidden window may miss the event.
+  useLook();
 
   useEffect(() => {
     if (!app) return;
     const on = app.on('menubar:shown', () => {
+      syncLook();
       setShown(true);
       void refreshMe();
       taskStore.refreshAll();

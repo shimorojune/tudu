@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router';
-import { syncThemeChoice, useTheme, type NoteResizeEdge } from '@tudu/ui';
+import { syncLook, useLook, type NoteResizeEdge } from '@tudu/ui';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { desktop, type NoteWindowState } from '../../app/desktop';
 import { useLiveEvents } from '../../app/live';
@@ -60,8 +60,9 @@ function resizeFrom(e: PointerEvent<HTMLElement>, edge: NoteResizeEdge): void {
 
 function MacNoteWindow() {
   useLiveEvents(true);
-  // The theme picked on the desk, live (the storage event), and on every open (a hidden window may miss it).
-  useTheme();
+  // The theme and Less motion picked on the desk, live (the storage event), and on every open (a hidden window may
+  // miss it).
+  useLook();
   const d = desktop()!;
   const [pinned, setPinned] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -81,7 +82,7 @@ function MacNoteWindow() {
     };
     void d.noteState().then(take);
     const stop = d.on('note:open', (payload) => {
-      syncThemeChoice();
+      syncLook();
       take(payload as NoteWindowState);
     });
     return () => {

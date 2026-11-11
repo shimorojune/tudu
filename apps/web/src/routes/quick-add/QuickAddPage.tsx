@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { addedWords } from '@tudu/core';
-import { Desk, QuickAdd, showToast, syncThemeChoice, useTheme, type QuickAddDraft } from '@tudu/ui';
+import { Desk, QuickAdd, showToast, syncLook, useLook, type QuickAddDraft } from '@tudu/ui';
 import type { MeResponse } from '@tudu/client';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import type { QuickAddSeed } from '../../app/dayView';
@@ -18,7 +18,8 @@ import './quick-add.css';
  * and it is gone again. On the web it is just a page; in the macOS app it is the floating window the summon shows.
  */
 export function QuickAddPage({ me }: { me: MeResponse }) {
-  const { theme } = useTheme();
+  // The theme and Less motion picked on the desk, live (the storage event) and on every summon.
+  const { theme } = useLook();
   const app = desktop();
   // The floating bar starts on the space you were last in on the desk (read again on every summon); its top line
   // can send it anywhere else. This window's list of spaces can be behind the desk's (a space made a moment ago): it never forgets the
@@ -65,8 +66,8 @@ export function QuickAddPage({ me }: { me: MeResponse }) {
         });
       seeded.current = false;
       takeSeed();
-      // The theme picked on the desk while the bar was put away (a hidden window may not hear it as it happens).
-      syncThemeChoice();
+      // The theme and Less motion picked on the desk while the bar was put away (a hidden window may not hear it).
+      syncLook();
       // The line is ready to write in, with the draft you left.
       setTimeout(() => document.querySelector<HTMLInputElement>('.app-floating .tp-qa-title')?.focus(), 0);
     });

@@ -1438,6 +1438,30 @@ test.describe('the look', () => {
     expect(s.look.deskBackground).toBe(BACKGROUND[mac]);
   });
 
+  test('C20-D09 the sheet follows every pick on the desk, opened after each (#74: Dark, Light, Dark)', async ({
+    app,
+  }) => {
+    await signIn(app);
+    await pickTheme(app, 'Light');
+    await openSheet(app);
+    const sheetDark = () =>
+      app.eval<boolean>(`return document.documentElement.classList.contains('dark')`, 'menubar');
+    expect(await sheetDark()).toBe(false);
+    await app.act('tray');
+    await sheetHidden(app);
+    for (const pick of ['Dark', 'Light', 'Dark'] as const) {
+      await pickTheme(app, pick);
+      await openSheet(app);
+      await app.until(
+        `return document.documentElement.classList.contains('dark') === ${pick === 'Dark'}`,
+        'menubar',
+      );
+      expect(await sheetDark()).toBe(pick === 'Dark');
+      await app.act('tray');
+      await sheetHidden(app);
+    }
+  });
+
   test('C11-D18 across launches: the desk is built in the picked theme, with its background, before any page loads', async ({
     app,
   }) => {
