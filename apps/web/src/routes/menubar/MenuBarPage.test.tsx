@@ -5,9 +5,9 @@ import type { SpaceSummary, Task } from '@tudu/core';
 import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { resetThemeForTests } from '@tudu/ui';
+import { MenuBarRow, resetThemeForTests } from '@tudu/ui';
 import { resetDesktop, type DesktopFake } from '../../app/desktop';
-import { MenuBarPage } from './MenuBarPage';
+import { MenuBarPage, menuBarRow } from './MenuBarPage';
 
 const TODAY = '2026-10-23';
 const live = vi.fn();
@@ -256,5 +256,22 @@ describe('C20-U21 the menu bar sheet follows the theme picked on the desk', () =
     localStorage.removeItem('tudu.motion');
     emit('menubar:shown');
     expect(html.dataset.motion).toBeUndefined();
+  });
+});
+
+describe('C20-U23 the sheet says today, tomorrow and yesterday', () => {
+  it('C20-U23 a row due today or tomorrow says so; one due yesterday is a red "Overdue"', () => {
+    const words = (due: string) => {
+      render(<MenuBarRow row={menuBarRow(task('d', 'ME-9', 'Call the bank', { due }), TODAY, [])} />);
+      const item = screen.getByRole('listitem');
+      const text = within(item).getByText(/Due|Overdue/);
+      const out = { text: text.textContent, red: text.classList.contains('tp-od') };
+      cleanup();
+      return out;
+    };
+    expect(words('2026-10-23')).toEqual({ text: 'Due today', red: false });
+    expect(words('2026-10-24')).toEqual({ text: 'Due tomorrow', red: false });
+    expect(words('2026-10-22')).toEqual({ text: 'Overdue', red: true });
+    expect(words('2026-10-27')).toEqual({ text: 'Due Tue', red: false });
   });
 });

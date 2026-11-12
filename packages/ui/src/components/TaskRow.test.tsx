@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { dueLabel } from '@tudu/core';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseRules, readStylesheet, rulesWhere } from '../test-utils/stylesheet';
@@ -309,6 +310,83 @@ describe('TaskRow subtasks and due (chunk 03)', () => {
     rerender(<TaskRow title="Reply to legal" id="ME-81" due={{ label: 'Fri', iso: '2026-10-23' }} />);
     expect(container.querySelector('.tp-sg-due')!.textContent).toBe('Due Fri');
     expect(container.querySelector('.tp-sg-due')).not.toHaveClass('tp-od');
+  });
+});
+
+describe('TaskRow near-day due words (#58)', () => {
+  const SUN = '2026-10-18';
+
+  it('C02-U39 today, tomorrow and yesterday read as words, with no tooltip that would only repeat them', () => {
+    const cases: [string, string, boolean][] = [
+      [SUN, 'Due today', false],
+      ['2026-10-19', 'Due tomorrow', false],
+      ['2026-10-17', 'Overdue since yesterday', true],
+    ];
+    for (const [iso, words, late] of cases) {
+      const { container, unmount } = render(
+        <TaskRow title="Reply to legal" id="ME-81" due={dueLabel(iso, SUN)} />,
+      );
+      const due = container.querySelector('.tp-sg-due')!;
+      expect(due.textContent).toBe(words);
+      expect(due.classList.contains('tp-od')).toBe(late);
+      // A Tooltip trigger carries Radix's data-state; these buttons are bare.
+      expect(due).not.toHaveAttribute('data-state');
+      expect(due).toHaveAccessibleName(`${words}. Change the date`);
+      unmount();
+    }
+    // Two days away still names the weekday and keeps its tooltip.
+    const { container } = render(
+      <TaskRow title="Reply to legal" id="ME-81" due={dueLabel('2026-10-16', SUN)} />,
+    );
+    expect(container.querySelector('.tp-sg-due')!.textContent).toBe('Overdue since Fri');
+    expect(container.querySelector('.tp-sg-due')).toHaveAttribute('data-state');
+  });
+
+  it('C02-U40 the words fade in only when they change in front of you', () => {
+    const row = (iso: string) => <TaskRow title="Call the bank" id="ME-61" due={dueLabel(iso, SUN)} />;
+    const { container, rerender } = render(row('2026-10-19'));
+    const due = () => container.querySelector('.tp-sg-due')!;
+    // First paint: still.
+    expect(due()).not.toHaveClass('tp-sg-turn');
+    const first = due().querySelector('span')!;
+    // The same words again: the same node, still no turn.
+    rerender(row('2026-10-19'));
+    expect(due().querySelector('span')).toBe(first);
+    expect(due()).not.toHaveClass('tp-sg-turn');
+    // Midnight: tomorrow becomes today, the words are a new node and turn.
+    rerender(row(SUN));
+    expect(due()).toHaveClass('tp-sg-turn');
+    expect(due().textContent).toBe('Due today');
+    expect(due().querySelector('span')).not.toBe(first);
+    // The motion is the design's: tp-label-in at dur-menu, off under reduced motion.
+    expect(rulesWhere(rules, (s) => s === '.tp-sg-turn > span')[0]!.declarations.animation).toBe(
+      'tp-label-in var(--dur-menu) var(--ease-arrive) both',
+    );
+    const reduced = rules.find(
+      (r) =>
+        r.selector === '.tp-sg-turn > span' && r.context.some((c) => c.includes('prefers-reduced-motion')),
+    );
+    expect(reduced!.declarations.animation).toBe('none');
+  });
+
+  it('C02-U41 in a line that wraps, long due words may break inside their item; elsewhere they never shrink', () => {
+    const wrap = rulesWhere(rules, (s) => s === '.tp-byline.tp-byline-wrap .tp-sg.tp-sg-due')[0]!
+      .declarations;
+    expect(wrap['flex-shrink']).toBe('1');
+    expect(wrap['min-width']).toBe('0');
+    expect(wrap['white-space']).toBe('normal');
+    expect(
+      rulesWhere(rules, (s) => s === '.tp-byline.tp-byline-wrap .tp-sg.tp-sg-due > span')[0]!.declarations[
+        'white-space'
+      ],
+    ).toBe('normal');
+    // A line that doesn't wrap keeps the date whole.
+    const plain = rulesWhere(rules, (s) => s === '.tp-byline .tp-sg-due');
+    expect(plain[0]!.declarations['flex-shrink']).toBe('0');
+    const { container } = render(
+      <TaskRow title="Book flights" id="ME-44" compact brief due={dueLabel('2026-10-17', SUN)} />,
+    );
+    expect(container.querySelector('.tp-byline')).toHaveClass('tp-byline-wrap');
   });
 });
 

@@ -1,8 +1,8 @@
 # "Due today", "Due tomorrow", "Overdue since yesterday" (#58)
 
 Status: canvas approved by Rohit 12 Nov 2026 for today (Version 208). He then asked for the same for yesterday and
-tomorrow; the boards (T-DueToday and T-DueToday-Dark on the Today page) now draw all three, canvas Version 219. This
-proposal is waiting for his approval.
+tomorrow; the boards (T-DueToday and T-DueToday-Dark on the Today page) now draw all three, canvas Version 219. Rohit
+approved the canvas and this proposal on 12 Nov 2026 (11:41 UTC).
 
 ## The report
 
