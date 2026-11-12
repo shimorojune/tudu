@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import type { ReactNode } from 'react';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
@@ -69,6 +70,7 @@ export function markWords(text: string, tokens: string[] | undefined): ReactNode
  * the Create row.
  */
 export function SearchHit(p: SearchHitProps) {
+  const mine = useMine();
   const common = {
     type: 'button' as const,
     role: 'option',
@@ -98,7 +100,7 @@ export function SearchHit(p: SearchHitProps) {
           </svg>
         </span>
         <span className="tp-sh-main">
-          <span className="tp-sh-title">{p.query}</span>
+          <span className="tp-sh-title">{mine(p.query)}</span>
         </span>
       </button>
     );
@@ -111,7 +113,7 @@ export function SearchHit(p: SearchHitProps) {
         </span>
         <span className="tp-sh-main">
           <span className="tp-sh-title">
-            Create <b>“{p.create}”</b>
+            Create <b>“{mine(p.create)}”</b>
           </span>
           <span className="tp-sh-by">
             <span>{p.note ?? 'Opens Quick Add with this as the title'}</span>
@@ -144,20 +146,20 @@ export function SearchHit(p: SearchHitProps) {
         )}
       </span>
       <span className="tp-sh-main">
-        <span className="tp-sh-title">{markWords(it.title, toks)}</span>
-        {it.snippet ? <span className="tp-sh-snip">{markWords(it.snippet, toks)}</span> : null}
+        <span className="tp-sh-title">{markWords(mine(it.title), toks)}</span>
+        {it.snippet ? <span className="tp-sh-snip">{markWords(mine(it.snippet), toks)}</span> : null}
         <span className="tp-sh-by">
           {it.space ? (
             <span className="tp-sh-space">
               <i className="tp-sh-tile" style={it.space.color ? { background: it.space.color } : undefined} />
-              {it.space.name}
+              {mine(it.space.name)}
             </span>
           ) : null}
           <span className={cx('tp-sh-where', it.where.tone === 'today' && 'tp-today')}>{it.where.label}</span>
           {it.project ? (
             <span className="tp-sh-proj">
               <i className="tp-sh-dot" style={{ background: it.project.color }} />
-              {it.project.name}
+              {mine(it.project.name)}
             </span>
           ) : null}
           {it.jira ? (

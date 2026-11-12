@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import type { ReactNode } from 'react';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
@@ -80,6 +81,7 @@ export function AppsPanel({
   onClose,
   className,
 }: AppsPanelProps) {
+  const mine = useMine();
   return (
     <section className={cx('tp-root tp-apps', compact && 'tp-compact', className)} aria-label="Apps">
       <div className="tp-apps-top">
@@ -112,7 +114,7 @@ export function AppsPanel({
               </div>
               <p>
                 {a.connected && a.off
-                  ? `Connected to your account. Turn it on to use it in ${spaceName || 'this space'}.`
+                  ? `Connected to your account. Turn it on to use it in ${mine(spaceName) || 'this space'}.`
                   : a.connected && a.status
                     ? a.status
                     : a.blurb}

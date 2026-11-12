@@ -11,6 +11,7 @@ import {
   IconButton,
   Menu,
   MiniCalendar,
+  ScrambledPill,
   Sheet,
   SheetBody,
   Tooltip,
@@ -296,6 +297,16 @@ export function Overlays() {
                   Menu
                 </Button>
               </Menu>
+            </Row>
+          )}
+        />
+        <Pair
+          title="Scrambled pill"
+          id="scrambled-pill"
+          note="In every window's top bar while Scramble my text is on (#67); clicking it turns the mode off."
+          render={() => (
+            <Row>
+              <ScrambledPill on onOff={() => showToast('Scramble my text is off')} />
             </Row>
           )}
         />

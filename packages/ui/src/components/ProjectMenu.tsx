@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import {
   PROJECT_COLOR_NAMES,
   PROJECT_COLORS,
@@ -45,6 +46,7 @@ export function ProjectMenu({
   heading = 'Project',
   className,
 }: ProjectMenuProps) {
+  const mine = useMine();
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState('');
   const [color, setColor] = useState<string>(PROJECT_COLORS[0]);
@@ -102,10 +104,10 @@ export function ProjectMenu({
         />
         <div className="tp-pm-foot">
           <span className="tp-pm-hint" key={same ? 'same' : 'new'}>
-            {same ? `${same.name} is already here.` : 'Its colour, here or later in Settings.'}
+            {same ? `${mine(same.name)} is already here.` : 'Its colour, here or later in Settings.'}
           </span>
           <Button variant={same ? 'secondary' : 'primary'} size="sm" disabled={!name.trim()} onClick={make}>
-            {same ? `Use ${same.name}` : 'Add'}
+            {same ? `Use ${mine(same.name)}` : 'Add'}
           </Button>
         </div>
       </div>
@@ -120,7 +122,7 @@ export function ProjectMenu({
           label: (
             <span className="tp-td-mi">
               <i className="tp-dot" style={{ background: x.color }} />
-              {x.name}
+              {mine(x.name)}
             </span>
           ),
           hint: x.id === selected ? '✓' : undefined,

@@ -21,8 +21,11 @@ import {
 import {
   copyText,
   FeedbackDialog,
+  readScramble,
+  setScramble,
   showToast,
   TOAST_WITH_ACTION_MS,
+  useScramble,
   type FeedbackPhase,
   type FeedbackReportsState,
   type SimilarReportsState,
@@ -286,11 +289,32 @@ export function currentDetails(
 
 /** "Filed as #142 on GitHub", with Copy link, for a moment longer than a plain toast. */
 export function toastFiled(issue: FeedbackIssue): void {
+  // Scramble my text still on after the report: the toast says so and offers to turn it off (#67). The link stays
+  // a click away in Your reports.
+  if (readScramble().on) {
+    showToast(`Filed as #${issue.number} on GitHub. Scramble is on.`, {
+      action: 'Turn off',
+      onAction: () => setScramble(false),
+      duration: TOAST_WITH_ACTION_MS,
+    });
+    return;
+  }
   showToast(`Filed as #${issue.number} on GitHub`, {
     action: 'Copy link',
     onAction: () => void copyText(issue.url),
     duration: TOAST_WITH_ACTION_MS,
   });
+}
+
+/** The thanks after an email-only report, with Turn off while Scramble my text is on. */
+export function toastThanks(): void {
+  if (readScramble().on)
+    showToast('Thanks. That’s with the Tudu team now. Scramble is on.', {
+      action: 'Turn off',
+      onAction: () => setScramble(false),
+      duration: TOAST_WITH_ACTION_MS,
+    });
+  else showToast('Thanks. That’s with the Tudu team now.', { duration: THANKS_MS });
 }
 
 /** What the "Already reported?" box shows, as the form's similar hook keeps it. */
@@ -433,6 +457,7 @@ export function FeedbackHost({ space, vp }: { space: Pick<SpaceSummary, 'kind'> 
   const view0 = viewOf(pathname);
   const line = feedbackDetailsLine(currentDetails(view0, space?.kind ?? null, app), pub);
   // Kept through a send, so a refused +1 comes back to the same rows.
+  const scrambled = useScramble().on;
   const similar = useSimilarIssues(d.text, isOpen && pub && view === 'form');
   const plusOne = pub ? d.plusOne : null;
 
@@ -482,7 +507,7 @@ export function FeedbackHost({ space, vp }: { space: Pick<SpaceSummary, 'kind'> 
     sentTimer.current = setTimeout(() => {
       clearFeedbackDraft();
       closeFeedback();
-      showToast('Thanks. That’s with the Tudu team now.', { duration: THANKS_MS });
+      toastThanks();
     }, SENT_MS);
   };
 
@@ -509,6 +534,7 @@ export function FeedbackHost({ space, vp }: { space: Pick<SpaceSummary, 'kind'> 
       shot={d.shot}
       onShot={(shot) => setFeedbackDraft({ shot })}
       public={d.public}
+      scrambled={scrambled}
       // Off lets go of a picked +1: a +1 is a GitHub comment.
       onPublic={(on) => setFeedbackDraft(on ? { public: true } : { public: false, plusOne: null })}
       details={details}

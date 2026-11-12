@@ -24,6 +24,7 @@ import {
   type JiraPanelState,
   type JiraPreviewIssue,
   type JiraView as PanelView,
+  useMine,
 } from '@tudu/ui';
 import { useEffect, useState } from 'react';
 import { askBacklogView, flashTask, locateTask, showDay, useShownDay } from './dayView';
@@ -185,6 +186,7 @@ export function JiraView({
   onClose?: () => void;
   compact?: boolean;
 }) {
+  const mine = useMine();
   const navigate = useNavigate();
   const vp = useViewport();
   const { today } = useWorkingDay();
@@ -490,7 +492,7 @@ export function JiraView({
         }}
       >
         Jira goes from every space you turned it on in, with your saved views. Your tasks keep their Jira
-        keys. To hide it only in {space.name}, use Turn off in {space.name} instead.
+        keys. To hide it only in {mine(space.name)}, use Turn off in {mine(space.name)} instead.
       </ConfirmDialog>
     </>
   );

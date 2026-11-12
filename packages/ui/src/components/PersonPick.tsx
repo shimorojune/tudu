@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { cx } from '../lib/cx';
 import { FilterField } from './FilterField';
@@ -49,6 +50,7 @@ const tick = (
  * inside, taking the room left on screen (at most 320px, at least 150px).
  */
 export function PersonPick({ people, selected, onPick, heading, me, meSub, className }: PersonPickProps) {
+  const mine = useMine();
   const others = people.filter((x) => !x.you);
   const [q, setQ] = useState('');
   const list = q
@@ -106,7 +108,11 @@ export function PersonPick({ people, selected, onPick, heading, me, meSub, class
       ) : null}
       <div ref={listEl} className="tp-ppick-list" style={maxH ? { maxHeight: maxH } : undefined}>
         {me && !q ? row('_me', !selected, me, 'Me', meSub ?? 'On your own list', () => onPick?.(null)) : null}
-        {list.map((x) => row(x.id, selected?.id === x.id, x, x.name, x.email, () => onPick?.(x)))}
+        {list.map((x) =>
+          row(x.id, selected?.id === x.id, x, mine(x.name), x.email ? mine(x.email) : undefined, () =>
+            onPick?.(x),
+          ),
+        )}
         {!list.length && (q || !me) ? <div className="tp-ppick-none">No one by that name.</div> : null}
       </div>
     </div>

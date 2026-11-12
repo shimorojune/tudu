@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router';
 import type { SpaceSummary } from '@tudu/core';
-import { Icon, NoteIcon, Sheet, SheetBody, type IconName } from '@tudu/ui';
+import { Icon, NoteIcon, Sheet, SheetBody, type IconName, useMine } from '@tudu/ui';
 import { openFeedback } from '../../app/feedback';
 import { useJira } from '../../app/jira';
 import { useAllScope } from '../../app/allSpaces';
@@ -60,6 +60,7 @@ export function moreItems(space: Pick<SpaceSummary, 'kind' | 'name'>, jira = fal
 export function MorePage() {
   const navigate = useNavigate();
   const space = useSpace();
+  const mine = useMine();
   const all = !!useAllScope();
   const { conn } = useJira(space.id);
   return (
@@ -76,7 +77,7 @@ export function MorePage() {
         </div>
         <SheetBody>
           <nav className="app-more-list" aria-label="More">
-            {moreItems(space, !!conn, all).map((it) => (
+            {moreItems({ ...space, name: mine(space.name) }, !!conn, all).map((it) => (
               <button
                 key={it.value}
                 type="button"

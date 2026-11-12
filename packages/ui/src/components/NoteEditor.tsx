@@ -1,3 +1,4 @@
+import { useMine, useMineField } from '../lib/scramble';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { drawingIds, moveTargets, type NotebookFolder } from '@tudu/core';
@@ -181,6 +182,7 @@ function LinkRow({
  * first, then the note fades off the page.
  */
 export function NoteEditor(p: NoteEditorProps) {
+  const mine = useMine();
   const note = p.note;
   const [menu, setMenu] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -188,6 +190,8 @@ export function NoteEditor(p: NoteEditorProps) {
   const [going, setGoing] = useState(false);
   const [asking, setAsking] = useState(false);
   const [title, setTitle] = useState(note?.title ?? '');
+  // Scramble my text: the title jumbles until it has focus.
+  const titleField = useMineField(title, { onBlur: () => p.onLeave?.() });
   const [bubble, setBubble] = useState<{ x: number; y: number; text: string } | null>(null);
   const wrap = useRef<HTMLDivElement | null>(null);
   const id = note?.id;
@@ -317,8 +321,8 @@ export function NoteEditor(p: NoteEditorProps) {
     );
 
   const links = note.linked;
-  const name = note.title.trim() || note.first?.trim() || 'this note';
-  const crumb = note.path.join('  /  ');
+  const name = mine(note.title.trim() || note.first?.trim() || '') || 'this note';
+  const crumb = note.path.map((x) => mine(x)).join('  /  ');
   const spots: PickItem[] = moveTargets(p.folders ?? [], note.folderId).map((t) => ({
     key: t.key,
     title: t.title,
@@ -466,15 +470,16 @@ export function NoteEditor(p: NoteEditorProps) {
       <div className="tp-nb-ed-in">
         <input
           className="tp-nb-title"
-          value={title}
-          placeholder={note.first || 'Untitled'}
+          value={titleField.value}
+          onFocus={titleField.bind.onFocus}
+          placeholder={mine(note.first) || 'Untitled'}
           aria-label="Note title"
           maxLength={200}
           onChange={(e) => {
             setTitle(e.target.value);
             p.onTitle?.(e.target.value);
           }}
-          onBlur={p.onLeave}
+          onBlur={titleField.bind.onBlur}
         />
         <LinkRow links={links} onUnlink={p.onUnlink} onOpen={p.onOpenTask}>
           {p.onLink ? (

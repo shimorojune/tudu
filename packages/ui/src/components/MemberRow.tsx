@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import { DropdownMenu } from 'radix-ui';
 import { useState } from 'react';
 import { cx } from '../lib/cx';
@@ -55,6 +56,7 @@ export function MemberRow({
   spaceName,
   className,
 }: MemberRowProps) {
+  const mine = useMine();
   const [open, setOpen] = useState(false);
   const words = ROLE_WORDS[role];
   const roleControl =
@@ -123,10 +125,10 @@ export function MemberRow({
       )}
       <span className="tp-mrow-n">
         <span className="tp-mrow-name">
-          {invited ? w.email : w.name || w.email}
+          {mine(invited ? w.email : w.name || w.email)}
           {w.you ? <span className="tp-prow-you">You</span> : null}
         </span>
-        <span className="tp-mrow-sub">{invited ? `Invited ${when ?? 'just now'}` : w.email}</span>
+        <span className="tp-mrow-sub">{invited ? `Invited ${when ?? 'just now'}` : mine(w.email)}</span>
       </span>
       {invited ? (
         <div className="tp-mrow-acts">

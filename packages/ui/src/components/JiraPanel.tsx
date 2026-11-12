@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import {
   addDays,
   dueWords,
@@ -175,6 +176,7 @@ export interface JPLinkedProps {
  * Clicking it shows the task where it lives.
  */
 export function JPLinked({ link: l, today, big, fresh, onShow }: JPLinkedProps) {
+  const mine = useMine();
   const w = linkChipWords({ ref: l.id ?? null, day: l.day, done: l.done }, today);
   const day = w.text.slice(l.id ? l.id.length + 3 : 0);
   return (
@@ -188,7 +190,7 @@ export function JPLinked({ link: l, today, big, fresh, onShow }: JPLinkedProps) 
         l.day === today && 'tp-today',
       )}
       aria-label={w.label}
-      title={l.title}
+      title={mine(l.title)}
       onClick={(e) => {
         e.stopPropagation();
         onShow?.(l);
@@ -210,7 +212,7 @@ export function JPLinked({ link: l, today, big, fresh, onShow }: JPLinkedProps) 
         <span className="tp-jp-lk-sp">
           {'· '}
           <SpaceTile space={l.space} size={12} />
-          {l.space.name}
+          {mine(l.space.name)}
         </span>
       ) : null}
     </button>
@@ -278,6 +280,7 @@ export function JiraPreview({
   onShowTask,
   onPick,
 }: JiraPreviewProps) {
+  const mine = useMine();
   const [all, setAll] = useState(false);
   const cms = it.comments ?? [];
   const shown = all || cms.length <= 4 ? cms : cms.slice(-3);
@@ -291,7 +294,7 @@ export function JiraPreview({
     it.assignee ? (
       <span className="tp-jp-who">
         <Avatar initials={it.assignee.initials} name={it.assignee.name} color={it.assignee.color} size="sm" />
-        {it.assignee.name}
+        {mine(it.assignee.name)}
       </span>
     ) : (
       <span className="tp-jp-none">{loading ? '' : 'Unassigned'}</span>
@@ -335,7 +338,7 @@ export function JiraPreview({
       </div>
       <div className="tp-jp-pvscroll" aria-busy={loading ? 'true' : undefined}>
         {it.issuetype ? <div className="tp-jp-pvtype">{it.issuetype}</div> : null}
-        <h2 className="tp-jp-pvsum">{it.summary}</h2>
+        <h2 className="tp-jp-pvsum">{mine(it.summary)}</h2>
         <dl className="tp-jp-facts">
           {facts.map(([k, v]) => (
             <Fragment key={k}>
@@ -367,7 +370,7 @@ export function JiraPreview({
                     <span className={cx('tp-jp-ld', l.day === today && 'tp-today')}>
                       {linkDayLong(l.day, today).replace('the Backlog', 'Backlog')}
                     </span>
-                    <span className="tp-jp-lt">{l.title || it.summary}</span>
+                    <span className="tp-jp-lt">{mine(l.title || it.summary)}</span>
                     {l.id ? <span className="tp-jp-lid">{l.id}</span> : null}
                   </button>
                 </li>
@@ -394,7 +397,7 @@ export function JiraPreview({
                   <Avatar initials={c.initials} name={c.who} color={c.color} size="sm" />
                   <div className="tp-td-cmt-b">
                     <div className="tp-td-who">
-                      <b>{c.who}</b>
+                      <b>{mine(c.who)}</b>
                       <span>{c.when}</span>
                     </div>
                     <RichTextContent html={c.html} className="tp-td-cmt-text" />
@@ -468,6 +471,7 @@ export const JP_CONNECTED_MS = 900;
  * made, and Connect. Jira's answer comes back right under the field it is about and clears as soon as you edit it.
  */
 export function JPConnect(p: JPConnectProps) {
+  const mine = useMine();
   const init = p.initial ?? {};
   const re = !!p.reconnect;
   const uid = useId();
@@ -568,7 +572,7 @@ export function JPConnect(p: JPConnectProps) {
           : p.allSpaces
             ? 'Connect once for your account with a personal access token. Then pick the spaces it shows in; it starts off everywhere until you do.'
             : p.account !== false
-              ? `Connect once for your account with a personal access token. Jira turns on in ${p.spaceName || 'this space'}; turn it on in your other spaces from Settings › Apps.`
+              ? `Connect once for your account with a personal access token. Jira turns on in ${mine(p.spaceName) || 'this space'}; turn it on in your other spaces from Settings › Apps.`
               : 'Connect with a personal access token. Tudu reads your issues and adds links; it never changes them without you.'}
       </p>
       {field(
@@ -730,6 +734,7 @@ export interface JiraPanelProps {
  * under a calm banner.
  */
 export function JiraPanel(p: JiraPanelProps) {
+  const mine = useMine();
   const init = p.initial ?? {};
   const today = p.today;
   const compact = !!p.compact;
@@ -1139,7 +1144,7 @@ export function JiraPanel(p: JiraPanelProps) {
               label="More"
               items={[
                 {
-                  label: p.spaceName ? `Turn off in ${p.spaceName}` : 'Turn off in this space',
+                  label: p.spaceName ? `Turn off in ${mine(p.spaceName)}` : 'Turn off in this space',
                   onSelect: () => {
                     setMoreOpen(false);
                     p.onTurnOff?.();
@@ -1308,7 +1313,7 @@ export function JiraPanel(p: JiraPanelProps) {
                   }}
                 >
                   <div className="tp-jp-main">
-                    <span className="tp-jp-sum">{it.summary}</span>
+                    <span className="tp-jp-sum">{mine(it.summary)}</span>
                     <div className="tp-jp-by">
                       {byline(
                         it,

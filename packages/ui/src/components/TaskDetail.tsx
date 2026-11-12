@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import {
   addDays,
   parseJiraKey,
@@ -301,6 +302,7 @@ export function TaskDetail(p: TaskDetailProps) {
   const { task: t, today, compact = false, readOnly = false } = p;
   const key = t.key;
   const [title, setTitle] = useState(t.title);
+  const mine = useMine();
   const [pop, setPop] = useState<null | 'day' | 'due' | 'vis' | 'project' | 'jira'>(null);
   const [jiraKey, setJiraKey] = useState('');
   const [histOpen, setHistOpen] = useState(false);
@@ -487,12 +489,12 @@ export function TaskDetail(p: TaskDetailProps) {
             <button
               type="button"
               className="tp-td-val tp-td-space"
-              title={`Open in ${p.inSpace.name}`}
+              title={`Open in ${mine(p.inSpace.name)}`}
               aria-label={`Space: ${p.inSpace.name}. Open in ${p.inSpace.name}`}
               onClick={p.onOpenSpace}
             >
               <SpaceTile space={p.inSpace} size={18} />
-              <span>{p.inSpace.name}</span>
+              <span>{mine(p.inSpace.name)}</span>
             </button>
           </dd>
         </div>
@@ -638,7 +640,7 @@ export function TaskDetail(p: TaskDetailProps) {
           {project ? (
             <>
               <i className="tp-dot" style={{ background: project.color }} />
-              <span>{project.name}</span>
+              <span>{mine(project.name)}</span>
             </>
           ) : (
             <span>{readOnly ? 'No project' : 'Add to a project'}</span>
@@ -865,7 +867,7 @@ export function TaskDetail(p: TaskDetailProps) {
               <Avatar initials={c.initials} name={c.who} size="sm" color={c.color} />
               <div className="tp-td-cmt-b">
                 <div className="tp-td-who">
-                  <b>{c.who}</b>
+                  <b>{mine(c.who)}</b>
                   <span>
                     {c.when}
                     {c.edited ? ' · edited' : ''}
@@ -950,13 +952,14 @@ export function TaskDetail(p: TaskDetailProps) {
               }}
             />
             {readOnly ? (
-              <h2 className="tp-td-title tp-td-title-ro">{t.title}</h2>
+              <h2 className="tp-td-title tp-td-title-ro">{mine(t.title)}</h2>
             ) : (
               <textarea
                 ref={titleRef}
                 rows={1}
                 className="tp-td-title"
-                value={title}
+                // Scramble my text: jumbled until it has focus, so only real words are ever written or saved.
+                value={writingTitle ? title : mine(title)}
                 aria-label="Task title"
                 spellCheck
                 onFocus={() => setWritingTitle(true)}
@@ -990,7 +993,7 @@ export function TaskDetail(p: TaskDetailProps) {
                 person={{ name: p.owner.name, initials: p.owner.initials, color: p.owner.color ?? undefined }}
                 size={16}
               />
-              <span>{p.ownerLine ?? `${p.owner.name}’s`}</span>
+              <span>{p.ownerLine ?? `${mine(p.owner.name)}’s`}</span>
             </div>
           ) : null}
           {facts}

@@ -1,3 +1,4 @@
+import { useMine, useMineField } from '../lib/scramble';
 import {
   addDays,
   dueDistance,
@@ -294,6 +295,7 @@ export function QAChip(p: QAChipProps) {
  * Project), a note and files only when you ask for them. Closing keeps the draft for next time.
  */
 export function QuickAdd(p: QuickAddProps) {
+  const mine = useMine();
   const { today } = p;
   const phone = p.variant === 'sheet';
   const overlay = p.layer !== 'none';
@@ -559,6 +561,8 @@ export function QuickAdd(p: QuickAddProps) {
   }
   const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('Files');
 
+  // Scramble my text: a draft left in the field jumbles too; with focus it's the real words.
+  const titleField = useMineField(f.title);
   if (overlay && !mounted) return null;
 
   const proj = p.projects.find((x) => x.id === f.projectId) ?? null;
@@ -572,7 +576,7 @@ export function QuickAdd(p: QuickAddProps) {
         : formatDay(f.planned);
   // For someone: the task goes to their Inbox. Planned becomes the day you would like ("Asks for Tue"); they pick the day.
   const to = p.send?.to ?? null;
-  const toName = to ? to.name.trim().split(/\s+/)[0]! : '';
+  const toName = to ? mine(to.name.trim().split(/\s+/)[0]!) : '';
   const space = p.send
     ? (p.send.spaces.find((s) => s.id === p.send!.spaceId) ?? p.send.spaces[0])
     : undefined;
@@ -661,7 +665,7 @@ export function QuickAdd(p: QuickAddProps) {
       empty={!proj}
       aria={proj ? `Project: ${proj.name}` : 'Choose a project'}
       icon={proj ? <i className="tp-dot" style={{ background: proj.color }} /> : <Ic name="project" />}
-      label={proj ? proj.name : 'Project'}
+      label={proj ? mine(proj.name) : 'Project'}
       pop={
         <ProjectMenu
           projects={p.projects}
@@ -733,10 +737,10 @@ export function QuickAdd(p: QuickAddProps) {
       <button
         type="button"
         className="tp-qa-sim-t"
-        title={`Open ${it.title}`}
+        title={`Open ${mine(it.title)}`}
         onClick={() => p.onOpenSimilar?.(it)}
       >
-        {it.title}
+        {mine(it.title)}
       </button>
       {it.where?.label ? <span className="tp-qa-sim-w">{it.where.label}</span> : null}
     </span>
@@ -761,7 +765,7 @@ export function QuickAdd(p: QuickAddProps) {
     p.send && p.send.spaces.length < 2 ? (
       <span className="tp-qa-chip tp-qa-static-chip" aria-label={`In ${space?.name ?? ''}`}>
         {space ? <SpaceTile space={space} size={18} /> : null}
-        <span>{space?.name ?? ''}</span>
+        <span>{mine(space?.name)}</span>
       </span>
     ) : p.send ? (
       <QAChip
@@ -770,7 +774,7 @@ export function QuickAdd(p: QuickAddProps) {
         up={phone}
         aria={`Space: ${space?.name ?? ''}`}
         icon={space ? <SpaceTile space={space} size={18} /> : <Ic name="project" />}
-        label={space?.name ?? ''}
+        label={mine(space?.name)}
         pop={
           <div className="tp-ppick-pop">
             <div className="tp-sswl" role="menu" aria-label="Which space">
@@ -791,7 +795,7 @@ export function QuickAdd(p: QuickAddProps) {
                   >
                     <SpaceTile space={s} size={24} />
                     <span className="tp-sswl-n">
-                      <span>{s.name}</span>
+                      <span>{mine(s.name)}</span>
                     </span>
                     {on ? (
                       <span className="tp-sswl-ok" aria-hidden="true">
@@ -826,13 +830,13 @@ export function QuickAdd(p: QuickAddProps) {
         empty={!to}
         aria={to ? `For ${to.name}` : 'Who it’s for'}
         icon={<PersonDot person={to ?? p.send.me} size={18} />}
-        label={to ? to.name : 'Me'}
+        label={to ? mine(to.name) : 'Me'}
         pop={
           <div className="tp-ppick-pop">
             <PersonPick
               people={p.send.people}
               me={p.send.me}
-              meSub={space ? `On your list in ${space.name}` : undefined}
+              meSub={space ? `On your list in ${mine(space.name)}` : undefined}
               selected={to}
               heading="Who it’s for"
               onPick={(x) => {
@@ -908,10 +912,10 @@ export function QuickAdd(p: QuickAddProps) {
           {from && !p.send?.to ? (
             <span
               className={cx('tp-qa-from', fromGoing && 'tp-out')}
-              title={`Links to the note “${from.name}”`}
+              title={`Links to the note “${mine(from.name)}”`}
             >
               <NoteIcon name="note" size={13} />
-              <span className="tp-qa-from-n">{from.name}</span>
+              <span className="tp-qa-from-n">{mine(from.name)}</span>
               <button
                 type="button"
                 aria-label="Don’t link it to this note"
@@ -943,7 +947,8 @@ export function QuickAdd(p: QuickAddProps) {
         <input
           ref={input}
           className="tp-qa-title"
-          value={f.title}
+          value={titleField.value}
+          {...titleField.bind}
           readOnly={saving}
           placeholder={to ? `What should ${toName} do?` : 'What needs doing?'}
           aria-label="Task title"
@@ -1046,7 +1051,7 @@ export function QuickAdd(p: QuickAddProps) {
               title={x.error}
             >
               <Ic name="file" size={13} />
-              <span className="tp-qa-fname">{x.name}</span>
+              <span className="tp-qa-fname">{mine(x.name)}</span>
               <span className="tp-qa-fsize">{x.error ? 'failed' : fileSize(x.size)}</span>
               <button
                 type="button"
@@ -1089,7 +1094,8 @@ export function QuickAdd(p: QuickAddProps) {
               ) : (
                 <>
                   Goes to <b>{toName}’s Inbox</b>
-                  {space && p.send!.spaces.length > 1 ? ` in ${space.name}` : ''}. {toName} picks the day
+                  {space && p.send!.spaces.length > 1 ? ` in ${mine(space.name)}` : ''}. {toName} picks the
+                  day
                   {lands.extra ? ` · ${lands.extra}` : ''}
                 </>
               )

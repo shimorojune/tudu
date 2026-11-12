@@ -30,6 +30,7 @@ import {
 } from 'react';
 import { cx } from '../lib/cx';
 import { useOutside } from '../lib/hooks';
+import { scrambleHtml, useScramble } from '../lib/scramble';
 import { Button } from './Button';
 import { MenuList } from './Menu';
 
@@ -250,6 +251,11 @@ export function RichTextEditor(p: RichTextEditorProps) {
   const lastW = useRef(0);
   const [fit, setFit] = useState(0);
   const [focused, setFocused] = useState(false);
+  // Scramble my text (#67): while it's on and the field isn't being written in, a jumbled read-only copy is drawn
+  // in the editor's place. A click or focus brings the live editor back with the real words.
+  const scr = useScramble();
+  const [peek, setPeek] = useState(false);
+  const veiled = scr.on && !focused && !peek;
   // Blank (the placeholder shows) only on nothing or one empty line: an empty bullet is not blank, though it saves as empty.
   const [empty, setEmpty] = useState(() => isBlankHtml(toHtml(p.value)));
   const [menu, setMenu] = useState<null | 'style' | 'link' | 'more'>(null);
@@ -334,6 +340,7 @@ export function RichTextEditor(p: RichTextEditorProps) {
       onFocus: () => setFocused(true),
       onBlur: ({ editor: e }) => {
         setFocused(false);
+        setPeek(false);
         const html = storedHtml(e.getHTML(), cb.current.fileBase);
         const em = htmlIsEmpty(html);
         cb.current.onBlur?.(em ? '' : html, em);
@@ -344,6 +351,10 @@ export function RichTextEditor(p: RichTextEditorProps) {
   useLayoutEffect(() => {
     edRef.current = editor;
   });
+  // Scramble my text: the jumbled copy was clicked, so the live editor is back; the caret goes in at the end.
+  useEffect(() => {
+    if (peek && editor && !editor.isFocused) editor.commands.focus('end');
+  }, [peek, editor]);
   useEffect(() => {
     p.drawings?.bind?.({
       remove: (id) => {
@@ -827,7 +838,31 @@ export function RichTextEditor(p: RichTextEditorProps) {
       }}
     >
       {lean ? null : bar}
-      <EditorContent editor={editor} className="tp-rte-host" />
+      {veiled ? (
+        <div className="tp-rte-host tp-rte-veil">
+          <div
+            className="tp-prose tp-rte-area"
+            role="textbox"
+            aria-multiline="true"
+            aria-label={p.label}
+            aria-readonly={p.readOnly ? 'true' : undefined}
+            data-placeholder={p.placeholder ?? ''}
+            tabIndex={p.readOnly ? -1 : 0}
+            onMouseDown={(e) => {
+              if (p.readOnly) return;
+              e.preventDefault();
+              setPeek(true);
+            }}
+            onFocus={() => {
+              if (!p.readOnly) setPeek(true);
+            }}
+            dangerouslySetInnerHTML={{
+              __html: scrambleHtml(withFileBase(editor?.getHTML() ?? toHtml(p.value), p.fileBase), scr.key),
+            }}
+          />
+        </div>
+      ) : null}
+      <EditorContent editor={editor} className="tp-rte-host" hidden={veiled} />
       {p.onAttach ? (
         <div className="tp-rte-drop" aria-hidden="true">
           <Ic name="attach" />
@@ -849,10 +884,12 @@ export interface RichTextContentProps {
 
 /** The same writing, read-only (comments). The HTML is cleaned again here, so nothing but words ever renders. */
 export function RichTextContent({ html, compact, fileBase, className }: RichTextContentProps) {
+  const scr = useScramble();
+  const clean = withFileBase(upgradeChips(cleanHtml(toHtml(html))), fileBase);
   return (
     <div
       className={cx('tp-root tp-prose', compact && 'tp-compact', className)}
-      dangerouslySetInnerHTML={{ __html: withFileBase(upgradeChips(cleanHtml(toHtml(html))), fileBase) }}
+      dangerouslySetInnerHTML={{ __html: scr.on ? scrambleHtml(clean, scr.key) : clean }}
     />
   );
 }

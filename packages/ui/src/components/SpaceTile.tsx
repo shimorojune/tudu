@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
 
@@ -26,6 +27,7 @@ export interface SpaceTileProps {
  * stacked sheets.
  */
 export function SpaceTile({ space, size = 36, label, className }: SpaceTileProps) {
+  const mine = useMine();
   const personal = !!space.personal;
   const all = !!space.all;
   const small = size < 18;
@@ -53,7 +55,7 @@ export function SpaceTile({ space, size = 36, label, className }: SpaceTileProps
         // offset, where a text line snaps to the pixel grid on its own and drifts. .355em is half Geist's cap height.
         <svg className="tp-stile-txt" width="100%" height="100%" aria-hidden="true">
           <text x="50%" y="50%" dy=".355em" textAnchor="middle">
-            {space.initials || String(space.name || '?').slice(0, 1)}
+            {mine(space.initials || String(space.name || '?').slice(0, 1))}
           </text>
         </svg>
       )}

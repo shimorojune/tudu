@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import {
   createContext,
   useContext,
@@ -191,6 +192,10 @@ export interface NoteItem {
 export const noteLabel = (n: { title: string; first?: string }) =>
   n.title.trim() || n.first?.trim() || 'Untitled';
 
+/** The label as drawn, with Scramble my text: the person's words jumble, Untitled stays Tudu's. */
+export const mineLabel = (mine: (t: string) => string, n: { title: string; first?: string }) =>
+  mine(n.title.trim() || n.first?.trim() || '') || 'Untitled';
+
 export interface NoteRowProps {
   note: NoteItem;
   depth?: number;
@@ -209,8 +214,9 @@ export interface NoteRowProps {
 
 /** One note in a list: its mark, its title (or its first line), how many tasks it's linked to, when it last changed. */
 export function NoteRow(p: NoteRowProps) {
+  const mine = useMine();
   const n = p.note;
-  const sub = p.sub === false ? null : (p.sub ?? n.where ?? null);
+  const sub = p.sub === false ? null : mine(p.sub ?? n.where ?? null) || null;
   return (
     <button
       type="button"
@@ -228,7 +234,7 @@ export function NoteRow(p: NoteRowProps) {
         <NoteIcon name="note" size={14} />
       </span>
       <span className="tp-nb-row-m">
-        <span className={cx('tp-nb-row-t', !n.title.trim() && 'tp-nb-untitled')}>{noteLabel(n)}</span>
+        <span className={cx('tp-nb-row-t', !n.title.trim() && 'tp-nb-untitled')}>{mineLabel(mine, n)}</span>
         {sub ? <span className="tp-nb-row-s">{sub}</span> : null}
       </span>
       {p.links !== false && n.links ? (
@@ -267,12 +273,13 @@ export function NoteTaskChip({
   onOpen?: () => void;
   onUnlink?: () => void;
 }) {
+  const mine = useMine();
   return (
     <span className="tp-root tp-nb-tchip">
-      <button type="button" className="tp-nb-tchip-b" title={task.title} onClick={onOpen}>
+      <button type="button" className="tp-nb-tchip-b" title={mine(task.title)} onClick={onOpen}>
         {task.space ? <SpaceTile space={task.space} size={14} /> : null}
         <span className="tp-nb-tchip-id">{task.id}</span>
-        <span className="tp-nb-tchip-t">{task.title}</span>
+        <span className="tp-nb-tchip-t">{mine(task.title)}</span>
       </button>
       {onUnlink ? (
         <button type="button" className="tp-nb-tchip-x" aria-label={`Unlink ${task.id}`} onClick={onUnlink}>
@@ -533,6 +540,7 @@ export interface NotePickerProps {
  * folder. It keeps inside its pane (narrowing, then sliding left) and opens upward when there's no room below.
  */
 export function NotePicker(p: NotePickerProps) {
+  const mine = useMine();
   const [q, setQ] = useState('');
   const [act, setAct] = useState(0);
   const input = useRef<HTMLInputElement | null>(null);
@@ -655,9 +663,9 @@ export function NotePicker(p: NotePickerProps) {
               <span className="tp-nb-row-m">
                 <span className="tp-nb-row-t">
                   {x.id ? <span className="tp-nb-tchip-id">{x.id} </span> : null}
-                  {x.title}
+                  {mine(x.title)}
                 </span>
-                {x.sub ? <span className="tp-nb-row-s">{x.sub}</span> : null}
+                {x.sub ? <span className="tp-nb-row-s">{mine(x.sub)}</span> : null}
               </span>
               {x.linked ? (
                 <span className="tp-nb-row-time">Linked</span>

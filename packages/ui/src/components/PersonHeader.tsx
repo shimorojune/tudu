@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import type { ReactNode } from 'react';
 import { cx } from '../lib/cx';
 import { PersonDot, type PersonDotPerson } from './PersonDot';
@@ -18,13 +19,14 @@ export interface PersonHeaderProps {
  * Its insets match the day header's, so every page title starts in the same place.
  */
 export function PersonHeader({ person: w, sub, children, compact, className }: PersonHeaderProps) {
+  const mine = useMine();
   return (
     <header className={cx('tp-root tp-ph', compact && 'tp-compact', className)}>
       <div className="tp-ph-row">
         <PersonDot person={w} size={compact ? 44 : 56} />
         <div className="tp-ph-n">
-          <h1 className="tp-ph-name">{w.name}</h1>
-          <div className="tp-ph-sub">{sub ?? w.email}</div>
+          <h1 className="tp-ph-name">{mine(w.name)}</h1>
+          <div className="tp-ph-sub">{sub ?? mine(w.email)}</div>
         </div>
       </div>
       {children ? <div className="tp-ph-tools">{children}</div> : null}

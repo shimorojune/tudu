@@ -41,6 +41,7 @@ import {
   showToast,
   type InboxEntry,
   type InboxWho,
+  useMine,
 } from '@tudu/ui';
 import { ApiError } from '@tudu/client';
 import { useEffect, useRef, useState } from 'react';
@@ -205,6 +206,7 @@ function endedState(err: unknown): InviteState | null {
  * it. Every row names its space. On phones the list is the page and an item is its own page with ‹ Inbox.
  */
 export function InboxPage() {
+  const mine = useMine();
   const vp = useViewport();
   const me = useQuery(meQuery).data;
   const shell = useSpace();
@@ -516,7 +518,7 @@ export function InboxPage() {
         plain
         onAction={() => narrow(null)}
       >
-        Requests and updates from {filterSpace.name} land here.
+        Requests and updates from {mine(filterSpace.name)} land here.
       </EmptyState>
     );
   else if (view === 'inbox' && empty)

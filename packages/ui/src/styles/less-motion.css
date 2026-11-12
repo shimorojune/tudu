@@ -183,6 +183,10 @@
 :root[data-motion='less'] .tp-pg-b {
   animation: tp-veil-in 120ms linear both;
 }
+:root[data-motion='less'] .tp-scr-pill {
+  animation: none;
+  transition: none;
+}
 :root[data-motion='less'] .tp-dlg,
 :root[data-motion='less'] .tp-dlg.tp-dlg-sheet {
   animation: tp-veil-in 120ms linear both;

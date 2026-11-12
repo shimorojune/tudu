@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import { addDays, formatDay, isoToday, type IsoDate } from '@tudu/core';
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { copyText, COPY_FAILED_WORDS, COPY_ID_FAILED_WORDS } from '../lib/clipboard';
@@ -107,7 +108,7 @@ interface Sig {
   bare?: boolean;
 }
 
-function signals(p: TaskRowProps): Sig[] {
+function signals(p: TaskRowProps, mine: (t: string) => string): Sig[] {
   const out: Sig[] = [];
   if (p.due) {
     const long = p.due.overdue ? `Overdue since ${p.due.label}` : `Due ${p.due.label}`;
@@ -167,18 +168,18 @@ function signals(p: TaskRowProps): Sig[] {
       bare: !!(p.brief || p.compact),
       // Alone (the week, phones) the tile carries the space by itself, so it is bigger than beside its name.
       icon: <SpaceTile space={p.inSpace} size={p.brief || p.compact ? 16 : 13} className="tp-sg-tile" />,
-      long: p.inSpace.name,
-      label: `Space · ${p.inSpace.name}`,
-      act: `Show only ${p.inSpace.name}`,
+      long: mine(p.inSpace.name),
+      label: `Space · ${mine(p.inSpace.name)}`,
+      act: `Show only ${mine(p.inSpace.name)}`,
     });
   }
   if (p.project) {
     out.push({
       k: 'project',
       icon: <i className="tp-dot" style={{ background: p.project.color }} />,
-      long: p.project.name,
-      label: `Project · ${p.project.name}`,
-      act: `Show all tasks in ${p.project.name}`,
+      long: mine(p.project.name),
+      label: `Project · ${mine(p.project.name)}`,
+      act: `Show all tasks in ${mine(p.project.name)}`,
     });
   }
   return p.brief
@@ -224,6 +225,7 @@ export const COPY_FLASH_MS = 700;
  */
 export function TaskRow(p: TaskRowProps) {
   const { title, id, done = false, compact, tick = 'ink' } = p;
+  const mine = useMine();
   const [sparking, fire] = useSpark();
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -267,7 +269,7 @@ export function TaskRow(p: TaskRowProps) {
     setPop((cur) => (cur && cur.k === k ? null : { k, el }));
   }
 
-  const sigs = signals(p);
+  const sigs = signals(p, mine);
   const byline: ReactNode[] = sigs.map((x) => {
     const isDate = (x.k === 'due' || x.k === 'carried') && canPick;
     const isSubs = x.k === 'subtasks';
@@ -499,10 +501,10 @@ export function TaskRow(p: TaskRowProps) {
                 className="tp-strike"
                 role={p.onOpen ? 'button' : undefined}
                 tabIndex={p.onOpen ? 0 : undefined}
-                title={title}
+                title={mine(title)}
                 onKeyDown={p.onOpen ? titleKey : undefined}
               >
-                {title}
+                {mine(title)}
               </span>
             </span>
             {byline.length ? (

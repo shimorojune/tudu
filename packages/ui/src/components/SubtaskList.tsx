@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
@@ -51,6 +52,8 @@ function SubTitle({
 }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(title);
+  // Scramble my text: jumbled to look at, the real words once it's being written.
+  const mine = useMine();
   const cancel = useRef(false);
   if (editing)
     return (
@@ -91,7 +94,7 @@ function SubTitle({
   return (
     <span
       className="tp-strike tp-sub-text"
-      title={hint ? title : undefined}
+      title={hint ? mine(title) : undefined}
       role="button"
       tabIndex={tabIndex}
       aria-label={`Edit subtask: ${title}`}
@@ -108,7 +111,7 @@ function SubTitle({
         }
       }}
     >
-      {title}
+      {mine(title)}
     </span>
   );
 }

@@ -1,5 +1,6 @@
 import { cx } from '../lib/cx';
-import { NoteIcon, noteLabel } from './NoteParts';
+import { mineLabel, NoteIcon } from './NoteParts';
+import { useMine } from '../lib/scramble';
 import { markWords } from './SearchHit';
 
 /** A note as Search lists it. */
@@ -31,6 +32,7 @@ export interface NoteHitProps {
  * inside that matched, then its folder and when it changed.
  */
 export function NoteHit(p: NoteHitProps) {
+  const mine = useMine();
   const it = p.item;
   return (
     <button
@@ -48,11 +50,11 @@ export function NoteHit(p: NoteHitProps) {
       </span>
       <span className="tp-sh-main">
         <span className={cx('tp-sh-title', !it.title.trim() && 'tp-nb-untitled')}>
-          {markWords(noteLabel(it), p.tokens)}
+          {markWords(mineLabel(mine, it), p.tokens)}
         </span>
-        {it.snippet ? <span className="tp-sh-snip">{markWords(it.snippet, p.tokens)}</span> : null}
+        {it.snippet ? <span className="tp-sh-snip">{markWords(mine(it.snippet), p.tokens)}</span> : null}
         <span className="tp-sh-by">
-          <span className="tp-sh-where">{it.where || 'Notebook'}</span>
+          <span className="tp-sh-where">{mine(it.where) || 'Notebook'}</span>
           {it.links ? (
             <span className="tp-sh-id">{it.links === 1 ? '1 task' : `${it.links} tasks`}</span>
           ) : null}

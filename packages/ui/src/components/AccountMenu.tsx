@@ -3,10 +3,12 @@ import { useState } from 'react';
 import { cx } from '../lib/cx';
 import { useControllable } from '../lib/hooks';
 import { Icon } from '../lib/icons';
+import { setScramble, useMine, useScramble } from '../lib/scramble';
 import type { ThemeChoice } from '../lib/theme';
 import { Avatar } from './Avatar';
 import { PersonDot } from './PersonDot';
 import { Segmented, type SegmentedItem } from './Segmented';
+import { Switch } from './Switch';
 
 export interface AccountMenuPerson {
   name: string;
@@ -21,6 +23,9 @@ export interface AccountMenuProps {
   /** The theme choice; kept locally when not given. */
   theme?: ThemeChoice;
   onTheme?: (choice: ThemeChoice) => void;
+  /** Scramble my text (#67). Follows the device's switch when not given (boards pass it). */
+  scramble?: boolean;
+  onScramble?: (on: boolean) => void;
   onSettings?: () => void;
   /** Send feedback, between Settings and Sign out. Without it the line stays out. */
   onFeedback?: () => void;
@@ -38,13 +43,15 @@ const THEMES: SegmentedItem<ThemeChoice>[] = [
 
 /**
  * You, from the avatar at the end of the top bar: your mark, name and email, the theme as a small
- * Light | Dark | System switch, Settings, Send feedback and Sign out. Radix floats the pop and handles Escape, a click outside
+ * Light | Dark | System switch, Scramble my text under it, Settings, Send feedback and Sign out. Radix floats the pop and handles Escape, a click outside
  * and focus; it eases in and out like every pop (tp-acct-pop, see app.css).
  */
 export function AccountMenu({
   me,
   theme,
   onTheme,
+  scramble,
+  onScramble,
   onSettings,
   onFeedback,
   onSignOut,
@@ -53,6 +60,9 @@ export function AccountMenu({
 }: AccountMenuProps) {
   const [open, setOpen] = useState(!!defaultOpen);
   const [choice, setChoice] = useControllable<ThemeChoice>(theme, 'system');
+  const device = useScramble();
+  const scrambled = scramble ?? device.on;
+  const mine = useMine();
   const closeThen = (then?: () => void) => {
     setOpen(false);
     then?.();
@@ -66,7 +76,7 @@ export function AccountMenu({
             className={cx('tp-acct-b', open && 'tp-on')}
             aria-haspopup="menu"
             aria-expanded={open ? 'true' : 'false'}
-            aria-label={`You: ${me.name}`}
+            aria-label={`You: ${mine(me.name)}`}
           >
             <Avatar initials={me.initials} name={me.name} color={me.color} image={me.image} />
           </button>
@@ -83,8 +93,8 @@ export function AccountMenu({
               <div className="tp-acct-me">
                 <PersonDot person={me} size={36} />
                 <span>
-                  <b>{me.name}</b>
-                  <span>{me.email}</span>
+                  <b>{mine(me.name)}</b>
+                  <span>{mine(me.email)}</span>
                 </span>
               </div>
               <div className="tp-acct-theme">
@@ -97,6 +107,18 @@ export function AccountMenu({
                     setChoice(v);
                     onTheme?.(v);
                   }}
+                />
+              </div>
+              {/* Flipping it keeps the menu open, like Theme: switch it, then take the screenshot. */}
+              <div className="tp-acct-scr">
+                <span>
+                  Scramble my text
+                  <small>Hides your words for screenshots</small>
+                </span>
+                <Switch
+                  label="Scramble my text"
+                  checked={scrambled}
+                  onChange={(on) => (onScramble ? onScramble(on) : setScramble(on))}
                 />
               </div>
               <div className="tp-mrow-sep" />

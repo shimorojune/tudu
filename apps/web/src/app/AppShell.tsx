@@ -16,6 +16,7 @@ import {
   BottomTabs,
   Fab,
   Icon,
+  ScrambledPill,
   Sidebar,
   SpaceSwitch,
   TopBar,
@@ -300,6 +301,7 @@ export function AppShell({
         <header className="app-phone-head">
           {switcher('sheet')}
           <div className="app-phone-tools">
+            <ScrambledPill />
             <button
               type="button"
               className={cx('app-phone-bug tp-tb-bug', feedbackOpen && 'tp-on')}
