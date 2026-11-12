@@ -5,6 +5,7 @@ import type { SpaceSummary, Task } from '@tudu/core';
 import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resetThemeForTests } from '@tudu/ui';
 import { resetDesktop, type DesktopFake } from '../../app/desktop';
 import { MenuBarPage } from './MenuBarPage';
 
@@ -171,5 +172,89 @@ describe('MC-U06 the Inbox line in the menu bar page', () => {
     mount(ME);
     await screen.findByRole('list', { name: 'Today in Personal' });
     expect(screen.queryByRole('button', { name: /new in your Inbox/ })).toBeNull();
+  });
+});
+
+describe('C20-U21 the menu bar sheet follows the theme picked on the desk', () => {
+  const html = document.documentElement;
+  const real = window.matchMedia;
+  let systemDark = false;
+  const schemeListeners = new Set<() => void>();
+  beforeEach(() => {
+    resetThemeForTests();
+    localStorage.clear();
+    html.className = '';
+    delete html.dataset.motion;
+    systemDark = false;
+    schemeListeners.clear();
+    window.matchMedia = ((query: string) => ({
+      media: query,
+      get matches() {
+        return query.includes('prefers-color-scheme: dark') && systemDark;
+      },
+      addEventListener: (_t: string, cb: () => void) => schemeListeners.add(cb),
+      removeEventListener: (_t: string, cb: () => void) => schemeListeners.delete(cb),
+      addListener() {},
+      removeListener() {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+  });
+  afterEach(() => {
+    window.matchMedia = real;
+    resetThemeForTests();
+    localStorage.clear();
+    html.className = '';
+    delete html.dataset.motion;
+  });
+
+  it('C20-U21 a pick heard live paints it; one made while hidden is painted on show; System follows macOS', async () => {
+    localStorage.setItem('tudu.theme', 'light');
+    mount(ME);
+    await screen.findByRole('list', { name: 'Today in Personal' });
+    expect(html).not.toHaveClass('dark');
+
+    // Dark on the desk: the shared storage tells this window.
+    localStorage.setItem('tudu.theme', 'dark');
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: 'tudu.theme', newValue: 'dark' }));
+    });
+    expect(html).toHaveClass('dark');
+
+    // Light on the desk while the sheet was away and heard nothing: the show reads it again.
+    emit('menubar:hidden');
+    localStorage.setItem('tudu.theme', 'light');
+    emit('menubar:shown');
+    expect(html).not.toHaveClass('dark');
+
+    // System, with macOS dark; then macOS turns light with no word from the desk.
+    emit('menubar:hidden');
+    systemDark = true;
+    localStorage.setItem('tudu.theme', 'system');
+    emit('menubar:shown');
+    expect(html).toHaveClass('dark');
+    act(() => {
+      systemDark = false;
+      schemeListeners.forEach((cb) => cb());
+    });
+    expect(html).not.toHaveClass('dark');
+
+    // The desk keeps the app's look; the sheet never sends it.
+    expect(calls('setAppearance')).toEqual([]);
+  });
+
+  it('C20-U22 Less motion: heard live, and taken up on show when it was missed', async () => {
+    mount(ME);
+    await screen.findByRole('list', { name: 'Today in Personal' });
+    expect(html.dataset.motion).toBeUndefined();
+    localStorage.setItem('tudu.motion', 'less');
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: 'tudu.motion', newValue: 'less' }));
+    });
+    expect(html.dataset.motion).toBe('less');
+
+    emit('menubar:hidden');
+    localStorage.removeItem('tudu.motion');
+    emit('menubar:shown');
+    expect(html.dataset.motion).toBeUndefined();
   });
 });

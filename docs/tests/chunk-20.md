@@ -48,3 +48,16 @@ Status column is kept by `pnpm test:status` in [STATUS.md](STATUS.md). Run this 
 | ------- | -------------------------- | --------------------------------------------------------------------------------------------- |
 | C20-U20 | ui `MenuBarSheet.test.tsx` | New note's tooltip shows "New note ⌥⌘N" above, with `aria-keyshortcuts`; without it, New note |
 | C20-E20 | e2e `menubar`              | The sheet with `noteShortcut` shows ⌥⌘N on New note; from an older app, New note alone        |
+
+## The sheet follows the theme and Less motion ([docs/plans/menubar-sheet-theme.md](../plans/menubar-sheet-theme.md))
+
+| ID      | Where                      | Case                                                                                                                                                         |
+| ------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| C20-U21 | web `MenuBarPage.test.tsx` | A theme pick heard live (storage event) paints the sheet; one stored while hidden is painted on `menubar:shown`; System follows macOS; no `setAppearance`    |
+| C20-U22 | web `MenuBarPage.test.tsx` | Less motion heard live, and taken up on `menubar:shown` when missed                                                                                          |
+| C20-E21 | e2e `menubar`              | Desk picks Dark, Light, Dark: the sheet matches each with no reload; a pick missed while hidden is taken up on show; System follows the page's colour scheme |
+| C20-E22 | e2e `menubar`              | Less motion flipped on the desk reaches the sheet and the floating Quick Add with no reload, both ways                                                       |
+| C20-D09 | Mac `desktop`              | #74's sequence in the real app: Light, then Dark, Light, Dark picked on the desk, the sheet opened after each, matching each time                            |
+| MC-T01  | Manual, Mac build          | Dark → open sheet → Light → open sheet → Dark → open sheet: the sheet matches every time                                                                     |
+| MC-T02  | Manual, Mac build          | System, flip macOS appearance with the sheet closed, open it: it matches macOS                                                                               |
+| MC-T03  | Manual, Mac build          | Less motion on, open the sheet: no drop-in motion                                                                                                            |

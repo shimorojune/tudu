@@ -354,4 +354,83 @@ test.describe('menubar', () => {
     expect((await calls(m, 'showMain')).map((c) => c.args)).toEqual([['/inbox']]);
     await b.context.close();
   });
+
+  test('C20-E21 the sheet follows the theme picked on the desk, with no reload: live, missed while away, and System', async ({
+    page,
+  }) => {
+    await page.context().addInitScript(() => {
+      if (!localStorage.getItem('tudu.theme')) localStorage.setItem('tudu.theme', 'light');
+    });
+    const { m } = await threeToday(page);
+    const html = m.locator('html');
+    const card = m.locator('.tp-root.tp-mb');
+    const bg = () => card.evaluate((el) => getComputedStyle(el).backgroundColor);
+    await expect(html).not.toHaveClass(/dark/);
+    const lightBg = await bg();
+    const loads = await m.evaluate(() => performance.getEntriesByType('navigation').length);
+
+    const pick = async (name: 'Light' | 'Dark' | 'System') => {
+      await page.getByRole('button', { name: /^You: / }).click();
+      await page.getByRole('group', { name: 'Theme' }).getByRole('button', { name }).click();
+      await page.keyboard.press('Escape');
+    };
+    // Rohit's sequence from #74: Dark, Light, Dark again; the sheet matches after each.
+    await pick('Dark');
+    await expect(html).toHaveClass(/dark/);
+    await expect.poll(bg).not.toBe(lightBg);
+    await pick('Light');
+    await expect(html).not.toHaveClass(/dark/);
+    await expect.poll(bg).toBe(lightBg);
+    await pick('Dark');
+    await expect(html).toHaveClass(/dark/);
+
+    // A pick the hidden sheet never heard (stored behind its back): the next show takes it up.
+    await emit(m, 'menubar:hidden');
+    await m.evaluate(() => localStorage.setItem('tudu.theme', 'light'));
+    await expect(html).toHaveClass(/dark/);
+    await emit(m, 'menubar:shown');
+    await expect(html).not.toHaveClass(/dark/);
+
+    // System follows the Mac's own appearance.
+    await m.emulateMedia({ colorScheme: 'dark' });
+    await pick('System');
+    await expect(html).toHaveClass(/dark/);
+    await m.emulateMedia({ colorScheme: 'light' });
+    await expect(html).not.toHaveClass(/dark/);
+
+    // All of it without the page loading again, and the sheet never speaks for the app's look.
+    expect(await m.evaluate(() => performance.getEntriesByType('navigation').length)).toBe(loads);
+    expect(await calls(m, 'setAppearance')).toHaveLength(0);
+  });
+
+  test('C20-E22 Less motion flipped on the desk reaches the sheet and the floating Quick Add with no reload', async ({
+    page,
+  }) => {
+    const { m } = await threeToday(page);
+    const f = await page.context().newPage();
+    await fixClock(f);
+    await installFake(f, { window: 'floating' });
+    await f.goto('/quick-add');
+    await expect(f.getByRole('textbox', { name: 'Task title' })).toBeVisible();
+    await expect(m.locator('html')).not.toHaveAttribute('data-motion', 'less');
+    await expect(f.locator('html')).not.toHaveAttribute('data-motion', 'less');
+
+    const lessMotion = async () => {
+      await page.getByRole('button', { name: /^You: / }).click();
+      await page.getByRole('menuitem', { name: 'Settings' }).click();
+      const d = page.getByRole('dialog', { name: 'Settings' });
+      await d
+        .getByRole('navigation', { name: 'Settings' })
+        .getByRole('button', { name: /^Appearance/ })
+        .click();
+      await d.getByRole('switch', { name: 'Less motion' }).click();
+      await page.keyboard.press('Escape');
+    };
+    await lessMotion();
+    await expect(m.locator('html')).toHaveAttribute('data-motion', 'less');
+    await expect(f.locator('html')).toHaveAttribute('data-motion', 'less');
+    await lessMotion();
+    await expect(m.locator('html')).not.toHaveAttribute('data-motion', 'less');
+    await expect(f.locator('html')).not.toHaveAttribute('data-motion', 'less');
+  });
 });

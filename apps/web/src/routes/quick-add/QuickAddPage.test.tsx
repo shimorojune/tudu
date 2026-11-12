@@ -173,9 +173,14 @@ describe('C11-U09 the floating window follows the theme picked on the desk', () 
 
     // Light on the desk while the bar was put away and heard nothing: the summon reads it again.
     localStorage.setItem('tudu.theme', 'light');
+    localStorage.setItem('tudu.motion', 'less');
     emit('floating:shown');
     await waitFor(() => expect(painted(container)).toBe('light'));
     expect(document.documentElement.classList.contains('dark')).toBe(false);
+    // Less motion flipped on the desk while it was away, too.
+    expect(document.documentElement.dataset.motion).toBe('less');
+    delete document.documentElement.dataset.motion;
+    localStorage.removeItem('tudu.motion');
   });
 });
 
