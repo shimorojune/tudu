@@ -219,6 +219,12 @@ export async function sampleBoxes<K extends string>(
   }, selectors);
   await act();
   await page.waitForTimeout(ms);
+  // On a slow runner the row can render late, so a glide can still be under way at `ms`: read on until the lifted
+  // copy has left the page. A copy that never leaves still fails in `expectLands`.
+  await page
+    .waitForFunction(() => !document.querySelector('.tp-drag-ghost'), null, { timeout: 3000 })
+    .catch(() => {});
+  await page.waitForTimeout(100);
   return page.evaluate(() => {
     const w = window as unknown as { __frames: unknown[]; __framing: boolean };
     w.__framing = false;

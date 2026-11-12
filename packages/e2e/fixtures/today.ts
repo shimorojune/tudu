@@ -110,5 +110,17 @@ export async function twoDays(page: Page): Promise<Locator> {
   await expect(second).toBeVisible();
   await expect(page.locator('.tp-spread-second')).toHaveClass(/tp-on/);
   await expect(page.locator('.tp-spread-second')).not.toHaveClass(/tp-moving/);
+  // `tp-moving` goes on a timer, so where frames come late (a busy runner) the page can still be sliding after it:
+  // a point read then is stale by the time the mouse gets there. Wait until the page's box stops changing.
+  let last = '';
+  await expect
+    .poll(async () => {
+      const b = await second.boundingBox();
+      const now = b ? `${b.x},${b.y},${b.width},${b.height}` : '';
+      const still = now !== '' && now === last;
+      last = now;
+      return still;
+    })
+    .toBe(true);
   return second;
 }
