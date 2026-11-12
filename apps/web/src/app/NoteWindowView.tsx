@@ -1,7 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { noteName } from '@tudu/core';
 import { NoteEditor, NoteWindow, type NoteWindowProps } from '@tudu/ui';
-import { noteItem, notebookStore, showInWindow, treeItems, useNoteWindow } from './notebook';
+import {
+  deleteFolderFromTree,
+  noteItem,
+  notebookStore,
+  showInWindow,
+  treeItems,
+  useNoteWindow,
+} from './notebook';
 import type { QuickAddSeed } from './dayView';
 import { useNoteEditor, type OpenPath } from './noteEditing';
 
@@ -28,7 +35,7 @@ export interface NoteWindowViewProps extends Pick<
 
 /**
  * The note window's inside, the same in the browser's floating panel and the Mac's own window: your
- * notes down the left (Recent, or All notes), the note on the right. It opens on a blank note unless it was asked
+ * notes down the left (Recent, or All notes, where folders are made and changed too), the note on the right. It opens on a blank note unless it was asked
  * for one; a blank note closed without a word is never kept.
  */
 export function NoteWindowView(p: NoteWindowViewProps) {
@@ -60,6 +67,21 @@ export function NoteWindowView(p: NoteWindowViewProps) {
       recentLoading={recent.isPending}
       tree={{ folders: items.folders, notes: items.notes }}
       treeLoading={tree.isPending}
+      treeError={tree.isError}
+      onTreeRetry={() => void tree.refetch()}
+      // All notes is the Notebook page's tree: the same calls, so a folder made here is the same folder there.
+      onNewNote={(folder) => showInWindow(null, undefined, folder?.id ?? null)}
+      onCreateFolder={(parentId, name) => {
+        const r = notebookStore.createFolder(parentId, name);
+        return 'error' in r ? r.error : null;
+      }}
+      onRenameFolder={(f, name) => notebookStore.renameFolder(f.id, name)?.error ?? null}
+      onDeleteFolder={(f) => {
+        // The open note went to Trash with its folder: the window goes back to a blank one.
+        if (deleteFolderFromTree(f, current)) showInWindow(null);
+      }}
+      onMoveNote={(id, folderId, index) => notebookStore.moveNote(id, folderId, index)}
+      onMoveFolder={(id, parentId, index) => notebookStore.moveFolder(id, parentId, index)}
       pinned={p.pinned}
       expanded={p.expanded}
       openLabel={p.openLabel}

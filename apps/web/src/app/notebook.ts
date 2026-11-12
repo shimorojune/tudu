@@ -8,6 +8,7 @@ import {
   folderPath,
   isoToday,
   noteName,
+  notesBelow,
   type NotebookResponse,
   type NoteHeader,
   type NoteListItem,
@@ -349,13 +350,34 @@ const winListeners = new Set<() => void>();
 const notifyWin = () => winListeners.forEach((l) => l());
 
 /**
- * Show a note in the note window, or a blank one (linked to a task). The note it showed before saves what's
+ * Show a note in the note window, or a blank one (linked to a task, or filed in a folder). The note it showed before saves what's
  * waiting, and goes away again if it was blank.
  */
-export function showInWindow(id: string | null, linkTo?: string): void {
+export function showInWindow(id: string | null, linkTo?: string, folderId?: string | null): void {
   if (winNote && winNote.id !== id) notebookStore.close(winNote.id);
-  winNote = { id: id ?? notebookStore.draft({ linkTo }), blank: !id };
+  winNote = { id: id ?? notebookStore.draft({ linkTo, folderId }), blank: !id };
   notifyWin();
+}
+
+/**
+ * Delete a folder the way the tree does it everywhere: it and what's in it go to Trash, and a toast says so with a
+ * way back. Says whether the open note went with it, so the caller can show something else.
+ */
+export function deleteFolderFromTree(
+  folder: { id: string; name: string },
+  openNoteId: string | null,
+): boolean {
+  const data = notebookStore.cachedTree();
+  const n = data ? notesBelow(data.folders, data.notes, folder.id) : 0;
+  const open = openNoteId ? data?.notes.find((x) => x.id === openNoteId) : undefined;
+  notebookStore.deleteFolder(folder.id);
+  showToast(
+    n
+      ? `Moved “${folder.name}” and its ${n === 1 ? 'note' : `${n} notes`} to Trash.`
+      : `Deleted “${folder.name}”.`,
+    { action: 'Undo', onAction: () => notebookStore.restoreFolder(folder.id) },
+  );
+  return !!open?.folderId && !notebookStore.cachedTree()?.notes.some((x) => x.id === openNoteId);
 }
 
 /** The note window is done with its note (it closes, or goes to the Notebook page). */

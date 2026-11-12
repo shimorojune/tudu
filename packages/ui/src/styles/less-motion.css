@@ -334,6 +334,9 @@
 :root[data-motion='less'] .tp-ak-tool {
   animation: none;
 }
+:root[data-motion='less'] .tp-nb-frow.tp-nb-naming {
+  animation-duration: 1ms;
+}
 
 /* app.css */
 :root[data-motion='less'] .tp-tip-pop,
