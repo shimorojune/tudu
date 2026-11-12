@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { Drawer, type DrawerProps } from './Drawer';
 
@@ -58,7 +58,8 @@ describe('Drawer', () => {
     const panel = screen.getByRole('dialog', { name: 'Task' });
     expect(panel).toHaveFocus();
 
-    await user.click(screen.getByRole('button', { name: 'Outside' }));
+    // Focus moves out without a press (a press outside closes it: C00-U37).
+    screen.getByRole('button', { name: 'Outside' }).focus();
     expect(screen.getByRole('button', { name: 'Outside' })).toHaveFocus();
     expect(onClose).not.toHaveBeenCalled();
     await user.keyboard('{Escape}');
@@ -117,5 +118,83 @@ describe('Drawer', () => {
       </Drawer>,
     );
     expect(container).toBeEmptyDOMElement();
+  });
+
+  describe('C00-U37 a modeless drawer closes on a press outside it', () => {
+    function outside(extra: Partial<DrawerProps> = {}, inside?: ReactNode) {
+      const user = userEvent.setup();
+      const onClose = vi.fn();
+      render(
+        <div>
+          <button type="button">Outside</button>
+          <button type="button" className="tp-jirabtn">
+            Jira
+          </button>
+          <button type="button" data-nav="app:Jira">
+            Jira row
+          </button>
+          <button type="button" data-nav="today">
+            Today
+          </button>
+          <div className="tp-toast-host">
+            <button type="button">Undo</button>
+          </div>
+          <div className="tp-nb-float">
+            <button type="button">Note</button>
+          </div>
+          <Drawer open onClose={onClose} label="Jira" modal={false} {...extra}>
+            <button type="button">Inside</button>
+            {inside}
+          </Drawer>
+        </div>,
+      );
+      return { user, onClose, press: (name: string) => user.click(screen.getByRole('button', { name })) };
+    }
+
+    it('a press on the page closes it; one inside does not', async () => {
+      const { onClose, press } = outside();
+      await press('Inside');
+      expect(onClose).not.toHaveBeenCalled();
+      await press('Outside');
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('another sidebar row is outside', async () => {
+      const { onClose, press } = outside();
+      await press('Today');
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('not outside: a toast, the floating note, and the two Jira toggles', async () => {
+      const { onClose, press } = outside();
+      for (const name of ['Undo', 'Note', 'Jira', 'Jira row']) await press(name);
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('a panel holding [data-keep-open] stays', async () => {
+      const { onClose, press } = outside({}, <form data-keep-open="" aria-label="Checking" />);
+      await press('Outside');
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('focus moving away without a press does not close it', async () => {
+      const { user, onClose } = outside();
+      await user.click(screen.getByRole('button', { name: 'Inside' }));
+      await user.tab({ shift: true });
+      screen.getByRole('button', { name: 'Outside' }).focus();
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('closeOnOutside={false} keeps it open', async () => {
+      const { onClose, press } = outside({ closeOnOutside: false });
+      await press('Outside');
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('a modal drawer is unchanged: only its veil closes it', async () => {
+      const { user, onClose, veil } = setup();
+      await user.click(veil() as HTMLElement);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
   });
 });

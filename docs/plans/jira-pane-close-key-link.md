@@ -1,12 +1,24 @@
 # Jira panel: a click outside closes it, and the issue key opens the ticket
 
-Status: proposal, awaiting Rohit's approval. Issues: #62 (Jira pane should close when we click outside) and #61 (in
+Status: approved by Rohit 12 Nov 2026; implemented (see As built). Issues: #62 (Jira pane should close when we click outside) and #61 (in
 the Jira pane, clicking the ticket ID should open the ticket in the browser). Canvas: approved by Rohit 12 Nov 2026 on
 the Jira page (boards `J-Outside`, `J-Outside-Dark`, `J-Outside-States`, `J-Outside-States-Dark`, sticky
 `p04-outside-draft`; `J-Motion` gained "Open the ticket" and the close wording). Both behaviours are now the default
 in the canvas kit, so every Jira prototype on the canvas has them. Kit: Tudu Paper, 12 Nov (`Drawer`
 `closeOnOutside`, `JiraPanel` `keyLinks`, `Sidebar` `data-nav`, connect form `data-keep-open`; READMEs for Drawer and
-JiraPanel, `index.d.ts`).
+JiraP## As built (12 Nov)
+
+As proposed, with these differences:
+
+- Drawer uses Radix's `onFocusOutside` and `onPointerDownOutside` (instead of `onInteractOutside`); the not-outside
+  list (`STAYS` in `Drawer.tsx`) applies to modal drawers too, as the old toast and note-window rule did.
+- C10-E32 doesn't check Back: closing by a press outside pushes the address like × does, so Back reopens Jira,
+  the same as after ×.
+- C11-E06 (desktop links) also clicks the preview header's key and checks it is handed to the app
+  (`openExternal`), with no popup.
+- Unit and e2e runs were on PR CI only.
+
+anel, `index.d.ts`).
 
 ## What is wrong today (master b532c83)
 

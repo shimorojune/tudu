@@ -55,6 +55,8 @@ export async function signOut(): Promise<void> {
   // Unsaved changes get a moment to land; whatever is left belongs to this person and goes with them.
   const { taskStore } = await import('./tasks');
   await taskStore.clear();
+  // A half-typed Jira token is theirs too.
+  (await import('./jira')).clearConnectDraft();
   await authClient.signOut();
   queryClient.setQueryData(meQuery.queryKey, null);
   await queryClient.invalidateQueries();
