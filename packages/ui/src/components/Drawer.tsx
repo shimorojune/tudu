@@ -15,10 +15,27 @@ export interface DrawerProps {
   fullscreen?: boolean;
   /** `false` for panels you work alongside (Jira): no veil, the page stays live, Esc closes only from inside. */
   modal?: boolean;
+  /**
+   * A modeless drawer closes on a press anywhere else on the page (#62), and the press still does its own job.
+   * `false` keeps it open. Modal drawers close on their veil either way.
+   */
+  closeOnOutside?: boolean;
   className?: string;
 }
 
 const LEAVE_MS = 190;
+
+/**
+ * Presses that are not "outside" a drawer: a toast (Undo on "Comment deleted") belongs to what the panel is doing, the
+ * note window (chunk 22) floats over it, the Jira button in the top bar and the sidebar's Jira row toggle it (one
+ * press closes it; closing first would reopen it on the click), and a panel holding `[data-keep-open]` is mid-step
+ * (Jira checking a token).
+ */
+const STAYS = '.tp-toast-host, .tp-nb-float, .tp-jirabtn, [data-nav="app:Jira"]';
+function stays(target: Element | null, panel: HTMLElement | null): boolean {
+  if (target?.closest?.(STAYS)) return true;
+  return !!panel?.querySelector('[data-keep-open]');
+}
 const FULL_LEAVE_MS = 260;
 
 /**
@@ -34,6 +51,7 @@ export function Drawer({
   width,
   fullscreen,
   modal = true,
+  closeOnOutside = true,
   className,
 }: DrawerProps) {
   const [mounted, setMounted] = useState(open);
@@ -112,11 +130,13 @@ export function Drawer({
               if (panel.current?.querySelector('.tp-td-pop:not(.tp-pop-leaving), .tp-rte-pop'))
                 e.preventDefault();
             }}
-            onInteractOutside={(e) => {
-              // A toast (Undo on "Comment deleted") sits over the page but belongs to what the panel is doing, and
-              // the note window (chunk 22) floats over the panel without closing it.
+            onFocusOutside={(e) => {
+              // Focus moving away (Tab, a shortcut) never closes a panel you work beside: only a press does.
+              if (modeless) e.preventDefault();
+            }}
+            onPointerDownOutside={(e) => {
               const target = e.detail.originalEvent.target as Element | null;
-              if (modeless || leaving || target?.closest?.('.tp-toast-host, .tp-nb-float'))
+              if (leaving || stays(target, panel.current) || (modeless && !closeOnOutside))
                 e.preventDefault();
             }}
           >

@@ -586,4 +586,116 @@ describe('the Jira panel (chunk 10)', () => {
     rerender(<Panel state="connect" onTurnOff={onTurnOff} onManage={onManage} onDisconnect={onDisconnect} />);
     expect(screen.queryByRole('button', { name: 'More' })).toBeNull();
   });
+
+  it('C10-U29 the key opens the ticket: rows on the desk and tablets, the preview header always; never the preview', async () => {
+    const user = userEvent.setup();
+    const onOpenInJira = vi.fn();
+    const onOpenIssue = vi.fn();
+    const site = 'https://jira.northwind.io';
+    const { rerender } = render(
+      <Panel siteUrl={site} onOpenInJira={onOpenInJira} onOpenIssue={onOpenIssue} />,
+    );
+    const key = within(row('TUDU-212')).getByRole('link', { name: 'Open TUDU-212 in Jira' });
+    expect(key).toHaveAttribute('href', `${site}/browse/TUDU-212`);
+    expect(key).toHaveAttribute('target', '_blank');
+    expect(key).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(key).toHaveClass('tp-jp-key');
+    expect(key).toHaveTextContent('TUDU-212');
+    for (const k of ['TUDU-219', 'TUDU-220'])
+      expect(within(row(k)).getByRole('link', { name: `Open ${k} in Jira` })).toBeInTheDocument();
+
+    await user.click(key);
+    expect(onOpenInJira).toHaveBeenCalledTimes(1);
+    expect(onOpenInJira).toHaveBeenLastCalledWith('TUDU-212');
+    expect(onOpenIssue).not.toHaveBeenCalled();
+    // The keyboard: Enter on the link opens the ticket, not the preview.
+    key.focus();
+    await user.keyboard('{Enter}');
+    expect(onOpenInJira).toHaveBeenCalledTimes(2);
+    expect(onOpenIssue).not.toHaveBeenCalled();
+    // A ⌘-click is the browser's own (a new tab), not ours.
+    fireEvent.click(key, { metaKey: true });
+    expect(onOpenInJira).toHaveBeenCalledTimes(2);
+    // A click the page already handled (the Mac app's link catcher, in capture) isn't opened a second time.
+    const caught = (e: MouseEvent) => e.preventDefault();
+    document.addEventListener('click', caught, true);
+    await user.click(key);
+    document.removeEventListener('click', caught, true);
+    expect(onOpenInJira).toHaveBeenCalledTimes(2);
+    expect(onOpenIssue).not.toHaveBeenCalled();
+    // The rest of the row still opens the preview.
+    await user.click(within(row('TUDU-212')).getByText('Make the Jira panel remember the last view'));
+    expect(onOpenIssue).toHaveBeenLastCalledWith('TUDU-212');
+
+    // The preview's header key is the same link.
+    rerender(<Panel siteUrl={site} open="TUDU-219" onOpenInJira={onOpenInJira} onOpenIssue={onOpenIssue} />);
+    const pv = screen.getByRole('dialog', { name: /^TUDU-219/ });
+    const pvKey = within(pv).getByRole('link', { name: 'Open TUDU-219 in Jira' });
+    expect(pvKey).toHaveClass('tp-jp-pvkey');
+    expect(pvKey).toHaveAttribute('href', `${site}/browse/TUDU-219`);
+    await user.click(pvKey);
+    expect(onOpenInJira).toHaveBeenLastCalledWith('TUDU-219');
+
+    // Phones: the row's key is text; the sheet's key is the link.
+    rerender(<Panel compact siteUrl={site} onOpenInJira={onOpenInJira} />);
+    expect(within(row('TUDU-212')).queryByRole('link')).toBeNull();
+    expect(row('TUDU-212').querySelector('span.tp-jp-key')).toHaveTextContent('TUDU-212');
+    rerender(<Panel compact siteUrl={site} open="TUDU-212" onOpenInJira={onOpenInJira} />);
+    expect(
+      within(screen.getByRole('dialog', { name: /^TUDU-212/ })).getByRole('link', {
+        name: 'Open TUDU-212 in Jira',
+      }),
+    ).toBeInTheDocument();
+
+    // keyLinks={false}, or no address to link to: plain text.
+    rerender(<Panel siteUrl={site} keyLinks={false} onOpenInJira={onOpenInJira} />);
+    expect(screen.queryAllByRole('link')).toHaveLength(0);
+    rerender(<Panel onOpenInJira={onOpenInJira} />);
+    expect(screen.queryAllByRole('link')).toHaveLength(0);
+  });
+
+  it('C10-U30 the connect form holds the panel open while it checks, and starts from what you typed', async () => {
+    const user = userEvent.setup();
+    let answer: () => void = () => {};
+    const onConnect = vi.fn(() => new Promise<void>((r) => (answer = r)));
+    const onConnectDraft = vi.fn();
+    const { container, rerender } = render(
+      <Panel state="connect" onConnect={onConnect} onConnectDraft={onConnectDraft} />,
+    );
+    const form = () => container.querySelector('form.tp-jp-connect')!;
+    expect(form()).not.toHaveAttribute('data-keep-open');
+
+    await user.type(screen.getByLabelText('Jira address'), 'https://jira.northwind.io');
+    expect(onConnectDraft).toHaveBeenLastCalledWith({ site: 'https://jira.northwind.io', token: '' });
+    await user.type(screen.getByLabelText('Personal access token'), 'good-1');
+    expect(onConnectDraft).toHaveBeenLastCalledWith({ site: 'https://jira.northwind.io', token: 'good-1' });
+
+    await user.click(screen.getByRole('button', { name: 'Connect Jira' }));
+    expect(form()).toHaveAttribute('data-keep-open');
+    // Through the Connected tick too.
+    await act(async () => answer());
+    expect(form()).toHaveAttribute('data-keep-open');
+
+    // A refusal lets go.
+    const refuse = vi.fn(async () => ({
+      error: { field: 'token' as const, message: 'Jira didn’t accept this token.' },
+    }));
+    rerender(<Panel key="again" state="connect" onConnect={refuse} />);
+    await user.type(screen.getByLabelText('Jira address'), 'https://jira.northwind.io');
+    await user.type(screen.getByLabelText('Personal access token'), 'bad-1');
+    await user.click(screen.getByRole('button', { name: 'Connect Jira' }));
+    expect(await screen.findByText('Jira didn’t accept this token.')).toBeInTheDocument();
+    expect(form()).not.toHaveAttribute('data-keep-open');
+
+    // A draft fills both fields.
+    rerender(
+      <Panel
+        key="draft"
+        state="connect"
+        connectDraft={{ site: 'https://jira.acme.io', token: 'half-typed' }}
+      />,
+    );
+    expect(screen.getByLabelText('Jira address')).toHaveValue('https://jira.acme.io');
+    expect(screen.getByLabelText('Personal access token')).toHaveValue('half-typed');
+  });
 });

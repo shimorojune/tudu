@@ -56,6 +56,7 @@ the drag between days fixes it at Wednesday 14 October so a day of the week is s
 | C05-E15 | Dark mode                  | The week, a cross off and (on the desk) a drag to the Backlog in the dark theme                                                                                                                                                        |
 | C05-E16 | A drop on another tile     | Motion on, read every frame: tile to tile and onto the empty Backlog, the card glides onto its row, the rows it left glide shut, the empty line folds all the way shut (no pop at the end), the counts and the server follow (desktop) |
 | C05-E17 | A drop on a very full tile | A row dropped at the tile's lower edge is scrolled into view and the card lands on it (desktop)                                                                                                                                        |
+| C05-E18 | Long due words in a tile   | At 1280×800 "Overdue since yesterday" in a week tile never runs past the line's edge (desktop)                                                                                                                                         |
 
 Not automated: the tint and the ink line under a dragged row between tiles, the fold's easing, the week turning,
 the picker's arrival. Judge those on staging and on the kit page's week section.

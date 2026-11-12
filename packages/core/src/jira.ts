@@ -166,9 +166,8 @@ export function jiraCountWords(n: number): string {
   return `${n} assigned to you, not in Tudu yet`;
 }
 
-/** The byline's due words: "Due today", "Due Thu", "Due 4 Nov", "Overdue since Mon". */
+/** The byline's due words, the same as a task row's: "Due today", "Due Thu", "Due 4 Nov", "Overdue since Mon". */
 export function jiraDueWords(due: IsoDate, today: IsoDate): { text: string; overdue: boolean } {
-  if (due === today) return { text: 'Due today', overdue: false };
   const l = dueLabel(due, today);
   return l.overdue
     ? { text: `Overdue since ${l.label}`, overdue: true }

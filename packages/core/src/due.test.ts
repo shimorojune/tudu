@@ -38,3 +38,45 @@ describe('C03-U23 due words', () => {
     expect(dueWords('2026-10-04', SUNDAY)).toEqual({ text: '2 weeks overdue', tone: 'overdue' });
   });
 });
+
+describe('C03-U30 today, tomorrow, yesterday', () => {
+  it('C03-U30 the three nearest days get words; the row says them with no tooltip', () => {
+    expect(dueLabel(SUNDAY, SUNDAY)).toEqual({
+      label: 'today',
+      tip: 'Due today',
+      overdue: false,
+      iso: SUNDAY,
+    });
+    expect(dueLabel('2026-10-19', SUNDAY)).toEqual({
+      label: 'tomorrow',
+      tip: 'Due tomorrow',
+      overdue: false,
+      iso: '2026-10-19',
+    });
+    expect(dueLabel('2026-10-17', SUNDAY)).toEqual({
+      label: 'yesterday',
+      tip: 'Overdue since yesterday',
+      overdue: true,
+      iso: '2026-10-17',
+    });
+  });
+
+  it('C03-U30 two days either way is a weekday again', () => {
+    expect(dueLabel('2026-10-20', SUNDAY)).toMatchObject({
+      label: 'Tue',
+      tip: 'Due Tuesday',
+      overdue: false,
+    });
+    expect(dueLabel('2026-10-16', SUNDAY)).toMatchObject({
+      label: 'Fri',
+      tip: 'Was due Friday',
+      overdue: true,
+    });
+  });
+
+  it('C03-U30 across a month and a year', () => {
+    expect(dueLabel('2027-01-01', '2026-12-31').label).toBe('tomorrow');
+    expect(dueLabel('2026-02-28', '2026-03-01').label).toBe('yesterday');
+    expect(dueLabel('2026-03-01', '2026-02-28').label).toBe('tomorrow');
+  });
+});

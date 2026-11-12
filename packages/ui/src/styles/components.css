@@ -115,6 +115,9 @@
   transition: background var(--dur-menu) var(--ease-change), color var(--dur-menu) var(--ease-change), opacity var(--dur-menu) var(--ease-change); }
 .tp-sg:hover { background: var(--accent); color: var(--foreground); }
 .tp-sg.tp-od, .tp-sg.tp-od:hover { color: var(--destructive); }
+/* New due words fade in when they change in front of you (midnight, a date picked); words a row is born with stay still. */
+.tp-sg-turn > span { animation: tp-label-in var(--dur-menu) var(--ease-arrive) both; }
+@media (prefers-reduced-motion: reduce) { .tp-sg-turn > span { animation: none; } }
 .tp-sg .tp-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
 .tp-sg .tp-jd { width: 6px; height: 6px; background: var(--jira); transform: rotate(45deg); border-radius: 1.5px; flex: none; }
 .tp-sg svg { flex: none; }
@@ -315,6 +318,11 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 .tp-byline-wrap .tp-sg-project > span { max-width: 140px; }
 .tp-byline-wrap { column-gap: 6px; }
 .tp-byline-wrap .tp-sep { display: none; } /* on phones the line wraps, so items are spaced instead of dotted (no dots left hanging at line ends) */
+/* Where the line wraps (week tiles, phones), long due words ("Overdue since yesterday") may break inside their own item
+   rather than run past the tile's edge; the clock stays on the first line. */
+.tp-byline.tp-byline-wrap .tp-sg.tp-sg-due { flex-shrink: 1; min-width: 0; max-width: 100%; height: auto; min-height: 22px; align-items: flex-start; padding-top: 3px; padding-bottom: 3px; white-space: normal; }
+.tp-byline.tp-byline-wrap .tp-sg.tp-sg-due > span { white-space: normal; overflow: visible; line-height: 16px; }
+.tp-byline.tp-byline-wrap .tp-sg.tp-sg-due > svg { margin-top: 2px; }
 
 /* ---- Phase 01: the day page ---------------------------------------------------------------- */
 
@@ -1192,6 +1200,16 @@ html.tp-is-dragging .tp-sub-del { opacity: 0 !important; }
 .tp-jp-back:focus-visible { outline: none; box-shadow: inset 0 0 0 1.5px var(--ring); }
 .tp-jp-pvkey { display: inline-flex; align-items: center; gap: 6px; margin-right: 2px; font-family: var(--font-mono); font-size: 12px; color: var(--jira); }
 .tp-jp-pvkey svg { color: var(--muted-foreground); }
+/* The issue key is a link to the ticket in Jira (#61): a soft Jira wash and an underline ease in under the pointer.
+   The wash sits in negative margin, so the byline never moves. .tp-hover/.tp-press/.tp-focus draw the states on a specimen. */
+a.tp-jp-key, a.tp-jp-pvkey { text-decoration: underline; text-decoration-color: transparent; text-decoration-thickness: 1px; text-underline-offset: 3px; border-radius: 5px; cursor: pointer; outline: none;
+  transition: background-color var(--dur-menu) var(--ease-change), text-decoration-color var(--dur-menu) var(--ease-change), box-shadow var(--dur-menu) var(--ease-change); }
+a.tp-jp-key { display: inline-flex; align-items: center; margin: 0 -5px; padding: 0 5px; line-height: 20px; white-space: nowrap; }
+a.tp-jp-pvkey { margin-right: -2px; padding: 3px 6px; }
+a.tp-jp-key:hover, a.tp-jp-pvkey:hover, a.tp-jp-key.tp-hover, a.tp-jp-pvkey.tp-hover { background: var(--jira-soft); text-decoration-color: currentColor; }
+a.tp-jp-key:active, a.tp-jp-pvkey:active, a.tp-jp-key.tp-press, a.tp-jp-pvkey.tp-press { background: color-mix(in srgb, var(--jira) 22%, transparent); text-decoration-color: currentColor; transition-duration: 60ms; }
+a.tp-jp-key:focus-visible, a.tp-jp-pvkey:focus-visible, a.tp-jp-key.tp-focus, a.tp-jp-pvkey.tp-focus { box-shadow: 0 0 0 1.5px var(--ring); }
+@media (prefers-reduced-motion: reduce) { a.tp-jp-key, a.tp-jp-pvkey { transition: none; } }
 .tp-jp-pvscroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: 6px 32px 28px; }
 .tp-jp-pvtype { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-foreground); }
 .tp-jp-pvsum { margin: 6px 0 18px; font-size: 22px; line-height: 1.3; font-weight: 600; letter-spacing: -.012em; color: var(--foreground); overflow-wrap: anywhere; }

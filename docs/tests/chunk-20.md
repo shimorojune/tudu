@@ -55,6 +55,7 @@ Status column is kept by `pnpm test:status` in [STATUS.md](STATUS.md). Run this 
 | ------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | C20-U21 | web `MenuBarPage.test.tsx` | A theme pick heard live (storage event) paints the sheet; one stored while hidden is painted on `menubar:shown`; System follows macOS; no `setAppearance`    |
 | C20-U22 | web `MenuBarPage.test.tsx` | Less motion heard live, and taken up on `menubar:shown` when missed                                                                                          |
+| C20-U23 | web `MenuBarPage.test.tsx` | A row due today reads "Due today", tomorrow "Due tomorrow", yesterday a red "Overdue", four days out "Due Tue" (#58)                                         |
 | C20-E21 | e2e `menubar`              | Desk picks Dark, Light, Dark: the sheet matches each with no reload; a pick missed while hidden is taken up on show; System follows the page's colour scheme |
 | C20-E22 | e2e `menubar`              | Less motion flipped on the desk reaches the sheet and the floating Quick Add with no reload, both ways                                                       |
 | C20-D09 | Mac `desktop`              | #74's sequence in the real app: Light, then Dark, Light, Dark picked on the desk, the sheet opened after each, matching each time                            |

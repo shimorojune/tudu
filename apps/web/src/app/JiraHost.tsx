@@ -30,8 +30,10 @@ import { useEffect, useState } from 'react';
 import { askBacklogView, flashTask, locateTask, showDay, useShownDay } from './dayView';
 import {
   ALL_GLOW,
+  clearConnectDraft,
   closeApps,
   followAssignedList,
+  getConnectDraft,
   glowJiraSpace,
   hostOf,
   jiraClient,
@@ -40,6 +42,7 @@ import {
   markJiraFresh,
   openApps,
   openInJira,
+  setConnectDraft,
   setFromApps,
   setJiraPick,
   useAppsOpen,
@@ -449,7 +452,10 @@ export function JiraView({
           });
         }}
         onConnect={connect}
+        connectDraft={getConnectDraft()}
+        onConnectDraft={setConnectDraft}
         onConnected={() => {
+          clearConnectDraft();
           setHolding(false);
           setReconnecting(false);
           setFromApps(false);
@@ -584,6 +590,7 @@ export function JiraConnectHost({ space }: { space: SpaceSummary }) {
     }
   };
   const connectedNow = () => {
+    clearConnectDraft();
     setHolding(false);
     glowJiraSpace(ALL_GLOW);
     const q = new URLSearchParams(loc.searchStr);
@@ -605,6 +612,8 @@ export function JiraConnectHost({ space }: { space: SpaceSummary }) {
           views={[]}
           view={JIRA_ASSIGNED_VIEW}
           allSpaces
+          connectDraft={getConnectDraft()}
+          onConnectDraft={setConnectDraft}
           onConnect={connect}
           onConnected={connectedNow}
           onCancelReconnect={close}

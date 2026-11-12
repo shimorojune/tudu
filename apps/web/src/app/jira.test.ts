@@ -9,9 +9,11 @@ import { moreItems } from '../routes/more/MorePage';
 import { phoneTab } from './AppShell';
 import { askOf, countsFor, panelState, toPanelIssue } from './JiraHost';
 import {
+  clearConnectDraft,
   clearJiraGlow,
   countFromList,
   followAssignedList,
+  getConnectDraft,
   glowJiraSpace,
   JIRA_COUNT_EVERY_MS,
   JIRA_STALE_MS,
@@ -20,6 +22,7 @@ import {
   peekJiraGlow,
   reloadJiraPickForTests,
   resetJiraForTests,
+  setConnectDraft,
   setJiraPick,
   turnOffHere,
   useJira,
@@ -27,7 +30,7 @@ import {
   useJiraPick,
   withJira,
 } from './jira';
-import { api, queryClient } from './session';
+import { api, queryClient, signOut } from './session';
 import { sectionFor } from './settings';
 import { viewOf } from './space';
 
@@ -468,5 +471,30 @@ describe('C10-U24..U28 the count follows the Assigned to me list and coming back
     act(() => followAssignedList(listOf(['A-1']), Date.now()));
     expect(queryClient.getQueryData<{ assigned: string[] }>(jiraConnectionKey())?.assigned).toEqual(['A-1']);
     await waitFor(() => expect(result.current.count).toBe(1));
+  });
+});
+
+describe('C10-U31 a half-typed connect form, kept in memory only', () => {
+  afterEach(() => clearConnectDraft());
+
+  it('keeps what you typed, writes nothing to storage, and an empty form keeps nothing', () => {
+    const set = vi.spyOn(Storage.prototype, 'setItem');
+    expect(getConnectDraft()).toBeNull();
+    setConnectDraft({ site: 'https://jira.northwind.io', token: 'half' });
+    expect(getConnectDraft()).toEqual({ site: 'https://jira.northwind.io', token: 'half' });
+    expect(set).not.toHaveBeenCalled();
+    expect(JSON.stringify({ ...localStorage, ...sessionStorage })).not.toContain('half');
+    setConnectDraft({ site: '', token: '' });
+    expect(getConnectDraft()).toBeNull();
+    set.mockRestore();
+  });
+
+  it('a connect clears it, and so does signing out', async () => {
+    setConnectDraft({ site: 'https://jira.northwind.io', token: 'half' });
+    clearConnectDraft();
+    expect(getConnectDraft()).toBeNull();
+    setConnectDraft({ site: 'https://jira.northwind.io', token: 'half' });
+    await signOut().catch(() => {});
+    expect(getConnectDraft()).toBeNull();
   });
 });

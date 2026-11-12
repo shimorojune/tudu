@@ -12,6 +12,9 @@
 }
 
 /* components.css */
+:root[data-motion='less'] .tp-sg-turn > span {
+  animation: none;
+}
 :root[data-motion='less'] .tp-btn.tp-indet::before {
   display: none;
 }
@@ -96,6 +99,10 @@
 }
 :root[data-motion='less'] .tp-datepop {
   animation: tp-label-in 120ms linear both;
+}
+:root[data-motion='less'] a.tp-jp-key,
+:root[data-motion='less'] a.tp-jp-pvkey {
+  transition: none;
 }
 :root[data-motion='less'] .tp-jp-pvwrap,
 :root[data-motion='less'] .tp-jp-pvwrap.tp-leaving,

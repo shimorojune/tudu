@@ -349,6 +349,8 @@ export {
   type JiraPreviewProps,
   type JiraView,
   type JiraConnectError,
+  type ConnectDraft,
+  type KeyLink,
   type JPConnectProps,
   type JPLinkedProps,
   type AddState,

@@ -209,6 +209,13 @@ test.describe('desktop', () => {
     await expect
       .poll(async () => calls(page, 'openExternal'))
       .toEqual([{ name: 'openExternal', args: [`${JIRA_SITE}/browse/TUDU-212`] }]);
+    // The key in the preview's header is a link to the same ticket (#61), handed to the app too.
+    await page
+      .getByRole('dialog', { name: /^TUDU-212 / })
+      .getByRole('link', { name: 'Open TUDU-212 in Jira' })
+      .click();
+    await expect.poll(async () => (await calls(page, 'openExternal')).length).toBe(2);
+    expect(popups).toBe(0);
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
 

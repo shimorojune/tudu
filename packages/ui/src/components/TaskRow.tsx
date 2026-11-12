@@ -189,6 +189,18 @@ function signals(p: TaskRowProps, mine: (t: string) => string): Sig[] {
     : out;
 }
 
+/**
+ * How many times `words` have changed since the row first drew them. The due words are keyed by it, so new words
+ * ("Due tomorrow" turning into "Due today" at midnight, a date picked from the row) fade in, and words a row is born
+ * with never move. Kept as state from the previous render, the way React documents it, not in a ref.
+ */
+function useTurn(words: string | undefined): number {
+  const [seen, setSeen] = useState({ words, n: 0 });
+  if (seen.words === words) return seen.n;
+  setSeen({ words, n: seen.n + 1 });
+  return seen.n + 1;
+}
+
 function Grip() {
   return (
     <span className="tp-grip" aria-hidden="true" title="Drag to reorder">
@@ -270,6 +282,7 @@ export function TaskRow(p: TaskRowProps) {
   }
 
   const sigs = signals(p, mine);
+  const dueTurn = useTurn(sigs.find((x) => x.k === 'due')?.long);
   const byline: ReactNode[] = sigs.map((x) => {
     const isDate = (x.k === 'due' || x.k === 'carried') && canPick;
     const isSubs = x.k === 'subtasks';
@@ -286,6 +299,7 @@ export function TaskRow(p: TaskRowProps) {
           x.mono && 'tp-mono',
           pop?.k === x.k && 'tp-on',
           isSubs && showSubs && 'tp-open',
+          x.k === 'due' && dueTurn > 0 && 'tp-sg-turn',
         )}
         aria-label={
           isSubs ? `${x.label}. ${showSubs ? 'Hide subtasks' : 'Show subtasks'}` : `${x.label}. ${x.act}`
@@ -315,7 +329,7 @@ export function TaskRow(p: TaskRowProps) {
         ) : (
           <>
             {x.icon}
-            <span>{x.long}</span>
+            <span key={x.k === 'due' ? dueTurn : undefined}>{x.long}</span>
           </>
         )}
         {isSubs ? (

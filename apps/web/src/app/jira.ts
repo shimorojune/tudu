@@ -12,7 +12,7 @@ import {
   type JiraLinksResponse,
 } from '@tudu/core';
 import { JiraClient, jiraConnectionKey, jiraLinksKey, jiraSpacesKey } from '@tudu/client';
-import { showToast } from '@tudu/ui';
+import { showToast, type ConnectDraft } from '@tudu/ui';
 import { useEffect, useSyncExternalStore } from 'react';
 import { openOutside } from './links';
 import { api, queryClient } from './session';
@@ -353,4 +353,20 @@ export function withJira(at: { pathname: string; searchStr: string }, jira: stri
   else q.set('jira', jira ?? '');
   const s = q.toString().replace(/(^|&)jira=(&|$)/, '$1jira$2');
   return `${at.pathname}${s ? `?${s}` : ''}`;
+}
+
+// ---- a half-typed connect form ----------------------------------------------------------------------------------
+
+/**
+ * What you typed into the connect form, kept while the panel is closed (a press outside closes it, #62) so opening
+ * Jira again brings it back. Memory only: never written to storage, and gone on a reload, a quit, a connect or sign
+ * out, so the token is never on disk.
+ */
+let connectDraft: ConnectDraft | null = null;
+export const getConnectDraft = (): ConnectDraft | null => connectDraft;
+export function setConnectDraft(d: ConnectDraft): void {
+  connectDraft = d.site || d.token ? { site: d.site, token: d.token } : null;
+}
+export function clearConnectDraft(): void {
+  connectDraft = null;
 }

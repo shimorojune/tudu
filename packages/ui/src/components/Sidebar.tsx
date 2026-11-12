@@ -193,6 +193,8 @@ export function Sidebar({
         <button
           type="button"
           className={cx('tp-nav', on && 'tp-on')}
+          // Which entry this is, for things outside the sidebar (the Jira panel knows its own toggle by it).
+          data-nav={it.value}
           aria-current={on ? 'page' : undefined}
           aria-label={rail ? `${it.label}${it.count ? `, ${it.count}` : ''}` : undefined}
           onClick={() => pick(it.value)}
