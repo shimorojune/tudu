@@ -561,6 +561,37 @@ test.describe('week', () => {
       'true',
     );
   });
+
+  test('C05-E18 at its narrowest the week keeps "Overdue since yesterday" inside the tile', async ({
+    page,
+  }) => {
+    test.skip(!desktop(), 'tiles side by side are the desk');
+    await signInFresh(page);
+    await writeTasks(page, ['Book flights for the offsite']);
+    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
+    await row(dayList(page), 'Book flights for the offsite')
+      .getByRole('button', { name: 'Book flights for the offsite' })
+      .click();
+    const p = page.getByRole('dialog', { name: 'Task details' });
+    await p.getByRole('button', { name: 'Due', exact: true }).click();
+    await p
+      .locator('.tp-td-pop')
+      .getByRole('button', { name: /^17 October/ })
+      .click();
+    await expect(row(dayList(page), 'Book flights for the offsite').locator('.tp-sg-due')).toHaveText(
+      'Overdue since yesterday',
+    );
+    await p.getByRole('button', { name: 'Close' }).click();
+    await idle(page);
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await goWeek(page);
+    const r = row(tileList(page, SUNDAY_LIST), 'Book flights for the offsite');
+    const due = r.locator('.tp-sg-due');
+    await expect(due).toHaveText('Overdue since yesterday');
+    const [d, line] = await Promise.all([due.boundingBox(), r.locator('.tp-byline').boundingBox()]);
+    // Never past the line's right edge: where the words don't fit, they take a second line inside their item.
+    expect(d!.x + d!.width).toBeLessThanOrEqual(line!.x + line!.width + 0.5);
+  });
 });
 
 /** The key a row is known by in every list it visits. */

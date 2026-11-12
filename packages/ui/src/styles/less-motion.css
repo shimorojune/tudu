@@ -12,6 +12,9 @@
 }
 
 /* components.css */
+:root[data-motion='less'] .tp-sg-turn > span {
+  animation: none;
+}
 :root[data-motion='less'] .tp-btn.tp-indet::before {
   display: none;
 }

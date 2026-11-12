@@ -115,6 +115,9 @@
   transition: background var(--dur-menu) var(--ease-change), color var(--dur-menu) var(--ease-change), opacity var(--dur-menu) var(--ease-change); }
 .tp-sg:hover { background: var(--accent); color: var(--foreground); }
 .tp-sg.tp-od, .tp-sg.tp-od:hover { color: var(--destructive); }
+/* New due words fade in when they change in front of you (midnight, a date picked); words a row is born with stay still. */
+.tp-sg-turn > span { animation: tp-label-in var(--dur-menu) var(--ease-arrive) both; }
+@media (prefers-reduced-motion: reduce) { .tp-sg-turn > span { animation: none; } }
 .tp-sg .tp-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
 .tp-sg .tp-jd { width: 6px; height: 6px; background: var(--jira); transform: rotate(45deg); border-radius: 1.5px; flex: none; }
 .tp-sg svg { flex: none; }
@@ -315,6 +318,11 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 .tp-byline-wrap .tp-sg-project > span { max-width: 140px; }
 .tp-byline-wrap { column-gap: 6px; }
 .tp-byline-wrap .tp-sep { display: none; } /* on phones the line wraps, so items are spaced instead of dotted (no dots left hanging at line ends) */
+/* Where the line wraps (week tiles, phones), long due words ("Overdue since yesterday") may break inside their own item
+   rather than run past the tile's edge; the clock stays on the first line. */
+.tp-byline.tp-byline-wrap .tp-sg.tp-sg-due { flex-shrink: 1; min-width: 0; max-width: 100%; height: auto; min-height: 22px; align-items: flex-start; padding-top: 3px; padding-bottom: 3px; white-space: normal; }
+.tp-byline.tp-byline-wrap .tp-sg.tp-sg-due > span { white-space: normal; overflow: visible; line-height: 16px; }
+.tp-byline.tp-byline-wrap .tp-sg.tp-sg-due > svg { margin-top: 2px; }
 
 /* ---- Phase 01: the day page ---------------------------------------------------------------- */
 

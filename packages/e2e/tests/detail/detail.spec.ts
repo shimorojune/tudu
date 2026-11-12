@@ -628,4 +628,71 @@ test.describe('detail', () => {
     await expect(panel(page).getByRole('textbox', { name: 'Notes' })).toContainText('In the dark.');
     await expect(panel(page).locator('.tp-td-cmt')).toHaveCount(1);
   });
+
+  test('C03-E21 today, tomorrow and yesterday read as words on the row; two days away is a weekday again', async ({
+    page,
+  }) => {
+    await signInFresh(page);
+    await writeTasks(page, ['Reply to legal']);
+    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
+    const p = await openTask(page, 'Reply to legal');
+    const due = row(dayList(page), 'Reply to legal').locator('.tp-sg-due');
+    const pick = async (day: string) => {
+      await p.getByRole('button', { name: 'Due', exact: true }).click();
+      await p
+        .locator('.tp-td-pop')
+        .getByRole('button', { name: new RegExp(`^${day} October`) })
+        .click();
+    };
+    // The fixture day is Sunday 18 October.
+    await pick('18');
+    await expect(due).toHaveText('Due today');
+    // No tooltip: it would only repeat the words (a tooltip's trigger carries data-state).
+    await expect(due).not.toHaveAttribute('data-state');
+    await pick('19');
+    await expect(due).toHaveText('Due tomorrow');
+    await pick('17');
+    await expect(due).toHaveText('Overdue since yesterday');
+    await expect(due).toHaveClass(/tp-od/);
+    await pick('21');
+    await expect(due).toHaveText('Due Wed');
+    await pick('16');
+    await expect(due).toHaveText('Overdue since Fri');
+    await expect(due).toHaveAttribute('data-state');
+    await pick('19');
+    await expect(due).toHaveText('Due tomorrow');
+    await idle(page);
+    await page.reload();
+    await expect(row(dayList(page), 'Reply to legal').locator('.tp-sg-due')).toHaveText('Due tomorrow');
+  });
+});
+
+// Its own clock: the page's timers run, so midnight can come while the page is open.
+test.describe('detail, the day turns', () => {
+  test('C03-E22 at midnight a task due tomorrow turns to "Due today" once Monday starts', async ({
+    page,
+  }) => {
+    await page.clock.install({ time: new Date(2026, 9, 18, 23, 59, 0) });
+    await signInFresh(page);
+    await writeTasks(page, ['Call the bank']);
+    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
+    const p = await openTask(page, 'Call the bank');
+    await p.getByRole('button', { name: 'Due', exact: true }).click();
+    await p
+      .locator('.tp-td-pop')
+      .getByRole('button', { name: /^19 October/ })
+      .click();
+    await expect(row(dayList(page), 'Call the bank').locator('.tp-sg-due')).toHaveText('Due tomorrow');
+    // On the phone the panel's own back button (its "Today" is also the name of the Pick a day preset).
+    if (test.info().project.name === 'phone') await p.locator('.tp-td-back').click();
+    else await p.getByRole('button', { name: 'Close' }).click();
+    await expect(panel(page)).toHaveCount(0);
+    await idle(page);
+    // Past midnight and past the page's 30s look at the clock: it asks before it moves.
+    await page.clock.runFor(90_000);
+    await expect(page.getByText(/^It’s 00:0\d on Monday\.$/)).toBeVisible();
+    await page.getByRole('button', { name: 'Start Monday' }).click();
+    await expect(page.getByRole('heading', { name: 'Monday' })).toBeVisible();
+    await expect(row(dayList(page), 'Call the bank').locator('.tp-sg-due')).toHaveText('Due today');
+  });
 });

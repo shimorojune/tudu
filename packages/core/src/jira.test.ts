@@ -191,4 +191,10 @@ describe('Jira words (chunk 10)', () => {
     expect(matchScore(task, 'tudu')).not.toBeNull();
     expect(matchScore({ ...task, keys: [] }, 'tudu')).toBeNull();
   });
+
+  it('C10-U29 the Jira pane says tomorrow and yesterday as a task row does', () => {
+    expect(jiraDueWords('2026-10-19', SUN)).toEqual({ text: 'Due tomorrow', overdue: false });
+    expect(jiraDueWords('2026-10-17', SUN)).toEqual({ text: 'Overdue since yesterday', overdue: true });
+    expect(jiraDueWords('2026-10-16', SUN)).toEqual({ text: 'Overdue since Fri', overdue: true });
+  });
 });
