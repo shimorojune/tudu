@@ -149,7 +149,7 @@ test.describe('desktop', () => {
     await app.waitState((x) => x.windows.main.url === `${WEB}/sign-in`);
     expect(s.windows.floating.visible).toBe(false);
     await signIn(app);
-    await app.waitState((x) => x.seen.signedIn);
+    await app.waitState((x) => x.seen.signedIn === true);
     expect((await app.state()).badge).toBeNull();
   });
 
@@ -270,7 +270,7 @@ test.describe('desktop', () => {
     expect(s.windows.floating.visible).toBe(false);
     expect(s.windows.main.url).toBe(`${WEB}/sign-in`);
     await signIn(app);
-    await app.waitState((x) => x.seen.signedIn);
+    await app.waitState((x) => x.seen.signedIn === true);
     await app.act('summon');
     await floatingShown(app);
     await app.until(`return !!T.all('textbox', 'Task title')[0]`, 'floating');
@@ -822,7 +822,7 @@ test.describe('desktop', () => {
     await app.launch();
     await onToday(app);
     expect(await app.eval(`return document.documentElement.classList.contains('dark')`)).toBe(true);
-    await app.waitState((x) => x.seen.signedIn);
+    await app.waitState((x) => x.seen.signedIn === true);
     await app.act('summon');
     await floatingShown(app);
     await app.until(`return T.get('textbox', 'Task title').value === 'Half a thought'`, 'floating');
@@ -1084,7 +1084,7 @@ test.describe('background', () => {
     const s = await app.state();
     expect(s.background).toMatchObject({ atLogin: true, policy: 'accessory', deskOpen: false, awake: true });
     expect(s.windows.main.visible).toBe(false);
-    await app.waitState((x) => x.seen.signedIn, 20_000);
+    await app.waitState((x) => x.seen.signedIn === true, 20_000);
     await openSheet(app);
     await sheetDay(app);
     await app.eval(`T.click(T.get('button', 'Open Tudu Test'))`, 'menubar');

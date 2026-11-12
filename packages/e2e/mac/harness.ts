@@ -536,7 +536,7 @@ export async function signIn(app: TuduApp, email = freshEmail()): Promise<string
   await app.until(`return typeof window.__tudu?.firstRun?.hide === 'function'`);
   await app.eval(`await window.__tudu.firstRun.hide();`);
   // The desk has told the app (the summon opens the bar from now on).
-  await app.waitState((s) => s.seen.signedIn);
+  await app.waitState((s) => s.seen.signedIn === true);
   return email;
 }
 

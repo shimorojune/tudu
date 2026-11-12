@@ -104,8 +104,12 @@ describe('shortcuts', () => {
     expect(spaceForNumber(list, 1)?.id).toBe('me');
     expect(spaceForNumber(list, 3)?.id).toBe('ac');
     expect(spaceForNumber(list, 4)).toBeNull();
-    expect(spaceForNumber([{ id: 'me' }], 0)).toBeNull();
-    const ten = [{ id: 'all', all: true }, ...Array.from({ length: 10 }, (_, i) => ({ id: `s${i}` }))];
+    const one: { id: string; all?: boolean }[] = [{ id: 'me' }];
+    expect(spaceForNumber(one, 0)).toBeNull();
+    const ten: { id: string; all?: boolean }[] = [
+      { id: 'all', all: true },
+      ...Array.from({ length: 10 }, (_, i) => ({ id: `s${i}` })),
+    ];
     expect(spaceForNumber(ten, 9)?.id).toBe('s8');
     expect(spaceForNumber(ten, 10)).toBeNull();
   });

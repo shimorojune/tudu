@@ -495,3 +495,4 @@ export {
   type ShortcutRowProps,
   type ShortcutAnswer,
 } from './components/ShortcutField';
+export { ShortcutsSection, keysSub } from './components/ShortcutsSection';

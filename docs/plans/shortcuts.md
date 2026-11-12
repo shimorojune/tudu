@@ -1,6 +1,6 @@
 # Shortcuts: switch spaces from the keyboard, and pick your own keys
 
-Status: proposal, waiting for Rohit's approval. Issues #60 (shortcuts to switch spaces, especially to All spaces) and
+Status: approved by Rohit on 12 Nov 2026 (space keys in Tudu only) and built. Issues #60 (shortcuts to switch spaces, especially to All spaces) and
 #57 (change the keys for Quick Add and the note window). Design approved by Rohit on 12 Nov 2026: canvas page
 "Settings & theme", boards `KS-Shortcuts`, `KS-Shortcuts-Dark` and `KS-Motion` (canvas v226). Test cases are listed
 below with the `SK-` prefix; they move to `docs/tests/shortcuts.md` when this is built.
@@ -75,8 +75,8 @@ everything around the hot key, so the build covers each of these:
 4. **A press before the page is ready still counts.** `summon` and `notes::open` decide on `seen.signed_in`, which the
    hidden main window reports after it loads. At login, a press in the first seconds currently finds `false` and opens
    the desk on Sign in. `signed_in` becomes `Option<bool>` (`None` until the page reports), and a press while it is
-   `None` is held and run when the report arrives (or after 8 seconds, falling back to today's behaviour). The last
-   known value is also written to `shortcuts.json`'s sibling `state.json` so a relaunch starts with it.
+   `None` is held and run when the report arrives (or after 8 seconds, falling back to today's behaviour). (Built
+   without the planned `state.json` copy of the last value: the held press already covers a relaunch.)
 5. **It checks itself.** On launch, on wake (the existing `updates::watch_wake` hook) and when Settings opens, the app
    asks `is_registered` for each binding. One that is no longer registered is registered again; if that fails the row
    shows "stopped working" and the menu bar drops it from the tooltip.
