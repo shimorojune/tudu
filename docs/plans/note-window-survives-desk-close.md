@@ -36,8 +36,10 @@ What I can't tell from the code is which of two things macOS does to it, and bot
 Quick Add and the menu bar sheet never show this because both hide themselves the moment they lose focus. The note
 window is the only panel meant to outlive the desk.
 
-The fix below covers both cases. The first implementation step is a CI run of the new failing test with extra
-logging, so the PR says which one it was.
+**Update 12 Nov, from Rohit:** a pinned note window does not vanish. A pinned window floats above other apps'
+windows, so macOS is not ordering the panel out. It is case 2: the note window is still there, covered by the app that
+comes forward when Tudu leaves the Dock. The fix below is the same (put it back in front), and the tests must read
+`onScreen` and the window order, since `visible` stays true throughout.
 
 ## The change
 
@@ -94,6 +96,9 @@ Mac app tests run on PR CI (macOS runner), not on your Mac. Rust unit tests and 
   Also: close the desk, and within the follow-up window close the note window; it stays hidden.
 - **C22-D48** mac `notebook.spec.ts`, pinned: pin the note window, open and close the desk. Still `visible`,
   `onScreen`, `pinned` and `alwaysOnTop`.
+
+For C22-D45 and C22-D46 another app's window (Finder, sized to cover the note window) sits behind Tudu before the
+desk closes, so the bug shows on CI: without the fix the note window ends up under it.
 
 C22-D45 is pushed first, alone, before the fix, to confirm CI reproduces the bug and to log which of the two cases
 it is. If CI cannot reproduce it (hosted runners have no real user session quirks), I will say so and the proof
