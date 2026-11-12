@@ -683,7 +683,10 @@ test.describe('detail, the day turns', () => {
       .getByRole('button', { name: /^19 October/ })
       .click();
     await expect(row(dayList(page), 'Call the bank').locator('.tp-sg-due')).toHaveText('Due tomorrow');
-    await closePanel(page);
+    // On the phone the panel's own back button (its "Today" is also the name of the Pick a day preset).
+    if (test.info().project.name === 'phone') await p.locator('.tp-td-back').click();
+    else await p.getByRole('button', { name: 'Close' }).click();
+    await expect(panel(page)).toHaveCount(0);
     await idle(page);
     // Past midnight and past the page's 30s look at the clock: it asks before it moves.
     await page.clock.runFor(90_000);
