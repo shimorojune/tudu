@@ -96,6 +96,15 @@ async function finderWindow(): Promise<void> {
   throw new Error('Finder never showed its window');
 }
 
+/** Every window on screen, front to back, as the window server has it: its app and its level (0 is a normal window). */
+function windowOrder(): string {
+  const js = `ObjC.import('CoreGraphics');
+    const l = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo($.kCGWindowListOptionOnScreenOnly, 0)));
+    JSON.stringify(l.map((w) => w.kCGWindowOwnerName + ':' + w.kCGWindowLayer));`;
+  const r = spawnSync('osascript', ['-l', 'JavaScript', '-e', js], { encoding: 'utf8' });
+  return (r.stdout || r.stderr).trim();
+}
+
 /** The desk closed and Tudu out of the Dock, then a moment more for macOS to bring the next app forward. */
 async function closeDesk(app: App): Promise<AppState> {
   await app.act('close', { window: 'main' });
@@ -194,10 +203,13 @@ test.describe('chunk 22 · the note window', () => {
     await finderWindow();
     await openNote(app);
     const before = await noteInFront(app);
+    console.log(`C22-D45 note open: front ${frontApp()} ${windowOrder()}`);
     const was = (await app.state()).windows.note;
     await app.act('reopen');
     await app.waitState((x) => x.windows.main.visible && x.background.policy === 'regular');
+    console.log(`C22-D45 desk open: front ${frontApp()} ${windowOrder()}`);
     const s = await closeDesk(app);
+    console.log(`C22-D45 desk closed: front ${frontApp()} ${windowOrder()}`);
     console.log(`C22-D45 others ahead of the note window: ${before} before, ${s.note.othersAhead} after`);
     expect(s.windows.main.visible).toBe(false);
     expect(s.note.othersAhead, 'no other app’s window came in front of it').toBe(before);
