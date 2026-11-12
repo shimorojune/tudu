@@ -63,6 +63,11 @@ describe('C11-U19 the launch mark is the same in the Mac app’s loader and on t
     expect(between(WEB, '/* launch */', '/* /launch */')).toBe(
       between(LOADER_CSS, '/* launch */', '/* /launch */'),
     );
+    // While the app arrives the page doesn't scroll (#48), in both copies.
+    for (const css of [WEB, LOADER_CSS])
+      expect(between(css, '/* launch */', '/* /launch */')).toMatch(
+        /:root\.tl-settle \{\noverflow: hidden;\n\}/,
+      );
   });
 
   it('C11-U19 the mark’s markup is the same on both pages, and the loader links the styles', () => {
@@ -133,6 +138,9 @@ describe('C11-U21 the mark gives way to the app', () => {
     expect(app).toHaveClass('tl-arrive');
     expect(document.getElementById('boot')).not.toBeNull();
     boot.dispatchEvent(new Event('animationend', { bubbles: true }));
+    // The mark's fade is over; the app is still arriving.
+    expect(document.getElementById('boot')).not.toBeNull();
+    app.dispatchEvent(new Event('animationend', { bubbles: true }));
     expect(document.getElementById('boot')).toBeNull();
     expect(app).not.toHaveClass('tl-arrive');
   });
@@ -171,6 +179,76 @@ describe('C11-U21 the mark gives way to the app', () => {
     boot.classList.remove('tl-leaving');
     dismissBoot(document, 900);
     expect(boot).not.toHaveClass('tl-leaving');
+  });
+});
+
+describe('the page holds still while the app arrives (#48)', () => {
+  function page(): { boot: HTMLElement; app: HTMLElement } {
+    document.body.innerHTML = '<div id="boot" class="tl-boot"></div><div id="root"></div>';
+    return { boot: document.getElementById('boot')!, app: document.getElementById('root')! };
+  }
+  /** jsdom lays nothing out: say how tall the document is against the window. */
+  function sized(scroll: number, client: number): void {
+    Object.defineProperty(root, 'scrollHeight', { configurable: true, get: () => scroll });
+    Object.defineProperty(root, 'clientHeight', { configurable: true, get: () => client });
+  }
+  afterEach(() => {
+    delete (root as unknown as Record<string, unknown>).scrollHeight;
+    delete (root as unknown as Record<string, unknown>).clientHeight;
+  });
+
+  it('C11-U47 shown on a page that doesn’t scroll: leaving holds it still; let go with tl-arrive when done', () => {
+    sized(800, 800);
+    const { boot, app } = page();
+    dismissBoot(document, 900);
+    expect(root).toHaveClass('tl-settle');
+    boot.dispatchEvent(new Event('animationend', { bubbles: true }));
+    expect(root).toHaveClass('tl-settle');
+    app.dispatchEvent(new Event('animationend', { bubbles: true }));
+    expect(root).not.toHaveClass('tl-settle');
+    expect(app).not.toHaveClass('tl-arrive');
+    expect(document.getElementById('boot')).toBeNull();
+  });
+
+  it('C11-U48 a page that already scrolls keeps its scrollbar: no tl-settle', () => {
+    sized(1400, 800);
+    const { boot } = page();
+    dismissBoot(document, 900);
+    expect(boot).toHaveClass('tl-leaving');
+    expect(root).not.toHaveClass('tl-settle');
+  });
+
+  it('C11-U49 never shown (under 300ms): no tl-settle either', () => {
+    sized(800, 800);
+    page();
+    dismissBoot(document, 120);
+    expect(root).not.toHaveClass('tl-settle');
+    expect(document.getElementById('boot')).toBeNull();
+  });
+
+  it('C11-U50 done waits for the later of the fade and the arrival, in either order; the backstop clears it all', () => {
+    sized(800, 800);
+    const first = page();
+    dismissBoot(document, 900);
+    first.app.dispatchEvent(new Event('animationend', { bubbles: true }));
+    // An animation inside the app is not the app's own arrival.
+    first.app.innerHTML = '<span></span>';
+    first.app.firstElementChild!.dispatchEvent(new Event('animationend', { bubbles: true }));
+    expect(document.getElementById('boot')).not.toBeNull();
+    first.boot.dispatchEvent(new Event('animationend', { bubbles: true }));
+    expect(document.getElementById('boot')).toBeNull();
+    expect(root).not.toHaveClass('tl-settle');
+
+    vi.useFakeTimers();
+    resetBoot();
+    const second = page();
+    dismissBoot(document, 900);
+    vi.advanceTimersByTime(BOOT_LEAVE_MS - 1);
+    expect(root).toHaveClass('tl-settle');
+    vi.advanceTimersByTime(1);
+    expect(document.getElementById('boot')).toBeNull();
+    expect(second.app).not.toHaveClass('tl-arrive');
+    expect(root).not.toHaveClass('tl-settle');
   });
 });
 

@@ -338,6 +338,10 @@
 :root[data-boot='held'][data-motion='less'] .tl-boot {
   animation: none;
 }
+/* While the app rises into place the page doesn't scroll, so no scrollbar flicks up and shifts it all sideways (#48). */
+:root.tl-settle {
+  overflow: hidden;
+}
 /* Leaving wins over every other state (held, Less motion): a short fade, whatever came before. */
 :root .tl-boot.tl-leaving.tl-leaving {
   opacity: 1;
