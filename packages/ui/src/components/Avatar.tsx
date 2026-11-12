@@ -1,4 +1,5 @@
 import { cx } from '../lib/cx';
+import { useMine } from '../lib/scramble';
 
 export interface AvatarProps {
   /** One or two letters. */
@@ -16,15 +17,17 @@ export interface AvatarProps {
 
 /** A person, as initials in a round chip. */
 export function Avatar({ initials, name, color, image, size = 'md', className }: AvatarProps) {
+  // Scramble my text: the name and initials jumble; a photo becomes a block (html[data-scrambled]).
+  const mine = useMine();
   return (
     <span
       className={cx('tp-root tp-avatar', size === 'sm' && 'tp-sm', image && 'tp-photo', className)}
-      title={name}
+      title={mine(name)}
       aria-label={name}
       role="img"
       style={color ? { background: color } : undefined}
     >
-      {image ? <img src={image} alt="" draggable={false} /> : initials}
+      {image ? <img src={image} alt="" draggable={false} /> : mine(initials)}
     </span>
   );
 }

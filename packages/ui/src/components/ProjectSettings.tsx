@@ -1,3 +1,4 @@
+import { useMine, useMineField } from '../lib/scramble';
 import {
   PROJECT_COLOR_NAMES,
   PROJECT_COLORS,
@@ -80,6 +81,8 @@ function Editor({
   /** Take the keyboard when it opens (not when a page draws it open, as the kit does). */
   focus: boolean;
 }) {
+  const mine = useMine();
+  const nameField = useMineField(draft.name);
   const trimmed = draft.name.trim();
   const changed = !project || trimmed !== project.name || draft.color !== project.color;
   const ok = !!trimmed && changed && !taken;
@@ -103,7 +106,7 @@ function Editor({
         }
       }}
     >
-      <h3 className="tp-prj-h">{project ? `Edit ${project.name}` : 'New project'}</h3>
+      <h3 className="tp-prj-h">{project ? `Edit ${mine(project.name)}` : 'New project'}</h3>
       <div>
         <span className="tp-prj-l">
           <span>Name</span>
@@ -117,7 +120,8 @@ function Editor({
           ref={field}
           label="Project name"
           placeholder="Like Onboarding or Hiring"
-          value={draft.name}
+          value={nameField.value}
+          {...nameField.bind}
           maxLength={PROJECT_NAME_MAX}
           error={taken ?? undefined}
           autoFocus={focus}
@@ -170,6 +174,7 @@ export function ProjectSettings({
   defaultEditing = null,
   inline = false,
 }: ProjectSettingsProps) {
+  const mine = useMine();
   // Which project the popup is open on: an id, 'new', or none.
   const [editing, setEditing] = useState<string | null>(defaultEditing);
   const [draft, setDraft] = useState<Draft>(() => {
@@ -207,7 +212,7 @@ export function ProjectSettings({
 
   const project = editing && editing !== 'new' ? (projects.find((p) => p.id === editing) ?? null) : null;
   const same = editing ? projectNamed(projects, draft.name, project?.id) : null;
-  const taken = same ? `${spaceName} already has ${same.name}.` : null;
+  const taken = same ? `${mine(spaceName)} already has ${mine(same.name)}.` : null;
 
   const markFresh = (id: string) => {
     focusAfter.current = id;
@@ -352,7 +357,7 @@ export function ProjectSettings({
                     onClick={() => open(p)}
                   >
                     <i className="tp-prj-dot" style={{ background: p.color }} aria-hidden="true" />
-                    <span className="tp-prj-n">{p.name}</span>
+                    <span className="tp-prj-n">{mine(p.name)}</span>
                     <span className="tp-prj-c" aria-hidden="true">
                       {openShort(p.open)}
                     </span>

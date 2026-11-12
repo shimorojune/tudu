@@ -1,3 +1,4 @@
+import { ScrambledPill } from './ScrambledPill';
 import type { ReactNode } from 'react';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
@@ -113,6 +114,7 @@ export function TopBar({
         />
       ) : null}
       <span className="tp-tb-sp" {...drag} />
+      <ScrambledPill />
       {onFeedback ? (
         <IconButton
           label="Report a bug or idea"

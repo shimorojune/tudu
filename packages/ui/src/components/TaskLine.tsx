@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
 import { PersonDot, type PersonDotPerson } from './PersonDot';
@@ -36,6 +37,7 @@ function first(name: string): string {
  * title, and a quiet byline (due · project · who · From you). Done tasks strike through in muted ink.
  */
 export function TaskLine({ task: t, who, onOpen, glow, className }: TaskLineProps) {
+  const mine = useMine();
   const by = [];
   if (t.due)
     by.push(
@@ -47,21 +49,21 @@ export function TaskLine({ task: t, who, onOpen, glow, className }: TaskLineProp
     by.push(
       <span key="p">
         <i className="tp-sh-dot" style={{ background: t.project.color }} />
-        {t.project.name}
+        {mine(t.project.name)}
       </span>,
     );
   if (who)
     by.push(
       <span key="w" className="tp-tl-who">
         <PersonDot person={who} size={16} />
-        {first(who.name)}
+        {mine(first(who.name))}
       </span>,
     );
   if (t.from)
     by.push(
       <span key="f" className="tp-tl-from">
         <Icon name="send" size={11} />
-        From {t.from}
+        From {t.from === 'you' ? 'you' : mine(t.from)}
       </span>,
     );
   return (
@@ -88,7 +90,7 @@ export function TaskLine({ task: t, who, onOpen, glow, className }: TaskLineProp
         ) : null}
       </span>
       <span className="tp-tl-main">
-        <span className="tp-tl-t">{t.title}</span>
+        <span className="tp-tl-t">{mine(t.title)}</span>
         {by.length ? <span className="tp-tl-by">{by}</span> : null}
       </span>
     </button>

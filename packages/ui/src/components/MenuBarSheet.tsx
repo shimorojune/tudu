@@ -1,3 +1,5 @@
+import { useMine } from '../lib/scramble';
+import { ScrambledPill } from './ScrambledPill';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
 import { NoteIcon } from './NoteParts';
@@ -91,6 +93,7 @@ function InboxLine({ inbox }: { inbox?: MenuBarSheetProps['inbox'] }) {
 
 /** The byline as Today writes it: "From Sat", the due date (red when overdue), the project's dot, the Jira key. */
 function Byline({ row }: { row: MenuBarRowItem }) {
+  const mine = useMine();
   const bits = [];
   if (row.carried)
     bits.push(
@@ -108,7 +111,7 @@ function Byline({ row }: { row: MenuBarRowItem }) {
     bits.push(
       <span key="p">
         <i style={{ background: row.project.color }} aria-hidden="true" />
-        {row.project.name}
+        {mine(row.project.name)}
       </span>,
     );
   if (row.jira) bits.push(<span key="j">{row.jira}</span>);
@@ -125,6 +128,7 @@ export function MenuBarRow({
   onToggle?: (row: MenuBarRowItem, done: boolean) => void;
   onOpen?: (row: MenuBarRowItem) => void;
 }) {
+  const mine = useMine();
   return (
     <div className={cx('tp-mb-r', row.done && 'tp-done')} role="listitem">
       <Checkbox size="sm" label={row.title} checked={!!row.done} onChange={(v) => onToggle?.(row, v)} />
@@ -134,7 +138,7 @@ export function MenuBarRow({
         aria-label={`Open ${row.title} in Tudu`}
         onClick={() => onOpen?.(row)}
       >
-        <span className="tp-mb-t">{row.title}</span>
+        <span className="tp-mb-t">{mine(row.title)}</span>
         <Byline row={row} />
       </button>
     </div>
@@ -174,6 +178,7 @@ export function MenuBarSheet({
   inbox,
   className,
 }: MenuBarSheetProps) {
+  const mine = useMine();
   const total = groups.reduce((n, g) => n + g.rows.length, 0);
   const done = groups.reduce((n, g) => n + g.rows.filter((r) => r.done).length, 0);
   const headed = groups.length > 1;
@@ -227,6 +232,8 @@ export function MenuBarSheet({
               <span>{heading.date}</span>
             </div>
           </div>
+          {/* The menu bar sheet is a window of its own: it carries the Scrambled pill too. */}
+          <ScrambledPill className="tp-mb-scr" />
           {state === 'day' ? <DayProgress done={done} total={total} compact size={30} /> : null}
         </div>
       ) : null}
@@ -251,7 +258,7 @@ export function MenuBarSheet({
               {headed ? (
                 <div className="tp-mb-gh">
                   <SpaceTile space={g.space} size={20} />
-                  <span className="tp-mb-gn">{g.name}</span>
+                  <span className="tp-mb-gn">{mine(g.name)}</span>
                   {`${g.rows.filter((r) => r.done).length} of ${g.rows.length}`}
                 </div>
               ) : null}

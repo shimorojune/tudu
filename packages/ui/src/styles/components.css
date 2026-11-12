@@ -2014,6 +2014,23 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 /* Theme change: one soft cross-fade of the whole window */
 .tp-vt-theme::view-transition-old(root), .tp-vt-theme::view-transition-new(root) { animation-duration: 280ms; animation-timing-function: var(--ease-change); }
 
+/* Scramble my text (#67): switching it crossfades the window through a soft blur, 240ms; nothing moves. */
+.tp-vt-scramble::view-transition-old(root), .tp-vt-scramble::view-transition-new(root) { animation-duration: 240ms; animation-timing-function: var(--ease-change); }
+.tp-vt-scramble::view-transition-old(root) { animation-name: tp-scr-old; }
+.tp-vt-scramble::view-transition-new(root) { animation-name: tp-scr-new; }
+@keyframes tp-scr-old { to { opacity: 0; filter: blur(3px); } }
+@keyframes tp-scr-new { from { opacity: 0; filter: blur(3px); } }
+/* While it's on, the person's pictures are plain blocks of the same size: photos, drawings. */
+html[data-scrambled] .tp-avatar.tp-photo, html[data-scrambled] .tp-pdot.tp-photo, html[data-scrambled] .tp-nb-draw-pic { background: var(--skeleton); }
+html[data-scrambled] .tp-avatar.tp-photo img, html[data-scrambled] .tp-pdot.tp-photo img, html[data-scrambled] .tp-nb-draw-pic img { visibility: hidden; }
+/* The Scrambled pill in every window's top bar: click to turn it off. */
+.tp-scr-pill { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px 0 7px; border: 0; border-radius: 999px; background: var(--warning-soft); color: var(--warning); font: inherit; font-size: 12px; font-weight: 500; line-height: 1; white-space: nowrap; cursor: pointer; animation: tp-scr-pill-in 220ms var(--ease-arrive) both; transition: background-color var(--dur-menu) var(--ease-change), opacity 180ms var(--ease-change); }
+.tp-scr-pill:hover { background: color-mix(in srgb, var(--warning-soft) 70%, var(--warning) 12%); }
+.tp-scr-pill:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ring); }
+.tp-scr-pill.tp-leaving { opacity: 0; pointer-events: none; }
+@keyframes tp-scr-pill-in { from { opacity: 0; transform: translateY(3px) scale(.92); } }
+@media (prefers-reduced-motion: reduce) { .tp-scr-pill { animation: none; transition: none; } }
+
 /* Dialog */
 .tp-dlg-layer { position: fixed; inset: 0; z-index: 75; display: flex; align-items: flex-start; justify-content: center; padding: 11vh 24px 24px; }
 .tp-dlg-veil { position: absolute; inset: 0; background: var(--veil); animation: tp-veil-in 180ms var(--ease-arrive) both; }
@@ -2161,6 +2178,9 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 .tp-acct-me > span > span { font-size: 12.5px; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tp-acct-theme { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 4px 6px 10px; font-size: 13.5px; }
 .tp-acct-theme .tp-seg { padding: 2px; }
+.tp-acct-scr { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 4px 6px 10px; font-size: 13.5px; }
+.tp-acct-scr > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.tp-acct-scr small { font-size: 12px; line-height: 16px; color: var(--muted-foreground); }
 .tp-acct-theme .tp-seg button { height: 26px; padding: 0 9px; font-size: 12px; }
 .tp-root .tp-mi.tp-acct-mi { justify-content: flex-start; gap: 10px; }
 .tp-acct-mi svg { color: var(--muted-foreground); }

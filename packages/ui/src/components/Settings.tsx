@@ -1,3 +1,4 @@
+import { setScramble, useMine, useMineField, useScramble } from '../lib/scramble';
 import { DEFAULT_HOURS, deleteWords, hoursLine, membersWords, spaceInitials, spaceLine } from '@tudu/core';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AiAccess, type AiAccessData, type AiGrant } from './AiAccess';
@@ -278,6 +279,7 @@ type SwitchState = { on: boolean; busy: boolean; error: string | null };
  * sent to from a space glows once.
  */
 function AccountApps({ p }: { p: SettingsProps }) {
+  const mine = useMine();
   const j = p.jira;
   const connected = !!j?.connected;
   const spaces: JiraSpaceRow[] =
@@ -358,7 +360,7 @@ function AccountApps({ p }: { p: SettingsProps }) {
               ? 'Bring your Jira issues next to your day. Connect once with a personal access token, then pick the spaces it shows in.'
               : expired
                 ? `Your token for ${site} has expired. Jira is paused in every space until you add a new one; your views and linked tasks stay.`
-                : `As ${j?.who || p.me.email} on ${site}. Only you see your issues.`
+                : `As ${mine(j?.who || p.me.email)} on ${site}. Only you see your issues.`
           }
           control={
             !connected ? (
@@ -425,7 +427,7 @@ function AccountApps({ p }: { p: SettingsProps }) {
                             }}
                             size={22}
                           />
-                          <span className="tp-set-spname">{x.name}</span>
+                          <span className="tp-set-spname">{mine(x.name)}</span>
                           {x.current && !p.allSpaces ? (
                             <span className="tp-set-here">You’re here</span>
                           ) : null}
@@ -508,17 +510,21 @@ function SavedField({
     setWas(value);
     setDraft(value);
   }
+  // Scramble my text: jumbled until it has focus, so only real words are written.
+  const field = useMineField(draft, {
+    onBlur: () => {
+      const v = draft.trim();
+      if (!v) setDraft(value);
+      else if (v !== value) onSave?.(v);
+    },
+  });
   return (
     <Field
       label={label}
-      value={draft}
+      value={field.value}
       maxLength={80}
       onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => {
-        const v = draft.trim();
-        if (!v) setDraft(value);
-        else if (v !== value) onSave?.(v);
-      }}
+      {...field.bind}
       onKeyDown={(e) => {
         if (e.key === 'Enter') e.currentTarget.blur();
       }}
@@ -538,6 +544,7 @@ function EmailRow({
   onConfirm?: (code: string) => Promise<void>;
 }) {
   const [step, setStep] = useState<'idle' | 'address' | 'code'>('idle');
+  const mine = useMine();
   const [next, setNext] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -579,7 +586,7 @@ function EmailRow({
     return (
       <SettingRow
         title="Email"
-        sub={email}
+        sub={mine(email)}
         control={
           <Button
             variant="secondary"
@@ -596,7 +603,7 @@ function EmailRow({
     return (
       <SettingRow
         title="Email"
-        sub={`Now ${email}. A code goes to the new address to check it’s yours.`}
+        sub={`Now ${mine(email)}. A code goes to the new address to check it’s yours.`}
         stack
       >
         <div className="tp-set-email">
@@ -756,18 +763,21 @@ function aiSub(a: AiAccessData | undefined): string {
     .join(' · ');
 }
 
-const TITLES = (p: SettingsProps): Record<SettingsSectionName, [string, string]> => ({
-  account: ['Account', p.me.email],
+const TITLES = (
+  p: SettingsProps,
+  mine: (t: string) => string,
+): Record<SettingsSectionName, [string, string]> => ({
+  account: ['Account', mine(p.me.email)],
   appearance: ['Appearance', 'How Tudu looks on this computer.'],
   hours: ['Working hours', 'When you work, and what Tudu does in those hours.'],
   mac: ['This Mac', 'How Tudu runs on this Mac.'],
   space: [
-    p.space.name,
+    mine(p.space.name),
     p.space.personal ? 'Yours alone. Nothing here is shared.' : spaceLine(p.space.members, p.space.role),
   ],
   members: [
     'Members',
-    `${p.members?.length ?? p.space.members} in ${p.space.name}` +
+    `${p.members?.length ?? p.space.members} in ${mine(p.space.name)}` +
       (p.invites?.length ? ` · ${p.invites.length} invited` : ''),
   ],
   apps:
@@ -775,7 +785,7 @@ const TITLES = (p: SettingsProps): Record<SettingsSectionName, [string, string]>
       ? ['Apps', 'Connected once, for you. Pick the spaces each one shows in.']
       : [
           'Apps',
-          `What you’ve connected in ${p.space.name}.${p.space.personal ? '' : ' Each person connects their own.'}`,
+          `What you’ve connected in ${mine(p.space.name)}.${p.space.personal ? '' : ' Each person connects their own.'}`,
         ],
   ai: ['AI access', 'Use Tudu from Claude, ChatGPT and your own tools.'],
 });
@@ -786,6 +796,7 @@ const TITLES = (p: SettingsProps): Record<SettingsSectionName, [string, string]>
  * pushed in with ‹ Settings. Fields save as you leave them; there is no Save button.
  */
 export function Settings(p: SettingsProps) {
+  const mine = useMine();
   const layout = p.layout ?? 'dialog';
   const phone = layout === 'phone';
   const sec =
@@ -813,7 +824,7 @@ export function Settings(p: SettingsProps) {
       key: 'you',
       title: 'You',
       items: [
-        { value: 'account', label: 'Account', icon: 'user', sub: p.me.email },
+        { value: 'account', label: 'Account', icon: 'user', sub: mine(p.me.email) },
         {
           value: 'appearance',
           label: 'Appearance',
@@ -846,7 +857,7 @@ export function Settings(p: SettingsProps) {
     },
     {
       key: 'space',
-      title: sp.name,
+      title: mine(sp.name),
       space: { name: sp.name, color: sp.color, personal: sp.personal, initials: spaceInitials(sp.name) },
       items: team
         ? [
@@ -945,6 +956,9 @@ export function Settings(p: SettingsProps) {
       <>
         <SettingsSection title="Theme">
           <ThemePick value={p.theme ?? 'system'} onChange={p.onTheme} compact={phone} />
+        </SettingsSection>
+        <SettingsSection title="Screenshots">
+          <ScrambleRow />
         </SettingsSection>
         <SettingsSection title="Motion">
           <SettingRow
@@ -1068,7 +1082,7 @@ export function Settings(p: SettingsProps) {
         ) : (
           <SettingsSection title="This space">
             <SettingRow
-              title={sp.name}
+              title={mine(sp.name)}
               sub="Its name and colour are kept by its admins."
               control={
                 <SpaceTile
@@ -1082,7 +1096,7 @@ export function Settings(p: SettingsProps) {
         {p.projects ? <ProjectSettings {...p.projects} /> : null}
         <SettingsSection title="Leaving">
           <SettingRow
-            title={`Leave ${sp.name}`}
+            title={`Leave ${mine(sp.name)}`}
             sub="What you shared stays with the space. You’ll need an invite to come back."
             control={
               <Button variant="secondary" size="sm" onClick={p.onLeave}>
@@ -1092,7 +1106,7 @@ export function Settings(p: SettingsProps) {
           />
           {admin ? (
             <SettingRow
-              title={`Delete ${sp.name}`}
+              title={`Delete ${mine(sp.name)}`}
               sub={deleteWords(sp.members)}
               control={
                 <Button variant="secondary" size="sm" onClick={p.onDelete}>
@@ -1142,7 +1156,7 @@ export function Settings(p: SettingsProps) {
             }
             sub={
               j?.connected
-                ? `As ${j.who || p.me.email} on ${j.site || 'your Jira'}. Only you see your issues.`
+                ? `As ${mine(j.who || p.me.email)} on ${j.site || 'your Jira'}. Only you see your issues.`
                 : 'Bring your Jira issues next to your day. Connect with a personal access token.'
             }
             control={
@@ -1165,7 +1179,7 @@ export function Settings(p: SettingsProps) {
     );
   }
 
-  const [title, line] = TITLES(p)[sec];
+  const [title, line] = TITLES(p, mine)[sec];
   const main = (
     <div className="tp-set-main">
       {phone ? null : (
@@ -1220,8 +1234,8 @@ export function Settings(p: SettingsProps) {
               <div className="tp-set-me">
                 <PersonDot person={p.me} size={44} />
                 <span>
-                  <b>{p.me.name}</b>
-                  <span>{p.me.email}</span>
+                  <b>{mine(p.me.name)}</b>
+                  <span>{mine(p.me.email)}</span>
                 </span>
               </div>
               <SettingsNav list groups={groups} onPick={pick} />
@@ -1261,16 +1275,19 @@ function SpaceNameField({
     setWas(value);
     setDraft(value);
   }
+  const field = useMineField(draft);
   return (
     <Field
       label="Space name"
-      value={draft}
+      value={field.value}
+      onFocus={field.bind.onFocus}
       maxLength={40}
       onChange={(e) => {
         setDraft(e.target.value);
         onDraft(e.target.value || null);
       }}
-      onBlur={() => {
+      onBlur={(e) => {
+        field.bind.onBlur(e);
         const v = draft.trim();
         if (!v || v === value) {
           setDraft(value);
@@ -1280,6 +1297,18 @@ function SpaceNameField({
       onKeyDown={(e) => {
         if (e.key === 'Enter') e.currentTarget.blur();
       }}
+    />
+  );
+}
+
+/** Scramble my text, the same switch as the account menu's: phones reach it here, since their avatar opens Settings. */
+function ScrambleRow() {
+  const { on } = useScramble();
+  return (
+    <SettingRow
+      title="Scramble my text"
+      sub="Hides your words for screenshots. Tudu’s own words stay; nothing saved changes."
+      control={<Switch label="Scramble my text" checked={on} onChange={setScramble} />}
     />
   );
 }

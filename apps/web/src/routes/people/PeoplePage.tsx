@@ -38,7 +38,7 @@ import {
 } from '@tudu/ui';
 import { useEffect, useRef, useState } from 'react';
 import { dayWord, firstName } from '@tudu/core';
-import { InboxSection, showToast } from '@tudu/ui';
+import { InboxSection, showToast, useMine } from '@tudu/ui';
 import { openMembers, openQuickAdd } from '../../app/dayView';
 import { toSentEntry } from '../inbox/InboxPage';
 import { api, meQuery, photoSrc } from '../../app/session';
@@ -87,6 +87,7 @@ export function PeoplePage() {
   const vp = useViewport();
   const me = useQuery(meQuery).data;
   const space = useSpace();
+  const mine = useMine();
   const { today } = useWorkingDay();
   const online = useOnline();
   const navigate = useNavigate();
@@ -142,7 +143,7 @@ export function PeoplePage() {
 
   const list = (
     <PeopleList
-      space={space.name}
+      space={mine(space.name)}
       members={members}
       pending={q.isPending}
       active={picked}
@@ -319,6 +320,7 @@ function EveryonePane(p: {
   onOpenPerson: (p: Person) => void;
   compact: boolean;
 }) {
+  const mine = useMine();
   const groups = groupShared(p.members, p.group, p.range, p.today);
   const total = sharedTotal(groups);
   const [dir, setDir] = useState<'next' | 'prev'>('next');
@@ -381,7 +383,7 @@ function EveryonePane(p: {
   else
     body = groups.map((g) => (
       <section key={g.key} className="app-shared-group" aria-label={g.title}>
-        <div className="app-shared-title tp-turnable">{g.title}</div>
+        <div className="app-shared-title tp-turnable">{p.group === 'person' ? mine(g.title) : g.title}</div>
         <div className="app-shared-list">
           {g.items.map((i) => (
             <TaskLine
@@ -432,6 +434,7 @@ function PersonPane(p: {
 }) {
   const w = p.person;
   const days = personDays(w.tasks, p.monday, p.sunday, p.today);
+  const mine = useMine();
   const first = firstName(w.name, w.email);
   // What you sent them: the requests from you to them in this space, with where each stands.
   const sent = useQuery({ ...taskStore.inboxQuery('sent', '', p.spaceId), enabled: !w.you });
@@ -457,7 +460,7 @@ function PersonPane(p: {
           color: w.color ?? undefined,
           image: photoSrc(w.image),
         }}
-        sub={w.you ? `${w.email} · you` : w.left ? `${w.email} · left the space` : w.email}
+        sub={w.you ? `${mine(w.email)} · you` : w.left ? `${mine(w.email)} · left the space` : mine(w.email)}
         compact={p.compact}
       >
         {w.you || w.left ? null : (
@@ -467,7 +470,7 @@ function PersonPane(p: {
             icon={<Icon name="send" size={14} />}
             onClick={() => openQuickAdd({ toId: w.id, spaceId: p.spaceId })}
           >
-            Send {first} a task
+            Send {mine(first)} a task
           </Button>
         )}
       </PersonHeader>

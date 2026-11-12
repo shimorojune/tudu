@@ -5,7 +5,8 @@ import { Button } from './Button';
 import { ConfirmDialog } from './ConfirmDialog';
 import { EmptyState } from './EmptyState';
 import { IconButton } from './IconButton';
-import { NoteIcon, noteLabel, reducedMotion, useFlip } from './NoteParts';
+import { mineLabel, NoteIcon, reducedMotion, useFlip } from './NoteParts';
+import { useMine } from '../lib/scramble';
 import { Skeleton } from './Skeleton';
 
 /** Something in Trash: a note, or a folder with what went with it. */
@@ -45,6 +46,7 @@ const countWords = (items: NoteTrashItem[]) => {
  * Delete now and Empty Trash ask first, since they're the only steps that can't be undone. Rows glide out as they go.
  */
 export function NoteTrash(p: NoteTrashProps) {
+  const mine = useMine();
   const list = useRef<HTMLDivElement | null>(null);
   const [leaving, setLeaving] = useState<Record<string, boolean>>({});
   const [ask, setAsk] = useState<NoteTrashItem | 'all' | null>(null);
@@ -66,7 +68,7 @@ export function NoteTrash(p: NoteTrashProps) {
     <div className="tp-root tp-nb-trashv">
       <ConfirmDialog
         open={!!ask}
-        title={ask === 'all' ? 'Empty Trash?' : asked ? `Delete “${noteLabel(asked)}” now?` : ''}
+        title={ask === 'all' ? 'Empty Trash?' : asked ? `Delete “${mineLabel(mine, asked)}” now?` : ''}
         confirmLabel={ask === 'all' ? 'Empty Trash' : 'Delete now'}
         busyLabel="Deleting…"
         doneLabel="Deleted"
@@ -119,10 +121,10 @@ export function NoteTrash(p: NoteTrashProps) {
                 </span>
                 <span className="tp-nb-row-m">
                   <span className={cx('tp-nb-row-t', !x.title.trim() && 'tp-nb-untitled')}>
-                    {noteLabel(x)}
+                    {mineLabel(mine, x)}
                   </span>
                   <span className="tp-nb-row-s">
-                    {`From ${x.where || 'Notebook'}`}
+                    {`From ${mine(x.where) || 'Notebook'}`}
                     {x.kind === 'folder' ? ` · ${x.notes === 1 ? '1 note' : `${x.notes ?? 0} notes`}` : ''}
                   </span>
                 </span>

@@ -217,6 +217,19 @@ describe('the screenshot on the public issue', () => {
     for (const t of ['image/svg+xml', 'image/heic', 'image/tiff', 'image/bmp', 'text/html', 'toString'])
       expect(shotCanBePublic(t)).toBe(false);
   });
+
+  it('C19-U34 public defaults to true (older clients file as before); a non-boolean is refused', () => {
+    const base = {
+      id: '9b2f7c1e-4a3d-4e5f-8a6b-7c8d9e0f1a2b',
+      kind: 'bug',
+      text: 'It broke.',
+      details: null,
+    };
+    expect(feedbackReportSchema.parse(base).public).toBe(true);
+    expect(feedbackReportSchema.parse({ ...base, public: false }).public).toBe(false);
+    for (const bad of ['no', 0, null])
+      expect(feedbackReportSchema.safeParse({ ...base, public: bad }).success).toBe(false);
+  });
 });
 
 describe('similar reports and +1 that one instead (#76)', () => {

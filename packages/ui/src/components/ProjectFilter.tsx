@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import { useRef, useState } from 'react';
 import { cx } from '../lib/cx';
 import { useWidthEase } from '../lib/hooks';
@@ -38,10 +39,11 @@ export function ProjectFilter({
   onEdit,
   className,
 }: ProjectFilterProps) {
+  const mine = useMine();
   const [open, setOpen] = useState(false);
   const btn = useRef<HTMLButtonElement | null>(null);
   const cur = value ? projects.find((p) => p.id === value) : undefined;
-  const label = cur ? cur.name : allLabel;
+  const label = cur ? mine(cur.name) : allLabel;
   useWidthEase(btn, label);
   const pick = (id: string | null) => () => onChange?.(id);
   return (
@@ -62,7 +64,7 @@ export function ProjectFilter({
             label: (
               <span className="tp-td-mi">
                 <i className="tp-dot" style={{ background: p.color }} aria-hidden="true" />
-                {p.name}
+                {mine(p.name)}
               </span>
             ),
             hint: p.count != null ? String(p.count) : undefined,

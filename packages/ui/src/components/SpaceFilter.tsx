@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import { useRef, useState } from 'react';
 import { cx } from '../lib/cx';
 import { useWidthEase } from '../lib/hooks';
@@ -32,10 +33,11 @@ export interface SpaceFilterProps {
  * with every space you are in and what waits there. Picking swaps the list in place; the pill eases to its new width.
  */
 export function SpaceFilter({ spaces, total, value, onChange, allTile, className }: SpaceFilterProps) {
+  const mine = useMine();
   const [open, setOpen] = useState(false);
   const btn = useRef<HTMLButtonElement | null>(null);
   const cur = value ? spaces.find((s) => s.id === value) : undefined;
-  const label = cur ? cur.name : 'All spaces';
+  const label = cur ? mine(cur.name) : 'All spaces';
   useWidthEase(btn, label);
   const pick = (id: string | null) => () => onChange?.(id);
   const tile = (s: FilterSpace, size: number) => (
@@ -71,7 +73,7 @@ export function SpaceFilter({ spaces, total, value, onChange, allTile, className
             label: (
               <span className="tp-td-mi">
                 {tile(s, 18)}
-                {s.name}
+                {mine(s.name)}
               </span>
             ),
             hint: s.count != null ? String(s.count) : undefined,

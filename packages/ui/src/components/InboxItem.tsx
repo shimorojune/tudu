@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import { addDays, formatDay, stripTags, textOf, toHtml, type IsoDate } from '@tudu/core';
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { cx } from '../lib/cx';
@@ -147,6 +148,7 @@ const dayIcon = (
 );
 
 function Who({ who, size, app }: { who: InboxWho | undefined; size: number; app?: boolean }) {
+  const mine = useMine();
   if (app)
     return (
       <span className="tp-ix-av tp-ix-av-app" aria-hidden="true" style={{ width: size, height: size }}>
@@ -164,7 +166,7 @@ function Who({ who, size, app }: { who: InboxWho | undefined; size: number; app?
         fontSize: Math.round(size * 0.38),
       }}
     >
-      {who?.initials || '?'}
+      {mine(who?.initials) || '?'}
     </span>
   );
 }
@@ -182,7 +184,13 @@ export function InboxItem(p: InboxItemProps) {
   const app = it.kind === 'app';
   const invite = it.kind === 'invite';
   const notice = it.kind === 'notice';
-  const t = it.task;
+  // Scramble my text: the task's title and project, names, a reason and a quote are the person's words.
+  const mine = useMine();
+  const t = {
+    ...it.task,
+    title: mine(it.task.title),
+    project: it.task.project ? { ...it.task.project, name: mine(it.task.project.name) } : it.task.project,
+  };
   const full = mode === 'full';
   const fold = mode === 'fold';
   const list = mode === 'list';
@@ -237,9 +245,9 @@ export function InboxItem(p: InboxItemProps) {
     ? (it.who?.name ?? 'Tudu')
     : invite || notice
       ? it.who
-        ? first(it.who.name)
+        ? mine(first(it.who.name))
         : ''
-      : first(sent ? it.to?.name : it.who?.name);
+      : mine(first(sent ? it.to?.name : it.who?.name));
   const oc = it.outcome ?? null;
   const ss = sent ? (it.status ?? { state: 'waiting' as const }) : null;
 
@@ -283,7 +291,7 @@ export function InboxItem(p: InboxItemProps) {
   );
 
   const by: ReactNode[] = [];
-  if (it.space) by.push(<span key="s">{it.space}</span>);
+  if (it.space) by.push(<span key="s">{mine(it.space)}</span>);
   if (req && t.forLabel) by.push(<span key="f">For {t.forLabel}</span>);
   if (sent) by.push(<span key="f">{t.forLabel ? `Asked for ${t.forLabel}` : 'No day asked'}</span>);
   if (t.due)
@@ -336,7 +344,7 @@ export function InboxItem(p: InboxItemProps) {
         <span className="tp-ix-oct">
           {ss.state === 'declined' ? (
             <>
-              {name} declined{ss.reason ? <span className="tp-ix-ocr">: {ss.reason}</span> : null}
+              {name} declined{ss.reason ? <span className="tp-ix-ocr">: {mine(ss.reason)}</span> : null}
             </>
           ) : ss.state === 'accepted' ? (
             <>
@@ -387,7 +395,9 @@ export function InboxItem(p: InboxItemProps) {
             text: `Accept onto ${k === today ? 'today' : k === tmr ? 'tomorrow' : formatDay(k)}`,
             tone: k === today ? 'today' : '',
           })}
-          hintEmpty={t.forLabel ? `${first(it.who?.name)} asked for ${t.forLabel}` : 'Pick a day for it'}
+          hintEmpty={
+            t.forLabel ? `${mine(first(it.who?.name))} asked for ${t.forLabel}` : 'Pick a day for it'
+          }
         />
       </DatePop>
     ) : null;
@@ -398,7 +408,7 @@ export function InboxItem(p: InboxItemProps) {
         ref={area}
         rows={2}
         value={reason}
-        placeholder={`Why? ${first(it.who?.name)} will see this.`}
+        placeholder={`Why? ${mine(first(it.who?.name))} will see this.`}
         aria-label="Reason for declining"
         onChange={(e) => setReason(e.target.value)}
         onKeyDown={(e) => {
@@ -632,7 +642,7 @@ export function InboxItem(p: InboxItemProps) {
             {open || full ? (
               <RichTextContent html={it.quote} fileBase={p.fileBase} />
             ) : (
-              stripTags(it.quote, ' ')
+              mine(stripTags(it.quote, ' '))
             )}
           </span>
         ) : null}

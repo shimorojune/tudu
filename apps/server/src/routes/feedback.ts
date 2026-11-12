@@ -43,6 +43,8 @@ export function feedbackMail(x: {
   shot: { name: string; type: string; body: Uint8Array; public?: boolean } | null;
   /** Its public issue, once filed; `pending` when GitHub is still to come. */
   issue?: FeedbackIssue | 'pending' | null;
+  /** GitHub filing is on, but its sender switched "File it as a public issue" off. */
+  emailOnly?: boolean;
 }): Mail {
   const first = x.report.text.split('\n')[0]!.trim();
   const gist = first.length > 60 ? `${first.slice(0, 59)}…` : first;
@@ -59,6 +61,7 @@ export function feedbackMail(x: {
       '',
       '---',
       `From ${x.from.name} <${x.from.email}>`,
+      ...(x.emailOnly ? ['Email only: they chose not to file it as a public GitHub issue.'] : []),
       ...details,
       x.shot
         ? `Screenshot: ${x.shot.name} (attached, ${x.shot.public ? 'shown on the issue' : 'private'})`
@@ -238,10 +241,18 @@ export function feedbackRoutes(
         429,
       );
 
+    // A +1 is a GitHub comment, so it can't be email only.
+    if (report.plusOneOf != null && !report.public)
+      return c.json(
+        { error: 'A +1 goes on GitHub. Switch “File it as a public issue” on, or send it as a new report.' },
+        400,
+      );
     // A +1 goes on an issue the mirror knows and that isn't locked; anything else is said before anything is saved.
     if (report.plusOneOf != null && (!tracker || !mirror || !(await mirror.canTakePlusOne(report.plusOneOf))))
       return c.json({ error: CANT_PLUS_ONE }, 409);
 
+    // Filed on GitHub only when there is a tracker and its sender left "File it as a public issue" on (#50).
+    const filed = tracker && report.public ? tracker : null;
     const id = randomUUID();
     let shot: { name: string; type: string; body: Uint8Array; key: string; public: boolean } | null = null;
     if (file && file.size) {
@@ -249,8 +260,14 @@ export function feedbackRoutes(
       const key = `feedback/${id}/${name}`;
       const body = new Uint8Array(await file.arrayBuffer());
       await storage.put(key, body, file.type);
-      // Only kinds GitHub shows inline go public; the form disables the switch for the rest.
-      shot = { name, type: file.type, body, key, public: report.shotPublic && shotCanBePublic(file.type) };
+      // Only kinds GitHub shows inline go public, and only on a public report.
+      shot = {
+        name,
+        type: file.type,
+        body,
+        key,
+        public: !!filed && report.shotPublic && shotCanBePublic(file.type),
+      };
     }
     const [row] = await db
       .insert(schema.feedback)
@@ -263,7 +280,7 @@ export function feedbackRoutes(
         details: report.details,
         screenshotKey: shot?.key ?? null,
         screenshotPublic: shot?.public ?? false,
-        issueState: tracker ? 'pending' : 'none',
+        issueState: filed ? 'pending' : 'none',
         plusOneOf: report.plusOneOf,
       })
       .onConflictDoNothing()
@@ -279,8 +296,8 @@ export function feedbackRoutes(
     }
 
     let sent: FeedbackSent = { id, issue: null, pending: false };
-    if (tracker) {
-      const out = await fileReport(db, tracker, id, { quiet: true, shots, mirror, refuse: true });
+    if (filed) {
+      const out = await fileReport(db, filed, id, { quiet: true, shots, mirror, refuse: true });
       if (out.state === 'refused') {
         // GitHub won't take it on that issue (locked or gone since the mirror read it): nothing is kept, so the
         // person can send the same words as a new report.
@@ -303,6 +320,7 @@ export function feedbackRoutes(
             from: { name: user.name, email: user.email },
             shot,
             issue: sent.issue ?? (sent.pending ? 'pending' : null),
+            emailOnly: !!tracker && !report.public,
           }),
         );
       } catch (err) {

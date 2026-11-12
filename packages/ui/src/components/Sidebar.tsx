@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { cx } from '../lib/cx';
 import { useControllable } from '../lib/hooks';
@@ -156,6 +157,7 @@ export function Sidebar({
   label = 'Main',
   className,
 }: SidebarProps) {
+  const mine = useMine();
   const [current, setCurrent] = useControllable<string | undefined>(active, defaultActive);
   const [folded, setFolded] = useControllable(collapsed, !!defaultCollapsed);
   const rail = !!fixedRail || (!!collapsible && folded);
@@ -287,7 +289,7 @@ export function Sidebar({
         'Spaces',
         spaces.map((sp) =>
           item(
-            { value: `space:${sp.name}`, label: sp.name, count: sp.count },
+            { value: `space:${sp.name}`, label: mine(sp.name), count: sp.count },
             <i className="tp-nav-sw" style={{ background: sp.color }} />,
           ),
         ),

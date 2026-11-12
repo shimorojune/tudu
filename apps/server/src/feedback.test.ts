@@ -73,6 +73,7 @@ function report(over: Partial<FeedbackReport> = {}): FeedbackReport {
     text: 'The tick did not stick.\nIt came back after a reload.',
     details: DETAILS,
     shotPublic: false,
+    public: true,
     plusOneOf: null,
     ...over,
   };
@@ -448,6 +449,78 @@ describe('the public GitHub issue', () => {
         expect(everything).not.toContain(secret);
       expect(issue!.body).toContain(`ref ${id.replace(/-/g, '').slice(0, 8)}`);
     }
+  });
+});
+
+describe('File it as a public issue (#50)', () => {
+  const LINKS = { base: 'http://localhost:3456', secret: 'test-secret-test-secret-test-secret' };
+  const fetchShot = (url: string) => server.app.request(url.replace(LINKS.base, ''));
+  const mineOf = async (jar: Jar) =>
+    (await (
+      await server.app.request('/api/feedback/mine', { headers: { cookie: jar.header() } })
+    ).json()) as {
+      filing: string;
+      reports: Array<{ id: string; state: string; issue: unknown }>;
+    };
+
+  it('C19-A32 off with GitHub set up: no issue, state none, the mail goes, Your reports shows it by email', async () => {
+    const { jar } = await signIn(server);
+    const marker = `A32 ${uuid()}`;
+    const r = report({ text: `Only the team. ${marker}`, public: false });
+    const res = await send(jar, r, png());
+    expect(res.status).toBe(200);
+    const sent = (await res.json()) as Sent;
+    expect(sent).toEqual({ id: sent.id, issue: null, pending: false });
+    expect(await issuesWith(marker)).toHaveLength(0);
+    expect((await rowsOf(r.id))[0]).toMatchObject({
+      issueState: 'none',
+      issueNumber: null,
+      screenshotPublic: false,
+    });
+    expect(mailsAbout(r.id)).toHaveLength(1);
+    const mine = await mineOf(jar);
+    expect(mine.reports.find((x) => x.id === sent.id)).toMatchObject({ state: 'none', issue: null });
+  });
+
+  it('C19-A33 off: the sweep never files it later, and its screenshot link answers 404', async () => {
+    const { jar } = await signIn(server);
+    const marker = `A33 ${uuid()}`;
+    const r = report({ text: `Never later. ${marker}`, public: false, shotPublic: true });
+    const { id } = (await (await send(jar, r, png())).json()) as Sent;
+    await server.app.request('/__test/feedback/sweep', { method: 'POST' });
+    expect(await issuesWith(marker)).toHaveLength(0);
+    expect((await rowsOf(r.id))[0]!.issueState).toBe('none');
+    expect((await fetchShot(shotUrl(LINKS, id))).status).toBe(404);
+  });
+
+  it('C19-A34 off with a +1: 400, nothing saved, no mail', async () => {
+    const { jar } = await signIn(server);
+    const r = report({ text: `A +1 kept private. ${uuid()}`, public: false, plusOneOf: 64 });
+    const res = await send(jar, r);
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toContain('A +1 goes on GitHub.');
+    expect(await rowsOf(r.id)).toHaveLength(0);
+    expect(mailsAbout(r.id)).toHaveLength(0);
+  });
+
+  it('C19-A35 a report without public (an older queued client) files as public, as before', async () => {
+    const { jar } = await signIn(server);
+    const marker = `A35 ${uuid()}`;
+    const { public: _, ...older } = report({ text: `Older client. ${marker}` });
+    expect((await send(jar, older)).status).toBe(200);
+    expect(await issuesWith(marker)).toHaveLength(1);
+    expect((await rowsOf(older.id))[0]!.issueState).toBe('filed');
+    expect(mailsAbout(older.id)[0]!.text).not.toContain('Email only');
+  });
+
+  it('C19-A36 the mail for an email-only report says so, right under who sent it', async () => {
+    const { jar, email } = await signIn(server);
+    const r = report({ text: `Mail says email only. ${uuid()}`, public: false });
+    await send(jar, r);
+    const lines = mailsAbout(r.id)[0]!.text.split('\n');
+    const from = lines.findIndex((l) => l.startsWith('From ') && l.includes(email));
+    expect(lines[from + 1]).toBe('Email only: they chose not to file it as a public GitHub issue.');
+    expect(mailsAbout(r.id)[0]!.text).not.toContain('GitHub issue:');
   });
 });
 

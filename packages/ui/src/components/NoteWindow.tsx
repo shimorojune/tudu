@@ -1,3 +1,5 @@
+import { useMine } from '../lib/scramble';
+import { ScrambledPill } from './ScrambledPill';
 import { Dialog as RadixDialog } from 'radix-ui';
 import {
   useEffect,
@@ -74,6 +76,7 @@ export interface NoteWindowProps {
  * way it resizes from every edge and corner, and the Tudu mark opens the note on the Notebook page.
  */
 export function NoteWindow(p: NoteWindowProps) {
+  const mine = useMine();
   const web = p.variant === 'web';
   const [rail, setRail] = useState(p.rail !== false);
   const [view, setView] = useState<'recent' | 'all'>('recent');
@@ -93,7 +96,7 @@ export function NoteWindow(p: NoteWindowProps) {
     }
   };
   const blank = p.blank ?? p.active === 'new';
-  const barTitle = blank && !p.title ? 'New note' : p.title || 'Untitled';
+  const barTitle = blank && !p.title ? 'New note' : mine(p.title) || 'Untitled';
   return (
     <section
       className={cx(
@@ -122,6 +125,8 @@ export function NoteWindow(p: NoteWindowProps) {
         <span className="tp-nb-win-title">
           <span key={`${p.active}:${barTitle}`}>{barTitle}</span>
         </span>
+        {/* The Mac app's note window is a window of its own: it carries the Scrambled pill too. */}
+        {web ? null : <ScrambledPill className="tp-nb-win-scr" />}
         {web ? null : (
           <IconButton
             label={p.pinned ? 'Pinned on top · click to unpin' : 'Keep on top of other windows'}

@@ -25,3 +25,4 @@ export * from './notebook';
 export * from './hours';
 export * from './nudges';
 export * from './ai';
+export * from './scramble';

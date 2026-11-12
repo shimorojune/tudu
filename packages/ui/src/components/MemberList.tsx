@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import type { ReactNode } from 'react';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
@@ -47,6 +48,7 @@ export function MemberList({
   empty,
   className,
 }: MemberListProps) {
+  const mine = useMine();
   const row = (
     key: string,
     on: boolean,
@@ -100,13 +102,13 @@ export function MemberList({
           <PersonDot person={x} size={30} />,
           x.you || x.left ? (
             <>
-              {x.name}
+              {mine(x.name)}
               <span className="tp-prow-you">{x.you ? 'You' : 'Left'}</span>
             </>
           ) : (
-            x.name
+            mine(x.name)
           ),
-          x.email,
+          x.email ? mine(x.email) : x.email,
           x.count,
           x.you ? `${x.name}, you` : x.left ? `${x.name}, left` : x.name,
           () => {

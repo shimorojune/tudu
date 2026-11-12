@@ -1,5 +1,5 @@
 import { FeedbackDialog, type FeedbackDialogProps, type FeedbackPhase } from '@tudu/ui';
-import { shotCanBePublic, type FeedbackKind, type MyReport, type SimilarIssue } from '@tudu/core';
+import { type FeedbackKind, type MyReport, type SimilarIssue } from '@tudu/core';
 import { useEffect, useState } from 'react';
 import { Pair, Section } from './Pair';
 
@@ -117,20 +117,21 @@ function Form({
   phase = 'idle',
   text = '',
   shot = false,
-  shown = false,
+  isPublic = true,
   ...more
 }: {
   phase?: FeedbackPhase;
   text?: string;
-  /** `true` is the drawing; `png` and `heic` are real image bytes, for the public switch. */
+  /** `true` is the drawing; `png` and `heic` are real image bytes, for the as-it-is and lock lines. */
   shot?: boolean | 'png' | 'heic';
-  shown?: boolean;
-} & Partial<Omit<FeedbackDialogProps, 'shot' | 'phase' | 'text'>>) {
+  /** Starts "File it as a public issue" off when false. */
+  isPublic?: boolean;
+} & Partial<Omit<FeedbackDialogProps, 'shot' | 'phase' | 'text' | 'public'>>) {
   const [kind, setKind] = useState<FeedbackKind>('bug');
   const [words, setWords] = useState(text);
   const [file, setFile] = useState<File | null>(() => (shot === true ? kitShot() : null));
   const [details, setDetails] = useState(true);
-  const [shotPublic, setShotPublic] = useState(shown);
+  const [pub, setPub] = useState(isPublic);
   const [picked, setPicked] = useState<SimilarIssue | null>(more.picked ?? null);
   useEffect(() => {
     if (shot !== 'png' && shot !== 'heic') return;
@@ -149,12 +150,12 @@ function Form({
       text={words}
       onText={setWords}
       shot={file}
-      onShot={(f) => {
-        setFile(f);
-        setShotPublic(!!f && shotCanBePublic(f.type));
+      onShot={setFile}
+      public={pub}
+      onPublic={(on) => {
+        setPub(on);
+        if (!on) setPicked(null);
       }}
-      shotPublic={shotPublic}
-      onShotPublic={setShotPublic}
       details={details}
       onDetails={setDetails}
       detailsLine={more.filing === 'github' ? LINE_ISSUE : LINE}
@@ -183,20 +184,25 @@ export function FeedbackStates() {
       <Pair title="Send feedback, sent" render={() => <Form text={WORDS} phase="sent" />} />
       <Pair
         title="Send feedback, public on GitHub"
-        note="Filed as public issues: the sub line, the footer's notice and the screenshot hint say so, quietly."
+        note="Filed as public issues: the sub line, the footer's notice and the last row, File it as a public issue, say so, quietly."
         render={() => (
           <Form filing="github" text={WORDS} onReports={() => {}} reports={REPORTS} reportsState="ready" />
         )}
       />
       <Pair
-        title="Send feedback, screenshot shown on the issue"
-        note="A screenshot in, the switch under it starts on (#75): the Public pill and the accent ring say so on the preview, and the line asks to check it shows nothing private."
-        render={() => <Form filing="github" text={WORDS} shot="png" shown />}
+        title="Send feedback, public with a screenshot"
+        note="It goes on the issue exactly as added (#67): one warning line asks to check it shows nothing private. Scramble my text, in the menu, is how to hide words first."
+        render={() => <Form filing="github" text={WORDS} shot="png" />}
       />
       <Pair
-        title="Send feedback, screenshot kept private"
-        note="Switched off: it goes to the team with the report, never on the issue. It holds for this screenshot only."
-        render={() => <Form filing="github" text={WORDS} shot="png" />}
+        title="Send feedback, not a public issue"
+        note="File it as a public issue off (#50): the head line says by email, Already reported folds shut, the footer is a quiet lock, and the screenshot stays with the team."
+        render={() => <Form filing="github" text={WORDS} shot="png" isPublic={false} />}
+      />
+      <Pair
+        title="Send feedback, text scrambled"
+        note="Scramble my text is on (#67): the hint by Add a screenshot says so. The form itself shows real words."
+        render={() => <Form filing="github" text={WORDS} scrambled />}
       />
       <Pair
         title="Send feedback, checking for similar reports"
@@ -235,7 +241,7 @@ export function FeedbackStates() {
       />
       <Pair
         title="Send feedback, screenshot GitHub can’t show"
-        note="A phone photo (HEIC): GitHub can’t draw it inline, so the switch is off and can’t be turned on."
+        note="A phone photo (HEIC): GitHub can’t draw it inline, so a lock line says it stays with the team."
         render={() => <Form filing="github" text={WORDS} shot="heic" />}
       />
       <Pair

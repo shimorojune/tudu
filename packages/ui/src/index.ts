@@ -42,6 +42,19 @@ export {
   type Theme,
   type ThemeChoice,
 } from './lib/theme';
+export {
+  SCRAMBLE_STORAGE_KEY,
+  readScramble,
+  setScramble,
+  syncScramble,
+  useScramble,
+  useMine,
+  useMineField,
+  scrambleHtml,
+  resetScrambleForTests,
+  type ScrambleState,
+} from './lib/scramble';
+export { ScrambledPill, type ScrambledPillProps } from './components/ScrambledPill';
 
 export { Button, type ButtonProps, type ButtonVariant } from './components/Button';
 export { IconButton, type IconButtonProps } from './components/IconButton';

@@ -34,11 +34,13 @@ export interface FeedbackDialogProps {
   shot: File | null;
   onShot?: (file: File | null) => void;
   /**
-   * "Show it on the public issue" (GitHub filing only): on for each new screenshot GitHub can show (#75); the caller
-   * sets it when one goes in, and switching it off holds for that screenshot only.
+   * "File it as a public issue" (GitHub filing only, #50): on for each new report; off sends it by email only. The
+   * screenshot goes wherever the report goes.
    */
-  shotPublic?: boolean;
-  onShotPublic?: (on: boolean) => void;
+  public?: boolean;
+  onPublic?: (on: boolean) => void;
+  /** Scramble my text is on (#67): the hint by Add a screenshot says so. The form itself is never scrambled. */
+  scrambled?: boolean;
   details: boolean;
   onDetails?: (on: boolean) => void;
   /** What the details are: "Tudu 0.38.0, macOS, the Today page. Never your tasks." */
@@ -116,8 +118,9 @@ export function FeedbackDialog({
   onText,
   shot,
   onShot,
-  shotPublic = false,
-  onShotPublic,
+  public: isPublic = true,
+  onPublic,
+  scrambled = false,
   details,
   onDetails,
   detailsLine,
@@ -200,21 +203,22 @@ export function FeedbackDialog({
 
   const shown = !!shot && !leaving;
   const github = filing === 'github';
-  // Only kinds GitHub shows inline can go on the issue; anything else keeps the row, off and disabled, saying why.
+  // Filed as a public issue: the server files on GitHub and the person left the switch on.
+  const pub = github && isPublic;
+  // Only kinds GitHub shows inline go on the issue; anything else stays with the team, and the form says so.
   const canShow = !!shot && shotCanBePublic(shot.type);
-  const showing = github && canShow && shotPublic;
   const sheet = variant === 'sheet';
   const ask = kind === 'bug' ? 'What happened?' : 'What would help?';
   const placeholder =
     (kind === 'bug'
       ? 'What you did, what you expected, what happened instead.'
       : 'What you’d like Tudu to do, and what it would save you.') +
-    (github ? ' Leave out anything private.' : '');
+    (pub ? ' Leave out anything private.' : '');
   const busy = phase === 'sending' || phase === 'sent';
-  const plusOne = github && picked ? picked : null;
+  const plusOne = pub && picked ? picked : null;
   const mineCount = reportsState === 'ready' && reports.length > 0 ? ` · ${reports.length}` : '';
 
-  let head: { title: string; sub: string };
+  let head: { title: string; sub: ReactNode; description?: string };
   let footer: ReactNode;
   let body: ReactNode = null;
   if (view === 'reports') {
@@ -320,13 +324,28 @@ export function FeedbackDialog({
   } else {
     head = {
       title: 'Send feedback',
-      sub: github
-        ? 'It’s filed as a public issue on GitHub, so you can follow it.'
-        : 'It goes straight to the people who make Tudu.',
+      sub: github ? (
+        // Both lines share one cell and crossfade when "File it as a public issue" flips.
+        <span className={cx('tp-fb-xf', !pub && 'tp-alt')}>
+          <span className="tp-fb-xf-a" aria-hidden={!pub}>
+            It’s filed as a public issue on GitHub, so you can follow it.
+          </span>
+          <span className="tp-fb-xf-b" aria-hidden={pub}>
+            It goes straight to the people who make Tudu, by email.
+          </span>
+        </span>
+      ) : (
+        'It goes straight to the people who make Tudu.'
+      ),
+      description: github
+        ? pub
+          ? 'It’s filed as a public issue on GitHub, so you can follow it.'
+          : 'It goes straight to the people who make Tudu, by email.'
+        : undefined,
     };
     footer = (
       <>
-        {github ? <PublicNotice /> : null}
+        {pub ? <PublicNotice key="pub" /> : github ? <TeamNotice key="team" /> : null}
         <span className="tp-fb-sp" />
         <Button variant="quiet" size="sm" onClick={onClose}>
           Cancel
@@ -336,7 +355,7 @@ export function FeedbackDialog({
           icon={<Icon name={plusOne ? 'check' : 'send'} size={14} />}
           disabled={!text.trim() && phase === 'idle'}
           loading={phase === 'sending'}
-          loadingLabel={plusOne ? 'Adding…' : github ? 'Filing…' : 'Sending…'}
+          loadingLabel={plusOne ? 'Adding…' : pub ? 'Filing…' : 'Sending…'}
           success={phase === 'sent'}
           successLabel="Sent"
           onClick={() => {
@@ -355,6 +374,7 @@ export function FeedbackDialog({
       onClose={onClose}
       title={head.title}
       sub={head.sub}
+      description={head.description}
       variant={variant}
       inline={inline}
       noFocus={inline}
@@ -393,10 +413,11 @@ export function FeedbackDialog({
             </div>
             {github && similar ? (
               <SimilarReports
-                state={similar.state}
+                // Off folds it shut: Already reported is about GitHub.
+                state={pub ? similar.state : 'hidden'}
                 issues={similar.issues}
                 stale={similar.stale}
-                picked={picked}
+                picked={pub ? picked : null}
                 onPick={onPick}
                 onOpen={onOpenIssue}
               />
@@ -404,7 +425,7 @@ export function FeedbackDialog({
             <div className={cx('tp-fb-slot', !shown && 'tp-hide')} aria-hidden={!shown} inert={!shown}>
               <div>
                 {shot ? (
-                  <figure className={cx('tp-fb-shot', showing && 'tp-shown')}>
+                  <figure className="tp-fb-shot">
                     <div
                       className={cx('tp-fb-shot-img', ready && 'tp-ready')}
                       role="img"
@@ -412,10 +433,6 @@ export function FeedbackDialog({
                     >
                       {url ? <img src={url} alt="" onLoad={() => setReadyFor(shot)} /> : null}
                     </div>
-                    <span className="tp-fb-pill" aria-hidden="true">
-                      <Icon name="globe" size={12} />
-                      Public
-                    </span>
                     <button
                       type="button"
                       className="tp-fb-shot-x"
@@ -430,34 +447,18 @@ export function FeedbackDialog({
                     </figcaption>
                   </figure>
                 ) : null}
-                {shot && github ? (
-                  <SettingRow
-                    className={cx('tp-fb-shotrow', !canShow && 'tp-cant')}
-                    title="Show it on the public issue"
-                    sub={
-                      canShow ? (
-                        <span className={cx('tp-fb-sub', showing && 'tp-on')}>
-                          <span className="tp-fb-sub-off">
-                            Private. Only the Tudu team sees it, with your report.
-                          </span>
-                          <span className="tp-fb-sub-on">
-                            Public. Anyone can see it on GitHub.{' '}
-                            <span className="tp-fb-check">Check it shows nothing private.</span>
-                          </span>
-                        </span>
-                      ) : (
-                        'GitHub can’t show this kind of image. It stays with the team.'
-                      )
-                    }
-                    control={
-                      <Switch
-                        label="Show the screenshot on the public issue"
-                        checked={showing}
-                        disabled={!canShow}
-                        onChange={(v) => onShotPublic?.(v)}
-                      />
-                    }
-                  />
+                {shot && pub ? (
+                  canShow ? (
+                    <p className="tp-fb-asis tp-warn">
+                      <Icon name="warning" size={13} />
+                      <span>It goes on the issue as it is. Check it shows nothing private.</span>
+                    </p>
+                  ) : (
+                    <p className="tp-fb-asis">
+                      <Icon name="lock" size={13} />
+                      <span>GitHub can’t show this kind of image. It stays with the team.</span>
+                    </p>
+                  )
                 ) : null}
               </div>
             </div>
@@ -469,10 +470,10 @@ export function FeedbackDialog({
                   </Button>
                   <span className={cx('tp-fb-hint', hint && 'tp-warn')} role={hint ? 'status' : undefined}>
                     {hint ??
-                      (github ? (
+                      (scrambled ? (
                         <>
-                          <Icon name="globe" size={12} />
-                          Shown on the issue unless you hide it
+                          <Icon name="shuffle" size={12} />
+                          Your text is scrambled
                         </>
                       ) : (
                         'or paste or drop one'
@@ -501,6 +502,25 @@ export function FeedbackDialog({
                 <Switch label="Include app details" checked={details} onChange={(v) => onDetails?.(v)} />
               }
             />
+            {github ? (
+              <SettingRow
+                className="tp-fb-pubrow"
+                title="File it as a public issue"
+                sub={
+                  <span className={cx('tp-fb-xf', !pub && 'tp-alt')}>
+                    <span className="tp-fb-xf-a" aria-hidden={!pub}>
+                      On GitHub, where you can follow it and others can +1.
+                    </span>
+                    <span className="tp-fb-xf-b" aria-hidden={pub}>
+                      Off. It goes to the Tudu team by email, nothing is public.
+                    </span>
+                  </span>
+                }
+                control={
+                  <Switch label="File it as a public issue" checked={pub} onChange={(v) => onPublic?.(v)} />
+                }
+              />
+            ) : null}
             {github && onReports ? (
               <button type="button" className="tp-fb-mine" onClick={onReports}>
                 Your reports{mineCount}
@@ -562,19 +582,33 @@ function PublicNotice() {
             <li>What you write</li>
             <li>Bug or idea</li>
             <li>App details, when switched on: version, system, page, window, theme</li>
-            <li>The screenshot, unless you hide it</li>
+            <li>
+              <span>
+                The screenshot
+                <em>Exactly as you added it</em>
+              </span>
+            </li>
           </ul>
           <h4>Only the Tudu team</h4>
           <ul className="tp-fb-priv">
             <li>Your name and email (so we can reply)</li>
-            <li>The screenshot, when you hide it</li>
           </ul>
           <p>
-            Never sent anywhere: your tasks, notes, people or space names, except what a public screenshot
-            shows.
+            Never sent anywhere: your tasks, notes, people or space names, except what your screenshot shows.{' '}
+            <b>Scramble my text</b>, in your menu, hides your words before you take one.
           </p>
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
+  );
+}
+
+/** The footer with "File it as a public issue" off: a quiet lock, not a button, since there is nothing to explain. */
+function TeamNotice() {
+  return (
+    <span className="tp-fb-pub tp-fb-team">
+      <Icon name="lock" size={13} />
+      <span>Only the Tudu team</span>
+    </span>
   );
 }

@@ -21,6 +21,7 @@ import {
   TaskDetail,
   TaskDetailSkeleton,
   showToast,
+  useMine,
   type DetailComment,
   type SubtaskItem,
   type TaskDetailTask,
@@ -86,6 +87,7 @@ function monthAround(day: IsoDate): { from: IsoDate; to: IsoDate } {
  * the arrows.
  */
 export function TaskPanel(p: TaskPanelProps) {
+  const mine = useMine();
   const { spaceId, open, today, vp } = p;
   const compact = vp === 'phone';
   const pageSpace = useSpace();
@@ -245,7 +247,7 @@ export function TaskPanel(p: TaskPanelProps) {
         visibility={
           space.kind === 'team'
             ? [
-                { value: 'space', label: `Everyone in ${space.name}` },
+                { value: 'space', label: `Everyone in ${mine(space.name)}` },
                 { value: 'me', label: 'Only you' },
               ]
             : [{ value: 'space', label: 'Only you' }]
@@ -262,7 +264,7 @@ export function TaskPanel(p: TaskPanelProps) {
               }
             : undefined
         }
-        ownerLine={theirs && owner ? ownerWords(d.day, owner.name || owner.email, today) : undefined}
+        ownerLine={theirs && owner ? ownerWords(d.day, mine(owner.name || owner.email), today) : undefined}
         onLocate={p.onLocate ? () => p.onLocate!(d.day) : undefined}
         locateLabel={`Go to ${d.day ? dayWord(d.day, today) : 'the Backlog'}`}
         calendar={{ marks: marks ?? {} }}

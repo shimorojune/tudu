@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
 import { PersonDot, type PersonDotPerson } from './PersonDot';
@@ -31,6 +32,7 @@ export function PersonRow({
   emptyLabel = 'Nothing shared',
   className,
 }: PersonRowProps) {
+  const mine = useMine();
   const done = tasks.filter((t) => t.done).length;
   const shown = tasks.slice(0, max);
   const rest = tasks.length - shown.length;
@@ -40,11 +42,11 @@ export function PersonRow({
         <PersonDot person={w} size={34} />
         <span className="tp-prow-n">
           <span className="tp-prow-name">
-            {w.name}
+            {mine(w.name)}
             {w.you ? <span className="tp-prow-you">You</span> : null}
             {w.left ? <span className="tp-prow-you">Left</span> : null}
           </span>
-          <span className="tp-prow-sub">{sub ?? w.email}</span>
+          <span className="tp-prow-sub">{sub ?? mine(w.email)}</span>
         </span>
         <span className="tp-prow-c">{tasks.length ? `${done} of ${tasks.length} done` : emptyLabel}</span>
         <span className="tp-prow-go" aria-hidden="true">

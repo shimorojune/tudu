@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { cx } from '../lib/cx';
@@ -50,6 +51,7 @@ export function SpaceSwitch({
   defaultOpen,
   className,
 }: SpaceSwitchProps) {
+  const mine = useMine();
   const cur = spaces.find((s) => s.id === active) ?? spaces[0];
   const sheet = variant === 'sheet';
   const [open, setOpen] = useState(!!defaultOpen);
@@ -139,7 +141,7 @@ export function SpaceSwitch({
           >
             <SpaceTile space={s} size={28} />
             <span className="tp-sswl-n">
-              <span>{s.name}</span>
+              <span>{s.all ? s.name : mine(s.name)}</span>
               {s.sub ? <span className="tp-sswl-sub">{s.sub}</span> : null}
             </span>
             {s.count && !on ? (
@@ -195,7 +197,7 @@ export function SpaceSwitch({
       {cur ? (
         <span key={cur.id} className={cx('tp-ssw-id', cur.id !== first.current && 'tp-ssw-swap')}>
           <SpaceTile space={cur} size={26} />
-          <span className="tp-ssw-name">{cur.name}</span>
+          <span className="tp-ssw-name">{cur.all ? cur.name : mine(cur.name)}</span>
         </span>
       ) : null}
       {others ? <span className="tp-ssw-pip" aria-label={`${others} new in other spaces`} /> : null}

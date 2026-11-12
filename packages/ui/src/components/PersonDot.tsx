@@ -1,4 +1,5 @@
 import { cx } from '../lib/cx';
+import { useMine } from '../lib/scramble';
 
 export interface PersonDotPerson {
   name?: string;
@@ -18,10 +19,12 @@ export interface PersonDotProps {
 
 /** A person as a small round mark: their initials on their colour, or their photo. The full name is its tooltip. */
 export function PersonDot({ person, size = 20, className }: PersonDotProps) {
+  // Scramble my text: the name and initials jumble; a photo becomes a block (html[data-scrambled]).
+  const mine = useMine();
   return (
     <span
       className={cx('tp-pdot', person.image && 'tp-photo', className)}
-      title={person.name}
+      title={person.name ? mine(person.name) : undefined}
       style={{
         width: size,
         height: size,
@@ -29,7 +32,7 @@ export function PersonDot({ person, size = 20, className }: PersonDotProps) {
         fontSize: Math.round(size * 0.42),
       }}
     >
-      {person.image ? <img src={person.image} alt="" draggable={false} /> : person.initials || '?'}
+      {person.image ? <img src={person.image} alt="" draggable={false} /> : mine(person.initials) || '?'}
     </span>
   );
 }

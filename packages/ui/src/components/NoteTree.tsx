@@ -1,3 +1,4 @@
+import { useMine } from '../lib/scramble';
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { canDrop, type DropTarget, type NotebookFolder, type NoteHeader } from '@tudu/core';
 import { cx } from '../lib/cx';
@@ -11,6 +12,7 @@ import {
   NoteIcon,
   NotePop,
   NoteRow,
+  mineLabel,
   noteLabel,
   reducedMotion,
   useCloseOnOutside,
@@ -256,6 +258,7 @@ function NameField({
 }
 
 function Folder({ folder: f, depth, c }: { folder: NoteFolderItem; depth: number; c: Common }) {
+  const mine = useMine();
   const open = !!c.openIds[f.id] || c.filtering;
   const count = f.notes.length + f.folders.length;
   const over = c.over && c.over.id === f.id ? c.over : null;
@@ -291,7 +294,7 @@ function Folder({ folder: f, depth, c }: { folder: NoteFolderItem; depth: number
     <div className={cx('tp-nb-f', c.drag?.id === f.id && 'tp-nb-dragging')}>
       <ConfirmDialog
         open={asking}
-        title={`Delete “${f.name}”?`}
+        title={`Delete “${mine(f.name)}”?`}
         confirmLabel="Delete"
         busyLabel="Deleting…"
         doneLabel="Deleted"
@@ -333,7 +336,7 @@ function Folder({ folder: f, depth, c }: { folder: NoteFolderItem; depth: number
           aria-level={depth + 1}
           data-nb-kind="folder"
           data-nb-id={f.id}
-          onPointerDown={c.filtering ? undefined : (e) => c.down(e, 'folder', f.id, f.name)}
+          onPointerDown={c.filtering ? undefined : (e) => c.down(e, 'folder', f.id, mine(f.name))}
         >
           <button
             type="button"
@@ -348,7 +351,7 @@ function Folder({ folder: f, depth, c }: { folder: NoteFolderItem; depth: number
             <span className="tp-nb-row-ic">
               <NoteIcon name="folder" size={14} />
             </span>
-            <span className="tp-nb-fname">{f.name}</span>
+            <span className="tp-nb-fname">{mine(f.name)}</span>
             {over?.bad ? (
               <span className="tp-nb-nodrop-l">Too deep</span>
             ) : (
@@ -443,6 +446,7 @@ function Folder({ folder: f, depth, c }: { folder: NoteFolderItem; depth: number
 
 /** A note in the tree: just its mark and its title. Links and times live in the note itself. */
 function TreeNote({ note, depth, c }: { note: NoteItem; depth: number; c: Common }) {
+  const mine = useMine();
   const over = c.over && c.over.id === note.id ? c.over : null;
   return (
     <div
@@ -458,7 +462,7 @@ function TreeNote({ note, depth, c }: { note: NoteItem; depth: number; c: Common
       aria-level={depth + 1}
       data-nb-kind="note"
       data-nb-id={note.id}
-      onPointerDown={c.filtering ? undefined : (e) => c.down(e, 'note', note.id, noteLabel(note))}
+      onPointerDown={c.filtering ? undefined : (e) => c.down(e, 'note', note.id, mineLabel(mine, note))}
     >
       <NoteRow
         note={note}

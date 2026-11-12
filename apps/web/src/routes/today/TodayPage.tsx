@@ -26,6 +26,7 @@ import {
   SpreadPage,
   TaskList,
   TaskListSkeleton,
+  useMine,
   type TaskItem,
 } from '@tudu/ui';
 import { useEffect, useLayoutEffect, useRef, useState, type TouchEvent } from 'react';
@@ -148,6 +149,7 @@ export function TodayPage() {
   const me = useQuery(meQuery).data;
   const space = useSpace();
   const all = useAllScope();
+  const mine = useMine();
   const { today, night, start, stay } = useWorkingDay();
   const online = useOnline();
   const day = useShownDay() ?? today;
@@ -239,7 +241,18 @@ export function TodayPage() {
 
   if (!me) return null;
   const nightText = night ? nightWords(night.now, night.from, night.to) : null;
-  const welcome = all ? undefined : welcomeFor(space, me.user.name, fresh);
+  // Scramble my text: the space's and the person's names in the welcome are theirs.
+  const welcome = all
+    ? undefined
+    : welcomeFor(
+        {
+          ...space,
+          name: mine(space.name),
+          joined: space.joined ? { by: space.joined.by ? mine(space.joined.by) : null } : space.joined,
+        },
+        mine(me.user.name),
+        fresh,
+      );
   const sheet = (
     <DaySheet
       spaceId={space.id}
@@ -362,13 +375,14 @@ export function AllBanners({
   failed: SpaceSummary[];
   onRetry: () => void;
 }) {
-  const names = failed.map((s) => s.name);
+  const mine = useMine();
+  const names = failed.map((s) => mine(s.name));
   const list =
     names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0];
   return (
     <>
       {all.gone ? (
-        <Banner tone="info" title={`You’re no longer in ${all.gone.name}.`} onDismiss={all.dismissGone}>
+        <Banner tone="info" title={`You’re no longer in ${mine(all.gone.name)}.`} onDismiss={all.dismissGone}>
           Its tasks left this page. Your other spaces are unchanged.
         </Banner>
       ) : null}
@@ -446,6 +460,7 @@ function DaySheet({
   const projectsOf = useAllProjects(all);
   const flash = useFlash();
   const locate = useLocate();
+  const mine = useMine();
   const range = monthAround(day);
   const spaceMarks = useQuery({ ...taskStore.marksQuery(spaceId, range.from, range.to), enabled: !all }).data;
   const allMarks = useAllMarks(all, range.from, range.to);
@@ -505,8 +520,8 @@ function DaySheet({
   const fetching = all ? gathered.fetching : q.isFetching;
   const filterName = all
     ? filters.lagSpace
-      ? (spaceOf(filters.lagSpace)?.name ?? '')
-      : (filters.lagProject ?? '')
+      ? mine(spaceOf(filters.lagSpace)?.name ?? '')
+      : mine(filters.lagProject ?? '')
     : '';
 
   let body;
@@ -583,7 +598,7 @@ function DaySheet({
         filterSpace={all ? filters.lagSpace : undefined}
         flashKey={flash && flash.day === day ? flash.id : undefined}
         locateKey={locate && locate.day === day ? `${locate.id}:${locate.nonce}` : undefined}
-        addLabel={all ? writeWords(all.target) : 'Write the next thing…'}
+        addLabel={all ? writeWords({ name: mine(all.target.name) }) : 'Write the next thing…'}
         addKey={writing}
         onAddClose={() => setWriting(null)}
         calendar={calendar}
@@ -686,6 +701,7 @@ export function FilterChips({
   filters: ReturnType<typeof useAllFilters>;
   projectsOf?: (spaceId: string) => Project[];
 }) {
+  const mine = useMine();
   const sp = filters.space ? all.spaces.find((s) => s.id === filters.space) : undefined;
   const project = filters.project
     ? all.spaces.flatMap((s) => projectsOf?.(s.id) ?? []).find((p) => p.name === filters.project)
@@ -695,12 +711,12 @@ export function FilterChips({
     <>
       {sp ? (
         <span className={filters.spaceChipClass}>
-          <Chip label={sp.name} space={tileOf(sp)} onClear={filters.clearSpace} />
+          <Chip label={mine(sp.name)} space={tileOf(sp)} onClear={filters.clearSpace} />
         </span>
       ) : null}
       {filters.project ? (
         <span className={filters.projectChipClass}>
-          <Chip label={filters.project} color={project?.color} onClear={filters.clearProject} />
+          <Chip label={mine(filters.project)} color={project?.color} onClear={filters.clearProject} />
         </span>
       ) : null}
     </>

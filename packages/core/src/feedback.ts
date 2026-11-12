@@ -54,10 +54,15 @@ export const feedbackReportSchema = z.object({
     .max(FEEDBACK_TEXT_MAX, 'That is too long. Keep it under 5000 characters.'),
   details: feedbackDetailsSchema.nullable(),
   /**
-   * "Show it on the public issue": the screenshot goes on the GitHub issue too. The form switches it on for each new
-   * screenshot (#75); missing (a report queued by an older app) still reads as private, as its sender saw it.
+   * The screenshot goes on the GitHub issue too. Since #67 there is no switch of its own: the form sends it true when
+   * the report is public and GitHub can show the image. Missing (a report queued by an older app) reads as private.
    */
   shotPublic: z.boolean().default(false),
+  /**
+   * "File it as a public issue" (#50): off sends it to the team by email only, with no GitHub issue. Missing (a report
+   * queued by an older app) reads as public, because that form said it would be.
+   */
+  public: z.boolean().default(true),
   /** "+1 that one instead": the issue this report joins as a comment, rather than a new issue (#76). */
   plusOneOf: z.number().int().positive().nullable().default(null),
 });

@@ -21,8 +21,11 @@ import {
 import {
   copyText,
   FeedbackDialog,
+  readScramble,
+  setScramble,
   showToast,
   TOAST_WITH_ACTION_MS,
+  useScramble,
   type FeedbackPhase,
   type FeedbackReportsState,
   type SimilarReportsState,
@@ -46,13 +49,16 @@ export interface FeedbackDraft {
   kind: FeedbackKind;
   text: string;
   shot: File | null;
-  /** "Show it on the public issue": on for each new screenshot GitHub can show (#75); off holds for that one. */
-  shotPublic: boolean;
+  /**
+   * "File it as a public issue" (#50): on for each new report; off sends this one by email only. The screenshot
+   * goes wherever the report goes (#67 dropped its own switch).
+   */
+  public: boolean;
   /** "+1 that one instead" (#76): the issue the report joins as a comment. Kept with the draft, so it survives a close. */
   plusOne: SimilarIssue | null;
 }
 
-const EMPTY: FeedbackDraft = { kind: 'bug', text: '', shot: null, shotPublic: false, plusOne: null };
+const EMPTY: FeedbackDraft = { kind: 'bug', text: '', shot: null, public: true, plusOne: null };
 let open = false;
 let draft: FeedbackDraft = EMPTY;
 const listeners = new Set<() => void>();
@@ -283,11 +289,32 @@ export function currentDetails(
 
 /** "Filed as #142 on GitHub", with Copy link, for a moment longer than a plain toast. */
 export function toastFiled(issue: FeedbackIssue): void {
+  // Scramble my text still on after the report: the toast says so and offers to turn it off (#67). The link stays
+  // a click away in Your reports.
+  if (readScramble().on) {
+    showToast(`Filed as #${issue.number} on GitHub. Scramble is on.`, {
+      action: 'Turn off',
+      onAction: () => setScramble(false),
+      duration: TOAST_WITH_ACTION_MS,
+    });
+    return;
+  }
   showToast(`Filed as #${issue.number} on GitHub`, {
     action: 'Copy link',
     onAction: () => void copyText(issue.url),
     duration: TOAST_WITH_ACTION_MS,
   });
+}
+
+/** The thanks after an email-only report, with Turn off while Scramble my text is on. */
+export function toastThanks(): void {
+  if (readScramble().on)
+    showToast('Thanks. That’s with the Tudu team now. Scramble is on.', {
+      action: 'Turn off',
+      onAction: () => setScramble(false),
+      duration: TOAST_WITH_ACTION_MS,
+    });
+  else showToast('Thanks. That’s with the Tudu team now.', { duration: THANKS_MS });
 }
 
 /** What the "Already reported?" box shows, as the form's similar hook keeps it. */
@@ -425,11 +452,14 @@ export function FeedbackHost({ space, vp }: { space: Pick<SpaceSummary, 'kind'> 
   // Until the server says otherwise, say it is public: better a notice too many than one too few.
   const filing = reports.mine?.filing ?? 'github';
   const github = filing === 'github';
+  // Filed on GitHub: the server files, and the person left "File it as a public issue" on.
+  const pub = github && d.public;
   const view0 = viewOf(pathname);
-  const line = feedbackDetailsLine(currentDetails(view0, space?.kind ?? null, app), github);
+  const line = feedbackDetailsLine(currentDetails(view0, space?.kind ?? null, app), pub);
   // Kept through a send, so a refused +1 comes back to the same rows.
-  const similar = useSimilarIssues(d.text, isOpen && github && view === 'form');
-  const plusOne = github ? d.plusOne : null;
+  const scrambled = useScramble().on;
+  const similar = useSimilarIssues(d.text, isOpen && pub && view === 'form');
+  const plusOne = pub ? d.plusOne : null;
 
   const send = async () => {
     setPhase('sending');
@@ -439,7 +469,8 @@ export function FeedbackHost({ space, vp }: { space: Pick<SpaceSummary, 'kind'> 
       kind: d.kind,
       text: d.text.trim(),
       details: details ? currentDetails(view0, space?.kind ?? null, app) : null,
-      shotPublic: github && !!d.shot && d.shotPublic,
+      shotPublic: pub && !!d.shot && shotCanBePublic(d.shot.type),
+      public: pub,
       plusOneOf: plusOne?.number ?? null,
     };
     const shot = d.shot ? { blob: d.shot, name: d.shot.name, type: d.shot.type } : null;
@@ -457,7 +488,7 @@ export function FeedbackHost({ space, vp }: { space: Pick<SpaceSummary, 'kind'> 
       clearFeedbackDraft();
       closeFeedback();
       showToast(
-        github ? 'Saved. It’s filed when you’re back online.' : 'Saved. It sends when you’re back online.',
+        pub ? 'Saved. It’s filed when you’re back online.' : 'Saved. It sends when you’re back online.',
         { duration: THANKS_MS },
       );
       return;
@@ -476,7 +507,7 @@ export function FeedbackHost({ space, vp }: { space: Pick<SpaceSummary, 'kind'> 
     sentTimer.current = setTimeout(() => {
       clearFeedbackDraft();
       closeFeedback();
-      showToast('Thanks. That’s with the Tudu team now.', { duration: THANKS_MS });
+      toastThanks();
     }, SENT_MS);
   };
 
@@ -501,10 +532,11 @@ export function FeedbackHost({ space, vp }: { space: Pick<SpaceSummary, 'kind'> 
         if (error) setError(null);
       }}
       shot={d.shot}
-      // Each new screenshot GitHub can show starts public (#75); switching it off holds for that one only.
-      onShot={(shot) => setFeedbackDraft({ shot, shotPublic: !!shot && shotCanBePublic(shot.type) })}
-      shotPublic={d.shotPublic}
-      onShotPublic={(shotPublic) => setFeedbackDraft({ shotPublic })}
+      onShot={(shot) => setFeedbackDraft({ shot })}
+      public={d.public}
+      scrambled={scrambled}
+      // Off lets go of a picked +1: a +1 is a GitHub comment.
+      onPublic={(on) => setFeedbackDraft(on ? { public: true } : { public: false, plusOne: null })}
       details={details}
       onDetails={(on) => {
         setDetails(on);
