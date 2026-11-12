@@ -39,9 +39,9 @@ It is still there on master (b532c83).
    fades in over `--dur-menu` with `--ease-arrive`. The clock icon and the rest of the line stay still. First paint
    never animates. The colour change into or out of red already eases (the existing `.tp-sg` transition).
    - CSS in `packages/ui/src/styles/components.css`: `.tp-sg-turn > span { animation: tp-label-in var(--dur-menu)
-     var(--ease-arrive) both; }`, reusing the existing `tp-label-in` keyframes (opacity 0 and 3px down to rest).
+var(--ease-arrive) both; }`, reusing the existing `tp-label-in` keyframes (opacity 0 and 3px down to rest).
    - Reduced motion and Less motion: `@media (prefers-reduced-motion: reduce) { .tp-sg-turn > span { animation:
-     none; } }`, then `node scripts/less-motion.mjs` so `less-motion.css` carries it too. The words swap at once.
+none; } }`, then `node scripts/less-motion.mjs` so `less-motion.css` carries it too. The words swap at once.
 4. **Design system and canvas, after the merge** (no drift):
    - The DS kit already says "Due today". Port the `tp-sg-turn` motion into the DS `bundle.js` TaskRow and
      `bundle.css` by hand, and the same into the canvas's own copy of the bundle.
