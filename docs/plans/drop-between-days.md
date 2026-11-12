@@ -175,6 +175,10 @@ path in the real WKWebView; the glide in Safari's engine is C02-E15 on the `webk
 is MC-1. C02-E17 found no shift in the app's header, so `DayHeader` is
 unchanged.
 
+Follow-up (12 Nov): the week's "Nothing planned" line has its own padding, so `closeRow` could only fold it from 42px
+to 24px and it popped out at the end. `closeRow` now closes an element's padding with its height (C02-U38), and
+C05-E16 checks the line is nearly nothing on its last frame.
+
 ## 6. Risks
 
 - **A stuck card.** The one new failure mode is a card that never leaves. Covered by the 600ms cap, unmount and

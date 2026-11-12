@@ -160,6 +160,16 @@ export function expectFolds(heights: number[], frames = 3): void {
   ).toBeGreaterThanOrEqual(frames);
 }
 
+/**
+ * As `expectFolds`, and the fold goes all the way: the last height seen before it is gone is nearly nothing. A fold
+ * that stops at the element's padding and then pops out fails here.
+ */
+export function expectFoldsShut(heights: number[], frames = 3): void {
+  expectFolds(heights, frames);
+  const last = heights.filter((h) => h > 0).pop()!;
+  expect(last, `last height before it is gone: ${heights.map(Math.round).join(' ')}`).toBeLessThan(8);
+}
+
 /** Where something is on one frame; `hidden` while it keeps its place but is not painted. */
 export interface FrameBox {
   x: number;

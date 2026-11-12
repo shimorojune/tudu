@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
-import { expectFolds, expectGlides, expectLands, sampleBoxes } from '../../fixtures/motion';
+import { expectFoldsShut, expectGlides, expectLands, sampleBoxes } from '../../fixtures/motion';
 import {
   carry,
   dayList,
@@ -605,7 +605,7 @@ test.describe('week, a drop on another day, with motion', () => {
     expectLands(frames);
     expectGlides(frames.map((f) => f.below!.y));
     // "Nothing planned" folds shut under the arriving row, then leaves the page
-    expectFolds(frames.map((f) => f.none?.height ?? 0));
+    expectFoldsShut(frames.map((f) => f.none?.height ?? 0));
     expect(frames[frames.length - 1]!.none).toBeNull();
     await expect.poll(() => titlesOf(tileList(page, 'Thursday 15 October'))).toEqual(['Call Sam at 3pm']);
     await expect(tileCount(page, 'Today, Wednesday 14 October')).toHaveText('2 tasks');
@@ -630,7 +630,7 @@ test.describe('week, a drop on another day, with motion', () => {
       () => page.mouse.up(),
     );
     expectLands(frames);
-    expectFolds(frames.map((f) => f.none?.height ?? 0));
+    expectFoldsShut(frames.map((f) => f.none?.height ?? 0));
     await expect.poll(() => titlesOf(backlogList(page))).toEqual(['Call Sam at 3pm']);
     await expect(nothing(page, 'Thursday 15 October', 'Nothing planned')).toBeVisible();
     await expect(tileCount(page, 'Backlog')).toHaveText('1 task');

@@ -108,14 +108,23 @@ export function closeRow(el: HTMLElement | null, done: () => void): void {
     return;
   }
   const full = el.getBoundingClientRect().height;
+  // An element with its own padding (the week's "Nothing planned" line) cannot fold below it by height alone: it
+  // would stop at its padding and pop out at the end. The padding closes with the height.
+  const cs = getComputedStyle(el);
+  const padTop = parseFloat(cs.paddingTop) || 0;
+  const padBottom = parseFloat(cs.paddingBottom) || 0;
   const dur = 240;
   let t0 = 0;
   el.style.overflow = 'hidden';
   el.style.pointerEvents = 'none';
+  el.style.boxSizing = 'border-box';
   const frame = (now: number) => {
     if (!t0) t0 = now;
     const q = Math.min(1, (now - t0) / dur);
-    el.style.height = `${full * (1 - easeArrive(q))}px`;
+    const left = 1 - easeArrive(q);
+    el.style.height = `${full * left}px`;
+    if (padTop) el.style.paddingTop = `${padTop * left}px`;
+    if (padBottom) el.style.paddingBottom = `${padBottom * left}px`;
     el.style.opacity = String(Math.max(0, 1 - q * 1.8));
     if (q < 1) requestAnimationFrame(frame);
     else done();
