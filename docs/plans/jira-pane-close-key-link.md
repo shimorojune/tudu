@@ -16,6 +16,11 @@ As proposed, with these differences:
   the same as after ×.
 - C11-E06 (desktop links) also clicks the preview header's key and checks it is handed to the app
   (`openExternal`), with no popup.
+- C10-E33: on the desk the open panel covers the top bar's Jira button, so a press there is a press inside the
+  panel (it stays open; × or a press outside closes it). The test checks that instead of a one-press toggle; the
+  sidebar's Jira row is the one-press toggle. `.tp-jirabtn` stays on the not-outside list for widths where it shows.
+- The key link leaves a click alone when the page already handled it (the Mac app's link catcher opens external
+  links in capture), so the ticket opens once, not twice (C10-U29, C11-E06).
 - Unit and e2e runs were on PR CI only.
 
 anel, `index.d.ts`).

@@ -240,7 +240,17 @@ function KeyAnchor({ k, className, link }: { k: string; className: string; link:
       aria-label={`Open ${k} in Jira`}
       onClick={(e) => {
         e.stopPropagation();
-        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0 || !link.onOpen) return;
+        // Already handled by the page (the Mac app's link catcher opens it itself): don't open it twice.
+        if (
+          e.defaultPrevented ||
+          e.metaKey ||
+          e.ctrlKey ||
+          e.shiftKey ||
+          e.altKey ||
+          e.button !== 0 ||
+          !link.onOpen
+        )
+          return;
         e.preventDefault();
         link.onOpen(k);
       }}

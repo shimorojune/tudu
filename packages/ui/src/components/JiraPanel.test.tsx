@@ -616,6 +616,13 @@ describe('the Jira panel (chunk 10)', () => {
     // A ⌘-click is the browser's own (a new tab), not ours.
     fireEvent.click(key, { metaKey: true });
     expect(onOpenInJira).toHaveBeenCalledTimes(2);
+    // A click the page already handled (the Mac app's link catcher, in capture) isn't opened a second time.
+    const caught = (e: MouseEvent) => e.preventDefault();
+    document.addEventListener('click', caught, true);
+    await user.click(key);
+    document.removeEventListener('click', caught, true);
+    expect(onOpenInJira).toHaveBeenCalledTimes(2);
+    expect(onOpenIssue).not.toHaveBeenCalled();
     // The rest of the row still opens the preview.
     await user.click(within(row('TUDU-212')).getByText('Make the Jira panel remember the last view'));
     expect(onOpenIssue).toHaveBeenLastCalledWith('TUDU-212');

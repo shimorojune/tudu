@@ -1236,13 +1236,18 @@ test.describe('jira', () => {
     await expect(page).toHaveURL(/[?&]jira/);
   });
 
-  test('C10-E33 not outside: the Jira button and row toggle it in one press; presses inside, Show and a toast’s Undo keep it', async ({
+  test('C10-E33 not outside: the sidebar row toggles it in one press; the top bar button is under the panel; presses inside, Show and a toast’s Undo keep it', async ({
     page,
   }) => {
     test.skip(phone() || tablet(), 'the desk has both toggles');
     await connected(page);
-    // The top bar's button: one press closes it, and it stays closed.
-    await jiraButton(page).click();
+    // The top bar's button sits under the open panel on the desk, so a press there is a press inside it.
+    await expect(jiraButton(page)).toHaveAttribute('aria-pressed', 'true');
+    const box = (await jiraButton(page).boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(jiraPanel(page)).toBeVisible();
+    // × closes it; the button is clear again.
+    await jiraPanel(page).getByRole('button', { name: 'Close Jira' }).click();
     await expect(jiraPanel(page)).toHaveCount(0);
     await expect(jiraButton(page)).toHaveAttribute('aria-pressed', 'false');
     // The sidebar's Jira row: opens it, then one press closes it.
