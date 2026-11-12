@@ -420,6 +420,19 @@ fn place_floating(app: &AppHandle, w: &WebviewWindow) {
     }
 }
 
+/// Tudu Test only: how many windows of other apps are in front of the note window (None: it is not on screen).
+#[cfg(feature = "control")]
+pub fn note_others_ahead(app: &AppHandle) -> Option<usize> {
+    let w = app.get_webview_window(NOTE)?;
+    #[cfg(target_os = "macos")]
+    return panel::others_ahead(&w);
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = w;
+        None
+    }
+}
+
 /// The note window takes the keyboard the same way.
 pub(crate) fn focus_panel(w: &WebviewWindow) {
     focus_floating(w);
@@ -654,6 +667,51 @@ mod panel {
                 win.setFrame_display(cocoa(&win, f), true);
             }
         });
+    }
+
+    /// In front of the other apps' windows at its level, without taking the keyboard or making Tudu active.
+    pub fn order_front(w: &WebviewWindow) {
+        let w2 = w.clone();
+        let _ = w.run_on_main_thread(move || {
+            if let Some(win) = ns_window(&w2) {
+                if win.isVisible() {
+                    win.orderFrontRegardless();
+                }
+            }
+        });
+    }
+
+    /// Tudu Test only: how many windows of other apps are in front of this one (the menu bar and the like
+    /// included), from the window server's front to back order. Asked on the main thread.
+    #[cfg(feature = "control")]
+    pub fn others_ahead(w: &WebviewWindow) -> Option<usize> {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let w2 = w.clone();
+        let _ = w.run_on_main_thread(move || {
+            let count = (|| {
+                let win = ns_window(&w2)?;
+                let mtm = MainThreadMarker::from(&*win);
+                let me = win.windowNumber();
+                let app = objc2_app_kit::NSApplication::sharedApplication(mtm);
+                let all = NSWindow::windowNumbersWithOptions(
+                    objc2_app_kit::NSWindowNumberListOptions::AllApplications,
+                    mtm,
+                )?;
+                let mut ahead = 0usize;
+                for n in all.iter() {
+                    let n = n.integerValue();
+                    if n == me {
+                        return Some(ahead);
+                    }
+                    if app.windowWithWindowNumber(n).is_none() {
+                        ahead += 1;
+                    }
+                }
+                None
+            })();
+            let _ = tx.send(count);
+        });
+        rx.recv_timeout(std::time::Duration::from_secs(2)).ok().flatten()
     }
 
     pub fn make_key(w: &WebviewWindow) {

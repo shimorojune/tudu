@@ -1,6 +1,6 @@
 # Note window goes away when the desk closes (#91)
 
-Status: proposal, awaiting Rohit's approval. Canvas: not applicable (no design change; the note window should simply
+Status: approved by Rohit 12 Nov 2026. Canvas: not applicable (no design change; the note window should simply
 stay where it is). Skipped with Rohit's OK (12 Nov 2026).
 
 ## The report

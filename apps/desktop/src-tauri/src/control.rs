@@ -294,7 +294,12 @@ fn state(app: &AppHandle) -> Value {
     });
     // The note window (chunk 22): pinned, filling the screen, what it was last asked for, and where it is kept.
     let notes = app.state::<crate::notes::Notes>();
-    let note = json!({ "state": notes.state(), "frame": notes.frame(), "glideSteps": notes.glide_steps() });
+    let note = json!({
+        "state": notes.state(),
+        "frame": notes.frame(),
+        "glideSteps": notes.glide_steps(),
+        "othersAhead": windows::note_others_ahead(app),
+    });
     json!({
         "track": track,
         "name": track.name(),

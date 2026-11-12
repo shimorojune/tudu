@@ -1,4 +1,7 @@
 import { spawnSync } from 'node:child_process';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   API,
   asPage,
@@ -81,6 +84,37 @@ async function bringForward(name = 'Finder'): Promise<void> {
 
 const near = (a: number, b: number) => Math.abs(a - b) <= 2;
 
+/** A real window of another app on screen and in front: Finder on a folder (no Apple Events needed). */
+async function finderWindow(): Promise<void> {
+  const dir = mkdtempSync(join(tmpdir(), 'tudu-finder-'));
+  spawnSync('open', [dir]);
+  const until = Date.now() + 5000;
+  while (Date.now() < until) {
+    if (frontApp() === BUNDLES.Finder) return;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error('Finder never showed its window');
+}
+
+/** The desk closed and Tudu out of the Dock, then a moment more for macOS to bring the next app forward. */
+async function closeDesk(app: App): Promise<AppState> {
+  await app.act('close', { window: 'main' });
+  await app.waitState((s) => !s.windows.main.visible && s.background.policy === 'accessory');
+  let s = await app.state();
+  for (let i = 0; i < 10; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+    s = await app.state();
+    expect(s.windows.note.visible, 'the note window stays shown').toBe(true);
+  }
+  return s;
+}
+
+/** The note window in front of the other apps' windows, and how many system windows still sit above it. */
+async function noteInFront(app: App): Promise<number> {
+  const s = await app.waitState((x) => x.windows.note.visible && x.note.othersAhead !== null);
+  return s.note.othersAhead!;
+}
+
 /** Settings › Appearance on the desk: pick a theme and wait for the app to keep it. */
 async function pickTheme(app: App, label: 'Light' | 'Dark'): Promise<void> {
   const open = await app.eval<boolean>(
@@ -151,6 +185,25 @@ test.describe('chunk 22 · the note window', () => {
     expect(near(s.windows.note.y, place.y)).toBe(true);
     expect(near(s.windows.note.width, 640)).toBe(true);
     expect(near(s.windows.note.height, 480)).toBe(true);
+  });
+
+  test('C22-D45 the note window stays in front when the desk is opened and closed again (#91)', async ({
+    app,
+  }) => {
+    await signIn(app);
+    await finderWindow();
+    await openNote(app);
+    const before = await noteInFront(app);
+    const was = (await app.state()).windows.note;
+    await app.act('reopen');
+    await app.waitState((x) => x.windows.main.visible && x.background.policy === 'regular');
+    const s = await closeDesk(app);
+    console.log(`C22-D45 others ahead of the note window: ${before} before, ${s.note.othersAhead} after`);
+    expect(s.windows.main.visible).toBe(false);
+    expect(s.note.othersAhead, 'no other app’s window came in front of it').toBe(before);
+    expect(near(s.windows.note.x, was.x) && near(s.windows.note.y, was.y)).toBe(true);
+    expect(near(s.windows.note.width, was.width) && near(s.windows.note.height, was.height)).toBe(true);
+    expect(s.note.state.pinned).toBe(false);
   });
 
   test('C22-D03 pin keeps it on top and starts off; fill the screen and back', async ({ app }) => {
