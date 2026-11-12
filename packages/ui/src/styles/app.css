@@ -732,8 +732,6 @@
 .tp-root .tp-fb-shot {
   position: relative;
   margin: 0;
-  /* Room for the accent ring when it's shown on the issue: the fold clips what's outside. */
-  padding: 3px;
   transform: none;
   transition: transform 280ms var(--ease-change);
 }
@@ -856,70 +854,48 @@
   flex: 1;
 }
 
-/* "Show it on the public issue" (K-FeedbackShot): a row under the screenshot, inside its fold. On, a Public pill
-   fades onto the preview's corner, the frame takes the accent ring, and the sub line crossfades. */
-.tp-root .tp-fb-shot-img {
-  transition: box-shadow 220ms var(--ease-change);
-}
-.tp-root .tp-fb-shot.tp-shown .tp-fb-shot-img {
-  box-shadow:
-    inset 0 0 0 1px var(--border-strong),
-    0 0 0 3px var(--accent);
-}
-.tp-root .tp-fb-pill {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 22px;
-  padding: 0 8px 0 7px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--foreground) 78%, transparent);
-  color: var(--background);
-  font-size: 11.5px;
-  font-weight: 500;
-  opacity: 0;
-  transform: translateY(-3px) scale(0.92);
-  transition:
-    opacity 180ms var(--ease-change),
-    transform 220ms var(--ease-arrive);
-  pointer-events: none;
-}
-.tp-root .tp-fb-shot.tp-shown .tp-fb-pill {
-  opacity: 1;
-  transform: none;
-}
-.tp-root .tp-fb-shotrow.tp-setrow {
-  margin-top: 12px;
-  padding: 10px 0 0;
-  border-top: 1px solid var(--line);
-}
-.tp-root .tp-fb-shotrow.tp-cant .tp-setrow-l {
-  color: var(--muted-foreground);
-}
-.tp-root .tp-fb-sub {
+/* "File it as a public issue" (K-FeedbackPrivacy): two lines share one grid cell and crossfade when the switch
+   flips (160ms), in the head and under the row. A public screenshot shows a warning "as it is" line; HEIC a lock line. */
+.tp-root .tp-fb-xf {
   display: grid;
 }
-.tp-root .tp-fb-sub > span {
+.tp-root .tp-fb-xf > span {
   grid-area: 1 / 1;
   transition:
     opacity 160ms var(--ease-change),
     transform 200ms var(--ease-arrive);
 }
-.tp-root .tp-fb-sub-on {
+.tp-root .tp-fb-xf-b {
   opacity: 0;
   transform: translateY(3px);
 }
-.tp-root .tp-fb-sub.tp-on .tp-fb-sub-off {
+.tp-root .tp-fb-xf.tp-alt .tp-fb-xf-a {
   opacity: 0;
   transform: translateY(-3px);
 }
-.tp-root .tp-fb-sub.tp-on .tp-fb-sub-on {
+.tp-root .tp-fb-xf.tp-alt .tp-fb-xf-b {
   opacity: 1;
   transform: none;
+}
+.tp-root .tp-fb-asis {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 17px;
+  color: var(--muted-foreground);
+}
+.tp-root .tp-fb-asis svg {
+  flex: none;
+  margin-top: 2px;
+}
+.tp-root .tp-fb-asis.tp-warn {
+  color: var(--warning);
+}
+.tp-root .tp-fb-pubrow.tp-setrow {
+  padding: 10px 0 0;
+  border-top: 1px solid var(--line);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -928,8 +904,7 @@
   .tp-root .tp-fb-shot-img,
   .tp-root .tp-fb-shot-img img,
   .tp-root .tp-fb-shot-img::before,
-  .tp-root .tp-fb-pill,
-  .tp-root .tp-fb-sub > span,
+  .tp-root .tp-fb-xf > span,
   .tp-fb-drop {
     transition: none;
     animation: none;
@@ -1006,8 +981,20 @@
   background: var(--accent);
   color: var(--foreground);
 }
+/* Off: the footer's quiet lock line. Not a button, so no hover or pointer. */
+.tp-root .tp-fb-pub.tp-fb-team {
+  cursor: default;
+}
+.tp-root .tp-fb-pub.tp-fb-team span {
+  text-decoration: none;
+}
+.tp-root .tp-fb-pub.tp-fb-team:hover {
+  background: transparent;
+  color: var(--muted-foreground);
+}
 .tp-root.tp-fb-pop {
-  z-index: 60;
+  /* Above the dialog's layer (75), which it opens from; below toasts (100). */
+  z-index: 80;
   width: 300px;
   max-width: calc(100vw - 16px);
   box-sizing: border-box;
@@ -1063,6 +1050,17 @@
   border-top: 1px solid var(--line);
   font-size: 12.5px;
   color: var(--muted-foreground);
+}
+.tp-root.tp-fb-pop li em {
+  display: block;
+  font-style: normal;
+  font-size: 12.5px;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+}
+.tp-root.tp-fb-pop p b {
+  font-weight: 500;
+  color: var(--foreground);
 }
 @keyframes tp-fb-pop-in {
   from {
@@ -1943,9 +1941,6 @@
   text-underline-offset: 3px;
   text-decoration-color: var(--border-strong);
   cursor: pointer;
-}
-.tp-root .tp-fb-check {
-  color: var(--warning);
 }
 .tp-root .tp-fbr-a .tp-fbr-plus {
   font-style: normal;

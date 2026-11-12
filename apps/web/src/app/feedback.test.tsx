@@ -70,6 +70,7 @@ const report = (text = 'The tick came back'): FeedbackReport => ({
   text,
   details: null,
   shotPublic: false,
+  public: true,
   plusOneOf: null,
 });
 const queued = (r = report(), shot = true): QueuedReport => ({
@@ -116,12 +117,12 @@ describe('C19-U05 the queue', () => {
     up = true;
     await new FeedbackQueue(store, send).flush();
     expect(sent.at(-1)!.report.text).toBe('Third');
-    // The choice to show the screenshot on the issue waits with it.
+    // The choice to file it in public, and to show the screenshot there, waits with it.
     up = false;
-    await q.submit(queued({ ...report('Fourth'), shotPublic: true }), false);
+    await q.submit(queued({ ...report('Fourth'), shotPublic: true, public: false }), false);
     up = true;
     await new FeedbackQueue(store, send).flush();
-    expect(sent.at(-1)!.report).toMatchObject({ text: 'Fourth', shotPublic: true });
+    expect(sent.at(-1)!.report).toMatchObject({ text: 'Fourth', shotPublic: true, public: false });
   });
 
   it('C19-U05 a refusal for good (400) or too many this hour (429) is said, not queued; a queued one waits on 429 and 500', async () => {
@@ -284,7 +285,7 @@ describe('C19-U06 the draft and the details switch', () => {
     expect(box()).toHaveValue('');
   });
 
-  it('C19-U22 the report says whether to show the screenshot; a new PNG starts public, a HEIC private; off holds for that one; email only never asks', async () => {
+  it('C19-U22 shotPublic follows public and the kind: a PNG on a public report goes public, a HEIC doesn’t, no shot is false', async () => {
     const user = userEvent.setup();
     mine.answer = { filing: 'github', reports: [] };
     send.mockResolvedValue({ id: 'x', issue: ISSUE, pending: false });
@@ -292,36 +293,71 @@ describe('C19-U06 the draft and the details switch', () => {
     act(() => openFeedback());
     await screen.findByRole('button', { name: 'Public on GitHub: what’s shared' });
     const shot = (name: string, type = 'image/png') => new File([new Uint8Array(2048)], name, { type });
-    const sw = () => screen.getByRole('switch', { name: 'Show the screenshot on the public issue' });
-    await user.type(box(), 'Drag puts it back');
-    await user.upload(screen.getByLabelText('Choose a screenshot'), shot('One.png'));
-    await waitFor(() => expect(sw()).toBeInTheDocument());
+    expect(screen.queryByRole('switch', { name: 'Show the screenshot on the public issue' })).toBeNull();
+    const sendWith = async (words: string, file: File | null) => {
+      act(() => openFeedback());
+      await user.type(box(), words);
+      if (file) {
+        await user.upload(screen.getByLabelText('Choose a screenshot'), file);
+        await waitFor(() => expect(document.querySelector('.tp-fb-nm')).toHaveTextContent(file.name));
+      }
+      await user.click(screen.getByRole('button', { name: 'Send' }));
+      await user.click(await screen.findByRole('button', { name: 'Done' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      return (send.mock.calls.at(-1)![0] as QueuedReport).report;
+    };
+    expect(await sendWith('Drag puts it back', shot('One.png'))).toMatchObject({
+      public: true,
+      shotPublic: true,
+    });
+    expect(await sendWith('Again on the phone', shot('IMG.heic', 'image/heic'))).toMatchObject({
+      public: true,
+      shotPublic: false,
+    });
+    expect(await sendWith('No shot this time', null)).toMatchObject({ public: true, shotPublic: false });
+  });
+
+  it('C19-U38 public off drops a picked +1 and stops similar looks; it holds through a close; a send starts the next one on', async () => {
+    const user = userEvent.setup();
+    mine.answer = { filing: 'github', reports: [] };
+    similar.answer = { issues: [JIRA] };
+    send.mockResolvedValue({ id: 'x', issue: null, pending: false });
+    mount();
+    act(() => openFeedback());
+    await screen.findByRole('button', { name: 'Public on GitHub: what’s shared' });
+    await user.type(box(), 'Jira count says 1');
+    await user.click(await screen.findByRole('button', { name: '+1 #64 instead of a new issue' }));
+    expect(screen.getByRole('button', { name: /\+1 on #64/ })).toBeInTheDocument();
+    const sw = () => screen.getByRole('switch', { name: 'File it as a public issue' });
     expect(sw()).toBeChecked();
     await user.click(sw());
     expect(sw()).not.toBeChecked();
-    // Another screenshot: public again; off held for the first one only.
-    await user.upload(screen.getByLabelText('Choose a screenshot'), shot('Two.png'));
-    await waitFor(() => expect(document.querySelector('.tp-fb-nm')).toHaveTextContent('Two.png'));
-    expect(sw()).toBeChecked();
-    // A kind GitHub can't show comes in private, and stays so.
-    await user.upload(screen.getByLabelText('Choose a screenshot'), shot('IMG.heic', 'image/heic'));
-    await waitFor(() => expect(document.querySelector('.tp-fb-nm')).toHaveTextContent('IMG.heic'));
+    expect(screen.getByRole('button', { name: /^Send$/ })).toBeInTheDocument();
+    const looks = similar.looks.length;
+    await user.type(box(), ' after a reload');
+    await new Promise((r) => setTimeout(r, 600));
+    expect(similar.looks).toHaveLength(looks);
+    // Closed and opened again: still off, words kept.
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    act(() => openFeedback());
     expect(sw()).not.toBeChecked();
-    expect(sw()).toBeDisabled();
-    await user.upload(screen.getByLabelText('Choose a screenshot'), shot('Three.png'));
-    await waitFor(() => expect(document.querySelector('.tp-fb-nm')).toHaveTextContent('Three.png'));
+    expect(box()).toHaveValue('Jira count says 1 after a reload');
+    await user.upload(
+      screen.getByLabelText('Choose a screenshot'),
+      new File([new Uint8Array(2048)], 'One.png', { type: 'image/png' }),
+    );
+    await waitFor(() => expect(document.querySelector('.tp-fb-nm')).toHaveTextContent('One.png'));
     await user.click(screen.getByRole('button', { name: 'Send' }));
     await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
-    expect((send.mock.calls[0]![0] as QueuedReport).report.shotPublic).toBe(true);
-    await user.click(await screen.findByRole('button', { name: 'Done' }));
+    expect((send.mock.calls[0]![0] as QueuedReport).report).toMatchObject({
+      public: false,
+      shotPublic: false,
+      plusOneOf: null,
+    });
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    // Sent and cleared: the next draft has no screenshot, so nothing to show.
     act(() => openFeedback());
-    expect(screen.queryByRole('switch', { name: 'Show the screenshot on the public issue' })).toBeNull();
-    await user.type(box(), 'No shot this time');
-    await user.click(screen.getByRole('button', { name: 'Send' }));
-    await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
-    expect((send.mock.calls[1]![0] as QueuedReport).report.shotPublic).toBe(false);
+    expect(sw()).toBeChecked();
   });
 
   it('C19-U32 similar looks: none under three words; one 450ms after the last key; a newer look aborts the older; rows stay dimmed while the next comes', async () => {

@@ -577,7 +577,7 @@ export const feedback = pgTable(
     text: text('text').notNull(),
     details: jsonb('details').$type<Record<string, unknown>>(),
     screenshotKey: text('screenshot_key'),
-    /** Its sender switched on "Show it on the public issue": the issue embeds it and Tudu serves it to anyone. */
+    /** It went on a public issue (filed public, a kind GitHub shows): the issue embeds it and Tudu serves it to anyone. */
     screenshotPublic: boolean('screenshot_public').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     /**

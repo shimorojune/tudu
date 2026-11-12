@@ -12,6 +12,8 @@ export interface DialogProps {
   label?: string;
   /** A quiet line under the title. */
   sub?: ReactNode;
+  /** What screen readers hear for `sub` when it isn't plain text. */
+  description?: string;
   icon?: ReactNode;
   /** Buttons; a quiet line on the left. */
   footer?: ReactNode;
@@ -179,7 +181,7 @@ export function Dialog(props: DialogProps) {
           {title ? null : <RadixDialog.Title className="sr-only">{label ?? 'Dialog'}</RadixDialog.Title>}
           {title ? <RadixDialog.Title className="sr-only">{title}</RadixDialog.Title> : null}
           <RadixDialog.Description className="sr-only">
-            {typeof props.sub === 'string' ? props.sub : ''}
+            {props.description ?? (typeof props.sub === 'string' ? props.sub : '')}
           </RadixDialog.Description>
         </div>
       </RadixDialog.Portal>

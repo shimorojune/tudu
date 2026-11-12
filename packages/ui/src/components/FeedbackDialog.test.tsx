@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { shotCanBePublic, type FeedbackKind, type SimilarIssue } from '@tudu/core';
+import { type FeedbackKind, type SimilarIssue } from '@tudu/core';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { AccountMenu } from './AccountMenu';
@@ -15,7 +15,7 @@ function Form({
   const [kind, setKind] = useState<FeedbackKind>('bug');
   const [text, setText] = useState('');
   const [shot, setShot] = useState<File | null>(null);
-  const [shotPublic, setShotPublic] = useState(false);
+  const [pub, setPub] = useState(true);
   const [details, setDetails] = useState(true);
   return (
     <FeedbackDialog
@@ -25,13 +25,9 @@ function Form({
       text={text}
       onText={setText}
       shot={shot}
-      onShot={(f) => {
-        // As the app does: each new screenshot GitHub can show comes in public (#75).
-        setShot(f);
-        setShotPublic(!!f && shotCanBePublic(f.type));
-      }}
-      shotPublic={shotPublic}
-      onShotPublic={setShotPublic}
+      onShot={setShot}
+      public={pub}
+      onPublic={setPub}
       details={details}
       onDetails={setDetails}
       detailsLine="Tudu 0.38.0, macOS, the Today page. Never your tasks."
@@ -97,7 +93,7 @@ describe('FeedbackDialog (chunk 19)', () => {
       'placeholder',
       'What you’d like Tudu to do, and what it would save you. Leave out anything private.',
     );
-    expect(screen.getByText('Shown on the issue unless you hide it')).toBeInTheDocument();
+    expect(screen.getByText('or paste or drop one')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Public on GitHub: what’s shared' })).toBeInTheDocument();
     rerender(<Form onSend={onSend} filing="github" phase="sending" />);
     expect(screen.getByRole('button', { name: /Filing…/ })).toBeInTheDocument();
@@ -115,11 +111,13 @@ describe('FeedbackDialog (chunk 19)', () => {
     expect(pop).toHaveTextContent('What you write');
     expect(pop).toHaveTextContent('App details, when switched on: version, system, page, window, theme');
     expect(pop).toHaveTextContent('Your name and email (so we can reply)');
-    expect(pop).toHaveTextContent('The screenshot, unless you hide it');
-    expect(pop).toHaveTextContent('The screenshot, when you hide it');
+    expect(pop).toHaveTextContent('The screenshotExactly as you added it');
+    expect(pop.querySelector('.tp-fb-priv')).toHaveTextContent(/^Your name and email \(so we can reply\)$/);
     expect(pop).toHaveTextContent(
-      'Never sent anywhere: your tasks, notes, people or space names, except what a public screenshot shows.',
+      'Never sent anywhere: your tasks, notes, people or space names, except what your screenshot shows. Scramble my text, in your menu, hides your words before you take one.',
     );
+    // #39: the popover's layer sits over the dialog's, so it shows above the form, not under it.
+    expect(pop).toHaveClass('tp-fb-pop');
     await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'What’s shared' })).toBeNull());
     expect(screen.getByRole('dialog', { name: 'Send feedback' })).toBeInTheDocument();
@@ -271,67 +269,80 @@ describe('FeedbackDialog (chunk 19)', () => {
     expect(screen.getByText('or paste or drop one')).toBeInTheDocument();
   });
 
-  it('C19-U19 a screenshot brings "Show it on the public issue", on (#75): the Public pill, the ring and the check line; off says private', async () => {
+  it('C19-U19 a screenshot brings no switch, pill or ring; public, the as-it-is line shows (#67)', async () => {
     const user = userEvent.setup();
     render(<Form filing="github" />);
-    const row = () => screen.queryByRole('switch', { name: 'Show the screenshot on the public issue' });
-    const fig = () => document.querySelector('.tp-fb-shot')!;
-    const sub = () => document.querySelector('.tp-fb-sub')!;
-    // No screenshot, no switch.
-    expect(row()).toBeNull();
     await user.upload(screen.getByLabelText('Choose a screenshot'), image('Screenshot.png', 12));
-    await waitFor(() => expect(row()).not.toBeNull());
-    expect(row()).toHaveAttribute('aria-checked', 'true');
-    expect(row()).toBeEnabled();
-    expect(fig()).toHaveClass('tp-shown');
-    expect(sub()).toHaveClass('tp-on');
-    expect(sub()).toHaveTextContent('Public. Anyone can see it on GitHub. Check it shows nothing private.');
-    expect(document.querySelector('.tp-fb-check')).toHaveTextContent('Check it shows nothing private.');
-    expect(document.querySelector('.tp-fb-pill')).toHaveTextContent('Public');
-    await user.click(row()!);
-    expect(row()).toHaveAttribute('aria-checked', 'false');
-    expect(fig()).not.toHaveClass('tp-shown');
-    expect(sub()).not.toHaveClass('tp-on');
-    expect(sub()).toHaveTextContent('Private. Only the Tudu team sees it, with your report.');
-    // Another screenshot comes in public again: off held for that one only.
-    act(() => {
-      box().dispatchEvent(withFiles('paste', [image('Other.png', 3)]));
-    });
-    await waitFor(() => expect(caption()).toBe('Other.png3 KB'));
-    expect(row()).toHaveAttribute('aria-checked', 'true');
-    expect(fig()).toHaveClass('tp-shown');
-    // A kind GitHub can't show keeps the row, off and disabled, saying why.
+    await waitFor(() => expect(caption()).toBe('Screenshot.png12 KB'));
+    expect(screen.queryByRole('switch', { name: 'Show the screenshot on the public issue' })).toBeNull();
+    expect(document.querySelector('.tp-fb-pill')).toBeNull();
+    expect(document.querySelector('.tp-fb-shot')).not.toHaveClass('tp-shown');
+    expect(
+      screen.getByText('It goes on the issue as it is. Check it shows nothing private.'),
+    ).toBeInTheDocument();
+  });
+
+  it('C19-U36 the as-it-is line goes with public off; HEIC shows the lock line instead', async () => {
+    const user = userEvent.setup();
+    render(<Form filing="github" />);
+    const asis = 'It goes on the issue as it is. Check it shows nothing private.';
+    await user.upload(screen.getByLabelText('Choose a screenshot'), image('Screenshot.png', 12));
+    await waitFor(() => expect(caption()).toBe('Screenshot.png12 KB'));
+    expect(screen.getByText(asis)).toBeInTheDocument();
+    await user.click(screen.getByRole('switch', { name: 'File it as a public issue' }));
+    expect(screen.queryByText(asis)).toBeNull();
+    await user.click(screen.getByRole('switch', { name: 'File it as a public issue' }));
     act(() => {
       box().dispatchEvent(
         withFiles('paste', [new File([new Uint8Array(64)], 'IMG_2041.heic', { type: 'image/heic' })]),
       );
     });
     await waitFor(() => expect(caption()).toBe('IMG_2041.heic1 KB'));
-    expect(row()).toBeDisabled();
-    expect(row()).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByText(asis)).toBeNull();
     expect(
       screen.getByText('GitHub can’t show this kind of image. It stays with the team.'),
     ).toBeInTheDocument();
-    await user.click(row()!);
-    expect(row()).toHaveAttribute('aria-checked', 'false');
-    expect(fig()).not.toHaveClass('tp-shown');
   });
 
-  it('C19-U20 email only: a screenshot brings no switch and no pill; the hint is as before', async () => {
+  it('C19-U35 the public row is last and on; off swaps the head line and footer, folds Already reported, Send stays Send', async () => {
+    const user = userEvent.setup();
+    render(<Form filing="github" similar={{ state: 'ready', issues: SIMILAR }} />);
+    const sw = screen.getByRole('switch', { name: 'File it as a public issue' });
+    expect(sw).toBeChecked();
+    const rows = [...document.querySelectorAll('.tp-fb .tp-setrow')];
+    expect(rows[rows.length - 1]).toHaveClass('tp-fb-pubrow');
+    expect(screen.getByText('On GitHub, where you can follow it and others can +1.')).toBeInTheDocument();
+    expect(screen.getByTestId('similar-reports')).toBeInTheDocument();
+    await user.click(sw);
+    expect(sw).not.toBeChecked();
+    expect(document.querySelector('.tp-fb-xf')).toHaveClass('tp-alt');
+    expect(screen.getByRole('dialog', { name: 'Send feedback' })).toHaveAccessibleDescription(
+      'It goes straight to the people who make Tudu, by email.',
+    );
+    expect(screen.queryByRole('button', { name: 'Public on GitHub: what’s shared' })).toBeNull();
+    expect(screen.getByText('Only the Tudu team')).toBeInTheDocument();
+    expect(box().getAttribute('placeholder')).not.toContain('Leave out anything private.');
+    expect(screen.getByTestId('similar-reports')).toHaveClass('tp-hide');
+    expect(screen.getByRole('button', { name: /^Send$/ })).toBeInTheDocument();
+  });
+
+  it('C19-U20 email only: no public row, no as-it-is line; the hint is as before', async () => {
     const user = userEvent.setup();
     render(<Form filing="email" />);
     expect(screen.getByText('or paste or drop one')).toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'File it as a public issue' })).toBeNull();
     await user.upload(screen.getByLabelText('Choose a screenshot'), image('Screenshot.png', 12));
     await waitFor(() => expect(caption()).toBe('Screenshot.png12 KB'));
-    expect(screen.queryByRole('switch', { name: 'Show the screenshot on the public issue' })).toBeNull();
-    expect(document.querySelector('.tp-fb-shot')).not.toHaveClass('tp-shown');
+    expect(screen.queryByText(/as it is/)).toBeNull();
   });
 
-  it('C19-U21 the hint by Add a screenshot says it’s shown on the issue unless you hide it', () => {
-    render(<Form filing="github" />);
-    expect(screen.getByText('Shown on the issue unless you hide it')).toBeInTheDocument();
-    expect(screen.queryByText('Private unless you show it')).toBeNull();
-    expect(screen.queryByText('Only the Tudu team sees it')).toBeNull();
+  it('C19-U21 the hint by Add a screenshot is plain; C19-U37 it reads "Your text is scrambled" while the mode is on', () => {
+    const { rerender } = render(<Form filing="github" />);
+    expect(screen.getByText('or paste or drop one')).toBeInTheDocument();
+    expect(screen.queryByText('Shown on the issue unless you hide it')).toBeNull();
+    rerender(<Form filing="github" scrambled />);
+    expect(screen.getByText('Your text is scrambled')).toBeInTheDocument();
+    expect(screen.queryByText('or paste or drop one')).toBeNull();
   });
 
   it('C19-U01 the avatar menu has Send feedback between Settings and Sign out', async () => {

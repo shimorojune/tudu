@@ -35,6 +35,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Shuffle,
   Send,
   SlidersVertical,
   Trash2,
@@ -107,6 +108,8 @@ export const ICONS = {
   key: Key,
   /** Copy a value (a key, a command). */
   copy: Copy,
+  /** Scramble my text, in the avatar menu and the top bar's Scrambled pill. */
+  shuffle: Shuffle,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

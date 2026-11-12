@@ -162,7 +162,7 @@ async function shotFlow(page: Page) {
   await expect(f.locator('.tp-fb-shot-img')).toHaveClass(/tp-ready/);
   await f.getByRole('button', { name: 'Remove the screenshot' }).click();
   await expect(caption(f)).toHaveCount(0);
-  await expect(f.getByText('Shown on the issue unless you hide it')).toBeVisible();
+  await expect(f.getByText('or paste or drop one')).toBeVisible();
   await pickShot(page, f, 'Board.png');
   await sendIt(page, f, `With a picture ${marker}`);
   const mail = await oneMail(page, marker);
@@ -346,24 +346,30 @@ test.describe('send feedback', () => {
           expect(l.getByRole('button', { name: 'Public on GitHub: what’s shared' })).toBeVisible(),
       ],
       [
-        'Send feedback, screenshot shown on the issue',
+        'Send feedback, public with a screenshot',
         async (l: Locator) => {
+          await expect(l.getByRole('switch', { name: 'File it as a public issue' })).toBeChecked();
           await expect(
             l.getByRole('switch', { name: 'Show the screenshot on the public issue' }),
-          ).toBeChecked();
-          await expect(l.locator('.tp-fb-shot')).toHaveClass(/tp-shown/);
+          ).toHaveCount(0);
           await expect(l.locator('.tp-fb-shot-img')).toHaveClass(/tp-ready/);
-          await expect(l.getByText('Check it shows nothing private.')).toBeVisible();
+          await expect(
+            l.getByText('It goes on the issue as it is. Check it shows nothing private.'),
+          ).toBeVisible();
         },
       ],
       [
-        'Send feedback, screenshot kept private',
+        'Send feedback, not a public issue',
         async (l: Locator) => {
-          const sw = l.getByRole('switch', { name: 'Show the screenshot on the public issue' });
-          await expect(sw).not.toBeChecked();
-          await expect(sw).toBeEnabled();
-          await expect(l.locator('.tp-fb-shot')).not.toHaveClass(/tp-shown/);
+          await expect(l.getByRole('switch', { name: 'File it as a public issue' })).not.toBeChecked();
+          await expect(l.getByText('Only the Tudu team')).toBeVisible();
+          await expect(l.getByRole('button', { name: 'Public on GitHub: what’s shared' })).toHaveCount(0);
+          await expect(l.getByText(/as it is/)).toHaveCount(0);
         },
+      ],
+      [
+        'Send feedback, text scrambled',
+        (l: Locator) => expect(l.getByText('Your text is scrambled')).toBeVisible(),
       ],
       [
         'Send feedback, checking for similar reports',
@@ -400,9 +406,6 @@ test.describe('send feedback', () => {
       [
         'Send feedback, screenshot GitHub can’t show',
         async (l: Locator) => {
-          await expect(
-            l.getByRole('switch', { name: 'Show the screenshot on the public issue' }),
-          ).toBeDisabled();
           await expect(
             l.getByText('GitHub can’t show this kind of image. It stays with the team.'),
           ).toBeVisible();
@@ -516,28 +519,34 @@ test.describe('send feedback', () => {
     await expect(link).toHaveAttribute('href', `https://github.com/shimorojune/tudu/issues/${issue.number}`);
   });
 
-  test('C19-E12 Public on GitHub lists what is public and what stays with the team; the screenshot hint says so', async ({
+  test('C19-E12 Public on GitHub opens above the form, the topmost thing where it shows; it lists what is public and what stays with the team', async ({
     page,
   }) => {
     test.skip(!desktop(), 'the same form on every size');
     await signInFresh(page);
     const f = await openByBug(page);
-    await expect(f.getByText('Shown on the issue unless you hide it')).toBeVisible();
+    await expect(f.getByText('or paste or drop one')).toBeVisible();
     await expect(words(f)).toHaveAttribute('placeholder', /Leave out anything private\.$/);
     await words(f).fill('Kept while I look');
     await f.getByRole('button', { name: 'Public on GitHub: what’s shared' }).click();
     const pop = page.getByRole('dialog', { name: 'What’s shared' });
     await expect(pop).toBeVisible();
+    // #39: not just visible, but on top. Under the dialog's layer it was there and could not be seen.
+    const onTop = await pop.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return !!hit && el.contains(hit);
+    });
+    expect(onTop).toBe(true);
     await expect(pop.getByRole('listitem')).toHaveText([
       'What you write',
       'Bug or idea',
       'App details, when switched on: version, system, page, window, theme',
-      'The screenshot, unless you hide it',
+      'The screenshotExactly as you added it',
       'Your name and email (so we can reply)',
-      'The screenshot, when you hide it',
     ]);
     await expect(pop).toContainText(
-      'Never sent anywhere: your tasks, notes, people or space names, except what a public screenshot shows.',
+      'Never sent anywhere: your tasks, notes, people or space names, except what your screenshot shows. Scramble my text, in your menu, hides your words before you take one.',
     );
     await page.keyboard.press('Escape');
     await expect(pop).toHaveCount(0);
@@ -580,7 +589,7 @@ test.describe('send feedback', () => {
     if (copied !== null) expect(copied).toBe(`https://github.com/shimorojune/tudu/issues/${n}`);
   });
 
-  test('C19-E15 switched off and on again, the issue shows the screenshot: its link serves the same bytes to a cookieless request', async ({
+  test('C19-E15 a public report shows the screenshot: its link serves the same bytes to a cookieless request', async ({
     page,
   }) => {
     test.skip(!desktop(), 'the same form on every size');
@@ -588,16 +597,7 @@ test.describe('send feedback', () => {
     const marker = `e15-${crypto.randomUUID()}`;
     const f = await openByBug(page);
     await pickShot(page, f, 'Public.png');
-    const sw = f.getByRole('switch', { name: 'Show the screenshot on the public issue' });
-    await expect(sw).toBeChecked();
-    await sw.click();
-    await expect(sw).not.toBeChecked();
-    await expect(f.getByText('Private. Only the Tudu team sees it, with your report.')).toBeVisible();
-    await sw.click();
-    await expect(sw).toBeChecked();
-    await expect(f.locator('.tp-fb-shot')).toHaveClass(/tp-shown/);
-    await expect(f.locator('.tp-fb-pill')).toHaveText('Public');
-    await expect(f.getByText(/^Public\. Anyone can see it on GitHub\./)).toBeVisible();
+    await expect(f.getByRole('switch', { name: 'File it as a public issue' })).toBeChecked();
     await sendIt(page, f, `Shown on the issue ${marker}`);
     const issue = await oneIssue(page, marker);
     const link = /!\[Screenshot\]\(([^)]+)\)/.exec(issue.body)?.[1];
@@ -614,43 +614,54 @@ test.describe('send feedback', () => {
     expect(mail.attachments?.map((a) => a.filename)).toEqual(['Public.png']);
   });
 
-  test('C19-E16 switched off, the issue has no screenshot; the mail still attaches it', async ({ page }) => {
+  test('C19-E16 public off with a PNG: no issue at all; the mail attaches it and says email only', async ({
+    page,
+  }) => {
     test.skip(!desktop(), 'the same form on every size');
     await signInFresh(page);
     const marker = `e16-${crypto.randomUUID()}`;
     const f = await openByBug(page);
     await pickShot(page, f, 'Private.png');
-    const sw = f.getByRole('switch', { name: 'Show the screenshot on the public issue' });
-    await expect(sw).toBeChecked();
-    await sw.click();
-    await expect(sw).not.toBeChecked();
-    await sendIt(page, f, `Kept private ${marker}`);
-    const issue = await oneIssue(page, marker);
-    expect(issue.body).not.toContain('Screenshot');
-    expect(issue.body).not.toContain('/api/feedback/shots/');
+    await f.getByRole('switch', { name: 'File it as a public issue' }).click();
+    await expect(f.getByText(/as it is/)).toHaveCount(0);
+    await words(f).fill(`Kept private ${marker}`);
+    await f.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(anyDialog(page)).toHaveCount(0);
+    await expect(toast(page)).toContainText('Thanks. That’s with the Tudu team now.');
     const mail = await oneMail(page, marker);
+    expect(mail.text).toContain('Email only: they chose not to file it as a public GitHub issue.');
     expect(mail.text).toContain('Screenshot: Private.png (attached, private)');
     expect(mail.attachments?.map((a) => [a.filename, a.type, a.size])).toEqual([
       ['Private.png', 'image/png', PNG.length],
     ]);
+    expect(await issuesAbout(page, marker)).toHaveLength(0);
   });
 
-  test('C19-E17 switched off, then the screenshot removed and another added: the switch is on again', async ({
+  test('C19-E23 public off: Already reported folds shut; sent, Your reports says Sent by email; nothing on GitHub', async ({
     page,
   }) => {
     test.skip(!desktop(), 'the same form on every size');
     await signInFresh(page);
+    const marker = `e23-${crypto.randomUUID()}`;
     const f = await openByBug(page);
-    await expect(f.getByRole('switch', { name: 'Show the screenshot on the public issue' })).toHaveCount(0);
-    await pickShot(page, f, 'First.png');
-    const sw = f.getByRole('switch', { name: 'Show the screenshot on the public issue' });
+    const sw = f.getByRole('switch', { name: 'File it as a public issue' });
+    await expect(sw).toBeChecked();
     await sw.click();
     await expect(sw).not.toBeChecked();
-    await f.getByRole('button', { name: 'Remove the screenshot' }).click();
-    await expect(caption(f)).toHaveCount(0);
-    await pickShot(page, f, 'Second.png');
-    await expect(sw).toBeChecked();
-    await expect(f.locator('.tp-fb-shot')).toHaveClass(/tp-shown/);
+    await expect(f.getByText('It goes straight to the people who make Tudu, by email.')).toBeVisible();
+    await expect(f.getByText('Only the Tudu team')).toBeVisible();
+    await expect(f.getByTestId('similar-reports')).toHaveClass(/tp-hide/);
+    await words(f).fill(`Only for the team ${marker}`);
+    await f.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(anyDialog(page)).toHaveCount(0);
+    await oneMail(page, marker);
+    expect(await issuesAbout(page, marker)).toHaveLength(0);
+    const again = await openByBug(page);
+    await expect(again.getByRole('switch', { name: 'File it as a public issue' })).toBeChecked();
+    await again.getByRole('button', { name: /^Your reports/ }).click();
+    const list = page.getByRole('dialog', { name: 'Your reports' });
+    await expect(list.getByText(/Only for the team/)).toBeVisible();
+    await expect(list).toContainText('Sent by email');
   });
 });
 
@@ -797,16 +808,16 @@ test.describe('already reported? (#76)', () => {
     }
   });
 
-  test('C19-E22 a PNG starts public: the switch is on and the pill shows; the issue embeds it', async ({
+  test('C19-E22 C19-E24 a PNG on a public report: the as-it-is line shows before Send; the issue embeds it', async ({
     page,
   }) => {
     await signInFresh(page);
     const marker = `e22-${crypto.randomUUID()}`;
     const f = await openByBug(page);
     await pickShot(page, f, 'Default.png');
-    await expect(f.getByRole('switch', { name: 'Show the screenshot on the public issue' })).toBeChecked();
-    await expect(f.locator('.tp-fb-pill')).toHaveText('Public');
-    await expect(f.getByText('Check it shows nothing private.')).toBeVisible();
+    await expect(f.getByRole('switch', { name: 'Show the screenshot on the public issue' })).toHaveCount(0);
+    await expect(f.locator('.tp-fb-pill')).toHaveCount(0);
+    await expect(f.getByText('It goes on the issue as it is. Check it shows nothing private.')).toBeVisible();
     await sendIt(page, f, `Public by default ${marker}`);
     const issue = await oneIssue(page, marker);
     expect(issue.body).toMatch(/!\[Screenshot\]\([^)]+\/api\/feedback\/shots\//);
