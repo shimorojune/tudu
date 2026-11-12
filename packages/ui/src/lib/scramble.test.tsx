@@ -59,7 +59,12 @@ describe('Scramble my text (chunk 23)', () => {
     expect(out).toContain('<b>' + scrambleText(Z, k) + '</b>');
     expect(out).toContain('data-id="1"');
     // The input is a string; nothing to mutate, and the same in gives the same out.
-    expect(scrambleHtml(html, k)).toBe(out);
+    expect(scrambleHtml(html, k)).toBe(out); // What comes out is cleaned again: nothing the cleaner wouldn't keep survives the round trip.
+    const bad = scrambleHtml(
+      '<p>a</p><img src=x onerror="alert(1)"><script>alert(1)</script><a href="javascript:alert(1)">x</a>',
+      k,
+    );
+    expect(bad).not.toMatch(/onerror|<script|<img|javascript:/i);
   });
 
   it('C23-U05 off by default; on writes a key and sets html[data-scrambled]; another window turns it on here; blocked storage still works', () => {

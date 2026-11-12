@@ -1,4 +1,4 @@
-import { scrambleText } from '@tudu/core';
+import { cleanHtml, scrambleText } from '@tudu/core';
 import { useCallback, useState, useSyncExternalStore, type FocusEvent } from 'react';
 import { fadeTheme } from './theme';
 
@@ -157,7 +157,8 @@ export function useMineField(
 /**
  * A copy of rich text (HTML) with every word jumbled: text nodes, and the names a file chip shows in its title. Tags,
  * marks, links, lists and checkboxes keep their shape, so the copy draws the same lines. Done on a detached document;
- * nothing in it runs.
+ * nothing in it runs. What comes out is cleaned again (`cleanHtml`), so the parse and re-serialise can never turn into
+ * markup the cleaner wouldn't keep: give it API-relative file links and add the file base after.
  */
 export function scrambleHtml(html: string, key: string): string {
   if (!html || typeof DOMParser === 'undefined') return html;
@@ -170,7 +171,7 @@ export function scrambleHtml(html: string, key: string): string {
       const v = el.getAttribute(a);
       if (v) el.setAttribute(a, scrambleText(v, key));
     }
-  return doc.body.innerHTML;
+  return cleanHtml(doc.body.innerHTML);
 }
 
 /** For tests: forget the cached mode. */

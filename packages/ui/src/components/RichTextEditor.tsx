@@ -857,7 +857,15 @@ export function RichTextEditor(p: RichTextEditorProps) {
               if (!p.readOnly) setPeek(true);
             }}
             dangerouslySetInnerHTML={{
-              __html: scrambleHtml(withFileBase(editor?.getHTML() ?? toHtml(p.value), p.fileBase), scr.key),
+              __html: withFileBase(
+                scrambleHtml(
+                  editor
+                    ? withoutFileBase(editor.getHTML(), p.fileBase)
+                    : upgradeChips(cleanHtml(toHtml(p.value))),
+                  scr.key,
+                ),
+                p.fileBase,
+              ),
             }}
           />
         </div>
@@ -885,11 +893,13 @@ export interface RichTextContentProps {
 /** The same writing, read-only (comments). The HTML is cleaned again here, so nothing but words ever renders. */
 export function RichTextContent({ html, compact, fileBase, className }: RichTextContentProps) {
   const scr = useScramble();
-  const clean = withFileBase(upgradeChips(cleanHtml(toHtml(html))), fileBase);
+  const clean = upgradeChips(cleanHtml(toHtml(html)));
   return (
     <div
       className={cx('tp-root tp-prose', compact && 'tp-compact', className)}
-      dangerouslySetInnerHTML={{ __html: scr.on ? scrambleHtml(clean, scr.key) : clean }}
+      dangerouslySetInnerHTML={{
+        __html: withFileBase(scr.on ? scrambleHtml(clean, scr.key) : clean, fileBase),
+      }}
     />
   );
 }
