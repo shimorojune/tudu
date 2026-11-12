@@ -72,6 +72,8 @@ describe('C22-U12 a folder row', () => {
     await user.clear(field);
     await user.type(field, 'House{Enter}');
     expect(onRenameFolder).toHaveBeenCalledWith(expect.objectContaining({ id: 'home' }), 'House');
+    // The menu lives outside the tree now: it still goes once it has left.
+    await waitFor(() => expect(screen.queryByRole('menu', { name: 'Home options' })).toBeNull());
     expect(screen.queryByRole('textbox', { name: 'Folder name' })).toBeNull();
 
     // A double-click on the name does the same; Esc goes back without a word.
@@ -108,6 +110,94 @@ describe('C22-U12 a folder row', () => {
     await user.click(within(folderRow('Northwind')).getByRole('button', { name: 'New folder in Northwind' }));
     await user.type(screen.getByRole('textbox', { name: 'Folder name' }), 'Hiring{Enter}');
     expect(onCreateFolder).toHaveBeenCalledWith('nw', 'Hiring');
+  });
+});
+
+describe('C22-U107 a folder’s ⋯ menu floats over the page (#92)', () => {
+  const openMenu = async (user: ReturnType<typeof userEvent.setup>, name: string) => {
+    await user.click(within(folderRow(name)).getByRole('button', { name: 'More' }));
+    return screen.getByRole('menu', { name: `${name} options` });
+  };
+
+  it('C22-U107 the menu of a folder inside folders is drawn outside the tree, where nothing clips it', async () => {
+    const { user } = setup();
+    const menu = await openMenu(user, 'Offsite');
+    expect(menu.closest('.tp-nb-kids')).toBeNull();
+    expect(screen.getByRole('navigation', { name: 'Notebook' })).not.toContainElement(menu);
+    const pop = menu.closest('.tp-nb-pop')!;
+    expect(pop).toHaveClass('tp-nb-pop-float', 'tp-root');
+    expect(pop.parentElement).toBe(document.body);
+    // Its row keeps its buttons showing while it is open.
+    expect(folderRow('Offsite')).toHaveClass('tp-nb-frow-busy');
+  });
+
+  it('C22-U107 a press on Rename inside it does not close it first: the name field appears', async () => {
+    const { user } = setup();
+    const menu = await openMenu(user, 'Offsite');
+    fireEvent.pointerDown(screen.getByRole('menuitem', { name: 'Rename' }));
+    expect(menu.closest('.tp-nb-pop')).not.toHaveClass('tp-nb-pop-leaving');
+    await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    expect(screen.getByRole('textbox', { name: 'Folder name' })).toHaveValue('Offsite');
+  });
+
+  it('C22-U107 a press on a menu item never lifts the folder’s row', async () => {
+    const { user } = setup();
+    await openMenu(user, 'Offsite');
+    fireEvent.pointerDown(screen.getByRole('menuitem', { name: 'Delete' }), {
+      pointerType: 'mouse',
+      button: 0,
+      clientX: 10,
+      clientY: 10,
+    });
+    fireEvent.pointerMove(document, { clientX: 60, clientY: 60 });
+    expect(document.querySelector('.tp-nb-ghost')).toBeNull();
+    expect(screen.getByRole('navigation', { name: 'Notebook' })).not.toHaveClass('tp-nb-carrying');
+    fireEvent.pointerUp(document, { clientX: 60, clientY: 60 });
+  });
+
+  it('C22-U107 a press elsewhere closes it, and so does Esc', async () => {
+    const { user } = setup();
+    await openMenu(user, 'Offsite');
+    fireEvent.pointerDown(document.body);
+    await waitFor(() => expect(screen.queryByRole('menu', { name: 'Offsite options' })).toBeNull());
+    await openMenu(user, 'Offsite');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('menu', { name: 'Offsite options' })).toBeNull());
+  });
+
+  it('C22-U107 scrolling the tree closes it, and so does a new window size', async () => {
+    const { user } = setup();
+    await openMenu(user, 'Offsite');
+    fireEvent.scroll(document.querySelector('.tp-nb-tree-scroll')!);
+    await waitFor(() => expect(screen.queryByRole('menu', { name: 'Offsite options' })).toBeNull());
+    await openMenu(user, 'Offsite');
+    fireEvent(window, new Event('resize'));
+    await waitFor(() => expect(screen.queryByRole('menu', { name: 'Offsite options' })).toBeNull());
+  });
+
+  it('C22-U107 opening another folder’s menu closes the first: one menu at a time', async () => {
+    const { user } = setup();
+    await openMenu(user, 'Offsite');
+    await openMenu(user, 'Home');
+    await waitFor(() => expect(screen.queryByRole('menu', { name: 'Offsite options' })).toBeNull());
+    expect(screen.getByRole('menu', { name: 'Home options' })).toBeInTheDocument();
+  });
+});
+
+describe('C22-U108 the name gives way to as many buttons as the row shows (#93)', () => {
+  const acts = (name: string) => folderRow(name).style.getPropertyValue('--nb-acts');
+
+  it('C22-U108 three on the first two levels, two on the third', () => {
+    setup();
+    expect(acts('Northwind')).toBe('3');
+    expect(acts('Planning')).toBe('3');
+    expect(acts('Offsite')).toBe('2');
+  });
+
+  it('C22-U108 one when the tree can make neither folders nor notes', () => {
+    setup({ onCreateFolder: undefined, onNewNote: undefined });
+    expect(acts('Northwind')).toBe('1');
+    expect(acts('Offsite')).toBe('1');
   });
 });
 

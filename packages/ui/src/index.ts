@@ -376,6 +376,7 @@ export {
   NoteTaskChip,
   NotePicker,
   NotePop,
+  placePop,
   SaveState,
   noteLabel,
   reducedMotion,

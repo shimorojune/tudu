@@ -1470,6 +1470,168 @@ async function inkOf(page: Page, fileId: string): Promise<number> {
   }, `data:image/png;base64,${b64}`);
 }
 
+test.describe('notebook folder rows (#92, #93)', () => {
+  // Folder names stop at 80 characters.
+  const LONG = 'Improve usability of the onboarding checklist for every new workspace admin';
+  const LONGER = 'Follow ups from the research interviews with people who gave up half way';
+
+  /** Open a folder that is shut. */
+  async function unfold(page: Page, name: string): Promise<void> {
+    const r = folderRow(page, name);
+    if ((await r.getAttribute('aria-expanded')) !== 'true') await r.locator('.tp-nb-ftog').click();
+    await expect(r).toHaveAttribute('aria-expanded', 'true');
+  }
+
+  /** Whether `item` is the thing painted at its own centre: nothing clips it and nothing covers it. */
+  const onTop = (item: Locator) =>
+    item.evaluate((el) => {
+      const b = el.getBoundingClientRect();
+      const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+      return !!hit && (hit === el || el.contains(hit));
+    });
+
+  test('C22-E91 the ⋯ menu of a folder inside a folder shows Rename and Delete in full, and Delete works', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    const features = await seedFolder(page, 'Features');
+    await seedFolder(page, 'Checklist', features);
+    await seedNote(page, 'Scratchpad');
+    await openNotebook(page);
+    await unfold(page, 'Features');
+    await folderRow(page, 'Checklist').hover();
+    await folderRow(page, 'Checklist').getByRole('button', { name: 'More' }).click();
+    const menu = page.getByRole('menu', { name: 'Checklist options' });
+    await expect(menu).toBeVisible();
+    // Over the page, not inside the folded box of its parent (that box clips).
+    expect(await menu.evaluate((el) => !!el.closest('.tp-nb-kids'))).toBe(false);
+    const view = page.viewportSize()!;
+    for (const name of ['Rename', 'Delete']) {
+      const item = menu.getByRole('menuitem', { name });
+      await expect(item).toBeInViewport({ ratio: 1 });
+      const b = (await item.boundingBox())!;
+      expect(b.y + b.height).toBeLessThanOrEqual(view.height);
+      await expect.poll(() => onTop(item)).toBe(true);
+    }
+    // It hangs from its button: right edges in line, just below it.
+    const btn = (await folderRow(page, 'Checklist').getByRole('button', { name: 'More' }).boundingBox())!;
+    const m = (await menu.boundingBox())!;
+    expect(Math.abs(m.x + m.width - (btn.x + btn.width))).toBeLessThanOrEqual(1);
+    expect(m.y).toBeGreaterThanOrEqual(btn.y + btn.height);
+    await menu.getByRole('menuitem', { name: 'Delete' }).click();
+    const ask = page.getByRole('dialog', { name: 'Delete “Checklist”?' });
+    await expect(ask).toBeVisible();
+    await expect(menu).toHaveCount(0);
+    await ask.getByRole('button', { name: 'Delete' }).click();
+    await expect(folderRow(page, 'Checklist')).toHaveCount(0);
+  });
+
+  test('C22-E92 at the foot of a long tree the ⋯ menu opens upward, whole; scrolling the tree closes it', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    for (let i = 1; i <= 34; i++) await seedFolder(page, `Folder ${String(i).padStart(2, '0')}`);
+    await openNotebook(page);
+    const scroller = tree(page).locator('.tp-nb-tree-scroll');
+    await expect(folderRow(page, 'Folder 01')).toBeVisible();
+    expect(await scroller.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+    await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+    // The last row in the tree, whichever way the folders are ordered.
+    const last = tree(page).locator('.tp-nb-frow').last();
+    const name = (await last.locator('.tp-nb-fname').textContent())!;
+    await last.hover();
+    await last.getByRole('button', { name: 'More' }).click();
+    const menu = page.getByRole('menu', { name: `${name} options` });
+    await expect(menu).toBeVisible();
+    await expect(menu).toBeInViewport({ ratio: 1 });
+    const btn = (await last.getByRole('button', { name: 'More' }).boundingBox())!;
+    const m = (await menu.boundingBox())!;
+    expect(m.y + m.height).toBeLessThanOrEqual(btn.y);
+    for (const item of ['Rename', 'Delete'])
+      await expect.poll(() => onTop(menu.getByRole('menuitem', { name: item }))).toBe(true);
+    await scroller.evaluate((el) => el.scrollTo(0, 0));
+    await expect(menu).toHaveCount(0);
+  });
+
+  test('C22-E93 a long folder name ends before the count, and before the buttons while they show', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    const features = await seedFolder(page, 'Features');
+    const second = await seedFolder(page, LONG, features);
+    await seedFolder(page, LONGER, second);
+    await seedNote(page, 'Scratchpad');
+    await openNotebook(page);
+    await unfold(page, 'Features');
+    await unfold(page, LONG);
+    // Off the row, and no focus left in it (a row that holds the focus shows its buttons too).
+    const away = async () => {
+      await page.mouse.move(900, 500);
+      await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    };
+    const edges = (r: Locator) =>
+      r.evaluate((row) => {
+        const name = row.querySelector('.tp-nb-fname')!;
+        const first = row.querySelector('.tp-nb-fadd .tp-ib')!;
+        return {
+          name: name.getBoundingClientRect().right,
+          count: row.querySelector('.tp-nb-fcount')!.getBoundingClientRect().left,
+          first: first.getBoundingClientRect().left,
+          cut: name.scrollWidth > name.clientWidth,
+          buttons: row.querySelectorAll('.tp-nb-fadd .tp-ib').length,
+          showing: getComputedStyle(row.querySelector('.tp-nb-fadd')!).opacity,
+        };
+      });
+    /** The name stops short of the first button, by a few pixels at most (no hole in the row either). */
+    const clear = async (r: Locator, buttons: number) => {
+      await expect.poll(async () => (await edges(r)).showing).toBe('1');
+      await expect
+        .poll(async () => {
+          const e = await edges(r);
+          return e.first - e.name;
+        })
+        .toBeGreaterThanOrEqual(0);
+      const e = await edges(r);
+      expect(e.buttons).toBe(buttons);
+      expect(e.cut).toBe(true);
+      expect(e.first - e.name).toBeLessThanOrEqual(8);
+    };
+
+    for (const [name, buttons] of [
+      [LONG, 3],
+      [LONGER, 2],
+    ] as const) {
+      const r = folderRow(page, name);
+      await away();
+      // At rest: cut short with an ellipsis, left of the count, using the row up to it.
+      await expect.poll(async () => (await edges(r)).showing).toBe('0');
+      const rest = await edges(r);
+      expect(rest.cut).toBe(true);
+      expect(rest.name).toBeLessThanOrEqual(rest.count + 0.5);
+      // Hovered: the buttons are in, and the name has given way to them.
+      await r.hover({ position: { x: 60, y: 10 } });
+      await clear(r, buttons);
+      // The menu open and the pointer elsewhere: the buttons stay, so the name stays clear of them.
+      await r.getByRole('button', { name: 'More' }).click();
+      // The menu is at its button at once, on the second level and the third: it never slides in from elsewhere.
+      const menu = page.getByRole('menu', { name: `${name} options` });
+      await expect(menu).toBeVisible();
+      const m = (await menu.boundingBox())!;
+      const btn = (await r.getByRole('button', { name: 'More' }).boundingBox())!;
+      expect(Math.abs(m.x + m.width - (btn.x + btn.width))).toBeLessThanOrEqual(1);
+      expect(m.y).toBeGreaterThanOrEqual(btn.y + btn.height);
+      await away();
+      await expect(r).toHaveClass(/tp-nb-frow-busy/);
+      await clear(r, buttons);
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('menu')).toHaveCount(0);
+    }
+  });
+});
+
 test.describe('notebook drawings', () => {
   test('C22-E80 Draw, a rectangle and a text, Done: the block shows a picture, the server has the scene, a reload shows it again', async ({
     page,

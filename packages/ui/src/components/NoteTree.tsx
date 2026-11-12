@@ -274,6 +274,9 @@ function Folder({ folder: f, depth, c }: { folder: NoteFolderItem; depth: number
     },
   ];
   const zone = over ? `tp-nb-drop-${over.zone}` : null;
+  const canAddFolder = depth < 2 && !!c.p.onCreateFolder;
+  // How many buttons the row shows on hover: the name gives way to exactly that many.
+  const acts = (canAddFolder ? 1 : 0) + (c.p.onNewNote ? 1 : 0) + 1;
   return (
     <div className={cx('tp-nb-f', c.drag?.id === f.id && 'tp-nb-dragging')}>
       <ConfirmDialog
@@ -314,7 +317,7 @@ function Folder({ folder: f, depth, c }: { folder: NoteFolderItem; depth: number
             c.landed === f.id && 'tp-nb-landed',
             c.flying === f.id && 'tp-nb-flying',
           )}
-          style={{ '--nb-depth': depth } as React.CSSProperties}
+          style={{ '--nb-depth': depth, '--nb-acts': acts } as React.CSSProperties}
           role="treeitem"
           aria-expanded={open}
           aria-level={depth + 1}
@@ -343,7 +346,7 @@ function Folder({ folder: f, depth, c }: { folder: NoteFolderItem; depth: number
             )}
           </button>
           <span className="tp-nb-fadd">
-            {depth < 2 && c.p.onCreateFolder ? (
+            {canAddFolder ? (
               <IconButton
                 label={`New folder in ${f.name}`}
                 tipSide="right"
@@ -369,7 +372,13 @@ function Folder({ folder: f, depth, c }: { folder: NoteFolderItem; depth: number
               >
                 <Icon name="more" size={14} />
               </IconButton>
-              <NotePop open={menu} className="tp-nb-pop-r tp-nb-fmenu">
+              {/* Over the page, not inside the row: a folded folder and the scrolling tree both clip. */}
+              <NotePop
+                open={menu}
+                className="tp-nb-pop-r tp-nb-fmenu"
+                float={wrap}
+                onClose={() => setMenu(false)}
+              >
                 <MenuList label={`${f.name} options`} items={items} />
               </NotePop>
             </span>
@@ -626,7 +635,8 @@ export function NoteTree(p: NoteTreeProps) {
   const down: Common['down'] = (e, kind, id, label) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     const target = e.target as Element;
-    if (target.closest?.('.tp-nb-fadd, .tp-nb-menuw, input')) return;
+    // A folder's menu floats over the page, but React still hands its presses to the row it belongs to.
+    if (target.closest?.('.tp-nb-fadd, .tp-nb-menuw, .tp-nb-pop, input')) return;
     if (!nav.current || carry.current.drag) return;
     // A new press: the click after the last drag has had its chance.
     unswallowing?.();

@@ -2817,7 +2817,12 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 /* Folder counts sit on the row's right edge (like the sidebar's): the hover buttons float over that spot instead of
    holding an empty slot beside it, and swap in as the count fades. */
 .tp-nb-frow .tp-nb-fadd { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); }
-.tp-nb-frow .tp-nb-ftog { padding-right: 12px; }
+.tp-nb-frow .tp-nb-ftog { padding-right: 12px; transition: padding-right var(--dur-menu) var(--ease-change); }
+/* While the buttons show, the name gives way to them and ends in an ellipsis just before the first one (--nb-acts
+   buttons of 26px; the count, faded out, keeps its 20px under them). Not while a row is being carried. */
+.tp-nb-frow:hover .tp-nb-ftog:not(.tp-nb-frename), .tp-nb-frow:focus-within .tp-nb-ftog:not(.tp-nb-frename), .tp-nb-frow.tp-nb-frow-busy .tp-nb-ftog:not(.tp-nb-frename) { padding-right: calc(var(--nb-acts, 3) * 26px - 10px); }
+.tp-nb-dragon .tp-nb-frow .tp-nb-ftog:not(.tp-nb-frename) { padding-right: 12px; }
+@media (prefers-reduced-motion: reduce) { .tp-nb-frow .tp-nb-ftog { transition-duration: 1ms; } }
 .tp-nb-fcount { min-width: 14px; text-align: right; transition: opacity var(--dur-menu) var(--ease-change); }
 /* Errors hold their shape at any width: the note's error scales its title and room to its pane (container query),
    stays centred, and scrolls rather than clipping when the pane is short. */
@@ -2924,6 +2929,9 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 /* Popovers leave with motion too (NotePop). */
 .tp-nb-pop.tp-nb-pop-leaving { animation: tp-pop-out 130ms var(--ease-leave) both; pointer-events: none; }
 .tp-nb-pop.tp-nb-pop-leaving.tp-nb-pop-up { animation-name: tp-pop-out-up; }
+/* A folder's menu floats over the page (fixed, placed by NotePop), so nothing in the tree clips it. */
+/* It is placed in one step: no transition may slide it there (Reduce motion gives everything a 120ms one). */
+.tp-nb-pop.tp-nb-pop-float { position: fixed; right: auto; bottom: auto; z-index: 70; transition-property: none; }
 /* A folder row with its menu open sits above the rows after it. */
 .tp-nb-frow.tp-nb-frow-busy { z-index: 6; }
 @media (prefers-reduced-motion: reduce) { .tp-nb-pop.tp-nb-pop-leaving { animation: tp-nb-fade-out 1ms linear both; } }
