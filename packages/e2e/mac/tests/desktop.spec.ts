@@ -939,6 +939,14 @@ test.describe('background', () => {
     expect(hidden.background.deskOpen).toBe(false);
     expect(hidden.background.awake).toBe(true);
     expect(alive(pid)).toBe(true);
+    // Leaving the Dock shows no panel that was not showing (the note window is only ever put back in front).
+    await new Promise((r) => setTimeout(r, 700));
+    const panels = (await app.state()).windows;
+    expect([panels.floating.visible, panels.menubar.visible, panels.note.visible]).toEqual([
+      false,
+      false,
+      false,
+    ]);
 
     await openSheet(app);
     await sheetDay(app);
@@ -1124,9 +1132,19 @@ test.describe('background', () => {
     await app.eval(dockChoice('Always'));
     await app.waitState((x) => x.background.dock === 'always');
 
+    // A note window open as the desk closes: with the Dock icon kept, it stays as it is.
+    await app.eval(`await window.__TAURI_INTERNALS__.invoke('open_note', { id: null, linkTo: null })`);
+    const ahead = (await app.waitState((x) => x.windows.note.visible && x.note.othersAhead !== null)).note
+      .othersAhead;
     await app.act('close', { window: 'main' });
     const kept = await app.waitState((x) => !x.windows.main.visible);
     expect(kept.background.policy).toBe('regular');
+    await new Promise((r) => setTimeout(r, 700));
+    const note = await app.state();
+    expect(note.windows.note.visible).toBe(true);
+    expect(note.note.othersAhead).toBe(ahead);
+    await app.act('close', { window: 'note' });
+    await app.waitState((x) => !x.windows.note.visible);
     expect(kept.badge).toBe('1');
     // Nothing planned today: no number beside the tick; the dot says something is new.
     expect(kept.background.trayTitle).toBeNull();
