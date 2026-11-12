@@ -168,3 +168,22 @@ The frame and fill-the-screen rules also have Rust tests under the same ids (`pl
 | C22-D40 | mac `notebook.spec.ts`            | In the note window, Draw opens the sheet over the whole window; drawing and Done work in WKWebView; ⌥⌘N still reaches Tudu while drawing                        |
 | C22-D41 | mac `notebook.spec.ts`            | Offline (the server drops every connection): draw, Done, back up: the save goes through and the picture shows                                                   |
 | C22-D42 | mac `notebook.spec.ts`            | An image pasted into a drawing (WebKit paste event with a PNG) uploads, survives a reload, and the scene holds no `dataURL`                                     |
+
+## The note window as the desk closes ([docs/plans/note-window-survives-desk-close.md](../plans/note-window-survives-desk-close.md), #91)
+
+The test channel's `note.othersAhead` is how many windows of other apps are in front of the note window (the menu bar
+and the like included; null when it is not on screen). A Finder window is on screen in each case.
+
+| ID      | Where                  | Case                                                                                                                         |
+| ------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| C16-U06 | Rust `background.rs`   | See [chunk 16](chunk-16.md)                                                                                                  |
+| C22-U72 | Rust `windows.rs`      | `refronts`: only within a second of leaving the Dock, while still out of it, and while the note window still shows           |
+| C22-D45 | mac `notebook.spec.ts` | Note window open, the desk opened and closed: it stays shown, no other app's window comes in front, same place, size and pin |
+| C22-D46 | mac `notebook.spec.ts` | From the menu bar alone (desk closed, New note, Open Tudu, close the desk): the same                                         |
+| C22-D47 | mac `notebook.spec.ts` | A note window closed before the desk, or just after it, stays closed                                                         |
+| C22-D48 | mac `notebook.spec.ts` | Pinned: still pinned and on top after the desk is opened and closed                                                          |
+| C22-D02 | mac `notebook.spec.ts` | Added: still on screen (`othersAhead` not null) when another app comes forward                                               |
+
+Manual, on the staging build: **MC-N01** Dock on While the window is open: close every window, a note from the menu
+bar, Open Tudu from the menu bar, close Tudu: the note window stays, with no blink, and the Dock icon goes. **MC-N02**
+the same pinned, and once with another app's window behind it.

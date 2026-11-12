@@ -6,13 +6,14 @@ Status column is kept by `pnpm test:status` in [STATUS.md](STATUS.md). Run this 
 
 ## Unit (`packages/ui`, `apps/web`, `apps/desktop`)
 
-| ID      | Component | Case                                                                                                                      |
-| ------- | --------- | ------------------------------------------------------------------------------------------------------------------------- |
-| C16-U01 | desktop   | Rust: the policy for the desk open or closed under each Dock choice; the Inbox count on the Dock or beside the tick       |
-| C16-U02 | desktop   | Rust: the Dock choice is kept on this Mac; an empty, old ("never") or torn file reads as While the window is open         |
-| C16-U03 | desktop   | Rust: the login item reads as macOS reports it: not registered and not found are off, enabled on, requires approval waits |
-| C16-U04 | Settings  | This Mac is listed under You only in the app; Open at login off, on, waiting with Open Login Items, refused; the Dock     |
-| C16-U05 | web       | The bridge's four commands and their arguments; `?settings=mac` only in the app; Settings reads the app as it opens       |
+| ID      | Component | Case                                                                                                                                                                                             |
+| ------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| C16-U01 | desktop   | Rust: the policy for the desk open or closed under each Dock choice; the Inbox count on the Dock or beside the tick                                                                              |
+| C16-U02 | desktop   | Rust: the Dock choice is kept on this Mac; an empty, old ("never") or torn file reads as While the window is open                                                                                |
+| C16-U03 | desktop   | Rust: the login item reads as macOS reports it: not registered and not found are off, enabled on, requires approval waits                                                                        |
+| C16-U04 | Settings  | This Mac is listed under You only in the app; Open at login off, on, waiting with Open Login Items, refused; the Dock                                                                            |
+| C16-U05 | web       | The bridge's four commands and their arguments; `?settings=mac` only in the app; Settings reads the app as it opens                                                                              |
+| C16-U06 | desktop   | Rust: leaving the Dock keeps a shown note window in front (`keeps_note`): only a real change from regular to accessory, only when it shows ([plan](../plans/note-window-survives-desk-close.md)) |
 
 ## End-to-end (`packages/e2e/tests/desktop`, desktop size, against the fake app)
 
@@ -33,3 +34,10 @@ Status column is kept by `pnpm test:status` in [STATUS.md](STATUS.md). Run this 
 | C16-D06 | ⌘Q from the shown and the hidden state, and ⋯ › Quit in the sheet while hidden, end the process                                                                                           |
 | C16-D07 | Always keeps the Dock icon and the badge after close and holds across a relaunch; While the window is open applies at once                                                                |
 | C11-D02 | Rewritten: closing hides the window and drops the Dock icon; the sheet's Open Tudu and the reopen bring it back as a regular app                                                          |
+
+## The note window as the desk closes ([docs/plans/note-window-survives-desk-close.md](../plans/note-window-survives-desk-close.md), #91)
+
+| ID      | Case                                                                                                             |
+| ------- | ---------------------------------------------------------------------------------------------------------------- |
+| C16-D01 | Added: after the switch to accessory, Quick Add, the sheet and the note window are still hidden                  |
+| C16-D07 | Added: with Always, a note window open as the desk closes stays shown, with no other app's window in front of it |

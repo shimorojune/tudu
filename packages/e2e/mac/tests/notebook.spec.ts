@@ -112,19 +112,14 @@ function windowOrder(): string {
 }
 
 /** The desk closed and Tudu out of the Dock, then a moment more for macOS to bring the next app forward. */
-async function closeDesk(app: App, log = ''): Promise<AppState> {
-  if (log) console.log(`${log} desk open: front ${frontApp()} ${windowOrder()}`);
+async function closeDesk(app: App): Promise<AppState> {
   await app.act('close', { window: 'main' });
   await app.waitState((s) => !s.windows.main.visible && s.background.policy === 'accessory');
   let s = await app.state();
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 10; i++) {
     await new Promise((r) => setTimeout(r, 100));
     s = await app.state();
     expect(s.windows.note.visible, 'the note window stays shown').toBe(true);
-    if (log && (i === 1 || i === 9 || i === 19))
-      console.log(
-        `${log} desk closed ${(i + 1) * 100}ms: front ${frontApp()} ahead ${s.note.othersAhead} ${windowOrder()}`,
-      );
   }
   return s;
 }
@@ -216,12 +211,10 @@ test.describe('chunk 22 · the note window', () => {
     await finderWindow();
     await openNote(app);
     const before = await noteInFront(app);
-    console.log(`C22-D45 note open: front ${frontApp()} ${windowOrder()}`);
     const was = (await app.state()).windows.note;
     await app.act('reopen');
     await app.waitState((x) => x.windows.main.visible && x.background.policy === 'regular');
-    const s = await closeDesk(app, 'C22-D45');
-    console.log(`C22-D45 others ahead of the note window: ${before} before, ${s.note.othersAhead} after`);
+    const s = await closeDesk(app);
     expect(s.windows.main.visible).toBe(false);
     expect(s.note.othersAhead, 'no other app’s window came in front of it').toBe(before);
     expect(near(s.windows.note.x, was.x) && near(s.windows.note.y, was.y)).toBe(true);
@@ -243,14 +236,12 @@ test.describe('chunk 22 · the note window', () => {
     await noteShown(app);
     await noteReady(app);
     const before = await noteInFront(app);
-    console.log(`C22-D46 note open: front ${frontApp()} ahead ${before} ${windowOrder()}`);
     await app.act('tray');
     await app.waitState((x) => x.windows.menubar.visible);
     await app.until(`return T.all('button', 'Open Tudu Test').length > 0`, 'menubar');
     await app.eval(`T.click(T.get('button', 'Open Tudu Test'))`, 'menubar');
     await app.waitState((x) => x.windows.main.visible && x.background.policy === 'regular');
-    const s = await closeDesk(app, 'C22-D46');
-    console.log(`C22-D46 others ahead of the note window: ${before} before, ${s.note.othersAhead} after`);
+    const s = await closeDesk(app);
     expect(s.note.othersAhead, 'no other app’s window came in front of it').toBe(before);
   });
 

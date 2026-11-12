@@ -125,3 +125,16 @@ becomes your manual check below.
   your OK.
 - `orderFrontRegardless` on a window in another Space: the panel already joins all Spaces, so it shows on the
   current one, as it does today.
+
+## As built
+
+- The follow-up is driven by macOS saying another app came forward (the observer the menu bar sheet already uses),
+  with looks at 150ms and 500ms as a backstop, all within one second of leaving the Dock.
+- No "shown" flag in `notes.rs`: since the window is covered, not hidden, `is_visible` already says whether you closed
+  it. The unit case for the follow-up is **C22-U72** (`refronts` in `windows.rs`); C22-U69 was already taken.
+- The test channel reports `note.othersAhead` (how many windows of other apps are in front of the note window) instead
+  of `onScreen`: an occlusion flag only turns when the window is fully covered, the order is exact.
+- CI reproduced the bug before the fix on the path from the report's follow-up (C22-D46: note from the menu bar, Open
+  Tudu, close the desk): Finder came forward within 200ms and its three windows sat in front of the note window, 8
+  windows ahead of it instead of 5. With the note opened from the desk (C22-D45) macOS on the runner left Tudu in
+  front, so that case passes either way and stays as a guard.
