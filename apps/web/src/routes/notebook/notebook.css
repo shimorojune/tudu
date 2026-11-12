@@ -91,6 +91,10 @@
 .app-notebook-phone .tp-nb-fadd {
   display: none;
 }
+/* No hover buttons on a phone, so the name never gives way to them (the doubled classes outrank the hover rule). */
+.app-notebook-phone .tp-nb-frow.tp-nb-frow .tp-nb-ftog.tp-nb-ftog {
+  padding-right: 12px;
+}
 .app-notebook-phone .tp-nb-frow .tp-nb-fcount {
   opacity: 1;
 }
