@@ -22,9 +22,13 @@ async function openShortcuts(app: App) {
 
 /** Click a row's keys and press new ones in the page, as a person would at the keyboard. */
 async function rebind(app: App, row: string, key: { code: string; key: string; mods: string[] }) {
+  await app.eval(`T.click(T.get('button', new RegExp('^${row} shortcut')));`);
+  // A person presses after the field says it is listening; a press in the same tick reaches the old handler.
+  await app.until(
+    `return !!T.all('button', new RegExp('^${row} shortcut'))[0]?.hasAttribute('data-listening')`,
+  );
   await app.eval(`
     const f = T.get('button', new RegExp('^${row} shortcut'));
-    T.click(f);
     const o = { code: ${JSON.stringify(key.code)}, key: ${JSON.stringify(key.key)}, bubbles: true, cancelable: true };
     for (const m of ${JSON.stringify(key.mods)}) o[m + 'Key'] = true;
     f.dispatchEvent(new KeyboardEvent('keydown', o));
