@@ -51,6 +51,12 @@ pub fn policy(dock: Dock, desk_open: bool, tick_hidden: bool) -> Policy {
     }
 }
 
+/// Leaving the Dock hands the screen to the next app, whose windows would cover a note window that is showing: it
+/// is put back in front. Only on a real change from a regular app, and only when the note window shows.
+pub fn keeps_note(from: Option<Policy>, to: Policy, note_shown: bool) -> bool {
+    from == Some(Policy::Regular) && to == Policy::Accessory && note_shown
+}
+
 /// What the tick and the Dock icon show.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Places {
@@ -343,8 +349,12 @@ pub fn apply(app: &AppHandle) {
     // policy set again for nothing can disturb the window that has the focus.
     if let Ok(mut last) = b.applied.lock() {
         if *last != Some(p) {
+            let keep = keeps_note(*last, p, windows::note_showing(app));
             mac::set_policy(app, p);
             *last = Some(p);
+            if keep {
+                windows::keep_note_front(app);
+            }
         }
     }
     let a = app.state::<App>();
@@ -798,6 +808,20 @@ mod tests {
         assert_eq!(policy(Dock::Open, true, true), Policy::Regular);
         assert_eq!(policy(Dock::Always, false, true), Policy::Regular);
         assert_eq!(policy(Dock::Always, false, false), Policy::Regular);
+    }
+
+    #[test]
+    fn c16_u06_leaving_the_dock_keeps_a_shown_note_window_in_front() {
+        use Policy::{Accessory, Regular};
+        assert!(keeps_note(Some(Regular), Accessory, true));
+        // Not showing: nothing to bring back (you closed it, or never opened it).
+        assert!(!keeps_note(Some(Regular), Accessory, false));
+        // No real change, back into the Dock, or the first word to macOS at launch.
+        assert!(!keeps_note(Some(Accessory), Accessory, true));
+        assert!(!keeps_note(Some(Accessory), Regular, true));
+        assert!(!keeps_note(Some(Regular), Regular, true));
+        assert!(!keeps_note(None, Accessory, true));
+        assert!(!keeps_note(None, Regular, true));
     }
 
     #[test]

@@ -52,6 +52,53 @@ pub fn last_outside() -> Outside {
     OUTSIDE.lock().map(|o| o.clone()).unwrap_or_default()
 }
 
+/// Until when a note window that was showing as Tudu left the Dock is put back in front of the app macOS brings
+/// forward in its place.
+static NOTE_KEEP: Mutex<Option<Instant>> = Mutex::new(None);
+const NOTE_KEEP_FOR: Duration = Duration::from_secs(1);
+/// macOS brings the next app forward a moment after the switch: looked at again after each of these.
+const NOTE_KEEP_LOOKS: [Duration; 2] = [Duration::from_millis(150), Duration::from_millis(350)];
+
+/// Whether the note window is put back in front now: Tudu left the Dock a moment ago, is still out of it, and the
+/// note window is still showing (closed since, it stays closed).
+fn refronts(kept_for: Option<Duration>, accessory: bool, note_shown: bool) -> bool {
+    kept_for.is_some_and(|ago| ago <= NOTE_KEEP_FOR) && accessory && note_shown
+}
+
+pub fn note_showing(app: &AppHandle) -> bool {
+    app.get_webview_window(NOTE)
+        .and_then(|w| w.is_visible().ok())
+        .unwrap_or(false)
+}
+
+/// Tudu just left the Dock with the note window showing: it goes back in front (not taking the keyboard) now, when
+/// the next app comes forward, and after a moment in case macOS was slow.
+pub fn keep_note_front(app: &AppHandle) {
+    if let Ok(mut k) = NOTE_KEEP.lock() {
+        *k = Some(Instant::now());
+    }
+    refront_note(app);
+    let a = app.clone();
+    std::thread::spawn(move || {
+        for wait in NOTE_KEEP_LOOKS {
+            std::thread::sleep(wait);
+            refront_note(&a);
+        }
+    });
+}
+
+fn refront_note(app: &AppHandle) {
+    let kept_for = NOTE_KEEP.lock().ok().and_then(|k| k.map(|t| t.elapsed()));
+    let accessory = background::current_policy(app) == background::Policy::Accessory;
+    if !refronts(kept_for, accessory, note_showing(app)) {
+        return;
+    }
+    #[cfg(target_os = "macos")]
+    if let Some(w) = app.get_webview_window(NOTE) {
+        panel::order_front(&w);
+    }
+}
+
 /// Where this build's windows find Tudu on the web.
 pub fn web(app: &AppHandle) -> Url {
     #[cfg(feature = "control")]
@@ -280,6 +327,10 @@ pub fn outside(app: &AppHandle, why: &'static str, who: Option<String>, ours: bo
                 .ok(),
         };
     }
+    // Another app coming forward as Tudu leaves the Dock: the note window stays in front of it.
+    if why == "activate" && !ours {
+        refront_note(app);
+    }
     if !hides {
         return;
     }
@@ -420,6 +471,19 @@ fn place_floating(app: &AppHandle, w: &WebviewWindow) {
     }
 }
 
+/// Tudu Test only: how many windows of other apps are in front of the note window (None: it is not on screen).
+#[cfg(feature = "control")]
+pub fn note_others_ahead(app: &AppHandle) -> Option<usize> {
+    let w = app.get_webview_window(NOTE)?;
+    #[cfg(target_os = "macos")]
+    return panel::others_ahead(&w);
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = w;
+        None
+    }
+}
+
 /// The note window takes the keyboard the same way.
 pub(crate) fn focus_panel(w: &WebviewWindow) {
     focus_floating(w);
@@ -512,6 +576,19 @@ mod tests {
         assert!(!opens(true, None));
         assert!(!opens(false, Some(Duration::from_millis(40))));
         assert!(opens(false, Some(Duration::from_millis(900))));
+    }
+
+    #[test]
+    fn c22_u72_the_note_window_goes_back_in_front_only_just_after_leaving_the_dock() {
+        let ms = Duration::from_millis;
+        assert!(refronts(Some(ms(0)), true, true));
+        assert!(refronts(Some(ms(500)), true, true));
+        // Never asked to, or too long ago: another app coming forward later covers it as any window.
+        assert!(!refronts(None, true, true));
+        assert!(!refronts(Some(ms(1500)), true, true));
+        // The desk came back, or you closed the note window in the meantime.
+        assert!(!refronts(Some(ms(100)), false, true));
+        assert!(!refronts(Some(ms(100)), true, false));
     }
 
     #[test]
@@ -654,6 +731,51 @@ mod panel {
                 win.setFrame_display(cocoa(&win, f), true);
             }
         });
+    }
+
+    /// In front of the other apps' windows at its level, without taking the keyboard or making Tudu active.
+    pub fn order_front(w: &WebviewWindow) {
+        let w2 = w.clone();
+        let _ = w.run_on_main_thread(move || {
+            if let Some(win) = ns_window(&w2) {
+                if win.isVisible() {
+                    win.orderFrontRegardless();
+                }
+            }
+        });
+    }
+
+    /// Tudu Test only: how many windows of other apps are in front of this one (the menu bar and the like
+    /// included), from the window server's front to back order. Asked on the main thread.
+    #[cfg(feature = "control")]
+    pub fn others_ahead(w: &WebviewWindow) -> Option<usize> {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let w2 = w.clone();
+        let _ = w.run_on_main_thread(move || {
+            let count = (|| {
+                let win = ns_window(&w2)?;
+                let mtm = MainThreadMarker::from(&*win);
+                let me = win.windowNumber();
+                let app = objc2_app_kit::NSApplication::sharedApplication(mtm);
+                let all = NSWindow::windowNumbersWithOptions(
+                    objc2_app_kit::NSWindowNumberListOptions::AllApplications,
+                    mtm,
+                )?;
+                let mut ahead = 0usize;
+                for n in all.iter() {
+                    let n = n.integerValue();
+                    if n == me {
+                        return Some(ahead);
+                    }
+                    if app.windowWithWindowNumber(n).is_none() {
+                        ahead += 1;
+                    }
+                }
+                None
+            })();
+            let _ = tx.send(count);
+        });
+        rx.recv_timeout(std::time::Duration::from_secs(2)).ok().flatten()
     }
 
     pub fn make_key(w: &WebviewWindow) {

@@ -63,6 +63,8 @@ export interface AppState {
     frame: { x: number; y: number; width: number; height: number } | null;
     /** Glide steps set so far (fill the screen and back). */
     glideSteps: number;
+    /** Windows of other apps in front of it (the menu bar and the like included); null when it is not on screen. */
+    othersAhead: number | null;
   };
   /** The tick: no native menu any more (items is empty); a click opens the menu bar's sheet under `rect`. */
   tray: {
