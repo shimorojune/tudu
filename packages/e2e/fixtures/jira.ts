@@ -73,9 +73,9 @@ export function jiraButton(page: Page): Locator {
 
 /** Open the panel: the top bar's button on the desk, the rail's Jira on tablets, the tab on phones. */
 export async function openJira(page: Page): Promise<void> {
-  const project =
-    (await page.evaluate(() => document.querySelector('[data-viewport]')?.getAttribute('data-viewport'))) ??
-    '';
+  // Waits for the shell: straight after a reload [data-viewport] isn't there yet, and reading it then would
+  // take a phone for the desk.
+  const project = (await page.locator('[data-viewport]').first().getAttribute('data-viewport')) ?? '';
   if (project === 'phone')
     await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: /Jira$/ }).click();
   else if (project === 'tablet') await sideJira(page).click();

@@ -373,7 +373,7 @@ export function Overlays() {
         />
         <Pair
           title="Drawer"
-          note="Slides 24px in and fades; leaves faster. Modeless keeps the page live."
+          note="Slides 24px in and fades; leaves faster. Modeless keeps the page live; a press outside closes it."
           render={() => <DrawerDemo />}
         />
         <Pair title="MiniCalendar" render={() => <CalendarDemo />} />

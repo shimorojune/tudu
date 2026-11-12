@@ -2,6 +2,7 @@ import {
   addDays,
   dueWords,
   formatDay,
+  issueUrl,
   jiraDueWords,
   linkChipWords,
   linkDayLong,
@@ -217,11 +218,63 @@ export function JPLinked({ link: l, today, big, fresh, onShow }: JPLinkedProps) 
   );
 }
 
-function byline(it: JiraPanelIssue, today: IsoDate, linked: ReactNode): ReactNode[] {
+/** Where an issue key links to: the ticket in Jira, and what a plain click does instead of leaving the page. */
+export interface KeyLink {
+  site: string;
+  onOpen?: (key: string) => void;
+}
+
+/**
+ * The issue key as a link to the ticket (#61). A plain click goes through `onOpen` (the page opens it outside, the
+ * same way on the web and in the Mac app); ⌘/Ctrl, Shift and middle clicks are left to the browser. It never opens
+ * the row's preview.
+ */
+function KeyAnchor({ k, className, link }: { k: string; className: string; link: KeyLink }) {
+  return (
+    <a
+      className={className}
+      href={issueUrl(link.site, k)}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={`Open ${k} in Jira`}
+      aria-label={`Open ${k} in Jira`}
+      onClick={(e) => {
+        e.stopPropagation();
+        // Already handled by the page (the Mac app's link catcher opens it itself): don't open it twice.
+        if (
+          e.defaultPrevented ||
+          e.metaKey ||
+          e.ctrlKey ||
+          e.shiftKey ||
+          e.altKey ||
+          e.button !== 0 ||
+          !link.onOpen
+        )
+          return;
+        e.preventDefault();
+        link.onOpen(k);
+      }}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      {k}
+    </a>
+  );
+}
+
+function byline(
+  it: JiraPanelIssue,
+  today: IsoDate,
+  linked: ReactNode,
+  keyLink?: KeyLink | null,
+): ReactNode[] {
   const b: ReactNode[] = [
-    <span key="k" className="tp-jp-key">
-      {it.key}
-    </span>,
+    keyLink ? (
+      <KeyAnchor key="k" k={it.key} className="tp-jp-key" link={keyLink} />
+    ) : (
+      <span key="k" className="tp-jp-key">
+        {it.key}
+      </span>
+    ),
   ];
   if (it.status)
     b.push(
@@ -264,6 +317,8 @@ export interface JiraPreviewProps {
   onOpenInJira?: (key: string) => void;
   onShowTask?: (l: JiraPanelLink) => void;
   onPick?: (anchor: HTMLElement) => void;
+  /** The header's key links to the ticket. */
+  keyLink?: KeyLink | null;
 }
 
 /** The whole issue, read-mostly, sliding over the list inside the panel (a sheet from the bottom on phones). */
@@ -277,6 +332,7 @@ export function JiraPreview({
   onOpenInJira,
   onShowTask,
   onPick,
+  keyLink,
 }: JiraPreviewProps) {
   const [all, setAll] = useState(false);
   const cms = it.comments ?? [];
@@ -322,7 +378,11 @@ export function JiraPreview({
           {compact ? 'Close' : 'All issues'}
         </button>
         <span className="tp-jp-sp" />
-        <span className="tp-jp-pvkey">{it.key}</span>
+        {keyLink ? (
+          <KeyAnchor k={it.key} className="tp-jp-pvkey" link={keyLink} />
+        ) : (
+          <span className="tp-jp-pvkey">{it.key}</span>
+        )}
         {onOpenInJira ? (
           <IconButton
             label={`Open ${it.key} in Jira`}
@@ -458,6 +518,16 @@ export interface JPConnectProps {
   spaceName?: string;
   /** Opened from All spaces: connecting turns Jira on nowhere; you pick the spaces next. */
   allSpaces?: boolean;
+  /** What you had typed before the panel closed: the form starts from it. */
+  draft?: ConnectDraft | null;
+  /** Each edit, so the page can keep the draft while the panel is closed. */
+  onDraft?: (d: ConnectDraft) => void;
+}
+
+/** A half-typed connect form. */
+export interface ConnectDraft {
+  site: string;
+  token: string;
 }
 
 /** How long the Connected tick shows before the panel moves on. */
@@ -471,8 +541,8 @@ export function JPConnect(p: JPConnectProps) {
   const init = p.initial ?? {};
   const re = !!p.reconnect;
   const uid = useId();
-  const [url, setUrl] = useState(init.site ?? (re && p.site ? p.site : ''));
-  const [token, setToken] = useState(init.token ?? '');
+  const [url, setUrl] = useState(init.site ?? (re && p.site ? p.site : (p.draft?.site ?? '')));
+  const [token, setToken] = useState(init.token ?? p.draft?.token ?? '');
   const [show, setShow] = useState(false);
   const [err, setErr] = useState<JiraConnectError | null>(init.error ?? null);
   const [busy, setBusy] = useState(false);
@@ -545,6 +615,8 @@ export function JPConnect(p: JPConnectProps) {
   return (
     <form
       className={cx('tp-jp-connect', p.compact && 'tp-compact')}
+      // Mid-check (and through the Connected tick) a press outside the panel must not close it (#62).
+      data-keep-open={working ? '' : undefined}
       noValidate
       onSubmit={(e) => e.preventDefault()}
       onKeyDown={(e) => {
@@ -586,6 +658,7 @@ export function JPConnect(p: JPConnectProps) {
           aria-describedby={badUrl ? `${uid}-url-err` : undefined}
           onChange={(e) => {
             setUrl(e.target.value);
+            p.onDraft?.({ site: e.target.value, token });
             if (badUrl) setErr(null);
           }}
         />,
@@ -607,6 +680,7 @@ export function JPConnect(p: JPConnectProps) {
           aria-describedby={badTok ? `${uid}-tok-err` : `${uid}-tok-hint`}
           onChange={(e) => {
             setToken(e.target.value);
+            p.onDraft?.({ site: url, token: e.target.value });
             if (badTok) setErr(null);
           }}
         />,
@@ -720,6 +794,11 @@ export interface JiraPanelProps {
   /** Where the panel was opened from (Apps, while connecting): a quiet way back. */
   onBack?: () => void;
   backLabel?: string;
+  /** The issue key links to the ticket (`siteUrl` + /browse/KEY): rows on the desk and tablets, the preview always. */
+  keyLinks?: boolean;
+  /** A half-typed connect form to start from, and each edit to it. */
+  connectDraft?: ConnectDraft | null;
+  onConnectDraft?: (d: ConnectDraft) => void;
   className?: string;
 }
 
@@ -733,6 +812,8 @@ export function JiraPanel(p: JiraPanelProps) {
   const init = p.initial ?? {};
   const today = p.today;
   const compact = !!p.compact;
+  const keyLink: KeyLink | null =
+    p.keyLinks !== false && p.siteUrl ? { site: p.siteUrl, onOpen: p.onOpenInJira } : null;
   const state = p.state ?? 'ready';
   const [query, setQuery] = useState(init.query ?? '');
   const [leaving, setLeaving] = useState<string | null>(null);
@@ -1184,6 +1265,8 @@ export function JiraPanel(p: JiraPanelProps) {
         account={p.account}
         spaceName={p.spaceName}
         allSpaces={p.allSpaces}
+        draft={p.connectDraft}
+        onDraft={p.onConnectDraft}
       />
     );
   } else if (state === 'loading') {
@@ -1297,7 +1380,7 @@ export function JiraPanel(p: JiraPanelProps) {
                   tabIndex={0}
                   aria-label={`${it.key}: ${it.summary}. Open preview`}
                   onClick={(e) => {
-                    if ((e.target as HTMLElement).closest('button')) return;
+                    if ((e.target as HTMLElement).closest('button, a')) return;
                     p.onOpenIssue?.(it.key);
                   }}
                   onKeyDown={(e) => {
@@ -1321,6 +1404,7 @@ export function JiraPanel(p: JiraPanelProps) {
                             onShow={(l) => showTask(it, l)}
                           />
                         ) : null,
+                        compact ? null : keyLink,
                       )}
                     </div>
                   </div>
@@ -1410,6 +1494,7 @@ export function JiraPanel(p: JiraPanelProps) {
         addState={addState(pv)}
         onBack={closePreview}
         onOpenInJira={p.onOpenInJira}
+        keyLink={keyLink}
         onShowTask={(l) => showTask(pv, l)}
         onPick={(el) => pick(pv, el)}
       />

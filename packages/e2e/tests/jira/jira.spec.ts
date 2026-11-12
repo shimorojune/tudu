@@ -80,6 +80,14 @@ async function allSpacesApps(page: Page): Promise<Locator> {
   return settings;
 }
 
+/** A press on the page beside the panel: the day's heading, at its left edge (#62). */
+async function pressOutside(page: Page): Promise<void> {
+  await page
+    .getByRole('heading', { level: 1 })
+    .first()
+    .click({ position: { x: 4, y: 4 } });
+}
+
 /** The connect form: the address and the token, then Connect. */
 async function fillConnect(page: Page, site: string, token: string): Promise<void> {
   const form = jiraPanel(page);
@@ -216,7 +224,10 @@ test.describe('jira', () => {
     // The panel sits over the sheet's arrows; the sidebar's week turns the day.
     await page.locator('.tp-sidebar button.tp-nav').filter({ hasText: 'Monday' }).click();
     await expect(page.getByRole('heading', { name: 'Monday', level: 1 })).toBeVisible();
-    await expect(jiraPanel(page)).toBeVisible();
+    // That press was outside the panel, so it closed it (#62); the day turned all the same.
+    await expect(jiraPanel(page)).toHaveCount(0);
+    await openJira(page);
+    await expect(page.getByRole('heading', { name: 'Monday', level: 1 })).toBeVisible();
     await jiraPanel(page).getByRole('button', { name: 'Refresh' }).click();
     await expect(jiraPanel(page).locator('.tp-jp-sync')).toContainText('Synced just now');
     await jiraPanel(page).getByRole('button', { name: 'Close Jira' }).click();
@@ -281,11 +292,14 @@ test.describe('jira', () => {
       SUMMARY['TUDU-220']!,
     );
 
-    // Cross the Monday task off: its chip says so.
+    // Cross the Monday task off: its chip says so. The checkbox is outside the panel, so Jira closes (#62); open
+    // it again to read the chip.
     await chipOf(page, 'TUDU-219').click();
     await row(dayList(page, 'Tasks for Monday 19 October'), SUMMARY['TUDU-219']!)
       .getByRole('checkbox')
       .click();
+    await expect(jiraPanel(page)).toHaveCount(0);
+    await openJira(page);
     await expect(chipOf(page, 'TUDU-219')).toHaveAccessibleName(/crossed off$/);
     await expect(chipOf(page, 'TUDU-219')).toHaveClass(/tp-done/);
   });
@@ -1194,4 +1208,174 @@ test.describe('jira', () => {
         'true',
       );
     });
+
+  test('C10-E32 a press outside closes Jira; a task clicked on the day opens as Jira leaves; Tab out leaves it open', async ({
+    page,
+  }) => {
+    test.skip(phone(), 'Jira is a page on phones');
+    await connected(page);
+    await pressOutside(page);
+    await expect(jiraPanel(page)).toHaveCount(0);
+    await expect(page).not.toHaveURL(/jira/);
+
+    await writeTasks(page, ['Tidy the buckets']);
+    await idle(page);
+    await openJira(page);
+    await row(dayList(page, 'Tasks for Sunday 18 October'), 'Tidy the buckets')
+      .getByRole('button', { name: 'Tidy the buckets' })
+      .click({ position: { x: 8, y: 8 } });
+    await expect(page.getByRole('dialog', { name: 'Task details' })).toBeVisible();
+    await expect(jiraPanel(page)).toHaveCount(0);
+    await closeTask(page);
+
+    // Focus leaving without a press keeps it.
+    await openJira(page);
+    await jiraPanel(page).getByRole('textbox', { name: 'Search issues across Jira' }).focus();
+    for (let i = 0; i < 12; i += 1) await page.keyboard.press('Shift+Tab');
+    await expect(jiraPanel(page)).toBeVisible();
+    await expect(page).toHaveURL(/[?&]jira/);
+  });
+
+  test('C10-E33 not outside: the sidebar row toggles it in one press; the top bar button is under the panel; presses inside, Show and a toast’s Undo keep it', async ({
+    page,
+  }) => {
+    test.skip(phone() || tablet(), 'the desk has both toggles');
+    await connected(page);
+    // The top bar's button sits under the open panel on the desk, so a press there is a press inside it.
+    await expect(jiraButton(page)).toHaveAttribute('aria-pressed', 'true');
+    const box = (await jiraButton(page).boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(jiraPanel(page)).toBeVisible();
+    // × closes it; the button is clear again.
+    await jiraPanel(page).getByRole('button', { name: 'Close Jira' }).click();
+    await expect(jiraPanel(page)).toHaveCount(0);
+    await expect(jiraButton(page)).toHaveAttribute('aria-pressed', 'false');
+    // The sidebar's Jira row: opens it, then one press closes it.
+    await sideJira(page).click();
+    await expect(jiraPanel(page)).toBeVisible();
+    await sideJira(page).click();
+    await expect(jiraPanel(page)).toHaveCount(0);
+    await openJira(page);
+
+    // Presses inside: search, the views menu, the day picker.
+    const p = jiraPanel(page);
+    await p.getByRole('textbox', { name: 'Search issues across Jira' }).click();
+    await p.getByRole('button', { name: 'View: Assigned to me' }).click();
+    await p.getByRole('menuitem', { name: 'Assigned to me' }).click();
+    await p.getByRole('button', { name: 'Add TUDU-212 to a day' }).click();
+    const pop = page.getByRole('dialog', { name: 'Add TUDU-212 to a day as a linked task' });
+    await pop.getByRole('button', { name: 'Today', exact: true }).click();
+    await expect(chipOf(page, 'TUDU-212')).toContainText('Today');
+    await expect(p).toBeVisible();
+
+    // Show: the day shows the task and Jira stays beside it.
+    await idle(page);
+    await chipOf(page, 'TUDU-212').click();
+    await expect(row(dayList(page, 'Tasks for Sunday 18 October'), SUMMARY['TUDU-212']!)).toBeVisible();
+    await expect(p).toBeVisible();
+
+    // A toast's Undo belongs to the panel's work.
+    const saved = await page.request.post(`${API_URL}/api/connectors/jira/views`, {
+      data: { name: 'My open bugs', jql: 'issuetype = Bug ORDER BY updated DESC' },
+    });
+    expect(saved.ok()).toBe(true);
+    await page.reload();
+    await expect.poll(() => issueKeys(page)).toEqual(ASSIGNED);
+    await jiraPanel(page).getByRole('button', { name: 'View: Assigned to me' }).click();
+    await jiraPanel(page).getByRole('menuitem', { name: 'My open bugs' }).click();
+    await jiraPanel(page).getByRole('button', { name: 'View: My open bugs' }).click();
+    await jiraPanel(page).getByRole('menuitem', { name: 'Custom JQL…' }).click();
+    await jiraPanel(page).getByRole('button', { name: 'Remove view' }).click();
+    await page.locator('.tp-toast').getByRole('button', { name: 'Undo' }).click();
+    await expect(jiraPanel(page).getByRole('button', { name: 'View: My open bugs' })).toBeVisible();
+  });
+
+  test('C10-E34 the key opens the ticket: in a row and in the preview, never the preview; phones link only the sheet’s key', async ({
+    page,
+  }) => {
+    await connected(page);
+    const url = `${JIRA_SITE}/browse/TUDU-212`;
+    if (phone()) {
+      await expect(issueRow(page, 'TUDU-212').getByRole('link')).toHaveCount(0);
+      await issueRow(page, 'TUDU-212').click();
+      const sheet = page.getByRole('dialog', { name: /^TUDU-212 / });
+      const tab = page.waitForEvent('popup');
+      await sheet.getByRole('link', { name: 'Open TUDU-212 in Jira' }).click();
+      expect((await tab).url()).toBe(url);
+      return;
+    }
+    const key = issueRow(page, 'TUDU-212').getByRole('link', { name: 'Open TUDU-212 in Jira' });
+    await expect(key).toHaveAttribute('href', url);
+    await key.hover();
+    await expect
+      .poll(() => key.evaluate((el) => getComputedStyle(el).backgroundColor))
+      .not.toBe('rgba(0, 0, 0, 0)');
+    let tab = page.waitForEvent('popup');
+    await key.click();
+    expect((await tab).url()).toBe(url);
+    await expect(jiraPanel(page)).toBeVisible();
+    await expect(page.getByRole('dialog', { name: /^TUDU-212 / })).toHaveCount(0);
+    await expect(page).not.toHaveURL(/jira=TUDU/);
+
+    await issueRow(page, 'TUDU-219').click();
+    const pv = page.getByRole('dialog', { name: /^TUDU-219 / });
+    tab = page.waitForEvent('popup');
+    await pv.getByRole('link', { name: 'Open TUDU-219 in Jira' }).click();
+    expect((await tab).url()).toBe(`${JIRA_SITE}/browse/TUDU-219`);
+    await expect(pv).toBeVisible();
+  });
+
+  test('C10-E35 the connect form: a press outside keeps what you typed for next time; mid-check it holds the panel; a reload forgets', async ({
+    page,
+  }) => {
+    test.skip(phone() || tablet(), 'the same form on every size');
+    await fixClock(page);
+    await signInFresh(page);
+    const openForm = async () => {
+      await addAnApp(page).click();
+      await page.getByRole('dialog', { name: 'Apps' }).getByRole('button', { name: 'Connect Jira' }).click();
+      await expect(jiraPanel(page).getByLabel('Jira address')).toBeVisible();
+    };
+    const token = goodToken();
+    await openForm();
+    await jiraPanel(page).getByLabel('Jira address').fill(JIRA_SITE);
+    await jiraPanel(page).getByLabel('Personal access token').fill(token);
+    await pressOutside(page);
+    await expect(jiraPanel(page)).toHaveCount(0);
+    await openForm();
+    await expect(jiraPanel(page).getByLabel('Jira address')).toHaveValue(JIRA_SITE);
+    await expect(jiraPanel(page).getByLabel('Personal access token')).toHaveValue(token);
+
+    // Memory only: a reload starts empty.
+    await page.reload();
+    await expect(jiraPanel(page).getByLabel('Jira address')).toHaveValue('');
+    await expect(jiraPanel(page).getByLabel('Personal access token')).toHaveValue('');
+
+    // Mid-check, a press outside doesn't close it.
+    let release: () => void = () => {};
+    const held = new Promise<void>((r) => (release = r));
+    await page.route('**/api/connectors/jira', async (r) => {
+      if (r.request().method() === 'POST') await held;
+      await r.continue();
+    });
+    await fillConnect(page, JIRA_SITE, token);
+    await expect(jiraPanel(page).getByRole('button', { name: 'Checking…' })).toBeVisible();
+    await pressOutside(page);
+    await expect(jiraPanel(page)).toBeVisible();
+    release();
+    await expect.poll(() => issueKeys(page)).toEqual(ASSIGNED);
+    await page.unroute('**/api/connectors/jira');
+  });
+
+  test('C10-E36 All spaces: a press outside the token form closes it', async ({ page }) => {
+    test.skip(phone(), 'Settings is a page under a space on phones');
+    await fixClock(page);
+    await signInFresh(page);
+    const settings = await allSpacesApps(page);
+    await settings.getByRole('button', { name: 'Connect' }).click();
+    await expect(jiraPanel(page).getByLabel('Jira address')).toBeVisible();
+    await page.locator('main.app-main').click({ position: { x: 24, y: 260 } });
+    await expect(jiraPanel(page)).toHaveCount(0);
+    await expect(page).not.toHaveURL(/jira/);
+  });
 });
