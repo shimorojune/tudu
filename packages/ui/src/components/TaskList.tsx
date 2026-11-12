@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
 import { closeRow, openRow, scrollerOf, settleFrom } from '../lib/motion';
-import { itemByKey, moveItem, useDropGroup, useReorder } from '../lib/reorder';
+import { itemByKey, landFlight, moveItem, useDropGroup, useReorder } from '../lib/reorder';
 import { AddTask } from './AddTask';
 import type { MiniCalendarProps } from './MiniCalendar';
 import type { SubtaskItem } from './SubtaskList';
@@ -176,6 +176,8 @@ export function TaskList(p: TaskListProps) {
     opened.current = fresh.key;
     stopOpen.current?.();
     stopOpen.current = openRow(el, fresh.follow ?? null);
+    // dropped here from another list: the lifted copy glides onto the row as its gap opens
+    landFlight(el);
   }, [fresh, tasks]);
   useEffect(() => {
     if (!fresh) return;
@@ -267,7 +269,7 @@ export function TaskList(p: TaskListProps) {
   const down = useReorder(ref, reorder, { group: narrowed ? null : p.group });
   useDropGroup(narrowed || p.locked ? null : p.group, ref, (key, at) => {
     p.onReceive?.(key, at);
-    setFresh({ key });
+    setFresh({ key, follow: 'out' });
     opened.current = null;
   });
 

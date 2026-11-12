@@ -625,6 +625,9 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 .tp-list.tp-drop-on { background: var(--selection); border-radius: var(--radius-md); transition: background var(--dur-menu) var(--ease-change); }
 .tp-drop-line { position: absolute; left: 24px; right: 24px; top: 0; height: 2px; border-radius: 2px; background: var(--foreground); opacity: .55; pointer-events: none; transition: transform 90ms var(--ease-change); }
 .tp-drop-line::before { content: ""; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--foreground); }
+/* after a drop the wash and the line fade (120ms) while the row glides in */
+.tp-list.tp-drop-on.tp-drop-off { background: transparent; transition: background 120ms var(--ease-leave); }
+.tp-list.tp-drop-off > .tp-drop-line { opacity: 0; transition: opacity 120ms var(--ease-leave); }
 .tp-sheet:has(.tp-dragging) { z-index: 20; }
 
 /* The day title is one button: click the day or the date to pick another day */
@@ -1486,6 +1489,12 @@ p.tp-jp-none { margin: 0; font-size: 13.5px; }
 .tp-drag-ghost, .tp-drag-ghost * { animation: none !important; }
 .tp-drag-ghost .tp-subwrap, .tp-drag-ghost .tp-ins { display: none; }
 .tp-item.tp-drag-src { visibility: hidden; }
+/* let go over another list: the copy glides onto its row (lib/reorder drives the move) and its lift eases off */
+.tp-drag-ghost.tp-flying .tp-row { box-shadow: 0 0 0 0 transparent; transition: box-shadow var(--dur-fold) var(--ease-settle); }
+/* a week day's empty line around a hand-over: it folds away under the row that lands (lib/motion closeRow), and
+   comes in only after the last row's gap has folded */
+.tp-wd-none.tp-wd-none-in { animation: tp-fade-in 160ms var(--ease-change) 240ms both; }
+@media (prefers-reduced-motion: reduce) { .tp-item.tp-new { animation: tp-fade-in 120ms linear both; } .tp-wd-none.tp-wd-none-in { animation-delay: 0ms; } }
 
 /* WeekPicker: a month in week rows */
 .tp-wkp { width: 300px; }

@@ -75,6 +75,7 @@ Every spec makes its own users and spaces. The multi-user specs use two browser 
 | C21-E23 | A saved task opens, closes and opens again on All spaces Today (unfiltered and filtered), Week and Backlog without freezing                                                                           |
 | C21-E24 | The same two triggers on a space's own Today, Week and Backlog (regression guard for the shared panel)                                                                                                |
 | C21-E28 | Getting started in All spaces (desk, tablet): Bring your Jira issues opens Settings on Apps (Connect shown), no Apps panel                                                                            |
+| C21-E29 | Two days, a drop on tomorrow                                                                                                                                                                          | Motion on: a Northwind task glides onto tomorrow, keeps its pill, and is on tomorrow in Northwind (desktop) |
 
 Every end-to-end spec makes its own people and spaces. Chunk 07's Search specs keep their IDs; C07-U08 now reads
 one list per browser (Search spans every space), and C07-E11 holds the new `/api/search` route.

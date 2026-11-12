@@ -1,6 +1,9 @@
+import type { Page } from '@playwright/test';
 import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
+import { expectGlides, expectLands, sampleBoxes } from '../../fixtures/motion';
 import {
   SUNDAY,
+  carry,
   dayList,
   drag,
   fixClock,
@@ -9,6 +12,7 @@ import {
   row,
   rowsOf,
   titlesOf,
+  twoDays,
   writeTasks,
 } from '../../fixtures/today';
 
@@ -345,5 +349,108 @@ test.describe('today', () => {
       'aria-checked',
       'true',
     );
+  });
+});
+
+const SUNDAY_TASKS = 'Tasks for Sunday 18 October';
+const MONDAY_TASKS = 'Tasks for Monday 19 October';
+
+/** Three tasks on Sunday, Monday beside it; "Call Sam at 3pm" (the middle row) held over Monday's list. */
+async function holdOverMonday(page: Page) {
+  await signInFresh(page);
+  await writeTasks(page, THREE);
+  await page.getByRole('textbox', { name: 'New task' }).press('Escape');
+  await idle(page);
+  const monday = await twoDays(page);
+  const sunday = dayList(page, SUNDAY_TASKS);
+  const moved = (await row(sunday, 'Call Sam at 3pm').getAttribute('data-key'))!;
+  const below = (await row(sunday, 'Book car service').getAttribute('data-key'))!;
+  const box = (await monday.locator('.tp-list').boundingBox())!;
+  await carry(page, row(sunday, 'Call Sam at 3pm'), { x: box.x + 120, y: box.y + 8 });
+  await expect(monday.locator('.tp-list')).toHaveClass(/tp-drop-on/);
+  return {
+    monday,
+    selectors: {
+      card: '.tp-drag-ghost',
+      row: `[aria-label="${MONDAY_TASKS}"] [data-reorder][data-key="${moved}"]`,
+      below: `[aria-label="${SUNDAY_TASKS}"] [data-reorder][data-key="${below}"]`,
+    },
+  };
+}
+
+async function expectMoved(page: Page) {
+  await expect.poll(() => titlesOf(dayList(page, MONDAY_TASKS))).toEqual(['Call Sam at 3pm']);
+  await expect
+    .poll(() => titlesOf(dayList(page, SUNDAY_TASKS)))
+    .toEqual(['Pay the electricity bill', 'Book car service']);
+}
+
+test.describe('today, a drop on the other day', () => {
+  test.beforeEach(async ({ page }) => {
+    test.skip(!['desktop', 'webkit'].includes(test.info().project.name), 'two days side by side is the desk');
+    await fixClock(page);
+  });
+
+  test.describe('with motion', () => {
+    // The rest of the suite runs with reduced motion; these are about what moves after the drop, and how.
+    test.use({ contextOptions: { reducedMotion: 'no-preference' } });
+
+    test('C02-E15 two days: let go over tomorrow and the card glides onto its new row while the row under the gap glides up; the server agrees', async ({
+      page,
+    }) => {
+      const { monday, selectors } = await holdOverMonday(page);
+      const frames = await sampleBoxes(page, selectors, () => page.mouse.up());
+      expectLands(frames);
+      // "Book car service" closes the gap over several frames, never in one jump
+      expectGlides(frames.map((f) => f.below!.y));
+      // nothing is left behind: the wash and the ink line are gone, no row keeps a style from the move
+      await expect(monday.locator('.tp-list')).not.toHaveClass(/tp-drop-on|tp-drop-off/);
+      await expect(monday.locator('.tp-drop-line')).toHaveCount(0);
+      await expect(
+        page.locator('[data-reorder][style*="margin"], [data-reorder][style*="visibility"]'),
+      ).toHaveCount(0);
+      await expectMoved(page);
+      await idle(page);
+      await page.reload();
+      await expectMoved(page);
+    });
+
+    // 1024 is the narrowest desk: the day header is at its tightest there
+    for (const width of [1440, 1024]) {
+      test(`C02-E17 a day that gets its first task by a drop: the top of its list stays where it was (${width} wide)`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 900 });
+        const { monday } = await holdOverMonday(page);
+        const list = monday.locator('.tp-list');
+        const before = (await list.boundingBox())!.y;
+        const tops: number[] = [];
+        await page.mouse.up();
+        for (let i = 0; i < 12; i++) {
+          tops.push((await list.boundingBox())!.y);
+          await page.waitForTimeout(50);
+        }
+        await expectMoved(page);
+        expect(
+          tops.every((y) => Math.abs(y - before) < 1),
+          `the list's top, 50ms apart: ${tops.map(Math.round).join(' ')} (was ${Math.round(before)})`,
+        ).toBe(true);
+      });
+    }
+  });
+
+  test('C02-E16 reduced motion: the same drop has no glide, the task is on tomorrow at once', async ({
+    page,
+  }) => {
+    const { selectors } = await holdOverMonday(page);
+    const frames = await sampleBoxes(page, selectors, () => page.mouse.up(), 500);
+    const landed = frames.filter((f) => f.row);
+    expect(landed.length).toBeGreaterThan(0);
+    // once the row is on Monday there is no lifted copy and the row is painted
+    expect(landed.every((f) => !f.card && !f.row!.hidden)).toBe(true);
+    // the row under the gap is in one place before and one after, nowhere in between
+    const ys = new Set(frames.map((f) => Math.round(f.below!.y)));
+    expect(ys.size, `places: ${[...ys].join(' ')}`).toBeLessThanOrEqual(2);
+    await expectMoved(page);
   });
 });

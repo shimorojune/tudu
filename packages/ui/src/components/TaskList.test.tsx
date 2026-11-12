@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { stopFlight } from '../lib/reorder';
 import { parseRules, readStylesheet, rulesWhere } from '../test-utils/stylesheet';
 import { Chip } from './Chip';
 import { SpaceFilter } from './SpaceFilter';
@@ -86,9 +87,47 @@ const titles = () =>
     .filter(Boolean);
 
 afterEach(() => {
+  stopFlight();
   vi.useRealTimers();
   document.documentElement.classList.remove('tp-is-dragging');
+  delete document.documentElement.dataset.motion;
 });
+
+/** Two days that trade rows through state, the way the pages do through the store. `refuse`: the move never lands. */
+function TwoDays({ refuse }: { refuse?: boolean }) {
+  const [sunday, setSunday] = useState(THREE);
+  const [monday, setMonday] = useState<TaskItem[]>([{ key: 'd', title: 'Dentist at 4pm' }]);
+  return (
+    <>
+      <TaskList tasks={sunday} group="days" label="Sunday" />
+      <TaskList
+        tasks={monday}
+        group="days"
+        label="Monday"
+        onReceive={(key, at) => {
+          const task = sunday.find((t) => t.key === key);
+          if (refuse || !task) return;
+          setSunday((l) => l.filter((t) => t.key !== key));
+          setMonday((l) => [...l.slice(0, at), task, ...l.slice(at)]);
+        }}
+      />
+    </>
+  );
+}
+
+/** Drag a Sunday row (by its title, at its slot's y) onto the end of Monday and let go. */
+function dropOnMonday(title = 'Call Sam at 3pm', y = 175) {
+  pointer(screen.getByText(title), 'pointerdown', 50, y);
+  pointer(window, 'pointermove', 60, y + 10);
+  pointer(window, 'pointermove', 760, 100 + ROW + 10);
+  pointer(window, 'pointerup', 760, 100 + ROW + 10);
+}
+
+const rowOf = (list: HTMLElement, key: string) => list.querySelector<HTMLElement>(`[data-key="${key}"]`);
+const pass = (ms: number) =>
+  act(() => {
+    vi.advanceTimersByTime(ms);
+  });
 
 describe('TaskList', () => {
   it('C02-U07 renders the rows in order; Alt with an arrow key moves one and reports the new order', async () => {
@@ -222,6 +261,7 @@ describe('TaskList', () => {
   });
 
   it('C02-U12 two lists in a group accept each other’s rows and report the move', () => {
+    vi.useFakeTimers();
     const onReceive = vi.fn();
     render(
       <>
@@ -246,7 +286,165 @@ describe('TaskList', () => {
     expect(monday.querySelector('.tp-drop-line')).not.toBeNull();
     pointer(window, 'pointerup', 760, 100 + ROW + 10);
     expect(onReceive).toHaveBeenCalledWith('b', 1);
+    // the lifted copy outlives the drag while it glides in; the wash and the line fade
+    expect(document.querySelector('.tp-drag-ghost')).toHaveClass('tp-flying');
+    expect(monday).toHaveClass('tp-drop-off');
+    pass(700);
     expect(monday).not.toHaveClass('tp-drop-on');
+    expect(monday.querySelector('.tp-drop-line')).toBeNull();
+    expect(document.querySelector('.tp-drag-ghost')).toBeNull();
+  });
+
+  it('C02-U29 a row dropped on another list: the lifted copy stays and flies, the move is reported once, the new row waits hidden under it', () => {
+    vi.useFakeTimers();
+    render(<TwoDays />);
+    layout();
+    dropOnMonday();
+    const monday = screen.getByRole('list', { name: 'Monday' });
+    const ghosts = document.querySelectorAll('.tp-drag-ghost');
+    expect(ghosts).toHaveLength(1);
+    expect(ghosts[0]).toHaveClass('tp-flying');
+    // by attribute, not role: the hidden row is out of the accessibility tree until the copy lands
+    expect([...monday.querySelectorAll('[data-reorder]')].map((li) => li.getAttribute('data-key'))).toEqual([
+      'd',
+      'b',
+    ]);
+    expect(rowOf(monday, 'b')!.style.visibility).toBe('hidden');
+    expect(rowOf(screen.getByRole('list', { name: 'Sunday' }), 'b')).toBeNull();
+    expect(document.documentElement).not.toHaveClass('tp-is-dragging');
+  });
+
+  it('C02-U30 after the glide the copy is gone, the row shows with the wash, and no row keeps an inline style from the move', () => {
+    vi.useFakeTimers();
+    render(<TwoDays />);
+    layout();
+    dropOnMonday();
+    pass(400);
+    const monday = screen.getByRole('list', { name: 'Monday' });
+    expect(document.querySelector('.tp-drag-ghost')).toBeNull();
+    expect(rowOf(monday, 'b')!.style.visibility).toBe('');
+    expect(rowOf(monday, 'b')).toHaveClass('tp-dropped');
+    for (const row of document.querySelectorAll<HTMLElement>('[data-reorder]')) {
+      expect(row.style.transform).toBe('');
+      expect(row.style.marginTop).toBe('');
+      expect(row.style.visibility).toBe('');
+    }
+    for (const list of screen.getAllByRole('list')) expect(list.style.paddingBottom).toBe('');
+  });
+
+  it('C02-U31 the list it left folds its gap: the row that moved up starts one row lower and eases shut; rows above never move', () => {
+    vi.useFakeTimers();
+    render(<TwoDays />);
+    layout();
+    dropOnMonday();
+    const sunday = screen.getByRole('list', { name: 'Sunday' });
+    expect(rowOf(sunday, 'c')!.style.marginTop).toBe(`${ROW}px`);
+    expect(rowOf(sunday, 'a')!.style.marginTop).toBe('');
+    pass(120);
+    const mid = parseFloat(rowOf(sunday, 'c')!.style.marginTop);
+    expect(mid).toBeGreaterThan(0);
+    expect(mid).toBeLessThan(ROW);
+    expect(rowOf(sunday, 'a')!.style.marginTop).toBe('');
+    pass(200);
+    expect(rowOf(sunday, 'c')!.style.marginTop).toBe('');
+  });
+
+  it('C02-U32 when the last row leaves, the fold is on the list’s bottom edge, not on a row', () => {
+    vi.useFakeTimers();
+    render(<TwoDays />);
+    layout();
+    dropOnMonday('Book car service', 230);
+    const sunday = screen.getByRole('list', { name: 'Sunday' });
+    expect(sunday.style.paddingBottom).toBe(`${ROW}px`);
+    for (const key of ['a', 'b']) expect(rowOf(sunday, key)!.style.marginTop).toBe('');
+    pass(300);
+    expect(sunday.style.paddingBottom).toBe('');
+  });
+
+  it('C02-U33 on a drop the ink line and the wash fade for 120ms; leaving the list mid-drag clears them at once', () => {
+    vi.useFakeTimers();
+    render(<TwoDays />);
+    layout();
+    const monday = screen.getByRole('list', { name: 'Monday' });
+    // over Monday, then out between the two lists: gone at once
+    pointer(screen.getByText('Call Sam at 3pm'), 'pointerdown', 50, 175);
+    pointer(window, 'pointermove', 60, 185);
+    pointer(window, 'pointermove', 760, 100 + ROW + 10);
+    expect(monday).toHaveClass('tp-drop-on');
+    pointer(window, 'pointermove', 650, 100 + ROW + 10);
+    expect(monday).not.toHaveClass('tp-drop-on');
+    expect(monday).not.toHaveClass('tp-drop-off');
+    expect(monday.querySelector('.tp-drop-line')).toBeNull();
+    // back over Monday and let go: they fade
+    pointer(window, 'pointermove', 760, 100 + ROW + 10);
+    pointer(window, 'pointerup', 760, 100 + ROW + 10);
+    expect(monday).toHaveClass('tp-drop-on', 'tp-drop-off');
+    expect(monday.querySelector('.tp-drop-line')).not.toBeNull();
+    pass(119);
+    expect(monday.querySelector('.tp-drop-line')).not.toBeNull();
+    pass(2);
+    expect(monday).not.toHaveClass('tp-drop-on');
+    expect(monday).not.toHaveClass('tp-drop-off');
+    expect(monday.querySelector('.tp-drop-line')).toBeNull();
+    const fade = rulesWhere(rules, (sel) => sel.includes('.tp-drop-off'));
+    expect(fade.length).toBeGreaterThan(0);
+    for (const r of fade) expect(Object.values(r.declarations).join(' ')).toContain('120ms');
+  });
+
+  it('C02-U34 less motion: no flying copy and no fold; the row is in its new list at once, with the wash', () => {
+    vi.useFakeTimers();
+    document.documentElement.dataset.motion = 'less';
+    render(<TwoDays />);
+    layout();
+    dropOnMonday();
+    const monday = screen.getByRole('list', { name: 'Monday' });
+    const sunday = screen.getByRole('list', { name: 'Sunday' });
+    expect(document.querySelector('.tp-drag-ghost')).toBeNull();
+    expect(monday).not.toHaveClass('tp-drop-on');
+    expect(monday.querySelector('.tp-drop-line')).toBeNull();
+    expect(rowOf(monday, 'b')!.style.visibility).toBe('');
+    expect(rowOf(monday, 'b')).toHaveClass('tp-new');
+    expect(rowOf(sunday, 'c')!.style.marginTop).toBe('');
+  });
+
+  it('C02-U35 a drag started during the glide lands the first row at once: one copy on the page, the row shown, the gap shut', () => {
+    vi.useFakeTimers();
+    render(<TwoDays />);
+    layout();
+    dropOnMonday();
+    const monday = screen.getByRole('list', { name: 'Monday' });
+    const sunday = screen.getByRole('list', { name: 'Sunday' });
+    expect(rowOf(monday, 'b')!.style.visibility).toBe('hidden');
+    pointer(screen.getByText('Pay the electricity bill'), 'pointerdown', 50, 125);
+    pointer(window, 'pointermove', 60, 135);
+    const ghosts = document.querySelectorAll('.tp-drag-ghost');
+    expect(ghosts).toHaveLength(1);
+    expect(ghosts[0]).not.toHaveClass('tp-flying');
+    expect(ghosts[0]).toHaveTextContent('Pay the electricity bill');
+    expect(rowOf(monday, 'b')!.style.visibility).toBe('');
+    expect(rowOf(sunday, 'c')!.style.marginTop).toBe('');
+    pointer(window, 'pointerup', 60, 135);
+    fireEvent.click(document.body);
+  });
+
+  it('C02-U36 a move that never lands, or a page that goes away mid-glide, still clears the copy', () => {
+    vi.useFakeTimers();
+    const refused = render(<TwoDays refuse />);
+    layout();
+    dropOnMonday();
+    expect(document.querySelector('.tp-drag-ghost')).toHaveClass('tp-flying');
+    pass(599);
+    expect(document.querySelector('.tp-drag-ghost')).not.toBeNull();
+    pass(2);
+    expect(document.querySelector('.tp-drag-ghost')).toBeNull();
+    refused.unmount();
+
+    const gone = render(<TwoDays />);
+    layout();
+    dropOnMonday();
+    expect(document.querySelector('.tp-drag-ghost')).toHaveClass('tp-flying');
+    gone.unmount();
+    expect(() => pass(1000)).not.toThrow();
     expect(document.querySelector('.tp-drag-ghost')).toBeNull();
   });
 

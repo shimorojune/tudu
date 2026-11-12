@@ -1,8 +1,10 @@
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { stopFlight } from '../lib/reorder';
 import { parseRules, readStylesheet } from '../test-utils/stylesheet';
-import { TaskList } from './TaskList';
+import { TaskList, type TaskItem } from './TaskList';
 import { WeekDay, WeekTiles } from './WeekDay';
 
 const rules = parseRules(readStylesheet('components.css'));
@@ -190,5 +192,95 @@ describe('WeekDay', () => {
     expect(container.querySelector<HTMLElement>('.tp-wk-tiles')!.style.getPropertyValue('--wk-cols')).toBe(
       '2',
     );
+  });
+});
+
+/** Two week tiles that trade rows through state; a tile with nothing on it is `empty`. */
+function TwoTiles() {
+  const [sunday, setSunday] = useState<TaskItem[]>([{ key: 'a', title: 'Pay the electricity bill' }]);
+  const [monday, setMonday] = useState<TaskItem[]>([]);
+  return (
+    <>
+      <WeekDay variant="tile" day="Sunday" empty={!sunday.length}>
+        <TaskList tasks={sunday} group="week" brief compact label="Sunday" />
+      </WeekDay>
+      <WeekDay variant="tile" day="Monday" empty={!monday.length}>
+        <TaskList
+          tasks={monday}
+          group="week"
+          brief
+          compact
+          label="Monday"
+          onReceive={(key) => {
+            setMonday(sunday.filter((t) => t.key === key));
+            setSunday((l) => l.filter((t) => t.key !== key));
+          }}
+        />
+      </WeekDay>
+    </>
+  );
+}
+
+function pointer(target: Element | Window, type: string, x: number, y: number) {
+  const ev = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 });
+  Object.defineProperty(ev, 'pointerType', { value: 'mouse' });
+  Object.defineProperty(ev, 'pointerId', { value: 1 });
+  act(() => {
+    target.dispatchEvent(ev);
+  });
+}
+
+describe('WeekDay around a drop', () => {
+  afterEach(() => {
+    stopFlight();
+    vi.useRealTimers();
+    document.documentElement.classList.remove('tp-is-dragging');
+  });
+
+  it('C05-U16 a task dropped on an empty tile: its empty line stays to fold away, then goes; the tile it emptied shows its line only after the fold; no drop, no fold', () => {
+    vi.useFakeTimers();
+    const { unmount } = render(<TwoTiles />);
+    // jsdom has no layout: Sunday's list at the left, Monday's 700px to the right
+    document.querySelectorAll<HTMLElement>('.tp-list').forEach((list, i) => {
+      const box = (top: number, height: number) =>
+        ({ left: i * 700, right: i * 700 + 300, top, bottom: top + height, width: 300, height }) as DOMRect;
+      list.getBoundingClientRect = () => box(100, list.children.length * 52);
+      Array.from(list.children).forEach((row, n) => {
+        (row as HTMLElement).getBoundingClientRect = () => box(100 + n * 52, 52);
+      });
+    });
+    const sunday = screen.getByRole('region', { name: 'Sunday' });
+    const monday = screen.getByRole('region', { name: 'Monday' });
+    expect(monday.querySelector('.tp-wd-none')).toHaveTextContent('Nothing planned');
+    expect(sunday.querySelector('.tp-wd-none')).toBeNull();
+
+    pointer(screen.getByText('Pay the electricity bill'), 'pointerdown', 50, 125);
+    pointer(window, 'pointermove', 60, 125);
+    pointer(window, 'pointermove', 760, 110);
+    pointer(window, 'pointerup', 760, 110);
+    expect(screen.getByRole('list', { name: 'Monday' }).querySelector('[data-key="a"]')).not.toBeNull();
+    // Monday: the line is still there, on its way out and hidden from screen readers
+    const leaving = monday.querySelector('.tp-wd-none')!;
+    expect(leaving).toHaveAttribute('aria-hidden', 'true');
+    expect(leaving).not.toHaveClass('tp-wd-none-in');
+    // Sunday: its line comes in late, after the gap has folded
+    expect(sunday.querySelector('.tp-wd-none')).toHaveClass('tp-wd-none-in');
+    const late = rules.find((r) => r.selector === '.tp-wd-none.tp-wd-none-in')!;
+    expect(late.declarations.animation).toContain('240ms');
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(monday.querySelector('.tp-wd-none')).toBeNull();
+    fireEvent.click(document.body);
+    unmount();
+
+    // with no drop behind it (a task added, the week turned) the line just comes and goes
+    stopFlight();
+    const plain = render(<WeekDay variant="tile" day="Tuesday" empty />);
+    expect(plain.container.querySelector('.tp-wd-none')).not.toHaveClass('tp-wd-none-in');
+    plain.rerender(<WeekDay variant="tile" day="Tuesday" />);
+    expect(plain.container.querySelector('.tp-wd-none')).toBeNull();
+    plain.rerender(<WeekDay variant="tile" day="Tuesday" empty />);
+    expect(plain.container.querySelector('.tp-wd-none')).not.toHaveClass('tp-wd-none-in');
   });
 });

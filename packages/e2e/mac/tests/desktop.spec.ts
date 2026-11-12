@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { HOLD_PORT } from '../playwright.config';
+import { expectGlides, expectLands, type Frame } from '../../fixtures/motion';
 import {
   alive,
   API,
@@ -1529,5 +1530,89 @@ test.describe('the look', () => {
     } finally {
       await web.down();
     }
+  });
+});
+
+test.describe('a drop on the other day', () => {
+  test('C02-D01 two days in the real app: a task let go over tomorrow glides onto its new row, or lands at once where the Mac asks for less motion', async ({
+    app,
+  }) => {
+    await signIn(app);
+    const space = await personal(app);
+    await addToday(app, space.id, ['Pay the electricity bill', 'Call Sam at 3pm', 'Book car service']);
+    await go(app, await app.eval<string>(`return location.pathname`));
+    await app.until(`return T.all('button', 'Book car service').length > 0`, 'main', 15_000);
+    // CI's Macs have Reduce motion on and the page follows it (CSS and script both), so there the drop must land at
+    // once, as C02-E16 has it. On a Mac with motion on, the same test checks the glide, as C02-E15 does.
+    const reduced = await app.eval<boolean>(
+      `return matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.dataset.motion === 'less'`,
+    );
+    await app.eval(`T.click(T.get('button', '2 days'))`);
+    await app.until(
+      `const s = document.querySelector('.tp-spread-second');
+       return !!s && s.classList.contains('tp-on') && !s.classList.contains('tp-moving')`,
+    );
+    // Pick the middle row up, carry it over tomorrow's list, let go, and read every frame until rest.
+    const frames = await app.eval<Frame<'card' | 'row' | 'below'>[]>(`
+      const [sun, mon] = [...document.querySelectorAll('[role=list][aria-label^="Tasks for "]')];
+      const rows = [...sun.querySelectorAll('[data-reorder]')];
+      const moved = rows[1], below = rows[2];
+      const key = moved.getAttribute('data-key');
+      const fire = (target, type, x, y) =>
+        target.dispatchEvent(new PointerEvent(type, {
+          bubbles: true, cancelable: true, view: window, button: 0, buttons: type === 'pointerup' ? 0 : 1,
+          pointerId: 1, pointerType: 'mouse', isPrimary: true, clientX: x, clientY: y,
+        }));
+      const next = () => new Promise((r) => requestAnimationFrame(r));
+      const from = moved.getBoundingClientRect();
+      const to = mon.getBoundingClientRect();
+      const x0 = from.left + 120, y0 = from.top + from.height / 2;
+      const x1 = to.left + 120, y1 = to.top + 8;
+      fire(moved.querySelector('.tp-strike'), 'pointerdown', x0, y0);
+      fire(window, 'pointermove', x0, y0 + 6);
+      for (let i = 1; i <= 12; i++) {
+        fire(window, 'pointermove', x0 + ((x1 - x0) * i) / 12, y0 + 6 + ((y1 - y0 - 6) * i) / 12);
+        await next();
+      }
+      if (!mon.classList.contains('tp-drop-on')) throw new Error('tomorrow never took the row');
+      const box = (el) => {
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { x: r.x, y: r.y, width: r.width, height: r.height, hidden: getComputedStyle(el).visibility === 'hidden' };
+      };
+      const read = () => ({
+        card: box(document.querySelector('.tp-drag-ghost')),
+        row: box(mon.querySelector('[data-reorder][data-key="' + key + '"]')),
+        below: box(below),
+      });
+      const frames = [read()];
+      fire(window, 'pointerup', x1, y1);
+      const end = performance.now() + 900;
+      while (performance.now() < end) {
+        await next();
+        frames.push(read());
+      }
+      return frames;`);
+    if (reduced) {
+      const landed = frames.filter((f) => f.row);
+      expect(landed.length).toBeGreaterThan(0);
+      // once the row is on tomorrow there is no lifted copy and the row is painted
+      expect(landed.every((f) => !f.card && !f.row!.hidden)).toBe(true);
+      // the row under the gap is in one place before and one after, nowhere in between
+      const ys = new Set(frames.map((f) => Math.round(f.below!.y)));
+      expect(ys.size, `places: ${[...ys].join(' ')}`).toBeLessThanOrEqual(2);
+    } else {
+      expectLands(frames);
+      expectGlides(frames.map((f) => f.below!.y));
+    }
+    expect(
+      await app.eval(`return document.querySelectorAll('.tp-drag-ghost, .tp-drop-line, .tp-drop-on').length`),
+    ).toBe(0);
+    expect(
+      await app.eval(
+        `return [...document.querySelectorAll('[role=list][aria-label^="Tasks for "]')].map((l) =>
+           [...l.querySelectorAll('[data-reorder] .tp-strike')].map((t) => t.textContent))`,
+      ),
+    ).toEqual([['Pay the electricity bill', 'Book car service'], ['Call Sam at 3pm']]);
   });
 });
