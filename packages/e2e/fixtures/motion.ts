@@ -160,6 +160,16 @@ export function expectFolds(heights: number[], frames = 3): void {
   ).toBeGreaterThanOrEqual(frames);
 }
 
+/**
+ * As `expectFolds`, and the fold goes all the way: the last height seen before it is gone is nearly nothing. A fold
+ * that stops at the element's padding and then pops out fails here.
+ */
+export function expectFoldsShut(heights: number[], frames = 3): void {
+  expectFolds(heights, frames);
+  const last = heights.filter((h) => h > 0).pop()!;
+  expect(last, `last height before it is gone: ${heights.map(Math.round).join(' ')}`).toBeLessThan(8);
+}
+
 /** Where something is on one frame; `hidden` while it keeps its place but is not painted. */
 export interface FrameBox {
   x: number;
@@ -209,6 +219,12 @@ export async function sampleBoxes<K extends string>(
   }, selectors);
   await act();
   await page.waitForTimeout(ms);
+  // On a slow runner the row can render late, so a glide can still be under way at `ms`: read on until the lifted
+  // copy has left the page. A copy that never leaves still fails in `expectLands`.
+  await page
+    .waitForFunction(() => !document.querySelector('.tp-drag-ghost'), null, { timeout: 3000 })
+    .catch(() => {});
+  await page.waitForTimeout(100);
   return page.evaluate(() => {
     const w = window as unknown as { __frames: unknown[]; __framing: boolean };
     w.__framing = false;

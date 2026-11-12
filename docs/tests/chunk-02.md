@@ -46,6 +46,7 @@ empty) before reading the server.
 | C02-U35 | A drag during the glide     | The first row lands at once: one copy on the page, the row shown, the gap shut                                                                              |
 | C02-U36 | A move that never lands     | A refused move, or a page that goes away mid-glide, still clears the copy                                                                                   |
 | C02-U37 | foldGap                     | Starts a row one gap lower and eases it shut in 240ms, cleans up, can be finished at once, does nothing under less motion                                   |
+| C02-U38 | closeRow, a padded line     | Its padding closes with its height down to nothing, so it cannot stop at its padding and pop out; a row without padding folds as before                     |
 
 ## API (`apps/server`)
 
