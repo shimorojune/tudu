@@ -125,4 +125,50 @@ test.describe('opening Tudu', () => {
     expect(seen).toBeLessThan(290);
     await expect(page.locator('#boot')).toHaveCount(0, { timeout: 10_000 });
   });
+
+  test('C11-E23 with motion on, the mark leaves and the app arrives without the page shifting sideways (#48)', async ({
+    page,
+  }) => {
+    await signInFresh(page);
+    // The suite runs with reduced motion; the jump came from the motion's 4px rise, so this one turns it back on.
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.addInitScript(() => {
+      type F = { width: number; tall: boolean; overflow: string; boot: boolean; arriving: boolean };
+      const w = window as unknown as { __frames: F[] };
+      w.__frames = [];
+      const tick = () => {
+        const html = document.documentElement;
+        const app = document.getElementById('root');
+        w.__frames.push({
+          width: html.clientWidth,
+          tall: html.scrollHeight > html.clientHeight,
+          overflow: getComputedStyle(html).overflowY,
+          boot: !!document.getElementById('boot'),
+          arriving: !!app?.classList.contains('tl-arrive'),
+        });
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    await holdMe(page, 2_000);
+    await page.goto('/');
+    await expect(page.locator('#boot')).toHaveCSS('opacity', '1');
+    await expect(page.getByRole('heading', { name: /day$/ })).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#boot')).toHaveCount(0);
+    await expect(page.locator('#root')).not.toHaveClass(/tl-arrive/);
+    const frames = await page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            __frames: { width: number; tall: boolean; overflow: string; boot: boolean; arriving: boolean }[];
+          }
+        ).__frames,
+    );
+    // From the mark on screen until the app is at rest: the window's content width never changes, and on any frame
+    // the page reaches past the window it can't scroll (no scrollbar to flick up).
+    const during = frames.filter((f) => f.boot || f.arriving);
+    expect(during.some((f) => f.arriving)).toBe(true);
+    expect(new Set(during.map((f) => f.width)).size).toBe(1);
+    expect(during.filter((f) => f.arriving && f.tall && f.overflow !== 'hidden')).toEqual([]);
+  });
 });

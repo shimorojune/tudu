@@ -1381,19 +1381,38 @@ const themes = (s: AppState) =>
 
 /**
  * A stand-in for the web on HOLD_PORT, passing everything to the real one: down until `up()`, and `/` answered only
- * after `holdMs` (the loader's reachability check and the page itself).
+ * after `holdMs` (the loader's reachability check and the page itself). With `head`, that script runs first thing in
+ * the page at `/`, before the page's own.
  */
 function standIn() {
   let server: Server | null = null;
   let holdMs = 0;
-  const up = (hold = 0) =>
+  let headScript = '';
+  const up = (hold = 0, head = '') =>
     new Promise<void>((resolve) => {
       holdMs = hold;
+      headScript = head;
       server = createServer((req, res) => {
         const pass = () => {
-          const out = request(`${WEB}${req.url}`, { method: req.method, headers: req.headers }, (r) => {
-            res.writeHead(r.statusCode ?? 502, r.headers);
-            r.pipe(res);
+          const inject = req.url === '/' && !!headScript;
+          const headers = { ...req.headers };
+          if (inject) delete headers['accept-encoding'];
+          const out = request(`${WEB}${req.url}`, { method: req.method, headers }, (r) => {
+            if (!inject) {
+              res.writeHead(r.statusCode ?? 502, r.headers);
+              r.pipe(res);
+              return;
+            }
+            const parts: Buffer[] = [];
+            r.on('data', (c: Buffer) => parts.push(c));
+            r.on('end', () => {
+              const html = Buffer.concat(parts)
+                .toString('utf8')
+                .replace('<head>', `<head><script>${headScript}</script>`);
+              const { 'content-length': _len, ...rest } = r.headers;
+              res.writeHead(r.statusCode ?? 502, rest);
+              res.end(html);
+            });
           });
           out.on('error', () => res.destroy());
           req.pipe(out);
@@ -1527,6 +1546,44 @@ test.describe('the look', () => {
       await onToday(app);
       expect(await app.eval(`return document.documentElement.dataset.boot`)).toBe('held');
       await app.until(`return !document.getElementById('boot')`);
+    } finally {
+      await web.down();
+    }
+  });
+  test('C11-D23 from the loader to the app at rest, the desk’s content never shifts sideways (#48)', async ({
+    app,
+  }) => {
+    await signIn(app);
+    await app.quit();
+    const web = standIn();
+    // Every frame of the web page, from its first script: the content width, and whether it could scroll past the window.
+    const recorder = `(function () {
+      var f = (window.__frames = []);
+      function tick() {
+        var h = document.documentElement, a = document.getElementById('root');
+        f.push({ width: h.clientWidth, tall: h.scrollHeight > h.clientHeight, overflow: getComputedStyle(h).overflowY,
+          boot: !!document.getElementById('boot'), arriving: !!(a && a.classList.contains('tl-arrive')) });
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    })();`;
+    try {
+      await web.up(2_000, recorder);
+      await app.launch({ TUDU_TEST_WEB: web.url });
+      await onToday(app);
+      await app.until(
+        `return !document.getElementById('boot') && !document.getElementById('root').classList.contains('tl-arrive')`,
+      );
+      const frames =
+        await app.eval<
+          { width: number; tall: boolean; overflow: string; boot: boolean; arriving: boolean }[]
+        >(`return window.__frames`);
+      // The web carried the mark on from the loader and let it go: those frames, through the app's arrival. CI's Macs
+      // have Reduce motion on (a fade, no rise), so there this guards the leave; with motion on it checks the rise too.
+      const during = frames.filter((f) => f.boot || f.arriving);
+      expect(during.length).toBeGreaterThan(0);
+      expect(new Set(during.map((f) => f.width)).size).toBe(1);
+      expect(during.filter((f) => f.arriving && f.tall && f.overflow !== 'hidden')).toEqual([]);
     } finally {
       await web.down();
     }

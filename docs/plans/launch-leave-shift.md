@@ -1,6 +1,6 @@
 # Launch mark jumps left as it leaves (#48)
 
-Status: proposal, awaiting Rohit's approval. Canvas: asked to skip (no design change; K-Launch already shows the
+Status: approved by Rohit 12 Nov 2026; implemented. Canvas: skipped with Rohit's OK (no design change; K-Launch already shows the
 intended leave, a swell and fade with no sideways move).
 
 ## The report
@@ -30,11 +30,11 @@ The app's arrival makes the page scrollable for a moment, and the scrollbar that
 Measured on master (f8cba7c) with the real web bundle in headless Chromium at 1200×800, scrollbars shown, frame by
 frame:
 
-| Frame                    | Window content width | Mark's left edge | Document height |
-| ------------------------ | -------------------- | ---------------- | --------------- |
-| last frame before leave  | 1200                 | 571.5            | 800             |
-| first leaving frame      | 1190                 | 566.5            | 804             |
-| ~90ms into the leave     | 1200                 | back in place    | 800             |
+| Frame                   | Window content width | Mark's left edge | Document height |
+| ----------------------- | -------------------- | ---------------- | --------------- |
+| last frame before leave | 1200                 | 571.5            | 800             |
+| first leaving frame     | 1190                 | 566.5            | 804             |
+| ~90ms into the leave    | 1200                 | back in place    | 800             |
 
 Chromium's styled scrollbar took 10px there (a 5px jump); WebKit takes the full 12px (6px). With the fix below
 injected, the width stays 1200 on every frame.
