@@ -39,7 +39,7 @@ export interface NoteTreeProps {
   loading?: boolean;
   error?: boolean;
   onRetry?: () => void;
-  /** The window's All notes list: no heading, no New, no Trash. */
+  /** The window's All notes list: no heading and no Trash; New sits beside Find. */
   bare?: boolean;
   /** The kit: Find starts with these words. */
   initialQuery?: string;
@@ -157,6 +157,8 @@ interface Common {
   landed: string | null;
   adding: string | null | undefined;
   setAdding: (parent: string | null | undefined) => void;
+  /** A folder was just named here: its row glows once when it arrives. */
+  named: (parent: string | null, name: string) => void;
   /** Press on a row: a mouse lifts it after a few pixels, a finger after a short hold. */
   down: (e: ReactPointerEvent, kind: Drag['kind'], id: string, label: string) => void;
   /** The row the card is flying to: hidden until it lands. */
@@ -167,10 +169,13 @@ interface Common {
 function NameField({
   initial,
   depth,
+  fresh,
   onDone,
 }: {
   initial: string;
   depth: number;
+  /** A new folder's row: it opens its own height, so the rows under it slide down. */
+  fresh?: boolean;
   onDone: (name: string | null) => string | null | void;
 }) {
   const [name, setName] = useState(initial);
@@ -195,7 +200,10 @@ function NameField({
   };
   return (
     <>
-      <div className="tp-nb-frow tp-nb-frow-busy" style={{ '--nb-depth': depth } as React.CSSProperties}>
+      <div
+        className={cx('tp-nb-frow tp-nb-frow-busy', fresh && 'tp-nb-naming')}
+        style={{ '--nb-depth': depth } as React.CSSProperties}
+      >
         <div className="tp-nb-ftog tp-nb-frename">
           <span className="tp-nb-chev">
             <NoteIcon name="chev" size={13} />
@@ -208,6 +216,7 @@ function NameField({
             className={cx('tp-nb-fname-in', err && 'tp-bad')}
             value={name}
             maxLength={80}
+            placeholder={fresh ? 'Folder name' : undefined}
             aria-label="Folder name"
             aria-invalid={err ? 'true' : undefined}
             onChange={(e) => {
@@ -256,15 +265,16 @@ function Folder({ folder: f, depth, c }: { folder: NoteFolderItem; depth: number
   const wrap = useRef<HTMLSpanElement | null>(null);
   useCloseOnOutside(wrap, menu, () => setMenu(false));
   const inside = countNotes(f);
+  // Only what the tree was given a way to do: a list that can't rename or delete has no ⋯.
   const items = [
-    {
+    c.p.onRenameFolder && {
       label: 'Rename',
       onSelect: () => {
         setMenu(false);
         setRenaming(true);
       },
     },
-    {
+    c.p.onDeleteFolder && {
       label: 'Delete',
       danger: true,
       onSelect: () => {
@@ -272,7 +282,7 @@ function Folder({ folder: f, depth, c }: { folder: NoteFolderItem; depth: number
         setAsking(true);
       },
     },
-  ];
+  ].filter((x): x is { label: string; danger?: boolean; onSelect: () => void } => !!x);
   const zone = over ? `tp-nb-drop-${over.zone}` : null;
   return (
     <div className={cx('tp-nb-f', c.drag?.id === f.id && 'tp-nb-dragging')}>
@@ -327,7 +337,7 @@ function Folder({ folder: f, depth, c }: { folder: NoteFolderItem; depth: number
             className="tp-nb-ftog"
             aria-expanded={open ? 'true' : 'false'}
             onClick={() => c.toggle(f.id)}
-            onDoubleClick={() => setRenaming(true)}
+            onDoubleClick={c.p.onRenameFolder ? () => setRenaming(true) : undefined}
           >
             <span className="tp-nb-chev">
               <NoteIcon name="chev" size={13} />
@@ -360,19 +370,21 @@ function Folder({ folder: f, depth, c }: { folder: NoteFolderItem; depth: number
                 <Icon name="plus" size={14} />
               </IconButton>
             ) : null}
-            <span ref={wrap} className="tp-nb-menuw">
-              <IconButton
-                label="More"
-                tipSide="right"
-                className={menu ? 'tp-on' : undefined}
-                onClick={() => setMenu(!menu)}
-              >
-                <Icon name="more" size={14} />
-              </IconButton>
-              <NotePop open={menu} className="tp-nb-pop-r tp-nb-fmenu">
-                <MenuList label={`${f.name} options`} items={items} />
-              </NotePop>
-            </span>
+            {items.length ? (
+              <span ref={wrap} className="tp-nb-menuw">
+                <IconButton
+                  label="More"
+                  tipSide="right"
+                  className={menu ? 'tp-on' : undefined}
+                  onClick={() => setMenu(!menu)}
+                >
+                  <Icon name="more" size={14} />
+                </IconButton>
+                <NotePop open={menu} className="tp-nb-pop-r tp-nb-fmenu">
+                  <MenuList label={`${f.name} options`} items={items} />
+                </NotePop>
+              </span>
+            ) : null}
           </span>
         </div>
       )}
@@ -385,13 +397,17 @@ function Folder({ folder: f, depth, c }: { folder: NoteFolderItem; depth: number
             <NameField
               initial=""
               depth={depth + 1}
+              fresh
               onDone={(name) => {
                 if (name === null) {
                   c.setAdding(undefined);
                   return null;
                 }
                 const bad = c.p.onCreateFolder?.(f.id, name);
-                if (!bad) c.setAdding(undefined);
+                if (!bad) {
+                  c.setAdding(undefined);
+                  c.named(f.id, name);
+                }
                 return bad;
               }}
             />
@@ -497,6 +513,23 @@ export function NoteTree(p: NoteTreeProps) {
   const toggle = (id: string) => setOpenIds((o) => ({ ...o, [id]: !o[id] }));
   const open = (id: string) => setOpenIds((o) => ({ ...o, [id]: true }));
   const flat = flatten(p.folders, p.notes);
+
+  // The folder you just named glows once when it arrives in the list, like a row you just dropped.
+  const justNamed = useRef<{ parent: string | null; name: string } | null>(null);
+  const named = (parent: string | null, name: string) => {
+    justNamed.current = { parent, name: name.trim() };
+  };
+  useEffect(() => {
+    const n = justNamed.current;
+    if (!n) return;
+    const f = flat.fs.find((x) => x.parentId === n.parent && x.name === n.name);
+    if (!f) return;
+    justNamed.current = null;
+    setLanded(f.id);
+    if (lt.current) clearTimeout(lt.current);
+    lt.current = setTimeout(() => setLanded(null), LANDED_MS);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the folders change: that is when it arrives
+  }, [p.folders]);
 
   /** Where a drop lands: the new parent and the index among its rows. */
   function place(d: Drag, o: Over): { parent: string | null; index?: number } {
@@ -766,6 +799,7 @@ export function NoteTree(p: NoteTreeProps) {
     landed,
     adding,
     setAdding,
+    named,
     down,
     flying: ghost?.to && !ghost.to.sink ? ghost.to.id : null,
   };
@@ -815,13 +849,17 @@ export function NoteTree(p: NoteTreeProps) {
           <NameField
             initial=""
             depth={0}
+            fresh
             onDone={(name) => {
               if (name === null) {
                 setAdding(undefined);
                 return null;
               }
               const bad = p.onCreateFolder?.(null, name);
-              if (!bad) setAdding(undefined);
+              if (!bad) {
+                setAdding(undefined);
+                named(null, name);
+              }
               return bad;
             }}
           />
@@ -846,9 +884,40 @@ export function NoteTree(p: NoteTreeProps) {
       </div>
     );
 
+  /** One quiet New button: a note (the usual thing, first) or a folder. */
+  const newButton = (size: number) => (
+    <span ref={newRef} className="tp-nb-menuw">
+      <IconButton
+        label="New note or folder"
+        tipSide="bottom-end"
+        className={newOpen ? 'tp-on' : undefined}
+        disabled={p.bare && (p.loading || p.error) ? true : undefined}
+        onClick={() => setNewOpen(!newOpen)}
+      >
+        <Icon name="plus" size={size} />
+      </IconButton>
+      <NotePop open={newOpen} className="tp-nb-pop-r tp-nb-newmenu">
+        <MenuList
+          label="New"
+          items={[
+            p.onNewNote && {
+              label: 'New note',
+              onSelect: () => {
+                setNewOpen(false);
+                p.onNewNote?.(null);
+              },
+            },
+            p.onCreateFolder && { label: 'New folder', onSelect: startFolder },
+          ]}
+        />
+      </NotePop>
+    </span>
+  );
+  // The window's list has no heading to hold New, so it sits beside Find there (when the list can make things).
   const find = (
     <div className="tp-nb-tree-ff">
       <FilterField placeholder="Find a note" value={q} onChange={setQ} />
+      {p.bare && (p.onNewNote || p.onCreateFolder) ? newButton(15) : null}
     </div>
   );
   const card = ghost ? (
@@ -890,32 +959,7 @@ export function NoteTree(p: NoteTreeProps) {
     >
       <div className="tp-nb-tree-h">
         <h2>Notebook</h2>
-        {/* One quiet New button: a note (the usual thing, first) or a folder. */}
-        <span ref={newRef} className="tp-nb-menuw">
-          <IconButton
-            label="New note or folder"
-            tipSide="bottom-end"
-            className={newOpen ? 'tp-on' : undefined}
-            onClick={() => setNewOpen(!newOpen)}
-          >
-            <Icon name="plus" size={17} />
-          </IconButton>
-          <NotePop open={newOpen} className="tp-nb-pop-r tp-nb-newmenu">
-            <MenuList
-              label="New"
-              items={[
-                {
-                  label: 'New note',
-                  onSelect: () => {
-                    setNewOpen(false);
-                    p.onNewNote?.(null);
-                  },
-                },
-                p.onCreateFolder && { label: 'New folder', onSelect: startFolder },
-              ]}
-            />
-          </NotePop>
-        </span>
+        {newButton(17)}
       </div>
       {find}
       <div ref={scroller} className="tp-nb-tree-scroll">

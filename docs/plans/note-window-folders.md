@@ -1,7 +1,7 @@
 # Folders in the note window (#90) and the Mac note window's shadow (#88)
 
 Status: canvas approved by Rohit 12 Nov 2026 (sheets "Draft · Folders in the note window", light and dark, Notebook
-page, canvas Version 206). Proposal awaiting approval. Nothing is implemented yet.
+page, canvas Version 206). Proposal approved by Rohit 12 Nov 2026; implemented.
 
 ## The reports
 
@@ -59,7 +59,7 @@ is cut off 10px out, as a hard line. It shows most in dark, where the shadow col
 ### 4. The shadow
 
 - `.tp-nb-win.tp-root:not(.tp-nb-web)`: `0 0 0 1px var(--hair), 0 1px 2px var(--hair), 0 4px 10px -4px
-  var(--shadow-color)`. It reaches 6px at the sides and 10px below. Pinned swaps the hairline for the existing
+var(--shadow-color)`. It reaches 6px at the sides and 10px below. Pinned swaps the hairline for the existing
   `1.5px var(--border-strong)` ring.
 - `.tp-nb-web` (the browser's floating note) keeps today's deep shadow.
 - No native change. The 10px padding stays, so window sizes and Fill the screen are untouched.

@@ -108,9 +108,8 @@
   animation: tp-veil-in 120ms linear both;
 }
 
-/* The bare note window: the Mac's own window (which draws its shadow itself). */
 /* The Mac note window is clear all round: only the note's own section paints, and the 10px around it is for its
-   shadow. */
+   shadow, which is drawn to end inside it (a window can't paint past its own edge). */
 html[data-app='note'],
 html[data-app='note'] body {
   background: transparent !important;
@@ -125,4 +124,17 @@ html[data-app='note'] body {
 }
 .app-note-window.app-note-mac {
   padding: 10px;
+}
+/* A dialog asked from the Mac note window (delete a note, delete a folder) dims the note, not the clear edge around
+   it: its layer is the note's own box, corners and all, and sits closer to the top than on the desk (the window can
+   be as small as 420 × 320). */
+html[data-app='note'] .tp-dlg-layer {
+  inset: 10px;
+  padding: 20px 16px 16px;
+  border-radius: 14px;
+  overflow: hidden;
+}
+/* Toasts rise inside the note too. */
+html[data-app='note'] .tp-toast-host {
+  bottom: 22px;
 }

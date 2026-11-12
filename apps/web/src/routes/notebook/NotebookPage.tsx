@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
-import { notesBelow } from '@tudu/core';
 import {
   EmptyState,
   Icon,
@@ -12,7 +11,7 @@ import {
   type NoteTrashItem,
 } from '@tudu/ui';
 import { useEffect, useRef, useState } from 'react';
-import { notebookStore, notesInOrder, trashItem, treeItems } from '../../app/notebook';
+import { deleteFolderFromTree, notebookStore, notesInOrder, trashItem, treeItems } from '../../app/notebook';
 import { useNoteEditor } from '../../app/noteEditing';
 import { NOTEBOOK_PATH } from '../../app/space';
 import { useViewport } from '../../app/viewport';
@@ -109,18 +108,7 @@ export function NotebookPage() {
       }}
       onRenameFolder={(f, name) => notebookStore.renameFolder(f.id, name)?.error ?? null}
       onDeleteFolder={(f) => {
-        const data = notebookStore.cachedTree();
-        const n = data ? notesBelow(data.folders, data.notes, f.id) : 0;
-        const inside = noteId && data?.notes.find((x) => x.id === noteId);
-        notebookStore.deleteFolder(f.id);
-        showToast(
-          n
-            ? `Moved “${f.name}” and its ${n === 1 ? 'note' : `${n} notes`} to Trash.`
-            : `Deleted “${f.name}”.`,
-          { action: 'Undo', onAction: () => notebookStore.restoreFolder(f.id) },
-        );
-        if (inside && inside.folderId && !notebookStore.cachedTree()?.notes.some((x) => x.id === noteId))
-          go(NOTEBOOK_PATH, true);
+        if (deleteFolderFromTree(f, noteId)) go(NOTEBOOK_PATH, true);
       }}
       onMoveNote={(id, folderId, index) => notebookStore.moveNote(id, folderId, index)}
       onMoveFolder={(id, parentId, index) => notebookStore.moveFolder(id, parentId, index)}

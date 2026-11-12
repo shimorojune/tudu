@@ -119,3 +119,78 @@ describe('C22-U61 the browser note window', () => {
     );
   });
 });
+
+describe('C22-U114 All notes in the note window makes and changes things', () => {
+  const DEEP = {
+    folders: [
+      {
+        id: 'nw',
+        name: 'Northwind',
+        notes: [{ id: 'interviews', title: 'Onboarding interview notes' }],
+        folders: [
+          {
+            id: 'plan',
+            name: 'Planning',
+            notes: [],
+            folders: [{ id: 'off', name: 'Offsite', notes: [], folders: [] }],
+          },
+        ],
+      },
+    ],
+    notes: [],
+    defaultOpen: { nw: true, plan: true },
+  };
+  const row = (name: string) =>
+    screen.getByRole('button', { name: new RegExp(`^${name}\\s*\\d*$`) }).parentElement!;
+  const open = async (extra: Partial<Parameters<typeof NoteWindow>[0]> = {}) => {
+    const user = userEvent.setup();
+    const on = {
+      onNewNote: vi.fn(),
+      onCreateFolder: vi.fn(() => null),
+      onRenameFolder: vi.fn(() => null),
+      onDeleteFolder: vi.fn(),
+    };
+    render(<NoteWindow active="new" recent={RECENT} tree={DEEP} {...on} {...extra} />);
+    await user.click(screen.getByRole('button', { name: 'All notes' }));
+    return { user, ...on };
+  };
+
+  it('C22-U114 a folder’s buttons reach the handlers with that folder', async () => {
+    const { user, onNewNote, onCreateFolder, onRenameFolder, onDeleteFolder } = await open();
+    await user.click(within(row('Northwind')).getByRole('button', { name: 'New note in Northwind' }));
+    expect(onNewNote).toHaveBeenCalledWith(expect.objectContaining({ id: 'nw' }));
+    await user.click(within(row('Northwind')).getByRole('button', { name: 'New folder in Northwind' }));
+    await user.type(screen.getByRole('textbox', { name: 'Folder name' }), 'Hiring{Enter}');
+    expect(onCreateFolder).toHaveBeenCalledWith('nw', 'Hiring');
+    // The third level makes notes, not folders.
+    expect(within(row('Offsite')).queryByRole('button', { name: 'New folder in Offsite' })).toBeNull();
+    await user.click(within(row('Planning')).getByRole('button', { name: 'More' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    const field = screen.getByRole('textbox', { name: 'Folder name' });
+    await user.clear(field);
+    await user.type(field, 'Plans{Enter}');
+    expect(onRenameFolder).toHaveBeenCalledWith(expect.objectContaining({ id: 'plan' }), 'Plans');
+    await user.click(within(row('Offsite')).getByRole('button', { name: 'More' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete “Offsite”?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    expect(onDeleteFolder).toHaveBeenCalledWith(expect.objectContaining({ id: 'off' }));
+  });
+
+  it('C22-U114 notes that didn’t load say so, and Try again asks again', async () => {
+    const onTreeRetry = vi.fn();
+    const { user } = await open({ treeError: true, onTreeRetry });
+    expect(screen.getByRole('alert')).toHaveTextContent('Your notes didn’t load.');
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(onTreeRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('C22-U17 without handlers All notes only opens notes: no New, no ⋯', async () => {
+    const user = userEvent.setup();
+    render(<NoteWindow active="new" recent={RECENT} tree={DEEP} onPick={() => {}} />);
+    await user.click(screen.getByRole('button', { name: 'All notes' }));
+    expect(screen.queryByRole('button', { name: 'New note or folder' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'More' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^New (note|folder) in/ })).toBeNull();
+  });
+});

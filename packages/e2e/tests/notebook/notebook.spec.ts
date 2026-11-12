@@ -1189,6 +1189,160 @@ test.describe('notebook', () => {
     await expect(win.locator('.tp-nb-win-title')).toHaveText('Gift ideas');
   });
 
+  /** The note window, opened on a seeded note through Search, showing All notes. */
+  async function windowOnAll(page: Page): Promise<{ win: Locator; all: Locator }> {
+    await seedNote(page, 'Train notes');
+    await openSearch(page);
+    await box(page).fill('train');
+    await panel(page)
+      .getByRole('option', { name: /Train notes/ })
+      .click();
+    const win = noteWindow(page);
+    await expect(win).toBeVisible();
+    await settle(page, page.locator('.tp-nb-float'));
+    await win.getByRole('button', { name: 'All notes' }).click();
+    return { win, all: win.getByRole('navigation', { name: 'Notebook' }) };
+  }
+  const winFolder = (all: Locator, name: string) =>
+    all
+      .locator('.tp-nb-frow')
+      .filter({ has: all.page().locator('.tp-nb-fname', { hasText: new RegExp(`^${name}$`) }) });
+  async function newFolderInWindow(page: Page, all: Locator): Promise<Locator> {
+    await all.getByRole('button', { name: 'New note or folder' }).click();
+    await page.getByRole('menuitem', { name: 'New folder' }).click();
+    const field = all.getByRole('textbox', { name: 'Folder name' });
+    await expect(field).toBeFocused();
+    return field;
+  }
+
+  test('C22-E95 the note window’s All notes makes a folder: + beside Find, named in place; it is on the Notebook page after a reload (#90)', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    const { all } = await windowOnAll(page);
+    const field = await newFolderInWindow(page, all);
+    await field.fill('Travel');
+    await field.press('Enter');
+    await expect(winFolder(all, 'Travel')).toBeVisible();
+    await expect.poll(async () => (await notebookNow(page)).folders.map((f) => f.name)).toEqual(['Travel']);
+    await page.reload();
+    await openNotebook(page);
+    await expect(folderRow(page, 'Travel')).toBeVisible();
+  });
+
+  test('C22-E96 a folder name already used says so under the field; Esc puts the row away and nothing is made', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    await seedFolder(page, 'Home');
+    const { all } = await windowOnAll(page);
+    const field = await newFolderInWindow(page, all);
+    await field.fill('Home');
+    await field.press('Enter');
+    await expect(all.getByRole('alert')).toHaveText('You already have a folder called Home.');
+    await expect(field).toHaveAttribute('aria-invalid', 'true');
+    await field.press('Escape');
+    await expect(all.getByRole('textbox', { name: 'Folder name' })).toHaveCount(0);
+    // The window is still there: Esc went to the field, not the window.
+    await expect(noteWindow(page)).toBeVisible();
+    expect((await notebookNow(page)).folders.map((f) => f.name)).toEqual(['Home']);
+  });
+
+  test('C22-E97 New note in a folder from the note window opens a blank note filed there; its first words put it in that folder', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    const home = await seedFolder(page, 'Home');
+    const { win, all } = await windowOnAll(page);
+    await winFolder(all, 'Home').hover();
+    await winFolder(all, 'Home').getByRole('button', { name: 'New note in Home' }).click();
+    await expect(win.locator('.tp-nb-win-title')).toHaveText('New note');
+    await expect(win.locator('.tp-nb-crumb')).toContainText('Home');
+    await title(win).fill('Packing list');
+    await expect
+      .poll(async () => (await notebookNow(page)).notes.find((n) => n.title === 'Packing list')?.folderId)
+      .toBe(home);
+    await expect(all.getByRole('button', { name: 'Packing list' })).toBeVisible();
+  });
+
+  test('C22-E98 in the note window: rename a folder, drag a note into it, delete it (the open note goes with it) and Undo', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    const home = await seedFolder(page, 'Home');
+    await seedNote(page, 'Gift ideas', { folderId: home });
+    const { win, all } = await windowOnAll(page);
+    // Rename, from ⋯.
+    await winFolder(all, 'Home').hover();
+    await winFolder(all, 'Home').getByRole('button', { name: 'More' }).click();
+    await page.getByRole('menuitem', { name: 'Rename' }).click();
+    const field = all.getByRole('textbox', { name: 'Folder name' });
+    await field.fill('House');
+    await field.press('Enter');
+    await expect(winFolder(all, 'House')).toBeVisible();
+    await expect.poll(async () => (await notebookNow(page)).folders[0]?.name).toBe('House');
+    // Drag the open note onto it.
+    const train = all.locator('[data-nb-kind="note"]').filter({ hasText: 'Train notes' });
+    const a = (await train.boundingBox())!;
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(a.x + a.width / 2 + 8, a.y + a.height / 2 + 2, { steps: 2 });
+    await expect(all.locator('.tp-nb-ghost')).toBeVisible();
+    const b = (await winFolder(all, 'House').boundingBox())!;
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 8 });
+    await page.mouse.up();
+    await expect
+      .poll(async () => (await notebookNow(page)).notes.find((n) => n.title === 'Train notes')?.folderId)
+      .toBe(home);
+    await expect(win.locator('.tp-nb-crumb')).toContainText('House');
+    // Delete asks first; the open note was inside, so the window goes back to a blank one.
+    await winFolder(all, 'House').hover();
+    await winFolder(all, 'House').getByRole('button', { name: 'More' }).click();
+    await page.getByRole('menuitem', { name: 'Delete' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Delete “House”?' });
+    await expect(dialog).toContainText('The folder and its 2 notes go to Trash');
+    await dialog.getByRole('button', { name: 'Delete' }).click();
+    await expect(winFolder(all, 'House')).toHaveCount(0);
+    await expect(win.locator('.tp-nb-win-title')).toHaveText('New note');
+    const toast = page.locator('.tp-toast', { hasText: 'Moved “House” and its 2 notes to Trash.' });
+    await expect(toast).toBeVisible();
+    await toast.getByRole('button', { name: 'Undo' }).click();
+    await expect(winFolder(all, 'House')).toBeVisible();
+    await expect.poll(async () => (await notebookNow(page)).notes.length).toBe(2);
+  });
+
+  test('C22-E99 the note window says when your notes didn’t load; Try again loads them', async ({ page }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    await seedFolder(page, 'Home');
+    let down = true;
+    await page.route('**/api/notebook', (r) =>
+      down ? r.fulfill({ status: 500, body: '{"error":"down"}' }) : r.continue(),
+    );
+    const { all } = await windowOnAll(page);
+    await expect(all.getByText('Your notes didn’t load.')).toBeVisible({ timeout: 20_000 });
+    await expect(all.getByRole('button', { name: 'New note or folder' })).toBeDisabled();
+    down = false;
+    await all.getByRole('button', { name: 'Try again' }).click();
+    await expect(winFolder(all, 'Home')).toBeVisible();
+    await expect(all.getByRole('button', { name: 'New note or folder' })).toBeEnabled();
+  });
+
+  test('C22-E100 the browser’s floating note keeps its deep shadow (only the Mac’s own window draws the short one, #88)', async ({
+    page,
+  }) => {
+    test.skip(!desk(), 'desktop web');
+    await signInFresh(page);
+    const { win } = await windowOnAll(page);
+    await expect(win).toHaveClass(/tp-nb-web/);
+    const shadow = await win.evaluate((el) => getComputedStyle(el).boxShadow);
+    expect(shadow).toContain('80px');
+  });
+
   test('C22-E17 phone: More › Notebook, a folder and a note; type; the format bar stays at the bottom of the note; ‹ goes back', async ({
     page,
   }) => {

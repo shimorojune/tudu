@@ -12,7 +12,7 @@ import { Icon } from '../lib/icons';
 import { IconButton } from './IconButton';
 import { Logo } from './Logo';
 import { NoteIcon, NoteRow, type NoteItem } from './NoteParts';
-import { NoteTree, type NoteFolderItem } from './NoteTree';
+import { NoteTree, type NoteFolderItem, type NoteTreeProps } from './NoteTree';
 import { Segmented } from './Segmented';
 import { Skeleton } from './Skeleton';
 
@@ -38,6 +38,9 @@ export interface NoteWindowProps {
   /** All notes: the whole tree. */
   tree?: { folders: NoteFolderItem[]; notes: NoteItem[]; defaultOpen?: Record<string, boolean> };
   treeLoading?: boolean;
+  /** All notes didn't load: the list says so, with Try again. */
+  treeError?: boolean;
+  onTreeRetry?: () => void;
   pinned?: boolean;
   expanded?: boolean;
   /** What the open button (the Tudu mark) says: "Open in your Notebook". */
@@ -47,6 +50,13 @@ export interface NoteWindowProps {
   className?: string;
   onPick?: (id: string) => void;
   onNew?: () => void;
+  /** All notes makes and changes things like the Notebook page's tree; without these it only opens notes. */
+  onNewNote?: NoteTreeProps['onNewNote'];
+  onCreateFolder?: NoteTreeProps['onCreateFolder'];
+  onRenameFolder?: NoteTreeProps['onRenameFolder'];
+  onDeleteFolder?: NoteTreeProps['onDeleteFolder'];
+  onMoveNote?: NoteTreeProps['onMoveNote'];
+  onMoveFolder?: NoteTreeProps['onMoveFolder'];
   onPin?: () => void;
   onExpand?: () => void;
   onOpenApp?: () => void;
@@ -59,7 +69,7 @@ export interface NoteWindowProps {
 
 /**
  * The small window for writing without the desk: a bar to drag it by, your notes down the left (Recent, or All
- * notes with Find), the note on the right. On the Mac it floats over every app: Pin keeps it above them (off to
+ * notes with Find, where you also make notes and folders, rename, delete and drag them), the note on the right. On the Mac it floats over every app: Pin keeps it above them (off to
  * start, and off again once it closes), the arrows fill the screen. In the browser it floats over the page. Either
  * way it resizes from every edge and corner, and the Tudu mark opens the note on the Notebook page.
  */
@@ -174,8 +184,16 @@ export function NoteWindow(p: NoteWindowProps) {
                   notes={p.tree.notes}
                   defaultOpen={p.tree.defaultOpen}
                   loading={p.treeLoading}
+                  error={p.treeError}
+                  onRetry={p.onTreeRetry}
                   active={p.active}
                   onPick={(n) => p.onPick?.(n.id)}
+                  onNewNote={p.onNewNote}
+                  onCreateFolder={p.onCreateFolder}
+                  onRenameFolder={p.onRenameFolder}
+                  onDeleteFolder={p.onDeleteFolder}
+                  onMoveNote={p.onMoveNote}
+                  onMoveFolder={p.onMoveFolder}
                 />
               </div>
             ) : (

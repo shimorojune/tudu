@@ -330,3 +330,151 @@ describe('C22-U48 while finding', () => {
     expect(ghost()).toBeNull();
   });
 });
+
+/** The note window's All notes list: the same tree, bare. */
+function bare(extra: Partial<Parameters<typeof NoteTree>[0]> = {}, folders = FOLDERS) {
+  const props = {
+    onRenameFolder: vi.fn(() => null),
+    onDeleteFolder: vi.fn(),
+    onCreateFolder: vi.fn((): string | null => null),
+    onNewNote: vi.fn(),
+    onPick: vi.fn(),
+    ...extra,
+  };
+  const view = render(<NoteTree bare folders={folders} notes={LOOSE} {...props} />);
+  const again = (next: NoteFolderItem[]) =>
+    view.rerender(<NoteTree bare folders={next} notes={LOOSE} {...props} />);
+  return { user: userEvent.setup(), again, ...props };
+}
+
+describe('C22-U110 New in the window’s list', () => {
+  it('C22-U110 sits beside Find: New note first, then New folder', async () => {
+    const { user, onNewNote } = bare();
+    const add = screen.getByRole('button', { name: 'New note or folder' });
+    expect(add.closest('.tp-nb-tree-ff')).not.toBeNull();
+    await user.click(add);
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['New note', 'New folder']);
+    await user.click(screen.getByRole('menuitem', { name: 'New note' }));
+    expect(onNewNote).toHaveBeenCalledWith(null);
+    expect(screen.queryByRole('menuitem')).toBeNull();
+  });
+
+  it('C22-U110 a list that can make nothing has no New', () => {
+    bare({ onNewNote: undefined, onCreateFolder: undefined });
+    expect(screen.queryByRole('button', { name: 'New note or folder' })).toBeNull();
+  });
+
+  it('C22-U110 waits while your notes load, and when they didn’t', () => {
+    bare({ loading: true });
+    expect(screen.getByRole('button', { name: 'New note or folder' })).toBeDisabled();
+    cleanup();
+    bare({ error: true });
+    expect(screen.getByRole('button', { name: 'New note or folder' })).toBeDisabled();
+  });
+});
+
+describe('C22-U111 naming a folder in the window’s list', () => {
+  const start = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByRole('button', { name: 'New note or folder' }));
+    await user.click(screen.getByRole('menuitem', { name: 'New folder' }));
+    return screen.getByRole('textbox', { name: 'Folder name' });
+  };
+
+  it('C22-U111 the cursor is in the field; Enter keeps the name', async () => {
+    const { user, onCreateFolder } = bare();
+    const field = await start(user);
+    expect(field).toHaveFocus();
+    await user.type(field, 'Travel{Enter}');
+    expect(onCreateFolder).toHaveBeenCalledWith(null, 'Travel');
+    expect(screen.queryByRole('textbox', { name: 'Folder name' })).toBeNull();
+  });
+
+  it('C22-U111 Esc and an empty name make nothing', async () => {
+    const { user, onCreateFolder } = bare();
+    await user.type(await start(user), 'Trav{Escape}');
+    expect(screen.queryByRole('textbox', { name: 'Folder name' })).toBeNull();
+    await user.type(await start(user), '{Enter}');
+    expect(screen.queryByRole('textbox', { name: 'Folder name' })).toBeNull();
+    expect(onCreateFolder).not.toHaveBeenCalled();
+  });
+
+  it('C22-U111 a name already used says why, clears on the next key, and clicking away drops the row', async () => {
+    const taken = 'You already have a folder called Home.';
+    const { user, onCreateFolder } = bare({ onCreateFolder: vi.fn(() => taken) });
+    const field = await start(user);
+    await user.type(field, 'Home{Enter}');
+    expect(screen.getByRole('alert')).toHaveTextContent(taken);
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    await user.type(field, 's');
+    expect(screen.queryByRole('alert')).toBeNull();
+    await user.type(field, '{Backspace}{Enter}');
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    fireEvent.blur(field);
+    expect(screen.queryByRole('textbox', { name: 'Folder name' })).toBeNull();
+    expect(onCreateFolder).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('C22-U112 a folder you just named', () => {
+  const travel: NoteFolderItem = { id: 'travel', name: 'Travel', notes: [], folders: [] };
+
+  it('C22-U112 its naming row opens, then its own row glows once', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { user, again } = bare();
+      await user.click(screen.getByRole('button', { name: 'New note or folder' }));
+      await user.click(screen.getByRole('menuitem', { name: 'New folder' }));
+      const field = screen.getByRole('textbox', { name: 'Folder name' });
+      expect(field.closest('.tp-nb-frow')).toHaveClass('tp-nb-naming');
+      await user.type(field, 'Travel{Enter}');
+      again([...FOLDERS, travel]);
+      await waitFor(() => expect(folderRow('Travel')).toHaveClass('tp-nb-landed'));
+      act(() => {
+        vi.advanceTimersByTime(800);
+      });
+      expect(folderRow('Travel')).not.toHaveClass('tp-nb-landed');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('C22-U112 a folder that arrives without being named here doesn’t glow; a rename’s field doesn’t open like a new row', async () => {
+    const { user, again } = bare();
+    again([...FOLDERS, travel]);
+    expect(folderRow('Travel')).not.toHaveClass('tp-nb-landed');
+    await user.dblClick(screen.getByRole('button', { name: /^Travel/ }));
+    expect(screen.getByRole('textbox', { name: 'Folder name' }).closest('.tp-nb-frow')).not.toHaveClass(
+      'tp-nb-naming',
+    );
+  });
+});
+
+describe('C22-U113 a folder’s ⋯ lists only what the list can do', () => {
+  it('C22-U113 no ⋯ without Rename and Delete, and a double-click renames nothing', async () => {
+    const { user } = bare({ onRenameFolder: undefined, onDeleteFolder: undefined });
+    expect(within(folderRow('Home')).queryByRole('button', { name: 'More' })).toBeNull();
+    await user.dblClick(screen.getByRole('button', { name: /^Home/ }));
+    expect(screen.queryByRole('textbox', { name: 'Folder name' })).toBeNull();
+  });
+
+  it('C22-U113 with only Delete, the menu is Delete alone', async () => {
+    const { user } = bare({ onRenameFolder: undefined });
+    await user.click(within(folderRow('Home')).getByRole('button', { name: 'More' }));
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Delete']);
+  });
+});
+
+describe('C22-U40 a mouse drag in the window’s list', () => {
+  it('C22-U40 the bare tree carries rows too: a note dropped on a folder moves into it', () => {
+    const onMoveNote = vi.fn();
+    bare({ onMoveNote });
+    press(rowOf('note', 'sunday'));
+    to(15, 10);
+    expect(ghost()).toHaveTextContent('Sunday scribbles');
+    over(rowOf('folder', 'home'));
+    to(20, 40);
+    expect(rowOf('folder', 'home')).toHaveClass('tp-nb-drop-into');
+    letGo();
+    expect(onMoveNote).toHaveBeenCalledWith('sunday', 'home', undefined);
+  });
+});

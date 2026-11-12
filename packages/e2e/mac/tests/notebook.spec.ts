@@ -349,6 +349,115 @@ test.describe('chunk 22 · the note window', () => {
       .toBe(folder);
   });
 
+  test('C22-D50 a folder made in the note window’s All notes shows on the desk’s Notebook page without a reload (#90)', async ({
+    app,
+  }) => {
+    await signIn(app);
+    await go(app, '/notebook');
+    await app.until(`return T.all('button', 'New note or folder').length > 0`);
+    await openNote(app);
+    await app.eval(`T.click(T.get('button', 'All notes'))`, 'note');
+    await app.until(`return T.all('button', 'New note or folder').length > 0`, 'note');
+    await app.eval(`T.click(T.get('button', 'New note or folder'))`, 'note');
+    await app.until(`return T.all('button', 'New folder').length > 0`, 'note');
+    await app.eval(`T.click(T.get('button', 'New folder'))`, 'note');
+    await app.until(`return T.all('textbox', 'Folder name').length > 0`, 'note');
+    await app.eval(
+      `const f = T.get('textbox', 'Folder name'); T.fill(f, 'Travel'); T.press('Enter', f);`,
+      'note',
+    );
+    await app.until(`return T.all('button', /^Travel/).length > 0`, 'note');
+    // The desk hears the Notebook changed and reads it again.
+    await app.until(`return T.all('button', /^Travel/).length > 0`, 'main', 5_000);
+  });
+
+  test('C22-D51 the note window’s shadow ends inside its 10px clear edge, pinned or not, light or dark (#88)', async ({
+    app,
+  }) => {
+    await signIn(app);
+    await openNote(app);
+    // How far the widest layer reaches past the note: offset + blur + spread.
+    const reach = `
+      const s = getComputedStyle(document.querySelector('.tp-nb-win')).boxShadow;
+      const pad = parseFloat(getComputedStyle(document.querySelector('.app-note-mac')).paddingLeft);
+      const layers = s.split(/,(?![^(]*\\))/).map((l) => (l.replace(/rgba?\\([^)]*\\)/, '').match(/-?[\\d.]+px/g) || []).map(parseFloat));
+      const far = Math.max(...layers.map(([x = 0, y = 0, blur = 0, spread = 0]) => Math.max(Math.abs(x), Math.abs(y)) + blur + spread));
+      return { far, pad, layers: layers.length };`;
+    const inside = async () => {
+      // The shadow eases when the pin changes: wait for it to come to rest inside the edge.
+      await app.until(
+        `${reach.replace('return { far, pad, layers: layers.length };', 'return layers.length > 0 && far <= pad;')}`,
+        'note',
+        2_000,
+      );
+      const r = await app.eval<{ far: number; pad: number; layers: number }>(reach, 'note');
+      expect(r.pad).toBe(10);
+      expect(r.layers).toBeGreaterThan(0);
+      expect(r.far).toBeLessThanOrEqual(r.pad);
+    };
+    await inside();
+    await app.eval(`T.click(T.get('button', 'Keep on top of other windows'))`, 'note');
+    await app.waitState((x) => x.note.state.pinned);
+    await app.until(`return !!document.querySelector('.tp-nb-win.tp-nb-pinned')`, 'note');
+    await inside();
+    await app.eval(`T.click(T.get('button', 'Pinned on top · click to unpin'))`, 'note');
+    await app.waitState((x) => !x.note.state.pinned);
+    await pickTheme(app, 'Dark');
+    await app.until(`return document.documentElement.classList.contains('dark')`, 'note', 2_000);
+    await inside();
+    await pickTheme(app, 'Light');
+  });
+
+  test('C22-D52 deleting a folder in the note window at its smallest size: the dialog and its dimming stay inside the note', async ({
+    app,
+  }) => {
+    await signIn(app);
+    await asPage(app, 'POST', '/api/sync', {
+      clientId: 'mac-seed',
+      mutations: [
+        {
+          id: crypto.randomUUID(),
+          type: 'folder.create',
+          payload: { id: crypto.randomUUID(), parentId: null, name: 'Home', position: null },
+          at: new Date().toISOString(),
+        },
+      ],
+    });
+    await openNote(app);
+    const s = await app.state();
+    const screen = s.windows.note.screen!;
+    await app.act('frame', { window: 'note', x: screen.x + 140, y: screen.y + 120, width: 420, height: 320 });
+    await app.waitState((x) => near(x.windows.note.width, 420) && near(x.windows.note.height, 320));
+    await app.eval(`T.click(T.get('button', 'All notes'))`, 'note');
+    await app.until(`return T.all('button', /^Home/).length > 0`, 'note');
+    await app.eval(
+      `const row = T.get('button', /^Home/).closest('.tp-nb-frow'); T.click(T.get('button', 'More', row));`,
+      'note',
+    );
+    await app.until(`return T.all('button', 'Delete').length > 0`, 'note');
+    await app.eval(`T.click(T.get('button', 'Delete'))`, 'note');
+    await app.until(`return !!document.querySelector('.tp-dlg-layer .tp-dlg')`, 'note');
+    const box = await app.eval<{
+      win: number[];
+      layer: number[];
+      dlg: number[];
+      view: number[];
+    }>(
+      `const r = (el) => { const b = el.getBoundingClientRect(); return [b.left, b.top, b.right, b.bottom].map(Math.round); };
+       return { win: r(document.querySelector('.tp-nb-win')), layer: r(document.querySelector('.tp-dlg-layer')), dlg: r(document.querySelector('.tp-dlg-layer .tp-dlg')), view: [0, 0, innerWidth, innerHeight] };`,
+      'note',
+    );
+    // The dimming is the note's own box, 10px inside the window all round.
+    expect(box.layer).toEqual(box.win);
+    expect(box.layer).toEqual([10, 10, box.view[2]! - 10, box.view[3]! - 10]);
+    // The dialog sits wholly inside it.
+    expect(box.dlg[0]).toBeGreaterThanOrEqual(box.layer[0]!);
+    expect(box.dlg[1]).toBeGreaterThanOrEqual(box.layer[1]!);
+    expect(box.dlg[2]).toBeLessThanOrEqual(box.layer[2]!);
+    expect(box.dlg[3]).toBeLessThanOrEqual(box.layer[3]!);
+    await app.eval(`T.click(T.get('button', 'Cancel'))`, 'note');
+  });
+
   test('C22-D30 ⌥⌘N opens the note window on a blank note over another app; with the sheet open, the sheet goes first', async ({
     app,
   }) => {
