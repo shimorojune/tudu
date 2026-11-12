@@ -131,9 +131,10 @@ All on PR CI (unit, web e2e, Mac e2e). Nothing runs on Rohit's Mac.
 
 ### Updated
 
-- **C22-U62** (NoteWindow, All notes renders the bare tree): now also checks that with no handlers the tree stays
-  read-only (no New, no ⋯), so the old behaviour is still what a caller without handlers gets.
-- **C22-U40..U52** (tree drag) run unchanged; one case is added to U41 for a drag inside the bare tree.
+- **C22-U17** (the note window: Recent and All notes switch the rail): also checks that with no handlers All notes
+  stays read-only (no New, no ⋯), so a caller without handlers gets the old behaviour.
+- **C22-U12** (a folder row): its ⋯ cases now pass `onRenameFolder` and `onDeleteFolder`.
+- **C22-U40** (a mouse drag): one case added for a drag inside the bare tree.
 - **C22-D03** (Fill the screen keeps a small margin) unchanged; it guards that the 10px padding didn't move.
 
 ### Manual, for Rohit
