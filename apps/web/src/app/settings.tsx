@@ -46,12 +46,14 @@ import { invitedWords } from './spaces';
 import { ALL_GLOW, askJiraReconnect, clearJiraGlow, hostOf, jiraClient, peekJiraGlow, useJira } from './jira';
 import { taskStore, useOnline } from './tasks';
 import { useViewport } from './viewport';
+import { useShortcutSettings } from './shortcuts';
 
 export const SECTIONS: SettingsSectionName[] = [
   'account',
   'appearance',
   'hours',
   'mac',
+  'keys',
   'space',
   'members',
   'apps',
@@ -257,6 +259,7 @@ export function SettingsView({
   const { choice, setTheme } = useTheme();
   const [lessMotion, setLessMotion] = useLessMotion();
   const mac = useThisMac();
+  const shortcuts = useShortcutSettings(section === 'keys');
   const workHours = useWorkHours(me);
   const nudges = useNudgeSettings(me);
   const version = useAppVersion();
@@ -440,6 +443,7 @@ export function SettingsView({
         workHours={workHours}
         nudges={nudges}
         mac={mac}
+        shortcuts={shortcuts}
         onSpaceName={(name) => taskStore.updateSpace(space.id, { name })}
         onSpaceColor={(color) => taskStore.updateSpace(space.id, { color })}
         onLeave={leave}

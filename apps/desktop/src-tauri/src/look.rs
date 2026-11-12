@@ -131,7 +131,12 @@ pub fn changed(held: Look, next: Look) -> bool {
 
 /// The page's Settings › Appearance and Less motion: kept on this Mac and applied to every window at once.
 #[tauri::command]
-pub fn set_appearance(app: AppHandle, state: State<'_, Looks>, theme: ThemeChoice, less_motion: bool) {
+pub fn set_appearance(
+    app: AppHandle,
+    state: State<'_, Looks>,
+    theme: ThemeChoice,
+    less_motion: bool,
+) {
     let next = Look { theme, less_motion };
     {
         let Ok(mut held) = state.look.lock() else {
@@ -148,7 +153,12 @@ pub fn set_appearance(app: AppHandle, state: State<'_, Looks>, theme: ThemeChoic
 
 /// Every window takes the theme; the desk (the one opaque window) its background too.
 pub fn apply(app: &AppHandle, look: Look) {
-    for label in [windows::MAIN, windows::FLOATING, windows::MENUBAR, windows::NOTE] {
+    for label in [
+        windows::MAIN,
+        windows::FLOATING,
+        windows::MENUBAR,
+        windows::NOTE,
+    ] {
         if let Some(w) = app.get_webview_window(label) {
             let _ = w.set_theme(native_theme(look.theme));
         }
@@ -178,10 +188,22 @@ mod tests {
         assert_eq!(native_theme(ThemeChoice::Dark), Some(Theme::Dark));
         assert_eq!(native_theme(ThemeChoice::System), None);
 
-        assert_eq!(hex(desk_background(ThemeChoice::Light, Theme::Dark)), "#eeece6");
-        assert_eq!(hex(desk_background(ThemeChoice::Dark, Theme::Light)), "#111211");
-        assert_eq!(hex(desk_background(ThemeChoice::System, Theme::Dark)), "#111211");
-        assert_eq!(hex(desk_background(ThemeChoice::System, Theme::Light)), "#eeece6");
+        assert_eq!(
+            hex(desk_background(ThemeChoice::Light, Theme::Dark)),
+            "#eeece6"
+        );
+        assert_eq!(
+            hex(desk_background(ThemeChoice::Dark, Theme::Light)),
+            "#111211"
+        );
+        assert_eq!(
+            hex(desk_background(ThemeChoice::System, Theme::Dark)),
+            "#111211"
+        );
+        assert_eq!(
+            hex(desk_background(ThemeChoice::System, Theme::Light)),
+            "#eeece6"
+        );
 
         let light = Look {
             theme: ThemeChoice::Light,

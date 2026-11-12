@@ -14,6 +14,10 @@ export interface SwitchSpace extends SpaceTileSpace {
   sub?: string;
   /** What is new in that space's Inbox, shown as "N new" on the others. */
   count?: number;
+  /** Its key from Settings › Shortcuts (⌃2), shown quietly before the count and the tick. */
+  hint?: string;
+  /** The same keys as `aria-keyshortcuts` writes them (`Control+2`). */
+  keyShortcuts?: string;
 }
 
 export interface SpaceSwitchProps {
@@ -137,6 +141,7 @@ export function SpaceSwitch({
             role="menuitemradio"
             aria-checked={on ? 'true' : 'false'}
             className={cx('tp-sswl-it', on && 'tp-on', picked === s.id && 'tp-picked')}
+            aria-keyshortcuts={s.keyShortcuts}
             onClick={() => pick(s)}
           >
             <SpaceTile space={s} size={28} />
@@ -144,6 +149,11 @@ export function SpaceSwitch({
               <span>{s.all ? s.name : mine(s.name)}</span>
               {s.sub ? <span className="tp-sswl-sub">{s.sub}</span> : null}
             </span>
+            {s.hint ? (
+              <span className="tp-sswl-k" aria-hidden="true">
+                {s.hint}
+              </span>
+            ) : null}
             {s.count && !on ? (
               <span className="tp-sswl-c">{s.count} new</span>
             ) : on ? (

@@ -139,7 +139,7 @@ test.describe('desktop', () => {
     expect(s.track).toBe('test');
     expect(s.identifier).toBe('net.ezdev.tudu.test');
     expect(s.version).toBe(run().current.version);
-    expect(s.shortcut).toEqual({ accelerator: 'CommandOrControl+Shift+N', registered: true });
+    expect(s.shortcut).toEqual({ accelerator: 'CommandOrControl+Shift+N', label: '⇧⌘N', registered: true });
     expect(s.tray.tooltip).toBe('Tudu Test');
     // No native menu (chunk 20): the tick opens today from the menu bar, which has Open, New task and Quit.
     expect(s.tray.items).toEqual([]);

@@ -1,4 +1,4 @@
-import type { Track } from '@tudu/core';
+import { formatCombo, fromAccelerator, type Track } from '@tudu/core';
 import type { QuickAddSeed } from './dayView';
 
 /**
@@ -41,9 +41,23 @@ export interface AppInfo {
   track: Track;
   name: string;
   version: string;
-  shortcut: string;
-  /** The note window's shortcut (⌥⌘N), only while the app has it registered; none from an older app. */
+  /** New task's keys (⇧⌘N), only while macOS has them: none when they are off or another app took them. */
+  shortcut?: string;
+  /** The note window's keys (⌥⌘N), the same way; none from an older app. */
   noteShortcut?: string;
+}
+
+/** A From anywhere shortcut as the app has it (Settings › Shortcuts). */
+export interface GlobalShortcutRow {
+  id: 'newTask' | 'newNote';
+  /** The plugin's form (`Shift+Super+KeyN`); null when it is off. */
+  accelerator: string | null;
+  /** As people read it (`⇧⌘N`). */
+  label: string | null;
+  /** macOS has it. */
+  registered: boolean;
+  /** Why it isn't working, when it is on and macOS doesn't have it. */
+  error?: string;
 }
 
 export type DesktopWindow = 'main' | 'floating' | 'menubar' | 'note';
@@ -148,10 +162,18 @@ export interface DesktopBridge {
   notifyNudge(title: string, body: string): Promise<void>;
   /** System Settings › Notifications, on Tudu's own row where macOS can. */
   openNotificationSettings(): void;
+  /** Settings › Shortcuts: the From anywhere shortcuts, checked with macOS first. Rejects on an app from before this. */
+  shortcuts(): Promise<GlobalShortcutRow[]>;
+  /**
+   * One From anywhere shortcut changed (`accelerator` null: off). Answers the rows; rejects with the line to show under
+   * the row when the app refused it (the old keys stay).
+   */
+  setShortcut(id: GlobalShortcutRow['id'], accelerator: string | null): Promise<GlobalShortcutRow[]>;
   /**
    * `go` (the desk is asked to show a page, or `feedback` for the form), `floating:shown` (the summon),
    * `menubar:shown` and `menubar:hidden` (the tick's click, and the sheet put away), `update:ready` (a check,
-   * whoever asked for it, downloaded a newer version) and `update:status` (the updater's state changed).
+   * whoever asked for it, downloaded a newer version), `update:status` (the updater's state changed) and
+   * `shortcuts:changed` (the From anywhere shortcuts changed, here or in another window, or macOS lost one).
    */
   on(event: DesktopEvent, fn: (payload: unknown) => void): () => void;
 }
@@ -164,7 +186,8 @@ export type DesktopEvent =
   | 'update:ready'
   | 'update:status'
   | 'note:open'
-  | 'nudges:pause';
+  | 'nudges:pause'
+  | 'shortcuts:changed';
 
 /** The look the app builds its windows with. */
 export interface Appearance {
@@ -205,6 +228,11 @@ export interface DesktopFake {
   notifyAnswer?: NotifyPermission;
   /** The nudges the fake app posted, newest last. */
   nudges?: Array<{ title: string; body: string }>;
+  /** The From anywhere shortcuts as the fake app has them; `taken` lists keys another app holds. */
+  shortcuts?: GlobalShortcutRow[];
+  taken?: string[];
+  /** An app from before Settings › Shortcuts: the commands are refused. */
+  noShortcuts?: boolean;
   /** The floating bar's waiting seed (summonWith keeps it, quickAddSeed takes it). */
   seed?: QuickAddSeed | null;
   calls: Array<{ name: string; args: unknown[] }>;
@@ -240,12 +268,25 @@ function fakeStatus(f: DesktopFake): UpdateStatus {
   };
 }
 
+/** The fake app's labels, as the real one writes them (macOS order). */
+function fakeLabel(accel: string): string {
+  const c = fromAccelerator(accel);
+  return c ? formatCombo(c, 'mac') : accel;
+}
+
+function fakeRows(f: DesktopFake): GlobalShortcutRow[] {
+  return (f.shortcuts ??= [
+    { id: 'newTask', accelerator: 'Shift+Super+KeyN', label: '⇧⌘N', registered: true },
+    { id: 'newNote', accelerator: 'Alt+Super+KeyN', label: '⌥⌘N', registered: true },
+  ]);
+}
+
 function fakeBridge(f: DesktopFake): DesktopBridge {
   const call = (name: string, ...args: unknown[]) => f.calls.push({ name, args });
   f.listeners ??= {};
   return {
     window: f.window ?? 'main',
-    info: async () => ({ track: 'test', name: 'Tudu Test', version: '0.37.0', shortcut: '⌘⇧N', ...f.info }),
+    info: async () => ({ track: 'test', name: 'Tudu Test', version: '0.37.0', shortcut: '⇧⌘N', ...f.info }),
     setSignedIn: (v) => call('setSignedIn', v),
     setBadge: (n) => call('setBadge', n),
     setTick: (t) => call('setTick', t),
@@ -372,6 +413,32 @@ function fakeBridge(f: DesktopFake): DesktopBridge {
       (f.nudges ??= []).push({ title, body });
     },
     openNotificationSettings: () => call('openNotificationSettings'),
+    shortcuts: async () => {
+      call('shortcuts');
+      if (f.noShortcuts) throw new Error('Command shortcuts_get not found');
+      return fakeRows(f);
+    },
+    setShortcut: async (id, accelerator) => {
+      call('setShortcut', id, accelerator);
+      if (f.noShortcuts) throw new Error('Command shortcuts_set not found');
+      const rows = fakeRows(f);
+      if (accelerator && f.taken?.includes(accelerator)) {
+        const was = rows.find((r) => r.id === id)?.label;
+        throw `macOS or another app already uses ${fakeLabel(accelerator)}. ${was ? `Still ${was}.` : 'It stays off.'}`;
+      }
+      f.shortcuts = rows.map((r) =>
+        r.id === id
+          ? {
+              id,
+              accelerator,
+              label: accelerator ? fakeLabel(accelerator) : null,
+              registered: !!accelerator,
+            }
+          : r,
+      );
+      for (const l of f.listeners!['shortcuts:changed'] ?? []) l(f.shortcuts);
+      return f.shortcuts;
+    },
     on: (event, fn) => {
       (f.listeners![event] ??= []).push(fn);
       return () => {
@@ -431,6 +498,8 @@ function tauriBridge(t: NonNullable<Window['__TAURI_INTERNALS__']>): DesktopBrid
     notifyStatus: () => invoke<NotifyPermission>('notify_status').catch(() => 'unavailable' as const),
     notifyNudge: (title, body) => invoke<void>('notify_nudge', { title, body }),
     openNotificationSettings: () => quiet(invoke('open_notification_settings')),
+    shortcuts: () => invoke<GlobalShortcutRow[]>('shortcuts_get'),
+    setShortcut: (id, accelerator) => invoke<GlobalShortcutRow[]>('shortcuts_set', { id, accelerator }),
     on: (event, fn) => {
       let stop: (() => void) | null = null;
       let gone = false;

@@ -7,8 +7,11 @@
 //!   background (chunk 16): the activation policy, the Dock choice, the count beside the tick, the login item, the
 //!   App Nap opt-out and each webview's inactive scheduling policy; and the tick's place as macOS keeps it (its
 //!   autosave name and saved position) and whether it is hidden; and the last blur, click or app coming forward that
-//!   could put the sheet away, with whether it did (`outside`).
-//! - `POST /act {"do": …}`: what a person does outside the page: `summon`, `notes-shortcut` (⌥⌘N), `tray` (a click on the tick, with
+//!   could put the sheet away, with whether it did (`outside`); and the From anywhere shortcuts (keys, label, whether
+//!   macOS has them) with any press held until the desk says whether you are signed in.
+//! - `POST /act {"do": …}`: what a person does outside the page: `summon`, `notes-shortcut` (New note's keys), `press` (any
+//!   `accelerator`, through the handler a key press reaches), `drop-shortcut` (with `id`: macOS losing it), `signed-in`
+//!   (with `value`: true, false, or null for not said yet), `tray` (a click on the tick, with
 //!   `button`: left or right), `reopen` (the dock icon), `close` (with `window`), `frame` (a window dragged and
 //!   resized: `window`, `x`, `y`, `width`, `height` in points), `outside-click` (a click in another
 //!   app), `check-update` (`auto`: only past the floor, as focus would), `wake`, `age-check` (with `minutes`), `quit`,
@@ -21,7 +24,7 @@
 //! The rest of the test set-up comes from the environment the harness launches the app with: TUDU_TEST_DATA (this
 //! run's folder: the webview's own data store is derived from it, so every folder starts clean), TUDU_TEST_WEB
 //! (the local web app the windows open), TUDU_TEST_API (the API, for the update feed) and TUDU_TEST_AT_LOGIN=1 (a
-//! launch as the login item would make it). The updater's public key
+//! launch as the login item would make it) and TUDU_TEST_TAKEN (keys another app holds). The updater's public key
 //! is a build input (the run's throwaway key).
 
 use std::collections::HashMap;
@@ -37,7 +40,8 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Manager, State, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
-use crate::{background, updates, windows, App, NOTES, SUMMON};
+use crate::shortcuts::{self, Id};
+use crate::{background, hotkeys, updates, windows, App};
 
 #[derive(Default)]
 pub struct Control {
@@ -51,6 +55,12 @@ fn env(name: &str) -> Option<String> {
 
 pub fn data_dir() -> Option<PathBuf> {
     env("TUDU_TEST_DATA").map(PathBuf::from)
+}
+
+/// Keys the test build pretends another app holds (TUDU_TEST_TAKEN, comma separated, in the plugin's form), so the
+/// refused path runs on CI.
+pub fn taken(accel: &str) -> bool {
+    env("TUDU_TEST_TAKEN").is_some_and(|v| v.split(',').any(|t| shortcuts::same(t.trim(), accel)))
 }
 
 /// Downloads land in the run's own folder.
@@ -260,8 +270,14 @@ fn state(app: &AppHandle) -> Value {
             "x": i.x, "y": i.y, "width": i.width, "height": i.height,
         })) })
     });
-    let registered = app.global_shortcut().is_registered(SUMMON);
-    let notes_registered = app.global_shortcut().is_registered(NOTES);
+    let keys = hotkeys::rows(app);
+    let key = |id: Id| {
+        keys.iter()
+            .find(|r| r.id == id)
+            .map(|r| json!({ "accelerator": r.accelerator, "label": r.label, "registered": r.registered }))
+            .unwrap_or(Value::Null)
+    };
+    let held = app.state::<hotkeys::Hotkeys>().held().map(Id::name);
     let bg = app.state::<background::Background>();
     let webview = |label: &str| {
         app.get_webview_window(label)
@@ -314,10 +330,12 @@ fn state(app: &AppHandle) -> Value {
         },
         "note": note,
         "tray": tray,
-        "shortcut": { "accelerator": SUMMON, "registered": registered },
+        "shortcut": key(Id::NewTask),
         "shortcuts": {
-            "summon": { "accelerator": SUMMON, "registered": registered },
-            "notes": { "accelerator": NOTES, "registered": notes_registered },
+            "summon": key(Id::NewTask),
+            "notes": key(Id::NewNote),
+            // A press waiting for the desk to say whether you are signed in.
+            "held": held,
         },
         "badge": dock_badge(app),
         "background": background,
@@ -335,15 +353,26 @@ fn act(app: &AppHandle, input: &Value) -> (u16, Value) {
     let a = app.clone();
     let input = input.clone();
     match what {
-        "summon" | "notes-shortcut" | "tray" | "reopen" | "close" | "outside-click" => {
+        "summon" | "notes-shortcut" | "press" | "tray" | "reopen" | "close" | "outside-click" => {
             // On the main thread, as a key press, a click in the menu or the Dock would be.
             let w = what.to_string();
             let _ = app.run_on_main_thread(move || {
                 match w.as_str() {
                     "summon" => windows::summon(&a, true),
-                    // ⌥⌘N, through the same handler a key press reaches.
+                    // New note's keys as they are now, through the same handler a key press reaches.
                     "notes-shortcut" => {
-                        if let Ok(s) = NOTES.parse() {
+                        let b = a.state::<hotkeys::Hotkeys>().bindings();
+                        if let Some(s) = b.get(Id::NewNote).and_then(|k| k.parse().ok()) {
+                            crate::pressed(&a, &s);
+                        }
+                    }
+                    // Any keys (`accelerator`), through that same handler: keys that are not yours do nothing.
+                    "press" => {
+                        let k = input
+                            .get("accelerator")
+                            .and_then(Value::as_str)
+                            .unwrap_or("");
+                        if let Ok(s) = k.parse() {
                             crate::pressed(&a, &s);
                         }
                     }
@@ -415,6 +444,30 @@ fn act(app: &AppHandle, input: &Value) -> (u16, Value) {
         }
         "wake" => {
             updates::woke(app);
+            (200, json!({ "ok": true }))
+        }
+        "drop-shortcut" => {
+            // macOS losing a hot key behind the app's back (`id`: newTask or newNote), as it can over sleep.
+            let id = input.get("id").and_then(Value::as_str).and_then(Id::parse);
+            let b = app.state::<hotkeys::Hotkeys>().bindings();
+            match id.and_then(|id| b.get(id)) {
+                Some(k) => {
+                    let _ = app.global_shortcut().unregister(k);
+                    (200, json!({ "ok": true }))
+                }
+                None => (400, json!({ "error": "no such shortcut, or it is off" })),
+            }
+        }
+        "signed-in" => {
+            // What the desk has said about signing in: null puts it back to not said yet (a launch at login before
+            // the page loads), true or false says it, as the page would.
+            let v = input.get("value").and_then(Value::as_bool);
+            if let Ok(mut s) = app.state::<App>().seen.lock() {
+                s.signed_in = v;
+            }
+            if v.is_some() {
+                hotkeys::signed_in_known(app);
+            }
             (200, json!({ "ok": true }))
         }
         "age-check" => {

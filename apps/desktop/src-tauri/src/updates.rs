@@ -333,6 +333,8 @@ pub fn watch_wake(app: &AppHandle) {
 /// The Mac woke (or the control channel says so).
 pub fn woke(app: &AppHandle) {
     auto_check(app);
+    // macOS can drop a hot key over sleep: any it lost is registered again.
+    crate::hotkeys::check(app);
 }
 
 /// Restart to update: install the downloaded version over this one and relaunch on it.
