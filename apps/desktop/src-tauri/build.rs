@@ -35,6 +35,8 @@ const COMMANDS: &[&str] = &[
     "notify_status",
     "notify_nudge",
     "open_notification_settings",
+    "shortcuts_get",
+    "shortcuts_set",
 ];
 const TEST_COMMANDS: &[&str] = &[
     "app_info",
@@ -70,6 +72,8 @@ const TEST_COMMANDS: &[&str] = &[
     "notify_status",
     "notify_nudge",
     "open_notification_settings",
+    "shortcuts_get",
+    "shortcuts_set",
     "control_reply",
 ];
 
