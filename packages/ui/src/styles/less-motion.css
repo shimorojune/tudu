@@ -274,6 +274,9 @@
 :root[data-motion='less'] .tp-nb-bubble {
   animation-duration: 1ms;
 }
+:root[data-motion='less'] .tp-nb-frow .tp-nb-ftog {
+  transition-duration: 1ms;
+}
 :root[data-motion='less'] .tp-nb-li-new,
 :root[data-motion='less'] .tp-nb-li-out,
 :root[data-motion='less'] .tp-nb-rail-all {

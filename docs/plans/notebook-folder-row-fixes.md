@@ -1,6 +1,6 @@
 # Notebook folder row: menu cut off, long name under the buttons (#92, #93)
 
-Status: proposal, awaiting Rohit's approval. Canvas: skipped with Rohit's OK (12 Nov 2026). No new design: both are
+Status: approved by Rohit 12 Nov 2026; implemented. Canvas: skipped with Rohit's OK (12 Nov 2026). No new design: both are
 the existing design drawn wrongly. The design system kit has the same two faults, so it gets the same fix after the
 merge (see "Design system and canvas").
 
@@ -84,6 +84,12 @@ handling; the screenshot is just cropped there. Nothing to fix (one optional tid
   buttons arrive instead of snapping. 1ms under reduced motion and Less motion. During a drag
   (`.tp-nb-dragon`, where the buttons are held hidden) the padding stays at rest.
 - The rename field is unaffected: the buttons are already `display: none` while renaming.
+- Found while building: the padding is `--nb-acts × 26px − 10px`, not `+ 10px`. The count stays in the row, faded
+  out, and its 20px sit under the buttons, so the name still ends 4px before the first one. On a phone the row has no
+  hover buttons, so the padding stays at rest there (`notebook.css`).
+- Found while building: with Reduce motion on, every element gets a 120ms transition, which slid the floating menu
+  in from off screen. The floating pop sets `transition-property: none`; C22-E93 checks the menu is at its button at
+  once.
 
 No server change, no migration, no copy change.
 

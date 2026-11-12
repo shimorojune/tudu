@@ -9,6 +9,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { cx } from '../lib/cx';
 import { POP_LEAVE_MS } from '../lib/linger';
 import { Icon } from '../lib/icons';
@@ -317,24 +318,76 @@ export function useFlip(ref: RefObject<HTMLElement | null>): void {
 /** A picker inside a popover says when it has turned upward, so the popover keeps that side while it leaves. */
 const PopUp = createContext<((up: boolean) => void) | null>(null);
 
+/** Where a floating popover goes: its top left corner in the window, and whether it opened upward. */
+export interface PopPlace {
+  left: number;
+  top: number;
+  up: boolean;
+}
+
+/** The gap between a floating popover and its button, and the room it keeps from the window's edges. */
+export const POP_GAP = 6;
+export const POP_EDGE = 8;
+
+/**
+ * Place a floating popover by its button: below it with their right edges in line, upward when there is no room
+ * below and more above, and always inside the window.
+ */
+export function placePop(
+  anchor: { left: number; right: number; top: number; bottom: number },
+  size: { w: number; h: number },
+  view: { w: number; h: number },
+): PopPlace {
+  const below = view.h - POP_EDGE - (anchor.bottom + POP_GAP);
+  const above = anchor.top - POP_GAP - POP_EDGE;
+  const up = size.h > below && above > below;
+  const top = up ? anchor.top - POP_GAP - size.h : anchor.bottom + POP_GAP;
+  const left = anchor.right - size.w;
+  return {
+    left: Math.max(POP_EDGE, Math.min(left, view.w - POP_EDGE - size.w)),
+    top: Math.max(POP_EDGE, Math.min(top, view.h - POP_EDGE - size.h)),
+    up,
+  };
+}
+
+/** A floating popover's box → the wrapper of the button that opened it, so a press inside it counts as inside. */
+const floatOwner = new WeakMap<Element, HTMLElement>();
+
 /**
  * A popover that leaves with motion (130ms) instead of vanishing. It keeps the side it opened on (a picker may have
  * turned it upward) while it leaves.
+ *
+ * With `float` (the wrapper of its button) it is drawn over the page instead of inside the wrapper, so a box that
+ * clips (a folded folder, a scrolling list) never cuts it. It then closes (`onClose`) when anything scrolls or the
+ * window changes size, because it would no longer sit by its button.
  */
 export function NotePop({
   open,
   className,
   children,
+  float,
+  onClose,
 }: {
   open: boolean;
   className?: string;
   children: ReactNode;
+  float?: RefObject<HTMLElement | null>;
+  onClose?: () => void;
 }) {
   const [shown, setShown] = useState(open);
   const [leaving, setLeaving] = useState(false);
   const [up, setUp] = useState(false);
+  const [place, setPlace] = useState<PopPlace | null>(null);
+  const box = useRef<HTMLDivElement | null>(null);
+  const close = useRef(onClose);
+  useLayoutEffect(() => {
+    close.current = onClose;
+  });
   if (open && (!shown || leaving)) {
-    if (!shown) setUp(false);
+    if (!shown) {
+      setUp(false);
+      setPlace(null);
+    }
     setShown(true);
     setLeaving(false);
   }
@@ -350,22 +403,67 @@ export function NotePop({
     );
     return () => clearTimeout(t);
   }, [leaving]);
+  const floating = !!float;
+  // Measured once as it opens, before the first paint, so it never jumps.
+  useLayoutEffect(() => {
+    const el = box.current;
+    const anchor = float?.current;
+    if (!floating || !shown || !el || !anchor) return;
+    floatOwner.set(el, anchor);
+    const p = placePop(
+      anchor.getBoundingClientRect(),
+      { w: el.offsetWidth, h: el.offsetHeight },
+      { w: window.innerWidth, h: window.innerHeight },
+    );
+    setPlace(p);
+    setUp(p.up);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- placed once, as it opens
+  }, [floating, shown]);
+  useEffect(() => {
+    if (!floating || !open) return;
+    const scroll = (e: Event) => {
+      if (e.target instanceof Node && box.current?.contains(e.target)) return;
+      close.current?.();
+    };
+    const resize = () => close.current?.();
+    window.addEventListener('scroll', scroll, true);
+    window.addEventListener('resize', resize);
+    return () => {
+      window.removeEventListener('scroll', scroll, true);
+      window.removeEventListener('resize', resize);
+    };
+  }, [floating, open]);
   if (!shown) return null;
-  return (
+  const pop = (
     <PopUp.Provider value={setUp}>
       <div
-        className={cx('tp-nb-pop', className, up && 'tp-nb-pop-up', leaving && 'tp-nb-pop-leaving')}
+        ref={box}
+        className={cx(
+          floating && 'tp-root tp-nb-pop-float',
+          'tp-nb-pop',
+          className,
+          up && 'tp-nb-pop-up',
+          leaving && 'tp-nb-pop-leaving',
+        )}
         aria-hidden={leaving ? 'true' : undefined}
+        style={
+          floating
+            ? place
+              ? { left: place.left, top: place.top }
+              : { left: -9999, top: 0, visibility: 'hidden' }
+            : undefined
+        }
       >
         {children}
       </div>
     </PopUp.Provider>
   );
+  return floating ? createPortal(pop, document.body) : pop;
 }
 
 /**
  * Close the popovers inside `root` on a click off them (anywhere, even inside the note) or Esc. `open` says whether
- * any is open; `close` closes them all.
+ * any is open; `close` closes them all. A popover of `root` that floats over the page counts as inside it.
  */
 export function useCloseOnOutside(
   root: RefObject<HTMLElement | null>,
@@ -380,6 +478,8 @@ export function useCloseOnOutside(
     if (!open) return;
     function down(e: PointerEvent) {
       const t = e.target as Element | null;
+      const float = t?.closest?.('.tp-nb-pop-float');
+      if (float && root.current && floatOwner.get(float) === root.current) return;
       const w = t?.closest?.('.tp-nb-menuw');
       if (!w || !root.current?.contains(w)) live.current();
     }
