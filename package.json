@@ -1,6 +1,6 @@
 {
   "name": "tudu",
-  "version": "0.41.1",
+  "version": "0.42.0",
   "private": true,
   "type": "module",
   "description": "Tudu: a calm day planner. Web app, macOS app and API.",

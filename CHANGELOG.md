@@ -1,3 +1,32 @@
+## [0.42.0](https://github.com/shimorojune/tudu/compare/tudu-0.41.1...tudu-0.42.0) (2026-11-13)
+
+### Features
+
+* **feedback:** File it as a public issue, and the explanation shows over the form ([#50](https://github.com/shimorojune/tudu/issues/50), [#39](https://github.com/shimorojune/tudu/issues/39)) ([dcc4bac](https://github.com/shimorojune/tudu/commit/dcc4bacf922f8bc5497c374750d7b1bf5c170c2d)), closes [#67](https://github.com/shimorojune/tudu/issues/67)
+* **feedback:** GitHub issue mirror, similar search and +1 as a comment on the server ([#76](https://github.com/shimorojune/tudu/issues/76)) ([09a26df](https://github.com/shimorojune/tudu/commit/09a26df4e09bd021420cbb231487fbd9280ad077))
+* **feedback:** screenshot public by default ([#75](https://github.com/shimorojune/tudu/issues/75)); Already reported? box and +1 that one instead in the form ([#76](https://github.com/shimorojune/tudu/issues/76)) ([6c6864e](https://github.com/shimorojune/tudu/commit/6c6864e2966d2699666de896262a00875b2b40c2))
+* **notebook:** make and change folders in the note window; the Mac window's shadow ends inside its edge ([#90](https://github.com/shimorojune/tudu/issues/90), [#88](https://github.com/shimorojune/tudu/issues/88)) ([3766b1e](https://github.com/shimorojune/tudu/commit/3766b1ed7ab3e80f39b61c08a1f97b5a9daa39f2))
+* Scramble my text, in the account menu under Theme ([#67](https://github.com/shimorojune/tudu/issues/67)) ([4cc04ec](https://github.com/shimorojune/tudu/commit/4cc04ecc6c9af46a9421e7800d97a1061da09f3d))
+
+### Bug Fixes
+
+* **desktop:** menu bar sheet follows the theme and Less motion picked on the desk ([#74](https://github.com/shimorojune/tudu/issues/74)) ([b9dee39](https://github.com/shimorojune/tudu/commit/b9dee396787814d0e6205eb2dfde0e4355033fff))
+* **desktop:** the note window stays in front when the desk closes ([#91](https://github.com/shimorojune/tudu/issues/91)) ([acd0d3c](https://github.com/shimorojune/tudu/commit/acd0d3c4a081ceb7e73c726e39ff7a8539c53765))
+* **jira:** a press outside closes the Jira panel, and the issue key opens the ticket ([#62](https://github.com/shimorojune/tudu/issues/62), [#61](https://github.com/shimorojune/tudu/issues/61)) ([53adfe2](https://github.com/shimorojune/tudu/commit/53adfe2efd63d5d0fd4e6bbdd95a0c0b5511197f))
+* **jira:** connect from All spaces, and On/Off beside the switch in Settings › Apps ([#59](https://github.com/shimorojune/tudu/issues/59), [#63](https://github.com/shimorojune/tudu/issues/63)) ([92a661f](https://github.com/shimorojune/tudu/commit/92a661fd879ddf816b1628531980c0a67d475892))
+* **jira:** the count follows the Assigned to me list and coming back to the app ([#64](https://github.com/shimorojune/tudu/issues/64)) ([0933261](https://github.com/shimorojune/tudu/commit/093326127bd8f45581eb2cf7de3dadef50b437cf))
+* **jira:** type the count write as Connected; tests wait for the hook to re-render ([ccf1801](https://github.com/shimorojune/tudu/commit/ccf180131409c59b519134dbe7daef954123e0e6))
+* keep the note on a failed reread, the floating bar's space, and a refused notification permission ([9d20c8b](https://github.com/shimorojune/tudu/commit/9d20c8be1a18941136312176fb6a57d621262141))
+* **launch:** the page holds still while the app arrives, so the mark no longer jumps left as it leaves ([#48](https://github.com/shimorojune/tudu/issues/48)) ([baa46a8](https://github.com/shimorojune/tudu/commit/baa46a84dd122c33465801dd9fca3887c7cbf332))
+* **live:** read who you are again on the first hello, so a request sent while a page loads still counts ([b4def47](https://github.com/shimorojune/tudu/commit/b4def47b4090b9f02dc9e9725a2c76df532858b3))
+* **live:** the page's stream starts where its /api/me read stands, instead of reading me again on hello ([ed0149c](https://github.com/shimorojune/tudu/commit/ed0149cb3ba454a4f3c88d52450fcb67be5c8f11))
+* **notebook:** folder menu floats over the page; long folder names give way to the row's buttons ([#92](https://github.com/shimorojune/tudu/issues/92), [#93](https://github.com/shimorojune/tudu/issues/93)) ([ff1a804](https://github.com/shimorojune/tudu/commit/ff1a80432ec97f86c194895e2b1cbecd1a7da109))
+* **outbox:** send changes from memory, so a stuck IndexedDB write can't stop every later change ([1c990b7](https://github.com/shimorojune/tudu/commit/1c990b7d29ac087b8e3d7a9c351ac73f5568c6fa))
+* **scramble:** clean the scrambled copy of rich text again after the parse round trip ([bb46150](https://github.com/shimorojune/tudu/commit/bb461508aa2c84dd63d6679d666ca6d8f7fd6886))
+* **ui:** hold the rail's tips while the sidebar folds; put the space tile on the icon column ([b9f4952](https://github.com/shimorojune/tudu/commit/b9f49525627c85e2e64da4025cec9dcab96d698b))
+* **ui:** say today, tomorrow and yesterday on a task's due date ([#58](https://github.com/shimorojune/tudu/issues/58)) ([46f4722](https://github.com/shimorojune/tudu/commit/46f47228b3cd24c4abea47d84516d2a618f46b06))
+* **ui:** the week's empty line folds all the way shut on a first drop ([b23f451](https://github.com/shimorojune/tudu/commit/b23f45126b236d754b089b69b8ef3261500aeb18))
+
 ## [0.41.1](https://github.com/shimorojune/tudu/compare/tudu-0.41.0...tudu-0.41.1) (2026-11-05)
 
 ### Bug Fixes
