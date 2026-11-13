@@ -57,7 +57,9 @@
             "allow-notify-permission",
             "allow-notify-status",
             "allow-notify-nudge",
-            "allow-open-notification-settings"
+            "allow-open-notification-settings",
+            "allow-shortcuts-get",
+            "allow-shortcuts-set"
           ]
         }
       ]

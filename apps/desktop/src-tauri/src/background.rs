@@ -239,12 +239,24 @@ fn write_prefs(app: &AppHandle, prefs: Prefs) {
 }
 
 fn save(app: &AppHandle, dock: Dock) {
-    write_prefs(app, Prefs { dock, ..read_prefs(app) });
+    write_prefs(
+        app,
+        Prefs {
+            dock,
+            ..read_prefs(app)
+        },
+    );
 }
 
 /// Keep the look beside the Dock choice.
 pub fn save_look(app: &AppHandle, look: Look) {
-    write_prefs(app, Prefs { look, ..read_prefs(app) });
+    write_prefs(
+        app,
+        Prefs {
+            look,
+            ..read_prefs(app)
+        },
+    );
 }
 
 /// At launch: the saved Dock choice, whether the login item started us, and the App Nap opt-out.

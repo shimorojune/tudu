@@ -46,6 +46,14 @@ export interface WindowState {
   /** The appearance macOS draws the window in (its traffic lights): Settings › Appearance, or macOS's own on System. */
   theme: 'light' | 'dark' | null;
 }
+/** A From anywhere shortcut as the test build reports it. */
+export interface GlobalKey {
+  /** The plugin's form; null when it is off. */
+  accelerator: string | null;
+  label: string | null;
+  registered: boolean;
+}
+
 export interface AppState {
   track: string;
   name: string;
@@ -80,11 +88,13 @@ export interface AppState {
     launchedAt: number;
     deskBackground: string | null;
   };
-  shortcut: { accelerator: string; registered: boolean };
-  /** Each global shortcut: the summon (⌘⇧N) and the note window (⌥⌘N). */
+  /** New task's keys (the summon), as `shortcuts.summon`. */
+  shortcut: GlobalKey;
+  /** Each From anywhere shortcut as it is now (Settings › Shortcuts), and a press held until signed in is known. */
   shortcuts: {
-    summon: { accelerator: string; registered: boolean };
-    notes: { accelerator: string; registered: boolean };
+    summon: GlobalKey;
+    notes: GlobalKey;
+    held: 'New task' | 'New note' | null;
   };
   badge: string | null;
   updater: {
@@ -99,7 +109,8 @@ export interface AppState {
     checking: boolean;
     downloading: { version: string; received: number; total: number | null } | null;
   };
-  seen: { signedIn: boolean; badge: number | null; opened: string[]; saved: string[] };
+  /** Null until the desk has said (the first seconds after a launch at login). */
+  seen: { signedIn: boolean | null; badge: number | null; opened: string[]; saved: string[] };
   /** Chunk 16: what macOS is told the app is, and what keeps it running in the background. */
   background: {
     policy: 'regular' | 'accessory';
@@ -525,7 +536,7 @@ export async function signIn(app: TuduApp, email = freshEmail()): Promise<string
   await app.until(`return typeof window.__tudu?.firstRun?.hide === 'function'`);
   await app.eval(`await window.__tudu.firstRun.hide();`);
   // The desk has told the app (the summon opens the bar from now on).
-  await app.waitState((s) => s.seen.signedIn);
+  await app.waitState((s) => s.seen.signedIn === true);
   return email;
 }
 

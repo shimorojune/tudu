@@ -215,7 +215,7 @@ pub fn open(app: &AppHandle, id: Option<String>, link_to: Option<String>) {
         .state::<App>()
         .seen
         .lock()
-        .map(|s| s.signed_in)
+        .map(|s| s.signed_in.unwrap_or(false))
         .unwrap_or(false);
     if !signed_in {
         windows::show_main(app, Some("/sign-in"));

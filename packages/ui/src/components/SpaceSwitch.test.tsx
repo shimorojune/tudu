@@ -137,3 +137,35 @@ describe('SpaceSwitch', () => {
     );
   });
 });
+
+describe('SK-U11 SpaceSwitch', () => {
+  it('SK-U11 each row shows its key before the count and the tick; a space with no key shows none', async () => {
+    const user = userEvent.setup();
+    const spaces: SwitchSpace[] = [
+      { id: 'me', name: 'Personal', personal: true, sub: 'Just you', hint: '⌃1', keyShortcuts: 'Control+1' },
+      {
+        id: 'nw',
+        name: 'Northwind',
+        color: '#3d5a80',
+        sub: '19 people',
+        count: 5,
+        hint: '⌃2',
+        keyShortcuts: 'Control+2',
+      },
+      { id: 'hm', name: 'Home', color: '#8a5a00', sub: '3 people' },
+    ];
+    render(<SpaceSwitch spaces={spaces} active="me" />);
+    await user.click(screen.getByRole('button', { name: /Personal/ }));
+    const [me, nw, hm] = within(screen.getByRole('menu', { name: 'Spaces' })).getAllByRole('menuitemradio');
+    const order = (row: HTMLElement) =>
+      Array.from(row.children).map(
+        (c) => c.className.split(' ').find((x) => x.startsWith('tp-')) ?? c.tagName,
+      );
+    expect(order(me!)).toEqual(['tp-stile', 'tp-sswl-n', 'tp-sswl-k', 'tp-sswl-ok']);
+    expect(order(nw!)).toEqual(['tp-stile', 'tp-sswl-n', 'tp-sswl-k', 'tp-sswl-c']);
+    expect(nw!.querySelector('.tp-sswl-k')).toHaveTextContent('⌃2');
+    expect(nw!).toHaveAttribute('aria-keyshortcuts', 'Control+2');
+    expect(hm!.querySelector('.tp-sswl-k')).toBeNull();
+    expect(hm!).not.toHaveAttribute('aria-keyshortcuts');
+  });
+});

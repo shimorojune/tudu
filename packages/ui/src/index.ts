@@ -292,6 +292,7 @@ export {
   type SettingsUpdates,
   type SettingsUpdateState,
   type SettingsSectionName,
+  type SettingsShortcuts,
   UP_TO_DATE_MS,
   JIRA_SWITCH_SETTLE_MS,
   jiraSpaceCount,
@@ -486,3 +487,12 @@ export {
 } from './components/OAuthConsent';
 export { CopyBox, CopyLink, COPIED_MS, type CopyBoxProps, type CopyLinkProps } from './components/CopyBox';
 export { AppMark, type AppMarkProps } from './components/AppMark';
+export { Keys, type KeysProps } from './components/Keys';
+export {
+  ShortcutRow,
+  SAVED_HOLD_MS,
+  SAVED_OUT_MS,
+  type ShortcutRowProps,
+  type ShortcutAnswer,
+} from './components/ShortcutField';
+export { ShortcutsSection, keysSub } from './components/ShortcutsSection';

@@ -57,9 +57,18 @@ describe('C20-U02 MenuBarSheet', () => {
       onFeedback: vi.fn(),
       onQuit: vi.fn(),
     };
-    render(<MenuBarSheet state="day" heading={heading} groups={[personal]} appName="Tudu Staging" {...on} />);
+    render(
+      <MenuBarSheet
+        state="day"
+        heading={heading}
+        groups={[personal]}
+        appName="Tudu Staging"
+        shortcut="⇧⌘N"
+        {...on}
+      />,
+    );
     const newTask = screen.getByRole('button', { name: 'New task' });
-    expect(newTask).toHaveAttribute('aria-keyshortcuts', 'Meta+Shift+N');
+    expect(newTask).toHaveAttribute('aria-keyshortcuts', 'Shift+Meta+N');
     expect(newTask).toHaveClass('tp-ib');
     expect(newTask.textContent).toBe('');
     expect(screen.getByRole('button', { name: 'New note' })).toHaveClass('tp-ib');
@@ -71,7 +80,7 @@ describe('C20-U02 MenuBarSheet', () => {
     expect(on.onNew).toHaveBeenCalledOnce();
     expect(on.onNewNote).toHaveBeenCalledOnce();
     expect(on.onOpenApp).toHaveBeenCalledOnce();
-    expect(screen.queryByText('⌘⇧N')).toBeNull();
+    expect(screen.queryByText('⇧⌘N')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'More' }));
     const items = screen.getAllByRole('menuitem').map((m) => m.textContent);
     expect(items[0]).toContain('Send feedback…');
@@ -186,10 +195,10 @@ describe('C20-U07 MenuBarSheet', () => {
   it('C20-U07 the foot icons say what they do in a tooltip above: New task with its shortcut, New note', async () => {
     const user = userEvent.setup();
     render(
-      <MenuBarSheet state="day" heading={heading} groups={[personal]} shortcut="⌘⇧N" onNewNote={vi.fn()} />,
+      <MenuBarSheet state="day" heading={heading} groups={[personal]} shortcut="⇧⌘N" onNewNote={vi.fn()} />,
     );
     act(() => screen.getByRole('button', { name: 'New task' }).focus());
-    await waitFor(() => expect(screen.getByRole('tooltip')).toHaveTextContent('New task ⌘⇧N'));
+    await waitFor(() => expect(screen.getByRole('tooltip')).toHaveTextContent('New task ⇧⌘N'));
     const pop = document.querySelector('.tp-tip-pop');
     expect(pop).toHaveAttribute('data-side', 'top');
     await user.tab();
@@ -303,5 +312,44 @@ describe('MC-U02 the Inbox line under the heading', () => {
         r.selector === '.tp-mb .tp-mb-ibx' && r.context.some((c) => c.includes('prefers-reduced-motion')),
     )!;
     expect(reduced.declarations['transition']).not.toMatch(/grid-template-rows/);
+  });
+});
+
+describe('SK-U14 MenuBarSheet', () => {
+  it('SK-U14 tooltips and aria-keyshortcuts follow your keys; Off or taken shows the name alone', async () => {
+    const { rerender } = render(
+      <MenuBarSheet state="day" heading={heading} groups={[personal]} shortcut="⌃⌥T" onNewNote={vi.fn()} />,
+    );
+    const task = screen.getByRole('button', { name: 'New task' });
+    expect(task).toHaveAttribute('aria-keyshortcuts', 'Control+Alt+T');
+    act(() => task.focus());
+    await waitFor(() => expect(screen.getByRole('tooltip')).toHaveTextContent('New task ⌃⌥T'));
+    act(() => task.blur());
+    rerender(<MenuBarSheet state="day" heading={heading} groups={[personal]} onNewNote={vi.fn()} />);
+    const off = screen.getByRole('button', { name: 'New task' });
+    expect(off).not.toHaveAttribute('aria-keyshortcuts');
+    act(() => off.focus());
+    await waitFor(() => expect(screen.getByRole('tooltip')).toHaveTextContent(/^New task$/));
+  });
+
+  it('SK-U14 a named key stays a word in aria-keyshortcuts', () => {
+    render(
+      <MenuBarSheet
+        state="day"
+        heading={heading}
+        groups={[personal]}
+        shortcut="⌥Space"
+        noteShortcut="⌃F5"
+        onNewNote={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'New task' })).toHaveAttribute(
+      'aria-keyshortcuts',
+      'Alt+Space',
+    );
+    expect(screen.getByRole('button', { name: 'New note' })).toHaveAttribute(
+      'aria-keyshortcuts',
+      'Control+F5',
+    );
   });
 });

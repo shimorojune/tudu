@@ -58,14 +58,10 @@ impl Track {
     }
 }
 
-/// The summon: one global shortcut that brings up the floating Quick Add over whatever you are doing.
+/// The summon's usual keys: the floating Quick Add over whatever you are doing (Settings › Shortcuts changes them).
 pub const SUMMON: &str = "CommandOrControl+Shift+N";
-/// The summon as the web app (and the menu bar's New task) shows it.
-pub const SUMMON_LABEL: &str = "⌘⇧N";
-/// The note window's shortcut: a blank note over whatever app you are in, as the menu bar's New note does.
+/// The note window's usual keys: a blank note over whatever app you are in, as the menu bar's New note does.
 pub const NOTES: &str = "CommandOrControl+Alt+N";
-/// It as the menu bar's New note tooltip shows it.
-pub const NOTES_LABEL: &str = "⌥⌘N";
 
 #[cfg(test)]
 mod tests {
@@ -79,7 +75,8 @@ mod tests {
             s,
             Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyN)
         );
-        assert_eq!(SUMMON_LABEL, "⌘⇧N");
+        // Written in macOS order, Shift before Command.
+        assert_eq!(crate::shortcuts::label(SUMMON).as_deref(), Some("⇧⌘N"));
     }
 
     #[test]
@@ -90,7 +87,7 @@ mod tests {
             Shortcut::new(Some(Modifiers::SUPER | Modifiers::ALT), Code::KeyN)
         );
         assert_ne!(s, SUMMON.parse::<Shortcut>().unwrap());
-        assert_eq!(NOTES_LABEL, "⌥⌘N");
+        assert_eq!(crate::shortcuts::label(NOTES).as_deref(), Some("⌥⌘N"));
     }
 
     #[test]

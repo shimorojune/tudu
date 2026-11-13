@@ -599,7 +599,11 @@ test.describe('chunk 22 · the note window', () => {
   }) => {
     await signIn(app);
     let s = await app.state();
-    expect(s.shortcuts.notes).toEqual({ accelerator: 'CommandOrControl+Alt+N', registered: true });
+    expect(s.shortcuts.notes).toEqual({
+      accelerator: 'CommandOrControl+Alt+N',
+      label: '⌥⌘N',
+      registered: true,
+    });
     expect(s.shortcuts.summon.registered).toBe(true);
     await app.act('close', { window: 'main' });
     await app.waitState((x) => !x.windows.main.visible);

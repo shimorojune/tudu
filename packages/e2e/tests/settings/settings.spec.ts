@@ -126,6 +126,7 @@ test.describe('settings', () => {
       'Account',
       'Appearance',
       'Working hours',
+      'Shortcuts',
       'Apps',
       'AI access',
       'Space',

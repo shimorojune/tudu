@@ -3173,3 +3173,36 @@ html[data-scrambled] .tp-avatar.tp-photo img, html[data-scrambled] .tp-pdot.tp-p
 .tp-nb-win.tp-root:not(.tp-nb-web) { box-shadow: 0 0 0 1px var(--hair), 0 1px 2px var(--hair), 0 4px 10px -4px var(--shadow-color); }
 .tp-nb-win.tp-root.tp-nb-pinned:not(.tp-nb-web) { box-shadow: 0 0 0 1.5px var(--border-strong), 0 1px 2px var(--hair), 0 4px 10px -4px var(--shadow-color); }
 @media (prefers-reduced-motion: reduce) { .tp-nb-frow.tp-nb-naming { animation-duration: 1ms; } }
+
+/* ---- Shortcuts: Keys (one cap per key) and ShortcutField (Settings › Shortcuts) ---- */
+.tp-keys { display: inline-flex; align-items: center; gap: 3px; }
+.tp-keys kbd { box-sizing: border-box; min-width: 22px; height: 22px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); background: color-mix(in srgb, var(--foreground) 7%, transparent); box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--foreground) 12%, transparent); font: 500 12px/1 var(--font-mono); color: var(--foreground); white-space: nowrap; }
+.tp-keys .tp-keys-to { padding: 0 3px; font-size: 12px; color: var(--muted-foreground); }
+.tp-kf-w { display: inline-flex; align-items: center; gap: 6px; }
+.tp-root .tp-kf, .tp-kf { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 136px; height: 34px; padding: 0 8px; border: 0; border-radius: var(--radius-md); background: transparent; box-shadow: inset 0 0 0 1px var(--input); color: var(--foreground); font: 500 12.5px/1 var(--font-sans); cursor: pointer; transition: background-color var(--dur-menu) var(--ease-change), box-shadow var(--dur-menu) var(--ease-change); }
+.tp-kf:hover { background: var(--accent); }
+.tp-root .tp-kf:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--border-strong), 0 0 0 3px var(--ring); }
+.tp-root .tp-kf.tp-rec, .tp-kf.tp-rec { background: var(--card); outline: none; box-shadow: inset 0 0 0 1px var(--border-strong), 0 0 0 3px var(--ring); animation: tp-kf-breathe 1.8s var(--ease-change) infinite; }
+.tp-root .tp-kf.tp-bad, .tp-kf.tp-bad { animation: none; box-shadow: inset 0 0 0 1px var(--destructive), 0 0 0 3px var(--destructive-soft); }
+.tp-kf-ask { color: var(--muted-foreground); font-weight: 450; animation: tp-label-in 160ms var(--ease-arrive) both; }
+.tp-kf-off { color: var(--muted-foreground); font-weight: 450; }
+.tp-kf-caret { width: 1.5px; height: 14px; border-radius: 1px; background: var(--foreground); animation: tp-kf-blink 1.1s steps(2, jump-none) infinite; }
+.tp-kf.tp-rec kbd { animation: tp-key-in 140ms var(--ease-settle) both; }
+.tp-kf.tp-saved kbd { animation: tp-key-in 180ms var(--ease-settle) both; }
+.tp-kf.tp-saved kbd:nth-child(2) { animation-delay: 35ms; }
+.tp-kf.tp-saved kbd:nth-child(3) { animation-delay: 70ms; }
+.tp-kf.tp-saved kbd:nth-child(n+4) { animation-delay: 105ms; }
+.tp-kf-ok { display: inline-flex; flex: none; width: 14px; height: 14px; overflow: hidden; color: var(--foreground); animation: tp-kf-ok-in 180ms var(--ease-settle) both; }
+.tp-kf-ok.tp-out { animation: tp-kf-ok-out 220ms var(--ease-leave) forwards; }
+.tp-kf-ok path { stroke-dasharray: 22; stroke-dashoffset: 22; animation: tp-draw 300ms var(--ease-settle) 120ms forwards; }
+.tp-kf-reset { animation: tp-label-in 160ms var(--ease-arrive) both; color: var(--muted-foreground); }
+.tp-kf-line { display: inline-block; animation: tp-label-in 160ms var(--ease-arrive) both; }
+@keyframes tp-kf-ok-in { from { width: 0; margin-left: -8px; } to { width: 14px; margin-left: 0; } }
+@keyframes tp-kf-ok-out { from { opacity: 1; width: 14px; margin-left: 0; transform: none; } to { opacity: 0; width: 0; margin-left: -8px; transform: scale(.6); } }
+@keyframes tp-kf-ok-fade { from { opacity: 1; width: 14px; margin-left: 0; } to { opacity: 0; width: 0; margin-left: -8px; } }
+@keyframes tp-key-in { from { opacity: 0; transform: translateY(3px) scale(.88); } to { opacity: 1; transform: none; } }
+@keyframes tp-kf-breathe { 50% { box-shadow: inset 0 0 0 1px var(--border-strong), 0 0 0 5px color-mix(in srgb, var(--ring) 45%, transparent); } }
+@keyframes tp-kf-blink { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .tp-kf.tp-rec, .tp-kf.tp-rec kbd, .tp-kf.tp-saved kbd, .tp-kf-caret { animation: none; } .tp-kf-ok path { animation: none; stroke-dashoffset: 0; } .tp-kf-ok { animation: none; } .tp-kf-ok.tp-out { animation: tp-kf-ok-fade 160ms linear forwards; } }
+/* The space list: each space's key at the row's end, in the quiet type menus use. */
+.tp-sswl-k { flex: none; font-family: var(--font-mono); font-size: 11px; font-weight: 400; color: var(--muted-foreground); letter-spacing: .02em; }

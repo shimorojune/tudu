@@ -42,14 +42,14 @@ export interface MenuBarSheetProps {
   offline?: boolean;
   /** "Tudu", "Tudu Staging": Open and Quit name the app. */
   appName?: string;
-  /** The summon, beside New task. */
+  /** New task's keys from anywhere (⇧⌘N), beside it; none while they are off or another app has them. */
   shortcut?: string;
   onToggle?: (row: MenuBarRowItem, done: boolean) => void;
   onOpen?: (row: MenuBarRowItem) => void;
   onNew?: () => void;
   /** New note (chunk 22): the note window on a blank note, over whatever app you are in. */
   onNewNote?: () => void;
-  /** The note window's shortcut, beside New note; an app too old to register it gives none. */
+  /** New note's keys, the same way; an app too old to register them gives none. */
   noteShortcut?: string;
   onOpenApp?: () => void;
   onFeedback?: () => void;
@@ -147,9 +147,11 @@ export function MenuBarRow({
 
 const KEY_NAMES: Record<string, string> = { '⌘': 'Meta', '⇧': 'Shift', '⌥': 'Alt', '⌃': 'Control' };
 
-/** `⌘⇧N` as aria-keyshortcuts writes it: `Meta+Shift+N`. */
+/** `⇧⌘N` as aria-keyshortcuts writes it: `Shift+Meta+N`; a named key stays a word (`⌥Space`: `Alt+Space`). */
 function keyShortcuts(shortcut: string): string {
-  return [...shortcut].map((k) => KEY_NAMES[k] ?? k.toUpperCase()).join('+');
+  const mods = [...shortcut].filter((k) => KEY_NAMES[k]);
+  const key = [...shortcut].filter((k) => !KEY_NAMES[k]).join('');
+  return [...mods.map((k) => KEY_NAMES[k]), key.length === 1 ? key.toUpperCase() : key].join('+');
 }
 
 /**
@@ -165,7 +167,7 @@ export function MenuBarSheet({
   emptyLines = [],
   offline,
   appName = 'Tudu',
-  shortcut = '⌘⇧N',
+  shortcut,
   noteShortcut,
   onToggle,
   onOpen,
@@ -276,9 +278,9 @@ export function MenuBarSheet({
           <IconButton
             label="New task"
             className="tp-mb-ib"
-            tipLabel={`New task  ${shortcut}`}
+            tipLabel={shortcut ? `New task  ${shortcut}` : undefined}
             tipSide="top"
-            aria-keyshortcuts={keyShortcuts(shortcut)}
+            aria-keyshortcuts={shortcut ? keyShortcuts(shortcut) : undefined}
             onClick={onNew}
           >
             <Icon name="plus" size={16} />

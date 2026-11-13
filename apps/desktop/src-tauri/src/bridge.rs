@@ -5,16 +5,19 @@ use std::path::PathBuf;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
-use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
+use crate::hotkeys;
+use crate::shortcuts::Id;
 use crate::windows;
-use crate::{App, NOTES, NOTES_LABEL, SUMMON_LABEL};
+use crate::App;
 
 /// What the app has been asked to do that leaves no trace in a window, kept for the control channel.
 #[derive(Default, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Seen {
-    pub signed_in: bool,
+    /// Whether someone is signed in, as the desk last said: none until it has said (the first seconds after a launch
+    /// at login), when a From anywhere press waits for it.
+    pub signed_in: Option<bool>,
     /// The Inbox count the page last gave.
     pub badge: Option<i64>,
     /// Today's tasks left and planned, as the page last gave them (none: not known yet, or signed out).
@@ -43,10 +46,12 @@ pub struct AppInfo {
     track: crate::Track,
     name: &'static str,
     version: String,
-    shortcut: &'static str,
-    /// The note window's shortcut, only while it is registered (another app may hold it).
+    /// New task's keys while macOS has them (off, or taken by another app: none).
     #[serde(skip_serializing_if = "Option::is_none")]
-    note_shortcut: Option<&'static str>,
+    shortcut: Option<String>,
+    /// New note's keys, the same way.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    note_shortcut: Option<String>,
 }
 
 #[tauri::command]
@@ -55,20 +60,19 @@ pub fn app_info(app: AppHandle, state: State<'_, App>) -> AppInfo {
         track: state.track,
         name: state.track.name(),
         version: app.package_info().version.to_string(),
-        shortcut: SUMMON_LABEL,
-        note_shortcut: app
-            .global_shortcut()
-            .is_registered(NOTES)
-            .then_some(NOTES_LABEL),
+        shortcut: hotkeys::live_label(&app, Id::NewTask),
+        note_shortcut: hotkeys::live_label(&app, Id::NewNote),
     }
 }
 
-/// The desk tells the app when someone signs in or out, so the summon knows which window to open.
+/// The desk tells the app when someone signs in or out, so the summon knows which window to open. A From anywhere
+/// press made before it first said runs now.
 #[tauri::command]
-pub fn set_signed_in(state: State<'_, App>, signed_in: bool) {
+pub fn set_signed_in(app: AppHandle, state: State<'_, App>, signed_in: bool) {
     if let Ok(mut s) = state.seen.lock() {
-        s.signed_in = signed_in;
+        s.signed_in = Some(signed_in);
     }
+    hotkeys::signed_in_known(&app);
 }
 
 /// The Inbox count across your spaces: the Dock icon's badge while there is one, and the tick's dot; zero clears

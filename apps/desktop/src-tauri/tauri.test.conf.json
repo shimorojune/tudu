@@ -58,6 +58,8 @@
             "allow-notify-status",
             "allow-notify-nudge",
             "allow-open-notification-settings",
+            "allow-shortcuts-get",
+            "allow-shortcuts-set",
             "allow-control-reply"
           ]
         }

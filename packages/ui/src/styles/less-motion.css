@@ -348,6 +348,22 @@
 :root[data-motion='less'] .tp-nb-frow.tp-nb-naming {
   animation-duration: 1ms;
 }
+:root[data-motion='less'] .tp-kf.tp-rec,
+:root[data-motion='less'] .tp-kf.tp-rec kbd,
+:root[data-motion='less'] .tp-kf.tp-saved kbd,
+:root[data-motion='less'] .tp-kf-caret {
+  animation: none;
+}
+:root[data-motion='less'] .tp-kf-ok path {
+  animation: none;
+  stroke-dashoffset: 0;
+}
+:root[data-motion='less'] .tp-kf-ok {
+  animation: none;
+}
+:root[data-motion='less'] .tp-kf-ok.tp-out {
+  animation: tp-kf-ok-fade 160ms linear forwards;
+}
 
 /* app.css */
 :root[data-motion='less'] .tp-tip-pop,

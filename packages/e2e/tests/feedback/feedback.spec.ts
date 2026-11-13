@@ -532,12 +532,16 @@ test.describe('send feedback', () => {
     const pop = page.getByRole('dialog', { name: 'What’s shared' });
     await expect(pop).toBeVisible();
     // #39: not just visible, but on top. Under the dialog's layer it was there and could not be seen.
-    const onTop = await pop.evaluate((el) => {
-      const r = el.getBoundingClientRect();
-      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-      return !!hit && el.contains(hit);
-    });
-    expect(onTop).toBe(true);
+    // Asked until it has settled: the popover is visible while it still fades in and before it is placed.
+    await expect
+      .poll(() =>
+        pop.evaluate((el) => {
+          const r = el.getBoundingClientRect();
+          const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return !!hit && el.contains(hit);
+        }),
+      )
+      .toBe(true);
     await expect(pop.getByRole('listitem')).toHaveText([
       'What you write',
       'Bug or idea',

@@ -26,3 +26,4 @@ export * from './hours';
 export * from './nudges';
 export * from './ai';
 export * from './scramble';
+export * from './shortcuts';

@@ -1,4 +1,4 @@
-import { deleteAsk, leaveAsk, removeAsk } from '@tudu/core';
+import { combo, defaultBindings, deleteAsk, leaveAsk, removeAsk } from '@tudu/core';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -6,7 +6,7 @@ import { paintMotion, readLessMotion, setLessMotion } from '../lib/theme';
 import { prefersReducedMotion } from '../lib/hooks';
 import { ConfirmDialog } from './ConfirmDialog';
 import { FIND_PAST, MembersBody, type MembersBodyMember } from './MembersBody';
-import { Settings, type SettingsProps } from './Settings';
+import { Settings, type SettingsProps, type SettingsShortcuts } from './Settings';
 
 const ME = { name: 'Rohit Raj', email: 'rohit@x.y', initials: 'RR' };
 const NW = { name: 'Northwind', color: '#3d5a80', members: 19, role: 'admin' as const };
@@ -633,5 +633,126 @@ describe('the version at the foot of the list', () => {
       <Settings me={ME} space={NW} still layout="phone" view="section" section="account" version={version} />,
     );
     expect(screen.queryByRole('link', { name: /^Tudu 0\.37\.0/ })).toBeNull();
+  });
+});
+
+describe('SK-U09 Settings › Shortcuts', () => {
+  const keys = (extra: Partial<SettingsShortcuts> = {}): SettingsShortcuts => ({
+    platform: 'mac',
+    bindings: defaultBindings('mac'),
+    usual: defaultBindings('mac'),
+    global: 'ready',
+    onSet: vi.fn(() => null),
+    onRetry: vi.fn(),
+    ...extra,
+  });
+  const MAC = { openAtLogin: 'off' as const, dock: 'open' as const };
+
+  it('SK-U09 listed under You after This Mac; From anywhere only with the Mac app; the In Tudu rows always', () => {
+    const { rerender } = settings({ section: 'keys', mac: MAC, shortcuts: keys() });
+    const items = within(nav())
+      .getAllByRole('button')
+      .map((b) => b.querySelector('.tp-snav-l')?.textContent ?? b.textContent);
+    expect(items.slice(0, 4)).toEqual(['Account', 'Appearance', 'This Mac', 'Shortcuts']);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Shortcuts');
+    expect(screen.getByText('Keys for Tudu on this Mac.')).toBeInTheDocument();
+    const anywhere = screen.getByRole('region', { name: 'From anywhere' });
+    expect(
+      within(anywhere).getByRole('button', { name: /^New task shortcut, Shift Command N/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(anywhere).getByRole('button', { name: /^New note shortcut, Option Command N/ }),
+    ).toBeInTheDocument();
+    const inTudu = screen.getByRole('region', { name: 'In Tudu' });
+    expect(
+      within(inTudu).getByRole('button', { name: /^All spaces shortcut, Control 0/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(inTudu).getByRole('button', { name: /^A space shortcut, Control 1 to 9/ }),
+    ).toBeInTheDocument();
+
+    // The web: In Tudu only, and where the others live.
+    rerender(
+      <Settings
+        me={ME}
+        space={NW}
+        still
+        section="keys"
+        shortcuts={keys({
+          global: undefined,
+          bindings: { ...defaultBindings('mac'), newTask: null, newNote: null },
+        })}
+      />,
+    );
+    expect(screen.queryByRole('region', { name: 'From anywhere' })).toBeNull();
+    expect(
+      screen.getByText('New task and New note from anywhere come with the Mac app.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Keys for Tudu on this computer.')).toBeInTheDocument();
+  });
+
+  it('SK-U09 loading shimmers the From anywhere fields; an error is a banner with Try again; never on phones', async () => {
+    const user = userEvent.setup();
+    const k = keys({ global: 'loading' });
+    const { rerender, container } = settings({ section: 'keys', shortcuts: k });
+    const anywhere = screen.getByRole('region', { name: 'From anywhere' });
+    expect(anywhere.querySelectorAll('.tp-skel')).toHaveLength(2);
+    expect(within(anywhere).queryByRole('button', { name: /shortcut/ })).toBeNull();
+    // The In Tudu rows never load.
+    expect(screen.getByRole('button', { name: /^All spaces shortcut/ })).toBeInTheDocument();
+
+    rerender(<Settings me={ME} space={NW} still section="keys" shortcuts={{ ...k, global: 'error' }} />);
+    expect(screen.getByText('Couldn’t load your From anywhere shortcuts.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(k.onRetry).toHaveBeenCalledOnce();
+    expect(container).toBeTruthy();
+
+    rerender(<Settings me={ME} space={NW} layout="phone" view="list" shortcuts={k} still />);
+    expect(screen.queryByText('Shortcuts')).toBeNull();
+  });
+});
+
+describe('SK-U10 Settings › Shortcuts', () => {
+  it('SK-U10 the back arrow only on changed rows, naming the usual keys; it puts them back', async () => {
+    const user = userEvent.setup();
+    const onSet = vi.fn(() => null);
+    const usual = defaultBindings('mac');
+    settings({
+      section: 'keys',
+      shortcuts: {
+        platform: 'mac',
+        usual,
+        bindings: { ...usual, newNote: null, space: combo(['alt', 'meta'], '#') },
+        global: 'ready',
+        onSet,
+      },
+    });
+    expect(screen.queryByRole('button', { name: 'Back to ⇧⌘N' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Back to ⌃0' })).toBeNull();
+    expect(screen.getByRole('button', { name: /^New note shortcut, off/ })).toHaveTextContent('Off');
+    await user.click(screen.getByRole('button', { name: 'Back to ⌥⌘N' }));
+    expect(onSet).toHaveBeenCalledWith('newNote', usual.newNote);
+    await user.click(screen.getByRole('button', { name: 'Back to ⌃1 to ⌃9' }));
+    expect(onSet).toHaveBeenCalledWith('space', usual.space);
+  });
+
+  it('SK-U10 a clash with another row is refused there and then', async () => {
+    const user = userEvent.setup();
+    const onSet = vi.fn(() => null);
+    settings({
+      section: 'keys',
+      shortcuts: {
+        platform: 'mac',
+        usual: defaultBindings('mac'),
+        bindings: defaultBindings('mac'),
+        global: 'ready',
+        onSet,
+      },
+    });
+    const all = screen.getByRole('button', { name: /^All spaces shortcut/ });
+    await user.click(all);
+    fireEvent.keyDown(all, { code: 'Digit2', key: '2', ctrlKey: true });
+    expect(screen.getByRole('alert')).toHaveTextContent('⌃2 already goes to a space. Pick other keys.');
+    expect(onSet).not.toHaveBeenCalled();
   });
 });

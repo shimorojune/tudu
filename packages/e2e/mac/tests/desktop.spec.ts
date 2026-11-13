@@ -139,7 +139,7 @@ test.describe('desktop', () => {
     expect(s.track).toBe('test');
     expect(s.identifier).toBe('net.ezdev.tudu.test');
     expect(s.version).toBe(run().current.version);
-    expect(s.shortcut).toEqual({ accelerator: 'CommandOrControl+Shift+N', registered: true });
+    expect(s.shortcut).toEqual({ accelerator: 'CommandOrControl+Shift+N', label: '⇧⌘N', registered: true });
     expect(s.tray.tooltip).toBe('Tudu Test');
     // No native menu (chunk 20): the tick opens today from the menu bar, which has Open, New task and Quit.
     expect(s.tray.items).toEqual([]);
@@ -149,7 +149,7 @@ test.describe('desktop', () => {
     await app.waitState((x) => x.windows.main.url === `${WEB}/sign-in`);
     expect(s.windows.floating.visible).toBe(false);
     await signIn(app);
-    await app.waitState((x) => x.seen.signedIn);
+    await app.waitState((x) => x.seen.signedIn === true);
     expect((await app.state()).badge).toBeNull();
   });
 
@@ -270,7 +270,7 @@ test.describe('desktop', () => {
     expect(s.windows.floating.visible).toBe(false);
     expect(s.windows.main.url).toBe(`${WEB}/sign-in`);
     await signIn(app);
-    await app.waitState((x) => x.seen.signedIn);
+    await app.waitState((x) => x.seen.signedIn === true);
     await app.act('summon');
     await floatingShown(app);
     await app.until(`return !!T.all('textbox', 'Task title')[0]`, 'floating');
@@ -822,7 +822,7 @@ test.describe('desktop', () => {
     await app.launch();
     await onToday(app);
     expect(await app.eval(`return document.documentElement.classList.contains('dark')`)).toBe(true);
-    await app.waitState((x) => x.seen.signedIn);
+    await app.waitState((x) => x.seen.signedIn === true);
     await app.act('summon');
     await floatingShown(app);
     await app.until(`return T.get('textbox', 'Task title').value === 'Half a thought'`, 'floating');
@@ -1084,7 +1084,7 @@ test.describe('background', () => {
     const s = await app.state();
     expect(s.background).toMatchObject({ atLogin: true, policy: 'accessory', deskOpen: false, awake: true });
     expect(s.windows.main.visible).toBe(false);
-    await app.waitState((x) => x.seen.signedIn, 20_000);
+    await app.waitState((x) => x.seen.signedIn === true, 20_000);
     await openSheet(app);
     await sheetDay(app);
     await app.eval(`T.click(T.get('button', 'Open Tudu Test'))`, 'menubar');

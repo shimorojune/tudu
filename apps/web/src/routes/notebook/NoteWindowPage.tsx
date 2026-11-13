@@ -118,7 +118,7 @@ function MacNoteWindow() {
             d.openInNotebook(id);
           }}
           openPath={(path) => d.showMain(path)}
-          // Make a task: the floating New task bar (⌘⇧N) comes up over every app, filled in; the desk stays put.
+          // Make a task: the floating New task bar (⇧⌘N) comes up over every app, filled in; the desk stays put.
           makeTask={(seed) => d.summonWith(seed)}
         />
       </div>

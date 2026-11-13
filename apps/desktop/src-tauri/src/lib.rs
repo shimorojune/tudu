@@ -6,10 +6,12 @@ mod background;
 mod bridge;
 #[cfg(feature = "control")]
 mod control;
+mod hotkeys;
 mod look;
 mod notes;
 mod nudges;
 mod place;
+mod shortcuts;
 mod track;
 mod updates;
 mod windows;
@@ -18,9 +20,9 @@ use tauri::{
     tray::{TrayIcon, TrayIconBuilder, TrayIconEvent},
     Manager, RunEvent, WindowEvent,
 };
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{Shortcut, ShortcutState};
 
-pub use track::{Track, NOTES, NOTES_LABEL, SUMMON, SUMMON_LABEL};
+pub use track::{Track, NOTES, SUMMON};
 
 /// What the app knows about itself, shared by the commands, the tray and the control channel.
 pub struct App {
@@ -64,6 +66,8 @@ macro_rules! handlers {
             nudges::notify_status,
             nudges::notify_nudge,
             nudges::open_notification_settings,
+            hotkeys::shortcuts_get,
+            hotkeys::shortcuts_set,
             $($extra),*
         ]
     };
@@ -114,6 +118,8 @@ pub fn run() {
             app.manage(look::Looks::start(app.handle()));
             // Before any window: a click on a nudge that launched Tudu is delivered to the delegate.
             nudges::start(app.handle());
+            // Before any window too, so a launch at login has your From anywhere keys before the desk has loaded.
+            hotkeys::start(app.handle());
 
             windows::create(app.handle(), at_login)?;
             background::seed_tray_place();
@@ -121,13 +127,6 @@ pub fn run() {
             background::apply(app.handle());
             background::watch_tick(app.handle());
             updates::watch_wake(app.handle());
-            if let Err(e) = app.global_shortcut().register(SUMMON) {
-                eprintln!("tudu: the summon {SUMMON} could not be registered: {e}");
-            }
-            // Taken by another app: logged, and the menu bar's New note shows no shortcut.
-            if let Err(e) = app.global_shortcut().register(NOTES) {
-                eprintln!("tudu: the note window's shortcut {NOTES} could not be registered: {e}");
-            }
             #[cfg(feature = "control")]
             control::start(app.handle());
             Ok(())
@@ -144,14 +143,9 @@ pub fn run() {
     });
 }
 
-/// A global shortcut pressed: ⌥⌘N opens the note window on a blank note (as the sheet's New note does), anything
-/// else is the summon.
+/// A global shortcut pressed: whichever of your From anywhere shortcuts has those keys now (Settings › Shortcuts).
 pub fn pressed(app: &tauri::AppHandle, shortcut: &Shortcut) {
-    if NOTES.parse::<Shortcut>().ok().as_ref() == Some(shortcut) {
-        notes::open(app, None, None);
-    } else {
-        windows::summon(app, true);
-    }
+    hotkeys::pressed(app, shortcut);
 }
 
 /// The menu-bar icon: the bare ink tick as a template image. It has no menu: a click, left or right, opens today from the

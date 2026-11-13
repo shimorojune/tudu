@@ -362,7 +362,7 @@ pub fn hide_floating(app: &AppHandle) {
     }
 }
 
-/// The summon (⌘⇧N, or New task in the tray). Shown: `toggle` hides it again. Not signed in: the desk opens on Sign
+/// The summon (⇧⌘N unless changed in Settings › Shortcuts, or New task in the tray). Shown: `toggle` hides it again. Not signed in: the desk opens on Sign
 /// in and the floating window stays hidden.
 pub fn summon(app: &AppHandle, toggle: bool) {
     let Some(w) = app.get_webview_window(FLOATING) else {
@@ -380,7 +380,7 @@ pub fn summon(app: &AppHandle, toggle: bool) {
         .state::<App>()
         .seen
         .lock()
-        .map(|s| s.signed_in)
+        .map(|s| s.signed_in.unwrap_or(false))
         .unwrap_or(false);
     if !signed_in {
         show_main(app, Some("/sign-in"));
@@ -775,7 +775,9 @@ mod panel {
             })();
             let _ = tx.send(count);
         });
-        rx.recv_timeout(std::time::Duration::from_secs(2)).ok().flatten()
+        rx.recv_timeout(std::time::Duration::from_secs(2))
+            .ok()
+            .flatten()
     }
 
     pub fn make_key(w: &WebviewWindow) {

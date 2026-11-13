@@ -50,13 +50,13 @@ describe('IconButton', () => {
 
   it('C20-U09 tipLabel says more in the tooltip while the label stays the accessible name', async () => {
     render(
-      <IconButton label="New task" tipLabel="New task  ⌘⇧N">
+      <IconButton label="New task" tipLabel="New task  ⇧⌘N">
         <Icon name="plus" />
       </IconButton>,
     );
     const btn = screen.getByRole('button', { name: 'New task' });
     act(() => btn.focus());
-    await waitFor(() => expect(screen.getByRole('tooltip')).toHaveTextContent('New task ⌘⇧N'));
+    await waitFor(() => expect(screen.getByRole('tooltip')).toHaveTextContent('New task ⇧⌘N'));
     expect(btn).toHaveAttribute('aria-label', 'New task');
   });
 });

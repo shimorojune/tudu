@@ -5,7 +5,9 @@ import {
   ALL_SLUG,
   hasAllSpaces,
   inboxBadge,
+  matchAppShortcut,
   membersWords,
+  spaceForNumber,
   spaceInitials,
   switcherOrder,
   weekdayName,
@@ -54,6 +56,8 @@ import { CreateSpaceHost, MembersHost } from './spaces';
 import { taskStore } from './tasks';
 import { useViewport } from './viewport';
 import { useWorkingDay } from './workingDay';
+import { spaceHint, useAppShortcuts, type AppBindings } from './shortcuts';
+import type { KeyPlatform } from '@tudu/core';
 import './shell.css';
 
 const VIEWS: Array<{
@@ -118,13 +122,17 @@ export function phoneTab(at: { view: View; onToday: boolean; searchOpen: boolean
  * The spaces as the switcher lists them: All spaces first (with two spaces or more, and no count of its own), then
  * Personal, each with its quiet line and its own Inbox count.
  */
-export function switchSpaces(spaces: SpaceSummary[]): SwitchSpace[] {
+export function switchSpaces(
+  spaces: SpaceSummary[],
+  keys?: { app: AppBindings; platform: KeyPlatform },
+): SwitchSpace[] {
+  const hint = (n: number) => (keys ? (spaceHint(keys.app, keys.platform, n) ?? {}) : {});
   const all: SwitchSpace[] = hasAllSpaces(spaces)
-    ? [{ id: ALL_SLUG, all: true, name: 'All spaces', sub: 'Everything that’s yours' }]
+    ? [{ id: ALL_SLUG, all: true, name: 'All spaces', sub: 'Everything that’s yours', ...hint(0) }]
     : [];
   return [
     ...all,
-    ...switcherOrder(spaces).map((s) => ({
+    ...switcherOrder(spaces).map((s, i) => ({
       id: s.id,
       name: s.name,
       color: s.color ?? undefined,
@@ -132,8 +140,44 @@ export function switchSpaces(spaces: SpaceSummary[]): SwitchSpace[] {
       initials: spaceInitials(s.name),
       sub: membersWords(s.members),
       count: inboxBadge(s.inbox) || undefined,
+      ...hint(i + 1),
     })),
   ];
+}
+
+/**
+ * A key press, as the space keys see it: the space it goes to, picked through the open list when there is one (so
+ * its tick draws in as a click's would). Under any other layer, or on a repeat, nothing; a match is never typed.
+ */
+export function spaceKey(
+  e: KeyboardEvent,
+  at: {
+    keys: { app: AppBindings };
+    spaceList: SwitchSpace[];
+    here: string;
+    pickSpace: (s: SwitchSpace) => void;
+  },
+  doc: Document = document,
+): void {
+  if (e.repeat || e.defaultPrevented) return;
+  const m = matchAppShortcut(e, at.keys.app);
+  if (!m || layerOpen(doc)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const target = spaceForNumber(at.spaceList, m.to === 'all' ? 0 : m.n);
+  if (!target || target.id === at.here) return;
+  const rows = doc.querySelectorAll<HTMLElement>('.tp-sswl [role="menuitemradio"]');
+  const row = rows[at.spaceList.indexOf(target)];
+  if (row) row.click();
+  else at.pickSpace(target);
+}
+
+/** A dialog, Quick Add, Search, Settings, a menu or a panel is up (the space list itself aside). */
+export function layerOpen(doc: Document = document): boolean {
+  const layers = doc.querySelectorAll(
+    '[role="dialog"], [role="alertdialog"], [role="menu"]:not(.tp-sswl), [role="listbox"]',
+  );
+  return Array.from(layers).some((el) => el.getClientRects().length > 0);
 }
 
 /**
@@ -259,18 +303,32 @@ export function AppShell({
     }, PAGE_OUT_MS);
   };
   const here = all ? ALL_SLUG : space.id;
+  const keys = useAppShortcuts();
+  const spaceList = switchSpaces(me.spaces, keys);
+  const pickSpace = (s: SwitchSpace) => {
+    if (s.id === here) return;
+    if (s.id === ALL_SLUG) return switchTo(switchPath(path, ALL_SLUG));
+    const next = me.spaces.find((x) => x.id === s.id);
+    if (next) switchTo(switchPath(path, next.slug));
+  };
+  // The space keys (Settings › Shortcuts): ⌃0 All spaces, ⌃1 to ⌃9 a space by its place in the list. They work while
+  // you type and never leave a character; under any other layer they wait.
+  const latest = useRef({ keys, spaceList, here, pickSpace });
+  useEffect(() => {
+    latest.current = { keys, spaceList, here, pickSpace };
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => spaceKey(e, latest.current);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
   const switcher = (variant: 'menu' | 'sheet', rail = false) => (
     <SpaceSwitch
       variant={variant}
       rail={rail}
-      spaces={switchSpaces(me.spaces)}
+      spaces={spaceList}
       active={here}
-      onPick={(s) => {
-        if (s.id === here) return;
-        if (s.id === ALL_SLUG) return switchTo(switchPath(path, ALL_SLUG));
-        const next = me.spaces.find((x) => x.id === s.id);
-        if (next) switchTo(switchPath(path, next.slug));
-      }}
+      onPick={pickSpace}
       onCreate={openCreateSpace}
     />
   );

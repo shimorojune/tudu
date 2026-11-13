@@ -17,6 +17,7 @@ import { PersonDot } from './PersonDot';
 import { ProjectSettings, type ProjectSettingsProps } from './ProjectSettings';
 import { Segmented } from './Segmented';
 import { SettingRow, SettingsSection } from './SettingsSection';
+import { ShortcutsSection, keysSub, type SettingsShortcuts } from './ShortcutsSection';
 import { SettingsNav, type SettingsNavGroup } from './SettingsNav';
 import { Skeleton } from './Skeleton';
 import { VersionLink, type VersionLinkProps } from './VersionLink';
@@ -25,8 +26,10 @@ import { SpaceTile } from './SpaceTile';
 import { Switch } from './Switch';
 import { ThemePick } from './ThemePick';
 
+export type { SettingsShortcuts };
+
 export type SettingsSectionName =
-  'account' | 'appearance' | 'hours' | 'mac' | 'space' | 'members' | 'apps' | 'ai';
+  'account' | 'appearance' | 'hours' | 'mac' | 'keys' | 'space' | 'members' | 'apps' | 'ai';
 
 /** Open at login, as macOS has it: `approval` waits for your OK in Login Items, `refused` is macOS saying no. */
 export type SettingsLogin = 'off' | 'on' | 'approval' | 'refused';
@@ -137,6 +140,9 @@ export interface SettingsProps {
 
   // This Mac: the Mac app only; without it the section is not listed.
   mac?: SettingsMac;
+
+  // Shortcuts: listed when given, never on phones.
+  shortcuts?: SettingsShortcuts;
 
   // Space
   onSpaceName?: (name: string) => void;
@@ -771,6 +777,7 @@ const TITLES = (
   appearance: ['Appearance', 'How Tudu looks on this computer.'],
   hours: ['Working hours', 'When you work, and what Tudu does in those hours.'],
   mac: ['This Mac', 'How Tudu runs on this Mac.'],
+  keys: ['Shortcuts', p.shortcuts?.global ? 'Keys for Tudu on this Mac.' : 'Keys for Tudu on this computer.'],
   space: [
     mine(p.space.name),
     p.space.personal ? 'Yours alone. Nothing here is shared.' : spaceLine(p.space.members, p.space.role),
@@ -799,8 +806,11 @@ export function Settings(p: SettingsProps) {
   const mine = useMine();
   const layout = p.layout ?? 'dialog';
   const phone = layout === 'phone';
+  const keys = phone ? undefined : p.shortcuts;
   const sec =
-    (p.section === 'mac' && !p.mac) || (p.section === 'hours' && !p.workHours)
+    (p.section === 'mac' && !p.mac) ||
+    (p.section === 'hours' && !p.workHours) ||
+    (p.section === 'keys' && !keys)
       ? 'account'
       : (p.section ?? 'account');
   const sp = p.space;
@@ -850,6 +860,9 @@ export function Settings(p: SettingsProps) {
                 sub: p.mac.openAtLogin === 'on' ? 'Opens at login' : 'Login, Dock',
               },
             ]
+          : []),
+        ...(keys
+          ? [{ value: 'keys', label: 'Shortcuts', icon: 'keyboard' as const, sub: keysSub(keys) }]
           : []),
         ...(acct ? [appsItem] : []),
         { value: 'ai', label: 'AI access', icon: 'link', sub: aiSub(p.aiAccess) },
@@ -1022,7 +1035,8 @@ export function Settings(p: SettingsProps) {
         {m.updates ? <UpdatesSection u={m.updates} /> : null}
       </>
     );
-  } else if (sec === 'space' && !team)
+  } else if (sec === 'keys' && keys) body = <ShortcutsSection k={keys} />;
+  else if (sec === 'space' && !team)
     body = (
       <>
         <SettingsSection title="This space">

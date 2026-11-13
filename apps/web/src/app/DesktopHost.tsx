@@ -4,7 +4,14 @@ import { ALL_SLUG, gatherToday, hasAllSpaces, PERSONAL_SLUG, todayLeft, type Tas
 import { useNavigate, useRouter } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { keepAppearance } from './appearance';
-import { desktop, FEEDBACK_GO, UPDATES_GO, type AppInfo, type UpdateReady } from './desktop';
+import {
+  desktop,
+  FEEDBACK_GO,
+  UPDATES_GO,
+  type AppInfo,
+  type GlobalShortcutRow,
+  type UpdateReady,
+} from './desktop';
 import { openFeedback } from './feedback';
 import { interceptLinks } from './links';
 import { NudgeClock } from './NudgeClock';
@@ -40,6 +47,20 @@ export function useAppInfo(): AppInfo | null {
       live = false;
     };
   }, [info]);
+  // Settings › Shortcuts changed New task's or New note's keys (in any window), or macOS lost one: the labels follow.
+  useEffect(() => {
+    const d = desktop();
+    if (!d) return;
+    return d.on('shortcuts:changed', (rows) => {
+      if (!Array.isArray(rows) || !appInfo) return;
+      const live = (id: string) => {
+        const r = (rows as GlobalShortcutRow[]).find((x) => x.id === id);
+        return r?.registered && r.label ? r.label : undefined;
+      };
+      appInfo = { ...appInfo, shortcut: live('newTask'), noteShortcut: live('newNote') };
+      setInfo(appInfo);
+    });
+  }, []);
   return info;
 }
 

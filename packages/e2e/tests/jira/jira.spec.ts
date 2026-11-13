@@ -728,7 +728,8 @@ test.describe('jira', () => {
       await page.getByRole('button', { name: /^You: / }).click();
       await page.getByRole('menuitem', { name: 'Settings' }).click();
       const nav = settings.getByRole('navigation', { name: 'Settings' });
-      await expect(nav.getByRole('button').nth(3)).toHaveText(/^Apps/);
+      // Account, Appearance, Working hours, Shortcuts, then Apps.
+      await expect(nav.getByRole('button').nth(4)).toHaveText(/^Apps/);
       await nav.getByRole('button', { name: /^Apps/ }).click();
     }
     await expect(settings.getByText('Use Jira in')).toBeVisible();
