@@ -29,4 +29,20 @@ describe('Skeleton', () => {
     expect(container.querySelectorAll('.tp-skl-row .tp-skl-box')).toHaveLength(3);
     expect(container.querySelectorAll('.tp-skl-lines .tp-skel')).toHaveLength(6);
   });
+
+  it('C02-U55 grouped: a header bar before the first row and again halfway, the shape the groups will take', () => {
+    const { container, rerender } = render(<TaskListSkeleton rows={5} grouped />);
+    const kids = [...container.querySelector('.tp-skl')!.children].map((c) => c.className);
+    expect(kids).toEqual([
+      'tp-skl-gh',
+      'tp-skl-row',
+      'tp-skl-row',
+      'tp-skl-row',
+      'tp-skl-gh',
+      'tp-skl-row',
+      'tp-skl-row',
+    ]);
+    rerender(<TaskListSkeleton rows={5} />);
+    expect(container.querySelector('.tp-skl-gh')).toBeNull();
+  });
 });

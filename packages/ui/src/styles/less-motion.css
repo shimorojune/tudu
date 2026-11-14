@@ -59,6 +59,7 @@
 :root[data-motion='less'] .tp-dh-row,
 :root[data-motion='less'] .tp-dh-tools,
 :root[data-motion='less'] .tp-list,
+:root[data-motion='less'] .tp-gh,
 :root[data-motion='less'] .tp-addtask,
 :root[data-motion='less'] .tp-empty,
 :root[data-motion='less'] .tp-skl) {
@@ -369,6 +370,17 @@
 }
 :root[data-motion='less'] .tp-kf-ok.tp-out {
   animation: tp-kf-ok-fade 160ms linear forwards;
+}
+:root[data-motion='less'] .tp-gh-turn,
+:root[data-motion='less'] .tp-g.tp-g-new {
+  animation: none;
+}
+:root[data-motion='less'] .tp-g-body,
+:root[data-motion='less'] .tp-gh-car {
+  transition-duration: 120ms;
+}
+:root[data-motion='less'] .tp-g-body.tp-g-shut > div {
+  transition-delay: 120ms;
 }
 :root[data-motion='less'] .tp-ctx.tp-menu,
 :root[data-motion='less'] .tp-ctx.tp-menu.tp-ctx-sub {

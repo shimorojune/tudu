@@ -10,6 +10,7 @@ export * from './quickadd';
 export * from './attachments';
 export * from './week';
 export * from './backlog';
+export * from './groups';
 export * from './search';
 export * from './spaces';
 export * from './people';

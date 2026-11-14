@@ -4,17 +4,12 @@ import type { Task } from './tasks';
 export type BacklogView = 'open' | 'done';
 
 /**
- * The count beside the Backlog's title: "4 tasks", "1 task", "2 tasks in Platform", "Nothing waiting"; in the
- * Crossed off view "3 crossed off", "1 crossed off in Home", "Nothing crossed off".
+ * The count beside the Backlog's title: "4 tasks", "1 task", "Nothing waiting"; in the Crossed off view
+ * "3 crossed off", "Nothing crossed off".
  */
-export function backlogCount(n: number, view: BacklogView, projectName?: string | null): string {
-  const where = projectName ? ` in ${projectName}` : '';
-  if (view === 'done') {
-    if (!n && !projectName) return 'Nothing crossed off';
-    return `${n} crossed off${where}`;
-  }
-  if (!n && !projectName) return 'Nothing waiting';
-  return `${n} ${n === 1 ? 'task' : 'tasks'}${where}`;
+export function backlogCount(n: number, view: BacklogView): string {
+  if (view === 'done') return n ? `${n} crossed off` : 'Nothing crossed off';
+  return n ? `${n} ${n === 1 ? 'task' : 'tasks'}` : 'Nothing waiting';
 }
 
 /**
@@ -34,11 +29,4 @@ export function splitBacklog<T extends Pick<Task, 'done' | 'doneAt' | 'updatedAt
         (b.number ?? 0) - (a.number ?? 0),
     );
   return { open, done };
-}
-
-/** How many tasks of a list each project has, by project id. Tasks with no project are not counted. */
-export function countByProject<T extends Pick<Task, 'projectId'>>(tasks: T[]): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const t of tasks) if (t.projectId) out[t.projectId] = (out[t.projectId] ?? 0) + 1;
-  return out;
 }

@@ -1,17 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { backlogCount, countByProject, splitBacklog } from './backlog';
+import { backlogCount, splitBacklog } from './backlog';
 
 describe('C06-U06 Backlog words', () => {
-  it('counts the view with and without a filter, and says Nothing waiting', () => {
+  it('counts the view, and says Nothing waiting', () => {
     expect(backlogCount(4, 'open')).toBe('4 tasks');
     expect(backlogCount(1, 'open')).toBe('1 task');
-    expect(backlogCount(2, 'open', 'Platform')).toBe('2 tasks in Platform');
-    expect(backlogCount(0, 'open', 'Home')).toBe('0 tasks in Home');
     expect(backlogCount(0, 'open')).toBe('Nothing waiting');
     expect(backlogCount(3, 'done')).toBe('3 crossed off');
     expect(backlogCount(1, 'done')).toBe('1 crossed off');
-    expect(backlogCount(1, 'done', 'Home')).toBe('1 crossed off in Home');
-    expect(backlogCount(0, 'done', 'Home')).toBe('0 crossed off in Home');
     expect(backlogCount(0, 'done')).toBe('Nothing crossed off');
   });
 
@@ -35,11 +31,5 @@ describe('C06-U06 Backlog words', () => {
     ]);
     expect(open.map((x) => x.id)).toEqual(['a', 'c']);
     expect(done.map((x) => x.id)).toEqual(['g', 'f', 'd', 'b', 'e']);
-  });
-
-  it('counts the tasks of the view by project, leaving out those with none', () => {
-    expect(
-      countByProject([{ projectId: 'p1' }, { projectId: null }, { projectId: 'p1' }, { projectId: 'p2' }]),
-    ).toEqual({ p1: 2, p2: 1 });
   });
 });

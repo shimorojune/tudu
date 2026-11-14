@@ -3,7 +3,6 @@ import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
 import {
   backlogCount,
   doneList,
-  filterChip,
   goBacklog,
   serverBacklog,
   sheet,
@@ -11,6 +10,16 @@ import {
   turnTo,
   writeBacklog,
 } from '../../fixtures/backlog';
+import {
+  group,
+  groupHeader,
+  groupNames,
+  groupTitles,
+  orderBy,
+  orderSwitch,
+  seedProjects,
+  serverList,
+} from '../../fixtures/groups';
 import { pick, rightClick, toast } from '../../fixtures/rowMenu';
 import { dayList, drag, fixClock, idle, row, rowsOf, titlesOf, writeTasks } from '../../fixtures/today';
 
@@ -38,15 +47,6 @@ async function quickAdd(page: Page, title: string, more?: (b: Locator) => Promis
   if (more) await more(b);
   await b.getByRole('button', { name: /^Add( task)?$/ }).click();
   await expect(bar(page)).toHaveCount(0, { timeout: 5000 });
-}
-
-/** Give the task in Quick Add a new project by name. */
-async function withNewProject(b: Locator, name: string): Promise<void> {
-  await b.getByRole('button', { name: 'Choose a project' }).click();
-  await b.locator('.tp-qa-pop').getByRole('menuitem', { name: 'New project…' }).click();
-  await b.getByRole('textbox', { name: 'Project name' }).fill(name);
-  await b.getByRole('textbox', { name: 'Project name' }).press('Enter');
-  await expect(b.getByRole('button', { name: `Project: ${name}` })).toBeVisible();
 }
 
 /** Three undated tasks, written from Today through Quick Add, then the Backlog open. */
@@ -77,7 +77,9 @@ test.describe('backlog', () => {
     await backlogWithThree(page);
     await expect(sheet(page).getByRole('heading', { name: 'Backlog' })).toBeVisible();
     await expect(backlogCount(page)).toHaveText('3 tasks');
-    await expect(filterChip(page)).toHaveText('All projects');
+    // no project menu any more; with one group there is nothing to group either
+    await expect(sheet(page).getByRole('button', { name: /^Project: / })).toHaveCount(0);
+    await expect(orderSwitch(sheet(page))).toHaveCount(0);
     await expect(sheet(page).getByRole('group', { name: 'View' })).toBeVisible();
     // the same rows as Today: the ID in the byline, no date
     await expect(rowsOf(todoList(page)).locator('.tp-sg-id')).toHaveText(['ME-1', 'ME-2', 'ME-3']);
@@ -210,55 +212,82 @@ test.describe('backlog', () => {
     ]);
   });
 
-  test('C06-E05 filter by project: the chip, the menu’s counts, the count in the title, nothing for a project; it survives a reload', async ({
+  test('C06-E16 by project: My order | By project replaced the project menu; groups with what’s left, a cross off, Crossed off groups too, the folds are Today’s', async ({
     page,
   }) => {
     await signInFresh(page);
-    await goBacklog(page);
-    await quickAdd(page, 'Clean up the old staging buckets', (b) => withNewProject(b, 'Platform'));
-    await quickAdd(page, 'Fix the flaky date-picker test', async (b) => {
-      await b.getByRole('button', { name: 'Choose a project' }).click();
-      await b.locator('.tp-qa-pop').getByRole('menuitem', { name: 'Platform' }).click();
-    });
-    await quickAdd(page, 'Renew passport', (b) => withNewProject(b, 'Home'));
-    await writeBacklog(page, ['Draft the Q4 hiring plan']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
-    await expect(backlogCount(page)).toHaveText('4 tasks');
-    await filterChip(page).click();
-    const menu = page.getByRole('menu');
-    // Newest project first.
-    await expect(menu.getByRole('menuitem')).toHaveText([
-      'All projects4',
-      'Home1',
-      'Platform2',
-      'Edit projects…',
+    const made = await seedProjects(page, [
+      { title: 'Clean up the old staging buckets', day: null, project: 'Platform' },
+      { title: 'Renew passport', day: null, project: 'Home' },
+      { title: 'Fix the flaky date-picker test', day: null, project: 'Platform' },
+      { title: 'Draft the Q4 hiring plan', day: null },
+      { title: 'Cancel the old hosting plan', day: null, project: 'Platform', done: true },
+      { title: 'Order the new keyboard', day: null, project: 'Home', done: true },
+      { title: 'Pay the bill', day: '2026-10-18', project: 'Platform' },
+      { title: 'Stretch', day: '2026-10-18' },
     ]);
-    await menu.getByRole('menuitem', { name: 'Platform' }).click();
-    await expect(filterChip(page)).toHaveText('Platform');
-    await expect(filterChip(page).locator('.tp-dot')).toBeVisible();
-    await expect(backlogCount(page)).toHaveText('2 tasks in Platform');
-    await expect
-      .poll(() => titlesOf(todoList(page)))
-      .toEqual(['Clean up the old staging buckets', 'Fix the flaky date-picker test']);
-    // with the filter on, the + between rows is off
-    if (desktop()) await expect(todoList(page).locator('.tp-ins')).toHaveCount(0);
-    // crossed off: nothing for Platform
-    await turnTo(page, 'Crossed off');
-    await expect(backlogCount(page)).toHaveText('0 crossed off in Platform');
-    await expect(page.getByText('Nothing here for this project.')).toBeVisible();
-    await turnTo(page, 'To do');
     await page.reload();
-    await expect(filterChip(page)).toHaveText('Platform');
-    await expect(backlogCount(page)).toHaveText('2 tasks in Platform');
-    // a project with no task: the way back
-    await filterChip(page).click();
-    await page.getByRole('menu').getByRole('menuitem', { name: 'Home' }).click();
-    await page.getByRole('checkbox', { name: 'Cross off: Renew passport' }).click();
-    await expect(page.getByText('Nothing here for this project.')).toBeVisible({ timeout: 3000 });
-    await expect(backlogCount(page)).toHaveText('0 tasks in Home');
-    await page.getByRole('button', { name: 'Show all projects' }).click();
-    await expect(filterChip(page)).toHaveText('All projects');
+    await goBacklog(page);
+    await expect(backlogCount(page)).toHaveText('4 tasks');
+    // the project menu is gone; the grouping switch leads the tools row, the view switch keeps the right end
+    await expect(sheet(page).getByRole('button', { name: /^Project: / })).toHaveCount(0);
+    const tools = sheet(page).locator('.tp-dh-tools');
+    await expect(tools.locator('.tp-seg').first()).toHaveAccessibleName('Order');
+    await expect(tools.locator('.tp-seg').last()).toHaveAccessibleName('View');
+    const lead = (await orderSwitch(sheet(page)).boundingBox())!;
+    const view = (await sheet(page).getByRole('group', { name: 'View' }).boundingBox())!;
+    if (!phone()) expect(lead.x + lead.width).toBeLessThan(view.x);
+
+    await orderBy(sheet(page), 'By project');
+    await expect.poll(() => groupNames(sheet(page))).toEqual([...made.order, 'No project']);
+    expect(await groupTitles(sheet(page), 'Platform')).toEqual([
+      'Clean up the old staging buckets',
+      'Fix the flaky date-picker test',
+    ]);
+    await expect(groupHeader(sheet(page), 'Platform')).toHaveAccessibleName('Platform, 2 left');
+    // the count is the whole Backlog's, whatever is folded
+    await expect(backlogCount(page)).toHaveText('4 tasks');
+
+    // a cross off folds the row away; the group's count follows
+    await page.getByRole('checkbox', { name: 'Cross off: Fix the flaky date-picker test' }).click();
+    await expect
+      .poll(() => groupTitles(sheet(page), 'Platform'), { timeout: 3000 })
+      .toEqual(['Clean up the old staging buckets']);
+    await expect(groupHeader(sheet(page), 'Platform')).toHaveAccessibleName('Platform, 1 left');
     await expect(backlogCount(page)).toHaveText('3 tasks');
+    // the last task of a project gone: its group goes too
+    await page.getByRole('checkbox', { name: 'Cross off: Renew passport' }).click();
+    await expect.poll(() => groupNames(sheet(page)), { timeout: 3000 }).toEqual(['Platform', 'No project']);
+    await idle(page);
+
+    // Crossed off groups too, with no "+" and no writing line
+    await turnTo(page, 'Crossed off');
+    await expect.poll(() => groupNames(sheet(page))).toEqual(made.order);
+    await expect(sheet(page).getByRole('button', { name: /^Add a task to / })).toHaveCount(0);
+    await expect(sheet(page).getByRole('button', { name: 'Add to the Backlog…' })).toHaveCount(0);
+    await turnTo(page, 'To do');
+
+    // write into a project from its "+": saved without a day, in that project
+    await group(sheet(page), 'Platform').locator('.tp-gh').hover();
+    await group(sheet(page), 'Platform').getByRole('button', { name: 'Add a task to Platform' }).click();
+    const line = group(sheet(page), 'Platform').getByRole('textbox', { name: 'New task' });
+    await expect(line).toBeFocused();
+    await line.fill('Rotate the deploy keys');
+    await line.press('Enter');
+    await line.press('Escape');
+    await idle(page);
+    const server = await serverList(page, made.spaceId, null);
+    expect(server.find((t) => t.title === 'Rotate the deploy keys')!.projectId).toBe(made.projects.Platform);
+
+    // fold Platform here: Today opens with it folded, and the choice (By project) is the space's
+    await groupHeader(sheet(page), 'Platform').click();
+    await expect(groupHeader(sheet(page), 'Platform')).toHaveAttribute('aria-expanded', 'false');
+    await page.reload();
+    await expect(groupHeader(sheet(page), 'Platform')).toHaveAttribute('aria-expanded', 'false');
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Sunday' })).toBeVisible();
+    await expect.poll(() => groupNames(page)).toEqual(['Platform', 'No project']);
+    await expect(groupHeader(page, 'Platform')).toHaveAttribute('aria-expanded', 'false');
   });
 
   test('C06-E06 reorder by drag: the order survives a reload and the server agrees', async ({ page }) => {
@@ -381,13 +410,12 @@ test.describe('backlog', () => {
       .toEqual(['Pay the electricity bill', 'Renew passport']);
   });
 
-  test('C06-E10 tablet: the rail, the sheet with the filter and the switch, the 460px panel', async ({
-    page,
-  }) => {
+  test('C06-E10 tablet: the rail, the sheet with its view switch, the 460px panel', async ({ page }) => {
     test.skip(!tablet(), 'the tablet’s Backlog');
     await backlogWithThree(page);
     await expect(page.getByRole('navigation', { name: 'Main' })).toHaveClass(/tp-rail/);
-    await expect(filterChip(page)).toBeVisible();
+    // one group only: nothing to group, so no grouping switch
+    await expect(orderSwitch(sheet(page))).toHaveCount(0);
     await expect(sheet(page).getByRole('group', { name: 'View' })).toBeVisible();
     await expect(sheet(page).locator('.tp-dh')).not.toHaveClass(/tp-compact/);
     await row(todoList(page), 'Renew passport')
@@ -488,7 +516,9 @@ test.describe('backlog', () => {
     });
     await goBacklog(page);
     await expect(sheet(page).getByRole('heading', { name: 'Backlog' })).toBeVisible();
-    await expect(filterChip(page)).toBeVisible();
+    // the view switch is there from the start; the grouping switch waits for the list
+    await expect(sheet(page).getByRole('group', { name: 'View' })).toBeVisible();
+    await expect(orderSwitch(sheet(page))).toHaveCount(0);
     await expect(backlogCount(page)).toHaveCount(0);
     await expect(page.locator('[aria-label="Loading tasks"]').first()).toBeAttached();
     release();

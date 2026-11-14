@@ -15,6 +15,15 @@ import {
 import { pick, rightClick } from '../../fixtures/rowMenu';
 import { expectGlides, expectLands, sampleBoxes } from '../../fixtures/motion';
 import {
+  group,
+  groupHeader,
+  groupNames,
+  groupTitles,
+  orderBy,
+  seedProjects,
+  serverList,
+} from '../../fixtures/groups';
+import {
   carry,
   dayList,
   drag,
@@ -1047,6 +1056,78 @@ test.describe('all spaces, a drop on the other day, with motion', () => {
       'Review the Northwind roadmap',
     ]);
     expect((await dayOf(page, w.nw.id)).map((t) => t.title)).not.toContain('Review the Northwind roadmap');
+  });
+});
+
+test.describe('all spaces, by project', () => {
+  test.beforeEach(async ({ page }) => {
+    await fixClock(page);
+  });
+
+  test('C21-E30 By project in All spaces: projects of every space in switcher order, space pills stay, a project pill folds the others, "+" writes into the project’s space', async ({
+    page,
+    browser,
+  }) => {
+    const w = await world(page, browser);
+    const own = await seedProjects(page, [
+      { title: 'File the tax return', day: SUN, project: 'Home' },
+      { title: 'Renew the lease', day: SUN, project: 'Home' },
+    ]);
+    const nw = await seedProjects(
+      page,
+      [
+        { title: 'Draft the launch plan', day: SUN, project: 'Launch' },
+        { title: 'Book the venue', day: SUN, project: 'Launch' },
+      ],
+      w.nw.id,
+    );
+    await page.reload();
+    await goAll(page);
+    await expect(allDay(page)).toBeVisible();
+    // In My order the project pill still filters, as before
+    await orderBy(page, 'By project');
+    await expect.poll(() => groupNames(page)).toEqual(['Home', 'Launch', 'No project']);
+    expect(await groupTitles(page, 'Launch')).toEqual(['Draft the launch plan', 'Book the venue']);
+    // rows keep their space pill
+    await expect(
+      group(page, 'Launch')
+        .locator('[data-reorder]')
+        .first()
+        .getByRole('button', { name: /Space · Northwind/ }),
+    ).toBeVisible();
+
+    // a row's project pill folds every other group
+    await group(page, 'Launch')
+      .locator('[data-reorder]')
+      .first()
+      .getByRole('button', { name: /Project · Launch/ })
+      .click();
+    await expect(groupHeader(page, 'Launch')).toHaveAttribute('aria-expanded', 'true');
+    await expect(groupHeader(page, 'Home')).toHaveAttribute('aria-expanded', 'false');
+    await expect(groupHeader(page, 'No project')).toHaveAttribute('aria-expanded', 'false');
+    // no project chip: nothing was filtered away
+    await expect(page.locator('.tp-chip')).toHaveCount(0);
+
+    // "+" on Launch writes into Northwind, in Launch
+    if (!phone()) await group(page, 'Launch').locator('.tp-gh').hover();
+    await group(page, 'Launch').getByRole('button', { name: 'Add a task to Launch' }).click();
+    const line = group(page, 'Launch').getByRole('textbox', { name: 'New task' });
+    await expect(line).toBeFocused();
+    await line.fill('Send the invitations');
+    await line.press('Enter');
+    await line.press('Escape');
+    await idle(page);
+    const saved = (await serverList(page, w.nw.id, SUN)).find((t) => t.title === 'Send the invitations')!;
+    expect(saved.projectId).toBe(nw.projects.Launch);
+    expect((await serverList(page, own.spaceId, SUN)).some((t) => t.title === 'Send the invitations')).toBe(
+      false,
+    );
+
+    // the fold is the project's space's: Personal's own Today has Home folded
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Sunday' })).toBeVisible();
+    await orderBy(page, 'By project');
+    await expect(groupHeader(page, 'Home')).toHaveAttribute('aria-expanded', 'false');
   });
 });
 

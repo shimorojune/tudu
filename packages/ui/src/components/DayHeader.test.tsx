@@ -165,6 +165,37 @@ describe('DayHeader', () => {
     expect(container.querySelector('.tp-prog')).toBeNull();
   });
 
+  it('C02-U54 aside sits on the title’s line between the date and the ring, and takes its own line on a narrow header', () => {
+    const { container, page, rerender } = setup({ aside: <b>Switch</b>, children: <i>Tools</i> });
+    const row = container.querySelector('.tp-dh-row')!;
+    expect([...row.children].map((c) => c.className.split(' ')[0])).toEqual([
+      'tp-dh-day',
+      'tp-dh-aside',
+      'tp-root',
+    ]);
+    expect(row.lastElementChild).toHaveClass('tp-prog');
+    expect(container.querySelector('.tp-dh-aside')).toHaveTextContent('Switch');
+    // children still have their own row
+    expect(container.querySelector('.tp-dh-tools')).toHaveTextContent('Tools');
+
+    const css = parseRules(readStylesheet('components.css'));
+    const own = css.find((r) => r.selector === '.tp-dh-row > .tp-dh-aside' && r.context.length === 1)!;
+    expect(own.context[0]).toBe('@container (max-width: 619.98px)');
+    expect(own.declarations.flex).toBe('1 1 100%');
+    expect(
+      css.find((r) => r.selector === '.tp-dh:has(> .tp-dh-row > .tp-dh-aside)')!.declarations[
+        'container-type'
+      ],
+    ).toBe('inline-size');
+    expect(
+      css.find((r) => r.selector === '.tp-dh.tp-compact .tp-dh-row > .tp-dh-aside')!.declarations.flex,
+    ).toBe('1 1 100%');
+
+    // without one the header is as it was
+    rerender(page({ aside: undefined }));
+    expect(container.querySelector('.tp-dh-aside')).toBeNull();
+  });
+
   it('nav={false} hides the arrows; without a calendar the title is plain; children are the tools row', () => {
     const { container, page, rerender } = setup({ nav: false, calendar: undefined, children: <i>Tools</i> });
     expect(screen.queryByRole('button', { name: 'Previous day' })).toBeNull();

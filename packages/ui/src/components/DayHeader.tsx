@@ -31,6 +31,12 @@ export interface DayHeaderProps {
   compact?: boolean;
   /** Tools under the title: filters lead on the left, a view switch sits at the right end. */
   children?: ReactNode;
+  /**
+   * A switch for the page (My order | By project). It sits on the title's line, between the date and the ring, so it
+   * costs no height; on a header too narrow for that (two days side by side, phones) it takes its own line under
+   * the title.
+   */
+  aside?: ReactNode;
   prevLabel?: string;
   nextLabel?: string;
   todayLabel?: string;
@@ -69,6 +75,7 @@ export function DayHeader({
   nav,
   compact,
   children,
+  aside,
   prevLabel = 'Previous day',
   nextLabel = 'Next day',
   todayLabel = 'Back to today',
@@ -177,6 +184,7 @@ export function DayHeader({
         </div>
         {/* bare (the week on the desk): the arrows sit on the title's line, just before the ring, so they never move with the title. */}
         {bare ? turn : null}
+        {aside ? <div className="tp-dh-aside">{aside}</div> : null}
         {total ? (
           <DayProgress
             done={done}

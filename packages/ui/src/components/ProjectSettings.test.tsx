@@ -2,7 +2,6 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PROJECT_COLORS } from '@tudu/core';
 import { describe, expect, it, vi } from 'vitest';
-import { ProjectFilter } from './ProjectFilter';
 import { ProjectMenu } from './ProjectMenu';
 import { ProjectSettings, type ProjectSettingsProject } from './ProjectSettings';
 
@@ -240,7 +239,7 @@ describe('Settings › Space › Projects (chunk 18)', () => {
     expect(row()).not.toHaveClass('tp-on');
   });
 
-  it('C18-U05 Edit projects… ends the picker and the Backlog filter when asked for, and calls back; absent without it', async () => {
+  it('C18-U05 Edit projects… ends the picker when asked for, and calls back; absent without it', async () => {
     const user = userEvent.setup();
     const onEdit = vi.fn();
     const { rerender } = render(
@@ -253,9 +252,5 @@ describe('Settings › Space › Projects (chunk 18)', () => {
     expect(onEdit).toHaveBeenCalledTimes(1);
     rerender(<ProjectMenu projects={PROJECTS} selected={null} onPick={vi.fn()} />);
     expect(screen.queryByRole('menuitem', { name: 'Edit projects…' })).toBeNull();
-    rerender(<ProjectFilter projects={PROJECTS} value={null} onEdit={onEdit} />);
-    await user.click(screen.getByRole('button', { name: 'Project: all projects' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Edit projects…' }));
-    expect(onEdit).toHaveBeenCalledTimes(2);
   });
 });
