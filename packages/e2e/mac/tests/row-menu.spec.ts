@@ -33,11 +33,21 @@ function rightClick(app: App, find: string): Promise<boolean> {
     return !el.dispatchEvent(new MouseEvent('contextmenu', o));`);
 }
 
+/** A string as a JS literal that is safe to put in a page script (JSON, with the characters a script reads oddly escaped). */
+const CHARS: Record<string, string> = {
+  '<': '\\u003C',
+  '>': '\\u003E',
+  '/': '\\u002F',
+  '\u2028': '\\u2028',
+  '\u2029': '\\u2029',
+};
+const lit = (v: string) => JSON.stringify(v).replace(/[<>/\u2028\u2029]/g, (c) => CHARS[c]!);
+
 const titleOf = (title: string) =>
-  `[...document.querySelectorAll('.tp-title > .tp-strike')].find((e) => e.textContent.trim() === ${JSON.stringify(title)})`;
+  `[...document.querySelectorAll('.tp-title > .tp-strike')].find((e) => e.textContent.trim() === ${lit(title)})`;
 
 const menuOpen = (title: string) =>
-  `return !!document.querySelector('.tp-ctx[role=menu][aria-label=${JSON.stringify(`Actions for ${title}`)}]')`;
+  `return !!document.querySelector('.tp-ctx[role=menu][aria-label=${lit(`Actions for ${title}`)}]')`;
 
 test.describe('RM Mac row menu', () => {
   test('RM-D01 a right-click on a row shows Tudu’s menu, not WebKit’s; Move to › Tomorrow moves it', async ({
