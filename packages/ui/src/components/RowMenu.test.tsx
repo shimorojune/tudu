@@ -195,6 +195,15 @@ describe('TaskList row menu', () => {
     rightClick(rowEl('Call Sam at 3pm'), 40, 220);
     expect(menus()).toHaveLength(1);
     expect((menus()[0] as HTMLElement).style.left).toBe('42px');
+    // Shift+F10 opens it on the row with Open focused; the browser's own keyboard contextmenu after it keeps that one.
+    const title = rowEl('Pay the electricity bill').querySelector<HTMLElement>('.tp-title > .tp-strike')!;
+    fireEvent.keyDown(title, { key: 'F10', shiftKey: true });
+    expect(screen.getByRole('menu', { name: 'Actions for Pay the electricity bill' })).toBeInTheDocument();
+    expect(document.activeElement).toHaveTextContent('Open');
+    fireEvent.contextMenu(title, { button: 0 });
+    expect(menus()).toHaveLength(1);
+    expect(document.activeElement).toHaveAttribute('role', 'menuitem');
+    expect(document.activeElement).toHaveTextContent('Open');
   });
 
   it('RM-U08 a menu fading out never closes the one that replaced it', () => {

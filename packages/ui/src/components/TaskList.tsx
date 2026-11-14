@@ -474,7 +474,16 @@ export function TaskList(p: TaskListProps) {
     // Text being written keeps the system's menu (spelling, paste); so does the paper around the rows.
     if (!item || (e.target as HTMLElement).closest('input, textarea, [contenteditable="true"]')) return;
     e.preventDefault();
-    openMenu(item.getAttribute('data-key')!, e.clientX, e.clientY, 'mouse');
+    const key = item.getAttribute('data-key')!;
+    // The keyboard's own `contextmenu` (Shift+F10, the Menu key) has no button 2 and no pointer: it opens the menu
+    // under the title with the first item focused, as the key does (also when it follows the key's own open).
+    const pointer = (e.nativeEvent as globalThis.PointerEvent).pointerType;
+    if (e.button !== 2 && !e.ctrlKey && !pointer) {
+      const r = (item.querySelector<HTMLElement>('.tp-title > .tp-strike') ?? item).getBoundingClientRect();
+      openMenu(key, r.left, r.bottom + 4, 'key');
+      return;
+    }
+    openMenu(key, e.clientX, e.clientY, 'mouse');
   }
   // A list in a fixed order has no drag to share the hold with: a touch hold of its own opens the sheet.
   function holdDown(e: PointerEvent<HTMLDivElement>) {
