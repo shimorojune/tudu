@@ -1715,9 +1715,14 @@ test.describe('a drop on the other day', () => {
     await addBacklog(app, space.id, ['Renew passport']);
     await go(app, await app.eval<string>(`return location.pathname`));
     await app.until(`return T.all('button', 'Call Sam at 3pm').length > 0`, 'main', 15_000);
-    await app.eval(
-      `T.click(T.get('button', 'Backlog', document.querySelector('[role=group][aria-label="Days to show"]')))`,
+    // The day's rows can draw before the top bar has its switch (CI saw no switch yet), so wait for it too.
+    const views = `document.querySelector('[role=group][aria-label="Days to show"]')`;
+    await app.until(
+      `const g = ${views}; return !!g && T.all('button', 'Backlog', g).length > 0`,
+      'main',
+      15_000,
     );
+    await app.eval(`T.click(T.get('button', 'Backlog', ${views}))`);
     const beside = `document.querySelector('[aria-label="The Backlog, beside the day"]')`;
     await app.until(
       `const s = document.querySelector('.tp-spread-start > .tp-spread-second');
