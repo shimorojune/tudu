@@ -61,7 +61,6 @@ export { IconButton, type IconButtonProps } from './components/IconButton';
 export { Checkbox, type CheckboxProps } from './components/Checkbox';
 export { Tag, type TagProps, type TagTone } from './components/Tag';
 export { Chip, type ChipProps } from './components/Chip';
-export { ProjectFilter, type ProjectFilterProps, type FilterProject } from './components/ProjectFilter';
 export { SpaceFilter, type SpaceFilterProps, type FilterSpace } from './components/SpaceFilter';
 export { Segmented, type SegmentedProps, type SegmentedItem } from './components/Segmented';
 export { Field, type FieldProps } from './components/Field';

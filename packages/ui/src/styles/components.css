@@ -1571,8 +1571,6 @@ p.tp-jp-none { margin: 0; font-size: 13.5px; }
 @media (hover: none) { .tp-row-plan { opacity: .7; } }
 html.tp-is-dragging .tp-row-plan { opacity: 0 !important; }
 /* ProjectFilter */
-.tp-pf { display: inline-flex; }
-.tp-pf .tp-td-mi { display: inline-flex; align-items: center; gap: 8px; }
 /* The Inbox's space filter: a muted pill, card-white with a ring while its menu is open. */
 .tp-sf { display: inline-flex; flex: none; }
 .tp-sf .tp-td-mi { display: inline-flex; align-items: center; gap: 8px; }

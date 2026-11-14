@@ -42,8 +42,7 @@ export function groupByProject<T extends Pick<Task, 'projectId'>>(
   const groups: ProjectGroup<T>[] = [...held.keys()]
     .map((id) => byId.get(id)!)
     .sort(
-      (a, b) =>
-        rank(a.spaceId) - rank(b.spaceId) || a.position - b.position || a.name.localeCompare(b.name),
+      (a, b) => rank(a.spaceId) - rank(b.spaceId) || a.position - b.position || a.name.localeCompare(b.name),
     )
     .map((p) => ({ key: p.id, spaceId: p.spaceId, name: p.name, color: p.color, tasks: held.get(p.id)! }));
   if (none.length) groups.push({ key: NO_PROJECT, name: 'No project', tasks: none });

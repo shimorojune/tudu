@@ -1,9 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate, useRouterState, useSearch } from '@tanstack/react-router';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import {
   addDays,
   backlogCount,
-  countByProject,
   splitBacklog,
   spaceInitials,
   type BacklogView,
@@ -14,12 +13,13 @@ import {
 import {
   DayHeader,
   EmptyState,
-  ProjectFilter,
   Segmented,
   Sheet,
   SpaceFilter,
   SheetBody,
+  TaskGroups,
   TaskList,
+  type TaskItem,
   TaskListSkeleton,
 } from '@tudu/ui';
 import { useEffect, useRef, useState } from 'react';
@@ -47,11 +47,10 @@ import { allPath, spacePath, useSpace } from '../../app/space';
 import { openInJira } from '../../app/jira';
 import { taskStore, useOnline } from '../../app/tasks';
 import { useViewport, type Viewport } from '../../app/viewport';
-import { editProjects, editProjectsHref } from '../../app/editProjects';
 import { useWorkingDay } from '../../app/workingDay';
 import { AllBanners, OfflineBanner, monthAround, openInSpace, toItem } from '../today/TodayPage';
 import { TaskPanel, type OpenTask } from '../today/TaskPanel';
-import { setBacklogFilter, useBacklogFilter } from './filter';
+import { useProjectGroups } from '../../app/grouped';
 import { taskLink, rowLink } from '../../app/links';
 
 const MIN_HEIGHT: Record<Viewport, number> = { desktop: 560, tablet: 640, phone: 520 };
@@ -170,9 +169,6 @@ interface BacklogSheetProps {
 
 /** The sheet: the header with the filter and the view switch, then the list for the view or its states. */
 function BacklogSheet({ all, filters, meId, spaceId, today, vp, onOpenTask, openKey }: BacklogSheetProps) {
-  const space = useSpace();
-  const navigate = useNavigate();
-  const loc = useRouterState({ select: (s) => s.location });
   const compact = vp === 'phone';
   const single = useQuery({ ...taskStore.backlogQuery(spaceId), enabled: !all });
   const gathered = useAllBacklog(all, meId, today);
@@ -211,14 +207,6 @@ function BacklogSheet({ all, filters, meId, spaceId, today, vp, onOpenTask, open
       setView(viewAsk.view);
     }
   }
-  const kept = useBacklogFilter(spaceId);
-  // All spaces narrows by space, never by a project (each space has its own).
-  const filterProject = kept && !all ? projects.find((p) => p.id === kept) : undefined;
-  const projectsReady = spaceProjects.isSuccess;
-  useEffect(() => {
-    if (kept && projectsReady && !filterProject && !all) setBacklogFilter(spaceId, null);
-  }, [kept, projectsReady, filterProject, spaceId, all]);
-  const filter = filterProject?.name;
   const [writing, setWriting] = useState<number | null>(null);
   const [seenAsk, setSeenAsk] = useState(ask);
   if (ask !== seenAsk) {
@@ -231,21 +219,26 @@ function BacklogSheet({ all, filters, meId, spaceId, today, vp, onOpenTask, open
   const inView = view === 'open' ? open : done;
   const spaceOf = (id: string) => all?.spaces.find((s) => s.id === id);
   const narrowedTo = all ? filters.lagSpace : null;
-  const shown = filterProject
-    ? inView.filter((t) => t.projectId === filterProject.id)
-    : all && filters.space
-      ? inView.filter((t) => t.spaceId === filters.space)
-      : inView;
+  const shown = all && filters.space ? inView.filter((t) => t.spaceId === filters.space) : inView;
   const listed = narrowedTo ? inView.filter((t) => t.spaceId === narrowedTo) : inView;
-  const counts = countByProject(inView);
   const items = inView.map((t) =>
     all ? toItem(t, today, projectsOf(t.spaceId), spaceOf(t.spaceId)) : toItem(t, today, projects),
   );
   const filterSpace = all?.filter ?? null;
+  // By project (see grouped.tsx): the same switch and the same folds as the day pages. It replaced the project menu.
+  const g = useProjectGroups({
+    spaceId,
+    tasks: listed,
+    items,
+    projects: all ? all.spaces.flatMap((s) => projectsOf(s.id)) : projects,
+    ready: spaceProjects.isSuccess,
+    spaces: all ? all.spaces.map((s) => s.id) : null,
+    className: 'tp-seg-lead',
+  });
   const count = q.data
     ? all
       ? allBacklogCount(shown.length, view, filterSpace?.name ?? null)
-      : backlogCount(shown.length, view, filterProject?.name)
+      : backlogCount(shown.length, view)
     : '';
   const calendar = { today, marks };
   const turnTo = (v: BacklogView) => {
@@ -270,7 +263,7 @@ function BacklogSheet({ all, filters, meId, spaceId, today, vp, onOpenTask, open
   void (null as unknown as Task);
 
   let body;
-  if (q.isPending) body = <TaskListSkeleton rows={5} compact={compact} />;
+  if (q.isPending) body = <TaskListSkeleton rows={5} compact={compact} grouped={g.wanted} />;
   else if (q.isError && !q.data)
     body = (
       <EmptyState
@@ -282,18 +275,6 @@ function BacklogSheet({ all, filters, meId, spaceId, today, vp, onOpenTask, open
         onAction={() => void q.refetch()}
       >
         Check your connection. Offline, the Backlog shows what was last loaded.
-      </EmptyState>
-    );
-  else if (filterProject && !shown.length)
-    body = (
-      <EmptyState
-        title="Nothing here for this project."
-        action="Show all projects"
-        plain
-        mark={false}
-        onAction={() => setBacklogFilter(spaceId, null)}
-      >
-        The rest of the Backlog is one click away.
       </EmptyState>
     );
   else if (all && filters.lagSpace && inView.length && !listed.length)
@@ -327,46 +308,110 @@ function BacklogSheet({ all, filters, meId, spaceId, today, vp, onOpenTask, open
         Tasks without a day land here. Give one a day with its calendar button when you’re ready.
       </EmptyState>
     );
-  else if (view === 'done')
-    body = (
-      <TaskList
-        linkFor={rowLink}
-        onSignal={onSignal}
-        tasks={items}
-        label="Crossed off in the Backlog"
-        compact={compact}
-        static
-        resetKey="done"
-        filter={filter}
-        filterSpace={narrowedTo}
-        leaveUndone
-        unleaveToast="Back in the Backlog"
-        onLeave={(t) => taskStore.cross(t.key, false)}
-        onUnleave={(t) => taskStore.cross(t.key, true)}
-        onOpenTask={(t) => onOpenTask(t.key, t.id)}
-        selectedKey={openKey}
-        locateKey={locate && locate.day === null ? `${locate.id}:${locate.nonce}` : undefined}
-      />
+  else if (view === 'done') {
+    const rows = {
+      linkFor: rowLink,
+      onSignal,
+      compact,
+      static: true,
+      resetKey: 'done',
+      leaveUndone: true,
+      unleaveToast: 'Back in the Backlog',
+      onLeave: (t: TaskItem) => taskStore.cross(t.key, false),
+      onUnleave: (t: TaskItem) => taskStore.cross(t.key, true),
+      onOpenTask: (t: TaskItem) => onOpenTask(t.key, t.id),
+      selectedKey: openKey,
+      locateKey: locate && locate.day === null ? `${locate.id}:${locate.nonce}` : undefined,
+    };
+    body = g.on ? (
+      <TaskGroups {...rows} groups={g.groups} folded={g.folded} onFold={g.fold} />
+    ) : (
+      <TaskList {...rows} tasks={items} label="Crossed off in the Backlog" filterSpace={narrowedTo} />
     );
-  else
-    body = (
+  } else {
+    const rows = {
+      linkFor: rowLink,
+      onSignal,
+      compact,
+      resetKey: 'open',
+      undated: true,
+      planButton: true,
+      leaveDone: true,
+      calendar,
+      flashKey: flash && flash.day === null ? flash.id : undefined,
+      addLabel: target ? `Add to ${target.name}’s Backlog…` : 'Add to the Backlog…',
+      addKey: writing,
+      onAddClose: () => setWriting(null),
+      onLeave: (t: TaskItem) => taskStore.cross(t.key, true),
+      onUnleave: (t: TaskItem) => taskStore.cross(t.key, false),
+      onMoveTask: (t: TaskItem, to: IsoDate | null, _from: IsoDate | null, at?: number) =>
+        all && at !== undefined && to === null
+          ? taskStore.moveInAll(t.key, to, at, order)
+          : taskStore.place(t.key, to, at),
+      onDueChange: (t: TaskItem, due: IsoDate | null) => taskStore.due(t.key, due),
+      onOpenTask: (t: TaskItem) => onOpenTask(t.key, t.id),
+      selectedKey: openKey,
+      locateKey: locate && locate.day === null ? `${locate.id}:${locate.nonce}` : undefined,
+      onAddSubtask: (t: TaskItem, title: string) => taskStore.addSubtask(spaceIdOf(t.key), t.key, title),
+      onRenameSubtask: (t: TaskItem, s: { key: string }, title: string) =>
+        taskStore.renameSubtask(t.key, s.key, title),
+      onToggleSubtask: (t: TaskItem, s: { key: string }, v: boolean) =>
+        taskStore.crossSubtask(t.key, s.key, v),
+      onReorderSubtask: (t: TaskItem, s: { key: string }, _from: number, to: number) =>
+        taskStore.placeSubtask(spaceIdOf(t.key), t.key, s.key, to),
+      onDeleteSubtask: (t: TaskItem, s: { key: string }) => taskStore.removeSubtask(t.key, s.key),
+      onRestoreSubtask: (t: TaskItem, s: { key: string; title: string; done?: boolean }, index: number) => {
+        const was = tasks.find((x) => x.id === t.key)?.subtasks.find((x) => x.id === s.key);
+        taskStore.restoreSubtask(
+          spaceIdOf(t.key),
+          t.key,
+          was ?? {
+            id: s.key,
+            taskId: t.key,
+            title: s.title,
+            position: 0,
+            done: !!s.done,
+            createdAt: '',
+            updatedAt: '',
+          },
+          index,
+        );
+      },
+    };
+    const openIds = open.map((t) => t.id);
+    const allIds = order.map((x) => x.id);
+    body = g.on ? (
+      <TaskGroups
+        {...rows}
+        groups={g.groups}
+        folded={g.folded}
+        onFold={g.fold}
+        onAdd={(text, group, before) => {
+          const to = g.target(group);
+          const extra = to.projectId ? { projectId: to.projectId } : {};
+          // On a project's own line it goes right after the project's last task, so My order keeps them together.
+          const slot = (list: string[]) =>
+            before ? list.indexOf(before) : to.projectId ? g.end(list, group) : -1;
+          if (!all) {
+            const at = slot(openIds);
+            return taskStore.create(spaceId, null, text, at === -1 ? undefined : at, extra);
+          }
+          const id = taskStore.create(to.spaceId ?? all.target.id, null, text, undefined, extra);
+          const k = slot(allIds);
+          taskStore.placeInAll(id, null, k === -1 ? order.length : k, order);
+          return id;
+        }}
+        onReorder={(group, moved) => {
+          if (all) taskStore.placeInAll(moved.key, null, g.place(allIds, group, moved.key, moved.to), order);
+          else taskStore.place(moved.key, null, g.place(openIds, group, moved.key, moved.to));
+        }}
+      />
+    ) : (
       <TaskList
-        linkFor={rowLink}
-        onSignal={onSignal}
+        {...rows}
         tasks={items}
         label="Tasks in the Backlog"
-        compact={compact}
-        resetKey="open"
-        filter={filter}
         filterSpace={narrowedTo}
-        undated
-        planButton
-        leaveDone
-        calendar={calendar}
-        flashKey={flash && flash.day === null ? flash.id : undefined}
-        addLabel={target ? `Add to ${target.name}’s Backlog…` : 'Add to the Backlog…'}
-        addKey={writing}
-        onAddClose={() => setWriting(null)}
         onAdd={(text, before) => {
           const at = before ? open.findIndex((t) => t.id === before) : undefined;
           if (!target) return taskStore.create(spaceId, null, text, at === -1 ? undefined : at);
@@ -376,8 +421,6 @@ function BacklogSheet({ all, filters, meId, spaceId, today, vp, onOpenTask, open
           taskStore.placeInAll(id, null, k === -1 ? order.length : k, order);
           return id;
         }}
-        onLeave={(t) => taskStore.cross(t.key, true)}
-        onUnleave={(t) => taskStore.cross(t.key, false)}
         onReorder={(_, moved) => {
           if (!all) return taskStore.place(moved.key, null, moved.to);
           // The list is To do only; All spaces' order is of the whole Backlog, so slot it by its neighbour.
@@ -386,39 +429,9 @@ function BacklogSheet({ all, filters, meId, spaceId, today, vp, onOpenTask, open
           const k = next ? rest.findIndex((x) => x.id === next.id) : -1;
           taskStore.placeInAll(moved.key, null, k === -1 ? rest.length : k, order);
         }}
-        onMoveTask={(t, to, _from, at) =>
-          all && at !== undefined && to === null
-            ? taskStore.moveInAll(t.key, to, at, order)
-            : taskStore.place(t.key, to, at)
-        }
-        onDueChange={(t, due) => taskStore.due(t.key, due)}
-        onOpenTask={(t) => onOpenTask(t.key, t.id)}
-        selectedKey={openKey}
-        locateKey={locate && locate.day === null ? `${locate.id}:${locate.nonce}` : undefined}
-        onAddSubtask={(t, title) => taskStore.addSubtask(spaceIdOf(t.key), t.key, title)}
-        onRenameSubtask={(t, s, title) => taskStore.renameSubtask(t.key, s.key, title)}
-        onToggleSubtask={(t, s, v) => taskStore.crossSubtask(t.key, s.key, v)}
-        onReorderSubtask={(t, s, _from, to) => taskStore.placeSubtask(spaceIdOf(t.key), t.key, s.key, to)}
-        onDeleteSubtask={(t, s) => taskStore.removeSubtask(t.key, s.key)}
-        onRestoreSubtask={(t, s, index) => {
-          const was = tasks.find((x) => x.id === t.key)?.subtasks.find((x) => x.id === s.key);
-          taskStore.restoreSubtask(
-            spaceIdOf(t.key),
-            t.key,
-            was ?? {
-              id: s.key,
-              taskId: t.key,
-              title: s.title,
-              position: 0,
-              done: s.done,
-              createdAt: '',
-              updatedAt: '',
-            },
-            index,
-          );
-        }}
       />
     );
+  }
 
   return (
     <Sheet label={all ? 'The Backlog, every space' : 'The Backlog'} fill minHeight={MIN_HEIGHT[vp]}>
@@ -439,29 +452,7 @@ function BacklogSheet({ all, filters, meId, spaceId, today, vp, onOpenTask, open
             onChange={pickSpace}
           />
         ) : null}
-        {all ? null : (
-          <ProjectFilter
-            projects={projects.map((p) => ({
-              id: p.id,
-              name: p.name,
-              color: p.color,
-              count: counts[p.id] ?? 0,
-            }))}
-            total={inView.length}
-            value={filterProject?.id ?? null}
-            onChange={(id) => setBacklogFilter(spaceId, id)}
-            onEdit={() =>
-              editProjects(
-                (href) => void navigate({ href }),
-                editProjectsHref(
-                  space.slug,
-                  { slug: space.slug, pathname: loc.pathname, searchStr: loc.searchStr },
-                  vp === 'phone',
-                ),
-              )
-            }
-          />
-        )}
+        {q.isPending || (q.isError && !q.data) ? null : g.control}
         <Segmented items={VIEWS} value={view} onChange={turnTo} label="View" />
       </DayHeader>
       <SheetBody>
@@ -469,7 +460,7 @@ function BacklogSheet({ all, filters, meId, spaceId, today, vp, onOpenTask, open
           plain
           as="div"
           label={view === 'open' ? 'To do' : 'Crossed off'}
-          turnKey={all ? `${view}:${narrowedTo ?? ''}` : view}
+          turnKey={all ? `${view}:${narrowedTo ?? ''}:${g.view}` : `${view}:${g.view}`}
           turnDir={dir}
         >
           {body}

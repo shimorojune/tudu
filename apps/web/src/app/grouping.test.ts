@@ -1,6 +1,7 @@
 import { NO_PROJECT } from '@tudu/core';
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { moreItems } from '../routes/more/MorePage';
 import {
   ALL_SCOPE,
   getGrouping,
@@ -71,5 +72,24 @@ describe('C02-U56 the grouping memory', () => {
     localStorage.setItem('tudu.backlog.filter', '{"s1":"p1"}');
     resetGrouping(true);
     expect(localStorage.getItem('tudu.backlog.filter')).toBeNull();
+  });
+});
+
+describe('C06-U09 the Backlog is on More', () => {
+  it('More lists the Backlog', () => {
+    expect(moreItems({ kind: 'personal', name: 'Personal' }).map((i) => [i.label, i.value])).toEqual([
+      ['Backlog', 'backlog'],
+      ['Notebook', 'notebook'],
+      ['Apps', 'apps'],
+      ['Settings', 'settings'],
+    ]);
+    // C08-U11 a team space lists People under the Backlog; the Inbox is in the header now (C08-U21)
+    expect(moreItems({ kind: 'team', name: 'Northwind' }).map((i) => [i.label, i.value, i.hint])).toEqual([
+      ['Backlog', 'backlog', 'Tasks without a day'],
+      ['People', 'people', 'Everyone in Northwind'],
+      ['Notebook', 'notebook', 'Your notes, only you see them'],
+      ['Apps', 'apps', 'None yet'],
+      ['Settings', 'settings', 'You, this space, how Tudu looks'],
+    ]);
   });
 });

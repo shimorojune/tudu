@@ -45,35 +45,35 @@ for the switch, syncing the choice or the folds between devices.
 
 ## 2. States
 
-| State | What shows |
-| --- | --- |
-| Loading, grouping on | Skeleton in the grouped shape: a header bar, then rows. The switch is a bar too. |
-| Grouped | Headers with counts, rows under each, one writing line at the foot. |
-| Folded | A folded group is its 36px header (44px on phones) with the count. |
-| Project done for the day | The count gives way to the success tick; the group stays in place. |
-| One group only | Plain list, no headers, switch hidden. The choice is kept and returns with a second group. |
-| Empty day | The usual empty page, no switch. |
-| Many projects | Folded groups are one line each; every count stays in view. |
-| Error | The usual error page, no groups, no switch. Choice and folds are kept. |
-| Offline | Everything works; grouping and folds are local, counts follow the device. |
-| 2 days | Both pages grouped, switch on its own line, folds shared, no dragging across pages. |
-| Backlog beside (#102) | Same switch and folds on the lean sheet; dragging to and from the day works in My order only. |
-| Backlog page | Switch on the left, To do \| Crossed off on the right. |
-| All spaces | Groups across spaces; space pill on rows; project pill folds the others. |
-| Phone | Switch under the compact title, 44px headers, "+" always shown. |
+| State                                  | What shows                                                                                                           |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Loading, grouping on                   | Skeleton in the grouped shape: a header bar, then rows. The switch is a bar too.                                     |
+| Grouped                                | Headers with counts, rows under each, one writing line at the foot.                                                  |
+| Folded                                 | A folded group is its 36px header (44px on phones) with the count.                                                   |
+| Project done for the day               | The count gives way to the success tick; the group stays in place.                                                   |
+| One group only                         | Plain list, no headers, switch hidden. The choice is kept and returns with a second group.                           |
+| Empty day                              | The usual empty page, no switch.                                                                                     |
+| Many projects                          | Folded groups are one line each; every count stays in view.                                                          |
+| Error                                  | The usual error page, no groups, no switch. Choice and folds are kept.                                               |
+| Offline                                | Everything works; grouping and folds are local, counts follow the device.                                            |
+| 2 days                                 | Both pages grouped, switch on its own line, folds shared, no dragging across pages.                                  |
+| Backlog beside (#102)                  | Same switch and folds on the lean sheet; dragging to and from the day works in My order only.                        |
+| Backlog page                           | Switch on the left, To do \| Crossed off on the right.                                                               |
+| All spaces                             | Groups across spaces; space pill on rows; project pill folds the others.                                             |
+| Phone                                  | Switch under the compact title, 44px headers, "+" always shown.                                                      |
 | A project deleted or renamed elsewhere | Its tasks fall under No project or the new name on the next read; a fold kept for a project that is gone is dropped. |
 
 ## 3. Motion
 
-| What | How |
-| --- | --- |
-| Switching My order ↔ By project | The list turns (`Sheet plain`, `--dur-day-turn` 280ms); the header holds still. |
-| Folding and opening a group | Grid rows 1fr ↔ 0fr with opacity, `--dur-fold` 300ms, `--ease-change`; the caret turns 90° with it. |
-| "+" on a header | Fades in over `--dur-menu` 160ms on hover; the writing line opens with the row-open motion. |
-| A group's last open task is crossed off | The count cross-fades to the tick, `--dur-menu`. |
-| A group gains its first task or loses its last | The group folds in or away, `--dur-fold`. |
-| The page's writing line gives way to the last group's line | Folds away and back, `--dur-fold`. |
-| Reduced motion | Everything above becomes a plain fade or an instant change. |
+| What                                                       | How                                                                                                 |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Switching My order ↔ By project                            | The list turns (`Sheet plain`, `--dur-day-turn` 280ms); the header holds still.                     |
+| Folding and opening a group                                | Grid rows 1fr ↔ 0fr with opacity, `--dur-fold` 300ms, `--ease-change`; the caret turns 90° with it. |
+| "+" on a header                                            | Fades in over `--dur-menu` 160ms on hover; the writing line opens with the row-open motion.         |
+| A group's last open task is crossed off                    | The count cross-fades to the tick, `--dur-menu`.                                                    |
+| A group gains its first task or loses its last             | The group folds in or away, `--dur-fold`.                                                           |
+| The page's writing line gives way to the last group's line | Folds away and back, `--dur-fold`.                                                                  |
+| Reduced motion                                             | Everything above becomes a plain fade or an instant change.                                         |
 
 ## 4. How it is built
 
@@ -127,55 +127,55 @@ IDs take the next free number at build time. Tests run on PR CI, not on the Mac.
 
 ### New
 
-| ID | Where | Scenario |
-| --- | --- | --- |
-| C02-U47 | core `groups.test.ts` | Groups follow project position, No project last; tasks keep the day's order inside a group; a task whose project is gone lands in No project; All spaces orders by space then project |
-| C02-U48 | core `groups.test.ts` | `dayIndexFor`: first, middle and last place in a group map to the right place in the day; a group of one; the moved task excluded from the count |
-| C02-U49 | ui `GroupHeader.test.tsx` | Caret, dot, name and count; the tick when all are crossed off; `aria-expanded`; click and Enter report the fold; "+" reports add and does not fold |
-| C02-U50 | ui `TaskGroups.test.tsx` | One header and list per group; a folded group shows no rows and is inert; folding reports the key |
-| C02-U51 | ui `TaskGroups.test.tsx` | "+" mounts that group's writing line focused; on a folded group it opens the group first; Enter reports the text with the group key |
-| C02-U52 | ui `TaskGroups.test.tsx` | Writing lines: one at the foot; No project's "+" focuses it; it is hidden while the last project's line is open and back when that closes |
-| C02-U53 | ui `TaskGroups.test.tsx` | A drag or Alt-arrow inside a group reports the group and the move; rows have no drop target in another group |
-| C02-U54 | ui `DayHeader.test.tsx` | `aside` renders between date and ring; absent, the header is unchanged; `children` still render in the tools row |
-| C02-U55 | ui `TaskListSkeleton.test.tsx` | `grouped` draws header bars and rows |
-| C02-U56 | web `grouping.test.ts` | On/off and folds kept per space and across reloads; a space never seen is off with nothing folded; a fold for a project that is gone is dropped; `tudu.backlog.filter` is removed |
-| C02-E26 | e2e today | Two projects on the day: the switch shows, By project groups in project order with counts, survives a reload, My order restores the plain list in the same order |
-| C02-E27 | e2e today | Fold a group, turn to tomorrow and back, reload: still folded; the ring still counts the whole day |
-| C02-E28 | e2e today | "+" on a header: the cursor is in the line, the task is saved with that project (read from the server) and sits last in the group; in My order it sits after that group's last task |
-| C02-E29 | e2e today | Reorder inside a group, switch to My order: only that task moved, positions on the server match |
-| C02-E30 | e2e today | One project only: no switch, plain list; add a task in a second project (Quick Add) and the groups return |
-| C02-E31 | e2e today | 2 days grouped: switch on its own line, a fold applies to both pages, a row cannot be dropped on the other page, the calendar button still moves it |
-| C02-E32 | e2e today | Backlog beside grouped: same folds; drag across is off in By project and works again in My order |
-| C02-E33 | e2e today | Phone and tablet: switch under the title, 44px headers, "+" visible without hover; desktop 720px+: switch on the title's line and the header no taller than before |
-| C02-E34 | e2e today | Dark theme, reduced motion, and the loading skeleton in the grouped shape on a held read |
-| C02-E35 | e2e today | Never two writing lines: open the last project's line and the page's line is gone; Esc brings it back |
-| C06-U11 | web Backlog page | The header's tools row: grouping switch first, To do \| Crossed off last; no project menu |
-| C06-E16 | e2e backlog | By project on the Backlog: groups and counts, a cross off folds the row away and the count drops, Crossed off groups too with no "+", folds match Today's |
-| C21-U24 | web All spaces | Groups across spaces in switcher order; a written task goes to the group's space and project |
-| C21-E30 | e2e all spaces | By project in All spaces: space pills stay, a project pill folds the other groups, My order's pill still filters |
+| ID      | Where                          | Scenario                                                                                                                                                                              |
+| ------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C02-U47 | core `groups.test.ts`          | Groups follow project position, No project last; tasks keep the day's order inside a group; a task whose project is gone lands in No project; All spaces orders by space then project |
+| C02-U48 | core `groups.test.ts`          | `dayIndexFor`: first, middle and last place in a group map to the right place in the day; a group of one; the moved task excluded from the count                                      |
+| C02-U49 | ui `GroupHeader.test.tsx`      | Caret, dot, name and count; the tick when all are crossed off; `aria-expanded`; click and Enter report the fold; "+" reports add and does not fold                                    |
+| C02-U50 | ui `TaskGroups.test.tsx`       | One header and list per group; a folded group shows no rows and is inert; folding reports the key                                                                                     |
+| C02-U51 | ui `TaskGroups.test.tsx`       | "+" mounts that group's writing line focused; on a folded group it opens the group first; Enter reports the text with the group key                                                   |
+| C02-U52 | ui `TaskGroups.test.tsx`       | Writing lines: one at the foot; No project's "+" focuses it; it is hidden while the last project's line is open and back when that closes                                             |
+| C02-U53 | ui `TaskGroups.test.tsx`       | A drag or Alt-arrow inside a group reports the group and the move; rows have no drop target in another group                                                                          |
+| C02-U54 | ui `DayHeader.test.tsx`        | `aside` renders between date and ring; absent, the header is unchanged; `children` still render in the tools row                                                                      |
+| C02-U55 | ui `TaskListSkeleton.test.tsx` | `grouped` draws header bars and rows                                                                                                                                                  |
+| C02-U56 | web `grouping.test.ts`         | On/off and folds kept per space and across reloads; a space never seen is off with nothing folded; a fold for a project that is gone is dropped; `tudu.backlog.filter` is removed     |
+| C02-E26 | e2e today                      | Two projects on the day: the switch shows, By project groups in project order with counts, survives a reload, My order restores the plain list in the same order                      |
+| C02-E27 | e2e today                      | Fold a group, turn to tomorrow and back, reload: still folded; the ring still counts the whole day                                                                                    |
+| C02-E28 | e2e today                      | "+" on a header: the cursor is in the line, the task is saved with that project (read from the server) and sits last in the group; in My order it sits after that group's last task   |
+| C02-E29 | e2e today                      | Reorder inside a group, switch to My order: only that task moved, positions on the server match                                                                                       |
+| C02-E30 | e2e today                      | One project only: no switch, plain list; add a task in a second project (Quick Add) and the groups return                                                                             |
+| C02-E31 | e2e today                      | 2 days grouped: switch on its own line, a fold applies to both pages, a row cannot be dropped on the other page, the calendar button still moves it                                   |
+| C02-E32 | e2e today                      | Backlog beside grouped: same folds; drag across is off in By project and works again in My order                                                                                      |
+| C02-E33 | e2e today                      | Phone and tablet: switch under the title, 44px headers, "+" visible without hover; desktop 720px+: switch on the title's line and the header no taller than before                    |
+| C02-E34 | e2e today                      | Dark theme, reduced motion, and the loading skeleton in the grouped shape on a held read                                                                                              |
+| C02-E35 | e2e today                      | Never two writing lines: open the last project's line and the page's line is gone; Esc brings it back                                                                                 |
+| C06-U11 | web Backlog page               | The header's tools row: grouping switch first, To do \| Crossed off last; no project menu                                                                                             |
+| C06-E16 | e2e backlog                    | By project on the Backlog: groups and counts, a cross off folds the row away and the count drops, Crossed off groups too with no "+", folds match Today's                             |
+| C21-U24 | web All spaces                 | Groups across spaces in switcher order; a written task goes to the group's space and project                                                                                          |
+| C21-E30 | e2e all spaces                 | By project in All spaces: space pills stay, a project pill folds the other groups, My order's pill still filters                                                                      |
 
 ### Updated
 
-| ID | Change |
-| --- | --- |
-| C06-U01 | Removed with `ProjectFilter`. |
-| C06-U04 | Stays for `TaskList`'s `filter` (All spaces), moved to chunk 21's wording. |
-| C06-U05 | Header: the switch replaces the filter in the tools row. |
-| C06-U06 | Count words lose the "in Platform" forms. |
-| C06-U09 | Replaced by C02-U56 (grouping memory); "More lists the Backlog" stays. |
-| C06-E05 | Rewritten as C06-E16; the filter menu, chip and "Show all projects" cases go. |
-| C06-E10, C06-E13 | "the filter" becomes "the grouping switch" (hidden while loading with fewer than two groups known). |
-| C02-U14 | Adds: the box sits on the words' baseline (computed style), light and compact. |
-| C02-U16, C02-E-two-days cases | Unchanged in My order; assert they run with grouping off. |
-| C02-D02 | Mac: unchanged, runs in My order. |
-| Kit snapshot tests | New grouped states; `ProjectFilter` state removed. |
+| ID                            | Change                                                                                              |
+| ----------------------------- | --------------------------------------------------------------------------------------------------- |
+| C06-U01                       | Removed with `ProjectFilter`.                                                                       |
+| C06-U04                       | Stays for `TaskList`'s `filter` (All spaces), moved to chunk 21's wording.                          |
+| C06-U05                       | Header: the switch replaces the filter in the tools row.                                            |
+| C06-U06                       | Count words lose the "in Platform" forms.                                                           |
+| C06-U09                       | Replaced by C02-U56 (grouping memory); "More lists the Backlog" stays.                              |
+| C06-E05                       | Rewritten as C06-E16; the filter menu, chip and "Show all projects" cases go.                       |
+| C06-E10, C06-E13              | "the filter" becomes "the grouping switch" (hidden while loading with fewer than two groups known). |
+| C02-U14                       | Adds: the box sits on the words' baseline (computed style), light and compact.                      |
+| C02-U16, C02-E-two-days cases | Unchanged in My order; assert they run with grouping off.                                           |
+| C02-D02                       | Mac: unchanged, runs in My order.                                                                   |
+| Kit snapshot tests            | New grouped states; `ProjectFilter` state removed.                                                  |
 
 ### Manual (yours, on staging)
 
-| ID | Check |
-| --- | --- |
+| ID     | Check                                                                                                                                                                                                      |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | MC-G01 | Mac app, Today with 3 projects: the header's caret, dot, name and count sit on one line, and the writing line's box lines up with its words. These were the two alignment fixes I could not render myself. |
-| MC-G02 | Fold all but one project on Today, open the Backlog page: same folds. Quit and relaunch: still there. |
+| MC-G02 | Fold all but one project on Today, open the Backlog page: same folds. Quit and relaunch: still there.                                                                                                      |
 
 ## 6. Risks
 

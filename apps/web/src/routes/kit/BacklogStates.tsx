@@ -1,12 +1,13 @@
 import {
   DayHeader,
   EmptyState,
-  ProjectFilter,
   Segmented,
   Sheet,
   SheetBody,
+  TaskGroups,
   TaskList,
   TaskListSkeleton,
+  type TaskGroupItem,
   type TaskItem,
 } from '@tudu/ui';
 import type { BacklogView } from '@tudu/core';
@@ -17,11 +18,6 @@ const TODAY = '2026-10-18';
 const NW = { name: 'Northwind', color: '#3d5a80' };
 const PF = { name: 'Platform', color: '#5b7553' };
 const HM = { name: 'Home', color: '#8a5a00' };
-const PROJECTS = [
-  { id: 'nw', ...NW, count: 2 },
-  { id: 'pf', ...PF, count: 2 },
-  { id: 'hm', ...HM, count: 0 },
-];
 const ROWS: TaskItem[] = [
   {
     key: 'a',
@@ -75,6 +71,16 @@ const DONE: TaskItem[] = [
   { key: 'x', id: 'ME-19', title: 'Order the new keyboard', project: HM, done: true },
   { key: 'y', id: 'ME-12', title: 'Cancel the old hosting plan', project: PF, done: true },
 ];
+const ORDERS = [
+  { value: 'mine', label: 'My order' },
+  { value: 'by', label: 'By project' },
+];
+/** ROWS under their projects, in the space's project order. */
+const GROUPS: TaskGroupItem[] = [
+  { key: 'nw', ...NW, tasks: ROWS.filter((t) => t.project === NW) },
+  { key: 'pf', ...PF, tasks: ROWS.filter((t) => t.project === PF) },
+  { key: 'none', name: 'No project', tasks: [{ key: 'e', id: 'ME-31', title: 'Renew the domain' }] },
+];
 const VIEWS: Array<{ value: BacklogView; label: string }> = [
   { value: 'open', label: 'To do' },
   { value: 'done', label: 'Crossed off' },
@@ -82,22 +88,23 @@ const VIEWS: Array<{ value: BacklogView; label: string }> = [
 
 function BacklogSheet({
   count,
-  filter,
+  order = 'mine',
+  onOrder,
   view = 'open',
   onView,
   children,
 }: {
   count: string;
-  filter?: string | null;
+  order?: string;
+  onOrder?: (v: string) => void;
   view?: BacklogView;
   onView?: (v: BacklogView) => void;
   children: ReactNode;
 }) {
-  const [f, setF] = useState<string | null>(filter ?? null);
   return (
     <Sheet label="Backlog" fill style={{ width: '100%', maxWidth: 440, height: 560 }}>
       <DayHeader day="Backlog" date={count} nav={false} compact>
-        <ProjectFilter projects={PROJECTS} total={4} value={f} onChange={setF} />
+        <Segmented items={ORDERS} value={order} onChange={onOrder} label="Order" className="tp-seg-lead" />
         <Segmented items={VIEWS} value={view} onChange={onView} label="View" />
       </DayHeader>
       <SheetBody>{children}</SheetBody>
@@ -183,7 +190,50 @@ function Working() {
   );
 }
 
-/** The Backlog's states: working, long, filtered, nothing for the project, empty, loading, failed. */
+/** The Backlog by project: fold from the headers, write into a project from its "+". */
+function Grouped({ folded: start = [] }: { folded?: string[] }) {
+  const [groups, setGroups] = useState(GROUPS);
+  const [folded, setFolded] = useState(start);
+  const [order, setOrder] = useState('by');
+  const n = groups.reduce((sum, g) => sum + g.tasks.length, 0);
+  return (
+    <BacklogSheet count={`${n} tasks`} order={order} onOrder={setOrder}>
+      <Sheet plain as="div" label="To do" turnKey={order} turnDir={order === 'by' ? 'next' : 'prev'}>
+        {order === 'by' ? (
+          <TaskGroups
+            groups={groups}
+            folded={folded}
+            onFold={(key, shut) => setFolded((f) => (shut ? [...f, key] : f.filter((k) => k !== key)))}
+            compact
+            undated
+            planButton
+            calendar={{ today: TODAY, marks: {} }}
+            addLabel="Add to the Backlog…"
+            onAdd={(text, group) => {
+              const key = `n${Date.now()}`;
+              setGroups((l) =>
+                l.map((g) => (g.key === group ? { ...g, tasks: [...g.tasks, { key, title: text }] } : g)),
+              );
+              return key;
+            }}
+          />
+        ) : (
+          <TaskList
+            tasks={groups.flatMap((g) => g.tasks)}
+            label="The Backlog in your own order"
+            compact
+            undated
+            planButton
+            calendar={{ today: TODAY, marks: {} }}
+            addLabel="Add to the Backlog…"
+          />
+        )}
+      </Sheet>
+    </BacklogSheet>
+  );
+}
+
+/** The Backlog's states: working, long, by project (open, folded, loading), empty, loading, failed. */
 export function BacklogStates() {
   return (
     <Section
@@ -198,7 +248,7 @@ export function BacklogStates() {
       />
       <Pair
         title="Long"
-        note="Only the list scrolls; the header and the filter stay."
+        note="Only the list scrolls; the header and its switches stay."
         render={() => (
           <BacklogSheet count="12 tasks">
             <TaskList
@@ -214,29 +264,21 @@ export function BacklogStates() {
         )}
       />
       <Pair
-        title="Filtered"
-        note="The chip shows the project with its dot; the count says what’s showing."
-        render={() => (
-          <BacklogSheet count="2 tasks in Platform" filter="pf">
-            <TaskList
-              tasks={ROWS}
-              label="A filtered Backlog"
-              compact
-              undated
-              planButton
-              calendar={{ today: TODAY, marks: {} }}
-              filter="Platform"
-            />
-          </BacklogSheet>
-        )}
+        title="By project"
+        note="My order | By project replaced the project menu. A slim header per project with what’s left; click it to fold. Hover a header for + to write into that project. One writing line closes the page."
+        render={() => <Grouped />}
       />
       <Pair
-        title="Nothing for this project"
+        title="By project, folded"
+        note="Folded groups are one line each and keep their count, so every project stays in view."
+        render={() => <Grouped folded={['nw', 'none']} />}
+      />
+      <Pair
+        title="By project, loading"
+        note="The shimmer takes the grouped shape, so the page doesn’t jump when it lands."
         render={() => (
-          <BacklogSheet count="0 tasks in Home" filter="hm">
-            <EmptyState title="Nothing here for this project." action="Show all projects" plain mark={false}>
-              The rest of the Backlog is one click away.
-            </EmptyState>
+          <BacklogSheet count="" order="by">
+            <TaskListSkeleton rows={5} compact grouped />
           </BacklogSheet>
         )}
       />
