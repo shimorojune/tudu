@@ -253,9 +253,9 @@ test.describe('today, by project', () => {
     });
     await idle(page);
     expect((await serverList(page, made.spaceId, MON)).map((t) => t.title)).toEqual(['Chase the PO', 'Pack']);
-    // it never left Sunday (dropped past its group's end, it is the group's last now)
+    // it never left Sunday or its group (where it lands inside the group is the pointer's path, C02-E29 holds that)
     expect((await serverList(page, made.spaceId, SUN)).map((t) => t.title).sort()).toEqual([...MINE].sort());
-    expect(await groupTitles(page.locator('.tp-sheet').first(), 'Platform')).toEqual([
+    expect((await groupTitles(page.locator('.tp-sheet').first(), 'Platform')).sort()).toEqual([
       'Fix the flaky test',
       'Rotate the keys',
     ]);
