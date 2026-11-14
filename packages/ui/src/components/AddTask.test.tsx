@@ -53,4 +53,11 @@ describe('AddTask', () => {
     rerender(<AddTask label="Write the next thing…" onAdd={onAdd} openKey={null} />);
     expect(screen.queryByRole('textbox')).toBeNull();
   });
+
+  it('C02-U14 the empty box sits on the words’ baseline, not the middle of the line box', () => {
+    const line = rulesWhere(rules, (sel) => sel === '.tp-addtask')[0]!;
+    expect(line.declarations['align-items']).toBe('baseline');
+    const box = rulesWhere(rules, (sel) => sel === '.tp-addtask-box')[0]!;
+    expect(box.declarations.transform).toBe('translateY(5px)');
+  });
 });

@@ -163,6 +163,13 @@ export {
   type TaskSignal,
   type TaskSpace,
 } from './components/TaskRow';
+export {
+  TaskGroups,
+  GroupHeader,
+  type TaskGroupsProps,
+  type TaskGroupItem,
+  type GroupHeaderProps,
+} from './components/TaskGroups';
 export { TaskList, FRESH_MS, type TaskListProps, type TaskItem, type TaskMove } from './components/TaskList';
 export { AddTask, type AddTaskProps } from './components/AddTask';
 export { DatePop, DATEPOP_LEAVE_MS, type DatePopProps } from './components/DatePop';

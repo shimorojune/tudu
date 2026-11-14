@@ -348,8 +348,9 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 @keyframes tp-row-wash { 0%, 30% { background: var(--selection); } 100% { background: transparent; } }
 
 /* AddTask: the next empty line of the day */
-.tp-addtask { position: relative; display: flex; align-items: center; gap: 14px; min-height: var(--row-min-height); padding: 0 24px 0 26px; } /* the empty box sits exactly under the rows' checkboxes */
-.tp-addtask-box { flex: none; width: var(--checkbox); height: var(--checkbox); border-radius: var(--radius-xs); box-shadow: inset 0 0 0 1.5px var(--line); transition: box-shadow var(--dur-menu) var(--ease-change); }
+.tp-addtask { position: relative; display: flex; align-items: baseline; gap: 14px; min-height: var(--row-min-height); padding: 0 24px 0 26px; } /* the empty box sits exactly under the rows' checkboxes */
+/* The box is tied to the words' baseline (it sits on it, then drops 5px to centre on the italic's lowercase), not to the line box, so it is level with the words whatever the fonts' metrics. */
+.tp-addtask-box { flex: none; transform: translateY(5px); width: var(--checkbox); height: var(--checkbox); border-radius: var(--radius-xs); box-shadow: inset 0 0 0 1.5px var(--line); transition: box-shadow var(--dur-menu) var(--ease-change); }
 .tp-addtask:hover .tp-addtask-box, .tp-addtask.tp-adding .tp-addtask-box { box-shadow: inset 0 0 0 1.5px var(--check-border); }
 .tp-addtask-btn, .tp-addtask-input { flex: 1; min-width: 0; height: var(--row-min-height); line-height: normal; font-family: var(--font-serif); font-style: italic; font-size: 21px; color: var(--ghost); text-align: left; transition: color var(--dur-menu) var(--ease-change); }
 .tp-addtask-btn:hover { color: var(--muted-foreground); }
@@ -566,10 +567,10 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 
 /* Turning the page: the old day slides a little and fades, the new one slides in from the other side.
    Only the day's content moves (eyebrow, title, ring, list, empty state); the controls (the arrows, Back to today) stay perfectly still. */
-.tp-turn-out-next :is(.tp-dh .tp-eyebrow, .tp-dh-row, .tp-dh-tools, .tp-list, .tp-addtask, .tp-empty, .tp-skl, .tp-wd-head, .tp-wd-none) { animation: tp-out-next 110ms var(--ease-leave) both; }
-.tp-turn-out-prev :is(.tp-dh .tp-eyebrow, .tp-dh-row, .tp-dh-tools, .tp-list, .tp-addtask, .tp-empty, .tp-skl, .tp-wd-head, .tp-wd-none) { animation: tp-out-prev 110ms var(--ease-leave) both; }
-.tp-turn-in-next :is(.tp-dh .tp-eyebrow, .tp-dh-row, .tp-dh-tools, .tp-list, .tp-addtask, .tp-empty, .tp-skl, .tp-wd-head, .tp-wd-none) { animation: tp-in-next var(--dur-day-turn) var(--ease-arrive) both; }
-.tp-turn-in-prev :is(.tp-dh .tp-eyebrow, .tp-dh-row, .tp-dh-tools, .tp-list, .tp-addtask, .tp-empty, .tp-skl, .tp-wd-head, .tp-wd-none) { animation: tp-in-prev var(--dur-day-turn) var(--ease-arrive) both; }
+.tp-turn-out-next :is(.tp-dh .tp-eyebrow, .tp-dh-row, .tp-dh-tools, .tp-list, .tp-gh, .tp-addtask, .tp-empty, .tp-skl, .tp-wd-head, .tp-wd-none) { animation: tp-out-next 110ms var(--ease-leave) both; }
+.tp-turn-out-prev :is(.tp-dh .tp-eyebrow, .tp-dh-row, .tp-dh-tools, .tp-list, .tp-gh, .tp-addtask, .tp-empty, .tp-skl, .tp-wd-head, .tp-wd-none) { animation: tp-out-prev 110ms var(--ease-leave) both; }
+.tp-turn-in-next :is(.tp-dh .tp-eyebrow, .tp-dh-row, .tp-dh-tools, .tp-list, .tp-gh, .tp-addtask, .tp-empty, .tp-skl, .tp-wd-head, .tp-wd-none) { animation: tp-in-next var(--dur-day-turn) var(--ease-arrive) both; }
+.tp-turn-in-prev :is(.tp-dh .tp-eyebrow, .tp-dh-row, .tp-dh-tools, .tp-list, .tp-gh, .tp-addtask, .tp-empty, .tp-skl, .tp-wd-head, .tp-wd-none) { animation: tp-in-prev var(--dur-day-turn) var(--ease-arrive) both; }
 @keyframes tp-out-next { to { opacity: 0; transform: translateX(-10px); } }
 @keyframes tp-out-prev { to { opacity: 0; transform: translateX(10px); } }
 @keyframes tp-in-next { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
@@ -594,7 +595,7 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 .tp-prog-stack > * { grid-area: 1 / 1; opacity: 0; transform: translateY(3px); transition: opacity 180ms var(--ease-change), transform 180ms var(--ease-change); }
 .tp-prog-stack > .tp-on { opacity: 1; transform: none; transition-delay: 120ms; }
 @media (prefers-reduced-motion: reduce) { .tp-prog-stack > * { transform: none; } }
-@media (prefers-reduced-motion: reduce) { .tp-prog-sparks { display: none; } :is(.tp-turn-out-next, .tp-turn-out-prev, .tp-turn-in-next, .tp-turn-in-prev) :is(.tp-dh .tp-eyebrow, .tp-dh-row, .tp-dh-tools, .tp-list, .tp-addtask, .tp-empty, .tp-skl) { animation-name: tp-label-in; } }
+@media (prefers-reduced-motion: reduce) { .tp-prog-sparks { display: none; } :is(.tp-turn-out-next, .tp-turn-out-prev, .tp-turn-in-next, .tp-turn-in-prev) :is(.tp-dh .tp-eyebrow, .tp-dh-row, .tp-dh-tools, .tp-list, .tp-gh, .tp-addtask, .tp-empty, .tp-skl) { animation-name: tp-label-in; } }
 
 /* Enter: a panel that appears beside another slides in a few pixels and fades */
 .tp-enter { animation: tp-in-next var(--dur-arrive) var(--ease-arrive) both; }
@@ -3219,3 +3220,49 @@ html[data-scrambled] .tp-avatar.tp-photo img, html[data-scrambled] .tp-pdot.tp-p
 @media (prefers-reduced-motion: reduce) { .tp-kf.tp-rec, .tp-kf.tp-rec kbd, .tp-kf.tp-saved kbd, .tp-kf-caret { animation: none; } .tp-kf-ok path { animation: none; stroke-dashoffset: 0; } .tp-kf-ok { animation: none; } .tp-kf-ok.tp-out { animation: tp-kf-ok-fade 160ms linear forwards; } }
 /* The space list: each space's key at the row's end, in the quiet type menus use. */
 .tp-sswl-k { flex: none; font-family: var(--font-mono); font-size: 11px; font-weight: 400; color: var(--muted-foreground); letter-spacing: .02em; }
+
+/* By project: the day's tasks under their projects. A slim header per group (caret, dot, name, what is left), folded
+   from the header; the caret, dot and tick hang off the name's baseline (x-height centre), never the line box. */
+.tp-g.tp-g-folded { border-bottom: 1px solid var(--line); }
+.tp-g.tp-g-new { animation: tp-fade-in var(--dur-fold) var(--ease-change) both; }
+.tp-gh { position: relative; display: flex; align-items: center; gap: 2px; height: 36px; padding: 0 28px 0 22px; }
+.tp-gh-main { display: inline-block; white-space: nowrap; max-width: calc(100% - 30px); overflow: hidden; text-overflow: ellipsis; height: 28px; line-height: 28px; padding: 0 9px 0 6px; margin-left: -6px; border-radius: var(--radius-sm); font-size: 12.5px; font-weight: 600; color: var(--foreground); text-align: left; transition: background-color var(--dur-menu) var(--ease-change); }
+.tp-gh-main:hover { background: var(--accent); }
+.tp-gh-main:focus-visible, .tp-gh-add:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.tp-gh-car { display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: calc(12.5px * .355 - 7px); color: var(--muted-foreground); transition: transform var(--dur-fold) var(--ease-settle); }
+.tp-gh-car svg, .tp-gh-tick svg { display: block; }
+.tp-gh-main[aria-expanded="false"] .tp-gh-car { transform: rotate(-90deg); }
+.tp-gh-dot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; vertical-align: calc(12.5px * .355 - 4px); }
+.tp-gh-dot.tp-gh-none { box-shadow: inset 0 0 0 1.5px var(--muted-foreground); }
+.tp-gh-n { display: inline-block; margin-left: 7px; font-family: var(--font-mono); font-size: 11px; font-weight: 400; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.tp-gh-tick { display: inline-block; margin-left: 7px; vertical-align: calc(12.5px * .355 - 6.5px); color: var(--success); }
+.tp-gh-turn { animation: tp-label-in var(--dur-menu) var(--ease-arrive) both; }
+.tp-gh-add { flex: none; width: 26px; height: 26px; margin-left: auto; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-full); color: var(--muted-foreground); opacity: 0; transition: opacity var(--dur-menu) var(--ease-change), background-color var(--dur-menu) var(--ease-change), color var(--dur-menu) var(--ease-change); }
+.tp-gh:hover .tp-gh-add, .tp-gh-add:focus-visible { opacity: 1; }
+.tp-gh-add:hover { background: var(--accent); color: var(--foreground); }
+.tp-gh.tp-compact { height: 44px; padding: 0 12px 0 16px; }
+.tp-gh.tp-compact .tp-gh-main { height: 36px; line-height: 36px; }
+.tp-gh.tp-compact .tp-gh-add { opacity: 1; width: 36px; height: 36px; }
+@media (hover: none) { .tp-gh-add { opacity: 1; } }
+.tp-g-body { display: grid; grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows var(--dur-fold) var(--ease-settle), opacity var(--dur-fold) var(--ease-settle); }
+.tp-g-body.tp-g-shut { grid-template-rows: 0fr; opacity: 0; }
+.tp-g-body > div { min-height: 0; overflow: hidden; }
+.tp-g-body.tp-g-shut > div { visibility: hidden; transition: visibility 0s linear var(--dur-fold); }
+@media (prefers-reduced-motion: reduce) { .tp-gh-turn, .tp-g.tp-g-new { animation: none; } .tp-g-body, .tp-gh-car { transition-duration: 120ms; } .tp-g-body.tp-g-shut > div { transition-delay: 120ms; } }
+/* The loading shape of a grouped page: a header bar, then rows. */
+.tp-skl-gh { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 28px 0 22px; }
+.tp-skl.tp-compact .tp-skl-gh { height: 44px; padding: 0 12px 0 16px; }
+/* The day header's aside (the My order | By project switch): on the title's line, between the date and the ring, so
+   it costs no height. On a header too narrow for that (two days side by side, phones) it takes its own line under
+   the title. The header is the query container: 620px of content is a 716px sheet. */
+.tp-dh:has(> .tp-dh-row > .tp-dh-aside) { container-type: inline-size; }
+.tp-dh-aside { flex: none; display: flex; align-items: center; padding-bottom: 4px; }
+.tp-dh-aside:empty { display: none; }
+@container (max-width: 619.98px) {
+  .tp-dh-row:has(> .tp-dh-aside) { flex-wrap: wrap; }
+  .tp-dh-row > .tp-dh-aside { order: 9; flex: 1 1 100%; margin-top: 14px; padding-bottom: 0; }
+}
+.tp-dh.tp-compact .tp-dh-row > .tp-dh-aside { order: 9; flex: 1 1 100%; margin-top: 12px; padding-bottom: 0; }
+.tp-dh.tp-compact .tp-dh-row:has(> .tp-dh-aside) { flex-wrap: wrap; }
+/* The Backlog's tools row: the grouping switch leads on the left, the view switch keeps the right end. */
+.tp-dh-tools .tp-seg.tp-seg-lead { margin-left: 0; }
