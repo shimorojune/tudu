@@ -9,6 +9,7 @@ import {
   daysInMonth,
   dueLabel,
   nightWords,
+  NO_PROJECT,
   type IsoDate,
   type Project,
   type SpaceSummary,
@@ -24,6 +25,7 @@ import {
   SheetBody,
   Spread,
   SpreadPage,
+  TaskGroups,
   TaskList,
   TaskListSkeleton,
   useMine,
@@ -60,6 +62,7 @@ import {
 import { openQuickAdd } from '../../app/dayView';
 import { allPath, spacePath, useSpace } from '../../app/space';
 import { openInJira } from '../../app/jira';
+import { useProjectGroups } from '../../app/grouped';
 import { useFirstRunOpen } from '../../app/firstRun';
 import { taskStore, useOnline } from '../../app/tasks';
 import { useViewport, type Viewport } from '../../app/viewport';
@@ -472,7 +475,8 @@ function DaySheet({
   const compact = vp === 'phone';
   const q = useQuery({ ...taskStore.dayQuery(spaceId, day, today), enabled: !all });
   const gathered = useAllDay(all, meId, day, today);
-  const spaceProjects = useQuery({ ...taskStore.projectsQuery(spaceId), enabled: !all }).data ?? [];
+  const projectsQ = useQuery({ ...taskStore.projectsQuery(spaceId), enabled: !all });
+  const spaceProjects = projectsQ.data ?? [];
   const projectsOf = useAllProjects(all);
   const flash = useFlash();
   const locate = useLocate();
@@ -511,20 +515,32 @@ function DaySheet({
   // In All spaces the ring counts what the filters leave (at once; the list follows a beat later).
   const projectName = (t: Task) =>
     t.projectId ? projectsOf(t.spaceId).find((p) => p.id === t.projectId)?.name : undefined;
+  // By project (see grouped.tsx): the page's tasks under their projects. In All spaces the space filter still
+  // narrows; the project filter gives way to folding (a row's project pill folds every other group).
+  const inSpace = all ? tasks.filter((t) => !filters.lagSpace || t.spaceId === filters.lagSpace) : tasks;
+  const g = useProjectGroups({
+    spaceId,
+    tasks: inSpace,
+    items,
+    projects: all ? all.spaces.flatMap((s) => projectsOf(s.id)) : spaceProjects,
+    ready: projectsQ.isSuccess,
+    spaces: all ? all.spaces.map((s) => s.id) : null,
+  });
   const counted = all
     ? tasks.filter(
         (t) =>
           (!filters.space || t.spaceId === filters.space) &&
-          (!filters.project || projectName(t) === filters.project),
+          (g.on || !filters.project || projectName(t) === filters.project),
       )
     : tasks;
   const visible = all
     ? tasks.filter(
         (t) =>
           (!filters.lagSpace || t.spaceId === filters.lagSpace) &&
-          (!filters.lagProject || projectName(t) === filters.lagProject),
+          (g.on || !filters.lagProject || projectName(t) === filters.lagProject),
       )
     : tasks;
+  const ids = tasks.map((t) => t.id);
   const done = counted.filter((t) => t.done).length;
   const h = dayHeading(day, today);
   const calendar = { today, selected: day, marks: marks ?? {}, onPick: onDay };
@@ -541,7 +557,7 @@ function DaySheet({
     : '';
 
   let body;
-  if (pending) body = <TaskListSkeleton rows={5} compact={compact} />;
+  if (pending) body = <TaskListSkeleton rows={5} compact={compact} grouped={g.wanted} />;
   else if (failed)
     body = (
       <EmptyState
@@ -597,27 +613,96 @@ function DaySheet({
         The rest of the day is one click away.
       </EmptyState>
     );
-  else
-    body = (
+  else {
+    // What the plain list and the grouped one share.
+    const rows = {
+      linkFor: rowLink,
+      compact,
+      flashKey: flash && flash.day === day ? flash.id : undefined,
+      locateKey: locate && locate.day === day ? `${locate.id}:${locate.nonce}` : undefined,
+      addLabel: all ? writeWords({ name: mine(all.target.name) }) : 'Write the next thing…',
+      addKey: writing,
+      onAddClose: () => setWriting(null),
+      calendar,
+      onToggleTask: (t: TaskItem, v: boolean) => taskStore.cross(t.key, v),
+      onMoveTask: (t: TaskItem, to: IsoDate | null, _from: IsoDate | null, at?: number) =>
+        all && at !== undefined
+          ? taskStore.moveInAll(t.key, to, at, orderFor(to))
+          : taskStore.place(t.key, to, at),
+      onKeepTask: (t: TaskItem) => taskStore.keep(t.key),
+      onDueChange: (t: TaskItem, due: IsoDate | null) => taskStore.due(t.key, due),
+      onOpenTask: onOpenTask ? (t: TaskItem) => onOpenTask(t.key, t.id, 'next', spaceIdOf(t.key)) : undefined,
+      selectedKey: openKey,
+      onAddSubtask: (t: TaskItem, title: string) => taskStore.addSubtask(spaceIdOf(t.key), t.key, title),
+      onRenameSubtask: (t: TaskItem, s: { key: string }, title: string) =>
+        taskStore.renameSubtask(t.key, s.key, title),
+      onToggleSubtask: (t: TaskItem, s: { key: string }, done: boolean) =>
+        taskStore.crossSubtask(t.key, s.key, done),
+      onReorderSubtask: (t: TaskItem, s: { key: string }, _from: number, to: number) =>
+        taskStore.placeSubtask(spaceIdOf(t.key), t.key, s.key, to),
+      onDeleteSubtask: (t: TaskItem, s: { key: string }) => taskStore.removeSubtask(t.key, s.key),
+      onRestoreSubtask: (t: TaskItem, s: { key: string; title: string; done?: boolean }, index: number) => {
+        const was = tasks.find((x) => x.id === t.key)?.subtasks.find((x) => x.id === s.key);
+        taskStore.restoreSubtask(
+          spaceIdOf(t.key),
+          t.key,
+          was ?? {
+            id: s.key,
+            taskId: t.key,
+            title: s.title,
+            position: 0,
+            done: !!s.done,
+            createdAt: '',
+            updatedAt: '',
+          },
+          index,
+        );
+      },
+    };
+    body = g.on ? (
+      <TaskGroups
+        {...rows}
+        groups={g.groups}
+        folded={g.folded}
+        onFold={g.fold}
+        resetKey={day}
+        onSignal={(t, k) => {
+          if (k === 'jira' && t.jira) openInJira(spaceIdOf(t.key), t.jira);
+          else if (all && k === 'project') {
+            const p = tasks.find((x) => x.id === t.key)?.projectId;
+            if (p) g.only(p);
+          } else if (all) filters.onSignal(t, k, false);
+        }}
+        onAdd={(text, group, before) => {
+          // On a project's own line it goes right after the project's last task, so My order keeps them together.
+          const slot = before ? ids.indexOf(before) : group === NO_PROJECT ? -1 : g.end(ids, group);
+          const at = slot === -1 ? undefined : slot;
+          const to = g.target(group);
+          const extra = to.projectId ? { projectId: to.projectId } : {};
+          if (!all) return taskStore.create(spaceId, day, text, at, extra);
+          const id = taskStore.create(to.spaceId ?? all.target.id, day, text, undefined, extra);
+          taskStore.placeInAll(id, day, at ?? order.length, order);
+          return id;
+        }}
+        onReorder={(group, moved) => {
+          const at = g.place(ids, group, moved.key, moved.to);
+          if (all) taskStore.placeInAll(moved.key, day, at, order);
+          else taskStore.place(moved.key, day, at);
+        }}
+      />
+    ) : (
       <TaskList
-        linkFor={rowLink}
+        {...rows}
         onSignal={(t, k) => {
           if (k === 'jira' && t.jira) openInJira(spaceIdOf(t.key), t.jira);
           else if (all) filters.onSignal(t, k);
         }}
         tasks={items}
         label={`Tasks for ${h.day} ${h.date}`}
-        compact={compact}
         resetKey={day}
         group={group}
         filter={all ? (filters.lagProject ?? undefined) : undefined}
         filterSpace={all ? filters.lagSpace : undefined}
-        flashKey={flash && flash.day === day ? flash.id : undefined}
-        locateKey={locate && locate.day === day ? `${locate.id}:${locate.nonce}` : undefined}
-        addLabel={all ? writeWords({ name: mine(all.target.name) }) : 'Write the next thing…'}
-        addKey={writing}
-        onAddClose={() => setWriting(null)}
-        calendar={calendar}
         onAdd={(text, before) => {
           const at = before ? tasks.findIndex((t) => t.id === before) : undefined;
           if (!all) return taskStore.create(spaceId, day, text, at === -1 ? undefined : at);
@@ -626,7 +711,6 @@ function DaySheet({
           taskStore.placeInAll(id, day, at === undefined || at === -1 ? order.length : at, order);
           return id;
         }}
-        onToggleTask={(t, v) => taskStore.cross(t.key, v)}
         onReorder={(_, moved) =>
           all
             ? taskStore.placeInAll(moved.key, day, moved.to, order)
@@ -635,39 +719,9 @@ function DaySheet({
         onReceive={(key, at) =>
           all ? taskStore.moveInAll(key, day, at, order) : taskStore.place(key, day, at)
         }
-        onMoveTask={(t, to, _from, at) =>
-          all && at !== undefined
-            ? taskStore.moveInAll(t.key, to, at, orderFor(to))
-            : taskStore.place(t.key, to, at)
-        }
-        onKeepTask={(t) => taskStore.keep(t.key)}
-        onDueChange={(t, due) => taskStore.due(t.key, due)}
-        onOpenTask={onOpenTask ? (t) => onOpenTask(t.key, t.id, 'next', spaceIdOf(t.key)) : undefined}
-        selectedKey={openKey}
-        onAddSubtask={(t, title) => taskStore.addSubtask(spaceIdOf(t.key), t.key, title)}
-        onRenameSubtask={(t, s, title) => taskStore.renameSubtask(t.key, s.key, title)}
-        onToggleSubtask={(t, s, done) => taskStore.crossSubtask(t.key, s.key, done)}
-        onReorderSubtask={(t, s, _from, to) => taskStore.placeSubtask(spaceIdOf(t.key), t.key, s.key, to)}
-        onDeleteSubtask={(t, s) => taskStore.removeSubtask(t.key, s.key)}
-        onRestoreSubtask={(t, s, index) => {
-          const was = tasks.find((x) => x.id === t.key)?.subtasks.find((x) => x.id === s.key);
-          taskStore.restoreSubtask(
-            spaceIdOf(t.key),
-            t.key,
-            was ?? {
-              id: s.key,
-              taskId: t.key,
-              title: s.title,
-              position: 0,
-              done: s.done,
-              createdAt: '',
-              updatedAt: '',
-            },
-            index,
-          );
-        }}
       />
     );
+  }
 
   const chips = all && !second ? <FilterChips all={all} filters={filters} projectsOf={projectsOf} /> : null;
   const header = (
@@ -686,6 +740,7 @@ function DaySheet({
       prevLabel={second ? 'Previous day, second sheet' : undefined}
       nextLabel={second ? 'Next day, second sheet' : undefined}
       pickLabel={second ? 'Pick the second day' : undefined}
+      aside={pending || failed ? null : g.control}
     >
       {chips}
     </DayHeader>
@@ -694,14 +749,16 @@ function DaySheet({
     <Sheet label={label} turnKey={day} turnDir={dir} fill minHeight={MIN_HEIGHT[vp]}>
       {all && !second ? <div className={filters.headerClass}>{header}</div> : header}
       <SheetBody>
-        {all ? (
-          // A filter turns the list like the Backlog's project filter: the header holds still.
-          <Sheet plain as="div" label={label} turnKey={filters.turnKey} turnDir={filters.turnDir}>
-            {body}
-          </Sheet>
-        ) : (
-          body
-        )}
+        {/* A filter (All spaces) or the My order | By project switch turns the list: the header holds still. */}
+        <Sheet
+          plain
+          as="div"
+          label={label}
+          turnKey={all ? `${filters.turnKey}|${g.view}` : g.view}
+          turnDir={all && !g.on ? filters.turnDir : g.on ? 'next' : 'prev'}
+        >
+          {body}
+        </Sheet>
       </SheetBody>
     </Sheet>
   );

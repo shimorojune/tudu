@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { cx } from '../lib/cx';
 import { useTurn } from '../lib/hooks';
 import { Icon } from '../lib/icons';
+import { useMine } from '../lib/scramble';
 import { AddTask } from './AddTask';
 import { FoldAway } from './FoldAway';
 import { TaskList, type TaskItem, type TaskListProps, type TaskMove } from './TaskList';
@@ -26,7 +27,8 @@ export interface GroupHeaderProps {
  * are left (a success tick when none are). The whole title is one button that folds the group to this line and opens
  * it again. The caret, dot and tick are tied to the name's baseline, so they sit level whatever the font's metrics.
  */
-export function GroupHeader({ name, color, left, folded, onFold, onAdd, compact }: GroupHeaderProps) {
+export function GroupHeader({ name: said, color, left, folded, onFold, onAdd, compact }: GroupHeaderProps) {
+  const name = useMine()(said);
   const turned = useTurn(String(left));
   return (
     <div className={cx('tp-root tp-gh', compact && 'tp-compact')}>
@@ -135,6 +137,7 @@ export function TaskGroups({
   compact,
   ...list
 }: TaskGroupsProps) {
+  const mine = useMine();
   // The project whose own writing line is open, and a counter that opens the page's line.
   const [line, setLine] = useState<string | null>(null);
   const [endBump, setEndBump] = useState(0);
@@ -209,7 +212,7 @@ export function TaskGroups({
         const body = (
           <section
             className={cx('tp-g', shut && 'tp-g-folded', fresh.includes(g.key) && 'tp-g-new')}
-            aria-label={g.name}
+            aria-label={mine(g.name)}
             data-group={g.key}
           >
             <GroupHeader
@@ -226,11 +229,11 @@ export function TaskGroups({
                 <TaskList
                   {...list}
                   tasks={g.tasks}
-                  label={`${g.name} tasks`}
+                  label={`${mine(g.name)} tasks`}
                   compact={compact}
                   resetKey={`${resetKey ?? ''}|${g.key}`}
                   flashKey={wrote ?? flashKey}
-                  addLabel={line === g.key && onAdd ? groupAddLabel(g.name) : undefined}
+                  addLabel={line === g.key && onAdd ? groupAddLabel(mine(g.name)) : undefined}
                   addKey={line === g.key ? g.key : undefined}
                   onAddClose={() => setLine((l) => (l === g.key ? null : l))}
                   onAdd={onAdd ? (text, before) => onAdd(text, g.key, before) : undefined}

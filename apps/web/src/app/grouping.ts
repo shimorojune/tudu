@@ -107,7 +107,7 @@ export function useAllGrouping(spaceIds: string[]): Grouping {
   const ids = spaceIds.join(' ');
   return useMemo(() => {
     const own = all[ALL_SCOPE] ?? OFF;
-    const folded = own.folded.filter((k) => k === NO_PROJECT);
+    const folded: string[] = own.folded.filter((k) => k === NO_PROJECT);
     for (const id of ids ? ids.split(' ') : [])
       for (const k of all[id]?.folded ?? []) if (k !== NO_PROJECT) folded.push(k);
     return { on: own.on, folded };
