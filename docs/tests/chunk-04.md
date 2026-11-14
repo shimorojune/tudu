@@ -80,6 +80,7 @@ laptop without Docker and in a RustFS service container in CI (`TUDU_CI_S3_*`).
 | C04-E20 | A failed paste             | With uploads failing, the chip turns red and the toast says so; Retry after the route recovers lands it; a reload never shows a broken chip                                                                        |
 | C04-E21 | A rich note from Quick Add | A bulleted list in the note (with the formatting row) and a long-named file: leaving the note keeps the row so Add does not move; the task's notes show the list markers and the chip on one line (desktop, phone) |
 | C04-E22 | A rich note to someone     | In a team space a numbered list in the note: their Inbox reads the words; accepted, the task's notes have the list                                                                                                 |
+| C04-E23 | The Backlog beside         | A task added to the Backlog washes in the sheet beside the day, with no toast (desktop)                                                                                                                            |
 
 Not automated: the bar's arrival and the veil, the chip width easing, the tick on Add, the sheet rising with the
 keyboard. Judge those on staging and on the kit page's Quick Add section.

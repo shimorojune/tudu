@@ -17,6 +17,7 @@ End-to-end tests fix the clock at Sunday 18 October 2026, 10:00.
 | C06-U07 | The Backlog in the store | A task written with no day lands at the end of the Backlog cache (or where the "+" asked); crossing off keeps it cached, with its position, and queues one change, Undo the reverse; a reorder queues one place change with the day null           |
 | C06-U08 | Where New task lands     | Nothing on the Backlog page, so the foot reads "Lands in Backlog"; Today and the week unchanged                                                                                                                                                    |
 | C06-U09 | The page's memory        | The filter is kept per browser and space and forgotten with null; a space never seen has none; More lists the Backlog                                                                                                                              |
+| C06-U10 | Nothing waiting folds    | `FoldAway`: the empty words stay to fold away as a task lands, then go; they come back late (240ms), after the gap shuts; less motion drops the delay                                                                                              |
 
 ## API (`apps/server`)
 

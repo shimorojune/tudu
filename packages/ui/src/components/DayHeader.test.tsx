@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { parseRules, readStylesheet } from '../test-utils/stylesheet';
 import { DayHeader, type DayHeaderProps } from './DayHeader';
 
 const TODAY = '2026-10-19';
@@ -243,5 +244,32 @@ describe('DayHeader', () => {
     expect(container.querySelector('.tp-dh')).not.toHaveClass('tp-compact');
     rerender(page({ compact: true }));
     expect(container.querySelector('.tp-dh')).toHaveClass('tp-compact');
+  });
+
+  it('C02-U44 dateTurn: a new date after first paint rises in once; first paint never moves; less motion swaps', () => {
+    const page = (date: string, dateTurn = true) => (
+      <DayHeader day="Backlog" date={date} nav={false} dateTurn={dateTurn} />
+    );
+    const { container, rerender } = render(page('5 tasks'));
+    const words = () => container.querySelector('.tp-dh-date')!;
+    expect(words()).not.toHaveClass('tp-dh-date-turn');
+    rerender(page('5 tasks'));
+    expect(words()).not.toHaveClass('tp-dh-date-turn');
+    rerender(page('6 tasks'));
+    expect(words()).toHaveClass('tp-dh-date-turn');
+    expect(words()).toHaveTextContent('6 tasks');
+    // without the prop the words just swap
+    const plain = render(page('1 task', false));
+    plain.rerender(page('2 tasks', false));
+    expect(plain.container.querySelector('.tp-dh-date')).not.toHaveClass('tp-dh-date-turn');
+    // the turn is the 160ms label rise; less motion and reduced motion take it away
+    const turn = parseRules(readStylesheet('components.css')).find(
+      (r) => r.selector === '.tp-dh-date-turn' && !r.context.length,
+    )!;
+    expect(turn.declarations.animation).toContain('tp-label-in var(--dur-menu)');
+    const less = parseRules(readStylesheet('less-motion.css')).find((r) =>
+      r.selector.includes('.tp-dh-date-turn'),
+    )!;
+    expect(less.declarations.animation).toBe('none');
   });
 });

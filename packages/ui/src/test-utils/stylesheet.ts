@@ -17,7 +17,8 @@ export interface CssRule {
   declarations: Record<string, string>;
 }
 
-export type StylesheetName = 'components.css' | 'app.css' | 'paper-theme.css' | 'tokens-extra.css';
+export type StylesheetName =
+  'components.css' | 'app.css' | 'paper-theme.css' | 'tokens-extra.css' | 'less-motion.css';
 
 // Not `new URL(x, import.meta.url)`: Vite rewrites that form into an asset URL.
 const here = dirname(fileURLToPath(import.meta.url));
