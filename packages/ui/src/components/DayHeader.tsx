@@ -1,6 +1,7 @@
 import { Popover } from 'radix-ui';
 import { useState, type ReactNode } from 'react';
 import { cx } from '../lib/cx';
+import { useTurn } from '../lib/hooks';
 import { Icon } from '../lib/icons';
 import { DayProgress } from './DayProgress';
 import { IconButton } from './IconButton';
@@ -40,6 +41,11 @@ export interface DayHeaderProps {
   weeks?: WeekPickerProps;
   /** The line under "All crossed off". */
   doneNote?: string;
+  /**
+   * The date words turn when they change (the Backlog's count as tasks come and go): they rise 3px and fade in.
+   * Off by default: a turning day already turns the whole sheet.
+   */
+  dateTurn?: boolean;
   className?: string;
 }
 
@@ -70,9 +76,11 @@ export function DayHeader({
   bare,
   weeks,
   doneNote,
+  dateTurn,
   className,
 }: DayHeaderProps) {
   const [open, setOpen] = useState(false);
+  const turned = useTurn(date);
   // "Back to today" always holds its place to the left of the arrows and only fades in and out, so the arrows never move.
   const away = isToday === false;
   const turn =
@@ -100,7 +108,14 @@ export function DayHeader({
   const title = (
     <>
       <h1>{day}</h1>
-      {date ? <span className="tp-dh-date">{date}</span> : null}
+      {date ? (
+        <span
+          key={dateTurn ? turned : undefined}
+          className={cx('tp-dh-date', dateTurn && turned > 0 && 'tp-dh-date-turn')}
+        >
+          {date}
+        </span>
+      ) : null}
     </>
   );
 

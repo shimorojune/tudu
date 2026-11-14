@@ -98,3 +98,14 @@ export function useTimer(): (fn: () => void, ms: number) => void {
     t.current = setTimeout(fn, ms);
   }, []);
 }
+
+/**
+ * How many times `words` have changed since the row first drew them. Words keyed by it fade in when they change (a row's due words, the Backlog's count), and words drawn the
+ * first time never move. Kept as state from the previous render, the way React documents it, not in a ref.
+ */
+export function useTurn(words: string | undefined): number {
+  const [seen, setSeen] = useState({ words, n: 0 });
+  if (seen.words === words) return seen.n;
+  setSeen({ words, n: seen.n + 1 });
+  return seen.n + 1;
+}

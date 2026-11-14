@@ -3,16 +3,18 @@ import { useSyncExternalStore } from 'react';
 
 /**
  * Small pieces of page state the shell and the day page share: the day being shown (null is today), the desk's
- * "Day | 2 days" switch (remembered per browser), and a counter the New task buttons bump to open the writing line.
+ * "Backlog | Day | 2 days" switch (remembered per browser), and a counter the New task buttons bump to open the writing line.
  * The day is kept here rather than in the address so turning it is immediate: two quick clicks on the arrow turn
  * two days.
  */
-export type DayView = 'one' | 'two';
+/** The desk's Today: one day, the next day beside it, or the Backlog beside it (on the left). */
+export type DayView = 'one' | 'two' | 'backlog';
 const KEY = 'tudu.view';
 
 function readView(): DayView {
   try {
-    return localStorage.getItem(KEY) === 'two' ? 'two' : 'one';
+    const v = localStorage.getItem(KEY);
+    return v === 'two' || v === 'backlog' ? v : 'one';
   } catch {
     return 'one';
   }

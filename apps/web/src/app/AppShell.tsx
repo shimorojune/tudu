@@ -471,12 +471,14 @@ export function AppShell({
             views={
               onToday && vp === 'desktop'
                 ? {
+                    // The Backlog opens on the left of the day, so it comes first. Not in All spaces (yet).
                     items: [
+                      ...(all ? [] : [{ value: 'backlog', label: 'Backlog' }]),
                       { value: 'one', label: 'Day' },
                       { value: 'two', label: '2 days' },
                     ],
-                    value: view,
-                    onChange: (v) => setDayView(v === 'two' ? 'two' : 'one'),
+                    value: all && view === 'backlog' ? 'one' : view,
+                    onChange: (v) => setDayView(v === 'two' || v === 'backlog' ? v : 'one'),
                   }
                 : undefined
             }

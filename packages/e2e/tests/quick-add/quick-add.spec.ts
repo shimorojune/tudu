@@ -2,7 +2,16 @@ import type { Locator, Page } from '@playwright/test';
 import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
 import { goInbox, pane, rows, section } from '../../fixtures/inbox';
 import { createSpace, joinLink, secondPerson, switchTo } from '../../fixtures/spaces';
-import { dayList, fixClock, idle, row, SUNDAY, titlesOf, writeTasks } from '../../fixtures/today';
+import {
+  dayList,
+  fixClock,
+  idle,
+  row,
+  SUNDAY,
+  titlesOf,
+  writeTasks,
+  SECOND_DAY_PAGE,
+} from '../../fixtures/today';
 import { expectListMarkers, expectOneLineChip } from '../../fixtures/visual';
 
 /** The bar (or the sheet on phones). */
@@ -395,7 +404,7 @@ test.describe('quick-add', () => {
     test.skip(test.info().project.name !== 'desktop', 'two days is the desk’s');
     await signInFresh(page);
     await page.getByRole('group', { name: 'Days to show' }).getByRole('button', { name: '2 days' }).click();
-    await expect(page.locator('.tp-spread-second')).toHaveClass(/tp-on/);
+    await expect(page.locator(SECOND_DAY_PAGE)).toHaveClass(/tp-on/);
     await quickAdd(page, 'On Monday', async (b) => {
       await b.getByRole('button', { name: 'Planned for: Today' }).click();
       await b.locator('.tp-qa-pop').getByRole('button', { name: 'Tomorrow' }).click();
@@ -403,6 +412,24 @@ test.describe('quick-add', () => {
     const monday = dayList(page, 'Tasks for Monday 19 October');
     await expect.poll(() => titlesOf(monday)).toEqual(['On Monday']);
     await expect(row(monday, 'On Monday')).toHaveClass(/tp-new/);
+    await expect(page.locator('.tp-toast')).toHaveCount(0);
+  });
+
+  test('C04-E23 the Backlog beside: a task added to the Backlog washes in its sheet, with no toast', async ({
+    page,
+  }) => {
+    test.skip(test.info().project.name !== 'desktop', 'the Backlog beside is the desk’s');
+    await signInFresh(page);
+    await page.getByRole('group', { name: 'Days to show' }).getByRole('button', { name: 'Backlog' }).click();
+    const sheet = page.getByRole('region', { name: 'The Backlog, beside the day' });
+    await expect(page.locator('.tp-spread-start > .tp-spread-second')).toHaveClass(/tp-on/);
+    await quickAdd(page, 'Renew passport', async (b) => {
+      await b.getByRole('button', { name: 'Planned for: Today' }).click();
+      await b.locator('.tp-qa-pop').getByRole('button', { name: 'Backlog' }).click();
+    });
+    const list = sheet.getByRole('list', { name: 'Tasks in the Backlog' });
+    await expect.poll(() => titlesOf(list)).toEqual(['Renew passport']);
+    await expect(row(list, 'Renew passport')).toHaveClass(/tp-new/);
     await expect(page.locator('.tp-toast')).toHaveCount(0);
   });
 

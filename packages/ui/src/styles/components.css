@@ -117,6 +117,8 @@
 .tp-sg.tp-od, .tp-sg.tp-od:hover { color: var(--destructive); }
 /* New due words fade in when they change in front of you (midnight, a date picked); words a row is born with stay still. */
 .tp-sg-turn > span { animation: tp-label-in var(--dur-menu) var(--ease-arrive) both; }
+.tp-dh-date-turn { animation: tp-label-in var(--dur-menu) var(--ease-arrive) both; }
+@media (prefers-reduced-motion: reduce) { .tp-dh-date-turn { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .tp-sg-turn > span { animation: none; } }
 .tp-sg .tp-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
 .tp-sg .tp-jd { width: 6px; height: 6px; background: var(--jira); transform: rotate(45deg); border-radius: 1.5px; flex: none; }
@@ -626,6 +628,15 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 .tp-spread-second.tp-moving { clip-path: inset(-48px -48px -48px 0); }
 .tp-spread-inner { flex: none; width: calc(50cqw - var(--spread-gap) / 2); opacity: 0; transition: opacity var(--dur-spread) var(--ease-settle); }
 .tp-spread-second.tp-on .tp-spread-inner { opacity: 1; }
+/* side="start" (the Backlog beside Today): the second page sits before the first, comes out from behind it to the
+   left and pushes it right. A Spread nested in the first page (the second day) keeps the whole row while this one is
+   closed, so one day or two look as they do on their own. */
+.tp-spread-start { flex-direction: row-reverse; }
+.tp-spread-start > .tp-spread-first:not(.tp-on):has(> .tp-spread) { width: 100cqw; }
+.tp-spread-page > .tp-spread { max-width: none; }
+.tp-spread-start > .tp-spread-second { justify-content: flex-start; }
+.tp-spread-start > .tp-spread-second.tp-on { margin-left: 0; margin-right: var(--spread-gap); }
+.tp-spread-start > .tp-spread-second.tp-moving { clip-path: inset(-48px 0 -48px -48px); }
 @media (prefers-reduced-motion: reduce) { .tp-spread-page { transition: none; } .tp-spread-inner { transition: opacity 120ms linear; } }
 
 /* Dragging between lists (two-day view): the target list gets a faint wash and a thin ink line where the row will land */
@@ -1512,6 +1523,8 @@ p.tp-jp-none { margin: 0; font-size: 13.5px; }
 /* a week day's empty line around a hand-over: it folds away under the row that lands (lib/motion closeRow), and
    comes in only after the last row's gap has folded */
 .tp-wd-none.tp-wd-none-in { animation: tp-fade-in 160ms var(--ease-change) 240ms both; }
+.tp-fold.tp-fold-in { animation: tp-fade-in 160ms var(--ease-change) 240ms both; }
+@media (prefers-reduced-motion: reduce) { .tp-fold.tp-fold-in { animation-delay: 0ms; } }
 @media (prefers-reduced-motion: reduce) { .tp-item.tp-new { animation: tp-fade-in 120ms linear both; } .tp-wd-none.tp-wd-none-in { animation-delay: 0ms; } }
 
 /* WeekPicker: a month in week rows */

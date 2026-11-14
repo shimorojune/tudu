@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
-import { dayList, fixClock, idle, row, titlesOf, writeTasks } from '../../fixtures/today';
+import { dayList, fixClock, idle, row, titlesOf, writeTasks, SECOND_DAY_PAGE } from '../../fixtures/today';
 import { expectListMarkers } from '../../fixtures/visual';
 
 const THREE = ['Pay the electricity bill', 'Review Quick Add PR', 'Book flights for the offsite'];
@@ -496,8 +496,8 @@ test.describe('detail', () => {
     await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     await page.getByRole('button', { name: '2 days' }).click();
     // wait for the second page to finish sliding out before measuring
-    await expect(page.locator('.tp-spread-second')).toHaveClass(/tp-on/);
-    await expect(page.locator('.tp-spread-second')).not.toHaveClass(/tp-moving/);
+    await expect(page.locator(SECOND_DAY_PAGE)).toHaveClass(/tp-on/);
+    await expect(page.locator(SECOND_DAY_PAGE)).not.toHaveClass(/tp-moving/);
     const first = dayList(page, 'Tasks for Sunday 18 October');
     const widthBefore = (await first.boundingBox())!.width;
     const second = page.getByRole('region', { name: 'The second day' });

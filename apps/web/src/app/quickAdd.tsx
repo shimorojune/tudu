@@ -322,7 +322,11 @@ export function QuickAddHost({ me, openPath }: { me: MeResponse; openPath?: (hre
           });
           return;
         }
-        const here = t.planned === a.shown || (a.view === 'two' && vp === 'desktop' && t.planned === day2);
+        // In view: the day shown, the second day beside it, or (a space's desk, Backlog beside) no day at all.
+        const here =
+          t.planned === a.shown ||
+          (a.view === 'two' && vp === 'desktop' && t.planned === day2) ||
+          (a.view === 'backlog' && vp === 'desktop' && !all && t.planned === null);
         if (here) {
           flashTask(id, t.planned);
           return;

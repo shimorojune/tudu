@@ -1,6 +1,6 @@
 # The Backlog beside Today (#102)
 
-Status: proposal, 14 Nov 2026. Canvas approved by Rohit on 14 Nov (Today page, boards `T-Backlog`, `T-Backlog-Dark`,
+Status: approved by Rohit on 14 Nov 2026 and built (see "As built" at the end). Canvas approved by Rohit on 14 Nov (Today page, boards `T-Backlog`, `T-Backlog-Dark`,
 `T-BacklogStates`, `T-BacklogStates-Dark`, `T-BacklogMotion`, sticky `p01-backlog-draft`, canvas Version 234).
 
 Issue #102 (0.41.1, Mac, Today): "We need a way to open the backlog alongside today such that we can quickly move items
@@ -45,8 +45,8 @@ in and out of backlog". Week already has a Backlog tile; Today has no way to sho
 | 2 days ↔ Backlog                       | Fold the open one (240ms), then open the other; 260ms apart                                                        |
 | Drag across                            | The #77 flight: lift `--dur-arrive`, glide + fold `--dur-fold` 300ms                                               |
 | Move with a click                      | `closeRow` 300ms, `openRow` `--dur-row-open` 360ms, wash 1.2s, toast 200ms                                         |
-| The Backlog's count words              | When the words change, they rise 3px and fade in (`tp-label-in`, `--dur-menu` 160ms) — new                         |
-| "Nothing waiting." with the first task | Folds away (height and fade, 300ms) under the first task; comes back only after the last task's gap has shut — new |
+| The Backlog's count words              | When the words change, they rise 3px and fade in (`tp-label-in`, `--dur-menu` 160ms) (new)                         |
+| "Nothing waiting." with the first task | Folds away (height and fade, 300ms) under the first task; comes back only after the last task's gap has shut (new) |
 | Less motion                            | Every move is a 120ms fade; the card drops in place; the count swaps at once                                       |
 
 ## 4. How it is built
@@ -99,24 +99,24 @@ All of it runs on the PR's CI, not on Rohit's Mac (since 10 Nov the app tests do
 
 ### New
 
-| ID      | Where                                 | Scenario                                                                                                                                                                                               |
-| ------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| C02-U42 | ui `Spread.test.tsx`                  | `side="start"`: the second page renders before the first visually (`tp-spread-start`), mounts at zero width, gets `tp-on` after two frames, unmounts `SPREAD_MS` after closing — same timings as `end` |
-| C02-U43 | ui `Spread.test.tsx`                  | Nested: an inner Spread in the first page of a closed start-side Spread keeps the full width class; opening the outer one doesn't open the inner                                                       |
-| C02-U44 | ui `DayHeader.test.tsx`               | `date` change after mount adds the turn class to the date words once; first render has none; under `data-motion='less'` it never does                                                                  |
-| C06-U10 | ui `EmptyState` / Backlog beside test | The empty words stay mounted while folding as a task arrives, then unmount; they come back only after a removed last row has folded                                                                    |
-| C02-U45 | web `dayView` test                    | `tudu.view = 'backlog'` reads back as `'backlog'`; unknown values read as `'one'`; `setDayView('backlog')` stores it                                                                                   |
-| C02-U46 | web `TodayPage` hook test             | `useShownView`: one → backlog and backlog → one switch at once; two → backlog shows `one` for 260ms then `backlog`; a quick second pick cancels the first timer                                        |
-| C04-U   | web `quickAdd` test                   | With the Backlog beside on the desk, an undated task added from Quick Add flashes in place and shows no toast; on a phone it still toasts (next free C04 U number at build time)                       |
-| C02-E18 | e2e web `today.spec.ts`               | The switch reads Backlog · Day · 2 days at 1440; pick Backlog: the Backlog sheet's box is left of the day's; reload: still open; pick Day: the Backlog sheet is gone                                   |
-| C02-E19 | e2e web `today.spec.ts`               | Drag a task from today onto the Backlog sheet, then another from the Backlog onto today; each lands, both counts follow ("6 tasks", ring), and the server agrees (`day` null / today)                  |
-| C02-E20 | e2e web `today.spec.ts`               | Click: a Backlog row's calendar button → Today moves it onto the day with a toast; Undo puts it back. A day row's day menu → Backlog moves it into the Backlog sheet                                   |
-| C02-E21 | e2e web `today.spec.ts`               | 2 days → Backlog: sampled per frame, the second day's sheet is gone (width 0) before the Backlog sheet starts growing; the day's width never exceeds its one-day width                                 |
-| C02-E22 | e2e web `today.spec.ts`               | States: an empty Backlog shows "Nothing waiting" and still takes a drop (the words fold away); the Backlog request failing shows the error with Try again while the day works; Try again loads it      |
-| C02-E23 | e2e web `today.spec.ts`               | Offline (route blocked): moving a task into the Backlog sheet works at once and syncs when back                                                                                                        |
-| C02-E24 | e2e web `today.spec.ts`               | Turning the day with the arrows keeps the Backlog beside; the moved task lands on the shown day                                                                                                        |
-| C02-E25 | e2e web `today.spec.ts`               | At 834 and 390 wide there is no Backlog choice; at 1440 in All spaces the switch is Day · 2 days                                                                                                       |
-| C02-D02 | mac `desktop.spec.ts`                 | In the real WKWebView: pick Backlog, drag a task across both ways, quit and relaunch: Backlog is still beside                                                                                          |
+| ID      | Where                                 | Scenario                                                                                                                                                                                              |
+| ------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C02-U42 | ui `Spread.test.tsx`                  | `side="start"`: the second page renders before the first visually (`tp-spread-start`), mounts at zero width, gets `tp-on` after two frames, unmounts `SPREAD_MS` after closing; same timings as `end` |
+| C02-U43 | ui `Spread.test.tsx`                  | Nested: an inner Spread in the first page of a closed start-side Spread keeps the full width class; opening the outer one doesn't open the inner                                                      |
+| C02-U44 | ui `DayHeader.test.tsx`               | `date` change after mount adds the turn class to the date words once; first render has none; under `data-motion='less'` it never does                                                                 |
+| C06-U10 | ui `EmptyState` / Backlog beside test | The empty words stay mounted while folding as a task arrives, then unmount; they come back only after a removed last row has folded                                                                   |
+| C02-U45 | web `dayView` test                    | `tudu.view = 'backlog'` reads back as `'backlog'`; unknown values read as `'one'`; `setDayView('backlog')` stores it                                                                                  |
+| C02-U46 | web `TodayPage` hook test             | `useShownView`: one → backlog and backlog → one switch at once; two → backlog shows `one` for 260ms then `backlog`; a quick second pick cancels the first timer                                       |
+| C04-U   | web `quickAdd` test                   | With the Backlog beside on the desk, an undated task added from Quick Add flashes in place and shows no toast; on a phone it still toasts (next free C04 U number at build time)                      |
+| C02-E18 | e2e web `today.spec.ts`               | The switch reads Backlog · Day · 2 days at 1440; pick Backlog: the Backlog sheet's box is left of the day's; reload: still open; pick Day: the Backlog sheet is gone                                  |
+| C02-E19 | e2e web `today.spec.ts`               | Drag a task from today onto the Backlog sheet, then another from the Backlog onto today; each lands, both counts follow ("6 tasks", ring), and the server agrees (`day` null / today)                 |
+| C02-E20 | e2e web `today.spec.ts`               | Click: a Backlog row's calendar button → Today moves it onto the day with a toast; Undo puts it back. A day row's day menu → Backlog moves it into the Backlog sheet                                  |
+| C02-E21 | e2e web `today.spec.ts`               | 2 days → Backlog: sampled per frame, the second day's sheet is gone (width 0) before the Backlog sheet starts growing; the day's width never exceeds its one-day width                                |
+| C02-E22 | e2e web `today.spec.ts`               | States: an empty Backlog shows "Nothing waiting" and still takes a drop (the words fold away); the Backlog request failing shows the error with Try again while the day works; Try again loads it     |
+| C02-E23 | e2e web `today.spec.ts`               | Offline (route blocked): moving a task into the Backlog sheet works at once and syncs when back                                                                                                       |
+| C02-E24 | e2e web `today.spec.ts`               | Turning the day with the arrows keeps the Backlog beside; the moved task lands on the shown day                                                                                                       |
+| C02-E25 | e2e web `today.spec.ts`               | At 834 and 390 wide there is no Backlog choice; at 1440 in All spaces the switch is Day · 2 days                                                                                                      |
+| C02-D02 | mac `desktop.spec.ts`                 | In the real WKWebView: pick Backlog, drag a task across both ways, quit and relaunch: Backlog is still beside                                                                                         |
 
 If a number is taken at build time (other threads number tests too), the next free one is used and `docs/tests` says
 which.
@@ -149,3 +149,13 @@ which.
 
 UI only. No migration, no settings, no flag. Ships with the next normal release; the design system and canvas sync in
 4.3 happens right after merge, before the thread closes.
+
+## 8. As built
+
+- The empty words fold with a small `FoldAway` wrapper in the design system (not an `EmptyState` prop).
+- The Quick Add check (C04 above) is a browser test, C04-E23, not a unit test: the toast-or-wash choice lives in the
+  Quick Add host, which has no unit harness.
+- A day row has no day menu of its own unless it was carried over; C02-E20 sends a day's task to the Backlog from its
+  panel (Planned › Backlog), the click path every day row has.
+- Older 2 days tests now aim at the second day's page by `SECOND_DAY_PAGE` (`fixtures/today.ts`), since the Backlog's
+  page is a `.tp-spread-second` too.
