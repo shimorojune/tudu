@@ -69,6 +69,7 @@ import { useViewport, type Viewport } from '../../app/viewport';
 import { useWorkingDay } from '../../app/workingDay';
 import { TaskPanel, type OpenTask } from './TaskPanel';
 import { taskLink, rowLink } from '../../app/links';
+import { useRowMenu } from '../../app/rowMenu';
 import { BacklogBeside } from '../backlog/BacklogBeside';
 import { useShownView } from './shownView';
 
@@ -277,6 +278,7 @@ export function TodayPage() {
       group={two || beside ? 'days' : undefined}
       onOpenTask={openTask}
       openKey={open?.id}
+      onCloseTask={closeTask}
       welcome={welcome}
     />
   );
@@ -351,13 +353,21 @@ export function TodayPage() {
                   second
                   onOpenTask={openTask}
                   openKey={open?.id}
+                  onCloseTask={closeTask}
                 />
               </SpreadPage>
             </Spread>
           </SpreadPage>
           <SpreadPage second>
             {all ? null : (
-              <BacklogBeside spaceId={space.id} today={today} onOpenTask={openTask} openKey={open?.id} />
+              <BacklogBeside
+                spaceId={space.id}
+                today={today}
+                onOpenTask={openTask}
+                openKey={open?.id}
+                meId={me.user.id}
+                onCloseTask={closeTask}
+              />
             )}
           </SpreadPage>
         </Spread>
@@ -450,6 +460,8 @@ interface DaySheetProps {
   onOpenTask?: (id: string, ref: string | null | undefined, dir?: 'next' | 'prev', spaceId?: string) => void;
   /** The open task's row keeps the selection wash. */
   openKey?: string;
+  /** Close the panel (its task was deleted from the row menu). */
+  onCloseTask?: () => void;
   /** Someone new to this Today: the empty day says welcome (see welcomeFor). */
   welcome?: Welcome;
 }
@@ -470,6 +482,7 @@ function DaySheet({
   second,
   onOpenTask,
   openKey,
+  onCloseTask,
   welcome,
 }: DaySheetProps) {
   const compact = vp === 'phone';
@@ -545,6 +558,13 @@ function DaySheet({
   const h = dayHeading(day, today);
   const calendar = { today, selected: day, marks: marks ?? {}, onPick: onDay };
   const spaceIdOf = (key: string) => tasks.find((t) => t.id === key)?.spaceId ?? spaceId;
+  const rowMenu = useRowMenu({
+    spaceIds: all ? all.spaces.map((x) => x.id) : [spaceId],
+    spaceIdOf,
+    meId,
+    openKey,
+    onCloseTask,
+  });
   const order = all ? gathered.order : [];
   const orderFor = (d: IsoDate | null) => (all ? (d === day ? order : cachedOrder(all, meId, d)) : []);
   const pending = all ? gathered.pending : q.isPending;
@@ -616,6 +636,7 @@ function DaySheet({
   else {
     // What the plain list and the grouped one share.
     const rows = {
+      menu: rowMenu,
       linkFor: rowLink,
       compact,
       flashKey: flash && flash.day === day ? flash.id : undefined,

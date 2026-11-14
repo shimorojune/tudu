@@ -20,6 +20,7 @@ import {
   seedProjects,
   serverList,
 } from '../../fixtures/groups';
+import { pick, rightClick, toast } from '../../fixtures/rowMenu';
 import { dayList, drag, fixClock, idle, row, rowsOf, titlesOf, writeTasks } from '../../fixtures/today';
 
 const THREE = ['Renew passport', 'Clean up the old staging buckets', 'Draft the Q4 hiring plan'];
@@ -569,5 +570,32 @@ test.describe('backlog', () => {
     await expect(page.locator('.tp-toast')).toHaveText(/Crossed off/);
     await turnTo(page, 'Crossed off');
     await expect.poll(() => titlesOf(doneList(page))).toEqual(['Renew passport']);
+  });
+});
+
+test.describe('backlog, the row menu', () => {
+  test.beforeEach(async ({ page }) => {
+    await fixClock(page);
+  });
+
+  test('RM-E06 a Backlog row: Move to › Today plans it for today; Mark as done folds it away with the Backlog’s toast', async ({
+    page,
+  }) => {
+    await backlogWithThree(page);
+    await rightClick(todoList(page), 'Clean up the old staging buckets');
+    await pick(page, /^Move to/, 'Today');
+    await expect.poll(() => titlesOf(todoList(page))).toEqual(['Renew passport', 'Draft the Q4 hiring plan']);
+    await expect(toast(page, /Moved to Today/)).toBeVisible();
+    await idle(page);
+    expect(await serverTaskDay(page, 'ME-2')).toBe('2026-10-18');
+    await rightClick(todoList(page), 'Renew passport');
+    await pick(page, 'Mark as done');
+    await expect.poll(() => titlesOf(todoList(page))).toEqual(['Draft the Q4 hiring plan']);
+    await expect(toast(page, /Crossed off/)).toBeVisible();
+    await idle(page);
+    expect(await serverBacklog(page)).toEqual([
+      ['Renew passport', true],
+      ['Draft the Q4 hiring plan', false],
+    ]);
   });
 });

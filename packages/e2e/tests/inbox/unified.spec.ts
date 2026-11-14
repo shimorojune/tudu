@@ -140,6 +140,16 @@ test.describe('the one Inbox', () => {
     await w.b.context.close();
   });
 
+  test('RM-E12 an Inbox row gets no task menu on a right-click', async ({ page, browser }) => {
+    test.skip(!desk(), 'a right-click is the desk’s');
+    const w = await twoSpaces(page, browser);
+    await goInbox(page);
+    await expect(row(page, 'Draft the Q4 plan')).toBeVisible();
+    await row(page, 'Draft the Q4 plan').click({ button: 'right' });
+    await expect(page.locator('.tp-ctx')).toHaveCount(0);
+    await w.b.context.close();
+  });
+
   test('C08-E25 space filter: Northwind narrows the list and the address; a reload keeps it; All spaces brings everything back', async ({
     page,
     browser,

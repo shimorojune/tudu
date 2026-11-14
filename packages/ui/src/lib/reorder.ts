@@ -165,6 +165,11 @@ export function useDropGroup(
 }
 
 export interface ReorderOptions {
+  /**
+   * Touch only: the row was held until it lifted, then let go without moving. The drag is called off and this
+   * gets the row's key (the row menu opens its sheet). Without it, the row just settles back.
+   */
+  onHoldRelease?: (key: string) => void;
   /** Lists with the same group trade rows. */
   group?: string | null;
 }
@@ -205,7 +210,7 @@ function items(c: HTMLElement): HTMLElement[] {
 }
 
 /** Swallow the one click that follows a drag (if it comes within 60ms), so dropping never opens or ticks. */
-function swallowNextClick(): void {
+export function swallowNextClick(): void {
   const off = () => window.removeEventListener('click', stop, true);
   const stop = (ev: Event) => {
     ev.stopPropagation();
@@ -518,6 +523,12 @@ export function useReorder(
         const key = s.item.getAttribute('data-key') ?? '';
         const { from, to } = s;
         cleanup(s);
+        const held = opts.current.onHoldRelease;
+        if (held && s.touch && !s.grip && Math.hypot(s.dx, s.dy) <= TOUCH_SLOP_PX) {
+          settleFrom(s.item, top);
+          held(key);
+          return;
+        }
         if (from !== to) {
           flip.current = { key, top };
           move.current(from, to, key);

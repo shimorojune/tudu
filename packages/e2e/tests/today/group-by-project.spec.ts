@@ -11,6 +11,7 @@ import {
   serverList,
   type SeedRow,
 } from '../../fixtures/groups';
+import { menu, pick, rightClick } from '../../fixtures/rowMenu';
 import {
   backlogBeside,
   dayList,
@@ -397,5 +398,26 @@ test.describe('today, by project', () => {
     );
     await expect(group(page, 'No project').getByRole('textbox')).toHaveCount(0);
     void rowsOf;
+  });
+
+  test('C02-E36 the row menu in a group: Project moves the row to that project’s group, and the server agrees', async ({
+    page,
+  }) => {
+    test.skip(!desktop(), 'touch sizes press and hold for the sheet (the row menu’s own cases)');
+    const made = await seeded(page);
+    await orderBy(page, 'By project');
+    await expect.poll(() => groupNames(page)).toEqual([...made.order, 'No project']);
+    await rightClick(group(page, 'No project'), 'Water the plants');
+    await expect(menu(page, 'Water the plants')).toBeVisible();
+    await pick(page, /^Project/, 'Platform');
+    await expect.poll(() => groupNames(page)).toEqual(made.order);
+    expect(await groupTitles(page, 'Platform')).toEqual([
+      'Rotate the keys',
+      'Water the plants',
+      'Fix the flaky test',
+    ]);
+    await idle(page);
+    const server = await serverList(page, made.spaceId, SUN);
+    expect(server.find((t) => t.title === 'Water the plants')!.projectId).toBe(made.projects.Platform);
   });
 });

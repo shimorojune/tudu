@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
 import { expectFoldsShut, expectGlides, expectLands, sampleBoxes } from '../../fixtures/motion';
+import { pick, rightClick } from '../../fixtures/rowMenu';
 import {
   carry,
   dayList,
@@ -708,5 +709,27 @@ test.describe('week, a drop on another day, with motion', () => {
     const view = (await body.boundingBox())!;
     expect(at.y).toBeGreaterThanOrEqual(view.y - 1);
     expect(at.y + at.height).toBeLessThanOrEqual(view.y + view.height + 1);
+  });
+});
+
+test.describe('week, the row menu', () => {
+  test.beforeEach(async ({ page }) => {
+    await fixClock(page);
+  });
+
+  test('RM-E07 a week tile row: Move to › Backlog moves it into the Backlog tile and the server has it', async ({
+    page,
+  }) => {
+    await signInFresh(page);
+    await writeTasks(page, THREE);
+    await goWeek(page);
+    const today = tileList(page, SUNDAY_LIST);
+    await rightClick(today, 'Call Sam at 3pm');
+    await pick(page, /^Move to/, 'Backlog');
+    await expect.poll(() => titlesOf(today)).toEqual(['Pay the electricity bill', 'Book car service']);
+    await expect.poll(() => titlesOf(backlogList(page))).toEqual(['Call Sam at 3pm']);
+    await idle(page);
+    expect(await serverDay(page, null)).toEqual(['Call Sam at 3pm']);
+    expect(await serverDay(page, '2026-10-18')).toEqual(['Pay the electricity bill', 'Book car service']);
   });
 });

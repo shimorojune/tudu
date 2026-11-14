@@ -12,6 +12,7 @@ import {
   switchTo,
   switcher,
 } from '../../fixtures/spaces';
+import { pick, rightClick } from '../../fixtures/rowMenu';
 import { expectGlides, expectLands, sampleBoxes } from '../../fixtures/motion';
 import {
   group,
@@ -1127,5 +1128,42 @@ test.describe('all spaces, by project', () => {
     await expect(page.getByRole('heading', { name: 'Sunday' })).toBeVisible();
     await orderBy(page, 'By project');
     await expect(groupHeader(page, 'Home')).toHaveAttribute('aria-expanded', 'false');
+  });
+});
+
+test.describe('all spaces, the row menu', () => {
+  test.beforeEach(async ({ page }) => {
+    await fixClock(page);
+  });
+
+  test('RM-E08 the Project list holds the task’s own space’s projects; picking one keeps the task in its space', async ({
+    page,
+    browser,
+  }) => {
+    const w = await world(page, browser);
+    const mk = (spaceId: string, name: string) => ({
+      id: crypto.randomUUID(),
+      type: 'project.create',
+      payload: { id: crypto.randomUUID(), spaceId, name },
+      at: new Date().toISOString(),
+    });
+    await page.request.post(`${API_URL}/api/sync`, {
+      data: { clientId: 'seed', mutations: [mk(w.nw.id, 'Roadmap'), mk(w.personal.id, 'Home')] },
+    });
+    await page.reload();
+    await goAll(page);
+    await rightClick(allDay(page), 'Review the Northwind roadmap');
+    await pick(page, /^Project/);
+    const sub = page.locator('.tp-ctx').last();
+    await expect(sub.getByRole('menuitemradio', { name: 'Roadmap', exact: true })).toBeVisible();
+    await expect(sub.getByRole('menuitemradio', { name: 'Home', exact: true })).toHaveCount(0);
+    await pick(page, 'Roadmap');
+    await expect(
+      row(allDay(page), 'Review the Northwind roadmap').getByText('Roadmap', { exact: true }),
+    ).toBeVisible();
+    await idle(page);
+    const t = (await dayOf(page, w.nw.id)) as Array<{ title: string; projectId?: string | null }>;
+    expect(t.find((x) => x.title === 'Review the Northwind roadmap')!.projectId).not.toBeNull();
+    await w.b.context.close();
   });
 });

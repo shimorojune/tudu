@@ -382,6 +382,16 @@
 :root[data-motion='less'] .tp-g-body.tp-g-shut > div {
   transition-delay: 120ms;
 }
+:root[data-motion='less'] .tp-ctx.tp-menu,
+:root[data-motion='less'] .tp-ctx.tp-menu.tp-ctx-sub {
+  animation: tp-ctx-out 120ms linear reverse both;
+}
+:root[data-motion='less'] .tp-ctxs-track {
+  transition-duration: 120ms;
+}
+:root[data-motion='less'] .tp-item.tp-ctx-hold .tp-row {
+  transform: none;
+}
 
 /* app.css */
 :root[data-motion='less'] .tp-tip-pop,

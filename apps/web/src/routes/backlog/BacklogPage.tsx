@@ -52,6 +52,7 @@ import { AllBanners, OfflineBanner, monthAround, openInSpace, toItem } from '../
 import { TaskPanel, type OpenTask } from '../today/TaskPanel';
 import { useProjectGroups } from '../../app/grouped';
 import { taskLink, rowLink } from '../../app/links';
+import { useRowMenu } from '../../app/rowMenu';
 
 const MIN_HEIGHT: Record<Viewport, number> = { desktop: 560, tablet: 640, phone: 520 };
 const VIEWS: Array<{ value: BacklogView; label: string }> = [
@@ -133,6 +134,7 @@ export function BacklogPage() {
         vp={vp}
         onOpenTask={openTask}
         openKey={open?.id}
+        onCloseTask={closeTask}
       />
       <TaskPanel
         spaceId={openSpace.id}
@@ -165,10 +167,22 @@ interface BacklogSheetProps {
   vp: Viewport;
   onOpenTask: (id: string, ref: string | null | undefined) => void;
   openKey?: string;
+  /** Close the panel (its task was deleted from the row menu). */
+  onCloseTask?: () => void;
 }
 
 /** The sheet: the header with the filter and the view switch, then the list for the view or its states. */
-function BacklogSheet({ all, filters, meId, spaceId, today, vp, onOpenTask, openKey }: BacklogSheetProps) {
+function BacklogSheet({
+  all,
+  filters,
+  meId,
+  spaceId,
+  today,
+  vp,
+  onOpenTask,
+  openKey,
+  onCloseTask,
+}: BacklogSheetProps) {
   const compact = vp === 'phone';
   const single = useQuery({ ...taskStore.backlogQuery(spaceId), enabled: !all });
   const gathered = useAllBacklog(all, meId, today);
@@ -246,6 +260,13 @@ function BacklogSheet({ all, filters, meId, spaceId, today, vp, onOpenTask, open
     setView(v);
   };
   const spaceIdOf = (key: string) => tasks.find((t) => t.id === key)?.spaceId ?? spaceId;
+  const rowMenu = useRowMenu({
+    spaceIds: all ? all.spaces.map((x) => x.id) : [spaceId],
+    spaceIdOf,
+    meId,
+    openKey,
+    onCloseTask,
+  });
   const order = all ? gathered.order : [];
   const target = all?.target;
   // All spaces' space filter: the list turns towards the space further down the switcher.
@@ -310,6 +331,7 @@ function BacklogSheet({ all, filters, meId, spaceId, today, vp, onOpenTask, open
     );
   else if (view === 'done') {
     const rows = {
+      menu: rowMenu,
       linkFor: rowLink,
       onSignal,
       compact,
@@ -330,6 +352,7 @@ function BacklogSheet({ all, filters, meId, spaceId, today, vp, onOpenTask, open
     );
   } else {
     const rows = {
+      menu: rowMenu,
       linkFor: rowLink,
       onSignal,
       compact,

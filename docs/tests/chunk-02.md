@@ -122,6 +122,7 @@ empty) before reading the server.
 | C02-E33 | Sizes                          | The switch costs no height on a wide sheet and takes its own line on a phone; headers 36px (44px on phones), "+" there without hover on touch; the writing line's box sits level with its words                                     |
 | C02-E34 | Dark and loading               | The groups in the dark theme; a held read keeps the grouped shape in the skeleton                                                                                                                                                   |
 | C02-E35 | Never two writing lines        | The page's line makes way while the last project's own line is open, Esc brings it back; No project's "+" focuses the page's line                                                                                                   |
+| C02-E36 | The row menu in a group        | Right-click a row under a group header: Project moves it to that project's group in the day's order, and the server agrees (desktop)                                                                                                |
 
 ## Desktop (`packages/e2e/mac`, Tudu Test on the macOS runner)
 

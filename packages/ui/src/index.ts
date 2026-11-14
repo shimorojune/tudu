@@ -169,7 +169,33 @@ export {
   type TaskGroupItem,
   type GroupHeaderProps,
 } from './components/TaskGroups';
-export { TaskList, FRESH_MS, type TaskListProps, type TaskItem, type TaskMove } from './components/TaskList';
+export {
+  TaskList,
+  FRESH_MS,
+  type TaskListProps,
+  type TaskItem,
+  type TaskMove,
+  type TaskListMenu,
+} from './components/TaskList';
+export {
+  RowMenu,
+  RowSheet,
+  ROW_MENU_LEAVE_MS,
+  ROW_SHEET_LEAVE_MS,
+  type RowMenuProps,
+  type RowSheetProps,
+  type RowMenuCloseWhy,
+} from './components/RowMenu';
+export {
+  rowMenuModel,
+  findRowMenuItem,
+  type RowMenuAct,
+  type RowMenuEntry,
+  type RowMenuItem,
+  type RowMenuProject,
+  type RowMenuTask,
+  type RowMenuContext,
+} from './lib/rowMenu';
 export { AddTask, type AddTaskProps } from './components/AddTask';
 export { DatePop, DATEPOP_LEAVE_MS, type DatePopProps } from './components/DatePop';
 export { Spread, SpreadPage, SPREAD_MS, type SpreadProps, type SpreadPageProps } from './components/Spread';

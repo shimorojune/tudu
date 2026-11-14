@@ -15,6 +15,7 @@ import { useProjectGroups } from '../../app/grouped';
 import { useFlash, useLocate } from '../../app/dayView';
 import { rowLink } from '../../app/links';
 import { openInJira } from '../../app/jira';
+import { useRowMenu } from '../../app/rowMenu';
 import { taskStore } from '../../app/tasks';
 import { monthAround, toItem } from '../today/TodayPage';
 
@@ -25,6 +26,9 @@ interface BacklogBesideProps {
   today: IsoDate;
   onOpenTask: (id: string, ref: string | null | undefined) => void;
   openKey?: string;
+  meId?: string;
+  /** Deleting the task open in the panel closes the panel. */
+  onCloseTask?: () => void;
 }
 
 /**
@@ -33,7 +37,14 @@ interface BacklogBesideProps {
  * on the Backlog page: a filtered list can't take drops). Tasks drag across both ways in the "days" group, or move
  * with the row's calendar button. Same cache as the Backlog page and the week's Backlog tile.
  */
-export function BacklogBeside({ spaceId, today, onOpenTask, openKey }: BacklogBesideProps) {
+export function BacklogBeside({
+  spaceId,
+  today,
+  onOpenTask,
+  openKey,
+  meId,
+  onCloseTask,
+}: BacklogBesideProps) {
   const q = useQuery(taskStore.backlogQuery(spaceId));
   const projectsQ = useQuery(taskStore.projectsQuery(spaceId));
   const projects = projectsQ.data ?? [];
@@ -51,6 +62,7 @@ export function BacklogBeside({ spaceId, today, onOpenTask, openKey }: BacklogBe
   // dragging to and from the day comes back in My order; the row's calendar button moves a task either way.
   const g = useProjectGroups({ spaceId, tasks: open, items, projects, ready: projectsQ.isSuccess });
   const ids = open.map((t) => t.id);
+  const rowMenu = useRowMenu({ spaceIds: [spaceId], spaceIdOf, meId, openKey, onCloseTask });
 
   let body;
   if (q.isPending) body = <TaskListSkeleton rows={4} grouped={g.wanted} />;
@@ -69,6 +81,7 @@ export function BacklogBeside({ spaceId, today, onOpenTask, openKey }: BacklogBe
     );
   else {
     const rows = {
+      menu: rowMenu,
       linkFor: rowLink,
       onSignal: (t: TaskItem, k: string) => {
         if (k === 'jira' && t.jira) openInJira(spaceIdOf(t.key), t.jira);
