@@ -425,19 +425,45 @@
   align-items: center;
   gap: 4px;
   padding: 0 6px 0 0;
+  transition: background-color var(--dur-menu) var(--ease-change);
 }
-.tp-prj-row + .tp-prj-row {
+/* The row carries the fill, edge to edge and under ⋯; only the card's own outer corners are round. Written on the
+   list's children so the kit's inline editor (the open row inside .tp-prj-anchor) keeps its hairlines and corners. */
+.tp-prj-list > * + * {
   border-top: 1px solid var(--line);
 }
-/* The row a popup is open on stays lit; a new or just-saved one opens its gap and keeps the wash for a moment. */
-.tp-prj-row.tp-on .tp-prj-main {
+.tp-prj-list > :first-child,
+.tp-prj-list > :first-child > .tp-prj-row {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+.tp-prj-list > :last-child,
+.tp-prj-list > :last-child > .tp-prj-row {
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
+.tp-prj-row:hover {
+  background: var(--accent);
+}
+/* The row a popup is open on stays lit. */
+.tp-prj-row.tp-on {
   background: var(--selection);
 }
-.tp-prj-row.tp-prj-fresh {
+/* A new row opens its gap and keeps the wash for a moment; a saved one only keeps the wash, so nothing moves. */
+.tp-prj-row.tp-prj-arrive {
   overflow: hidden;
   animation:
     tp-row-open var(--dur-row-open) var(--ease-arrive) both,
     tp-row-wash 2s var(--ease-change) both;
+}
+.tp-prj-row.tp-prj-saved {
+  animation: tp-row-wash 2s var(--ease-change) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tp-prj-row.tp-prj-arrive {
+    overflow: visible;
+    animation: tp-row-wash 2s var(--ease-change) both;
+  }
 }
 .tp-root .tp-prj-main {
   flex: 1;
@@ -448,26 +474,32 @@
   height: 48px;
   padding: 0 12px 0 16px;
   border: 0;
-  border-radius: var(--radius-lg);
+  border-radius: 0;
   background: transparent;
   font: inherit;
   color: var(--foreground);
   text-align: left;
   cursor: pointer;
-  transition: background-color var(--dur-menu) var(--ease-change);
-}
-.tp-root .tp-prj-main:hover {
-  background: var(--accent);
 }
 .tp-root .tp-prj-main:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 2px var(--ring);
+}
+/* The ring follows the row's shape where :has() is there to put it on the row. */
+@supports selector(:has(*)) {
+  .tp-root .tp-prj-main:focus-visible {
+    box-shadow: none;
+  }
+  .tp-prj-row:has(.tp-prj-main:focus-visible) {
+    box-shadow: inset 0 0 0 2px var(--ring);
+  }
 }
 .tp-prj-dot {
   flex: none;
   width: 12px;
   height: 12px;
   border-radius: 50%;
+  transition: background-color var(--dur-menu) var(--ease-change);
 }
 .tp-prj-n {
   flex: 1;

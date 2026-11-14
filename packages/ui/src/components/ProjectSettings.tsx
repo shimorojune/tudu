@@ -7,7 +7,7 @@ import {
   projectNamed,
 } from '@tudu/core';
 import { Popover } from 'radix-ui';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { cx } from '../lib/cx';
 import { useTimer } from '../lib/hooks';
 import { Button } from './Button';
@@ -183,14 +183,24 @@ export function ProjectSettings({
       ? { name: p.name, color: p.color }
       : { name: '', color: nextProjectColor(projects.map((x) => x.color)) };
   });
-  // The row that just arrived or changed keeps the wash for a moment.
-  const [fresh, setFresh] = useState<string | null>(null);
+  // The row that just arrived (it opens its gap) or was just saved (it only keeps the wash) for a moment.
+  const [fresh, setFresh] = useState<{ id: string; kind: 'new' | 'saved' } | null>(null);
   const [opened, setOpened] = useState(false);
   // Where focus goes once the popup has closed: a row (by id, once it is drawn) or New project.
   const focusAfter = useRef<string | null>(null);
   const newButton = useRef<HTMLButtonElement>(null);
   const rows = useRef(new Map<string, HTMLElement>());
   const later = useTimer();
+  // The open row, for the popup to hang from without wrapping (and so remounting) the row.
+  // Radix reads `current` in its own effect, after the rows are drawn.
+  const anchorRow = useMemo(() => {
+    const map = rows;
+    return {
+      get current(): HTMLElement | null {
+        return editing && editing !== 'new' ? (map.current.get(editing) ?? null) : null;
+      },
+    };
+  }, [editing]);
 
   const open = (p: ProjectSettingsProject | null) => {
     setOpened(true);
@@ -214,9 +224,11 @@ export function ProjectSettings({
   const same = editing ? projectNamed(projects, draft.name, project?.id) : null;
   const taken = same ? `${mine(spaceName)} already has ${mine(same.name)}.` : null;
 
-  const markFresh = (id: string) => {
+  const markFresh = (id: string, kind: 'new' | 'saved') => {
     focusAfter.current = id;
-    setFresh(id);
+    // Off first, then on the next frame, so a second save inside the wash runs it again.
+    setFresh(null);
+    requestAnimationFrame(() => setFresh({ id, kind }));
     later(() => setFresh(null), FRESH_MS);
   };
   const save = () => {
@@ -224,12 +236,12 @@ export function ProjectSettings({
     if (!name || taken) return;
     if (!project) {
       const id = onCreate?.(name, draft.color);
-      if (id) markFresh(id);
+      if (id) markFresh(id, 'new');
       else focusAfter.current = 'new';
     } else {
       if (name !== project.name) onRename?.(project, name);
       if (draft.color !== project.color) onRecolour?.(project, draft.color);
-      markFresh(project.id);
+      markFresh(project.id, 'saved');
     }
     setEditing(null);
   };
@@ -346,7 +358,11 @@ export function ProjectSettings({
                     if (el) rows.current.set(p.id, el);
                     else rows.current.delete(p.id);
                   }}
-                  className={cx('tp-prj-row', editing === p.id && 'tp-on', fresh === p.id && 'tp-prj-fresh')}
+                  className={cx(
+                    'tp-prj-row',
+                    editing === p.id && 'tp-on',
+                    fresh?.id === p.id && (fresh.kind === 'new' ? 'tp-prj-arrive' : 'tp-prj-saved'),
+                  )}
                   role="listitem"
                 >
                   <button
@@ -375,16 +391,12 @@ export function ProjectSettings({
                   </Menu>
                 </div>
               );
-              if (editing !== p.id) return row;
-              return inline ? (
+              if (editing !== p.id || !inline) return row;
+              return (
                 <div key={p.id} className="tp-prj-anchor">
                   {row}
                   {pop('row')}
                 </div>
-              ) : (
-                <Popover.Anchor key={p.id} asChild>
-                  {row}
-                </Popover.Anchor>
               );
             })}
           </div>
@@ -426,6 +438,7 @@ export function ProjectSettings({
           }}
         >
           {body}
+          {where === 'row' ? <Popover.Anchor virtualRef={anchorRow as RefObject<HTMLElement>} /> : null}
           {where ? pop(where) : null}
         </Popover.Root>
       )}

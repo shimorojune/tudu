@@ -374,6 +374,10 @@
 :root[data-motion='less'] .tp-dh-pop {
   animation-duration: 120ms !important;
 }
+:root[data-motion='less'] .tp-prj-row.tp-prj-arrive {
+  overflow: visible;
+  animation: tp-row-wash 2s var(--ease-change) both;
+}
 :root[data-motion='less'] .tp-root .tp-fb-slot,
 :root[data-motion='less'] .tp-root .tp-fb-shot,
 :root[data-motion='less'] .tp-root .tp-fb-shot-img,

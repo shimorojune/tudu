@@ -1,7 +1,18 @@
 # Projects list polish: one row fill, no jump after Save
 
-Status: proposal, waiting for Rohit. Canvas approved 14 Nov 2026: boards "Projects list, polished" (K-ProjectsPolish,
+Status: approved by Rohit 14 Nov 2026; implemented (see As built). Canvas approved 14 Nov 2026: boards "Projects list, polished" (K-ProjectsPolish,
 K-ProjectsPolish-Dark) on the "Spaces, people & projects" page of the design canvas.
+
+## As built (14 Nov)
+
+- `app.css`: the fill, the corners, the hairline (`.tp-prj-list > * + *`) and the ring (`:has`, inside
+  `@supports selector(:has(*))`) are as planned; `.tp-prj-fresh` is now `.tp-prj-arrive` (Create) and `.tp-prj-saved`
+  (Save). `less-motion.css` regenerated.
+- `ProjectSettings.tsx`: `fresh` is `{ id, kind }`; the popup hangs from the open row through
+  `<Popover.Anchor virtualRef>`, a memoised object whose `current` getter reads the row from the `rows` map (the React
+  hooks lint refuses a ref read during render). The non-inline row is never wrapped any more.
+- `docs/tests/STATUS.md` is not regenerated here: a local run only covers the unit suites and would rewrite the file
+  from a partial run.
 
 ## The report
 

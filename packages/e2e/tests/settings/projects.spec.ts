@@ -349,6 +349,23 @@ test.describe('settings › projects', () => {
       return past;
     });
     expect(over).toEqual([]);
+    // C18-E19 the kit's open row keeps its hairlines and the card keeps its corners, light and dark.
+    await page.setViewportSize({ width: 1280, height: 900 });
+    const editing = page.getByRole('region', { name: 'Projects, editing one', exact: true });
+    for (const i of [0, 1]) {
+      const l = list(editing.locator('.kit-desk').nth(i));
+      const lines = await l.evaluate((el) =>
+        [...el.children].slice(1).map((c) => getComputedStyle(c).borderTopWidth),
+      );
+      expect(lines.length).toBeGreaterThan(0);
+      expect(lines.every((w) => w === '1px')).toBe(true);
+      const corners = await l.evaluate((el) => {
+        const first = getComputedStyle(el.firstElementChild!);
+        const last = getComputedStyle(el.lastElementChild!);
+        return [first.borderTopLeftRadius, last.borderBottomRightRadius];
+      });
+      expect(corners).toEqual(['12px', '12px']);
+    }
   });
 
   test('C18-E10 New project lands first, in view, with the wash and focus; nothing under the popup moves while it is open', async ({
@@ -382,7 +399,7 @@ test.describe('settings › projects', () => {
     await ed.getByRole('textbox', { name: 'Project name' }).fill('Garden');
     await ed.getByRole('button', { name: 'Create project' }).click();
     await expect(rows).toHaveText(['GardenNone open', 'ErrandsNone open', 'HomeNone open']);
-    await expect(rows.first()).toHaveClass(/tp-prj-fresh/);
+    await expect(rows.first()).toHaveClass(/tp-prj-arrive/);
     await expect(rows.first()).toBeInViewport();
     await expect(s.getByRole('button', { name: 'Edit Garden, No open tasks' })).toBeFocused();
     await idle(page);
@@ -474,4 +491,152 @@ test.describe('settings › projects', () => {
     await idle(page);
     expect((await serverProjects(page, space.id)).map((p) => p.name)).toEqual(['Errands']);
   });
+
+  test('C18-E16 recolour and Save: frame by frame, no row and nothing under the list moves, and the row never fades', async ({
+    page,
+  }) => {
+    test.skip(!desktop(), 'the same list on every size');
+    await saveStaysPut(page);
+  });
+
+  test('C18-E17 the fill is on the whole row: edge to edge, square inside, the card corners on the first and last; the ring is on the row', async ({
+    page,
+  }) => {
+    test.skip(!desktop(), 'hover is a pointer thing');
+    await rowFill(page);
+  });
+
+  test('C18-E18 dark: E16 and E17 again', async ({ page }) => {
+    test.skip(!desktop(), 'the same list on every size');
+    await dark(page);
+    await saveStaysPut(page);
+    await page.context().clearCookies();
+    await rowFill(page);
+  });
 });
+
+/** Three projects, Settings › Space open, nothing animating. */
+async function threeProjects(page: Page) {
+  await signInFresh(page);
+  const space = await personal(page);
+  for (const n of ['Home', 'Garden', 'Errands']) await seedProject(page, space.id, n, []);
+  await page.reload();
+  const s = await openProjects(page);
+  const rows = list(s).getByRole('listitem');
+  await expect(rows).toHaveCount(3);
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'));
+  return { space, s, rows };
+}
+
+/** E16: every frame for 600ms after Save, each row's top and height and what is under the list stay put. */
+async function saveStaysPut(page: Page) {
+  const { s, rows } = await threeProjects(page);
+  await rows
+    .nth(1)
+    .getByRole('button', { name: /^Edit Garden/ })
+    .click();
+  const ed = page.getByRole('dialog', { name: 'Edit Garden' });
+  await ed
+    .getByRole('radiogroup', { name: 'Project colour' })
+    .getByRole('radio', { checked: false })
+    .nth(3)
+    .click();
+  await page.evaluate(() => {
+    const l = document.querySelector('.tp-prj-list')!;
+    const read = () => {
+      const top = l.getBoundingClientRect().top;
+      return {
+        rows: [...l.children].map((c) => {
+          const r = c.getBoundingClientRect();
+          return [r.top - top, r.height, Number(getComputedStyle(c).opacity)];
+        }),
+        under: l.getBoundingClientRect().bottom - top,
+      };
+    };
+    const w = window as unknown as { __before: ReturnType<typeof read>; __frames: ReturnType<typeof read>[] };
+    w.__before = read();
+    w.__frames = [];
+    const save = [...document.querySelectorAll('[role="dialog"] button')].find(
+      (b) => b.textContent === 'Save',
+    )!;
+    save.addEventListener(
+      'click',
+      () => {
+        const t0 = performance.now();
+        const tick = () => {
+          w.__frames.push(read());
+          if (performance.now() - t0 < 600) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+      { once: true },
+    );
+  });
+  await ed.getByRole('button', { name: 'Save' }).click();
+  await expect(ed).toHaveCount(0);
+  await expect(rows.nth(1)).toHaveClass(/tp-prj-saved/);
+  await expect(rows.nth(1)).not.toHaveClass(/tp-prj-arrive/);
+  await page.waitForTimeout(700);
+  const { before, frames } = (await page.evaluate(() => {
+    const w = window as unknown as { __before: unknown; __frames: unknown[] };
+    return { before: w.__before, frames: w.__frames };
+  })) as {
+    before: { rows: number[][]; under: number };
+    frames: { rows: number[][]; under: number }[];
+  };
+  expect(frames.length).toBeGreaterThan(10);
+  for (const f of frames) {
+    expect(Math.abs(f.under - before.under)).toBeLessThanOrEqual(0.5);
+    f.rows.forEach(([top, height, opacity], i) => {
+      expect(Math.abs(top! - before.rows[i]![0]!)).toBeLessThanOrEqual(0.5);
+      expect(Math.abs(height! - before.rows[i]![1]!)).toBeLessThanOrEqual(0.5);
+      expect(opacity).toBe(1);
+    });
+  }
+  void s;
+}
+
+/** E17: hover and focus light the whole row, with the card's corners only on the outside. */
+async function rowFill(page: Page) {
+  const { s, rows } = await threeProjects(page);
+  const box = (await list(s).boundingBox())!;
+  const look = (i: number) =>
+    rows.nth(i).evaluate((el) => {
+      const cs = getComputedStyle(el);
+      const main = getComputedStyle(el.querySelector('.tp-prj-main')!);
+      return {
+        bg: cs.backgroundColor,
+        mainBg: main.backgroundColor,
+        mainRadius: main.borderTopLeftRadius,
+        radii: [
+          cs.borderTopLeftRadius,
+          cs.borderTopRightRadius,
+          cs.borderBottomRightRadius,
+          cs.borderBottomLeftRadius,
+        ],
+        ring: cs.boxShadow,
+      };
+    });
+  const resting = (await look(1)).bg;
+  await rows.nth(1).hover();
+  await expect.poll(async () => (await look(1)).bg).not.toBe(resting);
+  const mid = await look(1);
+  expect(mid.mainBg).toBe('rgba(0, 0, 0, 0)');
+  expect(mid.mainRadius).toBe('0px');
+  expect(mid.radii).toEqual(['0px', '0px', '0px', '0px']);
+  const rb = (await rows.nth(1).boundingBox())!;
+  expect(Math.abs(rb.x - box.x)).toBeLessThanOrEqual(0.5);
+  expect(Math.abs(rb.x + rb.width - (box.x + box.width))).toBeLessThanOrEqual(0.5);
+  expect((await look(0)).radii).toEqual(['12px', '12px', '0px', '0px']);
+  expect((await look(2)).radii).toEqual(['0px', '0px', '12px', '12px']);
+  // Keyboard: the ring is drawn on the row, not on the button.
+  await page.mouse.move(0, 0);
+  await rows
+    .nth(0)
+    .getByRole('button', { name: /^Edit Errands/ })
+    .focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  await expect(rows.nth(0).getByRole('button', { name: /^Edit Errands/ })).toBeFocused();
+  await expect.poll(async () => (await look(0)).ring).toContain('inset');
+}
