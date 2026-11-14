@@ -84,7 +84,12 @@ test.describe('RM Mac row menu', () => {
     await writeTask(app, space, 'Call Sam at 3pm', day());
     await go(app, '/me');
     await app.until(`return !!${titleOf('Call Sam at 3pm')}`);
-    await app.eval(`T.click(T.get('button', 'Write the next thing…'));`);
+    // The writing line may already be open as the field; otherwise open it, as writeTasks does on the web.
+    await app.until(
+      `return !!document.querySelector('[aria-label="New task"]') || T.all('button', /^(Write the next thing…|Add a task)$/).length > 0`,
+    );
+    await app.eval(`
+      if (!document.querySelector('[aria-label="New task"]')) T.click(T.get('button', /^(Write the next thing…|Add a task)$/));`);
     await app.until(`return !!document.querySelector('[aria-label="New task"]')`);
     expect(await rightClick(app, `document.querySelector('[aria-label="New task"]')`)).toBe(false);
     expect(await app.eval<number>(`return document.querySelectorAll('.tp-ctx').length`)).toBe(0);
