@@ -370,6 +370,16 @@
 :root[data-motion='less'] .tp-kf-ok.tp-out {
   animation: tp-kf-ok-fade 160ms linear forwards;
 }
+:root[data-motion='less'] .tp-ctx.tp-menu,
+:root[data-motion='less'] .tp-ctx.tp-menu.tp-ctx-sub {
+  animation: tp-ctx-out 120ms linear reverse both;
+}
+:root[data-motion='less'] .tp-ctxs-track {
+  transition-duration: 120ms;
+}
+:root[data-motion='less'] .tp-item.tp-ctx-hold .tp-row {
+  transform: none;
+}
 
 /* app.css */
 :root[data-motion='less'] .tp-tip-pop,

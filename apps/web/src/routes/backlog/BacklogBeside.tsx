@@ -4,6 +4,7 @@ import { DayHeader, EmptyState, FoldAway, Sheet, SheetBody, TaskList, TaskListSk
 import { useFlash, useLocate } from '../../app/dayView';
 import { rowLink } from '../../app/links';
 import { openInJira } from '../../app/jira';
+import { useRowMenu } from '../../app/rowMenu';
 import { taskStore } from '../../app/tasks';
 import { monthAround, toItem } from '../today/TodayPage';
 
@@ -14,6 +15,9 @@ interface BacklogBesideProps {
   today: IsoDate;
   onOpenTask: (id: string, ref: string | null | undefined) => void;
   openKey?: string;
+  meId?: string;
+  /** Deleting the task open in the panel closes the panel. */
+  onCloseTask?: () => void;
 }
 
 /**
@@ -22,7 +26,14 @@ interface BacklogBesideProps {
  * on the Backlog page: a filtered list can't take drops). Tasks drag across both ways in the "days" group, or move
  * with the row's calendar button. Same cache as the Backlog page and the week's Backlog tile.
  */
-export function BacklogBeside({ spaceId, today, onOpenTask, openKey }: BacklogBesideProps) {
+export function BacklogBeside({
+  spaceId,
+  today,
+  onOpenTask,
+  openKey,
+  meId,
+  onCloseTask,
+}: BacklogBesideProps) {
   const q = useQuery(taskStore.backlogQuery(spaceId));
   const projects = useQuery(taskStore.projectsQuery(spaceId)).data ?? [];
   const range = monthAround(today);
@@ -35,6 +46,7 @@ export function BacklogBeside({ spaceId, today, onOpenTask, openKey }: BacklogBe
   const items = open.map((t) => toItem(t, today, projects));
   const count = q.data ? backlogCount(open.length, 'open') : '';
   const spaceIdOf = (key: string) => tasks.find((t) => t.id === key)?.spaceId ?? spaceId;
+  const rowMenu = useRowMenu({ spaceIds: [spaceId], spaceIdOf, meId, openKey, onCloseTask });
 
   let body;
   if (q.isPending) body = <TaskListSkeleton rows={4} />;
@@ -86,6 +98,7 @@ export function BacklogBeside({ spaceId, today, onOpenTask, openKey }: BacklogBe
           onMoveTask={(t, to, _from, at) => taskStore.place(t.key, to, at)}
           onDueChange={(t, due) => taskStore.due(t.key, due)}
           onOpenTask={(t) => onOpenTask(t.key, t.id)}
+          menu={rowMenu}
           selectedKey={openKey}
           onAddSubtask={(t, title) => taskStore.addSubtask(spaceIdOf(t.key), t.key, title)}
           onRenameSubtask={(t, s, title) => taskStore.renameSubtask(t.key, s.key, title)}

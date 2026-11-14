@@ -1,11 +1,31 @@
 import { dayWord, isoToday, type IsoDate } from '@tudu/core';
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type PointerEvent,
+} from 'react';
+import { copyText, COPY_FAILED_WORDS, COPY_ID_FAILED_WORDS } from '../lib/clipboard';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
 import { closeRow, openRow, scrollerOf, settleFrom } from '../lib/motion';
-import { itemByKey, landFlight, moveItem, useDropGroup, useReorder } from '../lib/reorder';
+import {
+  itemByKey,
+  landFlight,
+  moveItem,
+  swallowNextClick,
+  TOUCH_HOLD_MS,
+  TOUCH_SLOP_PX,
+  useDropGroup,
+  useReorder,
+} from '../lib/reorder';
+import { rowMenuModel, type RowMenuAct, type RowMenuProject } from '../lib/rowMenu';
 import { AddTask } from './AddTask';
 import type { MiniCalendarProps } from './MiniCalendar';
+import { RowMenu, RowSheet, type RowMenuCloseWhy } from './RowMenu';
 import type { SubtaskItem } from './SubtaskList';
 import {
   TaskRow,
@@ -32,6 +52,23 @@ export interface TaskItem {
   /** All spaces: the space it lives in, shown as a pill in its byline. */
   inSpace?: TaskSpace;
   subtasks?: SubtaskItem[];
+  /** Someone else's task (a shared space): the row menu only opens it and copies its link or ID. */
+  readOnly?: boolean;
+}
+
+/** The row menu: right-click a row (Shift+F10, or press and hold on touch). */
+export interface TaskListMenu {
+  /** The projects a task can move to (its own space's); `undefined` while they load. Leave out: no Project item. */
+  projects?: (task: TaskItem) => RowMenuProject[] | undefined;
+  onSetProject?: (task: TaskItem, projectId: string | null) => void;
+  /** Delete task: the row folds away first. Leave out: no Delete item. */
+  onDelete?: (task: TaskItem) => void;
+  /** Undo on the "Task deleted" toast. */
+  onRestore?: (task: TaskItem) => void;
+  /** Copy link, where the list's own `linkFor` is not set (the week's tiles copy the ID from the chip). */
+  linkFor?: (task: TaskItem) => string | undefined;
+  /** Someone else's task: open and copy only (as `TaskItem.readOnly`). */
+  readOnly?: (task: TaskItem) => boolean;
 }
 
 export interface TaskMove {
@@ -118,6 +155,8 @@ export interface TaskListProps {
   onReorderSubtask?: (task: TaskItem, sub: SubtaskItem, from: number, to: number) => void;
   onDeleteSubtask?: (task: TaskItem, sub: SubtaskItem, index: number) => void;
   onRestoreSubtask?: (task: TaskItem, sub: SubtaskItem, index: number) => void;
+  /** Right-click a row for its menu (and Shift+F10, and press and hold on touch). Leave out for read-only lists. */
+  menu?: TaskListMenu;
 }
 
 /** How long a new or dropped row keeps its wash. */
@@ -266,7 +305,10 @@ export function TaskList(p: TaskListProps) {
     const fromFull = tasks.findIndex((t) => t.key === key);
     p.onReorder?.(next, { key, from: fromFull, to: toFull });
   }
-  const down = useReorder(ref, reorder, { group: narrowed ? null : p.group });
+  const down = useReorder(ref, reorder, {
+    group: narrowed ? null : p.group,
+    onHoldRelease: p.menu ? (key) => openMenu(key, 0, 0, 'touch') : undefined,
+  });
   useDropGroup(narrowed || p.locked ? null : p.group, ref, (key, at) => {
     p.onReceive?.(key, at);
     setFresh({ key, follow: 'out' });
@@ -274,6 +316,15 @@ export function TaskList(p: TaskListProps) {
   });
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (p.menu && (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10'))) {
+      const item = rowOf(e.target);
+      if (!item || (e.target as HTMLElement).closest('input, textarea, [contenteditable="true"]')) return;
+      e.preventDefault();
+      const r = (item.querySelector<HTMLElement>('.tp-title > .tp-strike') ?? item).getBoundingClientRect();
+      openMenu(item.getAttribute('data-key')!, r.left, r.bottom + 4, 'key');
+      return;
+    }
+    if (p.static) return;
     if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
     const target = e.target as HTMLElement;
     if (target.closest('input, textarea')) return;
@@ -392,13 +443,218 @@ export function TaskList(p: TaskListProps) {
     });
   }
 
+  // The row menu. One open at a time; `n` names it, so a menu still fading out never closes the one after it.
+  const [ctx, setCtx] = useState<{
+    key: string;
+    x: number;
+    y: number;
+    kb: boolean;
+    sheet: boolean;
+    n: number;
+  } | null>(null);
+  const ctxN = useRef(0);
+  const [asked, setAsked] = useState<{
+    key: string;
+    k: 'plan' | 'carried' | 'due';
+    el: HTMLElement;
+    n: number;
+  } | null>(null);
+  function rowOf(target: EventTarget | null): HTMLElement | null {
+    const item = (target as HTMLElement | null)?.closest?.<HTMLElement>('[data-reorder]');
+    return item && item.parentNode === ref.current ? item : null;
+  }
+  function openMenu(key: string, x: number, y: number, how: 'mouse' | 'key' | 'touch') {
+    if (!p.menu || !shown.some((t) => t.key === key)) return;
+    ctxN.current += 1;
+    setCtx({ key, x, y, kb: how === 'key', sheet: how === 'touch', n: ctxN.current });
+  }
+  function onContextMenu(e: MouseEvent<HTMLDivElement>) {
+    if (!p.menu) return;
+    const item = rowOf(e.target);
+    // Text being written keeps the system's menu (spelling, paste); so does the paper around the rows.
+    if (!item || (e.target as HTMLElement).closest('input, textarea, [contenteditable="true"]')) return;
+    e.preventDefault();
+    const key = item.getAttribute('data-key')!;
+    // The keyboard's own `contextmenu` (Shift+F10, the Menu key) has no button 2 and no pointer: it opens the menu
+    // under the title with the first item focused, as the key does (also when it follows the key's own open).
+    const pointer = (e.nativeEvent as globalThis.PointerEvent).pointerType;
+    if (e.button !== 2 && !e.ctrlKey && !pointer) {
+      const r = (item.querySelector<HTMLElement>('.tp-title > .tp-strike') ?? item).getBoundingClientRect();
+      openMenu(key, r.left, r.bottom + 4, 'key');
+      return;
+    }
+    openMenu(key, e.clientX, e.clientY, 'mouse');
+  }
+  // A list in a fixed order has no drag to share the hold with: a touch hold of its own opens the sheet.
+  function holdDown(e: PointerEvent<HTMLDivElement>) {
+    if (e.pointerType !== 'touch' || !p.menu) return;
+    const item = rowOf(e.target);
+    if (
+      !item ||
+      (e.target as HTMLElement).closest('button, input, textarea, select, a, [contenteditable="true"]')
+    )
+      return;
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    const key = item.getAttribute('data-key')!;
+    let armed = false;
+    const timer = setTimeout(() => {
+      armed = true;
+      item.classList.add('tp-ctx-hold');
+    }, TOUCH_HOLD_MS);
+    const done = () => {
+      clearTimeout(timer);
+      item.classList.remove('tp-ctx-hold');
+      window.removeEventListener('pointermove', mv);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', done);
+    };
+    const mv = (ev: globalThis.PointerEvent) => {
+      if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > TOUCH_SLOP_PX) done();
+    };
+    const up = () => {
+      const go = armed;
+      done();
+      if (!go) return;
+      swallowNextClick();
+      openMenu(key, x0, y0, 'touch');
+    };
+    window.addEventListener('pointermove', mv);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', done);
+  }
+  function closeMenu(n: number, why?: RowMenuCloseWhy) {
+    setCtx((c) => (c && c.n === n ? null : c));
+    if (why === 'key' && ctx && ref.current) {
+      const el = itemByKey(ref.current, ctx.key);
+      el?.querySelector<HTMLElement>('.tp-strike[tabindex]')?.focus({ preventScroll: true });
+    }
+  }
+  const linkOf = (t: TaskItem) => p.linkFor?.(t) ?? p.menu?.linkFor?.(t);
+  function canFor(t: TaskItem) {
+    return {
+      open: !!p.onOpenTask,
+      toggle: true,
+      move: !!cal && !!p.onMoveTask,
+      due: !!cal && !!p.onDueChange,
+      project: !!p.menu?.projects && !!p.menu.onSetProject,
+      link: !!linkOf(t),
+      delete: !!p.menu?.onDelete,
+    };
+  }
+  function menuEntries(t: TaskItem) {
+    return rowMenuModel(
+      { ...t, readOnly: !!t.readOnly || !!p.menu?.readOnly?.(t) },
+      {
+        today: calToday,
+        day: calDay,
+        projects: p.menu?.projects?.(t),
+        can: canFor(t),
+      },
+    );
+  }
+  function act(t: TaskItem, a: RowMenuAct) {
+    const el = ref.current ? itemByKey(ref.current, t.key) : null;
+    const anchor = el?.querySelector<HTMLElement>('.tp-title > .tp-strike') ?? el;
+    switch (a.k) {
+      case 'open':
+        p.onOpenTask?.(t);
+        return;
+      case 'toggle':
+        // The row's own checkbox, so the ink, the spark and the Backlog's fold-away all play as they do on a tap.
+        el?.querySelector<HTMLButtonElement>('button.tp-cb')?.click();
+        return;
+      case 'move':
+        planTask(t, a.to);
+        return;
+      case 'pickDay':
+      case 'pickDue':
+        if (anchor)
+          setAsked({
+            key: t.key,
+            k: a.k === 'pickDue' ? 'due' : calDay === null ? 'plan' : 'carried',
+            el: anchor,
+            n: (asked?.n ?? 0) + 1,
+          });
+        return;
+      case 'due':
+        p.onDueChange?.(t, a.to);
+        return;
+      case 'project':
+        p.menu?.onSetProject?.(t, a.id);
+        return;
+      case 'copyLink':
+      case 'copyId': {
+        const link = a.k === 'copyLink' ? linkOf(t) : undefined;
+        const text = link ?? t.id;
+        if (!text) return;
+        void copyText(text).then((ok) => {
+          if (!ok) showToast(link ? COPY_FAILED_WORDS : COPY_ID_FAILED_WORDS);
+          else showToast(link ? 'Link copied' : `Copied ${t.id}`);
+        });
+        return;
+      }
+      case 'delete': {
+        const menu = p.menu;
+        closeRow(el, () => {
+          menu?.onDelete?.(t);
+          requestAnimationFrame(() => {
+            if (el?.isConnected) {
+              el.style.height = '';
+              el.style.opacity = '';
+              el.style.overflow = '';
+              el.style.pointerEvents = '';
+            }
+          });
+          showToast('Task deleted', {
+            action: 'Undo',
+            onAction: () => {
+              menu?.onRestore?.(t);
+              opened.current = null;
+              setFresh({ key: t.key });
+            },
+          });
+        });
+        return;
+      }
+    }
+  }
+  const ctxTask = ctx ? shown.find((t) => t.key === ctx.key) : undefined;
+  let menuNode = null;
+  if (ctx && ctxTask) {
+    const n = ctx.n;
+    menuNode = ctx.sheet ? (
+      <RowSheet
+        key={n}
+        entries={menuEntries(ctxTask)}
+        title={ctxTask.title}
+        byline={[ctxTask.id, ctxTask.project?.name].filter(Boolean).join(' · ')}
+        projectColor={ctxTask.project?.color}
+        onPick={(a) => act(ctxTask, a)}
+        onClose={() => closeMenu(n)}
+      />
+    ) : (
+      <RowMenu
+        key={n}
+        entries={menuEntries(ctxTask)}
+        x={ctx.x}
+        y={ctx.y}
+        keyboard={ctx.kb}
+        label={`Actions for ${ctxTask.title}`}
+        onPick={(a) => act(ctxTask, a)}
+        onClose={(why) => closeMenu(n, why)}
+      />
+    );
+  }
+
   return (
     <div className="tp-root">
       <div
         ref={ref}
         className="tp-list"
-        onPointerDown={p.static ? undefined : down}
-        onKeyDown={p.static ? undefined : onKeyDown}
+        onPointerDown={p.static ? (p.menu ? holdDown : undefined) : down}
+        onKeyDown={p.static && !p.menu ? undefined : onKeyDown}
+        onContextMenu={p.menu ? onContextMenu : undefined}
         role="list"
         aria-label={p.label ?? 'Tasks'}
       >
@@ -420,7 +676,12 @@ export function TaskList(p: TaskListProps) {
               key={t.key}
               data-reorder=""
               data-key={t.key}
-              className={cx('tp-item', fresh?.key === t.key && 'tp-new', p.selectedKey === t.key && 'tp-sel')}
+              className={cx(
+                'tp-item',
+                fresh?.key === t.key && 'tp-new',
+                p.selectedKey === t.key && 'tp-sel',
+                ctx?.key === t.key && 'tp-ctx-on',
+              )}
               role="listitem"
             >
               {canInsert && i > 0 && insKey !== t.key ? (
@@ -454,6 +715,7 @@ export function TaskList(p: TaskListProps) {
                 planned={calDay}
                 onPlan={cal ? (v) => planTask(t, v) : undefined}
                 onDueChange={cal && p.onDueChange ? (v) => p.onDueChange!(t, v) : undefined}
+                pickRequest={asked?.key === t.key ? asked : null}
                 onOpen={p.onOpenTask ? () => p.onOpenTask!(t) : undefined}
                 onSignal={p.onSignal ? (k) => p.onSignal!(t, k) : undefined}
                 onToggle={(v) => toggleTask(t, v)}
@@ -487,6 +749,7 @@ export function TaskList(p: TaskListProps) {
       <span className="sr-only" role="status" aria-live="polite">
         {said}
       </span>
+      {menuNode}
     </div>
   );
 }
