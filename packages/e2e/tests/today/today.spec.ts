@@ -14,6 +14,7 @@ import {
   titlesOf,
   twoDays,
   writeTasks,
+  SECOND_DAY_PAGE,
 } from '../../fixtures/today';
 
 const THREE = ['Pay the electricity bill', 'Call Sam at 3pm', 'Book car service'];
@@ -137,8 +138,8 @@ test.describe('today', () => {
     const monday = page.getByRole('region', { name: 'The second day' });
     await expect(monday.getByRole('heading', { name: 'Monday' })).toBeVisible();
     // wait for the second page to finish sliding out before aiming at it
-    await expect(page.locator('.tp-spread-second')).toHaveClass(/tp-on/);
-    await expect(page.locator('.tp-spread-second')).not.toHaveClass(/tp-moving/);
+    await expect(page.locator(SECOND_DAY_PAGE)).toHaveClass(/tp-on/);
+    await expect(page.locator(SECOND_DAY_PAGE)).not.toHaveClass(/tp-moving/);
     const target = monday.locator('.tp-list');
     const box = (await target.boundingBox())!;
     await drag(page, row(dayList(page, 'Tasks for Sunday 18 October'), 'Call Sam at 3pm'), {

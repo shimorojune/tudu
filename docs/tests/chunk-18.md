@@ -4,7 +4,8 @@ Status column is kept by `pnpm test:status` in [STATUS.md](STATUS.md). Run this 
 `pnpm test -- --project ui --project core --project web` and `pnpm e2e settings -g C18-`. End-to-end tests fix the
 clock at Sunday 18 October 2026, 10:00. These replace C09-U06 and C09-E06, which tested the old inline rows. The
 New project popup (U02 to U04, U08 to U18, S01, E01, E02, E09 to E15) is planned in
-[new-project-flow.md](../plans/new-project-flow.md).
+[new-project-flow.md](../plans/new-project-flow.md). U13, U19, U20 and E16 to E19 are planned in
+[projects-list-polish.md](../plans/projects-list-polish.md).
 
 ## Unit (`packages/ui`, `packages/core`, `apps/web`)
 
@@ -22,12 +23,14 @@ New project popup (U02 to U04, U08 to U18, S01, E01, E02, E09 to E15) is planned
 | C18-U10 | ProjectSettings | Renaming to another project's name is refused; renaming to its own name in another case is allowed                                                                          |
 | C18-U11 | ProjectSettings | A click outside the popup closes it without reporting anything, and focus goes back to what opened it                                                                       |
 | C18-U12 | ProjectSettings | The count shows from 50 characters ("50/60") to 60; the field takes no 61st                                                                                                 |
-| C18-U13 | ProjectSettings | After Create the new row gets focus and the arrival wash; after Save the edited row gets the wash                                                                           |
+| C18-U13 | ProjectSettings | After Create the new row gets focus and arrives (`tp-prj-arrive`: gap and wash); after Save the edited row only keeps the wash (`tp-prj-saved`)                             |
 | C18-U14 | core / ui       | Project colours have names (Navy … Umber) and the swatches use them as labels                                                                                               |
 | C18-U15 | client          | `applyToProjects` puts a created project first (`POSITION_STEP` when alone, before the first otherwise)                                                                     |
 | C18-U16 | QuickAdd        | In the picker's name card, picking Plum then Add reports the name with Plum                                                                                                 |
 | C18-U17 | QuickAdd        | Typing an existing name offers "Use Platform"; Enter picks it and creates nothing                                                                                           |
 | C18-U18 | QuickAdd        | ‹ and Esc in the name card go back to the list without closing the picker or creating anything                                                                              |
+| C18-U19 | ProjectSettings | Saving the same row again inside its wash runs the wash again (the class goes off, then on)                                                                                 |
+| C18-U20 | ProjectSettings | Opening and closing a row's popup keeps the same row element (no remount); the row is lit while it is open                                                                  |
 
 ## Server (`apps/server`)
 
@@ -54,3 +57,7 @@ New project popup (U02 to U04, U08 to U18, S01, E01, E02, E09 to E15) is planned
 | C18-E13 | Editing the last of 12 projects on a 1440x700 window: the popup opens upward and is fully on screen                                         |
 | C18-E14 | Phone: the popup fits the screen and Create works from the keyboard                                                                         |
 | C18-E15 | Quick Add (`quick-add.spec.ts`): New project… with Teal makes "Errands" first in teal; typing "errands" again offers "Use Errands"          |
+| C18-E16 | Recolour and Save: every frame for 600ms, no row's top or height and nothing under the list moves, and the row never fades                  |
+| C18-E17 | The fill is on the whole row, edge to edge; inner corners square, the card's 12px on the first and last rows; the focus ring is on the row  |
+| C18-E18 | Dark: E16 and E17 again                                                                                                                     |
+| C18-E19 | The kit (in E09): the open row keeps its hairlines and the card its corners, light and dark                                                 |

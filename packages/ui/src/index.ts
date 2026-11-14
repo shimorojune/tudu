@@ -248,6 +248,7 @@ export {
 } from './components/QuickAdd';
 
 // Week (chunk 05)
+export { FoldAway, type FoldAwayProps } from './components/FoldAway';
 export { WeekDay, WeekTiles, type WeekDayProps, type WeekTilesProps } from './components/WeekDay';
 export { WeekPicker, weekRowsOf, weekRowLabel, type WeekPickerProps } from './components/WeekPicker';
 

@@ -103,13 +103,16 @@ export async function drag(page: Page, from: Locator, to: { x: number; y: number
   await page.mouse.up();
 }
 
+/** The second day's page of the 2 days spread (not the Backlog's, which opens on the day's left). */
+export const SECOND_DAY_PAGE = '.tp-spread:not(.tp-spread-start) > .tp-spread-second';
+
 /** Show two days side by side (the desk) and wait for the second page to finish sliding out. */
 export async function twoDays(page: Page): Promise<Locator> {
   await page.getByRole('group', { name: 'Days to show' }).getByRole('button', { name: '2 days' }).click();
   const second = page.getByRole('region', { name: 'The second day' });
   await expect(second).toBeVisible();
-  await expect(page.locator('.tp-spread-second')).toHaveClass(/tp-on/);
-  await expect(page.locator('.tp-spread-second')).not.toHaveClass(/tp-moving/);
+  await expect(page.locator(SECOND_DAY_PAGE)).toHaveClass(/tp-on/);
+  await expect(page.locator(SECOND_DAY_PAGE)).not.toHaveClass(/tp-moving/);
   // `tp-moving` goes on a timer, so where frames come late (a busy runner) the page can still be sliding after it:
   // a point read then is stale by the time the mouse gets there. Wait until the page's box stops changing.
   let last = '';
@@ -123,4 +126,35 @@ export async function twoDays(page: Page): Promise<Locator> {
     })
     .toBe(true);
   return second;
+}
+
+/** The Backlog sheet beside the day (#102). */
+export function besideSheet(page: Page): Locator {
+  return page.getByRole('region', { name: 'The Backlog, beside the day' });
+}
+
+/** Its list: "Tasks in the Backlog". */
+export function besideList(page: Page): Locator {
+  return besideSheet(page).getByRole('list', { name: 'Tasks in the Backlog', includeHidden: true });
+}
+
+/** Open the Backlog beside the day (the desk) and wait for it to finish sliding out and stand still. */
+export async function backlogBeside(page: Page): Promise<Locator> {
+  await page.getByRole('group', { name: 'Days to show' }).getByRole('button', { name: 'Backlog' }).click();
+  const sheet = besideSheet(page);
+  await expect(sheet).toBeVisible();
+  const outer = page.locator('.tp-spread-start > .tp-spread-second');
+  await expect(outer).toHaveClass(/tp-on/);
+  await expect(outer).not.toHaveClass(/tp-moving/);
+  let last = '';
+  await expect
+    .poll(async () => {
+      const b = await sheet.boundingBox();
+      const now = b ? `${b.x},${b.y},${b.width},${b.height}` : '';
+      const still = now !== '' && now === last;
+      last = now;
+      return still;
+    })
+    .toBe(true);
+  return sheet;
 }

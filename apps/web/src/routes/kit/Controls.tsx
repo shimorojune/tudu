@@ -199,6 +199,7 @@ export function Controls() {
               label="View"
               defaultValue="one"
               items={[
+                { value: 'backlog', label: 'Backlog' },
                 { value: 'one', label: 'Day' },
                 { value: 'two', label: '2 days' },
               ]}

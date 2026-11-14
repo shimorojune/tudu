@@ -3,6 +3,7 @@ import { addDays, formatDay, isoToday, type IsoDate } from '@tudu/core';
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { copyText, COPY_FAILED_WORDS, COPY_ID_FAILED_WORDS } from '../lib/clipboard';
 import { cx } from '../lib/cx';
+import { useTurn } from '../lib/hooks';
 import { Icon } from '../lib/icons';
 import { InkTick, PlainTick } from '../lib/ink';
 import { Sparkle, useSpark } from '../lib/spark';
@@ -192,18 +193,6 @@ function signals(p: TaskRowProps, mine: (t: string) => string): Sig[] {
         (x) => x.k === 'due' || x.k === 'carried' || x.k === 'jira' || x.k === 'space' || x.k === 'project',
       )
     : out;
-}
-
-/**
- * How many times `words` have changed since the row first drew them. The due words are keyed by it, so new words
- * ("Due tomorrow" turning into "Due today" at midnight, a date picked from the row) fade in, and words a row is born
- * with never move. Kept as state from the previous render, the way React documents it, not in a ref.
- */
-function useTurn(words: string | undefined): number {
-  const [seen, setSeen] = useState({ words, n: 0 });
-  if (seen.words === words) return seen.n;
-  setSeen({ words, n: seen.n + 1 });
-  return seen.n + 1;
 }
 
 function Grip() {

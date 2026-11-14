@@ -67,6 +67,8 @@ import { useWorkingDay } from '../../app/workingDay';
 import { TaskPanel, type OpenTask } from './TaskPanel';
 import { taskLink, rowLink } from '../../app/links';
 import { useRowMenu } from '../../app/rowMenu';
+import { BacklogBeside } from '../backlog/BacklogBeside';
+import { useShownView } from './shownView';
 
 /** A swipe this wide (and wider than it is tall) turns the day on phones. */
 const SWIPE_PX = 60;
@@ -143,7 +145,8 @@ export function monthAround(day: IsoDate): { from: IsoDate; to: IsoDate } {
 /**
  * The day page: one plain list on the sheet. Crossed-off tasks stay where they are, struck through; the ring counts
  * them. Write on the last line, slot a task in with the "+", drag to reorder, turn the day with the arrows, the
- * calendar or a swipe. On the desk, "2 days" opens the next day beside it and tasks drag between the two.
+ * calendar or a swipe. On the desk, "2 days" opens the next day beside it and tasks drag between the two; in a
+ * space, "Backlog" opens the Backlog on the day's left the same way (#102).
  */
 export function TodayPage() {
   const vp = useViewport();
@@ -154,8 +157,11 @@ export function TodayPage() {
   const { today, night, start, stay } = useWorkingDay();
   const online = useOnline();
   const day = useShownDay() ?? today;
-  const view = useDayView();
+  const picked = useDayView();
+  // All spaces has no Backlog beside (yet): a remembered Backlog reads as one day there.
+  const view = useShownView(all && picked === 'backlog' ? 'one' : picked);
   const two = vp === 'desktop' && view === 'two';
+  const beside = vp === 'desktop' && view === 'backlog';
   const ask = useNewTaskAsk();
   const fresh = useFirstRunOpen(me);
   const filters = useAllFilters(all);
@@ -266,7 +272,7 @@ export function TodayPage() {
       vp={vp}
       ask={ask}
       label={all ? 'The day, every space' : 'The day'}
-      group={two ? 'days' : undefined}
+      group={two || beside ? 'days' : undefined}
       onOpenTask={openTask}
       openKey={open?.id}
       onCloseTask={closeTask}
@@ -324,25 +330,42 @@ export function TodayPage() {
         <AllBanners all={all} failed={shownAll.error ? [] : shownAll.failed} onRetry={shownAll.refetch} />
       ) : null}
       {vp === 'desktop' ? (
-        <Spread open={two}>
-          <SpreadPage>{sheet}</SpreadPage>
+        // Two spreads: the outer one opens the Backlog on the day's left, the inner one the next day on its right.
+        <Spread side="start" open={beside}>
+          <SpreadPage>
+            <Spread open={two}>
+              <SpreadPage>{sheet}</SpreadPage>
+              <SpreadPage second>
+                <DaySheet
+                  spaceId={space.id}
+                  all={all}
+                  filters={filters}
+                  meId={me.user.id}
+                  day={day2}
+                  today={today}
+                  onDay={setDay2}
+                  vp={vp}
+                  label="The second day"
+                  group="days"
+                  second
+                  onOpenTask={openTask}
+                  openKey={open?.id}
+                  onCloseTask={closeTask}
+                />
+              </SpreadPage>
+            </Spread>
+          </SpreadPage>
           <SpreadPage second>
-            <DaySheet
-              spaceId={space.id}
-              all={all}
-              filters={filters}
-              meId={me.user.id}
-              day={day2}
-              today={today}
-              onDay={setDay2}
-              vp={vp}
-              label="The second day"
-              group="days"
-              second
-              onOpenTask={openTask}
-              openKey={open?.id}
-              onCloseTask={closeTask}
-            />
+            {all ? null : (
+              <BacklogBeside
+                spaceId={space.id}
+                today={today}
+                onOpenTask={openTask}
+                openKey={open?.id}
+                meId={me.user.id}
+                onCloseTask={closeTask}
+              />
+            )}
           </SpreadPage>
         </Spread>
       ) : (

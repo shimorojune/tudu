@@ -12,6 +12,9 @@
 }
 
 /* components.css */
+:root[data-motion='less'] .tp-dh-date-turn {
+  animation: none;
+}
 :root[data-motion='less'] .tp-sg-turn > span {
   animation: none;
 }
@@ -148,6 +151,9 @@
 :root[data-motion='less'] .tp-wd-chev,
 :root[data-motion='less'] .tp-wd-peek {
   transition: none;
+}
+:root[data-motion='less'] .tp-fold.tp-fold-in {
+  animation-delay: 0ms;
 }
 :root[data-motion='less'] .tp-item.tp-new {
   animation: tp-fade-in 120ms linear both;
@@ -383,6 +389,10 @@
 :root[data-motion='less'] .tp-acct-pop,
 :root[data-motion='less'] .tp-dh-pop {
   animation-duration: 120ms !important;
+}
+:root[data-motion='less'] .tp-prj-row.tp-prj-arrive {
+  overflow: visible;
+  animation: tp-row-wash 2s var(--ease-change) both;
 }
 :root[data-motion='less'] .tp-root .tp-fb-slot,
 :root[data-motion='less'] .tp-root .tp-fb-shot,

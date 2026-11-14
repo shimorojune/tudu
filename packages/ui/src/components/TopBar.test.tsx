@@ -102,6 +102,7 @@ describe('TopBar', () => {
       leading: <i data-testid="lead">Lead</i>,
       views: {
         items: [
+          { value: 'backlog', label: 'Backlog' },
           { value: 'day', label: 'Day' },
           { value: 'two', label: '2 days' },
         ],
@@ -117,8 +118,15 @@ describe('TopBar', () => {
     const views = screen.getByRole('group', { name: 'Days to show' });
     expect(views).toHaveClass('tp-seg');
     expect(bar.children[1]).toBe(views);
+    expect(
+      within(views)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['Backlog', 'Day', '2 days']);
     await user.click(within(views).getByRole('button', { name: '2 days' }));
     expect(onChange).toHaveBeenCalledWith('two');
+    await user.click(within(views).getByRole('button', { name: 'Backlog' }));
+    expect(onChange).toHaveBeenLastCalledWith('backlog');
   });
 });
 

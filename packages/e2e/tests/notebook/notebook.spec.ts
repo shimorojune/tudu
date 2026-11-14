@@ -748,8 +748,22 @@ test.describe('notebook', () => {
     await selectWords(page, 4, 15);
     const bubble = page.locator('.tp-nb-bubble');
     await expect(bubble).toBeVisible();
-    // Once it has risen: no animation left, no transform, left and top in whole pixels.
-    await expect.poll(() => bubble.evaluate((el) => el.getAnimations().length)).toBe(0);
+    // Once it has risen: no transform, left and top in whole pixels. The only animation it may have is its own short
+    // rise, and that is played to its end here: a slow WebKit shard can hold the page's frames for seconds, so waiting
+    // for the clock made this test flake (14 Nov) without telling us anything about where the bubble rests.
+    const running = await bubble.evaluate((el) =>
+      el.getAnimations().map((a) => {
+        const name = a instanceof CSSAnimation ? a.animationName : 'other';
+        const end = a.effect?.getComputedTiming().endTime;
+        a.finish();
+        return { name, end: typeof end === 'number' ? end : Infinity };
+      }),
+    );
+    for (const a of running) {
+      expect(a.name).toBe('tp-nb-bubble-in');
+      expect(a.end).toBeLessThan(1000);
+    }
+    expect(await bubble.evaluate((el) => el.getAnimations().length)).toBe(0);
     const at = await bubble.evaluate((el) => {
       const cs = getComputedStyle(el);
       return { transform: cs.transform, left: cs.left, top: cs.top };

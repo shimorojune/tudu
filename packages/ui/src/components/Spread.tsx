@@ -18,6 +18,11 @@ export interface SpreadProps {
   maxWidth?: number;
   style?: CSSProperties;
   className?: string;
+  /**
+   * Where the second page opens: after the first (`end`, the second day) or before it (`start`, the Backlog beside
+   * Today), sliding out to the left and pushing the first page right. Same move and timing either way.
+   */
+  side?: 'end' | 'start';
 }
 
 /** How long the move takes, with a little room for the last frame. */
@@ -30,7 +35,7 @@ export const SPREAD_MS = 340;
  * after it has slid away. At rest nothing is clipped, so tasks drag freely from one page to the other.
  * Reduced motion: the pages switch without moving and the second fades in.
  */
-export function Spread({ open = false, children, maxWidth, style, className }: SpreadProps) {
+export function Spread({ open = false, children, maxWidth, style, className, side = 'end' }: SpreadProps) {
   const [mounted, setMounted] = useState(open);
   const [shown, setShown] = useState(open);
   const [moving, setMoving] = useState(false);
@@ -64,7 +69,15 @@ export function Spread({ open = false, children, maxWidth, style, className }: S
   const merged: CSSProperties = { ...(maxWidth ? { maxWidth } : null), ...style };
   return (
     <SpreadCtx.Provider value={{ shown, mounted, moving }}>
-      <div className={cx('tp-root tp-spread', shown && 'tp-spread-two', className)} style={merged}>
+      <div
+        className={cx(
+          'tp-root tp-spread',
+          shown && 'tp-spread-two',
+          side === 'start' && 'tp-spread-start',
+          className,
+        )}
+        style={merged}
+      >
         {children}
       </div>
     </SpreadCtx.Provider>
