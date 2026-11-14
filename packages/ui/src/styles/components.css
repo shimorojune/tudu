@@ -3222,7 +3222,9 @@ html[data-scrambled] .tp-avatar.tp-photo img, html[data-scrambled] .tp-pdot.tp-p
 
 /* RowMenu: right-click a task (and Shift+F10). The same Tudu Paper menu in the browser and the Mac app, at the
    pointer, with submenus beside it. RowSheet: the same actions for touch, as a sheet from the bottom. */
-.tp-ctx { position: fixed; z-index: 75; }
+/* No transitions: Less motion gives every element `transition: all 120ms`, which would slide the menu in from its off-screen
+   measuring place and keep it `visibility: hidden` (so unfocusable) for a frame. Its own animation is enough. */
+.tp-ctx { position: fixed; z-index: 75; transition-property: none; }
 .tp-ctx.tp-menu { width: 232px; padding: 5px; transform-origin: top left; animation: tp-ctx-in var(--dur-menu) var(--ease-arrive) both; }
 .tp-ctx.tp-menu.tp-ctx-sub { width: 196px; animation: tp-ctx-sub-in 120ms var(--ease-arrive) both; }
 .tp-ctx.tp-menu.tp-ctx-leaving { animation: tp-ctx-out 130ms var(--ease-leave) both; pointer-events: none; }

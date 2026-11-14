@@ -138,7 +138,20 @@ describe('RowMenu', () => {
     const onPick = vi.fn();
     const onClose = vi.fn();
     const entries = rowMenuModel({ id: 'ME-1' }, { today: TODAY, day: TODAY, projects: PROJECTS, can: ALL });
-    render(<RowMenu entries={entries} x={10} y={10} keyboard onPick={onPick} onClose={onClose} />);
+    // A browser refuses focus to a hidden element: the menu takes it only once it is placed and shown.
+    const hiddenFocus: string[] = [];
+    const real = HTMLElement.prototype.focus;
+    HTMLElement.prototype.focus = function (this: HTMLElement, o?: FocusOptions) {
+      if (this.closest<HTMLElement>('.tp-ctx')?.style.visibility === 'hidden')
+        hiddenFocus.push(this.textContent ?? '');
+      return real.call(this, o);
+    };
+    try {
+      render(<RowMenu entries={entries} x={10} y={10} keyboard onPick={onPick} onClose={onClose} />);
+    } finally {
+      HTMLElement.prototype.focus = real;
+    }
+    expect(hiddenFocus).toEqual([]);
     const main = screen.getByRole('menu', { name: 'Task actions' });
     expect(document.activeElement).toHaveTextContent('Open');
     fireEvent.mouseEnter(within(main).getByRole('menuitem', { name: /Due date/ }));

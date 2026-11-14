@@ -129,9 +129,13 @@ function CtxList(p: ListProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ax, ay]);
 
+  // Focus once the menu is placed: until then it is `visibility: hidden`, and a browser refuses focus to a hidden
+  // element without a word.
+  const focused = useRef(false);
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || !pos || focused.current) return;
+    focused.current = true;
     // From the keyboard the first item takes the focus; from the pointer the menu itself does, so ↑↓ still work.
     const first = p.focusFirst
       ? el.querySelector<HTMLElement>('[role^="menuitem"]:not([aria-disabled="true"])')
@@ -140,7 +144,7 @@ function CtxList(p: ListProps) {
         : el;
     first?.focus({ preventScroll: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pos]);
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     const el = ref.current;
