@@ -1,10 +1,10 @@
 # Right-click a task: one menu on every task list
 
-Status: proposal, awaiting Rohit's approval. Asked by Rohit on 14 Nov 2026 ("on the tasks lists, I want right click
+Status: approved by Rohit on 14 Nov 2026; built. Asked by Rohit on 14 Nov 2026 ("on the tasks lists, I want right click
 context menu options so I can do actions quickly"). Design approved by Rohit on 14 Nov 2026: canvas page Today, the
-"Draft — right-click a task" row, boards `T-RowMenu`, `T-RowMenu-Dark`, `T-RowMenuMotion`, `T-RowMenuStates`,
+right-click draft row, boards `T-RowMenu`, `T-RowMenu-Dark`, `T-RowMenuMotion`, `T-RowMenuStates`,
 `T-RowMenuStates-Dark`, `T-RowMenuPhone`, `T-RowMenuPhone-Dark` (canvas v240). Test cases are listed below with the
-`RM-` prefix; they move to `docs/tests/row-menu.md` when this is built.
+`RM-` prefix and as built in `docs/tests/row-menu.md`.
 
 Rohit's calls during the canvas round (14 Nov):
 
@@ -74,7 +74,7 @@ pick the action.
 - New `RowMenu` (desktop menu, submenus, keyboard, flip-at-edges, portal) and `RowSheet` (touch sheet) components,
   built from the canvas draft (`RowMenu`, `RowSheet`, `CtxDatePop` in the canvas DS bundle), with their CSS
   (`.tp-ctx*`, `.tp-ctxs-*`) moved into `packages/ui/src/styles`. Both take a pure item model from
-  `rowMenuModel(task, { today, day, projects, readOnly })` in `packages/ui/src/lib/rowMenu.ts`, so the menu and the
+  `rowMenuModel(task, { today, day, projects, can })` in `packages/ui/src/lib/rowMenu.ts`, so the menu and the
   sheet can never list different actions.
 - `RowMenu` is not Radix `DropdownMenu`: Radix opens from a trigger element, while this one opens at a point and must
   move between rows without closing. It follows the same ARIA (`role="menu"`, `menuitem`, `menuitemradio` with
@@ -84,9 +84,12 @@ pick the action.
   ```ts
   /** Right-click (and Shift+F10, and press-and-hold on touch) opens the row menu. Leave out for read-only lists. */
   menu?: {
-    projects: (task: TaskItem) => TaskProject[] | undefined; // undefined while loading: "Loading…" line
-    onSetProject: (task: TaskItem, projectId: string | null) => void;
-    onDelete: (task: TaskItem, at: number) => void;          // the list folds the row first
+    projects?: (task: TaskItem) => RowMenuProject[] | undefined; // undefined while loading: "Loading…" line
+    onSetProject?: (task: TaskItem, projectId: string | null) => void;
+    onDelete?: (task: TaskItem) => void;   // the list folds the row first, then toasts "Task deleted" with Undo
+    onRestore?: (task: TaskItem) => void;  // that Undo
+    linkFor?: (task: TaskItem) => string;  // when the list has no `linkFor` of its own (the week's tiles)
+    readOnly?: (task: TaskItem) => boolean; // someone else's task: Open and copy only
   };
   ```
 
@@ -125,23 +128,23 @@ All tests run on PR CI (and Actions › Flake check for repeats), not on Rohit's
 
 ### Unit (vitest)
 
-| ID     | Where                                          | Case                                                                                                                                                        |
-| ------ | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| RM-U01 | `packages/ui/src/lib/rowMenu.test.ts`          | Model for an open task on today: items and order; Move to ticks Today and disables it; Due has no Remove without a due date                                 |
-| RM-U02 | `packages/ui/src/lib/rowMenu.test.ts`          | Done task reads Mark as not done; a Backlog task (day null) ticks Backlog; a due date adds Remove and the due words; the task's project is ticked           |
-| RM-U03 | `packages/ui/src/lib/rowMenu.test.ts`          | No projects: one disabled "No projects yet"; projects loading: "Loading…"; `readOnly`: Open, Copy link, Copy task ID only                                   |
-| RM-U04 | `packages/ui/src/components/RowMenu.test.tsx`  | Opens at the point; flips up and left at the window's edges; portal into the desk; `role=menu`, ticks are `menuitemradio` with `aria-checked`               |
-| RM-U05 | `packages/ui/src/components/RowMenu.test.tsx`  | Hover opens a submenu after 60ms; a diagonal move keeps it 120ms; keyboard ↑↓ → ← Enter Esc; Shift+F10 focuses the first item; Esc returns focus to the row |
-| RM-U06 | `packages/ui/src/components/RowMenu.test.tsx`  | Closes on Esc, left click outside, scroll, resize, blur; a right-button pointerdown outside does not close it by itself                                     |
-| RM-U07 | `packages/ui/src/components/TaskList.test.tsx` | Right-click a row opens the menu with that row washed; right-click another row moves it (one menu, new row washed); same row moves it to the new point      |
-| RM-U08 | `packages/ui/src/components/TaskList.test.tsx` | A menu still fading out never closes the menu that replaced it (fake timers: right-click A, right-click B, run all timers, B's menu is open)                |
-| RM-U09 | `packages/ui/src/components/TaskList.test.tsx` | Right-click in the writing line or a subtask input keeps the browser menu (no `preventDefault`); right-click on empty paper too; no `menu` prop: no menu    |
-| RM-U10 | `packages/ui/src/components/TaskList.test.tsx` | Each action calls the right prop: open, toggle (and the Backlog's leave path), move (today, tomorrow, Backlog) with Undo, due, project, delete with Undo    |
-| RM-U11 | `packages/ui/src/components/TaskList.test.tsx` | Copy link and Copy task ID copy the right text and toast; a refused copy shows the ID chip's failure words                                                  |
-| RM-U12 | `packages/ui/src/components/TaskList.test.tsx` | Pick a day… / Pick a date… open the date popover on the row; a pick moves / sets due; the same day does nothing                                             |
-| RM-U13 | `packages/ui/src/components/TaskList.test.tsx` | Touch: hold 320ms then let go opens the sheet and swallows the click; moving 9px before 320ms is a drag and no sheet; a mouse hold does nothing             |
-| RM-U14 | `packages/ui/src/components/RowSheet.test.tsx` | Sheet lists the same actions as the menu; Project page with Back; veil tap and swipe down close it; reduce motion has no rise                               |
-| RM-U15 | `packages/ui/src/components/TaskList.test.tsx` | A loading list (skeleton) and an empty list open no menu                                                                                                    |
+| ID     | Where                                         | Case                                                                                                                                                        |
+| ------ | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RM-U01 | `packages/ui/src/lib/rowMenu.test.ts`         | Model for an open task on today: items and order; Move to ticks Today and disables it; Due has no Remove without a due date                                 |
+| RM-U02 | `packages/ui/src/lib/rowMenu.test.ts`         | Done task reads Mark as not done; a Backlog task (day null) ticks Backlog; a due date adds Remove and the due words; the task's project is ticked           |
+| RM-U03 | `packages/ui/src/lib/rowMenu.test.ts`         | No projects: one disabled "No projects yet"; projects loading: "Loading…"; `readOnly`: Open, Copy link, Copy task ID only                                   |
+| RM-U04 | `packages/ui/src/components/RowMenu.test.tsx` | Opens at the point; flips up and left at the window's edges; portal into the desk; `role=menu`, ticks are `menuitemradio` with `aria-checked`               |
+| RM-U05 | `packages/ui/src/components/RowMenu.test.tsx` | Hover opens a submenu after 60ms; a diagonal move keeps it 120ms; keyboard ↑↓ → ← Enter Esc; Shift+F10 focuses the first item; Esc returns focus to the row |
+| RM-U06 | `packages/ui/src/components/RowMenu.test.tsx` | Closes on Esc, left click outside, scroll, resize, blur; a right-button pointerdown outside does not close it by itself                                     |
+| RM-U07 | `packages/ui/src/components/RowMenu.test.tsx` | Right-click a row opens the menu with that row washed; right-click another row moves it (one menu, new row washed); same row moves it to the new point      |
+| RM-U08 | `packages/ui/src/components/RowMenu.test.tsx` | A menu still fading out never closes the menu that replaced it (fake timers: right-click A, right-click B, run all timers, B's menu is open)                |
+| RM-U09 | `packages/ui/src/components/RowMenu.test.tsx` | Right-click in the writing line or a subtask input keeps the browser menu (no `preventDefault`); right-click on empty paper too; no `menu` prop: no menu    |
+| RM-U10 | `packages/ui/src/components/RowMenu.test.tsx` | Each action calls the right prop: open, toggle (and the Backlog's leave path), move (today, tomorrow, Backlog) with Undo, due, project, delete with Undo    |
+| RM-U11 | `packages/ui/src/components/RowMenu.test.tsx` | Copy link and Copy task ID copy the right text and toast; a refused copy shows the ID chip's failure words                                                  |
+| RM-U12 | `packages/ui/src/components/RowMenu.test.tsx` | Pick a day… / Pick a date… open the date popover on the row; a pick moves / sets due; the same day does nothing                                             |
+| RM-U13 | `packages/ui/src/components/RowMenu.test.tsx` | Touch: hold 320ms then let go opens the sheet and swallows the click; moving 9px before 320ms is a drag and no sheet; a mouse hold does nothing             |
+| RM-U14 | `packages/ui/src/components/RowMenu.test.tsx` | Sheet lists the same actions as the menu; Project page with Back; veil tap and swipe down close it; reduce motion has no rise                               |
+| RM-U15 | `packages/ui/src/components/RowMenu.test.tsx` | A loading list (skeleton) and an empty list open no menu                                                                                                    |
 
 ### End-to-end (Playwright, web)
 
@@ -153,21 +156,21 @@ All tests run on PR CI (and Actions › Flake check for repeats), not on Rohit's
 | RM-E04 | `today`      | Right-click row A then row B: one menu, at B; right-click B again at another point: one menu, moved; right-click the header: no menu                    |
 | RM-E05 | `today`      | Shift+F10 on a focused row, keyboard to Move to › Tomorrow, Enter: moved; Esc returns focus to the row                                                  |
 | RM-E06 | `backlog`    | Backlog row: Move to › Today plans it (gone from the Backlog, on today); Mark as done folds it with the Backlog's toast                                 |
-| RM-E07 | `week`       | Week tile row: Move to › Pick a day… › Thursday moves it into Thursday's tile                                                                           |
+| RM-E07 | `week`       | Week tile row: Move to › Backlog moves it into the Backlog tile; the server has it undated (the fixed clock is Sunday, so a later weekday is next week) |
 | RM-E08 | `all-spaces` | All spaces: the Project list holds the task's space's projects only; setting one keeps the task in its space                                            |
 | RM-E09 | `today`      | Copy link puts the task link on the clipboard (permissions granted); the toast says Link copied                                                         |
 | RM-E10 | `today`      | Offline (route aborted): Move to and Delete apply at once and sync on reconnect                                                                         |
 | RM-E11 | `today`      | Phone (touch): press and hold, let go: the sheet; Move to Tomorrow chip moves it; press, hold and move: a drag, no sheet                                |
-| RM-E12 | `inbox`      | Inbox and People rows: right-click shows no Tudu menu                                                                                                   |
-| RM-E13 | `today`      | Someone else's task in a shared space: menu has Open, Copy link, Copy task ID only                                                                      |
-| RM-E14 | `today`      | Dark theme: menu and sheet use the dark tokens (screenshot compare against the canvas look)                                                             |
+| RM-E12 | `inbox`      | Inbox rows: right-click shows no Tudu menu (People has no task rows of its own)                                                                         |
+| RM-E13 | unit only    | Someone else's task: Open, Copy link, Copy task ID only. Covered by RM-U03; others' tasks never show in your lists (C21-E02), so there is no row to try |
+| RM-E14 | `today`      | Dark theme: the menu's background is the dark `--popover` token                                                                                         |
 
 ### Desktop (Tudu Test on the macOS CI runner)
 
-| ID     | Case                                                                                                                                          |
-| ------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| RM-D01 | In the real WKWebView, a right-click on a row (control channel pointer events) shows Tudu's menu and no WebKit menu; Move to › Tomorrow works |
-| RM-D02 | Right-click in the writing line still gets the system's text menu (Tudu's menu not shown)                                                     |
+| ID     | Case                                                                                                                                                                                                         |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| RM-D01 | In the real WKWebView, a right-click on a row (WebKit's event sequence, sent from the page) is cancelled by the page and shows Tudu's menu; Move to › Tomorrow works. That no WebKit menu is drawn is MC-R01 |
+| RM-D02 | Right-click in the writing line still gets the system's text menu (Tudu's menu not shown)                                                                                                                    |
 
 ### Manual (Rohit, Mac app on staging)
 
@@ -183,5 +186,7 @@ All tests run on PR CI (and Actions › Flake check for repeats), not on Rohit's
 - WKWebView sends `contextmenu` reliably for a two-finger click; Force Touch "look up" is a different gesture and is
   left alone.
 - The touch hold shares its timing with drag; a sheet that opens on a hold that was meant as a drag would be the
-  worst case. RM-U13 and RM-E11 pin the rule: any move over 8px before release is a drag.
+  worst case. RM-U13 and RM-E11 pin the rule: any move over 8px before release is a drag. On lists that reorder, the hold is
+  reorder's own lift let go without moving (`onHoldRelease`); on static lists (the Backlog's Crossed off) the list
+  runs its own 320ms hold.
 - Week tiles are narrow; the menu flips left near the right edge (RM-U04).

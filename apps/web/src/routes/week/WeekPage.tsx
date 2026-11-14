@@ -46,6 +46,7 @@ import {
 import { allPath, spacePath, useSpace } from '../../app/space';
 import { openInJira } from '../../app/jira';
 import { taskStore, useOnline } from '../../app/tasks';
+import { useRowMenu } from '../../app/rowMenu';
 import { useViewport, type Viewport } from '../../app/viewport';
 import { useWorkingDay } from '../../app/workingDay';
 import { AllBanners, FilterChips, OfflineBanner, openInSpace, toItem } from '../today/TodayPage';
@@ -148,6 +149,7 @@ export function WeekPage() {
         onWeek={(m) => showWeek(m, thisMonday)}
         onOpenTask={openTask}
         openKey={open?.id}
+        onCloseTask={closeTask}
       />
       <TaskPanel
         spaceId={openSpace.id}
@@ -182,6 +184,8 @@ interface WeekSheetProps {
   onWeek: (monday: IsoDate) => void;
   onOpenTask: (id: string, ref: string | null | undefined) => void;
   openKey?: string;
+  /** Close the panel (its task was deleted from the row menu). */
+  onCloseTask?: () => void;
 }
 
 /** The sheet: the week's header, then the tiles (desk) or the folding days (tablets and phones). */
@@ -196,6 +200,7 @@ function WeekSheet({
   onWeek,
   onOpenTask,
   openKey,
+  onCloseTask,
 }: WeekSheetProps) {
   const desk = vp === 'desktop';
   const compact = vp === 'phone';
@@ -236,6 +241,13 @@ function WeekSheet({
     return l ? l.order : cachedOrder(all, meId, day);
   };
   const spaceIdOf = (key: string) => taskStore.lastSeen(key)?.spaceId ?? spaceId;
+  const rowMenu = useRowMenu({
+    spaceIds: all ? all.spaces.map((x) => x.id) : [spaceId],
+    spaceIdOf,
+    meId,
+    openKey,
+    onCloseTask,
+  });
   const flash = useFlash();
   const folds = useFolds();
 
@@ -315,6 +327,7 @@ function WeekSheet({
         }
         onKeepTask={(t) => taskStore.keep(t.key)}
         onDueChange={(t, due) => taskStore.due(t.key, due)}
+        menu={rowMenu}
         onOpenTask={(t) => onOpenTask(t.key, raw?.find((x) => x.id === t.key)?.ref ?? t.id)}
       />
     );

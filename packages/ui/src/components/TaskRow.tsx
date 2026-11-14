@@ -82,6 +82,11 @@ export interface TaskRowProps {
   /** The carried pill's picker: the day it is on keeps it (the marker goes); another day, or null, moves it. */
   onPlan?: (day: IsoDate | null) => void;
   onDueChange?: (day: IsoDate | null) => void;
+  /**
+   * Open the row's own date picker from outside (the row menu's Pick a day… / Pick a date…), on `el`. A new `n`
+   * opens it again. Works on a done row too.
+   */
+  pickRequest?: { k: 'plan' | 'carried' | 'due'; el: HTMLElement; n: number } | null;
   /** A quiet calendar button at the row's end (the Backlog). */
   planButton?: boolean;
   /** Subtasks fold out from the byline ("1 of 4 done ›"), lined up under the title. */
@@ -241,7 +246,15 @@ export function TaskRow(p: TaskRowProps) {
   const [sparking, fire] = useSpark();
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [pop, setPop] = useState<{ k: 'carried' | 'due' | 'plan'; el: HTMLElement } | null>(null);
+  const [pop, setPop] = useState<{ k: 'carried' | 'due' | 'plan'; el: HTMLElement; asked?: boolean } | null>(
+    null,
+  );
+  // Only a new request opens it.
+  const [seenAsk, setSeenAsk] = useState(p.pickRequest?.n);
+  if (p.pickRequest?.n !== seenAsk) {
+    setSeenAsk(p.pickRequest?.n);
+    if (p.pickRequest) setPop({ k: p.pickRequest.k, el: p.pickRequest.el, asked: true });
+  }
   const [subsOpen, setSubsOpen] = useState(!!p.defaultSubtasksOpen);
   const subs = p.subtasks ?? [];
   const hasSubs = subs.length > 0 && !p.brief;
@@ -364,7 +377,7 @@ export function TaskRow(p: TaskRowProps) {
   }
 
   let datePop: ReactNode = null;
-  if (pop && canPick) {
+  if (pop && p.calendar && (canPick || pop.asked)) {
     const cal = p.calendar!;
     const today = cal.today ?? isoToday();
     const day = p.planned ?? cal.selected ?? today;
