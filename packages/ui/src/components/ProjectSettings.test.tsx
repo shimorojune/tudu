@@ -184,7 +184,7 @@ describe('Settings › Space › Projects (chunk 18)', () => {
     expect(nameField()).toHaveValue('x'.repeat(60));
   });
 
-  it('C18-U13 after Create the new row, once it arrives, takes focus and the wash; after Save the row does too', async () => {
+  it('C18-U13 after Create the new row arrives (gap and wash) and takes focus; after Save the row keeps only the wash', async () => {
     const user = userEvent.setup();
     const onCreate = vi.fn(() => 'p9');
     const { rerender, ...fns } = mount({ onCreate });
@@ -193,15 +193,51 @@ describe('Settings › Space › Projects (chunk 18)', () => {
     expect(onCreate).toHaveBeenCalledWith('Garden', PROJECT_COLORS[2]);
     const withNew = [{ id: 'p9', name: 'Garden', color: PROJECT_COLORS[2]!, open: 0 }, ...PROJECTS];
     rerender(<ProjectSettings projects={withNew} spaceName="Northwind" {...fns} onCreate={onCreate} />);
-    const first = within(screen.getByRole('list', { name: 'Projects' })).getAllByRole('listitem')[0]!;
-    expect(first).toHaveTextContent('Garden');
-    expect(first).toHaveClass('tp-prj-fresh');
+    const items = () => within(screen.getByRole('list', { name: 'Projects' })).getAllByRole('listitem');
+    expect(items()[0]).toHaveTextContent('Garden');
+    await waitFor(() => expect(items()[0]).toHaveClass('tp-prj-arrive'));
+    expect(items()[0]).not.toHaveClass('tp-prj-saved');
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Edit Garden, No open tasks' })).toHaveFocus(),
     );
     await user.click(screen.getByRole('button', { name: 'Edit Offsite, No open tasks' }));
     await user.type(nameField(), ' trip{Enter}');
-    expect(screen.getAllByRole('listitem')[2]).toHaveClass('tp-prj-fresh');
+    await waitFor(() => expect(items()[2]).toHaveClass('tp-prj-saved'));
+    expect(items()[2]).not.toHaveClass('tp-prj-arrive');
+  });
+
+  it('C18-U19 saving the same row again inside its wash runs the wash again: the class goes off, then back on', async () => {
+    const user = userEvent.setup();
+    mount();
+    const row = () => within(screen.getByRole('list', { name: 'Projects' })).getAllByRole('listitem')[1]!;
+    await user.click(screen.getByRole('button', { name: 'Edit Offsite, No open tasks' }));
+    await user.type(nameField(), ' trip{Enter}');
+    await waitFor(() => expect(row()).toHaveClass('tp-prj-saved'));
+    await user.click(screen.getByRole('button', { name: 'Edit Offsite, No open tasks' }));
+    await user.click(screen.getByRole('radio', { name: 'Plum' }));
+    const seen: boolean[] = [];
+    const watch = new MutationObserver(() => seen.push(row().classList.contains('tp-prj-saved')));
+    watch.observe(row(), { attributes: true, attributeFilter: ['class'] });
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(row()).toHaveClass('tp-prj-saved'));
+    watch.disconnect();
+    expect(seen).toContain(false);
+    expect(seen.at(-1)).toBe(true);
+  });
+
+  it('C18-U20 opening and closing a row’s popup keeps the same row element; the popup hangs from it', async () => {
+    const user = userEvent.setup();
+    mount();
+    const row = () => within(screen.getByRole('list', { name: 'Projects' })).getAllByRole('listitem')[0]!;
+    const before = row();
+    await user.click(screen.getByRole('button', { name: 'Edit Onboarding, 5 open tasks' }));
+    expect(editor()).toHaveAccessibleName('Edit Onboarding');
+    expect(row()).toBe(before);
+    expect(row()).toHaveClass('tp-on');
+    await user.keyboard('{Escape}');
+    noEditor();
+    expect(row()).toBe(before);
+    expect(row()).not.toHaveClass('tp-on');
   });
 
   it('C18-U05 Edit projects… ends the picker and the Backlog filter when asked for, and calls back; absent without it', async () => {
