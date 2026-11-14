@@ -173,6 +173,26 @@ export function TaskGroups({
     return () => clearTimeout(t);
   }, [gone]);
 
+  // A line opened on a folded group: the cursor goes in once the group has opened (a folded body is inert, so the
+  // field's own autofocus is lost).
+  const root = useRef<HTMLDivElement | null>(null);
+  const lineShut = !!line && folded.includes(line);
+  useEffect(() => {
+    if (!line || lineShut) return;
+    // The body may still read as hidden for a frame or two after the fold flips; keep trying until the field takes it.
+    let frame = 0;
+    let tries = 0;
+    const take = () => {
+      const field = root.current?.querySelector<HTMLElement>(
+        `section[data-group="${CSS.escape(line)}"] .tp-addtask-input`,
+      );
+      if (field && document.activeElement !== field) field.focus({ preventScroll: true });
+      if (document.activeElement !== field && tries++ < 12) frame = requestAnimationFrame(take);
+    };
+    take();
+    return () => cancelAnimationFrame(frame);
+  }, [line, lineShut]);
+
   // Showing a task that sits in a folded group opens the group first.
   const locate = list.locateKey;
   const located = useRef<string | undefined>(undefined);
@@ -205,7 +225,7 @@ export function TaskGroups({
   }
 
   return (
-    <div className={cx('tp-root tp-groups', compact && 'tp-compact')}>
+    <div ref={root} className={cx('tp-root tp-groups', compact && 'tp-compact')}>
       {all.map(({ item: g, out }) => {
         const shut = folded.includes(g.key);
         const left = g.tasks.filter((t) => !t.done).length;

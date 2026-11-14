@@ -1,6 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
 import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
-import { goBacklog, filterChip } from '../../fixtures/backlog';
 import { createSpace, joinLink, me, secondPerson } from '../../fixtures/spaces';
 import { dayList, fixClock, idle, row } from '../../fixtures/today';
 
@@ -234,7 +233,7 @@ test.describe('settings › projects', () => {
     await b.context.close();
   });
 
-  test('C18-E05 Edit projects… from Quick Add, the task panel and the Backlog filter opens Settings on Projects; Quick Add keeps its draft', async ({
+  test('C18-E05 Edit projects… from Quick Add and the task panel opens Settings on Projects; Quick Add keeps its draft', async ({
     page,
   }) => {
     test.skip(!desktop(), 'phones go to the Space page (E06)');
@@ -273,14 +272,6 @@ test.describe('settings › projects', () => {
     await projectsInView();
     await page.keyboard.press('Escape');
     await expect(dialog(page)).toHaveCount(0);
-
-    // The Backlog's project filter.
-    await panel.getByRole('button', { name: 'Close' }).click();
-    await expect(panel).toHaveCount(0);
-    await goBacklog(page);
-    await filterChip(page).click();
-    await page.getByRole('menuitem', { name: 'Edit projects…' }).click();
-    await projectsInView();
   });
 
   test('C18-E06 phone: create and delete in the Space page', async ({ page }) => {

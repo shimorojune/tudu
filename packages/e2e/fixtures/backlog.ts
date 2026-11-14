@@ -21,7 +21,7 @@ export function sheet(page: Page): Locator {
   return page.getByRole('region', { name: 'The Backlog' });
 }
 
-/** The count beside the title: "4 tasks", "2 tasks in Platform", "Nothing waiting", "3 crossed off". */
+/** The count beside the title: "4 tasks", "Nothing waiting", "3 crossed off". */
 export function backlogCount(page: Page): Locator {
   return sheet(page).locator('.tp-dh-date');
 }
@@ -39,11 +39,6 @@ export function doneList(page: Page): Locator {
 /** Turn the sheet to a view. */
 export async function turnTo(page: Page, view: 'To do' | 'Crossed off'): Promise<void> {
   await sheet(page).getByRole('group', { name: 'View' }).getByRole('button', { name: view }).click();
-}
-
-/** The project filter's chip. */
-export function filterChip(page: Page): Locator {
-  return sheet(page).getByRole('button', { name: /^Project: / });
 }
 
 /** Write tasks on the Backlog's writing line (opening it from the empty state goes through Quick Add). */

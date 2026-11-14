@@ -58,6 +58,6 @@ describe('AddTask', () => {
     const line = rulesWhere(rules, (sel) => sel === '.tp-addtask')[0]!;
     expect(line.declarations['align-items']).toBe('baseline');
     const box = rulesWhere(rules, (sel) => sel === '.tp-addtask-box')[0]!;
-    expect(box.declarations.transform).toBe('translateY(5px)');
+    expect(box.declarations.transform).toBe('translateY(3px)');
   });
 });

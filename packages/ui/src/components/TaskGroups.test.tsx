@@ -97,6 +97,9 @@ describe('GroupHeader', () => {
     expect(rule('.tp-gh-dot').declarations['vertical-align']).toBe('calc(12.5px * .355 - 4px)');
     expect(rule('.tp-gh-tick').declarations['vertical-align']).toBe('calc(12.5px * .355 - 6.5px)');
     expect(rule('.tp-gh-tick').declarations.color).toBe('var(--success)');
+    // the caret points down while open and right when folded
+    expect(rule('.tp-gh-car').declarations.transform).toBe('rotate(90deg)');
+    expect(rule('.tp-gh-main[aria-expanded="false"] .tp-gh-car').declarations.transform).toBe('none');
     expect(rule('.tp-g-body').declarations.transition).toContain('var(--dur-fold)');
   });
 });

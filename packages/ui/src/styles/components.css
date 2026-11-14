@@ -349,8 +349,8 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 
 /* AddTask: the next empty line of the day */
 .tp-addtask { position: relative; display: flex; align-items: baseline; gap: 14px; min-height: var(--row-min-height); padding: 0 24px 0 26px; } /* the empty box sits exactly under the rows' checkboxes */
-/* The box is tied to the words' baseline (it sits on it, then drops 5px to centre on the italic's lowercase), not to the line box, so it is level with the words whatever the fonts' metrics. */
-.tp-addtask-box { flex: none; transform: translateY(5px); width: var(--checkbox); height: var(--checkbox); border-radius: var(--radius-xs); box-shadow: inset 0 0 0 1.5px var(--line); transition: box-shadow var(--dur-menu) var(--ease-change); }
+/* The box is tied to the words' baseline (it sits on it, then drops 3px to centre on the italic's lowercase, as a row's checkbox centres on its title's), not to the line box, so it is level with the words whatever the fonts' metrics. */
+.tp-addtask-box { flex: none; transform: translateY(3px); width: var(--checkbox); height: var(--checkbox); border-radius: var(--radius-xs); box-shadow: inset 0 0 0 1.5px var(--line); transition: box-shadow var(--dur-menu) var(--ease-change); }
 .tp-addtask:hover .tp-addtask-box, .tp-addtask.tp-adding .tp-addtask-box { box-shadow: inset 0 0 0 1.5px var(--check-border); }
 .tp-addtask-btn, .tp-addtask-input { flex: 1; min-width: 0; height: var(--row-min-height); line-height: normal; font-family: var(--font-serif); font-style: italic; font-size: 21px; color: var(--ghost); text-align: left; transition: color var(--dur-menu) var(--ease-change); }
 .tp-addtask-btn:hover { color: var(--muted-foreground); }
@@ -3227,9 +3227,9 @@ html[data-scrambled] .tp-avatar.tp-photo img, html[data-scrambled] .tp-pdot.tp-p
 .tp-gh-main { display: inline-block; white-space: nowrap; max-width: calc(100% - 30px); overflow: hidden; text-overflow: ellipsis; height: 28px; line-height: 28px; padding: 0 9px 0 6px; margin-left: -6px; border-radius: var(--radius-sm); font-size: 12.5px; font-weight: 600; color: var(--foreground); text-align: left; transition: background-color var(--dur-menu) var(--ease-change); }
 .tp-gh-main:hover { background: var(--accent); }
 .tp-gh-main:focus-visible, .tp-gh-add:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
-.tp-gh-car { display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: calc(12.5px * .355 - 7px); color: var(--muted-foreground); transition: transform var(--dur-fold) var(--ease-settle); }
+.tp-gh-car { display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: calc(12.5px * .355 - 7px); color: var(--muted-foreground); transform: rotate(90deg); transition: transform var(--dur-fold) var(--ease-settle); }
 .tp-gh-car svg, .tp-gh-tick svg { display: block; }
-.tp-gh-main[aria-expanded="false"] .tp-gh-car { transform: rotate(-90deg); }
+.tp-gh-main[aria-expanded="false"] .tp-gh-car { transform: none; }
 .tp-gh-dot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; vertical-align: calc(12.5px * .355 - 4px); }
 .tp-gh-dot.tp-gh-none { box-shadow: inset 0 0 0 1.5px var(--muted-foreground); }
 .tp-gh-n { display: inline-block; margin-left: 7px; font-family: var(--font-mono); font-size: 11px; font-weight: 400; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }

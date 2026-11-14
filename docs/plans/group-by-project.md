@@ -100,7 +100,7 @@ No server change, no migration, no API change. Grouping is a view over data the 
 ### 4.2 App
 
 - **`packages/core/src/groups.ts`** (new, pure): `groupByProject(tasks, projects, spaces?)` returns the ordered
-  groups; `dayIndexFor(dayOrder, groupKeys, to)` turns "place 2 in this group" into the task's place in the whole
+  groups; `placeInGroup(dayOrder, groupKeys, to)` turns "place 2 in this group" into the task's place in the whole
   day, so a reorder inside a group is one ordinary `taskStore.place` and My order stays consistent.
 - **`apps/web/src/app/grouping.ts`** (new): per-space store in local storage, `tudu.group` =
   `{ [spaceId | "all"]: { on: boolean, folded: string[] } }`, same shape of code as today's `backlog/filter.ts`.
@@ -111,8 +111,8 @@ No server change, no migration, no API change. Grouping is a view over data the 
   grouped view the sheet passes no drag `group`, so 2 days cannot trade rows.
 - **`BacklogBeside.tsx`** and **`BacklogPage.tsx`**: the same wiring; the page drops `ProjectFilter`, the
   "Show all projects" empty state and the per-project count words.
-- **All spaces** (`allSpaces.tsx`, `TodayPage.tsx`): groups by project name (as its filter does today), key
-  `spaceId:projectId`; in grouped view the project pill's signal folds the others instead of filtering. A task
+- **All spaces** (`allSpaces.tsx`, `TodayPage.tsx`): groups by project id, spaces in switcher order (each
+  fold kept in the project's own space); in grouped view the project pill's signal folds the others instead of filtering. A task
   written in a group is created in that project's space.
 
 ### 4.3 After merge
@@ -130,7 +130,7 @@ IDs take the next free number at build time. Tests run on PR CI, not on the Mac.
 | ID      | Where                          | Scenario                                                                                                                                                                              |
 | ------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | C02-U47 | core `groups.test.ts`          | Groups follow project position, No project last; tasks keep the day's order inside a group; a task whose project is gone lands in No project; All spaces orders by space then project |
-| C02-U48 | core `groups.test.ts`          | `dayIndexFor`: first, middle and last place in a group map to the right place in the day; a group of one; the moved task excluded from the count                                      |
+| C02-U48 | core `groups.test.ts`          | `placeInGroup`: first, middle and last place in a group map to the right place in the day; a group of one; the moved task excluded from the count                                     |
 | C02-U49 | ui `GroupHeader.test.tsx`      | Caret, dot, name and count; the tick when all are crossed off; `aria-expanded`; click and Enter report the fold; "+" reports add and does not fold                                    |
 | C02-U50 | ui `TaskGroups.test.tsx`       | One header and list per group; a folded group shows no rows and is inert; folding reports the key                                                                                     |
 | C02-U51 | ui `TaskGroups.test.tsx`       | "+" mounts that group's writing line focused; on a folded group it opens the group first; Enter reports the text with the group key                                                   |
@@ -187,7 +187,7 @@ IDs take the next free number at build time. Tests run on PR CI, not on the Mac.
 - **Position math**: a reorder inside a group must not disturb other projects in My order. Covered by C02-U48 and
   C02-E29.
 - **All spaces** has its own ordering store (`placeInAll`); grouped reorder there goes through the same
-  `dayIndexFor` against the All spaces order. Covered by C21-U24 and C21-E30.
+  `placeInGroup` against the All spaces order. Covered by C21-U24 and C21-E30.
 - **Other open work**: the right-click menu (PR #107) and task times touch `TaskRow`, not the list's structure;
   whichever merges second rebases. No shared files with this beyond `TodayPage.tsx`.
 
