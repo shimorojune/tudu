@@ -1,4 +1,12 @@
-import { dayWord, isoToday, type IsoDate } from '@tudu/core';
+import {
+  dayWord,
+  isoToday,
+  type Clock,
+  type IsoDate,
+  type SpanPlace,
+  type TimeBlock,
+  type TimeWordsOptions,
+} from '@tudu/core';
 import {
   useEffect,
   useLayoutEffect,
@@ -45,6 +53,10 @@ export interface TaskItem {
   title: string;
   done?: boolean;
   due?: TaskDue;
+  /** Times (docs/plans/task-times.md): the due time, the planned block, and where a span stands on this day. */
+  dueAt?: Clock | null;
+  time?: TimeBlock | null;
+  span?: SpanPlace | null;
   carried?: TaskCarried;
   comments?: number;
   jira?: string;
@@ -131,6 +143,12 @@ export interface TaskListProps {
   /** The carried pill's picker kept it on this day: the marker goes. */
   onKeepTask?: (task: TaskItem) => void;
   onDueChange?: (task: TaskItem, day: IsoDate | null) => void;
+  /** Times from the row's pickers; without them the pickers have no time or Several days. */
+  onTimeChange?: (task: TaskItem, time: TimeBlock | null) => void;
+  onSpanChange?: (task: TaskItem, from: IsoDate, until: IsoDate | null) => void;
+  onDueTimeChange?: (task: TaskItem, at: Clock | null) => void;
+  /** 12-hour words unless the system says 24-hour. */
+  timeWords?: TimeWordsOptions;
   planButton?: boolean;
   /**
    * The Backlog: a crossed-off row waits a beat (the tick and sparkle play), then folds away with a toast and
@@ -702,6 +720,13 @@ export function TaskList(p: TaskListProps) {
                 link={p.linkFor?.(t)}
                 done={leaving[t.key] ?? !!t.done}
                 due={t.due}
+                dueAt={t.dueAt}
+                time={t.time}
+                span={t.span}
+                timeWords={p.timeWords}
+                onTimeChange={cal && p.onTimeChange ? (v) => p.onTimeChange!(t, v) : undefined}
+                onSpanChange={cal && p.onSpanChange ? (a, b) => p.onSpanChange!(t, a, b) : undefined}
+                onDueTimeChange={cal && p.onDueTimeChange ? (v) => p.onDueTimeChange!(t, v) : undefined}
                 carried={t.carried}
                 comments={t.comments}
                 jira={t.jira}

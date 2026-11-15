@@ -90,6 +90,7 @@ async function taskFromRequest(
   const iso = at.toISOString();
   const clocks: TaskClocks = { title: iso, done: iso, place: iso, carried: iso, deleted: iso, notes: iso };
   if (r.dueDay) clocks.due = iso;
+  if (r.dueDay && r.dueTime) clocks.dueAt = iso;
   if (r.projectId) clocks.project = iso;
   await tx.insert(schema.tasks).values({
     id: taskId,
@@ -99,6 +100,7 @@ async function taskFromRequest(
     day,
     position: await endOf(tx, r.spaceId, ownerId, day),
     dueDay: r.dueDay,
+    dueTime: r.dueDay ? r.dueTime : null,
     notes: notes ? cleanHtml(notes) : '',
     notesText: notes ? textOf(cleanHtml(notes)) : '',
     projectId: r.projectId,
@@ -111,7 +113,7 @@ async function taskFromRequest(
   if (r.dueDay)
     await tx
       .insert(schema.taskEvents)
-      .values({ taskId, kind: 'due.set', data: { due: r.dueDay }, actorId: r.fromId, at });
+      .values({ taskId, kind: 'due.set', data: { due: r.dueDay, dueAt: r.dueTime }, actorId: r.fromId, at });
   await tx.insert(schema.taskEvents).values({
     taskId,
     kind: history.kind,
@@ -175,6 +177,7 @@ export async function applyRequest(tx: Tx, userId: string, m: RequestMutation): 
         note: noteHtml(p.note),
         askedDay: p.askedDay,
         dueDay: p.due ?? null,
+        dueTime: p.due ? (p.dueAt ?? null) : null,
         projectId: p.projectId ?? null,
         attachments: p.attachments ?? [],
         createdAt: at,
@@ -401,6 +404,7 @@ export async function requestsWhere(db: Executor, where: ReturnType<typeof and>)
     note: r.note,
     askedDay: r.askedDay,
     due: r.dueDay,
+    dueAt: r.dueTime,
     projectId: r.projectId,
     attachments: r.attachments,
     state: r.state,

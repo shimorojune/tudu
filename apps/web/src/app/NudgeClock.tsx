@@ -15,6 +15,7 @@ import {
   tickNudges,
   useNudgePrefs,
 } from './nudges';
+import { timesPref, useTimesPref } from './TimeClock';
 
 /** Pause for today, from Settings or from a nudge's own button: until your next working day's start. */
 function pauseToday(me: MeResponse): void {
@@ -58,6 +59,7 @@ export function NudgeClock({ d, me }: { d: DesktopBridge; me: MeResponse }) {
 export function useNudgeSettings(me: MeResponse): SettingsNudges | undefined {
   const d = desktop();
   const p = useNudgePrefs();
+  const times = useTimesPref();
   const [permission, setPermission] = useState<NudgePermission>('unknown');
   const [test, setTest] = useState<SettingsNudges['test']>('idle');
   const [, tick] = useState(0);
@@ -116,6 +118,16 @@ export function useNudgeSettings(me: MeResponse): SettingsNudges | undefined {
     onSwitch: (on) => {
       nudgePrefs.set({ on });
       setTest('idle');
+      if (!on) return;
+      setPermission('asking');
+      void d.notifyPermission().then((s) => {
+        setPermission(s);
+        wasOff.current = s === 'denied';
+      });
+    },
+    times,
+    onTimes: (on) => {
+      timesPref.set(on);
       if (!on) return;
       setPermission('asking');
       void d.notifyPermission().then((s) => {

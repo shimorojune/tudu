@@ -138,7 +138,7 @@ describe('TaskDetail', () => {
     const { container } = render(<Panel />);
     expect(screen.getByRole('button', { name: 'Copy link to ME-52' })).toHaveTextContent('ME-52');
     expect(screen.getByRole('textbox', { name: 'Task title' })).toHaveValue('Review Quick Add PR');
-    const facts = container.querySelectorAll('.tp-td-prop dt span');
+    const facts = container.querySelectorAll('.tp-td-prop dt > span');
     expect(Array.from(facts).map((e) => e.textContent)).toEqual(['Planned', 'Due', 'Visible to']);
     expect(screen.getByRole('button', { name: 'Planned' })).toHaveTextContent('Today · Sun 18 Oct');
     expect(screen.getByRole('button', { name: 'Due' })).toHaveTextContent('Fri 16 Oct2 days overdue');
@@ -219,9 +219,7 @@ describe('TaskDetail', () => {
     const pop = container.querySelector('.tp-td-pop')!;
     expect(pop).not.toBeNull();
     expect(within(pop as HTMLElement).getByRole('button', { name: 'Tomorrow' })).toBeInTheDocument();
-    expect(
-      within(pop as HTMLElement).getByRole('button', { name: 'Move to the Backlog' }),
-    ).toBeInTheDocument();
+    expect(within(pop as HTMLElement).getByRole('button', { name: 'Backlog' })).toBeInTheDocument();
     await user.click(within(pop as HTMLElement).getByRole('button', { name: /19 October/ }));
     expect(onMove).toHaveBeenCalledWith('2026-10-19');
     expect(planned).toHaveAttribute('aria-expanded', 'false');
@@ -233,7 +231,7 @@ describe('TaskDetail', () => {
     );
   });
 
-  it('C03-U05 Due: pick a day, the hover hint says how far, Remove due date clears it', async () => {
+  it('C03-U05 Due: pick a day, the hover hint says how far, No date clears it', async () => {
     const user = userEvent.setup();
     const onDue = vi.fn();
     const { container } = render(<Panel onDue={onDue} initial={FRESH} />);
@@ -249,7 +247,7 @@ describe('TaskDetail', () => {
     await user.click(due);
     await user.click(
       within(container.querySelector('.tp-td-pop') as HTMLElement).getByRole('button', {
-        name: 'Remove due date',
+        name: 'No date',
       }),
     );
     expect(onDue).toHaveBeenLastCalledWith(null);
@@ -485,7 +483,7 @@ describe('TaskDetail project (chunk 04)', () => {
         onNewProject={onNewProject}
       />,
     );
-    const facts = Array.from(container.querySelectorAll('.tp-td-prop dt span')).map((e) => e.textContent);
+    const facts = Array.from(container.querySelectorAll('.tp-td-prop dt > span')).map((e) => e.textContent);
     expect(facts).toEqual(['Planned', 'Due', 'Project', 'Visible to']);
     const fact = screen.getByRole('button', { name: 'Project' });
     expect(fact).toHaveTextContent('Add to a project');
@@ -518,7 +516,7 @@ describe('TaskDetail project (chunk 04)', () => {
     expect(onProject).toHaveBeenLastCalledWith('new-1');
     // without a project list the fact stays out
     const { container: c3 } = render(<Panel initial={{ ...FULL, key: 't3' }} />);
-    expect(Array.from(c3.querySelectorAll('.tp-td-prop dt span')).map((e) => e.textContent)).toEqual([
+    expect(Array.from(c3.querySelectorAll('.tp-td-prop dt > span')).map((e) => e.textContent)).toEqual([
       'Planned',
       'Due',
       'Visible to',
@@ -684,5 +682,73 @@ describe('TaskDetail in All spaces', () => {
     expect(onOpenSpace).toHaveBeenCalledTimes(1);
     rerender(<Panel />);
     expect(screen.queryByRole('button', { name: /^Space:/ })).toBeNull();
+  });
+});
+
+describe('TaskDetail times (docs/plans/task-times.md)', () => {
+  it('TT-U14 Planned reads its block or its span; Due reads its time; the pickers send times and spans', async () => {
+    const user = userEvent.setup();
+    const onTime = vi.fn();
+    const onSpan = vi.fn();
+    const onDueTime = vi.fn();
+    const { rerender } = render(
+      <TaskDetail
+        today={TODAY}
+        me={ME}
+        visibility={VIS}
+        task={{
+          ...FULL,
+          day: TODAY,
+          time: { start: '15:00', end: '16:00' },
+          due: '2026-10-20',
+          dueAt: '17:00',
+        }}
+        calendar={{ now: new Date(2026, 9, 18, 9, 0) }}
+        onTime={onTime}
+        onSpan={onSpan}
+        onDueTime={onDueTime}
+      />,
+    );
+    const planned = screen.getByRole('button', { name: 'Planned' });
+    expect(planned).toHaveTextContent('3 to 4 PM');
+    expect(screen.getByRole('button', { name: 'Due' })).toHaveTextContent('Tue 20 Oct, 5 PM');
+    await user.click(planned);
+    await user.click(screen.getByRole('button', { name: 'Remove time' }));
+    expect(onTime).toHaveBeenCalledWith(null);
+    await user.click(screen.getByRole('switch', { name: 'Several days' }));
+    await user.click(screen.getByRole('button', { name: /^21 October/ }));
+    expect(onSpan).toHaveBeenCalledWith(TODAY, '2026-10-21');
+    rerender(
+      <TaskDetail
+        today={TODAY}
+        me={ME}
+        visibility={VIS}
+        task={{ ...FULL, day: TODAY, until: '2026-10-21', time: { start: '16:00', end: '18:00' } }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Planned' })).toHaveTextContent(
+      'Sun 18, 4 PM to Wed 21 Oct, 6 PM',
+    );
+  });
+
+  it('TT-U14 Due: Today, Tomorrow, No date; a time with no due day is due today', async () => {
+    const user = userEvent.setup();
+    const onDue = vi.fn();
+    const onDueTime = vi.fn();
+    render(
+      <TaskDetail
+        today={TODAY}
+        me={ME}
+        visibility={VIS}
+        task={{ ...FULL, due: null }}
+        onDue={onDue}
+        onDueTime={onDueTime}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Due' }));
+    expect(screen.getByRole('button', { name: 'No date' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Add a time' }));
+    expect(onDue).toHaveBeenCalledWith(TODAY);
+    expect(onDueTime).toHaveBeenCalled();
   });
 });

@@ -3,12 +3,18 @@ import {
   addDays,
   dueDistance,
   fileSize,
+  fmtBlock,
+  fmtTime,
   formatDay,
   isEmptyHtml,
   landsWords,
   noteHtml,
+  spanFact,
   toHtml,
+  type Clock,
   type IsoDate,
+  type TimeBlock,
+  type TimeWordsOptions,
 } from '@tudu/core';
 import {
   useEffect,
@@ -16,6 +22,7 @@ import {
   useRef,
   useState,
   type ClipboardEvent,
+  type CSSProperties,
   type DragEvent,
   type ReactNode,
 } from 'react';
@@ -27,6 +34,8 @@ import { Button } from './Button';
 import { IconButton } from './IconButton';
 import { Logo } from './Logo';
 import { MiniCalendar, type MiniCalendarProps } from './MiniCalendar';
+import { PlanPicker } from './PlanPicker';
+import { TimeChoice } from './TimeChoice';
 import { NoteIcon } from './NoteParts';
 import { PersonDot, type PersonDotPerson } from './PersonDot';
 import { PersonPick, type PickPerson } from './PersonPick';
@@ -52,6 +61,10 @@ export interface QuickAddDraft {
   /** The day it lands on; null is the Backlog. */
   planned: IsoDate | null;
   due: IsoDate | null;
+  /** Times (docs/plans/task-times.md); a draft kept before times has none. */
+  until?: IsoDate | null;
+  time?: TimeBlock | null;
+  dueAt?: Clock | null;
   projectId: string | null;
   /** Rich text, as HTML (a draft kept before notes were rich may be plain words). */
   note: string;
@@ -63,6 +76,10 @@ export interface QuickAddResult {
   title: string;
   planned: IsoDate | null;
   due: IsoDate | null;
+  /** The last day of several, the planned block and the due time (docs/plans/task-times.md). */
+  until: IsoDate | null;
+  time: TimeBlock | null;
+  dueAt: Clock | null;
   projectId: string | null;
   /** Cleaned HTML; empty when the note has no words. */
   note: string;
@@ -116,7 +133,9 @@ export interface QuickAddProps {
   /** The day it lands on when it opens: the day you are looking at. */
   planned?: IsoDate | null;
   projects: ProjectOption[];
-  calendar?: Pick<MiniCalendarProps, 'marks' | 'month'>;
+  calendar?: Pick<MiniCalendarProps, 'marks' | 'month' | 'now'>;
+  /** 12-hour words unless the system says 24-hour. */
+  timeWords?: TimeWordsOptions;
   /** The phone keyboard's height, so the sheet sits on it. */
   keyboard?: number;
   /** Offline: files need a connection. */
@@ -195,6 +214,9 @@ function fresh(p: QuickAddProps): QuickAddDraft {
     title: i.title ?? p.seed?.title ?? '',
     planned: i.planned !== undefined ? i.planned : p.planned !== undefined ? p.planned : p.today,
     due: i.due ?? null,
+    until: i.until ?? null,
+    time: i.time ?? null,
+    dueAt: i.dueAt ?? null,
     projectId: i.projectId ?? null,
     note: toHtml(i.note ?? p.seed?.note ?? ''),
     files: i.files ?? [],
@@ -258,6 +280,8 @@ export interface QAChipProps {
   tone?: 'today' | 'od' | null;
   aria: string;
   icon: ReactNode;
+  /** The icon is an svg drawn inside the words, on their baseline: its size in px. */
+  ic?: number;
   label: string;
   pop: ReactNode;
 }
@@ -279,8 +303,19 @@ export function QAChip(p: QAChipProps) {
         aria-label={p.aria}
         onClick={() => p.onOpen(!p.open)}
       >
-        {p.icon}
-        <span>{p.label}</span>
+        {p.ic ? (
+          <span>
+            <span className="tp-bl-ic" style={{ '--ic': `${p.ic}px` } as CSSProperties} aria-hidden="true">
+              {p.icon}
+            </span>
+            {p.label}
+          </span>
+        ) : (
+          <>
+            {p.icon}
+            <span>{p.label}</span>
+          </>
+        )}
       </button>
       <Linger open={p.open} className={cx('tp-qa-pop', p.up && 'tp-qa-pop-up')}>
         {p.pop}
@@ -483,6 +518,10 @@ export function QuickAdd(p: QuickAddProps) {
         title,
         planned: f.planned,
         due: f.due,
+        // A request asks for a day, not days or a time.
+        until: f.planned && !to ? (f.until ?? null) : null,
+        time: f.planned && !to ? (f.time ?? null) : null,
+        dueAt: f.due ? (f.dueAt ?? null) : null,
         projectId: f.projectId,
         note: noteHtml(f.note),
         attachments: files.filter((x) => x.id).map((x) => x.id!),
@@ -501,6 +540,9 @@ export function QuickAdd(p: QuickAddProps) {
           title: '',
           planned: now.planned !== undefined ? now.planned : now.today,
           due: null,
+          until: null,
+          time: null,
+          dueAt: null,
           projectId: null,
           note: '',
           files: [],
@@ -583,9 +625,24 @@ export function QuickAdd(p: QuickAddProps) {
   const plannedLabel = to ? (f.planned ? `Asks for ${plannedWord}` : 'No day asked') : plannedWord;
   const dueRel = f.due ? dueDistance(f.due, today) : null;
   const lands = landsWords(
-    { planned: f.planned, due: f.due, projectName: proj?.name, note: f.note, files: f.files.length },
+    {
+      planned: f.planned,
+      due: f.due,
+      projectName: proj?.name,
+      note: f.note,
+      files: f.files.length,
+      until: to ? null : f.until,
+      time: to ? null : f.time,
+      dueAt: f.dueAt,
+    },
     today,
+    p.timeWords,
   );
+  const o = p.timeWords ?? {};
+  const plannedFull =
+    f.until && f.planned && !to
+      ? spanFact(f.planned, f.until, f.time ?? null, o)
+      : plannedLabel + (f.time && f.planned && !to ? ` ${fmtBlock(f.time, o)}` : '');
 
   const plannedChip = (
     <QAChip
@@ -594,28 +651,36 @@ export function QuickAdd(p: QuickAddProps) {
       up={phone}
       aria={`${to ? 'Asks for' : 'Planned for'}: ${plannedWord}`}
       icon={f.planned ? <Ic name="day" /> : <Ic name="backlog" />}
-      label={plannedLabel}
+      ic={14}
+      label={plannedFull}
       tone={f.planned === today && !to ? 'today' : null}
       pop={
-        <MiniCalendar
-          {...(p.calendar ?? {})}
-          today={today}
-          selected={f.planned ?? undefined}
-          month={(f.planned ?? today).slice(0, 7)}
-          presets={[
-            { label: 'Today', on: f.planned === today, value: today },
-            { label: 'Tomorrow', on: f.planned === tomorrow, value: tomorrow },
-            { label: 'Backlog', on: !f.planned, value: null },
-          ]}
-          onPreset={(v) => {
-            set({ planned: v });
-            setPop(null);
-          }}
-          onPick={(k) => {
-            set({ planned: k });
-            setPop(null);
-          }}
-        />
+        <div className="tp-root tp-calwrap">
+          <PlanPicker
+            cal={{ ...(p.calendar ?? {}), today, month: (f.planned ?? today).slice(0, 7) }}
+            today={today}
+            day={f.planned}
+            until={f.until ?? null}
+            time={f.time ?? null}
+            now={p.calendar?.now}
+            presets={[
+              { label: 'Today', on: f.planned === today && !f.until, value: today },
+              { label: 'Tomorrow', on: f.planned === tomorrow && !f.until, value: tomorrow },
+              { label: 'Backlog', on: !f.planned, value: null },
+            ]}
+            onPreset={(v) => {
+              // The Backlog has no days or time.
+              set(v ? { planned: v, until: null } : { planned: v, until: null, time: null });
+              setPop(null);
+            }}
+            onDay={(k) => {
+              set({ planned: k });
+              setPop(null);
+            }}
+            onSpan={to ? undefined : (a, b) => set({ planned: a, until: b })}
+            onTime={to ? undefined : (v) => set({ time: v })}
+          />
+        </div>
       }
     />
   );
@@ -627,33 +692,43 @@ export function QuickAdd(p: QuickAddProps) {
       empty={!f.due}
       aria={f.due ? `Due ${formatDay(f.due)}` : 'Add a due date'}
       icon={<Ic name="due" />}
-      label={f.due ? `Due ${formatDay(f.due)}` : 'Due date'}
+      ic={14}
+      label={f.due ? `Due ${formatDay(f.due)}${f.dueAt ? ` ${fmtTime(f.dueAt, o)}` : ''}` : 'Due date'}
       tone={dueRel?.tone === 'overdue' ? 'od' : null}
       pop={
-        <MiniCalendar
-          today={today}
-          selected={f.due ?? undefined}
-          month={(f.due ?? today).slice(0, 7)}
-          marks={{}}
-          clearLabel={f.due ? 'Remove due date' : undefined}
-          onClear={
-            f.due
-              ? () => {
-                  set({ due: null });
-                  setPop(null);
-                }
-              : undefined
-          }
-          hint={(k) => {
-            const r = dueDistance(k, today);
-            return { text: `${formatDay(k)} · ${r.tone === 'today' ? 'due today' : r.text}`, tone: r.tone };
-          }}
-          hintEmpty="Pick a due date"
-          onPick={(k) => {
-            set({ due: k });
-            setPop(null);
-          }}
-        />
+        <div className="tp-root tp-calwrap">
+          <MiniCalendar
+            today={today}
+            selected={f.due ?? undefined}
+            month={(f.due ?? today).slice(0, 7)}
+            marks={{}}
+            presets={[
+              { label: 'Today', on: f.due === today, value: today },
+              { label: 'Tomorrow', on: f.due === tomorrow, value: tomorrow },
+              { label: 'No date', on: !f.due, value: null },
+            ]}
+            onClear={() => {
+              set({ due: null, dueAt: null });
+              setPop(null);
+            }}
+            hint={(k) => {
+              const r = dueDistance(k, today);
+              return { text: `${formatDay(k)} · ${r.tone === 'today' ? 'due today' : r.text}`, tone: r.tone };
+            }}
+            hintEmpty="Pick a due date"
+            onPick={(k) => {
+              set({ due: k });
+              setPop(null);
+            }}
+          />
+          <TimeChoice
+            kind="due"
+            value={f.due ? (f.dueAt ?? null) : null}
+            isToday={(f.due ?? today) === today}
+            now={p.calendar?.now}
+            onChange={(v) => set({ due: f.due ?? today, dueAt: v })}
+          />
+        </div>
       }
     />
   );

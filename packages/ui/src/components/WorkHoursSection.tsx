@@ -37,6 +37,9 @@ export interface SettingsNudges {
   /** "09:00, 10:00, 11:00": the first slots, for How often's line. */
   example: string;
   onSwitch?: (on: boolean) => void;
+  /** Notify me at planned and due times (docs/plans/task-times.md); shares the permission with nudges. */
+  times?: boolean;
+  onTimes?: (on: boolean) => void;
   onEvery?: (every: NudgeEvery) => void;
   onPause?: () => void;
   onResume?: () => void;
@@ -252,6 +255,7 @@ function Fold({ open, children }: { open: boolean; children: ReactNode }) {
 
 function Nudges({ n }: { n: SettingsNudges }) {
   const off = n.permission === 'denied' && n.on;
+  const timesOff = n.permission === 'denied' && !!n.times && !n.on;
   const open = n.on && n.permission === 'allowed';
   const sub =
     n.permission === 'asking' ? (
@@ -295,7 +299,33 @@ function Nudges({ n }: { n: SettingsNudges }) {
             </div>
           ) : null}
         </SettingRow>
-        <Fold open={off}>
+        {n.onTimes ? (
+          <SettingRow
+            title="Notify me at planned and due times"
+            sub={
+              timesOff ? (
+                <>
+                  <Bad>macOS has Tudu’s notifications off.</Bad> Turn on Allow notifications for Tudu, then
+                  come back.
+                </>
+              ) : (
+                'A Mac notification when a task’s planned time starts and when it’s due. Any hour, even outside working hours.'
+              )
+            }
+            control={
+              <Switch label="Notify me at planned and due times" checked={!!n.times} onChange={n.onTimes} />
+            }
+          >
+            {timesOff ? (
+              <div>
+                <Button variant="secondary" size="sm" onClick={n.onOpenSettings}>
+                  Open Notification settings
+                </Button>
+              </div>
+            ) : null}
+          </SettingRow>
+        ) : null}
+        <Fold open={off || timesOff}>
           <AllowGuide />
         </Fold>
         <Fold open={open}>
@@ -402,6 +432,10 @@ export function WorkHoursSection({ hours, nudges, phone }: WorkHoursSectionProps
             <SettingRow
               title="Nudges"
               sub="Nudges come from the Tudu app on a Mac. Your hours here are the ones it uses."
+            />
+            <SettingRow
+              title="Notify me at planned and due times"
+              sub="Notifications come from the Tudu app on a Mac."
             />
           </SettingsSection>
         )}

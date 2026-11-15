@@ -15,6 +15,7 @@ import {
 import { openFeedback } from './feedback';
 import { interceptLinks } from './links';
 import { NudgeClock } from './NudgeClock';
+import { TimeClock } from './TimeClock';
 import { setOpenUpdates } from './notebook';
 import { meQuery, queryClient } from './session';
 import { settingsHref } from './settings';
@@ -148,6 +149,7 @@ export function DesktopHost() {
     <WorkingDayProvider>
       <TodayCount me={me} report={(t) => d.setTick(t)} />
       <NudgeClock d={d} me={me} />
+      <TimeClock d={d} me={me} />
     </WorkingDayProvider>
   ) : null;
 }

@@ -1,5 +1,8 @@
 import { z } from 'zod';
 import { isIsoDate, type IsoDate } from './dates';
+import { minutesOf } from './hours';
+import { SPAN_MAX_DAYS, type Clock, type TimeBlock } from './times';
+import { diffDays } from './dates';
 import { COMMENT_MAX, NOTES_MAX } from './notes';
 import { DECLINE_REASON_MAX, REQUEST_NOTE_MAX } from './inbox';
 import { projectColorSchema, projectNameSchema } from './projects';
@@ -25,6 +28,19 @@ export interface Task {
   carriedFrom: IsoDate | null;
   /** The deadline, a separate fact from the day it is planned for. */
   due: IsoDate | null;
+  /**
+   * Times (docs/plans/task-times.md). Optional: rows cached by a client from before times have none, which reads
+   * as no time and one day.
+   *
+   * The due time ("17:00"), wall clock; null is due by the day's end.
+   */
+  dueAt?: Clock | null;
+  /** The last day of a task planned over several days (after `day`); null for one day. */
+  until?: IsoDate | null;
+  /** The planned block: start on the first day, end on the same day (or on the last day of a span). */
+  time?: TimeBlock | null;
+  /** A span's own place on a day after its first, once moved there; otherwise it is placed first. */
+  places?: Record<IsoDate, number>;
   /** Who sees it in a team space: everyone, or only you. Personal is yours either way. */
   visibility: TaskVisibility;
   /** The project it belongs to, if any (the coloured dot). */
@@ -107,7 +123,11 @@ export type HistoryEvent =
       provider?: TaskLink['provider'];
       key?: string;
     }
-  | { id: number; at: string; kind: 'due.set'; due: IsoDate }
+  | { id: number; at: string; kind: 'due.set'; due: IsoDate; dueAt?: Clock | null }
+  | { id: number; at: string; kind: 'time.set'; time: TimeBlock }
+  | { id: number; at: string; kind: 'time.cleared' }
+  | { id: number; at: string; kind: 'span.set'; from: IsoDate; until: IsoDate }
+  | { id: number; at: string; kind: 'span.cleared' }
   | { id: number; at: string; kind: 'due.cleared' }
   | { id: number; at: string; kind: 'moved'; from: IsoDate | null; to: IsoDate | null }
   | { id: number; at: string; kind: 'carried'; from: IsoDate }
@@ -182,6 +202,10 @@ const commentHtml = z
   .max(COMMENT_MAX, 'That comment is too long.');
 const visibility = z.enum(['space', 'me']);
 const projectId = id.nullable();
+const clock = z.string().refine((t) => minutesOf(t) !== null, 'Not a time of day');
+const block = z
+  .object({ start: clock, end: clock })
+  .refine((b) => b.start !== b.end, 'A time needs an end after its start.');
 const jiraKey = z
   .string()
   .max(JIRA_KEY_MAX)
@@ -223,7 +247,11 @@ const taskLink = z
  * | task.keep     | the carried marker       |
  * | task.delete   | deleted                  |
  * | task.restore  | deleted (Undo)           |
- * | task.due      | due                      |
+ * | task.due      | due (null also clears the due time) |
+ * | task.dueTime  | the due time             |
+ * | task.time     | the planned block        |
+ * | task.span     | the last day of several (with the place clock: it is where the task is) |
+ * | task.dayPlace | a span's place on one of its later days |
  * | task.notes    | notes                    |
  * | task.visibility | visibility             |
  * | task.link     | the task's link in one app (link, unlink); one clock per app |
@@ -247,6 +275,10 @@ export const taskMutationSchema = z.discriminatedUnion('type', [
       position: position.nullable(),
       /** Quick Add can give a task its due day, project, notes and files at birth. */
       due: isoDay.nullable().optional(),
+      /** And its due time, planned block and last day (several days). */
+      dueAt: clock.nullable().optional(),
+      time: block.nullable().optional(),
+      until: isoDay.nullable().optional(),
       projectId: projectId.optional(),
       notes: notes.optional(),
       /** Ids of files uploaded before the task existed; they become its attachments. */
@@ -269,6 +301,10 @@ export const taskMutationSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('task.delete'), payload: z.object({ id }) }),
   z.object({ type: z.literal('task.restore'), payload: z.object({ id }) }),
   z.object({ type: z.literal('task.due'), payload: z.object({ id, due: isoDay.nullable() }) }),
+  z.object({ type: z.literal('task.dueTime'), payload: z.object({ id, at: clock.nullable() }) }),
+  z.object({ type: z.literal('task.time'), payload: z.object({ id, time: block.nullable() }) }),
+  z.object({ type: z.literal('task.span'), payload: z.object({ id, until: isoDay.nullable() }) }),
+  z.object({ type: z.literal('task.dayPlace'), payload: z.object({ id, day: isoDay, position }) }),
   z.object({ type: z.literal('task.notes'), payload: z.object({ id, notes }) }),
   z.object({ type: z.literal('task.visibility'), payload: z.object({ id, visibility }) }),
   z.object({ type: z.literal('task.project'), payload: z.object({ id, projectId }) }),
@@ -319,6 +355,8 @@ export const taskMutationSchema = z.discriminatedUnion('type', [
       note: z.string().max(REQUEST_NOTE_MAX, 'That note is too long.').optional(),
       askedDay: isoDay.nullable(),
       due: isoDay.nullable().optional(),
+      /** The time on the due day the sender asks for. */
+      dueAt: clock.nullable().optional(),
       projectId: projectId.optional(),
       attachments: z.array(id).max(20).optional(),
     }),
@@ -467,3 +505,10 @@ export interface ProjectsChangedEvent {
   clientId: string | null;
 }
 export const PROJECTS_CHANGED = 'projects.changed';
+
+/** Whether a span's last day is a real span from `day`: after it, and at most SPAN_MAX_DAYS long. */
+export function spanOk(day: IsoDate | null, until: IsoDate | null | undefined): boolean {
+  if (!until) return true;
+  if (!day || until <= day) return false;
+  return diffDays(day, until) < SPAN_MAX_DAYS;
+}

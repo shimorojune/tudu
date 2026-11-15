@@ -7,8 +7,9 @@ import {
   welcomeTitle,
   dayHeading,
   daysInMonth,
-  dueLabel,
+  dueLabelAt,
   nightWords,
+  spanOf,
   NO_PROJECT,
   type IsoDate,
   type Project,
@@ -72,6 +73,7 @@ import { taskLink, rowLink } from '../../app/links';
 import { useRowMenu } from '../../app/rowMenu';
 import { BacklogBeside } from '../backlog/BacklogBeside';
 import { useShownView } from './shownView';
+import { rowTimes, timeWords, useMinute } from '../../app/times';
 
 /** A swipe this wide (and wider than it is tall) turns the day on phones. */
 const SWIPE_PX = 60;
@@ -79,7 +81,14 @@ const SWIPE_PX = 60;
 const MIN_HEIGHT: Record<Viewport, number> = { desktop: 560, tablet: 640, phone: 520 };
 
 /** A task as a row: the words of its byline for the day shown; in All spaces, its space's pill too. */
-export function toItem(t: Task, today: IsoDate, projects: Project[], space?: SpaceSummary): TaskItem {
+export function toItem(
+  t: Task,
+  today: IsoDate,
+  projects: Project[],
+  space?: SpaceSummary,
+  /** The day the row is shown on (a span reads Day n of N there) and the wall clock (a due time turns red). */
+  at: { day?: IsoDate | null; now?: Date } = {},
+): TaskItem {
   const project = t.projectId ? projects.find((p) => p.id === t.projectId) : undefined;
   return {
     ...(space ? { inSpace: tileOf(space) } : {}),
@@ -88,7 +97,10 @@ export function toItem(t: Task, today: IsoDate, projects: Project[], space?: Spa
     title: t.title,
     done: t.done,
     project: project ? { name: project.name, color: project.color } : undefined,
-    due: t.due && !t.done ? dueLabel(t.due, today) : undefined,
+    due: t.due && !t.done ? dueLabelAt(t.due, today, t.dueAt, at.now ?? new Date(), timeWords) : undefined,
+    dueAt: t.dueAt ?? null,
+    time: t.time ?? null,
+    span: spanOf(t.day, t.until, at.day === undefined ? t.day : at.day),
     carried: t.carriedFrom && !t.done ? carriedLabel(t.carriedFrom, today) : undefined,
     comments: t.commentCount || undefined,
     jira: t.jira ?? undefined,
@@ -485,6 +497,7 @@ function DaySheet({
   onCloseTask,
   welcome,
 }: DaySheetProps) {
+  const now = useMinute();
   const compact = vp === 'phone';
   const q = useQuery({ ...taskStore.dayQuery(spaceId, day, today), enabled: !all });
   const gathered = useAllDay(all, meId, day, today);
@@ -523,7 +536,9 @@ function DaySheet({
   const spaceOf = (id: string) => all?.spaces.find((s) => s.id === id);
   const tasks = all ? gathered.tasks : (q.data?.tasks ?? []);
   const items = tasks.map((t) =>
-    all ? toItem(t, today, projectsOf(t.spaceId), spaceOf(t.spaceId)) : toItem(t, today, spaceProjects),
+    all
+      ? toItem(t, today, projectsOf(t.spaceId), spaceOf(t.spaceId), { day, now })
+      : toItem(t, today, spaceProjects, undefined, { day, now }),
   );
   // In All spaces the ring counts what the filters leave (at once; the list follows a beat later).
   const projectName = (t: Task) =>
@@ -636,6 +651,7 @@ function DaySheet({
   else {
     // What the plain list and the grouped one share.
     const rows = {
+      ...rowTimes,
       menu: rowMenu,
       linkFor: rowLink,
       compact,

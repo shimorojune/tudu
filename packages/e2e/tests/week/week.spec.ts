@@ -268,7 +268,7 @@ test.describe('week', () => {
     await expect(p.getByRole('textbox', { name: 'Task title' })).toHaveValue('Pay the electricity bill');
     await expect(p.getByRole('button', { name: 'Previous task' })).toHaveCount(0);
     await p.getByRole('button', { name: 'Planned', exact: true }).click();
-    await p.locator('.tp-td-pop').getByRole('button', { name: 'Move to the Backlog' }).click();
+    await p.locator('.tp-td-pop').getByRole('button', { name: 'Backlog' }).click();
     await expect(page.locator('.tp-toast')).toHaveText(/Moved to the Backlog/);
     // and the toast goes on its own (the app runs in StrictMode, which once kept it)
     await expect(page.locator('.tp-toast')).toHaveCount(0, { timeout: 5000 });
@@ -416,7 +416,7 @@ test.describe('week', () => {
       .click();
     const p = second.getByRole('dialog', { name: 'Task details' });
     await p.getByRole('button', { name: 'Planned', exact: true }).click();
-    await p.locator('.tp-td-pop').getByRole('button', { name: 'Move to the Backlog' }).click();
+    await p.locator('.tp-td-pop').getByRole('button', { name: 'Backlog' }).click();
     await expect.poll(() => titlesOf(backlogList(page)), { timeout: 10_000 }).toEqual(['From the first tab']);
     await expect.poll(() => titlesOf(tileList(page, SUNDAY_LIST))).toEqual(['From the second tab']);
     await second.close();

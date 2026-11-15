@@ -92,7 +92,7 @@ describe('QuickAdd', () => {
     ).toBe(true);
   });
 
-  it('C04-U03 Due: the hover hint says how far; the chip reads the date, red when overdue; Remove due date clears it', async () => {
+  it('C04-U03 Due: the hover hint says how far; the chip reads the date, red when overdue; No date clears it', async () => {
     const user = userEvent.setup();
     render(<Bar />);
     await user.click(chip('Add a due date'));
@@ -112,7 +112,7 @@ describe('QuickAdd', () => {
     await user.click(chip('Due Fri 16 Oct'));
     await user.click(
       within(document.querySelector('.tp-qa-pop') as HTMLElement).getByRole('button', {
-        name: 'Remove due date',
+        name: 'No date',
       }),
     );
     expect(chip('Add a due date')).toBeInTheDocument();
@@ -352,6 +352,9 @@ describe('QuickAdd', () => {
       title: 'Book the meeting room',
       planned: '2026-10-19',
       due: null,
+      until: null,
+      time: null,
+      dueAt: null,
       projectId: null,
       note: '',
       attachments: [],
@@ -689,5 +692,46 @@ describe('QuickAdd', () => {
       ).toBeInTheDocument();
       expect(onNewProject).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('QuickAdd times (docs/plans/task-times.md)', () => {
+  it('TT-U15 the chips open the pickers; the chips and the foot read the times; the task is made with them', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(<Bar onSave={onSave} calendar={{ now: new Date(2026, 9, 18, 14, 10) }} />);
+    await user.click(chip('Planned for: Today'));
+    let pop = document.querySelector('.tp-qa-pop') as HTMLElement;
+    await user.click(within(pop).getByRole('button', { name: 'Add a time' }));
+    expect(foot()).toBe('Lands on Today at 3 PM');
+    await user.click(within(pop).getByRole('switch', { name: 'Several days' }));
+    await user.click(within(pop).getByRole('button', { name: /^21 October/ }));
+    expect(foot()).toBe('Lands on Today at 3 PM, every day until Wed 21 Oct');
+    await user.keyboard('{Escape}');
+    await user.click(chip('Add a due date'));
+    pop = document.querySelector('.tp-qa-pop:not(.tp-pop-leaving)') as HTMLElement;
+    expect(within(pop).getByRole('button', { name: 'No date' })).toBeInTheDocument();
+    await user.click(within(pop).getByRole('button', { name: 'Add a time' }));
+    expect(foot()).toBe('Lands on Today at 3 PM, every day until Wed 21 Oct · due Sun 18 Oct 3 PM');
+    await user.type(screen.getByRole('textbox', { name: 'Task title' }), 'Run the offsite{Enter}');
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Run the offsite',
+        planned: TODAY,
+        until: '2026-10-21',
+        time: { start: '15:00', end: '16:00' },
+        due: TODAY,
+        dueAt: '15:00',
+      }),
+    );
+  });
+
+  it('TT-U16 the chips hold their icons inside the words', () => {
+    render(<Bar />);
+    for (const name of ['Planned for: Today', 'Add a due date']) {
+      const ic = chip(name).querySelector('.tp-bl-ic');
+      expect(ic, name).not.toBeNull();
+      expect(ic!.querySelector('svg')).not.toBeNull();
+    }
   });
 });

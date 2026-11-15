@@ -48,6 +48,7 @@ import { openInJira } from '../../app/jira';
 import { taskStore, useOnline } from '../../app/tasks';
 import { useViewport, type Viewport } from '../../app/viewport';
 import { useWorkingDay } from '../../app/workingDay';
+import { rowTimes } from '../../app/times';
 import { AllBanners, OfflineBanner, monthAround, openInSpace, toItem } from '../today/TodayPage';
 import { TaskPanel, type OpenTask } from '../today/TaskPanel';
 import { useProjectGroups } from '../../app/grouped';
@@ -372,6 +373,8 @@ function BacklogSheet({
           ? taskStore.moveInAll(t.key, to, at, order)
           : taskStore.place(t.key, to, at),
       onDueChange: (t: TaskItem, due: IsoDate | null) => taskStore.due(t.key, due),
+      timeWords: rowTimes.timeWords,
+      onDueTimeChange: rowTimes.onDueTimeChange,
       onOpenTask: (t: TaskItem) => onOpenTask(t.key, t.id),
       selectedKey: openKey,
       locateKey: locate && locate.day === null ? `${locate.id}:${locate.nonce}` : undefined,

@@ -162,6 +162,13 @@ export interface DesktopBridge {
   notifyNudge(title: string, body: string): Promise<void>;
   /** System Settings › Notifications, on Tudu's own row where macOS can. */
   openNotificationSettings(): void;
+  /**
+   * Times on Planned and Due (docs/plans/task-times.md): replace the pending time notifications with these; answers
+   * how many macOS took. Rejects on an app from before times, or when macOS can't notify.
+   */
+  scheduleTimes(items: TimeNotice[]): Promise<number>;
+  /** No time notifications left pending (the switch off). */
+  cancelTimes(): Promise<void>;
   /** Settings › Shortcuts: the From anywhere shortcuts, checked with macOS first. Rejects on an app from before this. */
   shortcuts(): Promise<GlobalShortcutRow[]>;
   /**
@@ -187,7 +194,19 @@ export type DesktopEvent =
   | 'update:status'
   | 'note:open'
   | 'nudges:pause'
+  | 'times:cross'
+  | 'times:open'
   | 'shortcuts:changed';
+
+/** One time notification: at a task's planned start, or at its due time. */
+export interface TimeNotice {
+  taskId: string;
+  kind: 'start' | 'due';
+  title: string;
+  body: string;
+  /** When, in ms since the epoch. */
+  atMs: number;
+}
 
 /** The look the app builds its windows with. */
 export interface Appearance {
@@ -226,6 +245,8 @@ export interface DesktopFake {
   /** Notifications as the fake macOS has them; `notifyAnswer` is what asking gives (the status follows it). */
   notify?: NotifyPermission;
   notifyAnswer?: NotifyPermission;
+  /** The time notifications the fake macOS holds pending. */
+  times?: TimeNotice[];
   /** The nudges the fake app posted, newest last. */
   nudges?: Array<{ title: string; body: string }>;
   /** The From anywhere shortcuts as the fake app has them; `taken` lists keys another app holds. */
@@ -413,6 +434,15 @@ function fakeBridge(f: DesktopFake): DesktopBridge {
       (f.nudges ??= []).push({ title, body });
     },
     openNotificationSettings: () => call('openNotificationSettings'),
+    scheduleTimes: async (items) => {
+      call('scheduleTimes', items);
+      f.times = items;
+      return items.length;
+    },
+    cancelTimes: async () => {
+      call('cancelTimes');
+      f.times = [];
+    },
     shortcuts: async () => {
       call('shortcuts');
       if (f.noShortcuts) throw new Error('Command shortcuts_get not found');
@@ -498,6 +528,8 @@ function tauriBridge(t: NonNullable<Window['__TAURI_INTERNALS__']>): DesktopBrid
     notifyStatus: () => invoke<NotifyPermission>('notify_status').catch(() => 'unavailable' as const),
     notifyNudge: (title, body) => invoke<void>('notify_nudge', { title, body }),
     openNotificationSettings: () => quiet(invoke('open_notification_settings')),
+    scheduleTimes: (items) => invoke<number>('schedule_times', { items }),
+    cancelTimes: () => invoke<void>('cancel_times'),
     shortcuts: () => invoke<GlobalShortcutRow[]>('shortcuts_get'),
     setShortcut: (id, accelerator) => invoke<GlobalShortcutRow[]>('shortcuts_set', { id, accelerator }),
     on: (event, fn) => {

@@ -319,7 +319,7 @@ test.describe('backlog', () => {
       'Clean up the old staging buckets',
     );
     await expect(page).toHaveURL(/\/backlog\?task=ME-2$/);
-    if (phone()) await expect(p.getByRole('button', { name: 'Backlog' })).toBeVisible();
+    if (phone()) await expect(p.locator('.tp-td-back')).toBeVisible();
     await expect(p.getByRole('button', { name: 'Planned', exact: true })).toHaveText(/Backlog/);
     await p.getByRole('button', { name: 'Next task' }).click();
     await expect(p.getByRole('textbox', { name: 'Task title' })).toHaveValue('Draft the Q4 hiring plan');
@@ -334,7 +334,7 @@ test.describe('backlog', () => {
       .poll(() => titlesOf(todoList(page)))
       .toEqual(['Clean up the old staging buckets', 'Draft the Q4 hiring plan']);
     await expect(backlogCount(page)).toHaveText('2 tasks');
-    if (phone()) await p.getByRole('button', { name: 'Backlog' }).click();
+    if (phone()) await p.locator('.tp-td-back').click();
     else await p.getByRole('button', { name: 'Close' }).click();
     await expect(panel(page)).toHaveCount(0);
     await expect(page).toHaveURL(/\/backlog$/);

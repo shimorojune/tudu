@@ -18,6 +18,7 @@ import { openInJira } from '../../app/jira';
 import { useRowMenu } from '../../app/rowMenu';
 import { taskStore } from '../../app/tasks';
 import { monthAround, toItem } from '../today/TodayPage';
+import { rowTimes } from '../../app/times';
 
 const MIN_HEIGHT = 560;
 
@@ -98,6 +99,8 @@ export function BacklogBeside({
       onMoveTask: (t: TaskItem, to: IsoDate | null, _from: IsoDate | null, at?: number) =>
         taskStore.place(t.key, to, at),
       onDueChange: (t: TaskItem, due: IsoDate | null) => taskStore.due(t.key, due),
+      timeWords: rowTimes.timeWords,
+      onDueTimeChange: rowTimes.onDueTimeChange,
       onOpenTask: (t: TaskItem) => onOpenTask(t.key, t.id),
       selectedKey: openKey,
       onAddSubtask: (t: TaskItem, title: string) => taskStore.addSubtask(spaceIdOf(t.key), t.key, title),

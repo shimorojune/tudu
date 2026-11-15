@@ -1,6 +1,7 @@
 import { dayWord } from './carried';
 import { formatDay, type IsoDate } from './dates';
 import type { HistoryEvent } from './tasks';
+import { fmtBlock, fmtTime, spanWords } from './times';
 
 /** The words of one history event: "Due date set to Fri 16 Oct", "Moved from the Backlog to Today". */
 export function historyWords(e: HistoryEvent, today: IsoDate): string {
@@ -9,7 +10,15 @@ export function historyWords(e: HistoryEvent, today: IsoDate): string {
       if (e.source === 'connector' && e.key) return `Created from ${e.key}`;
       return e.source === 'quick-add' ? 'Created from Quick Add' : 'Created';
     case 'due.set':
-      return `Due date set to ${formatDay(e.due)}`;
+      return `Due date set to ${formatDay(e.due)}${e.dueAt ? `, ${fmtTime(e.dueAt)}` : ''}`;
+    case 'time.set':
+      return `Time set to ${fmtBlock(e.time)}`;
+    case 'time.cleared':
+      return 'Time removed';
+    case 'span.set':
+      return `Planned ${spanWords(e.from, e.until)}`;
+    case 'span.cleared':
+      return 'Back to one day';
     case 'due.cleared':
       return 'Due date removed';
     case 'moved':

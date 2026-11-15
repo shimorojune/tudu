@@ -3,16 +3,23 @@ import {
   addDays,
   parseJiraKey,
   dueDistance,
+  fmtBlock,
+  fmtTime,
   formatDay,
   relativeDayLabel,
+  spanFact,
+  type Clock,
   type IsoDate,
   type TaskVisibility,
+  type TimeBlock,
+  type TimeWordsOptions,
 } from '@tudu/core';
 import {
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
   type RefObject,
@@ -29,6 +36,8 @@ import { Checkbox } from './Checkbox';
 import { IconButton } from './IconButton';
 import { Menu, MenuList } from './Menu';
 import { MiniCalendar, type MiniCalendarProps } from './MiniCalendar';
+import { PlanPicker } from './PlanPicker';
+import { TimeChoice } from './TimeChoice';
 import { PersonDot } from './PersonDot';
 import { ProjectMenu, type ProjectOption } from './ProjectMenu';
 import { RichTextContent, RichTextEditor, toHtml } from './RichTextEditor';
@@ -68,6 +77,10 @@ export interface TaskDetailTask {
   day: IsoDate | null;
   carried?: TaskCarried;
   due: IsoDate | null;
+  /** Times (docs/plans/task-times.md): the due time, the planned block, the last day of several. */
+  dueAt?: Clock | null;
+  time?: TimeBlock | null;
+  until?: IsoDate | null;
   visibility: TaskVisibility;
   /** The project it belongs to, if any. */
   projectId?: string | null;
@@ -93,7 +106,9 @@ export interface TaskDetailProps {
   /** "Only you", and the space once there is one. */
   visibility: VisibilityOption[];
   /** The month's dots for the Planned picker. */
-  calendar?: Pick<MiniCalendarProps, 'marks' | 'month'>;
+  calendar?: Pick<MiniCalendarProps, 'marks' | 'month' | 'now'>;
+  /** 12-hour words unless the system says 24-hour. */
+  timeWords?: TimeWordsOptions;
   /** The space's projects for the Project fact. Without the list the fact stays out. */
   projects?: ProjectOption[];
   /** Where attachment chips link: the API's origin. */
@@ -126,6 +141,12 @@ export interface TaskDetailProps {
   onCross?: (done: boolean) => void;
   onMove?: (day: IsoDate | null) => void;
   onDue?: (day: IsoDate | null) => void;
+  /** The planned block; null takes it off. Without it there is no time under Planned. */
+  onTime?: (time: TimeBlock | null) => void;
+  /** Several days, from `day` to `until` (null: one day). Without it there is no Several days. */
+  onSpan?: (day: IsoDate, until: IsoDate | null) => void;
+  /** The due time; null takes it off. */
+  onDueTime?: (at: Clock | null) => void;
   onVisibility?: (v: TaskVisibility) => void;
   onProject?: (projectId: string | null) => void;
   /**
@@ -212,6 +233,18 @@ function FactIcon({ name }: { name: keyof typeof FACT_ICONS }) {
   );
 }
 
+/** A fact's label with its icon inside the words, on their baseline (.tp-bl-ic). */
+function FactLabel({ icon, label }: { icon: keyof typeof FACT_ICONS; label: string }) {
+  return (
+    <span>
+      <span className="tp-bl-ic" style={{ '--ic': '15px' } as CSSProperties} aria-hidden="true">
+        <FactIcon name={icon} />
+      </span>
+      {label}
+    </span>
+  );
+}
+
 interface FactProps {
   icon: keyof typeof FACT_ICONS;
   label: string;
@@ -239,8 +272,7 @@ function Fact({ icon, label, empty, open, onOpen, pop, children, readOnly }: Fac
     return (
       <div className="tp-td-prop">
         <dt>
-          <FactIcon name={icon} />
-          <span>{label}</span>
+          <FactLabel icon={icon} label={label} />
         </dt>
         <dd>
           <span className={cx('tp-td-val tp-td-ro', empty && 'tp-td-empty')} aria-label={label}>
@@ -252,8 +284,7 @@ function Fact({ icon, label, empty, open, onOpen, pop, children, readOnly }: Fac
   return (
     <div className="tp-td-prop" ref={box} onKeyDown={onKey}>
       <dt>
-        <FactIcon name={icon} />
-        <span>{label}</span>
+        <FactLabel icon={icon} label={label} />
       </dt>
       <dd>
         <button
@@ -506,44 +537,51 @@ export function TaskDetail(p: TaskDetailProps) {
         open={pop === 'day'}
         onOpen={(v) => setPop(v ? 'day' : null)}
         pop={
-          <MiniCalendar
-            {...cal}
-            today={today}
-            selected={t.day}
-            month={(t.day ?? today).slice(0, 7)}
-            presets={[
-              { label: 'Today', on: t.day === today, value: today },
-              { label: 'Tomorrow', on: t.day === tomorrow, value: tomorrow },
-            ]}
-            onPreset={(v) => {
-              setPop(null);
-              if (v !== t.day) p.onMove?.(v);
-            }}
-            onPick={(k) => {
-              setPop(null);
-              if (k !== t.day) p.onMove?.(k);
-            }}
-            clearLabel={t.day ? 'Move to the Backlog' : undefined}
-            onClear={
-              t.day
-                ? () => {
-                    setPop(null);
-                    p.onMove?.(null);
-                  }
-                : undefined
-            }
-            hint={(k) => ({
-              text:
-                k === t.day
-                  ? `Keep it on ${k === today ? 'today' : formatDay(k)}`
-                  : `Move to ${k === today ? 'today' : k === tomorrow ? 'tomorrow' : formatDay(k)}`,
-              tone: k === today ? 'today' : '',
-            })}
-            hintEmpty="Pick a day for it"
-          />
+          <div className="tp-root tp-calwrap">
+            <PlanPicker
+              cal={{ ...cal, today, month: (t.day ?? today).slice(0, 7) }}
+              today={today}
+              day={t.day}
+              until={t.until ?? null}
+              time={t.time ?? null}
+              now={cal.now}
+              presets={[
+                { label: 'Today', on: t.day === today && !t.until, value: today },
+                { label: 'Tomorrow', on: t.day === tomorrow && !t.until, value: tomorrow },
+                { label: 'Backlog', on: !t.day, value: null },
+              ]}
+              onPreset={(v) => {
+                setPop(null);
+                if (v !== t.day || t.until) p.onMove?.(v);
+              }}
+              onDay={(k) => {
+                setPop(null);
+                if (k !== t.day) p.onMove?.(k);
+              }}
+              onSpan={p.onSpan}
+              onTime={p.onTime}
+              hint={(k) => ({
+                text:
+                  k === t.day
+                    ? `Keep it on ${k === today ? 'today' : formatDay(k)}`
+                    : `Move to ${k === today ? 'today' : k === tomorrow ? 'tomorrow' : formatDay(k)}`,
+                tone: k === today ? 'today' : '',
+              })}
+              hintEmpty="Pick a day for it"
+            />
+          </div>
         }
       >
-        <span>{dayLabel(t.day, today)}</span>
+        {t.day && t.until ? (
+          <span key={`sp${t.day}${t.until}`}>{spanFact(t.day, t.until, t.time ?? null, p.timeWords)}</span>
+        ) : (
+          <span>{dayLabel(t.day, today)}</span>
+        )}
+        {t.day && !t.until && t.time ? (
+          <span key={`tm${t.time.start}${t.time.end}`} className="tp-td-time">
+            {fmtBlock(t.time, p.timeWords)}
+          </span>
+        ) : null}
         {t.carried ? (
           <span className={cx('tp-td-note', t.carried.slipping && 'tp-od')}>
             carried from {t.carried.label}
@@ -558,35 +596,56 @@ export function TaskDetail(p: TaskDetailProps) {
         open={pop === 'due'}
         onOpen={(v) => setPop(v ? 'due' : null)}
         pop={
-          <MiniCalendar
-            today={today}
-            selected={due ?? undefined}
-            month={(due ?? today).slice(0, 7)}
-            marks={{}}
-            clearLabel={due ? 'Remove due date' : undefined}
-            onClear={
-              due
-                ? () => {
-                    setPop(null);
-                    p.onDue?.(null);
-                  }
-                : undefined
-            }
-            onPick={(k) => {
-              setPop(null);
-              if (k !== due) p.onDue?.(k);
-            }}
-            hint={(k) => {
-              const r = dueDistance(k, today);
-              return { text: `${formatDay(k)} · ${r.tone === 'today' ? 'due today' : r.text}`, tone: r.tone };
-            }}
-            hintEmpty="Pick a due date"
-          />
+          <div className="tp-root tp-calwrap">
+            <MiniCalendar
+              today={today}
+              selected={due ?? undefined}
+              month={(due ?? today).slice(0, 7)}
+              marks={{}}
+              presets={[
+                { label: 'Today', on: due === today, value: today },
+                { label: 'Tomorrow', on: due === tomorrow, value: tomorrow },
+                { label: 'No date', on: !due, value: null },
+              ]}
+              onClear={() => {
+                setPop(null);
+                if (due) p.onDue?.(null);
+              }}
+              onPick={(k) => {
+                setPop(null);
+                if (k !== due) p.onDue?.(k);
+              }}
+              hint={(k) => {
+                const r = dueDistance(k, today);
+                return {
+                  text: `${formatDay(k)} · ${r.tone === 'today' ? 'due today' : r.text}`,
+                  tone: r.tone,
+                };
+              }}
+              hintEmpty="Pick a due date"
+            />
+            {p.onDueTime ? (
+              <TimeChoice
+                kind="due"
+                value={due ? (t.dueAt ?? null) : null}
+                isToday={(due ?? today) === today}
+                now={cal.now}
+                onChange={(v) => {
+                  // A time with no due day is due today at that time.
+                  if (!due && v) p.onDue?.(today);
+                  p.onDueTime?.(v);
+                }}
+              />
+            ) : null}
+          </div>
         }
       >
         {due ? (
           <>
-            <span className={dueRel?.tone === 'overdue' ? 'tp-td-od' : undefined}>{formatDay(due)}</span>
+            <span className={dueRel?.tone === 'overdue' ? 'tp-td-od' : undefined}>
+              {formatDay(due)}
+              {t.dueAt ? `, ${fmtTime(t.dueAt, p.timeWords)}` : ''}
+            </span>
             <span
               className={cx(
                 'tp-td-note',

@@ -3326,3 +3326,75 @@ html[data-scrambled] .tp-avatar.tp-photo img, html[data-scrambled] .tp-pdot.tp-p
   .tp-ctxs-track { transition-duration: 120ms; }
   .tp-item.tp-ctx-hold .tp-row { transform: none; }
 }
+
+/* ---- Times on Planned and Due, Planned over several days (docs/plans/task-times.md) ---- */
+/* Icons inside a line of words hang off the text baseline (.tp-bl-ic): the icon meets the capitals whatever line box
+   the platform builds for the font (Geist on macOS draws its line box lower than Chromium on Linux). */
+.tp-bl-ic { display: inline-block; vertical-align: calc(1em * .355 - var(--ic, 14px) / 2); margin-right: 8px; }
+.tp-bl-ic svg { display: block; }
+.tp-sg .tp-bl-ic { margin-right: 4px; }
+.tp-byline .tp-sg .tp-bl-ic { margin-right: 5px; }
+.tp-td-prop dt .tp-bl-ic { margin-right: 9px; }
+.tp-qa-chip .tp-bl-ic { margin-right: 6px; }
+.tp-sc-l .tp-bl-ic, .tp-tc-add .tp-bl-ic { color: var(--muted-foreground); }
+.tp-cal-h > span:first-child { text-box: trim-both cap alphabetic; }
+/* The time under a day picker. */
+.tp-tc { box-sizing: border-box; margin: 2px 12px 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.tp-tc.tp-hsizing { overflow: hidden; transition: height var(--dur-fold) var(--ease-settle); }
+.tp-tc-add { display: flex; align-items: center; gap: 8px; width: 100%; height: 32px; padding: 0 8px; border-radius: var(--radius-sm); font-size: 12.5px; font-weight: 600; color: var(--foreground-2);
+  transition: background-color var(--dur-menu) var(--ease-change), color var(--dur-menu) var(--ease-change); }
+.tp-tc-add:hover { background: var(--accent); color: var(--foreground); }
+/* Room around the row so a focus ring is never cut by the clip. */
+.tp-tc-open { margin: -4px; padding: 4px; overflow: hidden; animation: tp-label-in var(--dur-menu) var(--ease-arrive) both; }
+.tp-tc-row { display: flex; align-items: center; gap: 6px; }
+.tp-tf { flex: 1; min-width: 0; display: inline-flex; align-items: center; height: 32px; padding: 0 2px 0 6px; border-radius: var(--radius-sm); box-shadow: inset 0 0 0 1px var(--border);
+  font-size: 13px; font-weight: 500; color: var(--foreground); font-variant-numeric: tabular-nums; cursor: default; user-select: none;
+  transition: box-shadow var(--dur-menu) var(--ease-change), background-color var(--dur-menu) var(--ease-change); }
+.tp-tf:hover { background: var(--accent); }
+.tp-tf:focus-within { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ring, var(--border-strong)); }
+.tp-tf.tp-bad { box-shadow: inset 0 0 0 1.5px var(--destructive); }
+.tp-tf-seg { padding: 2px 3px; border-radius: 4px; outline: none; transition: background-color var(--dur-menu) var(--ease-change), color var(--dur-menu) var(--ease-change); }
+.tp-tf-seg[data-seg="p"] { margin-left: 3px; cursor: pointer; }
+.tp-root .tp-tf-seg:focus-visible { outline: none; box-shadow: none; }
+.tp-tf-seg:focus { background: var(--primary); color: var(--primary-foreground); }
+.tp-tf-c { color: var(--muted-foreground); }
+.tp-tf-step { margin-left: auto; display: flex; flex-direction: column; }
+.tp-tf-step button { display: grid; place-items: center; width: 18px; height: 13px; border-radius: 3px; color: var(--muted-foreground); transition: background-color var(--dur-menu) var(--ease-change), color var(--dur-menu) var(--ease-change); }
+.tp-tf-step button:hover { background: var(--accent-2, var(--border)); color: var(--foreground); }
+.tp-tc-to { flex: none; font-size: 12.5px; color: var(--muted-foreground); }
+.tp-tc-x { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius-sm); color: var(--muted-foreground);
+  transition: background-color var(--dur-menu) var(--ease-change), color var(--dur-menu) var(--ease-change); }
+.tp-tc-x:hover { background: var(--destructive-soft); color: var(--destructive); }
+.tp-tc-msg { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows var(--dur-fold) var(--ease-settle), opacity var(--dur-menu) var(--ease-change); }
+.tp-tc-msg > div { min-height: 0; overflow: hidden; }
+.tp-tc-msg.tp-in { grid-template-rows: 1fr; opacity: 1; }
+.tp-tc-warn { padding: 6px 6px 0; font-size: 12.5px; line-height: 18px; color: var(--destructive); }
+/* Several days: one row under the month. */
+.tp-sc { margin-bottom: 0; }
+.tp-sc + .tp-tc { border-top: 0; padding-top: 2px; }
+.tp-sc-row { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 2px 0 8px; cursor: pointer; }
+.tp-sc-l { font-size: 12.5px; font-weight: 600; color: var(--foreground-2); white-space: nowrap; }
+.tp-sc-words { flex: 1; min-width: 0; font-size: 12.5px; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: tp-label-in var(--dur-menu) var(--ease-arrive) both; }
+/* The calendar's range, and its hint line that folds open and shut. */
+.tp-cal-d.tp-range { background: var(--accent); border-radius: 0; }
+.tp-cal-d.tp-range.tp-range-a { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.tp-cal-d.tp-range.tp-range-z { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.tp-cal-d.tp-range.tp-sel { background: var(--primary); }
+.tp-cal-hintw { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows var(--dur-fold) var(--ease-settle), opacity var(--dur-menu) var(--ease-change); }
+.tp-cal-hintw.tp-in { grid-template-rows: 1fr; opacity: 1; }
+.tp-cal-hintw > div { min-height: 0; overflow: hidden; }
+.tp-cal-ht { display: block; overflow: hidden; text-overflow: ellipsis; animation: tp-label-in var(--dur-menu) var(--ease-arrive) both; }
+/* A span's later days: the row is tinted back until it is hovered or focused. */
+.tp-row.tp-span-on { opacity: .58; transition: opacity var(--dur-menu) var(--ease-change); }
+.tp-row.tp-span-on:hover, .tp-row.tp-span-on:focus-within { opacity: 1; }
+.tp-sg-time span, .tp-td-time { font-variant-numeric: tabular-nums; }
+.tp-td-time { animation: tp-label-in var(--dur-menu) var(--ease-arrive) both; }
+.tp-td-time::before { content: '·'; margin-right: 6px; color: var(--muted-foreground); }
+@media (prefers-reduced-motion: reduce) {
+  .tp-tc-open { animation: tp-label-in 120ms linear both; }
+  .tp-tc-msg, .tp-cal-hintw { transition: opacity 120ms linear; }
+  .tp-td-time, .tp-sc-words, .tp-cal-ht { animation: none; }
+}
+/* A month with rows under it (Several days, the time): one card. */
+.tp-calwrap { width: 280px; border-radius: var(--radius-lg); background: var(--popover); color: var(--popover-foreground); box-shadow: var(--shadow-pop); padding-bottom: 2px; }
+.tp-calwrap .tp-cal { background: transparent; box-shadow: none; }
