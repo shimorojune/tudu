@@ -37,6 +37,11 @@ const GROUPS: Record<string, GroupEntry[]> = {};
 export const FLIGHT_MS = 300;
 /** A hand-over whose row never shows up in the other list (the move was refused, the list went away) ends here. */
 export const FLIGHT_CAP_MS = 600;
+/**
+ * A reorder the page never renders (it refused the move, or failed) lets go of the held rows after this long, and the
+ * row glides back into its old slot.
+ */
+export const HOLD_CAP_MS = 400;
 /** How long the ink line and the list's wash take to fade after a drop. */
 export const DROP_FADE_MS = 120;
 
@@ -238,7 +243,16 @@ export function useReorder(
   options: ReorderOptions = {},
 ): (e: ReactPointerEvent<HTMLElement>) => void {
   const st = useRef<DragState | null>(null);
-  const flip = useRef<{ key: string; top: number } | null>(null);
+  // A drop in this list holds every row where the drag left it until the page renders the new order (#113): the
+  // store may answer a task later (React Query batches with setTimeout), and the frame between must never show the
+  // old order. `to` is where the row should then be; `rows` are the ones still carrying the drag's transforms.
+  const flip = useRef<{
+    key: string;
+    top: number;
+    to: number;
+    rows: HTMLElement[];
+    timer: ReturnType<typeof setTimeout>;
+  } | null>(null);
   const opts = useRef(options);
   const move = useRef(onMove);
   useLayoutEffect(() => {
@@ -258,16 +272,38 @@ export function useReorder(
     }
     const f = flip.current;
     if (!f || !c) return;
-    flip.current = null;
     const el = itemByKey(c, f.key);
-    if (el) settleFrom(el, f.top);
+    // Any other render (the drag's own cleanup, a tick elsewhere) leaves the hold alone: only the new order ends it.
+    if (!el || items(c).indexOf(el) !== f.to) return;
+    letGo(true);
   });
+
+  /** Ends a held drop: the rows drop their drag transforms at once, and the row glides in from where it was let go. */
+  function letGo(glide: boolean) {
+    const f = flip.current;
+    if (!f) return;
+    flip.current = null;
+    clearTimeout(f.timer);
+    f.rows.forEach((n) => {
+      n.classList.remove('tp-shift', 'tp-dragging');
+      n.style.transition = 'none';
+      n.style.transform = '';
+    });
+    void containerRef.current?.offsetWidth;
+    f.rows.forEach((n) => {
+      n.style.transition = '';
+    });
+    const el = glide && containerRef.current ? itemByKey(containerRef.current, f.key) : null;
+    if (el) settleFrom(el, f.top);
+  }
 
   useEffect(() => {
     if (!touchGuard++) window.addEventListener('touchmove', blockTouchScroll, { passive: false });
     return () => {
       if (!--touchGuard) window.removeEventListener('touchmove', blockTouchScroll);
       st.current?.cancel();
+      if (flip.current) clearTimeout(flip.current.timer);
+      flip.current = null;
     };
   }, []);
 
@@ -352,6 +388,7 @@ export function useReorder(
     if (s.active) return;
     // a row still gliding from the last drop lands at once, so this drag measures a settled page
     stopFlight();
+    letGo(false);
     s.active = true;
     dragging = true;
     s.list = items(s.c);
@@ -520,21 +557,29 @@ export function useReorder(
           return;
         }
         const top = s.rects[s.from]!.top + s.dy;
-        resetRows();
         swallowNextClick();
         const key = s.item.getAttribute('data-key') ?? '';
         const { from, to } = s;
-        cleanup(s);
         const held = opts.current.onHoldRelease;
+        if (from !== to && !(held && s.touch && !s.grip && Math.hypot(s.dx, s.dy) <= TOUCH_SLOP_PX)) {
+          // Hold: the others stay where they made room and the row stays where it was let go (straightened, still
+          // lifted) until the page renders the new order; the layout effect then settles it.
+          s.item.style.transition = 'none';
+          s.item.style.transform = `translateY(${s.dy}px)`;
+          cleanup(s);
+          const h = { key, top, to, rows: s.list, timer: setTimeout(() => letGo(true), HOLD_CAP_MS) };
+          flip.current = h;
+          move.current(from, to, key);
+          return;
+        }
+        resetRows();
+        cleanup(s);
         if (held && s.touch && !s.grip && Math.hypot(s.dx, s.dy) <= TOUCH_SLOP_PX) {
           settleFrom(s.item, top);
           held(key);
           return;
         }
-        if (from !== to) {
-          flip.current = { key, top };
-          move.current(from, to, key);
-        } else settleFrom(s.item, top);
+        settleFrom(s.item, top);
       },
     };
     if (s.touch && !s.grip) s.timer = setTimeout(() => begin(s), TOUCH_HOLD_MS);

@@ -184,6 +184,49 @@ describe('SubtaskList', () => {
     pointer(window, 'pointerup', 50, 110, 'touch');
   });
 
+  it('C03-U31 a drop holds the subtasks where the drag left them until the page renders the move, then settles', () => {
+    vi.useFakeTimers();
+    function Late() {
+      const [subs, setSubs] = useState(THREE);
+      return (
+        <SubtaskList
+          variant="panel"
+          parentTitle="Review Quick Add PR"
+          subtasks={subs}
+          onReorder={(_, from, to) => {
+            setTimeout(() => setSubs((l) => moveItem(l, from, to)), 0);
+          }}
+        />
+      );
+    }
+    const { container } = render(<Late />);
+    layRows(container);
+    const third = container.querySelector<HTMLElement>('[data-key="c"]')!;
+    pointer(within(third).getByText('Leave review comments'), 'pointerdown', 50, 100 + 2 * ROW + 10);
+    pointer(window, 'pointermove', 50, 100 + 2 * ROW + 20);
+    pointer(window, 'pointermove', 50, 100);
+    pointer(window, 'pointerup', 50, 100);
+    expect(titles(container)).toEqual([
+      'Pull the branch',
+      'Run it on a clean profile',
+      'Leave review comments',
+    ]);
+    expect(third.style.transform).toBe(`translateY(${-2 * ROW - 10}px)`);
+    expect(container.querySelector<HTMLElement>('[data-key="a"]')!.style.transform).toBe(
+      `translateY(${ROW}px)`,
+    );
+    act(() => {
+      vi.advanceTimersByTime(0);
+    });
+    expect(titles(container)).toEqual([
+      'Leave review comments',
+      'Pull the branch',
+      'Run it on a clean profile',
+    ]);
+    expect(container.querySelector<HTMLElement>('[data-key="a"]')!.style.transform).toBe('');
+    expect(container.querySelector('[data-key="c"]')).toHaveClass('tp-settling');
+  });
+
   it('C03-U13 under a row: no tab stops while folded, and the row’s own clothes', () => {
     const { container } = render(<List variant="row" shown={false} />);
     expect(container.querySelector('.tp-subs')).not.toBeNull();
