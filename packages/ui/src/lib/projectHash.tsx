@@ -142,11 +142,10 @@ export function useProjectHash(o: ProjectHashOptions): ProjectHash {
 
   // Opens above when the box that scrolls has no room below and more above, so opening it never scrolls the list.
   const start = tok ? tok.start : -1;
+  const waiting = !!o.loading;
+  const failed = !!err;
   useLayoutEffect(() => {
-    if (start < 0) {
-      setFlip(false);
-      return;
-    }
+    if (start < 0) return;
     const el = o.input.current;
     const m = box.current;
     if (!el || !m || o.up) return;
@@ -156,7 +155,7 @@ export function useProjectHash(o: ProjectHashOptions): ProjectHash {
     const below = b.bottom - r.bottom;
     const above = r.top - b.top;
     setFlip(below < m.offsetHeight + 8 && above > below);
-  }, [start, rows, !!o.loading, !!err, o.up, o.input]);
+  }, [start, rows, waiting, failed, o.up, o.input]);
 
   function pick(p: HashProject) {
     const el = o.input.current;
