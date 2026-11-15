@@ -46,6 +46,10 @@ export interface TaskRow {
   day: string | null;
   done: boolean;
   due: string | null;
+  /** Times (docs/plans/task-times.md): the due time, the planned block, the last day of several. */
+  dueAt?: string | null;
+  time?: { start: string; end: string } | null;
+  until?: string | null;
   projectId: string | null;
   visibility: 'space' | 'me';
   ownerId: string | null;

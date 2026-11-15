@@ -1,6 +1,6 @@
 # Times on Planned and Due, and Planned over several days
 
-Status: proposal, awaiting Rohit's approval. Canvas approved by Rohit on 15 Nov 2026 ("looks good"), canvas Version 271,
+Status: approved by Rohit on 15 Nov 2026 ("approved"); built on `claude/project-thread-15i6da`. Canvas approved by Rohit on 15 Nov 2026 ("looks good"), canvas Version 271,
 page "Task detail": boards `D-Times`(+Dark, the prototype), `D-TimeStates`(+Dark), `D-TimeMotion`, `D-TimeWeek`(+Dark)
 and `D-TimeDays`(+Dark). No code yet.
 

@@ -170,6 +170,12 @@ export type TaskClocks = Partial<
     | 'notes'
     | 'visibility'
     | 'project'
+    /** The planned block (start and end on the wall clock). */
+    | 'time'
+    /** The time on the due day. */
+    | 'dueAt'
+    /** The task's own order on the later days of a span. */
+    | 'places'
     /** A link to an outside issue, one clock per connector (its provider's name). */
     | ConnectorProvider,
     string
@@ -217,6 +223,15 @@ export const tasks = pgTable(
     carriedFrom: date('carried_from', { mode: 'string' }),
     /** The deadline, separate from the day it is planned for. */
     dueDay: date('due_day', { mode: 'string' }),
+    /** The last day of a planned span; null for a one-day task (docs/plans/task-times.md). */
+    endDay: date('end_day', { mode: 'string' }),
+    /** The planned block on the wall clock, "HH:MM": the start on the first day, the end on the last. */
+    startTime: text('start_time'),
+    endTime: text('end_time'),
+    /** The due moment on the due day, "HH:MM". */
+    dueTime: text('due_time'),
+    /** Where a span sits on each of its later days (the first day uses `position`). */
+    places: jsonb('places').$type<Record<string, number>>().notNull().default({}),
     /** Rich text, as cleaned HTML. */
     notes: text('notes').notNull().default(''),
     /** The notes' words alone, kept beside the HTML so search reads text, never markup. */
@@ -244,6 +259,14 @@ export const tasks = pgTable(
     index('tasks_embedding').using('hnsw', t.embedding.op('vector_cosine_ops')),
     index('tasks_space_day').on(t.spaceId, t.day, t.position),
     index('tasks_owner_day').on(t.ownerId, t.spaceId, t.day),
+    index('tasks_space_end_day').on(t.spaceId, t.endDay),
+    check(
+      'tasks_span_after_day',
+      sql`${t.endDay} IS NULL OR (${t.day} IS NOT NULL AND ${t.endDay} > ${t.day})`,
+    ),
+    check('tasks_time_pair', sql`(${t.startTime} IS NULL) = (${t.endTime} IS NULL)`),
+    check('tasks_time_needs_day', sql`${t.startTime} IS NULL OR ${t.day} IS NOT NULL`),
+    check('tasks_due_time_needs_day', sql`${t.dueTime} IS NULL OR ${t.dueDay} IS NOT NULL`),
   ],
 );
 
@@ -300,6 +323,10 @@ export const historyKind = pgEnum('history_kind', [
   'withdrawn',
   'link.added',
   'link.removed',
+  'time.set',
+  'time.cleared',
+  'span.set',
+  'span.cleared',
 ]);
 
 /** What happened to a task, written by the server as it applies changes, so every device reads the same history. */
@@ -372,6 +399,8 @@ export const requests = pgTable(
     /** The day the sender asked for; null for none. */
     askedDay: date('asked_day', { mode: 'string' }),
     dueDay: date('due_day', { mode: 'string' }),
+    /** The time on the due day the sender asked for, "HH:MM". */
+    dueTime: text('due_time'),
     projectId: text('project_id').references(() => projects.id, { onDelete: 'set null' }),
     /** Files sent along; they join the task on accept. */
     attachments: jsonb('attachments').$type<string[]>().notNull().default([]),

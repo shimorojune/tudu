@@ -1,5 +1,6 @@
 import type { McpServer } from 'skybridge/server';
 import { z } from 'zod';
+import { blockFrom } from '@tudu/core';
 import { tuduFor, TuduError, type Access, type TaskRow, type Tudu } from './tudu';
 
 /**
@@ -42,6 +43,7 @@ const DELETE = {
 } as const;
 
 const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'A day is YYYY-MM-DD.');
+const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'A time is HH:MM, 24-hour.');
 const taskRef = z
   .string()
   .min(1)
@@ -90,10 +92,16 @@ export const textOf = (html: string) =>
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-const line = (t: Pick<TaskRow, 'ref' | 'title' | 'done' | 'day' | 'due'> & { spaceId?: string }) =>
+const line = (
+  t: Pick<TaskRow, 'ref' | 'title' | 'done' | 'day' | 'due' | 'dueAt' | 'time' | 'until'> & {
+    spaceId?: string;
+  },
+) =>
   `${t.done ? '[x]' : '[ ]'} ${t.ref ?? '(saving)'} ${t.title}` +
   (t.day ? ` · on ${t.day}` : ' · Backlog') +
-  (t.due ? ` · due ${t.due}` : '');
+  (t.until ? ` · until ${t.until}` : '') +
+  (t.time ? ` · ${t.time.start}–${t.time.end}` : '') +
+  (t.due ? ` · due ${t.due}${t.dueAt ? ' ' + t.dueAt : ''}` : '');
 /** A task as data: what a model needs to refer to it and say where it is. */
 const brief = (t: TaskRow) => ({
   ref: t.ref,
@@ -103,6 +111,9 @@ const brief = (t: TaskRow) => ({
   done: t.done,
   day: t.day,
   due: t.due ?? null,
+  dueAt: t.dueAt ?? null,
+  time: t.time ?? null,
+  until: t.until ?? null,
 });
 const list = (head: string, tasks: TaskRow[]) =>
   tasks.length ? `${head}\n${tasks.map(line).join('\n')}` : `${head}\nNo tasks.`;
@@ -429,13 +440,35 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
             .optional()
             .describe('YYYY-MM-DD, or "backlog". Today when left out.'),
           due: isoDay.optional().describe('A deadline, separate from the day it is planned for.'),
+          dueAt: hhmm.optional().describe('The time on the due day, HH:MM. Needs due.'),
+          start: hhmm
+            .optional()
+            .describe('The planned start time, HH:MM. Needs a day; end defaults to an hour later.'),
+          end: hhmm.optional().describe('The planned end time, HH:MM (on the last day when until is given).'),
+          until: isoDay
+            .optional()
+            .describe('The last day, for a task planned over several days (at most 31).'),
           notes: z.string().max(20000).optional().describe('Plain text; blank lines start new paragraphs.'),
         },
         annotations: WRITE,
       },
       run(
         cfg,
-        async (tudu, a: { spaceId: string; title: string; day?: string; due?: string; notes?: string }) => {
+        async (
+          tudu,
+          a: {
+            spaceId: string;
+            title: string;
+            day?: string;
+            due?: string;
+            dueAt?: string;
+            start?: string;
+            end?: string;
+            until?: string;
+            notes?: string;
+          },
+        ) => {
+          const time = a.start ? { start: a.start, end: a.end ?? blockFrom(a.start).end } : undefined;
           const out = await tudu.sync([
             {
               type: 'task.create',
@@ -446,6 +479,9 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
                 day: a.day === 'backlog' ? null : today(a.day),
                 position: null,
                 ...(a.due ? { due: a.due } : {}),
+                ...(a.due && a.dueAt ? { dueAt: a.dueAt } : {}),
+                ...(time ? { time } : {}),
+                ...(a.until ? { until: a.until } : {}),
                 ...(a.notes ? { notes: htmlOf(a.notes) } : {}),
               },
             },
@@ -460,7 +496,7 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
         name: 'update_task',
         title: 'Change a task',
         description:
-          'Rename a task, set or clear its due day, or replace its notes. Only what you pass changes.',
+          'Rename a task, set or clear its due day and time, its planned time or its last day, or replace its notes. Only what you pass changes.',
         inputSchema: {
           task: taskRef,
           title: z.string().trim().min(1).max(200).optional(),
@@ -468,23 +504,67 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
             .union([isoDay, z.literal('none')])
             .optional()
             .describe('YYYY-MM-DD, or "none" to clear it.'),
+          dueAt: z
+            .union([hhmm, z.literal('none')])
+            .optional()
+            .describe('The time on the due day, HH:MM, or "none".'),
+          start: z
+            .union([hhmm, z.literal('none')])
+            .optional()
+            .describe(
+              'The planned start, HH:MM, or "none" to clear the time. End defaults to an hour later.',
+            ),
+          end: hhmm.optional().describe('The planned end, HH:MM.'),
+          until: z
+            .union([isoDay, z.literal('none')])
+            .optional()
+            .describe('The last day of several, YYYY-MM-DD, or "none" for one day.'),
           notes: z.string().max(20000).optional().describe('Replaces the notes. Plain text.'),
         },
         annotations: SET,
       },
-      run(cfg, async (tudu, a: { task: string; title?: string; due?: string; notes?: string }) => {
-        const { taskId } = await findTask(tudu, a.task);
-        const m: Array<{ type: string; payload: Record<string, unknown> }> = [];
-        if (a.title) m.push({ type: 'task.rename', payload: { id: taskId, title: a.title } });
-        if (a.due)
-          m.push({ type: 'task.due', payload: { id: taskId, due: a.due === 'none' ? null : a.due } });
-        if (a.notes !== undefined)
-          m.push({ type: 'task.notes', payload: { id: taskId, notes: htmlOf(a.notes) } });
-        if (!m.length) return 'Nothing to change.';
-        const out = await tudu.sync(m);
-        const t = out.tasks.find((x) => x.id === taskId);
-        return t ? { text: `Changed ${line(t)}`, data: { task: brief(t) } } : 'Changed.';
-      }),
+      run(
+        cfg,
+        async (
+          tudu,
+          a: {
+            task: string;
+            title?: string;
+            due?: string;
+            dueAt?: string;
+            start?: string;
+            end?: string;
+            until?: string;
+            notes?: string;
+          },
+        ) => {
+          const { taskId } = await findTask(tudu, a.task);
+          const m: Array<{ type: string; payload: Record<string, unknown> }> = [];
+          if (a.title) m.push({ type: 'task.rename', payload: { id: taskId, title: a.title } });
+          if (a.due)
+            m.push({ type: 'task.due', payload: { id: taskId, due: a.due === 'none' ? null : a.due } });
+          if (a.dueAt)
+            m.push({ type: 'task.dueTime', payload: { id: taskId, at: a.dueAt === 'none' ? null : a.dueAt } });
+          // The span first: whether the end may come before the start depends on it.
+          if (a.until)
+            m.push({
+              type: 'task.span',
+              payload: { id: taskId, until: a.until === 'none' ? null : a.until },
+            });
+          if (a.start === 'none') m.push({ type: 'task.time', payload: { id: taskId, time: null } });
+          else if (a.start)
+            m.push({
+              type: 'task.time',
+              payload: { id: taskId, time: { start: a.start, end: a.end ?? blockFrom(a.start).end } },
+            });
+          if (a.notes !== undefined)
+            m.push({ type: 'task.notes', payload: { id: taskId, notes: htmlOf(a.notes) } });
+          if (!m.length) return 'Nothing to change.';
+          const out = await tudu.sync(m);
+          const t = out.tasks.find((x) => x.id === taskId);
+          return t ? { text: `Changed ${line(t)}`, data: { task: brief(t) } } : 'Changed.';
+        },
+      ),
     )
     .registerTool(
       {

@@ -17,11 +17,11 @@ import {
   type SpaceSummary,
   type IsoDate,
 } from '@tudu/core';
-import { and, asc, count, eq, gte, inArray, isNull, lte, schema, type Db } from '@tudu/db';
+import { and, asc, count, eq, inArray, isNull, schema, type Db } from '@tudu/db';
 import type { Mailer } from './email';
 import { inviteMail } from './email';
 import { forgetFormer, oldSlugsOf } from './settings';
-import { roleIn, toTask } from './tasks';
+import { inDaysSql, roleIn, toTask } from './tasks';
 import { linksColumn } from './taskLinks';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -518,6 +518,11 @@ const sharedColumns = {
   doneAt: schema.tasks.doneAt,
   carriedFrom: schema.tasks.carriedFrom,
   dueDay: schema.tasks.dueDay,
+  dueTime: schema.tasks.dueTime,
+  endDay: schema.tasks.endDay,
+  startTime: schema.tasks.startTime,
+  endTime: schema.tasks.endTime,
+  places: schema.tasks.places,
   visibility: schema.tasks.visibility,
   projectId: schema.tasks.projectId,
   links: linksColumn,
@@ -547,8 +552,7 @@ export async function peopleOf(
         eq(schema.tasks.spaceId, spaceId),
         eq(schema.tasks.visibility, 'space'),
         isNull(schema.tasks.deletedAt),
-        gte(schema.tasks.day, from),
-        lte(schema.tasks.day, to),
+        inDaysSql(from, to),
       ),
     )
     .orderBy(asc(schema.tasks.day), asc(schema.tasks.position), asc(schema.tasks.createdAt));

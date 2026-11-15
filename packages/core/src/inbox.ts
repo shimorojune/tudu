@@ -25,6 +25,8 @@ export interface TaskRequest {
   /** The day the sender asked for; null for no day. */
   askedDay: IsoDate | null;
   due: IsoDate | null;
+  /** The time on the due day ("17:00"); absent or null for none. */
+  dueAt?: string | null;
   projectId: string | null;
   attachments: string[];
   state: RequestState;
