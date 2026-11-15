@@ -1,7 +1,16 @@
 import type { McpServer } from 'skybridge/server';
 import { z } from 'zod';
-import { blockFrom } from '@tudu/core';
 import { tuduFor, TuduError, type Access, type TaskRow, type Tudu } from './tudu';
+
+/**
+ * An hour after `start` ("HH:MM"), kept inside the day: the end a block gets when none is given. The same as core's
+ * `blockFrom`; the MCP image installs production dependencies only, and core is a dev dependency (types).
+ */
+function hourLater(start: string): string {
+  const [h, m] = start.split(':').map(Number);
+  const n = Math.min(23 * 60 + 59, (h ?? 0) * 60 + (m ?? 0) + 60);
+  return `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
+}
 
 /**
  * Tudu's tools. Each one is a thin call to the API as the caller; the API enforces what the key or app may do, so
@@ -468,7 +477,7 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
             notes?: string;
           },
         ) => {
-          const time = a.start ? { start: a.start, end: a.end ?? blockFrom(a.start).end } : undefined;
+          const time = a.start ? { start: a.start, end: a.end ?? hourLater(a.start) } : undefined;
           const out = await tudu.sync([
             {
               type: 'task.create',
@@ -558,7 +567,7 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
           else if (a.start)
             m.push({
               type: 'task.time',
-              payload: { id: taskId, time: { start: a.start, end: a.end ?? blockFrom(a.start).end } },
+              payload: { id: taskId, time: { start: a.start, end: a.end ?? hourLater(a.start) } },
             });
           if (a.notes !== undefined)
             m.push({ type: 'task.notes', payload: { id: taskId, notes: htmlOf(a.notes) } });
