@@ -80,7 +80,8 @@ export function MiniCalendar({
   const [hover, setHover] = useState<IsoDate | null>(null);
   const [focused, setFocused] = useState<number | null>(null);
   const grid = useRef<HTMLDivElement | null>(null);
-  const hintSaid = useRef<CalendarHint | null>(null);
+  // The last words said: they stay while the hint line folds away.
+  const [said, setSaid] = useState<CalendarHint | null>(null);
 
   const first = toIso(view.y, view.m, 1);
   const startDow = (weekdayOf(first) + 6) % 7;
@@ -152,6 +153,10 @@ export function MiniCalendar({
   const showToday = !!today && !hasPresets;
   const showClear = !!onClear && !!clearLabel;
 
+  if (hint) {
+    const now = hintValue ?? { text: hintEmpty ?? 'Pick a day' };
+    if (!said || said.text !== now.text || said.tone !== now.tone) setSaid(now);
+  }
   return (
     <div className={cx('tp-root tp-cal', className)} role="group" aria-label={label}>
       <div className="tp-cal-h">
@@ -243,8 +248,6 @@ export function MiniCalendar({
       </div>
       {(() => {
         // The hint line folds open and shut (never a jump); the last words stay while it folds away.
-        if (hint) hintSaid.current = hintValue ?? { text: hintEmpty ?? 'Pick a day' };
-        const said = hintSaid.current;
         if (!said) return null;
         return (
           <div className={cx('tp-cal-hintw', hint && 'tp-in')} aria-hidden={hint ? undefined : 'true'}>

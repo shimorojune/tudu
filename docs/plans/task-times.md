@@ -180,69 +180,69 @@ Unit, API, web end-to-end and desktop tests run on PR CI (and Actions › Flake 
 
 ### Unit (vitest)
 
-| ID     | Where                               | Case                                                                                                                       |
-| ------ | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| TT-U01 | `core/times.test.ts`                | `fmtBlock`: `3 to 4 PM`, `11 AM to 1 PM`, `9:30 to 10 AM`, 24-hour `15:00–16:00`; `nextFullHour` at 14:10 is 15:00, at 23:20 is 23:00 |
-| TT-U02 | `core/spans.test.ts`                | `spanOf` for first, middle, last and outside days; `spanDays` across a month; `moveSpan` keeps the length                  |
-| TT-U03 | `core/spans.test.ts`                | `spanTimeWords`: start only on day 1, end only on the last day, nothing between, nothing without a time                     |
-| TT-U04 | `core/due.test.ts`                  | `dueLabel` with a time: before the minute `Due today 5 PM`; at and after `Overdue since 5 PM`; tomorrow `Due tomorrow 9 AM`; no time unchanged |
-| TT-U05 | `core/week.test.ts`, `menubar.test.ts` | A span counts once per day it shows; crossed off counts done on every day                                               |
-| TT-U06 | `ui/TimeField.test.tsx`             | Type `3`, `0`, `5` → 3:05; Up/Down step hours, minutes by 5, wrap AM/PM; Left/Right move parts; `aria-valuetext`           |
-| TT-U07 | `ui/TimeChoice.test.tsx`            | Add a time fills the next full hour (+1 hr block); end before start keeps the old value, red edge, message line has `tp-in`; × clears |
-| TT-U08 | `ui/TimeChoice.test.tsx`            | `That’s already over today` / `That time has passed today` only on today; the message line is folded (not removed) when quiet |
-| TT-U09 | `ui/MiniCalendar.test.tsx`          | Range: set, then a click starts again (local), second click either side commits once; closing between commits nothing; hint words |
-| TT-U10 | `ui/MiniCalendar.test.tsx`          | Due presets Today / Tomorrow / No date; No date calls `onClear`; no `Remove due date` foot                                 |
-| TT-U11 | `ui/PlanPicker.test.tsx`            | Several days switch: on asks for the last day, off returns to one day; the time fields relabel for a span                  |
-| TT-U12 | `ui/TaskRow.test.tsx`               | Pills: block, due with time, span words (full and brief); `tp-span-on` on days 2+ and not when done                        |
-| TT-U13 | `ui/TaskRow.test.tsx`               | The due pill turns red at the due minute with fake timers; the turn class is set once                                       |
-| TT-U14 | `ui/TaskDetail.test.tsx`            | Planned and Due facts with times and spans; the pop never makes `.tp-td-scroll` scroll (pop shifted up when near the bottom) |
-| TT-U15 | `ui/QuickAdd.test.tsx`              | Chips open the pickers; chip words; the task is created with time, span and due time                                       |
-| TT-U16 | `ui/*` (pills, TDProp, QAChip, Banner) | Icons sit inside the words as `.tp-bl-ic` (structure test)                                                              |
-| TT-U17 | `client/tasks.test.ts`              | Optimistic `task.span` writes into each day key, shrinking removes, moving shifts; `task.time` / `task.dueTime` overlays   |
-| TT-U18 | `web/app/TimeClock.test.ts`         | The next 48 hours scheduled, nearest 60 only, done/deleted skipped, switch off cancels all, a span once at its start        |
-| TT-U19 | `ui/WorkHoursSection.test.tsx`      | The Notify switch on a Mac, the one-line note elsewhere, the permission state shared with nudges                           |
+| ID     | Where                                  | Case                                                                                                                                           |
+| ------ | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| TT-U01 | `core/times.test.ts`                   | `fmtBlock`: `3 to 4 PM`, `11 AM to 1 PM`, `9:30 to 10 AM`, 24-hour `15:00–16:00`; `nextFullHour` at 14:10 is 15:00, at 23:20 is 23:00          |
+| TT-U02 | `core/spans.test.ts`                   | `spanOf` for first, middle, last and outside days; `spanDays` across a month; `moveSpan` keeps the length                                      |
+| TT-U03 | `core/spans.test.ts`                   | `spanTimeWords`: start only on day 1, end only on the last day, nothing between, nothing without a time                                        |
+| TT-U04 | `core/due.test.ts`                     | `dueLabel` with a time: before the minute `Due today 5 PM`; at and after `Overdue since 5 PM`; tomorrow `Due tomorrow 9 AM`; no time unchanged |
+| TT-U05 | `core/week.test.ts`, `menubar.test.ts` | A span counts once per day it shows; crossed off counts done on every day                                                                      |
+| TT-U06 | `ui/TimeField.test.tsx`                | Type `3`, `0`, `5` → 3:05; Up/Down step hours, minutes by 5, wrap AM/PM; Left/Right move parts; `aria-valuetext`                               |
+| TT-U07 | `ui/TimeChoice.test.tsx`               | Add a time fills the next full hour (+1 hr block); end before start keeps the old value, red edge, message line has `tp-in`; × clears          |
+| TT-U08 | `ui/TimeChoice.test.tsx`               | `That’s already over today` / `That time has passed today` only on today; the message line is folded (not removed) when quiet                  |
+| TT-U09 | `ui/MiniCalendar.test.tsx`             | Range: set, then a click starts again (local), second click either side commits once; closing between commits nothing; hint words              |
+| TT-U10 | `ui/MiniCalendar.test.tsx`             | Due presets Today / Tomorrow / No date; No date calls `onClear`; no `Remove due date` foot                                                     |
+| TT-U11 | `ui/PlanPicker.test.tsx`               | Several days switch: on asks for the last day, off returns to one day; the time fields relabel for a span                                      |
+| TT-U12 | `ui/TaskRow.test.tsx`                  | Pills: block, due with time, span words (full and brief); `tp-span-on` on days 2+ and not when done                                            |
+| TT-U13 | `ui/TaskRow.test.tsx`                  | The due pill turns red at the due minute with fake timers; the turn class is set once                                                          |
+| TT-U14 | `ui/TaskDetail.test.tsx`               | Planned and Due facts with times and spans; the pop never makes `.tp-td-scroll` scroll (pop shifted up when near the bottom)                   |
+| TT-U15 | `ui/QuickAdd.test.tsx`                 | Chips open the pickers; chip words; the task is created with time, span and due time                                                           |
+| TT-U16 | `ui/*` (pills, TDProp, QAChip, Banner) | Icons sit inside the words as `.tp-bl-ic` (structure test)                                                                                     |
+| TT-U17 | `client/tasks.test.ts`                 | Optimistic `task.span` writes into each day key, shrinking removes, moving shifts; `task.time` / `task.dueTime` overlays                       |
+| TT-U18 | `web/app/TimeClock.test.ts`            | The next 48 hours scheduled, nearest 60 only, done/deleted skipped, switch off cancels all, a span once at its start                           |
+| TT-U19 | `ui/WorkHoursSection.test.tsx`         | The Notify switch on a Mac, the one-line note elsewhere, the permission state shared with nudges                                               |
 
 ### API (vitest, `apps/server`)
 
-| ID     | Case                                                                                                                        |
-| ------ | --------------------------------------------------------------------------------------------------------------------------- |
-| TT-A01 | `task.time`, `task.span`, `task.dueTime` save with field clocks; an older write loses to a newer one                         |
-| TT-A02 | Invalid: end ≤ start on one day, `until` ≤ `day`, half a block, bad `HH:MM` are refused (400)                                 |
-| TT-A03 | Day query lists a span on each of its days with its place, first by default; the week query likewise                         |
-| TT-A04 | Moving a span by `task.place` shifts `end_day`; `task_day_places` rows follow                                                 |
-| TT-A05 | Roll-over: a span ending today does not carry; ending yesterday carries, dropping span and planned time, keeping due time   |
-| TT-A06 | `task.due` null clears `due_time`; requests carry `due_time`                                                                 |
-| TT-A07 | Migration 0022 up on a copy of a seeded database: old rows unchanged, checks hold                                            |
+| ID     | Case                                                                                                                      |
+| ------ | ------------------------------------------------------------------------------------------------------------------------- |
+| TT-A01 | `task.time`, `task.span`, `task.dueTime` save with field clocks; an older write loses to a newer one                      |
+| TT-A02 | Invalid: end ≤ start on one day, `until` ≤ `day`, half a block, bad `HH:MM` are refused (400)                             |
+| TT-A03 | Day query lists a span on each of its days with its place, first by default; the week query likewise                      |
+| TT-A04 | Moving a span by `task.place` shifts `end_day`; `task_day_places` rows follow                                             |
+| TT-A05 | Roll-over: a span ending today does not carry; ending yesterday carries, dropping span and planned time, keeping due time |
+| TT-A06 | `task.due` null clears `due_time`; requests carry `due_time`                                                              |
+| TT-A07 | Migration 0022 up on a copy of a seeded database: old rows unchanged, checks hold                                         |
 
 ### End-to-end, web (Playwright, `packages/e2e/tests/times/`)
 
-| ID     | Case                                                                                                         |
-| ------ | ------------------------------------------------------------------------------------------------------------ |
-| TT-E01 | Panel › Planned › Add a time, type 2:30 PM; the row reads `2:30 to 3:30 PM`; survives a reload                |
-| TT-E02 | End before start: red line, nothing saved; fixing it saves                                                     |
-| TT-E03 | Several days Sun 18 to Wed 21: the task shows on each day with Day n of 4, tinted from day 2; the week tiles show 1/4..4/4 |
-| TT-E04 | Move the span's start forward (click 21, then 25): Wed 21 to Sun 25; closing after one click changes nothing     |
-| TT-E05 | Cross off on day 3: crossed off on all four days and counted once per day                                       |
-| TT-E06 | Due presets; Due at 5 PM with a fixed clock at 4:59 then 5:00: the pill turns `Overdue since 5 PM`             |
-| TT-E07 | Quick Add with Planned time and Due time creates the task with both                                             |
-| TT-E08 | Offline: set a time and a span, come back online, both saved                                                    |
+| ID     | Case                                                                                                                                       |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| TT-E01 | Panel › Planned › Add a time, type 2:30 PM; the row reads `2:30 to 3:30 PM`; survives a reload                                             |
+| TT-E02 | End before start: red line, nothing saved; fixing it saves                                                                                 |
+| TT-E03 | Several days Sun 18 to Wed 21: the task shows on each day with Day n of 4, tinted from day 2; the week tiles show 1/4..4/4                 |
+| TT-E04 | Move the span's start forward (click 21, then 25): Wed 21 to Sun 25; closing after one click changes nothing                               |
+| TT-E05 | Cross off on day 3: crossed off on all four days and counted once per day                                                                  |
+| TT-E06 | Due presets; Due at 5 PM with a fixed clock at 4:59 then 5:00: the pill turns `Overdue since 5 PM`                                         |
+| TT-E07 | Quick Add with Planned time and Due time creates the task with both                                                                        |
+| TT-E08 | Offline: set a time and a span, come back online, both saved                                                                               |
 | TT-E09 | Popup size: opening, Several days on/off and Add a time ↔ fields never change the height by more than 6px in one frame (sampled per frame) |
-| TT-E10 | Phone viewport: the picker fits without scrolling the sheet                                                      |
+| TT-E10 | Phone viewport: the picker fits without scrolling the sheet                                                                                |
 
 ### Desktop (Rust and the web view, macOS CI runner)
 
-| ID     | Case                                                                                                            |
-| ------ | --------------------------------------------------------------------------------------------------------------- |
-| TT-D01 | `schedule_times` replaces the pending set; identifiers are stable; `cancel_times` removes                        |
-| TT-D02 | Cross off from the notification's action posts `task.cross` for that task; Open shows the main window on it      |
-| TT-D03 | Permission refused: nothing scheduled, the shared refused state shows                                             |
+| ID     | Case                                                                                                        |
+| ------ | ----------------------------------------------------------------------------------------------------------- |
+| TT-D01 | `schedule_times` replaces the pending set; identifiers are stable; `cancel_times` removes                   |
+| TT-D02 | Cross off from the notification's action posts `task.cross` for that task; Open shows the main window on it |
+| TT-D03 | Permission refused: nothing scheduled, the shared refused state shows                                       |
 
 ### Manual on Rohit's Mac (Rohit's checks, after merge on staging)
 
-| ID     | Case                                                                                         |
-| ------ | -------------------------------------------------------------------------------------------- |
+| ID     | Case                                                                                           |
+| ------ | ---------------------------------------------------------------------------------------------- |
 | MC-T01 | A planned start two minutes ahead: the banner comes with Tudu's window closed; Cross off works |
-| MC-T02 | Icons beside words line up on the Mac (pills, panel labels, Quick Add chips, banner)          |
+| MC-T02 | Icons beside words line up on the Mac (pills, panel labels, Quick Add chips, banner)           |
 
 ## Risks
 

@@ -544,7 +544,10 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
           if (a.due)
             m.push({ type: 'task.due', payload: { id: taskId, due: a.due === 'none' ? null : a.due } });
           if (a.dueAt)
-            m.push({ type: 'task.dueTime', payload: { id: taskId, at: a.dueAt === 'none' ? null : a.dueAt } });
+            m.push({
+              type: 'task.dueTime',
+              payload: { id: taskId, at: a.dueAt === 'none' ? null : a.dueAt },
+            });
           // The span first: whether the end may come before the start depends on it.
           if (a.until)
             m.push({

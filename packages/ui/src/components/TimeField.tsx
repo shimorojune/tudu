@@ -1,5 +1,5 @@
 import { fmtTime, minutesOf, timeOf, type Clock } from '@tudu/core';
-import { useRef, type KeyboardEvent } from 'react';
+import { useLayoutEffect, useRef, type KeyboardEvent } from 'react';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
 
@@ -32,7 +32,22 @@ function parts(t: Clock): { h: number; m: number; pm: boolean } {
  */
 export function TimeField({ label, value, onChange, ok, onBad, bad, still }: TimeFieldProps) {
   const q = parts(value);
-  const n = minutesOf(value) ?? 0;
+  // The value as last set here: keys typed faster than the page re-renders build on it, not on a stale prop.
+  const cur = useRef(value);
+  const sent = useRef<Clock[]>([]);
+  useLayoutEffect(() => {
+    const i = sent.current.indexOf(value);
+    // One of ours on its way back, older than the last one sent: the newer one is still coming.
+    if (i >= 0) sent.current = sent.current.slice(i + 1);
+    else {
+      sent.current = [];
+      cur.current = value;
+    }
+  }, [value]);
+  const now_ = () => {
+    const n = minutesOf(cur.current) ?? 0;
+    return { n, q: parts(cur.current) };
+  };
   const box = useRef<HTMLDivElement | null>(null);
   const buf = useRef<{ s: string; t: number; seg: Seg | null }>({ s: '', t: 0, seg: null });
   const last = useRef<Seg>('h');
@@ -44,10 +59,15 @@ export function TimeField({ label, value, onChange, ok, onBad, bad, still }: Tim
       return false;
     }
     onBad?.(false);
-    if (t !== value) onChange?.(t);
+    if (t !== cur.current) {
+      cur.current = t;
+      sent.current = [...sent.current.slice(-8), t];
+      onChange?.(t);
+    }
     return true;
   }
   function step(seg: Seg, d: number) {
+    const { n, q } = now_();
     if (seg === 'h') set(n + 60 * d);
     else if (seg === 'm') set(Math.floor(n / 60) * 60 + (((((Math.round(q.m / 5) + d) * 5) % 60) + 60) % 60));
     else set(n + 720);
@@ -57,8 +77,9 @@ export function TimeField({ label, value, onChange, ok, onBad, bad, still }: Tim
   }
   function key(seg: Seg, e: KeyboardEvent<HTMLSpanElement>) {
     const k = e.key;
+    const { n, q } = now_();
     const b = buf.current;
-    const now = Date.now();
+    const now = e.timeStamp;
     if (k === 'ArrowUp' || k === 'ArrowDown') {
       e.preventDefault();
       step(seg, k === 'ArrowUp' ? 1 : -1);
@@ -125,7 +146,7 @@ export function TimeField({ label, value, onChange, ok, onBad, bad, still }: Tim
         last.current = id;
       }}
       onKeyDown={(e) => key(id, e)}
-      onClick={id === 'p' ? () => set(n + 720) : undefined}
+      onClick={id === 'p' ? () => set(now_().n + 720) : undefined}
     >
       {text}
     </span>

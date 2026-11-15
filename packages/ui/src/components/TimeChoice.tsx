@@ -35,7 +35,7 @@ export function TimeChoice(p: TimeChoiceProps) {
   const block = p.kind === 'block';
   const root = useRef<HTMLDivElement | null>(null);
   const fresh = useRef(false);
-  const said = useRef('');
+  const [said, setSaid] = useState('');
   const [bad, setBad] = useState(false);
   const at = p.value ? (p.kind === 'block' ? p.value.start : p.value) : null;
   const nowM = p.isToday ? minutesOf(clockOf(p.now ?? new Date())) : null;
@@ -76,7 +76,7 @@ export function TimeChoice(p: TimeChoiceProps) {
   const late = !multi && nowM !== null && nowM !== undefined && (minutesOf(end ?? at) ?? 0) <= nowM;
   const msg =
     !multi && bad ? BAD : late ? (block ? 'That’s already over today' : 'That time has passed today') : null;
-  if (msg) said.current = msg;
+  if (msg && msg !== said) setSaid(msg);
   const setStart = (t: Clock) => {
     setBad(false);
     if (p.kind === 'due') return p.onChange?.(t);
@@ -121,7 +121,7 @@ export function TimeChoice(p: TimeChoiceProps) {
         </div>
         <div className={cx('tp-tc-msg', msg && 'tp-in')} role="status" aria-live="polite">
           <div>
-            <div className="tp-tc-warn">{said.current}</div>
+            <div className="tp-tc-warn">{said}</div>
           </div>
         </div>
       </div>

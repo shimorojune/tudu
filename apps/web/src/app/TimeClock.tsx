@@ -11,7 +11,7 @@ import {
   type Task,
   type TimeWordsOptions,
 } from '@tudu/core';
-import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { DesktopBridge, TimeNotice } from './desktop';
 import { taskStore } from './tasks';
 import { timeWords } from './times';
@@ -173,22 +173,11 @@ export function TimeClock({ d, me }: { d: DesktopBridge; me: MeResponse }) {
 
 /** A number that goes up every `ms`, and when `bump` is called. */
 function useTickEvery(ms: number): [number, () => void] {
-  const n = useRef(0);
-  const subs = useRef(new Set<() => void>());
-  const bump = useRef(() => {
-    n.current += 1;
-    subs.current.forEach((f) => f());
-  }).current;
+  const [n, setN] = useState(0);
+  const bump = useCallback(() => setN((x) => x + 1), []);
   useEffect(() => {
     const id = setInterval(bump, ms);
     return () => clearInterval(id);
   }, [ms, bump]);
-  const v = useSyncExternalStore(
-    (f) => {
-      subs.current.add(f);
-      return () => subs.current.delete(f);
-    },
-    () => n.current,
-  );
-  return [v, bump];
+  return [n, bump];
 }
