@@ -164,6 +164,30 @@ async function findTask(
   return { ...at, task };
 }
 
+interface ProjectRow {
+  id: string;
+  name: string;
+  color: string;
+}
+const projectsIn = async (tudu: Tudu, spaceId: string) =>
+  (await tudu.get<{ projects: ProjectRow[] }>(`/api/spaces/${spaceId}/projects`)).projects;
+
+/** A project of the space by its name (any case). An unknown name fails with the space's names, so the model can retry. */
+async function projectNamed(tudu: Tudu, spaceId: string, name: string): Promise<ProjectRow> {
+  const projects = await projectsIn(tudu, spaceId);
+  // The MCP image carries no workspace packages, so this matches the way core's exactProject does.
+  const q = name.trim().toLocaleLowerCase();
+  const p = projects.find((x) => x.name.trim().toLocaleLowerCase() === q);
+  if (p) return p;
+  throw new TuduError(
+    400,
+    projects.length
+      ? `No project called "${name.trim()}" in this space. Its projects: ${projects.map((x) => x.name).join(', ')}.`
+      : `This space has no projects yet, so "${name.trim()}" can't be set. People make them in Settings › Projects.`,
+  );
+}
+const projectArg = z.string().trim().min(1).max(60);
+
 interface TaskDetail extends TaskRow {
   notes: string;
   subtasks: Array<{ id: string; title: string; done: boolean }>;
@@ -207,7 +231,7 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
         name: 'list_spaces',
         title: 'List spaces',
         description:
-          'The spaces you are in: Personal and team spaces, with their ids and task ID prefixes. Start here.',
+          'The spaces you are in: Personal and team spaces, with their ids, task ID prefixes and projects. Start here.',
         annotations: READ,
       },
       run(cfg, async (tudu) => {
@@ -221,13 +245,23 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
             members: number;
           }>;
         }>('/api/me');
-        const text = me.spaces
+        // Each space's projects, by name, for create_task and update_task. A space whose list can't be read has none.
+        const projects = await Promise.all(
+          me.spaces.map((s) =>
+            projectsIn(tudu, s.id)
+              .then((ps) => ps.map((p) => ({ id: p.id, name: p.name })))
+              .catch(() => []),
+          ),
+        );
+        const spaces = me.spaces.map((s, i) => ({ ...s, projects: projects[i]! }));
+        const text = spaces
           .map(
             (s) =>
-              `${s.name} (${s.kind}, ${s.prefix}-…, ${s.members} ${s.members === 1 ? 'person' : 'people'}, you are ${s.role}) id=${s.id}`,
+              `${s.name} (${s.kind}, ${s.prefix}-…, ${s.members} ${s.members === 1 ? 'person' : 'people'}, you are ${s.role}) id=${s.id}` +
+              `\n  Projects: ${s.projects.length ? s.projects.map((p) => p.name).join(', ') : 'none'}`,
           )
           .join('\n');
-        return { text: text || 'No spaces this connection can reach.', data: { spaces: me.spaces } };
+        return { text: text || 'No spaces this connection can reach.', data: { spaces } };
       }),
     )
     .registerTool(
@@ -458,6 +492,9 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
             .optional()
             .describe('The last day, for a task planned over several days (at most 31).'),
           notes: z.string().max(20000).optional().describe('Plain text; blank lines start new paragraphs.'),
+          project: projectArg
+            .optional()
+            .describe('A project of the space, by its name (any case), as list_spaces lists them.'),
         },
         annotations: WRITE,
       },
@@ -475,8 +512,10 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
             end?: string;
             until?: string;
             notes?: string;
+            project?: string;
           },
         ) => {
+          const project = a.project ? await projectNamed(tudu, a.spaceId, a.project) : null;
           const time = a.start ? { start: a.start, end: a.end ?? hourLater(a.start) } : undefined;
           const out = await tudu.sync([
             {
@@ -492,11 +531,13 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
                 ...(time ? { time } : {}),
                 ...(a.until ? { until: a.until } : {}),
                 ...(a.notes ? { notes: htmlOf(a.notes) } : {}),
+                ...(project ? { projectId: project.id } : {}),
               },
             },
           ]);
           const t = out.tasks[0];
-          return t ? { text: `Added ${line(t)}`, data: { task: brief(t) } } : 'Added.';
+          const inProject = project ? ` · in ${project.name}` : '';
+          return t ? { text: `Added ${line(t)}${inProject}`, data: { task: brief(t) } } : 'Added.';
         },
       ),
     )
@@ -505,7 +546,7 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
         name: 'update_task',
         title: 'Change a task',
         description:
-          'Rename a task, set or clear its due day and time, its planned time or its last day, or replace its notes. Only what you pass changes.',
+          'Rename a task, set or clear its due day and time, its planned time, its last day or its project, or replace its notes. Only what you pass changes.',
         inputSchema: {
           task: taskRef,
           title: z.string().trim().min(1).max(200).optional(),
@@ -529,6 +570,11 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
             .optional()
             .describe('The last day of several, YYYY-MM-DD, or "none" for one day.'),
           notes: z.string().max(20000).optional().describe('Replaces the notes. Plain text.'),
+          project: projectArg
+            .optional()
+            .describe(
+              'A project of the task’s space by its name (any case), or "none" to take it out of its project.',
+            ),
         },
         annotations: SET,
       },
@@ -545,10 +591,16 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
             end?: string;
             until?: string;
             notes?: string;
+            project?: string;
           },
         ) => {
-          const { taskId } = await findTask(tudu, a.task);
+          const { taskId, spaceId: taskSpace } = await findTask(tudu, a.task);
           const m: Array<{ type: string; payload: Record<string, unknown> }> = [];
+          if (a.project) {
+            const none = a.project.trim().toLowerCase() === 'none';
+            const p = none ? null : await projectNamed(tudu, taskSpace, a.project);
+            m.push({ type: 'task.project', payload: { id: taskId, projectId: p ? p.id : null } });
+          }
           if (a.title) m.push({ type: 'task.rename', payload: { id: taskId, title: a.title } });
           if (a.due)
             m.push({ type: 'task.due', payload: { id: taskId, due: a.due === 'none' ? null : a.due } });

@@ -693,6 +693,49 @@ describe('QuickAdd', () => {
       expect(onNewProject).not.toHaveBeenCalled();
     });
   });
+
+  it('PH-U13 # in the title fills the Project chip and takes the #word out; no menu while saving', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(<Bar onSave={onSave} spaceName="Northwind" />);
+    const line = screen.getByRole('textbox', { name: 'Task title' });
+    await waitFor(() => expect(line).toHaveFocus());
+    await user.type(line, 'Review the notes #pla');
+    expect(screen.getByText('Projects in Northwind')).toBeInTheDocument();
+    await user.keyboard('{Enter}');
+    expect(line).toHaveValue('Review the notes');
+    const proj = chip('Project: Platform');
+    expect(proj).toHaveClass('tp-hm-landed');
+    expect(onSave).not.toHaveBeenCalled();
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0]![0]).toMatchObject({ title: 'Review the notes', projectId: 'pf' });
+  });
+
+  it('PH-U13 the # menu stays shut while the task is saving', async () => {
+    const user = userEvent.setup();
+    render(<Bar initial={{ saving: true, title: 'Ship it ' }} />);
+    const line = screen.getByRole('textbox', { name: 'Task title' });
+    line.focus();
+    await user.type(line, '#');
+    expect(screen.queryByRole('listbox', { name: 'Projects' })).toBeNull();
+  });
+
+  it('PH-U14 a project left from another space is not sent with the task', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    const { rerender } = render(<Bar onSave={onSave} />);
+    const line = screen.getByRole('textbox', { name: 'Task title' });
+    await user.type(line, 'Plan #nor{Enter}');
+    expect(chip('Project: Northwind')).toBeInTheDocument();
+    // The space changes and its projects with it.
+    rerender(<Bar onSave={onSave} projects={[{ id: 'hm', name: 'Home', color: '#a35d3d' }]} />);
+    expect(chip('Choose a project')).toBeInTheDocument();
+    await user.click(line);
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0]![0]).toMatchObject({ title: 'Plan', projectId: null });
+  });
 });
 
 describe('QuickAdd times (docs/plans/task-times.md)', () => {

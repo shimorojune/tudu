@@ -30,6 +30,7 @@ import { cx } from '../lib/cx';
 import { useOutside, useWidthEase } from '../lib/hooks';
 import { Icon } from '../lib/icons';
 import { Linger } from '../lib/linger';
+import { useProjectHash } from '../lib/projectHash';
 import { Button } from './Button';
 import { IconButton } from './IconButton';
 import { Logo } from './Logo';
@@ -148,6 +149,10 @@ export interface QuickAddProps {
   /** Every change to the draft (the macOS app keeps the floating bar's draft across launches). */
   onDraftChange?: (draft: QuickAddDraft) => void;
   onNewProject?: (name: string, color: string) => string | void;
+  /** The space the task goes to, for the `#` menu's "Projects in …" (with a space chip it is that space's). */
+  spaceName?: string;
+  /** The space's projects have not come in yet: the `#` menu shows its loading rows. */
+  projectsLoading?: boolean;
   /** "Edit projects…" at the foot of the project picker: Settings on this space's Projects. */
   onEditProjects?: () => void;
   /** Upload a file as soon as it is added; resolve with the attachment's id. */
@@ -284,6 +289,8 @@ export interface QAChipProps {
   ic?: number;
   label: string;
   pop: ReactNode;
+  /** It just took a value from elsewhere (`#` in the title): one selection wash. */
+  landed?: boolean;
 }
 
 /** A quiet chip that opens its picker right under it (above it on phones) and eases its width when its label changes. */
@@ -297,7 +304,12 @@ export function QAChip(p: QAChipProps) {
       <button
         ref={btn}
         type="button"
-        className={cx('tp-qa-chip', p.empty && 'tp-qa-empty', p.tone && `tp-qa-${p.tone}`)}
+        className={cx(
+          'tp-qa-chip',
+          p.empty && 'tp-qa-empty',
+          p.tone && `tp-qa-${p.tone}`,
+          p.landed && 'tp-hm-landed',
+        )}
         aria-expanded={p.open ? 'true' : 'false'}
         aria-haspopup="dialog"
         aria-label={p.aria}
@@ -522,7 +534,8 @@ export function QuickAdd(p: QuickAddProps) {
         until: f.planned && !to ? (f.until ?? null) : null,
         time: f.planned && !to ? (f.time ?? null) : null,
         dueAt: f.due ? (f.dueAt ?? null) : null,
-        projectId: f.projectId,
+        // Only a project of the space it goes to (switching the space leaves the last one's project behind).
+        projectId: live.current.projects.some((x) => x.id === f.projectId) ? f.projectId : null,
         note: noteHtml(f.note),
         attachments: files.filter((x) => x.id).map((x) => x.id!),
         spaceId: p.send?.spaceId,
@@ -605,6 +618,30 @@ export function QuickAdd(p: QuickAddProps) {
 
   // Scramble my text: a draft left in the field jumbles too; with focus it's the real words.
   const titleField = useMineField(f.title);
+  // # in the title picks the project: the #word leaves the title and the Project chip washes once as it fills.
+  const [landed, setLanded] = useState(0);
+  useEffect(() => {
+    if (!landed) return;
+    const t = setTimeout(() => setLanded(0), 700);
+    return () => clearTimeout(t);
+  }, [landed]);
+  const hash = useProjectHash({
+    projects: p.projects,
+    spaceName: p.send
+      ? (p.send.spaces.find((s) => s.id === p.send!.spaceId) ?? p.send.spaces[0])?.name
+      : p.spaceName,
+    loading: p.projectsLoading,
+    input,
+    setText: (title) => set({ title }),
+    onPick: (x) => {
+      set({ projectId: x.id });
+      setPop(null);
+      setLanded((n) => n + 1);
+    },
+    onNew: p.onNewProject,
+    up: phone,
+    off: saving || added,
+  });
   if (overlay && !mounted) return null;
 
   const proj = p.projects.find((x) => x.id === f.projectId) ?? null;
@@ -741,6 +778,7 @@ export function QuickAdd(p: QuickAddProps) {
       aria={proj ? `Project: ${proj.name}` : 'Choose a project'}
       icon={proj ? <i className="tp-dot" style={{ background: proj.color }} /> : <Ic name="project" />}
       label={proj ? mine(proj.name) : 'Project'}
+      landed={!!landed}
       pop={
         <ProjectMenu
           projects={p.projects}
@@ -1029,14 +1067,20 @@ export function QuickAdd(p: QuickAddProps) {
           aria-label="Task title"
           spellCheck
           enterKeyHint="done"
-          onChange={(e) => set({ title: e.target.value })}
+          {...hash.field}
+          onChange={(e) => {
+            set({ title: e.target.value });
+            hash.look(e);
+          }}
           onKeyDown={(e) => {
+            if (hash.onKeyDown(e)) return;
             if (e.key === 'Enter') {
               e.preventDefault();
               void add();
             }
           }}
         />
+        {hash.menu}
         {phone || !p.onClose || p.send ? null : (
           <IconButton label="Close" className="tp-qa-x" tip={false} onClick={p.onClose}>
             <Icon name="x" size={16} />

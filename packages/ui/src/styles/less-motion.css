@@ -404,6 +404,13 @@
 :root[data-motion='less'] .tp-cal-ht {
   animation: none;
 }
+:root[data-motion='less'] .tp-hm-err,
+:root[data-motion='less'] .tp-qa-chip.tp-hm-landed > span {
+  animation: tp-label-in 120ms linear both;
+}
+:root[data-motion='less'] .tp-root .tp-qa-chip.tp-hm-landed {
+  animation: none;
+}
 
 /* app.css */
 :root[data-motion='less'] .tp-tip-pop,

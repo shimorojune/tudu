@@ -236,6 +236,12 @@ export {
 
 // Quick Add (chunk 04)
 export { Linger, POP_LEAVE_MS } from './lib/linger';
+export {
+  useProjectHash,
+  type HashProject,
+  type ProjectHash,
+  type ProjectHashOptions,
+} from './lib/projectHash';
 export { ProjectMenu, type ProjectMenuProps, type ProjectOption } from './components/ProjectMenu';
 export {
   QuickAdd,

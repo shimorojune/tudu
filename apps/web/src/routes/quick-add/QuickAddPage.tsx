@@ -91,6 +91,7 @@ export function QuickAddPage({ me }: { me: MeResponse }) {
           today={a.today}
           planned={a.today}
           projects={a.projects}
+          projectsLoading={a.projectsLoading}
           offline={!a.online}
           onNewProject={a.newProject}
           onEditProjects={

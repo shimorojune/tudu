@@ -6,6 +6,7 @@ export * from './due';
 export * from './notes';
 export * from './history';
 export * from './projects';
+export * from './projectHash';
 export * from './quickadd';
 export * from './attachments';
 export * from './week';

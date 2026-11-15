@@ -3398,3 +3398,31 @@ html[data-scrambled] .tp-avatar.tp-photo img, html[data-scrambled] .tp-pdot.tp-p
 /* A month with rows under it (Several days, the time): one card. */
 .tp-calwrap { width: 280px; border-radius: var(--radius-lg); background: var(--popover); color: var(--popover-foreground); box-shadow: var(--shadow-pop); padding-bottom: 2px; }
 .tp-calwrap .tp-cal { background: transparent; box-shadow: none; }
+/* # in a task's title picks its project (useProjectHash). The menu is the DS menu, opened under the # (above it on
+   phones, or when the box around it has no room below, so opening it never scrolls anything). */
+.tp-qa-line { position: relative; }
+.tp-hm-pop { position: absolute; left: 0; top: calc(100% + 2px); z-index: 45; animation: tp-pop-in var(--dur-menu) var(--ease-arrive) both; transform-origin: top left; }
+.tp-hm-pop.tp-up { top: auto; bottom: calc(100% + 2px); transform-origin: bottom left; }
+.tp-root .tp-menu.tp-hm { width: 248px; max-height: 292px; overflow-y: auto; }
+.tp-hm-it { justify-content: flex-start; gap: 10px; text-align: left; cursor: default; user-select: none; -webkit-user-select: none; }
+.tp-hm-it.tp-on { background: var(--accent); }
+.tp-qa-phone .tp-hm-pop.tp-up .tp-hm-it { height: 44px; }
+.tp-hm-it .tp-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.tp-mi.tp-hm-it span.tp-hm-n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-sans); font-size: 13.5px; color: var(--popover-foreground); }
+.tp-hm-n b { font-weight: 600; }
+.tp-hm-new { color: var(--foreground-2); }
+.tp-hm-new svg { flex: none; color: var(--muted-foreground); }
+.tp-mi.tp-hm-new span.tp-hm-n { color: var(--foreground-2); }
+.tp-hm-none { margin: 0; padding: 6px 10px 8px; font-size: 13px; line-height: 18px; color: var(--muted-foreground); }
+.tp-hm-err { margin: 2px 0 0; padding: 6px 10px 6px; font-size: 12.5px; line-height: 17px; color: var(--destructive); animation: tp-label-in var(--dur-menu) var(--ease-arrive) both; }
+.tp-hm-ld { padding: 2px 0 4px; }
+.tp-hm-skl { height: 36px; padding: 0 10px; display: flex; align-items: center; gap: 10px; }
+.tp-hm-skd { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+/* Quick Add: the Project chip washes once as # fills it. */
+.tp-root .tp-qa-chip.tp-hm-landed { animation: tp-hm-land 700ms var(--ease-settle) both; }
+.tp-qa-chip.tp-hm-landed > span { animation: tp-label-in var(--dur-menu) var(--ease-arrive) both; }
+@keyframes tp-hm-land { 0% { box-shadow: inset 0 0 0 1px var(--border-strong), 0 0 0 3px var(--selection); background: var(--selection); } 100% { } }
+@media (prefers-reduced-motion: reduce) {
+  .tp-hm-err, .tp-qa-chip.tp-hm-landed > span { animation: tp-label-in 120ms linear both; }
+  .tp-root .tp-qa-chip.tp-hm-landed { animation: none; }
+}

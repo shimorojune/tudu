@@ -76,7 +76,8 @@ export function useQuickAddActions(spaceId: string | undefined) {
   // On the week page a new task lands on the first day of the shown week that is not gone by; in the Backlog, nowhere.
   const shown = pagePlannedDay(page, { shownDay, monday, today });
   const view = useDayView();
-  const projects = useQuery({ ...taskStore.projectsQuery(spaceId ?? ''), enabled: !!spaceId }).data ?? [];
+  const projectsQ = useQuery({ ...taskStore.projectsQuery(spaceId ?? ''), enabled: !!spaceId });
+  const projects = projectsQ.data ?? [];
   const online = useOnline();
   const save = (t: QuickAddResult) => {
     if (!spaceId) throw new Error('no space');
@@ -101,6 +102,8 @@ export function useQuickAddActions(spaceId: string | undefined) {
     page,
     monday,
     projects,
+    // The # menu's quiet rows while the space's projects come in.
+    projectsLoading: !!spaceId && projectsQ.isPending,
     online,
     save,
     newProject: (name: string, color: string) =>
@@ -230,6 +233,7 @@ export function QuickAddHost({ me, openPath }: { me: MeResponse; openPath?: (hre
       today={a.today}
       planned={a.shown}
       projects={a.projects}
+      projectsLoading={a.projectsLoading}
       keyboard={keyboard}
       offline={!a.online}
       // The top line is always there: "In Personal for Me" with plain chips until there is a team space to pick.
