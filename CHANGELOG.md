@@ -1,3 +1,22 @@
+## [0.43.0](https://github.com/shimorojune/tudu/compare/tudu-0.42.0...tudu-0.43.0) (2026-11-15)
+
+### Features
+
+* **backlog:** My order | By project replaces the project menu, on the Backlog page and beside the day ([ce7d655](https://github.com/shimorojune/tudu/commit/ce7d655711d34fa267a1ec95c5355e8e2d349c18))
+* **core:** group a page's tasks by project, and remember the choice per space ([77a2617](https://github.com/shimorojune/tudu/commit/77a2617a19cc5a24b6a8e360a99ca674b42aa7df))
+* **times:** the client store places a span on each of its days ([ae03d14](https://github.com/shimorojune/tudu/commit/ae03d1407b3a78cf119649d79acf9d67ee7d7303))
+* **times:** times on Planned and Due, Planned over several days: data, API and MCP ([b1d6b2e](https://github.com/shimorojune/tudu/commit/b1d6b2e721ce7351007f1b44481d7e839ddeaf6d))
+* **today:** My order | By project on the day pages and All spaces ([a4c7b20](https://github.com/shimorojune/tudu/commit/a4c7b20a0d2ea676d4bea186bcf5af9b7ef7859c))
+* **today:** open the Backlog beside the day on the desk ([#102](https://github.com/shimorojune/tudu/issues/102)) ([f7f6b57](https://github.com/shimorojune/tudu/commit/f7f6b57c90ffc12250e5fc4cedbafc14a074af22)), closes [#77](https://github.com/shimorojune/tudu/issues/77)
+* **ui:** right-click task menu on task lists ([34134aa](https://github.com/shimorojune/tudu/commit/34134aa1753d1ac413f357a2ff040efd7c3e3c35))
+* **ui:** TaskGroups and GroupHeader, a title-line slot on DayHeader, the grouped skeleton, and the writing line's box on its words' baseline ([b51aea3](https://github.com/shimorojune/tudu/commit/b51aea3dbf7c011a65ef9c9651f31c3276c9dbda))
+
+### Bug Fixes
+
+* **mcp:** no runtime import from @tudu/core (the image installs prod dependencies only) ([f57ac96](https://github.com/shimorojune/tudu/commit/f57ac96076b5def7436d0389b2d9b5960e5c131d))
+* **projects:** one full-width row fill, and Save no longer folds the row ([9995263](https://github.com/shimorojune/tudu/commit/9995263546a874b23f9d90c60f1e1dd2167e64f3))
+* **ui:** the keyboard's own contextmenu keeps the first item focused ([5bd3261](https://github.com/shimorojune/tudu/commit/5bd3261bb2e4eaa916165cbe990ef950daa2a442))
+
 ## [0.42.0](https://github.com/shimorojune/tudu/compare/tudu-0.41.1...tudu-0.42.0) (2026-11-13)
 
 ### Features
