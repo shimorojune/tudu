@@ -109,6 +109,8 @@ export interface SpanPlace {
   until: IsoDate;
   n: number;
   of: number;
+  /** The day shown is today's date (set when spanOf is given today): its row reads in full, never tinted (#116). */
+  today?: boolean;
 }
 
 /** Whether a task planned `from` (to `until`) is on `day`. */
@@ -122,9 +124,12 @@ export function spanOf(
   from: IsoDate | null,
   until: IsoDate | null | undefined,
   day: IsoDate | null,
+  today?: IsoDate,
 ): SpanPlace | null {
   if (!from || !until || until <= from || !day || day < from || day > until) return null;
-  return { from, until, n: diffDays(from, day) + 1, of: diffDays(from, until) + 1 };
+  const place: SpanPlace = { from, until, n: diffDays(from, day) + 1, of: diffDays(from, until) + 1 };
+  if (today !== undefined) place.today = day === today;
+  return place;
 }
 
 /** Days in a span, counting both ends: Sun 18 to Wed 21 is 4. */

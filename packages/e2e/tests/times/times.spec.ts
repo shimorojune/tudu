@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { API_URL, expect, signInFresh, test, newTaskButton } from '../../fixtures/app';
 import { dayList, fixClock, idle, row, writeTasks } from '../../fixtures/today';
+import { goWeek, tileList } from '../../fixtures/week';
 
 /** Times on Planned and Due, and Planned over several days (docs/plans/task-times.md). */
 
@@ -111,6 +112,41 @@ test.describe('times', () => {
     const r3 = row(dayList(page, /Tuesday 20 October/), 'Run the offsite');
     await expect(r3.locator('.tp-sg-time')).toHaveText('Day 3 of 4');
     await expect(r3.locator('.tp-row')).toHaveClass(/tp-span-on/);
+  });
+
+  test('TT-E11 a span on today reads in full; its later days stay tinted, on the day and in the week (#116)', async ({
+    page,
+  }) => {
+    await fixClock(page);
+    await signInFresh(page);
+    await firstTask(page, 'Run the offsite');
+    const p = await openTask(page, 'Run the offsite');
+    await p.getByRole('button', { name: 'Planned', exact: true }).click();
+    const pop = p.locator('.tp-td-pop');
+    await pop.getByRole('switch', { name: 'Several days' }).click();
+    await pop.getByRole('button', { name: /^21 October/ }).click();
+    await idle(page);
+    await p.getByRole('button', { name: 'Close' }).click();
+    // the next morning: Monday 19 is today, the span's second day
+    await fixClock(page, new Date(2026, 9, 19, 10, 0));
+    await page.reload();
+    const today = row(dayList(page, /Monday 19 October/), 'Run the offsite');
+    await expect(today.locator('.tp-sg-time')).toHaveText('Day 2 of 4');
+    await expect(today.locator('.tp-row')).not.toHaveClass(/tp-span-on/);
+    await expect(today.locator('.tp-row')).toHaveCSS('opacity', '1');
+    await page.getByRole('button', { name: 'Next day' }).click();
+    const tomorrow = row(dayList(page, /Tuesday 20 October/), 'Run the offsite');
+    await expect(tomorrow.locator('.tp-sg-time')).toHaveText('Day 3 of 4');
+    await expect(tomorrow.locator('.tp-row')).toHaveClass(/tp-span-on/);
+    if (test.info().project.name === 'desktop') {
+      await goWeek(page);
+      await expect(
+        row(tileList(page, 'Monday 19 October'), 'Run the offsite').locator('.tp-row'),
+      ).not.toHaveClass(/tp-span-on/);
+      await expect(
+        row(tileList(page, 'Tuesday 20 October'), 'Run the offsite').locator('.tp-row'),
+      ).toHaveClass(/tp-span-on/);
+    }
   });
 
   test('TT-E06 Due presets and Due at 5 PM: the pill turns Overdue at 5:00, not at midnight', async ({

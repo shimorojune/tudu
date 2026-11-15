@@ -6,24 +6,27 @@ on PR CI (and Actions › Flake check for repeats), not on Rohit's Mac.
 
 ## Where each one lives
 
-| ID                    | Where                                                                        |
-| --------------------- | ---------------------------------------------------------------------------- |
-| TT-U01..U04           | `packages/core/src/times.test.ts`                                            |
-| TT-U06                | `packages/ui/src/components/TimeField.test.tsx`                              |
-| TT-U07, U08           | `packages/ui/src/components/TimeChoice.test.tsx`                             |
-| TT-U09                | `packages/ui/src/components/PlanPicker.test.tsx`, `MiniCalendar.test.tsx`    |
-| TT-U10                | `packages/ui/src/components/MiniCalendar.test.tsx`                           |
-| TT-U11                | `packages/ui/src/components/PlanPicker.test.tsx`                             |
-| TT-U12, U16           | `packages/ui/src/components/TaskRow.test.tsx` (U16 also `QuickAdd.test.tsx`) |
-| TT-U14                | `packages/ui/src/components/TaskDetail.test.tsx`                             |
-| TT-U15                | `packages/ui/src/components/QuickAdd.test.tsx`                               |
-| TT-U17                | `packages/client/src/tasks.test.ts`                                          |
-| TT-U18                | `apps/web/src/app/TimeClock.test.ts`                                         |
-| TT-U19                | `packages/ui/src/components/WorkHoursSection.test.tsx`                       |
-| TT-A01..A06           | `apps/server/src/tasks.test.ts`, `requests.test.ts`                          |
-| TT-A07                | `apps/server/src/taskTimes.migration.test.ts`                                |
-| TT-E01..E03, E06, E07 | `packages/e2e/tests/times/times.spec.ts`                                     |
-| TT-D01                | `apps/desktop/src-tauri/src/times.rs` (cargo test, macOS runner)             |
+| ID                         | Where                                                                        |
+| -------------------------- | ---------------------------------------------------------------------------- |
+| TT-U01..U04                | `packages/core/src/times.test.ts`                                            |
+| TT-U06                     | `packages/ui/src/components/TimeField.test.tsx`                              |
+| TT-U07, U08                | `packages/ui/src/components/TimeChoice.test.tsx`                             |
+| TT-U09                     | `packages/ui/src/components/PlanPicker.test.tsx`, `MiniCalendar.test.tsx`    |
+| TT-U10                     | `packages/ui/src/components/MiniCalendar.test.tsx`                           |
+| TT-U11                     | `packages/ui/src/components/PlanPicker.test.tsx`                             |
+| TT-U12, U16                | `packages/ui/src/components/TaskRow.test.tsx` (U16 also `QuickAdd.test.tsx`) |
+| TT-U20                     | `packages/core/src/times.test.ts` (span-today.md, #116)                      |
+| TT-U21                     | `packages/ui/src/components/TaskRow.test.tsx` (span-today.md, #116)          |
+| TT-U22                     | `apps/web/src/routes/today/toItem.test.ts` (span-today.md, #116)             |
+| TT-U14                     | `packages/ui/src/components/TaskDetail.test.tsx`                             |
+| TT-U15                     | `packages/ui/src/components/QuickAdd.test.tsx`                               |
+| TT-U17                     | `packages/client/src/tasks.test.ts`                                          |
+| TT-U18                     | `apps/web/src/app/TimeClock.test.ts`                                         |
+| TT-U19                     | `packages/ui/src/components/WorkHoursSection.test.tsx`                       |
+| TT-A01..A06                | `apps/server/src/tasks.test.ts`, `requests.test.ts`                          |
+| TT-A07                     | `apps/server/src/taskTimes.migration.test.ts`                                |
+| TT-E01..E03, E06, E07, E11 | `packages/e2e/tests/times/times.spec.ts`                                     |
+| TT-D01                     | `apps/desktop/src-tauri/src/times.rs` (cargo test, macOS runner)             |
 
 ## Not automated yet
 

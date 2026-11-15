@@ -535,4 +535,15 @@ describe('TaskRow times (docs/plans/task-times.md)', () => {
       expect(ic!.querySelector('svg'), k).not.toBeNull();
     }
   });
+
+  it('TT-U21 a span on today reads in full; its other later days are tinted; day 1 never is (#116)', () => {
+    const span = { from: '2026-10-17', until: '2026-10-20', n: 2, of: 4 };
+    const { rerender } = render(<Row span={{ ...span, today: true }} />);
+    expect(sig('time')).toHaveTextContent('Day 2 of 4');
+    expect(document.querySelector('.tp-row')).not.toHaveClass('tp-span-on');
+    rerender(<Row span={{ ...span, n: 3, today: false }} />);
+    expect(document.querySelector('.tp-row')).toHaveClass('tp-span-on');
+    rerender(<Row span={{ ...span, n: 1, today: false }} />);
+    expect(document.querySelector('.tp-row')).not.toHaveClass('tp-span-on');
+  });
 });

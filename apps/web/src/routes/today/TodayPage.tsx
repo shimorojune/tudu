@@ -91,7 +91,8 @@ export function toItem(
     due: t.due && !t.done ? dueLabelAt(t.due, today, t.dueAt, at.now ?? new Date(), timeWords) : undefined,
     dueAt: t.dueAt ?? null,
     time: t.time ?? null,
-    span: spanOf(t.day, t.until, at.day === undefined ? t.day : at.day),
+    // a span on today's date reads in full; its other later days are tinted (#116)
+    span: spanOf(t.day, t.until, at.day === undefined ? t.day : at.day, today),
     carried: t.carriedFrom && !t.done ? carriedLabel(t.carriedFrom, today) : undefined,
     comments: t.commentCount || undefined,
     jira: t.jira ?? undefined,
