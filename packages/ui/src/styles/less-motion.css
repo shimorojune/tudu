@@ -392,6 +392,18 @@
 :root[data-motion='less'] .tp-item.tp-ctx-hold .tp-row {
   transform: none;
 }
+:root[data-motion='less'] .tp-tc-open {
+  animation: tp-label-in 120ms linear both;
+}
+:root[data-motion='less'] .tp-tc-msg,
+:root[data-motion='less'] .tp-cal-hintw {
+  transition: opacity 120ms linear;
+}
+:root[data-motion='less'] .tp-td-time,
+:root[data-motion='less'] .tp-sc-words,
+:root[data-motion='less'] .tp-cal-ht {
+  animation: none;
+}
 :root[data-motion='less'] .tp-hm-err,
 :root[data-motion='less'] .tp-qa-chip.tp-hm-landed > span {
   animation: tp-label-in 120ms linear both;

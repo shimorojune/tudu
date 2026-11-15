@@ -26,6 +26,7 @@ export * from './allSpaces';
 export * from './notebook';
 export * from './hours';
 export * from './nudges';
+export * from './times';
 export * from './ai';
 export * from './scramble';
 export * from './shortcuts';

@@ -1,6 +1,27 @@
 import { useMine } from '../lib/scramble';
-import { addDays, formatDay, isoToday, type IsoDate } from '@tudu/core';
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import {
+  addDays,
+  fmtBlock,
+  fmtTime,
+  formatDay,
+  isoToday,
+  spanFact,
+  spanPill,
+  type Clock,
+  type IsoDate,
+  type SpanPlace,
+  type TimeBlock,
+  type TimeWordsOptions,
+} from '@tudu/core';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import { copyText, COPY_FAILED_WORDS, COPY_ID_FAILED_WORDS } from '../lib/clipboard';
 import { cx } from '../lib/cx';
 import { useTurn } from '../lib/hooks';
@@ -10,6 +31,8 @@ import { Sparkle, useSpark } from '../lib/spark';
 import { DatePop } from './DatePop';
 import { JiraMark } from './JiraMark';
 import { MiniCalendar, type MiniCalendarProps } from './MiniCalendar';
+import { PlanPicker } from './PlanPicker';
+import { TimeChoice } from './TimeChoice';
 import { SubtaskList, type SubtaskItem } from './SubtaskList';
 import { showToast } from './Toast';
 import { SpaceTile, type SpaceTileSpace } from './SpaceTile';
@@ -39,7 +62,7 @@ export interface TaskProject {
   color: string;
 }
 
-export type TaskSignal = 'due' | 'carried' | 'subtasks' | 'comments' | 'jira' | 'space' | 'project';
+export type TaskSignal = 'time' | 'due' | 'carried' | 'subtasks' | 'comments' | 'jira' | 'space' | 'project';
 
 /** The space a task lives in, as All spaces shows it on the row. */
 export interface TaskSpace extends SpaceTileSpace {
@@ -60,6 +83,18 @@ export interface TaskRowProps {
   /** A byline item other than the date was clicked. */
   onSignal?: (kind: TaskSignal) => void;
   due?: TaskDue;
+  /** The due time ("17:00"), for the due picker's time; the words are already in `due`. */
+  dueAt?: Clock | null;
+  /** Times (docs/plans/task-times.md): the planned block. */
+  time?: TimeBlock | null;
+  /** Where this day falls in a task planned over several days; its later days are tinted. */
+  span?: SpanPlace | null;
+  /** 12-hour words unless the system says 24-hour. */
+  timeWords?: TimeWordsOptions;
+  onTimeChange?: (t: TimeBlock | null) => void;
+  /** Several days: from `from` to `until` (null back to one day). */
+  onSpanChange?: (from: IsoDate, until: IsoDate | null) => void;
+  onDueTimeChange?: (at: Clock | null) => void;
   carried?: TaskCarried;
   comments?: number;
   jira?: string;
@@ -112,16 +147,39 @@ interface Sig {
   mono?: boolean;
   /** The tile alone, its name in the tooltip. */
   bare?: boolean;
+  /** The icon is drawn inside the words, on their baseline (its size in px). */
+  ic?: number;
 }
 
 function signals(p: TaskRowProps, mine: (t: string) => string): Sig[] {
   const out: Sig[] = [];
+  const o = p.timeWords ?? {};
+  if (p.span) {
+    out.push({
+      k: 'time',
+      icon: <Icon name="week" size={12} stroke={2.2} />,
+      ic: 12,
+      long: spanPill(p.time ?? null, p.span, !!p.brief, o),
+      label: `Planned ${spanFact(p.span.from, p.span.until, p.time ?? null, o)}`,
+      act: 'Change the days or the time',
+    });
+  } else if (p.time) {
+    out.push({
+      k: 'time',
+      icon: <Icon name="week" size={12} stroke={2.2} />,
+      ic: 12,
+      long: p.brief ? fmtTime(p.time.start, o) : fmtBlock(p.time, o),
+      label: `Planned ${fmtBlock(p.time, o)}`,
+      act: 'Change the time',
+    });
+  }
   if (p.due) {
     const long = p.due.overdue ? `Overdue since ${p.due.label}` : `Due ${p.due.label}`;
     out.push({
       k: 'due',
       od: p.due.overdue,
       icon: <Icon name="clock" size={12} stroke={2.2} />,
+      ic: 12,
       long,
       label: p.due.tip ?? long,
       act: 'Change the date',
@@ -132,6 +190,7 @@ function signals(p: TaskRowProps, mine: (t: string) => string): Sig[] {
       k: 'carried',
       od: !!p.carried.slipping,
       icon: <Icon name="carried" size={12} stroke={2.2} />,
+      ic: 12,
       long: `From ${p.carried.label}`,
       label: p.carried.tip ?? `Carried over from ${p.carried.label}`,
       act: 'Change the date',
@@ -143,6 +202,7 @@ function signals(p: TaskRowProps, mine: (t: string) => string): Sig[] {
     out.push({
       k: 'subtasks',
       icon: <Icon name="subtasks" size={12} />,
+      ic: 12,
       long: `${done} of ${subs.length} done`,
       label: `${done} of ${subs.length} subtasks done`,
       act: 'Show or hide subtasks',
@@ -153,6 +213,7 @@ function signals(p: TaskRowProps, mine: (t: string) => string): Sig[] {
     out.push({
       k: 'comments',
       icon: <Icon name="comment" size={12} />,
+      ic: 12,
       long: words,
       label: words,
       act: 'Open comments',
@@ -190,7 +251,13 @@ function signals(p: TaskRowProps, mine: (t: string) => string): Sig[] {
   }
   return p.brief
     ? out.filter(
-        (x) => x.k === 'due' || x.k === 'carried' || x.k === 'jira' || x.k === 'space' || x.k === 'project',
+        (x) =>
+          x.k === 'time' ||
+          x.k === 'due' ||
+          x.k === 'carried' ||
+          x.k === 'jira' ||
+          x.k === 'space' ||
+          x.k === 'project',
       )
     : out;
 }
@@ -235,9 +302,11 @@ export function TaskRow(p: TaskRowProps) {
   const [sparking, fire] = useSpark();
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [pop, setPop] = useState<{ k: 'carried' | 'due' | 'plan'; el: HTMLElement; asked?: boolean } | null>(
-    null,
-  );
+  const [pop, setPop] = useState<{
+    k: 'carried' | 'due' | 'plan' | 'time';
+    el: HTMLElement;
+    asked?: boolean;
+  } | null>(null);
   // Only a new request opens it.
   const [seenAsk, setSeenAsk] = useState(p.pickRequest?.n);
   if (p.pickRequest?.n !== seenAsk) {
@@ -279,14 +348,17 @@ export function TaskRow(p: TaskRowProps) {
     showToast(link ? 'Link copied' : `Copied ${id}`);
   }
 
-  function pick(k: 'carried' | 'due' | 'plan', el: HTMLElement) {
+  function pick(k: 'carried' | 'due' | 'plan' | 'time', el: HTMLElement) {
     setPop((cur) => (cur && cur.k === k ? null : { k, el }));
   }
 
   const sigs = signals(p, mine);
-  const dueTurn = useTurn(sigs.find((x) => x.k === 'due')?.long);
+  const dueTurn = useTurn(
+    `${sigs.find((x) => x.k === 'due')?.long ?? ''}|${sigs.find((x) => x.k === 'time')?.long ?? ''}`,
+  );
   const byline: ReactNode[] = sigs.map((x) => {
-    const isDate = (x.k === 'due' || x.k === 'carried') && canPick;
+    const isDate = (x.k === 'due' || x.k === 'carried' || x.k === 'time') && canPick;
+    const turns = x.k === 'due' || x.k === 'time';
     const isSubs = x.k === 'subtasks';
     const hasTip = (x.k === 'due' || x.k === 'carried') && x.label !== x.long;
     const button = (
@@ -301,7 +373,7 @@ export function TaskRow(p: TaskRowProps) {
           x.mono && 'tp-mono',
           pop?.k === x.k && 'tp-on',
           isSubs && showSubs && 'tp-open',
-          x.k === 'due' && dueTurn > 0 && 'tp-sg-turn',
+          turns && dueTurn > 0 && 'tp-sg-turn',
         )}
         aria-label={
           isSubs ? `${x.label}. ${showSubs ? 'Hide subtasks' : 'Show subtasks'}` : `${x.label}. ${x.act}`
@@ -310,11 +382,11 @@ export function TaskRow(p: TaskRowProps) {
           isDate ? (pop?.k === x.k ? 'true' : 'false') : isSubs ? (showSubs ? 'true' : 'false') : undefined
         }
         aria-haspopup={isDate ? 'dialog' : undefined}
-        title={x.k === 'due' || x.k === 'carried' ? undefined : x.long}
+        title={x.k === 'due' || x.k === 'carried' ? undefined : x.k === 'time' ? x.label : x.long}
         onClick={(e) => {
           e.stopPropagation();
           if (isDate) {
-            pick(x.k as 'carried' | 'due', e.currentTarget);
+            pick(x.k as 'carried' | 'due' | 'time', e.currentTarget);
             return;
           }
           if (isSubs) setSubsOpen((v) => !v);
@@ -328,10 +400,18 @@ export function TaskRow(p: TaskRowProps) {
             {x.icon}
             {x.bare ? null : x.long}
           </span>
+        ) : x.ic && !x.bare ? (
+          // The icon inside the words, on their baseline (.tp-bl-ic).
+          <span key={turns ? dueTurn : undefined}>
+            <span className="tp-bl-ic" style={{ '--ic': `${x.ic}px` } as CSSProperties} aria-hidden="true">
+              {x.icon}
+            </span>
+            {x.long}
+          </span>
         ) : (
           <>
             {x.icon}
-            <span key={x.k === 'due' ? dueTurn : undefined}>{x.long}</span>
+            <span key={turns ? dueTurn : undefined}>{x.long}</span>
           </>
         )}
         {isSubs ? (
@@ -394,27 +474,39 @@ export function TaskRow(p: TaskRowProps) {
           />
         </DatePop>
       );
-    } else if (pop.k === 'carried') {
+    } else if (pop.k === 'carried' || pop.k === 'time') {
       const plan = (v: IsoDate | null) => {
         close();
         p.onPlan?.(v);
       };
+      const o = p.timeWords ?? {};
+      const sp = p.span ?? null;
+      const first = sp ? sp.from : day;
+      const heading = sp
+        ? `Planned ${spanFact(sp.from, sp.until, p.time ?? null, o)}`
+        : pop.k === 'time' && p.time
+          ? `Planned ${day === today ? 'today' : formatDay(day)}, ${fmtBlock(p.time, o)}`
+          : p.carried
+            ? (p.carried.tip ?? `Carried over from ${p.carried.label}`)
+            : 'Move it';
       datePop = (
-        <DatePop
-          anchor={pop.el}
-          onClose={close}
-          heading={p.carried ? (p.carried.tip ?? `Carried over from ${p.carried.label}`) : 'Move it'}
-        >
-          <MiniCalendar
-            {...cal}
-            selected={day}
+        <DatePop anchor={pop.el} onClose={close} heading={heading}>
+          <PlanPicker
+            cal={cal}
+            today={today}
+            day={first}
+            until={sp ? sp.until : null}
+            time={p.time ?? null}
+            now={cal.now}
             presets={[
-              { label: 'Today', on: day === today, value: today },
-              { label: 'Tomorrow', on: day === tmr, value: tmr },
+              { label: 'Today', on: first === today && !sp, value: today },
+              { label: 'Tomorrow', on: first === tmr && !sp, value: tmr },
               { label: 'Backlog', on: false, value: null },
             ]}
             onPreset={plan}
-            onPick={plan}
+            onDay={plan}
+            onSpan={p.onSpanChange}
+            onTime={p.onTimeChange}
             hint={(k) => ({
               text: k === day ? `Keep it on ${k === today ? 'today' : formatDay(k)}` : `Move to ${word(k)}`,
               tone: k === today ? 'today' : '',
@@ -436,11 +528,28 @@ export function TaskRow(p: TaskRowProps) {
             selected={dIso}
             month={(dIso ?? cal.month ?? today).slice(0, 7)}
             marks={{}}
-            clearLabel="Remove due date"
+            presets={[
+              { label: 'Today', on: dIso === today, value: today },
+              { label: 'Tomorrow', on: dIso === tmr, value: tmr },
+              { label: 'No date', on: !dIso, value: null },
+            ]}
             onClear={() => setDue(null)}
             onPick={setDue}
             hintEmpty="Pick a due date"
           />
+          {p.onDueTimeChange ? (
+            <TimeChoice
+              kind="due"
+              value={dIso ? (p.dueAt ?? null) : null}
+              isToday={(dIso ?? today) === today}
+              now={cal.now}
+              onChange={(t) => {
+                // A time with no due day sets the day to today too.
+                if (!dIso && t) p.onDueChange?.(today);
+                p.onDueTimeChange?.(t);
+              }}
+            />
+          ) : null}
         </DatePop>
       );
     }
@@ -488,6 +597,7 @@ export function TaskRow(p: TaskRowProps) {
       <div
         className={cx(
           'tp-row',
+          p.span && p.span.n > 1 && !done && 'tp-span-on',
           done && 'tp-done',
           compact && 'tp-compact',
           p.onOpen && 'tp-openable',

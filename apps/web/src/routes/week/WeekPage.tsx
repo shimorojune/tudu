@@ -51,6 +51,7 @@ import { useViewport, type Viewport } from '../../app/viewport';
 import { useWorkingDay } from '../../app/workingDay';
 import { AllBanners, FilterChips, OfflineBanner, openInSpace, toItem } from '../today/TodayPage';
 import { TaskPanel, type OpenTask } from '../today/TaskPanel';
+import { rowTimes, useMinute } from '../../app/times';
 import { useFolds } from './folds';
 import { taskLink } from '../../app/links';
 
@@ -202,6 +203,7 @@ function WeekSheet({
   openKey,
   onCloseTask,
 }: WeekSheetProps) {
+  const now = useMinute();
   const desk = vp === 'desktop';
   const compact = vp === 'phone';
   const narrow = useNarrow();
@@ -223,8 +225,10 @@ function WeekSheet({
   const allMarks = useAllMarks(all, marksFrom, marksTo);
   const marks = all ? allMarks : spaceMarks;
   const spaceOf = (id: string) => all?.spaces.find((s) => s.id === id);
-  const itemOf = (t: Task) =>
-    all ? toItem(t, today, projectsOf(t.spaceId), spaceOf(t.spaceId)) : toItem(t, today, spaceProjects);
+  const itemOf = (t: Task, day: IsoDate | null) =>
+    all
+      ? toItem(t, today, projectsOf(t.spaceId), spaceOf(t.spaceId), { day, now })
+      : toItem(t, today, spaceProjects, undefined, { day, now });
   // In All spaces a tile shows what the space filter leaves, a beat behind the header (as the list narrows).
   const narrowed = (tasks: Task[] | undefined) =>
     all && filters.lagSpace ? tasks?.filter((t) => t.spaceId === filters.lagSpace) : tasks;
@@ -327,6 +331,10 @@ function WeekSheet({
         }
         onKeepTask={(t) => taskStore.keep(t.key)}
         onDueChange={(t, due) => taskStore.due(t.key, due)}
+        timeWords={rowTimes.timeWords}
+        onDueTimeChange={rowTimes.onDueTimeChange}
+        onTimeChange={day === null ? undefined : rowTimes.onTimeChange}
+        onSpanChange={day === null ? undefined : rowTimes.onSpanChange}
         menu={rowMenu}
         onOpenTask={(t) => onOpenTask(t.key, raw?.find((x) => x.id === t.key)?.ref ?? t.id)}
       />
@@ -375,7 +383,7 @@ function WeekSheet({
   const dayTiles = days.map((d) => {
     const all_ = tasksOf(d);
     const tasks = narrowed(all_);
-    const items = all_?.map(itemOf);
+    const items = all_?.map((t) => itemOf(t, d));
     const openTitles = tasks?.filter((t) => !t.done).map((t) => t.title) ?? [];
     return {
       day: d,
@@ -388,7 +396,7 @@ function WeekSheet({
   });
   const backlogAll = tasksOf(null);
   const backlogTasks = narrowed(backlogAll);
-  const backlogItems = backlogAll?.map(itemOf);
+  const backlogItems = backlogAll?.map((t) => itemOf(t, null));
   const backlogBody = listFor(null, backlogItems, pending);
   const backlogCount = backlogTasks ? tileCount(backlogTasks.length, 0) : '';
   const backlogEmpty = !!backlogTasks && backlogTasks.length === 0;

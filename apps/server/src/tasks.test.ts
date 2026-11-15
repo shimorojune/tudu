@@ -324,11 +324,13 @@ describe('tasks and sync', () => {
         'done',
         'doneAt',
         'due',
+        'dueAt',
         'id',
         'jira',
         'links',
         'number',
         'ownerId',
+        'places',
         'position',
         'projectId',
         'ref',
@@ -336,7 +338,9 @@ describe('tasks and sync', () => {
         'subsDone',
         'subsTotal',
         'subtasks',
+        'time',
         'title',
+        'until',
         'updatedAt',
         'visibility',
       ].sort(),
@@ -1298,5 +1302,250 @@ describe('the week (chunk 05)', () => {
     const stranger = await person();
     const res = await get(server.app, `/api/spaces/${p.spaceId}/search?q=renew`, stranger.jar);
     expect(res.status).toBe(403);
+  });
+});
+
+describe('times on Planned and Due (docs/plans/task-times.md)', () => {
+  const at = (iso: string, h: number) =>
+    new Date(Date.parse(`${iso}T00:00:00.000Z`) + h * 3600_000).toISOString();
+
+  async function marks(p: Person, from: string, to: string) {
+    const res = await get(server.app, `/api/spaces/${p.spaceId}/marks?from=${from}&to=${to}`, p.jar);
+    return ((await res.json()) as MarksResponse).marks;
+  }
+  async function week(p: Person, monday: string, today?: string): Promise<WeekResponse> {
+    const q = today ? `?today=${today}` : '';
+    return (await (
+      await get(server.app, `/api/spaces/${p.spaceId}/weeks/${monday}${q}`, p.jar)
+    ).json()) as WeekResponse;
+  }
+  const one = async (p: Person, id: string, iso: string) =>
+    (await day(p, iso)).tasks.find((t) => t.id === id);
+
+  it('TT-A01 time, span and due time save with their own clocks; an older write loses to a newer one', async () => {
+    const p = await person();
+    const id = randomUUID();
+    await sync(p, [create(p, 'Write the plan', '2026-11-02', 1000, id)]);
+    await sync(p, [
+      m('task.time', { id, time: { start: '15:00', end: '16:00' } }, at('2026-11-01', 2)),
+      m('task.due', { id, due: '2026-11-04' }, at('2026-11-01', 2)),
+      m('task.dueTime', { id, at: '17:00' }, at('2026-11-01', 2)),
+      m('task.span', { id, until: '2026-11-04' }, at('2026-11-01', 2)),
+    ]);
+    let t = (await one(p, id, '2026-11-02'))!;
+    expect(t.time).toEqual({ start: '15:00', end: '16:00' });
+    expect(t.dueAt).toBe('17:00');
+    expect(t.until).toBe('2026-11-04');
+    // Older writes arrive late: each field keeps the newer value.
+    await sync(p, [
+      m('task.time', { id, time: { start: '09:00', end: '10:00' } }, at('2026-11-01', 1)),
+      m('task.dueTime', { id, at: null }, at('2026-11-01', 1)),
+      m('task.span', { id, until: null }, at('2026-11-01', 1)),
+    ]);
+    t = (await one(p, id, '2026-11-02'))!;
+    expect(t.time).toEqual({ start: '15:00', end: '16:00' });
+    expect(t.dueAt).toBe('17:00');
+    expect(t.until).toBe('2026-11-04');
+    // Newer ones win, and history says so.
+    await sync(p, [
+      m('task.time', { id, time: null }, at('2026-11-01', 3)),
+      m('task.span', { id, until: null }, at('2026-11-01', 3)),
+    ]);
+    t = (await one(p, id, '2026-11-02'))!;
+    expect(t.time).toBeNull();
+    expect(t.until).toBeNull();
+    const kinds = (await detail(p, id)).history.map((h) => h.kind);
+    expect(kinds).toEqual(
+      expect.arrayContaining(['time.set', 'time.cleared', 'span.set', 'span.cleared', 'due.set']),
+    );
+  });
+
+  it('TT-A02 a time ending before it starts on one day, a last day not after the first, half a time and a bad time are refused', async () => {
+    const p = await person();
+    const id = randomUUID();
+    const backlog = randomUUID();
+    await sync(p, [create(p, 'One day', '2026-11-02', 1000, id), create(p, 'No day', null, 1000, backlog)]);
+    const bad = [
+      m('task.time', { id, time: { start: '16:00', end: '15:00' } }),
+      m('task.time', { id, time: { start: '16:00', end: '16:00' } }),
+      m('task.time', { id, time: { start: '16:00' } }),
+      m('task.time', { id, time: { start: '25:00', end: '26:00' } }),
+      m('task.span', { id, until: '2026-11-02' }),
+      m('task.span', { id, until: '2026-11-01' }),
+      m('task.span', { id, until: '2026-12-15' }),
+      m('task.time', { id: backlog, time: { start: '09:00', end: '10:00' } }),
+    ];
+    const res = await sync(p, bad);
+    expect(res.results.map((r) => r.status)).toEqual(bad.map(() => 'rejected'));
+    expect(res.results.every((r) => r.status === 'rejected' && r.code === 400)).toBe(true);
+    // Over several days the end may come before the start: it is on another day.
+    const ok = await sync(p, [
+      m('task.span', { id, until: '2026-11-03' }),
+      m('task.time', { id, time: { start: '16:00', end: '10:00' } }),
+    ]);
+    expect(ok.results.map((r) => r.status)).toEqual(['ok', 'ok']);
+    // Back to one day, that time ends an hour after its start.
+    await sync(p, [m('task.span', { id, until: null })]);
+    expect((await one(p, id, '2026-11-02'))!.time).toEqual({ start: '16:00', end: '17:00' });
+  });
+
+  it('TT-A03 a span is on each of its days, first unless given a place there; the week and the dots likewise', async () => {
+    const p = await person();
+    const span = randomUUID();
+    const a = randomUUID();
+    const b = randomUUID();
+    await sync(p, [
+      create(p, 'Before', '2026-11-03', 1000, a),
+      create(p, 'After', '2026-11-03', 2000, b),
+      m('task.create', {
+        id: span,
+        spaceId: p.spaceId,
+        title: 'Conference',
+        day: '2026-11-02',
+        position: 5000,
+        until: '2026-11-04',
+        time: { start: '10:00', end: '17:00' },
+      }),
+    ]);
+    expect(titles(await day(p, '2026-11-01'))).toEqual([]);
+    expect(titles(await day(p, '2026-11-02'))).toEqual(['Conference']);
+    expect(titles(await day(p, '2026-11-03'))).toEqual(['Conference', 'Before', 'After']);
+    expect(titles(await day(p, '2026-11-04'))).toEqual(['Conference']);
+    expect(titles(await day(p, '2026-11-05'))).toEqual([]);
+    // Its own place on the 3rd, after "Before"; the other days are unchanged.
+    await sync(p, [m('task.dayPlace', { id: span, day: '2026-11-03', position: 1500 })]);
+    expect(titles(await day(p, '2026-11-03'))).toEqual(['Before', 'Conference', 'After']);
+    expect(titles(await day(p, '2026-11-02'))).toEqual(['Conference']);
+    // A place on its first day, or off the span, is refused.
+    const off = await sync(p, [
+      m('task.dayPlace', { id: span, day: '2026-11-02', position: 1 }),
+      m('task.dayPlace', { id: span, day: '2026-11-06', position: 1 }),
+    ]);
+    expect(off.results.map((r) => r.status)).toEqual(['rejected', 'rejected']);
+    const w = await week(p, '2026-11-02');
+    expect(w.days.map((d) => d.tasks.map((t) => t.title))).toEqual([
+      ['Conference'],
+      ['Before', 'Conference', 'After'],
+      ['Conference'],
+      [],
+      [],
+      [],
+      [],
+    ]);
+    // A span that starts in the week before still shows on this week's days.
+    const early = randomUUID();
+    await sync(p, [
+      m('task.create', {
+        id: early,
+        spaceId: p.spaceId,
+        title: 'Trip',
+        day: '2026-10-31',
+        position: 1,
+        until: '2026-11-03',
+      }),
+    ]);
+    expect((await week(p, '2026-11-02')).days[0]!.tasks.map((t) => t.title)).toEqual(['Trip', 'Conference']);
+    expect(await marks(p, '2026-11-01', '2026-11-05')).toEqual({
+      '2026-11-01': 1,
+      '2026-11-02': 2,
+      '2026-11-03': 4,
+      '2026-11-04': 1,
+    });
+  });
+
+  it('TT-A04 moving a span keeps its length; its places go; to the Backlog it loses its days and its time', async () => {
+    const p = await person();
+    const id = randomUUID();
+    await sync(p, [
+      m('task.create', {
+        id,
+        spaceId: p.spaceId,
+        title: 'Offsite',
+        day: '2026-11-09',
+        position: 1,
+        until: '2026-11-11',
+        time: { start: '09:00', end: '12:00' },
+      }),
+      m('task.dayPlace', { id, day: '2026-11-10', position: 50 }),
+    ]);
+    const moved = await sync(p, [m('task.place', { id, day: '2026-11-12', position: null })]);
+    const t = moved.tasks.find((x) => x.id === id)!;
+    expect(t.day).toBe('2026-11-12');
+    expect(t.until).toBe('2026-11-14');
+    expect(t.places).toEqual({});
+    expect(t.time).toEqual({ start: '09:00', end: '12:00' });
+    expect(titles(await day(p, '2026-11-10'))).toEqual([]);
+    expect(titles(await day(p, '2026-11-14'))).toEqual(['Offsite']);
+    const out = await sync(p, [m('task.place', { id, day: null, position: null })]);
+    const b = out.tasks.find((x) => x.id === id)!;
+    expect([b.day, b.until, b.time]).toEqual([null, null, null]);
+  });
+
+  it('TT-A05 carrying over: a span ending today stays; one that ended yesterday carries as one day with no time, keeping its due time', async () => {
+    const p = await person();
+    const on = randomUUID();
+    const over = randomUUID();
+    await sync(p, [
+      m('task.create', {
+        id: on,
+        spaceId: p.spaceId,
+        title: 'Still on',
+        day: '2026-11-16',
+        position: 1,
+        until: '2026-11-18',
+      }),
+      m('task.create', {
+        id: over,
+        spaceId: p.spaceId,
+        title: 'Ran out',
+        day: '2026-11-15',
+        position: 2,
+        until: '2026-11-17',
+        time: { start: '10:00', end: '11:00' },
+        due: '2026-11-20',
+        dueAt: '17:00',
+      }),
+    ]);
+    const today = await day(p, '2026-11-18', '2026-11-18');
+    expect(titles(today)).toEqual(['Still on', 'Ran out']);
+    const carried = today.tasks.find((t) => t.id === over)!;
+    expect(carried).toMatchObject({
+      day: '2026-11-18',
+      until: null,
+      time: null,
+      carriedFrom: '2026-11-15',
+      due: '2026-11-20',
+      dueAt: '17:00',
+    });
+    const still = today.tasks.find((t) => t.id === on)!;
+    expect([still.day, still.until, still.carriedFrom]).toEqual(['2026-11-16', '2026-11-18', null]);
+  });
+
+  it('TT-A06 clearing the due day clears its time; a request carries its due time onto the task', async () => {
+    const p = await person();
+    const id = randomUUID();
+    await sync(p, [
+      m('task.create', {
+        id,
+        spaceId: p.spaceId,
+        title: 'Pay',
+        day: null,
+        position: null,
+        due: '2026-11-20',
+        dueAt: '09:30',
+      }),
+    ]);
+    let t = (await sync(p, [m('task.due', { id, due: '2026-11-21' })])).tasks[0]!;
+    expect([t.due, t.dueAt]).toEqual(['2026-11-21', '09:30']);
+    t = (await sync(p, [m('task.due', { id, due: null })])).tasks[0]!;
+    expect([t.due, t.dueAt]).toEqual([null, null]);
+    // A time with no due day changes nothing.
+    t = (await sync(p, [m('task.dueTime', { id, at: '10:00' })])).tasks[0]!;
+    expect(t.dueAt).toBeNull();
+    const [row] = await server.db
+      .select({ dueTime: schema.tasks.dueTime, dueDay: schema.tasks.dueDay })
+      .from(schema.tasks)
+      .where(eq(schema.tasks.id, id));
+    expect(row).toEqual({ dueTime: null, dueDay: null });
   });
 });

@@ -10,6 +10,7 @@ import {
   type DueTone,
   type IsoDate,
 } from './dates';
+import { fmtTime, isPast, type Clock, type TimeWordsOptions } from './times';
 
 export interface DueLabel {
   /**
@@ -43,4 +44,28 @@ export function dueLabel(due: IsoDate, today: IsoDate): DueLabel {
 /** The due fact in the panel: "Fri 16 Oct" and "2 days overdue" (red), "today" (brand), "in 4 days". */
 export function dueWords(due: IsoDate, today: IsoDate): { text: string; tone: DueTone } {
   return dueDistance(due, today);
+}
+
+/**
+ * The due pill with a time (docs/plans/task-times.md): "Due today 5 PM", "Due tomorrow 9 AM", "Due Fri 5 PM", and
+ * overdue once the minute has passed, not at midnight: "Overdue since 5 PM". Without a time, as `dueLabel`.
+ */
+export function dueLabelAt(
+  due: IsoDate,
+  today: IsoDate,
+  at: Clock | null | undefined,
+  now: Date,
+  o: TimeWordsOptions = {},
+): DueLabel {
+  const base = dueLabel(due, today);
+  if (!at) return base;
+  const t = fmtTime(at, o);
+  if (due === today) {
+    const late = isPast(due, at, now);
+    return late
+      ? { label: t, tip: `Was due today at ${t}`, overdue: true, iso: due }
+      : { label: `today ${t}`, tip: `Due today at ${t}`, overdue: false, iso: due };
+  }
+  if (base.overdue) return base;
+  return { ...base, label: `${base.label} ${t}`, tip: `${base.tip} at ${t}` };
 }

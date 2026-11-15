@@ -2,7 +2,14 @@ import { applyRequest, noteComment } from './requests';
 import { moveSlug } from './settings';
 import {
   addDays,
+  blockFrom,
+  blockOk,
+  byPlaceOn,
   chipHtml,
+  moveSpan,
+  onDay,
+  spanList,
+  spanOk,
   cleanHtml,
   isEmptyHtml,
   isInboxMutation,
@@ -110,6 +117,11 @@ const taskColumns = {
   doneAt: schema.tasks.doneAt,
   carriedFrom: schema.tasks.carriedFrom,
   dueDay: schema.tasks.dueDay,
+  dueTime: schema.tasks.dueTime,
+  endDay: schema.tasks.endDay,
+  startTime: schema.tasks.startTime,
+  endTime: schema.tasks.endTime,
+  places: schema.tasks.places,
   visibility: schema.tasks.visibility,
   projectId: schema.tasks.projectId,
   links: linksColumn,
@@ -129,6 +141,11 @@ type TaskRow = {
   doneAt: Date | null;
   carriedFrom: string | null;
   dueDay: string | null;
+  dueTime?: string | null;
+  endDay?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  places?: Record<string, number>;
   visibility: 'space' | 'me';
   projectId: string | null;
   links: TaskLink[];
@@ -155,6 +172,10 @@ export function toTask(r: TaskRow, c: Counts = { subtasks: [], commentCount: 0 }
     doneAt: r.doneAt?.toISOString() ?? null,
     carriedFrom: r.carriedFrom,
     due: r.dueDay,
+    dueAt: r.dueTime ?? null,
+    until: r.endDay ?? null,
+    time: r.startTime && r.endTime ? { start: r.startTime, end: r.endTime } : null,
+    places: r.places ?? {},
     visibility: r.visibility,
     projectId: r.projectId,
     links: r.links,
@@ -220,15 +241,28 @@ export async function tasksOfDay(
     .from(schema.tasks)
     .innerJoin(schema.spaces, eq(schema.spaces.id, schema.tasks.spaceId))
     .where(
-      and(
-        eq(schema.tasks.spaceId, spaceId),
-        ownedBy(userId),
-        eq(schema.tasks.day, day),
-        isNull(schema.tasks.deletedAt),
-      ),
+      and(eq(schema.tasks.spaceId, spaceId), ownedBy(userId), onDaySql(day), isNull(schema.tasks.deletedAt)),
     )
     .orderBy(asc(schema.tasks.position), asc(schema.tasks.createdAt));
-  return withCounts(db, rows);
+  return (await withCounts(db, rows)).sort(byPlaceOn(day));
+}
+
+/** A task is on `day`: planned for it, or planned over several days that hold it (docs/plans/task-times.md). */
+export function onDaySql(day: IsoDate) {
+  return or(eq(schema.tasks.day, day), and(lt(schema.tasks.day, day), gte(schema.tasks.endDay, day)))!;
+}
+
+/** A task is on some day from `from` to `to`: its first day or its span overlaps them. */
+export function inDaysSql(from: IsoDate, to: IsoDate) {
+  return and(
+    lte(schema.tasks.day, to),
+    gte(sql`coalesce(${schema.tasks.endDay}, ${schema.tasks.day})`, from),
+  )!;
+}
+
+/** Every day a task is on: its day, or each day of its span; the Backlog is null. */
+export function daysOf(day: IsoDate | null, until: IsoDate | null | undefined): Array<IsoDate | null> {
+  return day === null ? [null] : spanList(day, until);
 }
 
 /** The tasks with no day (the Backlog) in a space, in order: the asking person's own. */
@@ -445,8 +479,7 @@ export async function tasksOfWeek(
       and(
         eq(schema.tasks.spaceId, spaceId),
         ownedBy(userId),
-        gte(schema.tasks.day, monday),
-        lte(schema.tasks.day, sunday),
+        inDaysSql(monday, sunday),
         isNull(schema.tasks.deletedAt),
       ),
     )
@@ -454,7 +487,9 @@ export async function tasksOfWeek(
   const tasks = await withCounts(db, rows);
   const out = new Map<IsoDate, Task[]>();
   for (let i = 0; i < 7; i++) out.set(addDays(monday, i), []);
-  for (const t of tasks) out.get(t.day!)?.push(t);
+  // A task over several days is on each of them.
+  for (const t of tasks) for (const d of daysOf(t.day, t.until)) if (d) out.get(d)?.push(t);
+  for (const [d, list] of out) list.sort(byPlaceOn(d));
   return out;
 }
 
@@ -648,20 +683,21 @@ export async function marksOf(
   to: IsoDate,
 ): Promise<Record<string, number>> {
   const rows = await db
-    .select({ day: schema.tasks.day, n: count() })
+    .select({ day: schema.tasks.day, until: schema.tasks.endDay, n: count() })
     .from(schema.tasks)
     .where(
       and(
         eq(schema.tasks.spaceId, spaceId),
         ownedBy(userId),
-        gte(schema.tasks.day, from),
-        lte(schema.tasks.day, to),
+        inDaysSql(from, to),
         isNull(schema.tasks.deletedAt),
       ),
     )
-    .groupBy(schema.tasks.day);
+    .groupBy(schema.tasks.day, schema.tasks.endDay);
   const marks: Record<string, number> = {};
-  for (const r of rows) if (r.day) marks[r.day] = r.n;
+  // A task over several days marks each of them.
+  for (const r of rows)
+    for (const d of daysOf(r.day, r.until)) if (d && d >= from && d <= to) marks[d] = (marks[d] ?? 0) + r.n;
   return marks;
 }
 
@@ -698,12 +734,18 @@ export async function rollForward(
       .for('update');
     if (!space || (space.rolledTo && space.rolledTo >= today)) return { days: [], tasks: [] };
     const open = await tx
-      .select({ id: schema.tasks.id, day: schema.tasks.day, carriedFrom: schema.tasks.carriedFrom })
+      .select({
+        id: schema.tasks.id,
+        day: schema.tasks.day,
+        until: schema.tasks.endDay,
+        carriedFrom: schema.tasks.carriedFrom,
+      })
       .from(schema.tasks)
       .where(
         and(
           eq(schema.tasks.spaceId, spaceId),
-          lt(schema.tasks.day, today),
+          // A task over several days is still on while its last day has not passed.
+          lt(sql`coalesce(${schema.tasks.endDay}, ${schema.tasks.day})`, today),
           isNull(schema.tasks.doneAt),
           isNull(schema.tasks.deletedAt),
         ),
@@ -725,13 +767,24 @@ export async function rollForward(
     for (let i = 0; i < open.length; i++) {
       const t = open[i]!;
       const position = first === null ? (i + 1) * POSITION_STEP : first - (open.length - i) * POSITION_STEP;
+      // Carried, a task over several days becomes a one-day task on today, and its time is gone with its days.
       await tx
         .update(schema.tasks)
-        .set({ day: today, position, carriedFrom: t.carriedFrom ?? t.day, updatedAt: now })
+        .set({
+          day: today,
+          position,
+          carriedFrom: t.carriedFrom ?? t.day,
+          endDay: null,
+          startTime: null,
+          endTime: null,
+          places: {},
+          updatedAt: now,
+        })
         .where(eq(schema.tasks.id, t.id));
       await record(tx, t.id, 'carried', { from: t.day }, null, now);
     }
-    return { days: [today, ...new Set(open.map((t) => t.day!))], tasks: open.map((t) => t.id) };
+    const left = open.flatMap((t) => daysOf(t.day, t.until)) as IsoDate[];
+    return { days: [today, ...new Set(left)], tasks: open.map((t) => t.id) };
   });
 }
 
@@ -876,6 +929,15 @@ async function create(
   const notes = (p.notes ?? '') + (files.length ? `<p>${files.map(chipHtml).join(' ')}</p>` : '');
   const clocks: TaskClocks = { title: m.at, done: m.at, place: m.at, carried: m.at, deleted: m.at };
   if (p.due !== undefined) clocks.due = m.at;
+  // Times (docs/plans/task-times.md): a time needs its day; a span its first day.
+  const until = p.day && p.until && spanOk(p.day, p.until) ? p.until : null;
+  if (p.until && !until)
+    throw new Rejected(400, 'Several days need a last day after the first, within a month.');
+  const time = p.day && p.time && blockOk(p.time, !!until) ? p.time : null;
+  if (p.time && !time) throw new Rejected(400, 'A time needs its day, and an end after its start.');
+  const dueAt = p.due && p.dueAt ? p.dueAt : null;
+  if (p.time !== undefined) clocks.time = m.at;
+  if (p.dueAt !== undefined) clocks.dueAt = m.at;
   if (p.notes !== undefined) clocks.notes = m.at;
   if (p.projectId !== undefined) clocks.project = m.at;
   // A client from before connectors names the Jira key alone.
@@ -889,6 +951,10 @@ async function create(
     day: p.day,
     position: p.position ?? (await endOf(tx, p.spaceId, p.day)),
     dueDay: p.due ?? null,
+    dueTime: dueAt,
+    endDay: until,
+    startTime: time?.start ?? null,
+    endTime: time?.end ?? null,
     notes: notes ? cleanHtml(notes) : '',
     notesText: notes ? textOf(cleanHtml(notes)) : '',
     projectId,
@@ -909,7 +975,9 @@ async function create(
   const made: Record<string, unknown> = source ? { source } : {};
   if (link) Object.assign(made, { provider: link.provider, key: link.key });
   await record(tx, p.id, 'created', made, userId, new Date(m.at));
-  if (p.due) await record(tx, p.id, 'due.set', { due: p.due }, userId, new Date(m.at));
+  if (p.due) await record(tx, p.id, 'due.set', { due: p.due, dueAt }, userId, new Date(m.at));
+  if (until) await record(tx, p.id, 'span.set', { from: p.day, until }, userId, new Date(m.at));
+  if (time) await record(tx, p.id, 'time.set', { time }, userId, new Date(m.at));
   if (files.length)
     await tx
       .update(schema.attachments)
@@ -920,7 +988,7 @@ async function create(
           files.map((f) => f.id),
         ),
       );
-  return { taskId: p.id, spaceId: p.spaceId, days: [p.day] };
+  return { taskId: p.id, spaceId: p.spaceId, days: daysOf(p.day, until) };
 }
 
 /**
@@ -935,6 +1003,11 @@ async function lockTask(tx: Tx, userId: string, taskId: string, forComment = fal
       day: schema.tasks.day,
       doneAt: schema.tasks.doneAt,
       dueDay: schema.tasks.dueDay,
+      dueTime: schema.tasks.dueTime,
+      endDay: schema.tasks.endDay,
+      startTime: schema.tasks.startTime,
+      endTime: schema.tasks.endTime,
+      places: schema.tasks.places,
       deletedAt: schema.tasks.deletedAt,
       clocks: schema.tasks.clocks,
       ownerId: schema.tasks.ownerId,
@@ -983,10 +1056,11 @@ async function setLink(
 
 async function change(tx: Tx, userId: string, m: TaskChange): Promise<Applied> {
   const t = await lockTask(tx, userId, m.payload.id);
-  const base: Applied = { taskId: m.payload.id, spaceId: t.spaceId, days: [t.day] };
+  const base: Applied = { taskId: m.payload.id, spaceId: t.spaceId, days: daysOf(t.day, t.endDay) };
   const clocks: TaskClocks = { ...t.clocks };
   const set: Partial<typeof schema.tasks.$inferInsert> = {};
-  const days: Array<IsoDate | null> = [t.day];
+  const days: Array<IsoDate | null> = daysOf(t.day, t.endDay);
+  const time = t.startTime && t.endTime ? { start: t.startTime, end: t.endTime } : null;
   const at = new Date(m.at);
   let linked = false;
   if (t.deletedAt) {
@@ -1025,7 +1099,16 @@ async function change(tx: Tx, userId: string, m: TaskChange): Promise<Applied> {
         set.position = m.payload.position ?? (await endOf(tx, t.spaceId, m.payload.day));
         clocks.place = m.at;
         if (m.payload.day !== t.day) {
-          days.push(m.payload.day);
+          // Several days move together, keeping their length; to the Backlog they are one task with no day or time.
+          if (t.endDay && t.day && m.payload.day) set.endDay = moveSpan(t.day, t.endDay, m.payload.day).until;
+          else if (t.endDay) set.endDay = null;
+          if (Object.keys(t.places).length) set.places = {};
+          if (m.payload.day === null && time) {
+            set.startTime = null;
+            set.endTime = null;
+            clocks.time = m.at;
+          }
+          days.push(...daysOf(m.payload.day, set.endDay === undefined ? t.endDay : set.endDay));
           await record(tx, m.payload.id, 'moved', { from: t.day, to: m.payload.day }, userId, at);
           // A task moved to another day has found its place: it no longer carries the marker.
           if (newer(m.at, clocks.carried)) {
@@ -1045,10 +1128,79 @@ async function change(tx: Tx, userId: string, m: TaskChange): Promise<Applied> {
       if (newer(m.at, clocks.due)) {
         set.dueDay = m.payload.due;
         clocks.due = m.at;
+        // No due day, no due time; a new day keeps the time.
+        if (!m.payload.due && t.dueTime) {
+          set.dueTime = null;
+          clocks.dueAt = m.at;
+        }
         if (m.payload.due !== t.dueDay) {
-          if (m.payload.due) await record(tx, m.payload.id, 'due.set', { due: m.payload.due }, userId, at);
+          if (m.payload.due)
+            await record(tx, m.payload.id, 'due.set', { due: m.payload.due, dueAt: t.dueTime }, userId, at);
           else await record(tx, m.payload.id, 'due.cleared', {}, userId, at);
         }
+      }
+      break;
+    case 'task.dueTime':
+      // A time with no due day has nothing to sit on: it changes nothing.
+      if (newer(m.at, clocks.dueAt) && t.dueDay) {
+        set.dueTime = m.payload.at;
+        clocks.dueAt = m.at;
+        if (m.payload.at !== t.dueTime)
+          await record(tx, m.payload.id, 'due.set', { due: t.dueDay, dueAt: m.payload.at }, userId, at);
+      }
+      break;
+    case 'task.time':
+      if (newer(m.at, clocks.time)) {
+        if (m.payload.time && !t.day) throw new Rejected(400, 'A time needs a day. Plan the task first.');
+        if (m.payload.time && !blockOk(m.payload.time, !!t.endDay))
+          throw new Rejected(400, 'A time needs an end after its start.');
+        set.startTime = m.payload.time?.start ?? null;
+        set.endTime = m.payload.time?.end ?? null;
+        clocks.time = m.at;
+        const same = time?.start === set.startTime && time?.end === set.endTime;
+        if (!same) {
+          if (m.payload.time)
+            await record(tx, m.payload.id, 'time.set', { time: m.payload.time }, userId, at);
+          else await record(tx, m.payload.id, 'time.cleared', {}, userId, at);
+        }
+      }
+      break;
+    case 'task.span':
+      // The last day is part of where the task is: the place clock.
+      if (newer(m.at, clocks.place)) {
+        const until = m.payload.until;
+        if (until && !spanOk(t.day, until))
+          throw new Rejected(400, 'Several days need a last day after the first, within a month.');
+        if (until === t.endDay) break;
+        set.endDay = until;
+        clocks.place = m.at;
+        // Places on days the span no longer holds go.
+        const places = Object.fromEntries(
+          Object.entries(t.places).filter(([d]) => onDay(t.day, until, d) && d !== t.day),
+        );
+        if (Object.keys(places).length !== Object.keys(t.places).length) set.places = places;
+        // Back to one day, a time that ended on another day ends an hour after it starts.
+        if (!until && time && !blockOk(time)) {
+          const b = blockFrom(time.start);
+          set.startTime = b.start;
+          set.endTime = b.end;
+          clocks.time = m.at;
+        }
+        days.push(...daysOf(t.day, until));
+        if (until) await record(tx, m.payload.id, 'span.set', { from: t.day, until }, userId, at);
+        else await record(tx, m.payload.id, 'span.cleared', {}, userId, at);
+      }
+      break;
+    case 'task.dayPlace':
+      // A span's own place on one of its later days; the first day is task.place.
+      if (newer(m.at, clocks.places)) {
+        const d = m.payload.day;
+        if (!t.endDay || !onDay(t.day, t.endDay, d) || d === t.day)
+          throw new Rejected(400, 'That task isn’t on that day any more.');
+        set.places = { ...t.places, [d]: m.payload.position };
+        clocks.places = m.at;
+        days.length = 0;
+        days.push(d);
       }
       break;
     case 'task.notes':
@@ -1353,7 +1505,7 @@ async function placeInAll(tx: Tx, userId: string, m: AllMutation): Promise<Appli
   const p = m.payload;
   const t = await lockTask(tx, userId, p.id);
   if (t.deletedAt) throw new Rejected(410, DELETED);
-  if (t.day !== p.day) throw new Rejected(400, 'That task isn’t on that day any more.');
+  if (!onDay(t.day, t.endDay, p.day)) throw new Rejected(400, 'That task isn’t on that day any more.');
   const at = new Date(m.at);
   const [have] = await tx
     .select({ clock: schema.allSpacesPlaces.clock })
@@ -1399,7 +1551,12 @@ export async function allSpacesPlaces(
         // A place only counts on the day it was given: a task moved since has none.
         or(
           and(isNull(P.day), isNull(schema.tasks.day)),
-          and(eq(P.day, schema.tasks.day), gte(P.day, from), lte(P.day, to)),
+          and(
+            gte(P.day, schema.tasks.day),
+            lte(P.day, sql`coalesce(${schema.tasks.endDay}, ${schema.tasks.day})`),
+            gte(P.day, from),
+            lte(P.day, to),
+          ),
         ),
         backlog ? undefined : isNotNull(P.day),
       ),

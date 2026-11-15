@@ -47,6 +47,7 @@ import { inboxPath, pagePath, spacePath, useSpace } from './space';
 import { taskStore, useOnline } from './tasks';
 import { useViewport } from './viewport';
 import { useWorkingDay } from './workingDay';
+import { timeWords } from './times';
 
 /** The phone keyboard's height, from the visual viewport, so the sheet can sit on it. */
 export function useKeyboardHeight(on: boolean): number {
@@ -82,6 +83,9 @@ export function useQuickAddActions(spaceId: string | undefined) {
     if (!spaceId) throw new Error('no space');
     const id = taskStore.create(spaceId, t.planned, t.title, undefined, {
       due: t.due,
+      dueAt: t.dueAt,
+      time: t.time,
+      until: t.until,
       projectId: t.projectId,
       notes: t.note,
       attachments: t.attachments,
@@ -215,6 +219,7 @@ export function QuickAddHost({ me, openPath }: { me: MeResponse; openPath?: (hre
   };
   return (
     <QuickAdd
+      timeWords={timeWords}
       open={open}
       seed={seed}
       similar={similar}
@@ -253,6 +258,7 @@ export function QuickAddHost({ me, openPath }: { me: MeResponse; openPath?: (hre
             note: t.note,
             askedDay: t.planned,
             due: t.due,
+            dueAt: t.dueAt,
             projectId: t.projectId,
             attachments: t.attachments,
           });

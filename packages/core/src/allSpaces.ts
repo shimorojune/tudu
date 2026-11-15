@@ -2,6 +2,7 @@ import type { IsoDate } from './dates';
 import { placeAt, renumber } from './positions';
 import type { SpaceSummary } from './spaces';
 import type { AllSpacesPlace } from './tasks';
+import { placeOn, onDay } from './times';
 
 /** The address All spaces answers to: `/all`, `/all/week`, `/all/backlog`. */
 export const ALL_SLUG = 'all';
@@ -21,6 +22,9 @@ export interface GatherTask {
   id: string;
   spaceId: string;
   day: IsoDate | null;
+  /** The last day of several (docs/plans/task-times.md): the task is on each of them. */
+  until?: IsoDate | null;
+  places?: Record<IsoDate, number>;
   ownerId: string | null;
   position: number;
   createdAt: string;
@@ -58,7 +62,7 @@ export function gatherAll<T extends GatherTask>(
   for (const s of ordered) {
     if (filter && s.id !== filter) continue;
     for (const t of lists[s.id] ?? []) {
-      if (t.spaceId !== s.id || t.day !== day) continue;
+      if (t.spaceId !== s.id || !onDay(t.day, t.until, day)) continue;
       if (t.ownerId !== null && t.ownerId !== meId) continue;
       all.push(t);
     }
@@ -71,7 +75,7 @@ export function gatherAll<T extends GatherTask>(
     loose.sort(
       (a, b) =>
         rank.get(a.spaceId)! - rank.get(b.spaceId)! ||
-        a.position - b.position ||
+        placeOn(a, day) - placeOn(b, day) ||
         a.createdAt.localeCompare(b.createdAt),
     );
   const tasks = [...placed, ...loose];

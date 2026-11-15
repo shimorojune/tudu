@@ -281,6 +281,19 @@ describe('requests and the Inbox', () => {
     expect(ax2.counts.unread).toBe(2);
   });
 
+  it('TT-A06 a request carries its due time onto the task it becomes', async () => {
+    const { a, b, space } = await team();
+    const reqId = randomUUID();
+    await sync(a, [send(space.id, b.userId, 'Send the deck', { due: '2026-10-23', dueAt: '17:00' }, reqId)]);
+    expect((await inbox(b, space.id)).toAnswer[0]!.request).toMatchObject({
+      due: '2026-10-23',
+      dueAt: '17:00',
+    });
+    const taskId = randomUUID();
+    const out = await sync(b, [m('request.accept', { id: reqId, taskId, day: '2026-10-21' })]);
+    expect(out.tasks[0]).toMatchObject({ id: taskId, due: '2026-10-23', dueAt: '17:00' });
+  });
+
   it('C08-A08 withdraw: a waiting or declined request comes back as your task; an accepted one is refused; the receiver’s item goes', async () => {
     const { a, b, space } = await team();
     const waiting = randomUUID();

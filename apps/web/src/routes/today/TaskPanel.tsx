@@ -38,6 +38,7 @@ import { useRefOnce } from '../../app/refOnce';
 import { taskStore } from '../../app/tasks';
 import { noteItem, notebookStore, notePicks, openNote } from '../../app/notebook';
 import type { Viewport } from '../../app/viewport';
+import { timeWords } from '../../app/times';
 
 export interface OpenTask {
   id: string;
@@ -188,6 +189,9 @@ export function TaskPanel(p: TaskPanelProps) {
       day: d.day,
       carried: d.carriedFrom && !d.done ? carriedLabel(d.carriedFrom, today) : undefined,
       due: d.due,
+      dueAt: d.dueAt ?? null,
+      time: d.time ?? null,
+      until: d.until ?? null,
       visibility: d.visibility,
       projectId: d.projectId,
       jira: d.jira,
@@ -268,6 +272,7 @@ export function TaskPanel(p: TaskPanelProps) {
         onLocate={p.onLocate ? () => p.onLocate!(d.day) : undefined}
         locateLabel={`Go to ${d.day ? dayWord(d.day, today) : 'the Backlog'}`}
         calendar={{ marks: marks ?? {} }}
+        timeWords={timeWords}
         projects={projects}
         fileBase={API_URL}
         turnDir={shown?.dir}
@@ -284,6 +289,9 @@ export function TaskPanel(p: TaskPanelProps) {
           showToast(`Moved to ${dayWord(to, today)}`);
         }}
         onDue={(due) => taskStore.due(d.id, due)}
+        onDueTime={(at) => taskStore.dueTime(d.id, at)}
+        onTime={d.day ? (v) => taskStore.time(d.id, v) : undefined}
+        onSpan={(from, until) => taskStore.span(d.id, from, until)}
         onVisibility={(v) => taskStore.visibility(d.id, v)}
         onProject={(projectId) => taskStore.setProject(d.id, projectId)}
         // Only where Jira is connected in this space, or to unlink a key the task kept from before.

@@ -76,6 +76,38 @@ export function useWidthEase(ref: RefObject<HTMLElement | null>, key: unknown): 
   }, [key, ref]);
 }
 
+/**
+ * When `key` changes, ease the element's height from its old size to its new one (a pop whose content grows or
+ * shrinks: Add a time turning into its fields). Adds `tp-hsizing` while moving.
+ */
+export function useHeightEase(ref: RefObject<HTMLElement | null>, key: unknown): void {
+  const last = useRef(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const from = el.style.height ? el.getBoundingClientRect().height : last.current;
+    el.style.transition = 'none';
+    el.style.height = '';
+    const to = el.getBoundingClientRect().height;
+    last.current = to;
+    el.style.transition = '';
+    if (!from || Math.abs(from - to) < 0.5 || prefersReducedMotion()) return;
+    el.classList.add('tp-hsizing');
+    el.style.height = `${from}px`;
+    void el.offsetHeight;
+    el.style.height = `${to}px`;
+    const done = (e: TransitionEvent) => {
+      if (e.target === el && e.propertyName === 'height') {
+        el.style.height = '';
+        el.classList.remove('tp-hsizing');
+        el.removeEventListener('transitionend', done);
+      }
+    };
+    el.addEventListener('transitionend', done);
+    return () => el.removeEventListener('transitionend', done);
+  }, [key, ref]);
+}
+
 /** A stable id for a field: the explicit one, else a generated one with a readable prefix. */
 export function useFieldId(explicit: string | undefined, label: string | undefined, prefix = 'tp-f'): string {
   const auto = useId();

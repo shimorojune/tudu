@@ -90,7 +90,7 @@ test.describe('detail', () => {
     await page.reload();
     await expect(panel(page).getByRole('button', { name: 'Due', exact: true })).toHaveText(/Wed 21 Oct/);
     await panel(page).getByRole('button', { name: 'Due', exact: true }).click();
-    await panel(page).locator('.tp-td-pop').getByRole('button', { name: 'Remove due date' }).click();
+    await panel(page).locator('.tp-td-pop').getByRole('button', { name: 'No date' }).click();
     await expect(panel(page).getByRole('button', { name: 'Due', exact: true })).toHaveText('Add a due date');
     await expect(row(dayList(page), 'Reply to legal').locator('.tp-sg-due')).toHaveCount(0);
     await idle(page);
@@ -376,7 +376,7 @@ test.describe('detail', () => {
       .getByRole('button', { name: /^21 October/ })
       .click();
     await p.getByRole('button', { name: 'Planned', exact: true }).click();
-    await p.locator('.tp-td-pop').getByRole('button', { name: 'Tomorrow' }).click();
+    await p.locator('.tp-td-pop').last().getByRole('button', { name: 'Tomorrow' }).click();
     await idle(page);
     await expect(p.getByRole('button', { name: /^History/ })).toHaveText(/3 events/);
     await p.getByRole('button', { name: /^History/ }).click();

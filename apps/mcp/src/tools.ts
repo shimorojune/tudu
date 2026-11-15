@@ -3,6 +3,16 @@ import { z } from 'zod';
 import { tuduFor, TuduError, type Access, type TaskRow, type Tudu } from './tudu';
 
 /**
+ * An hour after `start` ("HH:MM"), kept inside the day: the end a block gets when none is given. The same as core's
+ * `blockFrom`; the MCP image installs production dependencies only, and core is a dev dependency (types).
+ */
+function hourLater(start: string): string {
+  const [h, m] = start.split(':').map(Number);
+  const n = Math.min(23 * 60 + 59, (h ?? 0) * 60 + (m ?? 0) + 60);
+  return `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
+}
+
+/**
  * Tudu's tools. Each one is a thin call to the API as the caller; the API enforces what the key or app may do, so
  * a tool never decides access itself. Every tool has a title and the read-only, destructive and idempotent hints
  * (the Claude and ChatGPT directories ask for them).
@@ -42,6 +52,7 @@ const DELETE = {
 } as const;
 
 const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'A day is YYYY-MM-DD.');
+const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'A time is HH:MM, 24-hour.');
 const taskRef = z
   .string()
   .min(1)
@@ -90,10 +101,16 @@ export const textOf = (html: string) =>
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-const line = (t: Pick<TaskRow, 'ref' | 'title' | 'done' | 'day' | 'due'> & { spaceId?: string }) =>
+const line = (
+  t: Pick<TaskRow, 'ref' | 'title' | 'done' | 'day' | 'due' | 'dueAt' | 'time' | 'until'> & {
+    spaceId?: string;
+  },
+) =>
   `${t.done ? '[x]' : '[ ]'} ${t.ref ?? '(saving)'} ${t.title}` +
   (t.day ? ` · on ${t.day}` : ' · Backlog') +
-  (t.due ? ` · due ${t.due}` : '');
+  (t.until ? ` · until ${t.until}` : '') +
+  (t.time ? ` · ${t.time.start}–${t.time.end}` : '') +
+  (t.due ? ` · due ${t.due}${t.dueAt ? ' ' + t.dueAt : ''}` : '');
 /** A task as data: what a model needs to refer to it and say where it is. */
 const brief = (t: TaskRow) => ({
   ref: t.ref,
@@ -103,6 +120,9 @@ const brief = (t: TaskRow) => ({
   done: t.done,
   day: t.day,
   due: t.due ?? null,
+  dueAt: t.dueAt ?? null,
+  time: t.time ?? null,
+  until: t.until ?? null,
 });
 const list = (head: string, tasks: TaskRow[]) =>
   tasks.length ? `${head}\n${tasks.map(line).join('\n')}` : `${head}\nNo tasks.`;
@@ -463,6 +483,14 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
             .optional()
             .describe('YYYY-MM-DD, or "backlog". Today when left out.'),
           due: isoDay.optional().describe('A deadline, separate from the day it is planned for.'),
+          dueAt: hhmm.optional().describe('The time on the due day, HH:MM. Needs due.'),
+          start: hhmm
+            .optional()
+            .describe('The planned start time, HH:MM. Needs a day; end defaults to an hour later.'),
+          end: hhmm.optional().describe('The planned end time, HH:MM (on the last day when until is given).'),
+          until: isoDay
+            .optional()
+            .describe('The last day, for a task planned over several days (at most 31).'),
           notes: z.string().max(20000).optional().describe('Plain text; blank lines start new paragraphs.'),
           project: projectArg
             .optional()
@@ -474,9 +502,21 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
         cfg,
         async (
           tudu,
-          a: { spaceId: string; title: string; day?: string; due?: string; notes?: string; project?: string },
+          a: {
+            spaceId: string;
+            title: string;
+            day?: string;
+            due?: string;
+            dueAt?: string;
+            start?: string;
+            end?: string;
+            until?: string;
+            notes?: string;
+            project?: string;
+          },
         ) => {
           const project = a.project ? await projectNamed(tudu, a.spaceId, a.project) : null;
+          const time = a.start ? { start: a.start, end: a.end ?? hourLater(a.start) } : undefined;
           const out = await tudu.sync([
             {
               type: 'task.create',
@@ -487,6 +527,9 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
                 day: a.day === 'backlog' ? null : today(a.day),
                 position: null,
                 ...(a.due ? { due: a.due } : {}),
+                ...(a.due && a.dueAt ? { dueAt: a.dueAt } : {}),
+                ...(time ? { time } : {}),
+                ...(a.until ? { until: a.until } : {}),
                 ...(a.notes ? { notes: htmlOf(a.notes) } : {}),
                 ...(project ? { projectId: project.id } : {}),
               },
@@ -503,7 +546,7 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
         name: 'update_task',
         title: 'Change a task',
         description:
-          'Rename a task, set or clear its due day or project, or replace its notes. Only what you pass changes.',
+          'Rename a task, set or clear its due day and time, its planned time, its last day or its project, or replace its notes. Only what you pass changes.',
         inputSchema: {
           task: taskRef,
           title: z.string().trim().min(1).max(200).optional(),
@@ -511,6 +554,21 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
             .union([isoDay, z.literal('none')])
             .optional()
             .describe('YYYY-MM-DD, or "none" to clear it.'),
+          dueAt: z
+            .union([hhmm, z.literal('none')])
+            .optional()
+            .describe('The time on the due day, HH:MM, or "none".'),
+          start: z
+            .union([hhmm, z.literal('none')])
+            .optional()
+            .describe(
+              'The planned start, HH:MM, or "none" to clear the time. End defaults to an hour later.',
+            ),
+          end: hhmm.optional().describe('The planned end, HH:MM.'),
+          until: z
+            .union([isoDay, z.literal('none')])
+            .optional()
+            .describe('The last day of several, YYYY-MM-DD, or "none" for one day.'),
           notes: z.string().max(20000).optional().describe('Replaces the notes. Plain text.'),
           project: projectArg
             .optional()
@@ -522,7 +580,20 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
       },
       run(
         cfg,
-        async (tudu, a: { task: string; title?: string; due?: string; notes?: string; project?: string }) => {
+        async (
+          tudu,
+          a: {
+            task: string;
+            title?: string;
+            due?: string;
+            dueAt?: string;
+            start?: string;
+            end?: string;
+            until?: string;
+            notes?: string;
+            project?: string;
+          },
+        ) => {
           const { taskId, spaceId: taskSpace } = await findTask(tudu, a.task);
           const m: Array<{ type: string; payload: Record<string, unknown> }> = [];
           if (a.project) {
@@ -533,6 +604,23 @@ export function registerTools(server: McpServer, cfg: ToolsConfig) {
           if (a.title) m.push({ type: 'task.rename', payload: { id: taskId, title: a.title } });
           if (a.due)
             m.push({ type: 'task.due', payload: { id: taskId, due: a.due === 'none' ? null : a.due } });
+          if (a.dueAt)
+            m.push({
+              type: 'task.dueTime',
+              payload: { id: taskId, at: a.dueAt === 'none' ? null : a.dueAt },
+            });
+          // The span first: whether the end may come before the start depends on it.
+          if (a.until)
+            m.push({
+              type: 'task.span',
+              payload: { id: taskId, until: a.until === 'none' ? null : a.until },
+            });
+          if (a.start === 'none') m.push({ type: 'task.time', payload: { id: taskId, time: null } });
+          else if (a.start)
+            m.push({
+              type: 'task.time',
+              payload: { id: taskId, time: { start: a.start, end: a.end ?? hourLater(a.start) } },
+            });
           if (a.notes !== undefined)
             m.push({ type: 'task.notes', payload: { id: taskId, notes: htmlOf(a.notes) } });
           if (!m.length) return 'Nothing to change.';

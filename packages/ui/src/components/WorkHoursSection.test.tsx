@@ -254,3 +254,33 @@ describe('WH-U13 the web and phones', () => {
     expect(screen.queryByRole('button', { name: 'Set hours per day' })).toBeNull();
   });
 });
+
+describe('TT-U19 Notify me at planned and due times', () => {
+  it('TT-U19 on a Mac the switch sits beside the nudges one; off in macOS shows the same red line and guide', async () => {
+    const user = userEvent.setup();
+    const onTimes = vi.fn();
+    const onOpenSettings = vi.fn();
+    const { rerender } = render(
+      <WorkHoursSection hours={{ hours: DEFAULT_HOURS }} nudges={nudges({ times: true, onTimes })} />,
+    );
+    const sw = screen.getByRole('switch', { name: 'Notify me at planned and due times' });
+    expect(sw).toBeChecked();
+    await user.click(sw);
+    expect(onTimes).toHaveBeenCalledWith(false);
+    rerender(
+      <WorkHoursSection
+        hours={{ hours: DEFAULT_HOURS }}
+        nudges={nudges({ times: true, permission: 'denied', onTimes, onOpenSettings })}
+      />,
+    );
+    expect(screen.getByText('macOS has Tudu’s notifications off.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Open Notification settings' }));
+    expect(onOpenSettings).toHaveBeenCalled();
+  });
+
+  it('TT-U19 the web and phones say where they come from', () => {
+    render(<WorkHoursSection hours={{ hours: DEFAULT_HOURS }} />);
+    expect(screen.getByText('Notifications come from the Tudu app on a Mac.')).toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'Notify me at planned and due times' })).toBeNull();
+  });
+});
