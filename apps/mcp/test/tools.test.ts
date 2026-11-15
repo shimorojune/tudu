@@ -44,6 +44,21 @@ const api = (async (input: RequestInfo | URL, init?: RequestInit) => {
         notebook: true,
       },
     });
+  if (p === '/api/me')
+    return Response.json({
+      spaces: [
+        { id: 's1', kind: 'personal', name: 'Personal', prefix: 'ME', role: 'owner', members: 1 },
+        { id: 's2', kind: 'team', name: 'Northwind', prefix: 'NW', role: 'member', members: 4 },
+      ],
+    });
+  if (p === '/api/spaces/s1/projects')
+    return Response.json({
+      projects: [
+        { id: 'p1', name: 'Home', color: '#a35d3d' },
+        { id: 'p2', name: 'Garden', color: '#5b7553' },
+      ],
+    });
+  if (p === '/api/spaces/s2/projects') return Response.json({ projects: [] });
   if (p.startsWith('/api/spaces/s1/days/'))
     return Response.json({ tasks: [task], counts: { total: 1, done: 0 } });
   if (p === '/api/tasks/ref/ME-1') return Response.json({ spaceId: 's1', taskId: 't1' });
@@ -149,6 +164,59 @@ describe('MCP tools', () => {
     expect(bodies[1]).toMatchObject({
       type: 'note.body',
       payload: { id: 'n1', html: '<p>one</p><p>two</p>', baseRev: 4 },
+    });
+  });
+
+  it('PH-U15 create_task takes a project by name; update_task sets one or "none"; an unknown name lists the space’s', async () => {
+    calls.length = 0;
+    const made = await client.callTool({
+      name: 'create_task',
+      arguments: { spaceId: 's1', title: 'Water the plants', project: 'garden' },
+    });
+    expect(made.isError, textOf(made)).toBeFalsy();
+    expect(textOf(made)).toContain('in Garden');
+    const create = calls.find((c) => c.path === '/api/sync')!.body!.mutations![0]!;
+    expect(create).toMatchObject({ type: 'task.create', payload: { spaceId: 's1', projectId: 'p2' } });
+
+    calls.length = 0;
+    const set = await client.callTool({ name: 'update_task', arguments: { task: 'ME-1', project: 'HOME' } });
+    expect(set.isError, textOf(set)).toBeFalsy();
+    expect(calls.find((c) => c.path === '/api/sync')!.body!.mutations).toMatchObject([
+      { type: 'task.project', payload: { id: 't1', projectId: 'p1' } },
+    ]);
+
+    calls.length = 0;
+    await client.callTool({ name: 'update_task', arguments: { task: 'ME-1', project: 'none' } });
+    expect(calls.find((c) => c.path === '/api/sync')!.body!.mutations).toMatchObject([
+      { type: 'task.project', payload: { id: 't1', projectId: null } },
+    ]);
+
+    calls.length = 0;
+    const no = await client.callTool({
+      name: 'create_task',
+      arguments: { spaceId: 's1', title: 'Fix the fence', project: 'Fence' },
+    });
+    expect(no.isError).toBe(true);
+    expect(textOf(no)).toBe('No project called "Fence" in this space. Its projects: Home, Garden.');
+    expect(calls.some((c) => c.path === '/api/sync')).toBe(false);
+  });
+
+  it('PH-U16 list_spaces lists each space’s projects', async () => {
+    const r = await client.callTool({ name: 'list_spaces', arguments: {} });
+    expect(r.isError, textOf(r)).toBeFalsy();
+    expect(textOf(r)).toContain('Projects: Home, Garden');
+    expect(textOf(r)).toContain('Projects: none');
+    expect(r.structuredContent).toMatchObject({
+      spaces: [
+        {
+          id: 's1',
+          projects: [
+            { id: 'p1', name: 'Home' },
+            { id: 'p2', name: 'Garden' },
+          ],
+        },
+        { id: 's2', projects: [] },
+      ],
     });
   });
 });

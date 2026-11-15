@@ -12,6 +12,7 @@ import {
   type TaskItem,
 } from '@tudu/ui';
 import { useProjectGroups } from '../../app/grouped';
+import { useLineHash } from '../../app/lineHash';
 import { useFlash, useLocate } from '../../app/dayView';
 import { rowLink } from '../../app/links';
 import { openInJira } from '../../app/jira';
@@ -48,6 +49,7 @@ export function BacklogBeside({
   const q = useQuery(taskStore.backlogQuery(spaceId));
   const projectsQ = useQuery(taskStore.projectsQuery(spaceId));
   const projects = projectsQ.data ?? [];
+  const hashOf = useLineHash([spaceId]);
   const range = monthAround(today);
   const marks = useQuery(taskStore.marksQuery(spaceId, addDays(range.from, -7), range.to)).data ?? {};
   const flash = useFlash();
@@ -81,6 +83,7 @@ export function BacklogBeside({
     );
   else {
     const rows = {
+      hash: hashOf(spaceId),
       menu: rowMenu,
       linkFor: rowLink,
       onSignal: (t: TaskItem, k: string) => {
@@ -140,15 +143,17 @@ export function BacklogBeside({
             folded={g.folded}
             onFold={g.fold}
             resetKey="beside"
-            onAdd={(text, group, before) => {
+            onAdd={(text, group, before, picked) => {
               const to = g.target(group);
               const at = before ? ids.indexOf(before) : to.projectId ? g.end(ids, group) : -1;
+              // The line's pill wins: # picked another project, or × left it with none.
+              const projectId = picked === undefined ? to.projectId : picked;
               return taskStore.create(
                 spaceId,
                 null,
                 text,
                 at === -1 ? undefined : at,
-                to.projectId ? { projectId: to.projectId } : {},
+                projectId ? { projectId } : {},
               );
             }}
             onReorder={(group, moved) =>
@@ -162,9 +167,15 @@ export function BacklogBeside({
             label="Tasks in the Backlog"
             resetKey="beside"
             group="days"
-            onAdd={(text, before) => {
+            onAdd={(text, before, projectId) => {
               const at = before ? open.findIndex((t) => t.id === before) : undefined;
-              return taskStore.create(spaceId, null, text, at === -1 ? undefined : at);
+              return taskStore.create(
+                spaceId,
+                null,
+                text,
+                at === -1 ? undefined : at,
+                projectId ? { projectId } : {},
+              );
             }}
             onReorder={(_, moved) => taskStore.place(moved.key, null, moved.to)}
             onReceive={(key, at) => taskStore.place(key, null, at)}

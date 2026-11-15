@@ -51,6 +51,7 @@ import { useWorkingDay } from '../../app/workingDay';
 import { AllBanners, OfflineBanner, monthAround, openInSpace, toItem } from '../today/TodayPage';
 import { TaskPanel, type OpenTask } from '../today/TaskPanel';
 import { useProjectGroups } from '../../app/grouped';
+import { useLineHash } from '../../app/lineHash';
 import { taskLink, rowLink } from '../../app/links';
 import { useRowMenu } from '../../app/rowMenu';
 
@@ -198,6 +199,8 @@ function BacklogSheet({
   const spaceProjects = useQuery({ ...taskStore.projectsQuery(spaceId), enabled: !all });
   const projects = all ? [] : (spaceProjects.data ?? []);
   const projectsOf = useAllProjects(all);
+  // # on the writing lines: the projects of the space a task written there goes to.
+  const hashOf = useLineHash(all ? all.spaces.map((s) => s.id) : [spaceId]);
   const range = monthAround(today);
   const spaceMarks =
     useQuery({ ...taskStore.marksQuery(spaceId, addDays(range.from, -7), range.to), enabled: !all }).data ??
@@ -365,6 +368,7 @@ function BacklogSheet({
       addLabel: target ? `Add to ${target.name}’s Backlog…` : 'Add to the Backlog…',
       addKey: writing,
       onAddClose: () => setWriting(null),
+      hash: hashOf(target ? target.id : spaceId),
       onLeave: (t: TaskItem) => taskStore.cross(t.key, true),
       onUnleave: (t: TaskItem) => taskStore.cross(t.key, false),
       onMoveTask: (t: TaskItem, to: IsoDate | null, _from: IsoDate | null, at?: number) =>
@@ -409,9 +413,12 @@ function BacklogSheet({
         groups={g.groups}
         folded={g.folded}
         onFold={g.fold}
-        onAdd={(text, group, before) => {
+        hashFor={(group) => hashOf(g.target(group).spaceId ?? (target ? target.id : spaceId))}
+        onAdd={(text, group, before, picked) => {
           const to = g.target(group);
-          const extra = to.projectId ? { projectId: to.projectId } : {};
+          // The line's pill wins: # picked another project, or × left it with none.
+          const projectId = picked === undefined ? to.projectId : picked;
+          const extra = projectId ? { projectId } : {};
           // On a project's own line it goes right after the project's last task, so My order keeps them together.
           const slot = (list: string[]) =>
             before ? list.indexOf(before) : to.projectId ? g.end(list, group) : -1;
@@ -435,11 +442,12 @@ function BacklogSheet({
         tasks={items}
         label="Tasks in the Backlog"
         filterSpace={narrowedTo}
-        onAdd={(text, before) => {
+        onAdd={(text, before, projectId) => {
           const at = before ? open.findIndex((t) => t.id === before) : undefined;
-          if (!target) return taskStore.create(spaceId, null, text, at === -1 ? undefined : at);
+          const extra = projectId ? { projectId } : undefined;
+          if (!target) return taskStore.create(spaceId, null, text, at === -1 ? undefined : at, extra);
           // In All spaces: into Personal's (or the filtered space's) Backlog, in its place here.
-          const id = taskStore.create(target.id, null, text);
+          const id = taskStore.create(target.id, null, text, undefined, extra);
           const k = before ? order.findIndex((x) => x.id === before) : -1;
           taskStore.placeInAll(id, null, k === -1 ? order.length : k, order);
           return id;

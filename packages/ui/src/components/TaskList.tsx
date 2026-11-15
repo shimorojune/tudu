@@ -23,7 +23,8 @@ import {
   useReorder,
 } from '../lib/reorder';
 import { rowMenuModel, type RowMenuAct, type RowMenuProject } from '../lib/rowMenu';
-import { AddTask } from './AddTask';
+import { AddTask, type AddTaskHash } from './AddTask';
+import type { HashProject } from '../lib/projectHash';
 import type { MiniCalendarProps } from './MiniCalendar';
 import { RowMenu, RowSheet, type RowMenuCloseWhy } from './RowMenu';
 import type { SubtaskItem } from './SubtaskList';
@@ -95,9 +96,13 @@ export interface TaskListProps {
    * Write a new task: at the end, or slotted in above `before` (the "+" between rows). Return the new row's key so
    * it opens its gap with the new-task wash.
    */
-  onAdd?: (text: string, before?: string) => string | void;
+  onAdd?: (text: string, before?: string, projectId?: string | null) => string | void;
   /** Ends the list with the writing line: "Write the next thing…". */
   addLabel?: string;
+  /** `#` on the writing lines picks the task's project; `onAdd` then gets its id (null for none). */
+  hash?: AddTaskHash;
+  /** The project the writing lines start with (a project group's list). */
+  addProject?: HashProject | null;
   /** Change it to open the writing line; a list that mounts with one starts with the line open. */
   addKey?: string | number | null;
   /** The writing line closed (Esc, or clicking away). */
@@ -340,15 +345,18 @@ export function TaskList(p: TaskListProps) {
     setSaid(`Moved to place ${to + 1} of ${shown.length}`);
   }
 
-  function add(text: string) {
-    const key = p.onAdd?.(text);
+  // The project only travels when the line has `#`, so a plain list's onAdd sees what it always did.
+  const withProject = (text: string, before: string | undefined, projectId?: string | null) =>
+    p.hash ? p.onAdd?.(text, before, projectId ?? null) : p.onAdd?.(text, before);
+  function add(text: string, projectId?: string | null) {
+    const key = p.hash ? withProject(text, undefined, projectId) : p.onAdd?.(text);
     if (key) {
       opened.current = null;
       setFresh({ key, follow: 'add' });
     }
   }
-  function insertBefore(before: string, text: string) {
-    const key = p.onAdd?.(text, before);
+  function insertBefore(before: string, text: string, projectId?: string | null) {
+    const key = withProject(text, before, projectId);
     if (key) {
       opened.current = null;
       setFresh({ key });
@@ -666,7 +674,9 @@ export function TaskList(p: TaskListProps) {
                 <AddTask
                   label="Write a task here…"
                   autoOpen
-                  onAdd={(v) => insertBefore(t.key, v)}
+                  hash={p.hash}
+                  project={p.addProject}
+                  onAdd={(v, projectId) => insertBefore(t.key, v, projectId)}
                   onClose={() => setIns(null)}
                 />
               </div>,
@@ -741,6 +751,8 @@ export function TaskList(p: TaskListProps) {
           label={p.addLabel}
           compact={compact}
           onAdd={add}
+          hash={p.hash}
+          project={p.addProject}
           openKey={p.addKey}
           autoOpen={p.addKey !== undefined && p.addKey !== null}
           onClose={p.onAddClose}

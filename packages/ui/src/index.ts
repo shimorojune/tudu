@@ -196,7 +196,7 @@ export {
   type RowMenuTask,
   type RowMenuContext,
 } from './lib/rowMenu';
-export { AddTask, type AddTaskProps } from './components/AddTask';
+export { AddTask, ProjectPill, type AddTaskProps, type AddTaskHash } from './components/AddTask';
 export { DatePop, DATEPOP_LEAVE_MS, type DatePopProps } from './components/DatePop';
 export { Spread, SpreadPage, SPREAD_MS, type SpreadProps, type SpreadPageProps } from './components/Spread';
 export {
@@ -236,6 +236,12 @@ export {
 
 // Quick Add (chunk 04)
 export { Linger, POP_LEAVE_MS } from './lib/linger';
+export {
+  useProjectHash,
+  type HashProject,
+  type ProjectHash,
+  type ProjectHashOptions,
+} from './lib/projectHash';
 export { ProjectMenu, type ProjectMenuProps, type ProjectOption } from './components/ProjectMenu';
 export {
   QuickAdd,
