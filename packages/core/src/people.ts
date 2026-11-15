@@ -1,5 +1,6 @@
 import { addDays, compareIso, formatDay, relativeDayLabel, weekdayName, type IsoDate } from './dates';
 import type { Task } from './tasks';
+import { onDay, placeOn, spanList } from './times';
 
 /** Someone in a space, as People shows them. */
 export interface Person {
@@ -98,7 +99,7 @@ export function groupShared<T extends Task>(
   range: PeopleRange,
   today: IsoDate,
 ): Array<SharedGroup<T>> {
-  const keep = (t: T) => t.day !== null && (range === 'week' || t.day === today);
+  const keep = (t: T) => t.day !== null && (range === 'week' || onDay(t.day, t.until, today));
   if (by === 'person') {
     return members
       .map((m) => ({
@@ -115,9 +116,12 @@ export function groupShared<T extends Task>(
   for (const m of members)
     for (const t of m.tasks) {
       if (!keep(t)) continue;
-      const list = days.get(t.day!) ?? [];
-      list.push({ task: t, who: m });
-      days.set(t.day!, list);
+      // A task over several days is on each of them (today only on today).
+      for (const d of range === 'week' ? spanList(t.day!, t.until) : [today]) {
+        const list = days.get(d) ?? [];
+        list.push({ task: t, who: m });
+        days.set(d, list);
+      }
     }
   return [...days.keys()]
     .sort(compareIso)
@@ -141,7 +145,7 @@ export function personDays<T extends Task>(
     out.push({
       day: d,
       title: d === today ? `Today · ${weekdayName(d)}` : dayGroupTitle(d, today),
-      tasks: tasks.filter((t) => t.day === d).sort((a, b) => a.position - b.position),
+      tasks: tasks.filter((t) => onDay(t.day, t.until, d)).sort((a, b) => placeOn(a, d) - placeOn(b, d)),
     });
   }
   return out;

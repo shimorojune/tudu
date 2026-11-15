@@ -945,3 +945,81 @@ describe('C11-U50 a change left on disk by an earlier page', () => {
     await vi.waitFor(async () => expect(await disk.all()).toEqual([]));
   });
 });
+
+describe('TT-U17 times and several days in the store (docs/plans/task-times.md)', () => {
+  const D = (n: number) => addDays(SUN, n);
+
+  it('TT-U17 a span shows on each of its days at once; shrinking takes it off; moving shifts it', async () => {
+    const days: Record<string, Task[]> = {};
+    for (let i = 0; i < 6; i++) days[D(i)] = [task(`o${i}`, `Own ${i}`, D(i), 1024)];
+    days[SUN] = [task('s1', 'Offsite', SUN, 2048), ...days[SUN]!];
+    const t = setup(days);
+    for (let i = 0; i < 6; i++) await t.load(D(i));
+    const on = () => [0, 1, 2, 3, 4, 5].map((i) => t.read(D(i)).map((x) => x.title));
+    t.store.span('s1', SUN, D(2));
+    expect(on()).toEqual([
+      ['Own 0', 'Offsite'],
+      ['Offsite', 'Own 1'],
+      ['Offsite', 'Own 2'],
+      ['Own 3'],
+      ['Own 4'],
+      ['Own 5'],
+    ]);
+    expect(t.read(D(1)).find((x) => x.id === 's1')!.until).toBe(D(2));
+    // Shrink to two days: the third day loses it.
+    t.store.span('s1', SUN, D(1));
+    expect(on()[2]).toEqual(['Own 2']);
+    // Move the start forward: the span keeps its new first day and last day.
+    t.store.span('s1', D(3), D(5));
+    expect(on()).toEqual([
+      ['Own 0'],
+      ['Own 1'],
+      ['Own 2'],
+      ['Own 3', 'Offsite'],
+      ['Offsite', 'Own 4'],
+      ['Offsite', 'Own 5'],
+    ]);
+    // A plain move keeps the length.
+    t.store.place('s1', D(1));
+    expect(on()).toEqual([
+      ['Own 0'],
+      ['Own 1', 'Offsite'],
+      ['Offsite', 'Own 2'],
+      ['Offsite', 'Own 3'],
+      ['Own 4'],
+      ['Own 5'],
+    ]);
+    // A reorder on a later day is its own place there; the first day keeps its order.
+    t.store.place('s1', D(2), 1);
+    expect(on()[2]).toEqual(['Own 2', 'Offsite']);
+    expect(on()[1]).toEqual(['Own 1', 'Offsite']);
+    // Crossing off on day 3 is crossed off on every day.
+    t.store.cross('s1', true);
+    expect([1, 2, 3].map((i) => t.read(D(i)).find((x) => x.id === 's1')!.done)).toEqual([true, true, true]);
+    await t.settle();
+  });
+
+  it('TT-U17 the time and the due time show at once; clearing the due day clears its time; Backlog drops times', async () => {
+    const t = setup({ [SUN]: [task('t1', 'Call Sam', SUN, 1024, { due: MON })] });
+    await t.load(SUN);
+    await t.loadBacklog();
+    t.store.time('t1', { start: '15:00', end: '16:00' });
+    t.store.dueTime('t1', '17:00');
+    expect(t.read(SUN)[0]).toMatchObject({ time: { start: '15:00', end: '16:00' }, dueAt: '17:00' });
+    t.store.due('t1', null);
+    expect(t.read(SUN)[0]).toMatchObject({ due: null, dueAt: null });
+    t.store.place('t1', null);
+    expect(t.readBacklog()[0]).toMatchObject({ day: null, time: null, until: null });
+    // A create with Quick Add's times lands on each day of its span.
+    await t.load(MON);
+    t.store.create(SPACE, SUN, 'Trip', undefined, {
+      until: MON,
+      time: { start: '09:00', end: '18:00' },
+      due: MON,
+      dueAt: '12:00',
+    });
+    expect(t.read(MON).map((x) => x.title)).toEqual(['Trip']);
+    expect(t.read(SUN).find((x) => x.title === 'Trip')).toMatchObject({ until: MON, dueAt: '12:00' });
+    await t.settle();
+  });
+});

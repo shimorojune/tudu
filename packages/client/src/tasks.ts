@@ -18,6 +18,12 @@ import {
   type SpaceSummary,
   nextProjectColor,
   placeAt,
+  placeOn,
+  byPlaceOn,
+  moveSpan,
+  onDay,
+  blockOk,
+  blockFrom,
   placesFor,
   POSITION_STEP,
   positionBetween,
@@ -25,6 +31,7 @@ import {
   TASKS_CHANGED,
   taskIdOf,
   type Attachment,
+  type TimeBlock,
   type BacklogResponse,
   type Comment,
   type CommentAuthor,
@@ -102,6 +109,27 @@ function byPosition(a: { position: number; createdAt: string }, b: { position: n
   return a.position - b.position || a.createdAt.localeCompare(b.createdAt);
 }
 
+/** A day's order: a task over several days sits on its later days by its place there (docs/plans/task-times.md). */
+function sortOn(tasks: Task[], day: IsoDate | null): Task[] {
+  return tasks.sort(byPlaceOn(day));
+}
+
+/** The last day a task is on after a place to `to`: several days move together; the Backlog has one. */
+function untilAfter(t: Task, to: IsoDate | null): IsoDate | null {
+  if (!t.until || !t.day || !to) return null;
+  return t.day === to ? t.until : moveSpan(t.day, t.until, to).until;
+}
+
+/** A task's days changed to `day`..`until`: places outside them go; a time that ended on another day fits one day. */
+function withSpan<T extends Task>(t: T, day: IsoDate | null, until: IsoDate | null): T {
+  const places = Object.fromEntries(
+    Object.entries(t.places ?? {}).filter(([d]) => d !== day && onDay(day, until, d) && day === t.day),
+  );
+  let time = day === null ? null : (t.time ?? null);
+  if (time && !until && !blockOk(time)) time = blockFrom(time.start);
+  return { ...t, day, until, places, time };
+}
+
 /** The task a create makes, as it looks before the server has numbered it. */
 export function draftOf(m: Extract<SyncMutation, { type: 'task.create' }>, end = POSITION_STEP): Task {
   const p = m.payload;
@@ -117,6 +145,10 @@ export function draftOf(m: Extract<SyncMutation, { type: 'task.create' }>, end =
     doneAt: null,
     carriedFrom: null,
     due: p.due ?? null,
+    dueAt: (p.due && p.dueAt) || null,
+    until: (p.day && p.until) || null,
+    time: (p.day && p.time) || null,
+    places: {},
     visibility: 'space',
     projectId: p.projectId ?? null,
     jira: (p.link?.provider === 'jira' ? p.link.key : p.jira) ?? null,
@@ -235,7 +267,15 @@ function patchTask<T extends Task>(t: T, m: SyncMutation): T {
     case 'task.keep':
       return { ...t, carriedFrom: null };
     case 'task.due':
-      return { ...t, due: m.payload.due };
+      return { ...t, due: m.payload.due, dueAt: m.payload.due ? (t.dueAt ?? null) : null };
+    case 'task.dueTime':
+      return t.due ? { ...t, dueAt: m.payload.at } : t;
+    case 'task.time':
+      return t.day ? { ...t, time: m.payload.time } : t;
+    case 'task.span':
+      return withSpan(t, t.day, m.payload.until);
+    case 'task.dayPlace':
+      return { ...t, places: { ...(t.places ?? {}), [m.payload.day]: m.payload.position } };
     case 'task.visibility':
       return { ...t, visibility: m.payload.visibility };
     case 'task.project':
@@ -290,7 +330,8 @@ export function applyToDay(
   let out: Task[];
   switch (m.type) {
     case 'task.create': {
-      if (has || m.payload.day !== day || m.payload.spaceId !== spaceId) return tasks;
+      const until = m.payload.day ? m.payload.until : null;
+      if (has || !onDay(m.payload.day, until, day) || m.payload.spaceId !== spaceId) return tasks;
       out = [...tasks, draftOf(m, end())];
       break;
     }
@@ -300,34 +341,45 @@ export function applyToDay(
     case 'task.restore': {
       if (has) return tasks;
       const t = lookup(id);
-      if (!t || t.spaceId !== spaceId || t.day !== day) return tasks;
+      if (!t || t.spaceId !== spaceId || !onDay(t.day, t.until, day)) return tasks;
       out = [...tasks, t];
       break;
     }
     case 'task.place': {
       const to = m.payload.day;
-      if (has && to !== day) out = tasks.filter((t) => t.id !== id);
-      else if (has) out = map((t) => ({ ...t, position: m.payload.position ?? t.position }));
-      else if (to === day) {
-        const t = lookup(id);
-        if (!t || t.spaceId !== spaceId) return tasks;
-        out = [
-          ...tasks,
-          {
-            ...t,
-            day,
-            position: m.payload.position ?? end(),
-            carriedFrom: t.day === day ? t.carriedFrom : null,
-          },
-        ];
-      } else return tasks;
+      const was = tasks.find((t) => t.id === id) ?? lookup(id);
+      if (!was || was.spaceId !== spaceId) return tasks;
+      const until = untilAfter(was, to);
+      const moved = (t: Task): Task => {
+        if (t.day === to) return { ...t, position: m.payload.position ?? t.position };
+        return {
+          ...withSpan(t, to, until),
+          position: m.payload.position ?? (to === day ? end() : t.position),
+          carriedFrom: null,
+        };
+      };
+      if (has && !onDay(to, until, day)) out = tasks.filter((t) => t.id !== id);
+      else if (has) out = map(moved);
+      else if (onDay(to, until, day)) out = [...tasks, moved(was)];
+      else return tasks;
+      break;
+    }
+    case 'task.span': {
+      // Several days: the task joins the days it now holds and leaves the ones it no longer does.
+      const was = tasks.find((t) => t.id === id) ?? lookup(id);
+      if (!was || was.spaceId !== spaceId || !was.day) return tasks;
+      const on = onDay(was.day, m.payload.until, day);
+      if (has && !on) out = tasks.filter((t) => t.id !== id);
+      else if (has) out = map((t) => patchTask(t, m));
+      else if (on) out = [...tasks, patchTask(was, m)];
+      else return tasks;
       break;
     }
     default:
       if (!has) return tasks;
       out = map((t) => patchTask(t, m));
   }
-  return [...out].sort(byPosition);
+  return sortOn([...out], day);
 }
 
 /** Apply one mutation to a task's full detail. Pure; a mutation for another task leaves it alone. */
@@ -590,6 +642,10 @@ export class TaskStore {
     index?: number,
     extra: {
       due?: IsoDate | null;
+      /** Times (docs/plans/task-times.md): the due time, the planned block, the last day of several. */
+      dueAt?: string | null;
+      time?: TimeBlock | null;
+      until?: IsoDate | null;
       projectId?: string | null;
       notes?: string;
       attachments?: string[];
@@ -608,6 +664,9 @@ export class TaskStore {
       position,
     };
     if (extra.due !== undefined) payload.due = extra.due;
+    if (extra.due && extra.dueAt) payload.dueAt = extra.dueAt;
+    if (day && extra.time) payload.time = extra.time;
+    if (day && extra.until) payload.until = extra.until;
     if (extra.projectId !== undefined) payload.projectId = extra.projectId;
     if (extra.notes) payload.notes = extra.notes;
     if (extra.attachments?.length) payload.attachments = extra.attachments;
@@ -780,7 +839,7 @@ export class TaskStore {
     const data = qc.getQueryData<DayData>(key);
     this.known.set(t.id, t);
     if (data && !data.tasks.some((x) => x.id === t.id))
-      qc.setQueryData<DayData>(key, { day: t.day, tasks: [...data.tasks, t].sort(byPosition) });
+      qc.setQueryData<DayData>(key, { day: t.day, tasks: sortOn([...data.tasks, t], t.day) });
   }
 
   /** Mark a request answered (or gone) in every cached Inbox view, so it folds out at once. */
@@ -1024,21 +1083,54 @@ export class TaskStore {
     if (list && index !== undefined) {
       const others = list.filter((x) => x.id !== id);
       const placed = placeAt(
-        others.map((x) => x.position),
+        others.map((x) => placeOn(x, day)),
         index,
       );
       if (placed.renumbered) {
         const order = [...others];
         order.splice(Math.min(index, order.length), 0, t);
-        order.forEach((x, i) =>
-          this.mutate({ type: 'task.place', payload: { id: x.id, day, position: placed.renumbered![i]! } }),
-        );
+        order.forEach((x, i) => this.placeOnDay(x, day, placed.renumbered![i]!));
         return;
       }
-      this.mutate({ type: 'task.place', payload: { id, day, position: placed.position } });
+      this.placeOnDay(t, day, placed.position);
       return;
     }
+    // Dropped on a later day of its own span with no place given: the span stays where it is.
+    if (day !== null && t.day !== day && onDay(t.day, t.until, day)) return;
     this.mutate({ type: 'task.place', payload: { id, day, position: this.positionFor(t.spaceId, day, id) } });
+  }
+
+  /** A reorder on `day`: a span's later day takes its own place there; any other is the task's place. */
+  private placeOnDay(t: Task, day: IsoDate | null, position: number): void {
+    if (day !== null && t.day !== day && onDay(t.day, t.until, day))
+      this.mutate({ type: 'task.dayPlace', payload: { id: t.id, day, position } });
+    else this.mutate({ type: 'task.place', payload: { id: t.id, day, position } });
+  }
+
+  /** The time on the due day; null clears it (due by the day's end). */
+  dueTime(id: string, at: string | null): void {
+    this.mutate({ type: 'task.dueTime', payload: { id, at } });
+  }
+
+  /** The planned block; null clears it. */
+  time(id: string, time: TimeBlock | null): void {
+    this.mutate({ type: 'task.time', payload: { id, time } });
+  }
+
+  /**
+   * Several days: from `day` to `until` (null back to one day). A new first day is a place there, sent first, so
+   * the span is checked against the day it now starts on.
+   */
+  span(id: string, day: IsoDate, until: IsoDate | null): void {
+    const t = this.known.get(id);
+    if (!t) return;
+    if (t.day !== day)
+      this.mutate({
+        type: 'task.place',
+        payload: { id, day, position: this.positionFor(t.spaceId, day, id) },
+      });
+    if ((this.known.get(id)?.until ?? null) !== until)
+      this.mutate({ type: 'task.span', payload: { id, until } });
   }
 
   /**
@@ -1402,7 +1494,7 @@ export class TaskStore {
   /** Server rows with every change still on its way applied on top. */
   private overlay(spaceId: string, day: IsoDate | null, rows: Task[]): Task[] {
     this.remember(rows);
-    let tasks = [...rows].sort(byPosition);
+    let tasks = sortOn([...rows], day);
     for (const { m } of this.pending.values())
       if (!isNotebookMutation(m)) tasks = applyToDay(tasks, day, spaceId, m, (id) => this.known.get(id));
     this.remember(tasks);
@@ -1423,7 +1515,7 @@ export class TaskStore {
   private positionFor(spaceId: string, day: IsoDate | null, id: string, index?: number): number | null {
     const list = this.cached(spaceId, day);
     if (!list) return null;
-    const others = list.filter((x) => x.id !== id).map((x) => x.position);
+    const others = list.filter((x) => x.id !== id).map((x) => placeOn(x, day));
     return placeAt(others, index ?? others.length).position;
   }
 
@@ -1498,7 +1590,7 @@ export class TaskStore {
       if (!data) continue;
       const [, spaceId, day] = key as unknown as [string, string, IsoDate | null];
       let tasks = data.tasks.filter((t) => !rows.has(t.id) && !gone.has(t.id));
-      for (const t of rows.values()) if (t.spaceId === spaceId && t.day === day) tasks.push(t);
+      for (const t of rows.values()) if (t.spaceId === spaceId && onDay(t.day, t.until, day)) tasks.push(t);
       for (const { m } of this.pending.values())
         if (
           !isProjectMutation(m) &&
@@ -1508,7 +1600,7 @@ export class TaskStore {
           rows.has(taskIdOf(m))
         )
           tasks = applyToDay(tasks, day, spaceId, m, (id) => this.known.get(id));
-      tasks.sort(byPosition);
+      sortOn(tasks, day);
       if (!sameTasks(tasks, data.tasks)) qc.setQueryData<DayData>(key, { day, tasks });
     }
   }
