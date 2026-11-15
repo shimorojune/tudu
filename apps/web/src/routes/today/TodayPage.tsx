@@ -10,7 +10,6 @@ import {
   dueLabelAt,
   nightWords,
   spanOf,
-  NO_PROJECT,
   type IsoDate,
   type Project,
   type SpaceSummary,
@@ -33,15 +32,7 @@ import {
   type TaskItem,
 } from '@tudu/ui';
 import { useEffect, useLayoutEffect, useRef, useState, type TouchEvent } from 'react';
-import {
-  setSecondDay,
-  showDay,
-  useDayView,
-  useFlash,
-  useLocate,
-  useNewTaskAsk,
-  useShownDay,
-} from '../../app/dayView';
+import { setSecondDay, showDay, useDayView, useFlash, useLocate, useShownDay } from '../../app/dayView';
 import { openMembers } from '../../app/dayView';
 import { api, meQuery } from '../../app/session';
 import {
@@ -159,7 +150,7 @@ export function monthAround(day: IsoDate): { from: IsoDate; to: IsoDate } {
 
 /**
  * The day page: one plain list on the sheet. Crossed-off tasks stay where they are, struck through; the ring counts
- * them. Write on the last line, slot a task in with the "+", drag to reorder, turn the day with the arrows, the
+ * them. The last line opens Quick Add on this day; drag to reorder, turn the day with the arrows, the
  * calendar or a swipe. On the desk, "2 days" opens the next day beside it and tasks drag between the two; in a
  * space, "Backlog" opens the Backlog on the day's left the same way (#102).
  */
@@ -177,7 +168,6 @@ export function TodayPage() {
   const view = useShownView(all && picked === 'backlog' ? 'one' : picked);
   const two = vp === 'desktop' && view === 'two';
   const beside = vp === 'desktop' && view === 'backlog';
-  const ask = useNewTaskAsk();
   const fresh = useFirstRunOpen(me);
   const filters = useAllFilters(all);
 
@@ -285,7 +275,6 @@ export function TodayPage() {
       today={today}
       onDay={go}
       vp={vp}
-      ask={ask}
       label={all ? 'The day, every space' : 'The day'}
       group={two || beside ? 'days' : undefined}
       onOpenTask={openTask}
@@ -464,8 +453,6 @@ interface DaySheetProps {
   onDay: (day: IsoDate) => void;
   vp: Viewport;
   label: string;
-  /** New task asks: each bump opens the writing line. */
-  ask?: number;
   group?: string;
   /** The second sheet of the two days. */
   second?: boolean;
@@ -489,7 +476,6 @@ function DaySheet({
   onDay,
   vp,
   label,
-  ask,
   group,
   second,
   onOpenTask,
@@ -515,16 +501,9 @@ function DaySheet({
   // Turning the day: the page turns towards the day you are heading to; writing and editing start fresh.
   const [shown, setShown] = useState(day);
   const [dir, setDir] = useState<'next' | 'prev'>('next');
-  const [writing, setWriting] = useState<number | null>(null);
   if (day !== shown) {
     setShown(day);
     setDir(day > shown ? 'next' : 'prev');
-    setWriting(null);
-  }
-  const [seenAsk, setSeenAsk] = useState(ask);
-  if (ask !== seenAsk) {
-    setSeenAsk(ask);
-    if (ask) setWriting(ask);
   }
 
   // The arrows turn from the latest day, even when clicked on the outgoing page while it turns away.
@@ -591,6 +570,9 @@ function DaySheet({
       : mine(filters.lagProject ?? '')
     : '';
 
+  // The writing line and the empty states' New task: Quick Add on this day (in All spaces, in the space it writes to;
+  // grouped, the end line is No project's).
+  const writeHere = () => openQuickAdd({ day, spaceId: all?.target.id, projectId: g.on ? null : undefined });
   let body;
   if (pending) body = <TaskListSkeleton rows={5} compact={compact} grouped={g.wanted} />;
   else if (failed)
@@ -606,28 +588,28 @@ function DaySheet({
         Check your connection. Nothing you wrote is lost.
       </EmptyState>
     );
-  else if (!tasks.length && writing === null && !group && welcome && h.isToday)
+  else if (!tasks.length && !group && welcome && h.isToday)
     body = (
       <EmptyState
         title={welcome.title}
-        action={welcome.action === 'invite' ? 'Invite people' : 'Add a task'}
-        onAction={welcome.action === 'invite' ? openMembers : () => setWriting((n) => (n ?? 0) + 1)}
+        action={welcome.action === 'invite' ? 'Invite people' : 'New task'}
+        onAction={welcome.action === 'invite' ? openMembers : writeHere}
       >
         {welcome.body}
       </EmptyState>
     );
-  else if (all && !tasks.length && writing === null && !group)
+  else if (all && !tasks.length && !group)
     body = (
-      <EmptyState title={emptyAllWords(h.day, h.isToday)} action="New task" onAction={() => openQuickAdd()}>
+      <EmptyState title={emptyAllWords(h.day, h.isToday)} action="New task" onAction={writeHere}>
         Plan something in any of your spaces and it shows up here, with its space beside it.
       </EmptyState>
     );
-  else if (!tasks.length && writing === null && !group)
+  else if (!tasks.length && !group)
     body = (
       <EmptyState
         title={h.isToday ? 'Nothing planned for today yet.' : `Nothing planned for ${h.day} yet.`}
-        action="Add a task"
-        onAction={() => setWriting((n) => (n ?? 0) + 1)}
+        action="New task"
+        onAction={writeHere}
       >
         Write the first thing you want to get done. It stays on this page until you cross it off.
       </EmptyState>
@@ -658,8 +640,7 @@ function DaySheet({
       flashKey: flash && flash.day === day ? flash.id : undefined,
       locateKey: locate && locate.day === day ? `${locate.id}:${locate.nonce}` : undefined,
       addLabel: all ? writeWords({ name: mine(all.target.name) }) : 'Write the next thing…',
-      addKey: writing,
-      onAddClose: () => setWriting(null),
+      onAddOpen: writeHere,
       calendar,
       onToggleTask: (t: TaskItem, v: boolean) => taskStore.cross(t.key, v),
       onMoveTask: (t: TaskItem, to: IsoDate | null, _from: IsoDate | null, at?: number) =>
@@ -710,16 +691,13 @@ function DaySheet({
             if (p) g.only(p);
           } else if (all) filters.onSignal(t, k, false);
         }}
-        onAdd={(text, group, before) => {
-          // On a project's own line it goes right after the project's last task, so My order keeps them together.
-          const slot = before ? ids.indexOf(before) : group === NO_PROJECT ? -1 : g.end(ids, group);
-          const at = slot === -1 ? undefined : slot;
+        onGroupAdd={(group) => {
           const to = g.target(group);
-          const extra = to.projectId ? { projectId: to.projectId } : {};
-          if (!all) return taskStore.create(spaceId, day, text, at, extra);
-          const id = taskStore.create(to.spaceId ?? all.target.id, day, text, undefined, extra);
-          taskStore.placeInAll(id, day, at ?? order.length, order);
-          return id;
+          openQuickAdd({
+            day,
+            spaceId: all ? (to.spaceId ?? all.target.id) : undefined,
+            projectId: to.projectId ?? null,
+          });
         }}
         onReorder={(group, moved) => {
           const at = g.place(ids, group, moved.key, moved.to);
@@ -740,14 +718,6 @@ function DaySheet({
         group={group}
         filter={all ? (filters.lagProject ?? undefined) : undefined}
         filterSpace={all ? filters.lagSpace : undefined}
-        onAdd={(text, before) => {
-          const at = before ? tasks.findIndex((t) => t.id === before) : undefined;
-          if (!all) return taskStore.create(spaceId, day, text, at === -1 ? undefined : at);
-          // Written in All spaces: it goes to Personal (or the filtered space), and takes its place here.
-          const id = taskStore.create(all.target.id, day, text);
-          taskStore.placeInAll(id, day, at === undefined || at === -1 ? order.length : at, order);
-          return id;
-        }}
         onReorder={(_, moved) =>
           all
             ? taskStore.placeInAll(moved.key, day, moved.to, order)

@@ -117,6 +117,7 @@ function Working() {
   const [tasks, setTasks] = useState(ROWS);
   const [done, setDone] = useState(DONE);
   const [view, setView] = useState<BacklogView>('open');
+  const [fresh, setFresh] = useState<string | undefined>(undefined);
   const dir = view === 'done' ? 'next' : 'prev';
   return (
     <BacklogSheet
@@ -135,10 +136,12 @@ function Working() {
             leaveDone
             calendar={{ today: TODAY, marks: {} }}
             addLabel="Add to the Backlog…"
-            onAdd={(text) => {
+            // The app opens Quick Add here; the kit stands in for it with a task that arrives as one would.
+            flashKey={fresh}
+            onAddOpen={() => {
               const key = `n${Date.now()}`;
-              setTasks((l) => [...l, { key, title: text }]);
-              return key;
+              setTasks((l) => [...l, { key, title: 'A task from Quick Add' }]);
+              setFresh(key);
             }}
             onReorder={(next) => setTasks(next)}
             onLeave={(t) => {
@@ -195,6 +198,17 @@ function Grouped({ folded: start = [] }: { folded?: string[] }) {
   const [groups, setGroups] = useState(GROUPS);
   const [folded, setFolded] = useState(start);
   const [order, setOrder] = useState('by');
+  const [fresh, setFresh] = useState<string | undefined>(undefined);
+  // The app opens Quick Add on the group's project; the kit stands in for it with a task that arrives as one would.
+  const addTo = (group: string) => {
+    const key = `n${Date.now()}`;
+    setGroups((l) =>
+      l.map((g) =>
+        g.key === group ? { ...g, tasks: [...g.tasks, { key, title: 'A task from Quick Add' }] } : g,
+      ),
+    );
+    setFresh(key);
+  };
   const n = groups.reduce((sum, g) => sum + g.tasks.length, 0);
   return (
     <BacklogSheet count={`${n} tasks`} order={order} onOrder={setOrder}>
@@ -209,13 +223,9 @@ function Grouped({ folded: start = [] }: { folded?: string[] }) {
             planButton
             calendar={{ today: TODAY, marks: {} }}
             addLabel="Add to the Backlog…"
-            onAdd={(text, group) => {
-              const key = `n${Date.now()}`;
-              setGroups((l) =>
-                l.map((g) => (g.key === group ? { ...g, tasks: [...g.tasks, { key, title: text }] } : g)),
-              );
-              return key;
-            }}
+            flashKey={fresh}
+            onAddOpen={() => addTo(groups[groups.length - 1]!.key)}
+            onGroupAdd={(group) => addTo(group)}
           />
         ) : (
           <TaskList
@@ -226,6 +236,7 @@ function Grouped({ folded: start = [] }: { folded?: string[] }) {
             planButton
             calendar={{ today: TODAY, marks: {} }}
             addLabel="Add to the Backlog…"
+            onAddOpen={() => {}}
           />
         )}
       </Sheet>
@@ -259,13 +270,14 @@ export function BacklogStates() {
               planButton
               calendar={{ today: TODAY, marks: {} }}
               addLabel="Add to the Backlog…"
+              onAddOpen={() => {}}
             />
           </BacklogSheet>
         )}
       />
       <Pair
         title="By project"
-        note="My order | By project replaced the project menu. A slim header per project with what’s left; click it to fold. Hover a header for + to write into that project. One writing line closes the page."
+        note="My order | By project replaced the project menu. A slim header per project with what’s left; click it to fold. Hover a header for + to open Quick Add on that project. One writing line closes the page; it opens Quick Add too."
         render={() => <Grouped />}
       />
       <Pair
@@ -286,7 +298,7 @@ export function BacklogStates() {
         title="Empty"
         render={() => (
           <BacklogSheet count="Nothing waiting">
-            <EmptyState title="Nothing waiting." action="Add a task">
+            <EmptyState title="Nothing waiting." action="New task">
               Tasks without a day land here. Give one a day with its calendar button when you’re ready.
             </EmptyState>
           </BacklogSheet>

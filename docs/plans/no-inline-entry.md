@@ -1,6 +1,6 @@
 # No typing in task lists: the writing line opens Quick Add
 
-Status: proposal, awaiting Rohit's approval. Asked by Rohit on 15 Nov 2026 ("checkbox alignment is broken when typing
+Status: approved by Rohit on 15 Nov 2026; building. Asked by Rohit on 15 Nov 2026 ("checkbox alignment is broken when typing
 task - let's do one thing, let's remove inline task addition entirely, only keep the modal based entry"). Design
 approved by Rohit on 15 Nov 2026 ("looks good"): canvas page Today, the no-inline draft row at y 30700, boards
 `T-AddQA`, `T-AddQA-Dark`, `T-AddQAMotion`, `T-AddQAStates`, `T-AddQAStates-Dark` (canvas Version 274). Test cases

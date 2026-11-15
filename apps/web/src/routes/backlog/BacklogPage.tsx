@@ -23,14 +23,7 @@ import {
   TaskListSkeleton,
 } from '@tudu/ui';
 import { useEffect, useRef, useState } from 'react';
-import {
-  openQuickAdd,
-  setPage,
-  useBacklogViewAsk,
-  useFlash,
-  useLocate,
-  useNewTaskAsk,
-} from '../../app/dayView';
+import { openQuickAdd, setPage, useBacklogViewAsk, useFlash, useLocate } from '../../app/dayView';
 import { api, meQuery } from '../../app/session';
 import {
   allBacklogCount,
@@ -207,7 +200,6 @@ function BacklogSheet({
   const marks = all ? allMarks : spaceMarks;
   const flash = useFlash();
   const locate = useLocate();
-  const ask = useNewTaskAsk();
 
   // The view starts at To do each visit; the filter is remembered. A filter for a project that is gone is dropped.
   // A task picked in Search asks for its view (Crossed off for a crossed-off one).
@@ -221,12 +213,6 @@ function BacklogSheet({
       setDir(viewAsk.view === 'done' ? 'next' : 'prev');
       setView(viewAsk.view);
     }
-  }
-  const [writing, setWriting] = useState<number | null>(null);
-  const [seenAsk, setSeenAsk] = useState(ask);
-  if (ask !== seenAsk) {
-    setSeenAsk(ask);
-    if (ask) setWriting(ask);
   }
 
   const tasks = q.data?.tasks ?? [];
@@ -284,6 +270,10 @@ function BacklogSheet({
   };
   void (null as unknown as Task);
 
+  // The writing line and the empty Backlog's New task: Quick Add on no day (in All spaces, in the space it writes
+  // to; grouped, the end line is No project's).
+  const writeHere = () =>
+    openQuickAdd({ day: null, spaceId: target?.id, projectId: g.on ? null : undefined });
   let body;
   if (q.isPending) body = <TaskListSkeleton rows={5} compact={compact} grouped={g.wanted} />;
   else if (q.isError && !q.data)
@@ -317,16 +307,16 @@ function BacklogSheet({
         Tasks you cross off in the Backlog wait here. Untick one to bring it back.
       </EmptyState>
     );
-  else if (view === 'open' && !open.length && writing === null && all)
+  else if (view === 'open' && !open.length && all)
     body = (
-      <EmptyState title="Nothing waiting, in any space." action="New task" onAction={() => openQuickAdd()}>
+      <EmptyState title="Nothing waiting, in any space." action="New task" onAction={writeHere}>
         Tasks without a day land here, from every space. Give one a day with its calendar button when you’re
         ready.
       </EmptyState>
     );
-  else if (view === 'open' && !open.length && writing === null)
+  else if (view === 'open' && !open.length)
     body = (
-      <EmptyState title="Nothing waiting." action="Add a task" onAction={() => openQuickAdd()}>
+      <EmptyState title="Nothing waiting." action="New task" onAction={writeHere}>
         Tasks without a day land here. Give one a day with its calendar button when you’re ready.
       </EmptyState>
     );
@@ -364,8 +354,7 @@ function BacklogSheet({
       calendar,
       flashKey: flash && flash.day === null ? flash.id : undefined,
       addLabel: target ? `Add to ${target.name}’s Backlog…` : 'Add to the Backlog…',
-      addKey: writing,
-      onAddClose: () => setWriting(null),
+      onAddOpen: writeHere,
       onLeave: (t: TaskItem) => taskStore.cross(t.key, true),
       onUnleave: (t: TaskItem) => taskStore.cross(t.key, false),
       onMoveTask: (t: TaskItem, to: IsoDate | null, _from: IsoDate | null, at?: number) =>
@@ -412,20 +401,13 @@ function BacklogSheet({
         groups={g.groups}
         folded={g.folded}
         onFold={g.fold}
-        onAdd={(text, group, before) => {
+        onGroupAdd={(group) => {
           const to = g.target(group);
-          const extra = to.projectId ? { projectId: to.projectId } : {};
-          // On a project's own line it goes right after the project's last task, so My order keeps them together.
-          const slot = (list: string[]) =>
-            before ? list.indexOf(before) : to.projectId ? g.end(list, group) : -1;
-          if (!all) {
-            const at = slot(openIds);
-            return taskStore.create(spaceId, null, text, at === -1 ? undefined : at, extra);
-          }
-          const id = taskStore.create(to.spaceId ?? all.target.id, null, text, undefined, extra);
-          const k = slot(allIds);
-          taskStore.placeInAll(id, null, k === -1 ? order.length : k, order);
-          return id;
+          openQuickAdd({
+            day: null,
+            spaceId: all ? (to.spaceId ?? all.target.id) : undefined,
+            projectId: to.projectId ?? null,
+          });
         }}
         onReorder={(group, moved) => {
           if (all) taskStore.placeInAll(moved.key, null, g.place(allIds, group, moved.key, moved.to), order);
@@ -438,15 +420,6 @@ function BacklogSheet({
         tasks={items}
         label="Tasks in the Backlog"
         filterSpace={narrowedTo}
-        onAdd={(text, before) => {
-          const at = before ? open.findIndex((t) => t.id === before) : undefined;
-          if (!target) return taskStore.create(spaceId, null, text, at === -1 ? undefined : at);
-          // In All spaces: into Personal's (or the filtered space's) Backlog, in its place here.
-          const id = taskStore.create(target.id, null, text);
-          const k = before ? order.findIndex((x) => x.id === before) : -1;
-          taskStore.placeInAll(id, null, k === -1 ? order.length : k, order);
-          return id;
-        }}
         onReorder={(_, moved) => {
           if (!all) return taskStore.place(moved.key, null, moved.to);
           // The list is To do only; All spaces' order is of the whole Backlog, so slot it by its neighbour.

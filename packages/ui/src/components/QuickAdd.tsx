@@ -181,6 +181,8 @@ export interface QuickAddProps {
     from?: QuickAddFromNote | null;
     /** Where it is planned: a day, or `null` for the Backlog (a list's own "New task"). Left out: the day shown. */
     day?: IsoDate | null;
+    /** The project it goes in (a group's "+"), or `null` for none. Left out: the draft's. */
+    projectId?: string | null;
     nonce: number;
   } | null;
   /**
@@ -390,6 +392,8 @@ export function QuickAdd(p: QuickAddProps) {
   if (p.seed && p.seed.nonce !== seenSeed) {
     setSeenSeed(p.seed.nonce);
     if (p.seed.day !== undefined) set({ planned: p.seed.day });
+    // Only a project of the space it goes to is sent (see save), so one that is not in the list is simply dropped.
+    if (p.seed.projectId !== undefined) set({ projectId: p.seed.projectId });
     if (p.seed.title !== undefined) set({ title: p.seed.title });
     if (p.seed.note !== undefined) {
       set({ note: toHtml(p.seed.note) });

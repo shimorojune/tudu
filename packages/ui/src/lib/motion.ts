@@ -45,19 +45,16 @@ export function scrollerOf(el: Element): HTMLElement | null {
 
 /**
  * Open a new row's gap: height 0 to its own over dur-row-open (ease-arrive), the words fading in over the last part.
- * With `follow`, the scroller glides along in step so the row (or, for 'add', the writing line under it) lands in
- * view. Returns a function that finishes at once.
+ * With `follow`, the scroller glides along in step so the row lands in view. Returns a function that finishes at once.
  */
-export function openRow(el: HTMLElement, follow?: 'add' | 'out' | null): () => void {
+export function openRow(el: HTMLElement, follow?: 'out' | null): () => void {
   const full = el.getBoundingClientRect().height;
   const sc = follow ? scrollerOf(el) : null;
   let need = 0;
   let start = 0;
   if (sc) {
-    const list = el.closest('.tp-list');
-    const anchor = follow === 'add' ? (list?.parentElement?.querySelector(':scope > .tp-addtask') ?? el) : el;
     const sr = sc.getBoundingClientRect();
-    const ar = anchor.getBoundingClientRect();
+    const ar = el.getBoundingClientRect();
     start = sc.scrollTop;
     need = Math.max(0, ar.bottom + 20 - sr.bottom);
   }

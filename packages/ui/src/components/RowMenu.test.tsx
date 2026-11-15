@@ -233,8 +233,10 @@ describe('TaskList row menu', () => {
   });
 
   it('RM-U09 text being written and the paper keep the system menu; no `menu`, no Tudu menu', () => {
-    const { unmount } = render(<Day addLabel="Write the next thing…" addKey={1} />);
-    const input = screen.getByRole('textbox');
+    const { unmount } = render(<Day />);
+    // A field inside a row (a subtask being written, a title being renamed): the system's menu, not Tudu's.
+    const input = document.createElement('input');
+    rowEl('Call Sam at 3pm').appendChild(input);
     const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
     input.dispatchEvent(ev);
     expect(ev.defaultPrevented).toBe(false);
