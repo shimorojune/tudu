@@ -92,7 +92,7 @@ describe('QuickAdd', () => {
     ).toBe(true);
   });
 
-  it('C04-U03 Due: the hover hint says how far; the chip reads the date, red when overdue; Remove due date clears it', async () => {
+  it('C04-U03 Due: the hover hint says how far; the chip reads the date, red when overdue; No date clears it', async () => {
     const user = userEvent.setup();
     render(<Bar />);
     await user.click(chip('Add a due date'));
@@ -112,7 +112,7 @@ describe('QuickAdd', () => {
     await user.click(chip('Due Fri 16 Oct'));
     await user.click(
       within(document.querySelector('.tp-qa-pop') as HTMLElement).getByRole('button', {
-        name: 'Remove due date',
+        name: 'No date',
       }),
     );
     expect(chip('Add a due date')).toBeInTheDocument();
@@ -352,6 +352,9 @@ describe('QuickAdd', () => {
       title: 'Book the meeting room',
       planned: '2026-10-19',
       due: null,
+      until: null,
+      time: null,
+      dueAt: null,
       projectId: null,
       note: '',
       attachments: [],

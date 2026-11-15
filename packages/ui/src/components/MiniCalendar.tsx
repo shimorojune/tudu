@@ -25,6 +25,8 @@ export interface MiniCalendarProps {
   today?: IsoDate;
   selected?: IsoDate | null;
   defaultSelected?: IsoDate | null;
+  /** The last day of several (docs/plans/task-times.md): the days from `selected` to it are shaded as one range. */
+  until?: IsoDate | null;
   /** A dot on days with tasks: { "2026-10-19": 3 }. */
   marks?: Record<string, number>;
   onPick?: (date: IsoDate) => void;
@@ -39,6 +41,8 @@ export interface MiniCalendarProps {
   hintEmpty?: string;
   label?: string;
   className?: string;
+  /** The wall clock now, for a time chosen under the month (tests pass a fixed one). The month itself ignores it. */
+  now?: Date;
 }
 
 const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -58,6 +62,7 @@ export function MiniCalendar({
   today,
   selected,
   defaultSelected = null,
+  until = null,
   marks = {},
   onPick,
   presets,
@@ -75,6 +80,7 @@ export function MiniCalendar({
   const [hover, setHover] = useState<IsoDate | null>(null);
   const [focused, setFocused] = useState<number | null>(null);
   const grid = useRef<HTMLDivElement | null>(null);
+  const hintSaid = useRef<CalendarHint | null>(null);
 
   const first = toIso(view.y, view.m, 1);
   const startDow = (weekdayOf(first) + 6) % 7;
@@ -172,7 +178,9 @@ export function MiniCalendar({
                   setSel(x.value);
                   jump(x.value);
                 }
-                if (onPreset) onPreset(x.value);
+                // "No date" under a due date takes it off.
+                if (x.value === null && onClear && !onPreset) onClear();
+                else if (onPreset) onPreset(x.value);
                 else if (x.value) onPick?.(x.value);
               }}
             >
@@ -198,7 +206,9 @@ export function MiniCalendar({
           if (!d) return <span key={`e${j}`} />;
           const k = key(d);
           const count = marks[k];
-          const isSel = k === sel;
+          const isEnd = !!until && k === until;
+          const inRange = !!until && !!sel && k >= sel && k <= until;
+          const isSel = k === sel || isEnd;
           const tab = focused ? focused === d : isSel || (!sel?.startsWith(k.slice(0, 7)) && d === 1);
           return (
             <button
@@ -206,7 +216,14 @@ export function MiniCalendar({
               type="button"
               data-day={d}
               data-date={k}
-              className={cx('tp-cal-d', k === today && 'tp-today', isSel && 'tp-sel')}
+              className={cx(
+                'tp-cal-d',
+                k === today && 'tp-today',
+                isSel && 'tp-sel',
+                inRange && 'tp-range',
+                inRange && k === sel && 'tp-range-a',
+                isEnd && 'tp-range-z',
+              )}
               aria-pressed={isSel ? 'true' : 'false'}
               aria-label={`${d} ${MONTHS_LONG[view.m - 1]}${count ? `, ${count} ${count === 1 ? 'task' : 'tasks'}` : ''}`}
               tabIndex={tab ? 0 : -1}
@@ -224,19 +241,31 @@ export function MiniCalendar({
           );
         })}
       </div>
-      {hint ? (
-        <div
-          className={cx(
-            'tp-cal-hint',
-            hintValue?.tone === 'overdue' && 'tp-od',
-            hintValue?.tone === 'today' && 'tp-now',
-          )}
-          aria-live="polite"
-          data-testid="calendar-hint"
-        >
-          {hintValue ? hintValue.text : (hintEmpty ?? 'Pick a day')}
-        </div>
-      ) : null}
+      {(() => {
+        // The hint line folds open and shut (never a jump); the last words stay while it folds away.
+        if (hint) hintSaid.current = hintValue ?? { text: hintEmpty ?? 'Pick a day' };
+        const said = hintSaid.current;
+        if (!said) return null;
+        return (
+          <div className={cx('tp-cal-hintw', hint && 'tp-in')} aria-hidden={hint ? undefined : 'true'}>
+            <div>
+              <div
+                className={cx(
+                  'tp-cal-hint',
+                  said.tone === 'overdue' && 'tp-od',
+                  said.tone === 'today' && 'tp-now',
+                )}
+                aria-live="polite"
+                data-testid={hint ? 'calendar-hint' : undefined}
+              >
+                <span key={said.text} className="tp-cal-ht">
+                  {said.text}
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {showToday || showClear ? (
         <div className={cx('tp-cal-f', showClear && 'tp-cal-f2')}>
           {showClear ? (
