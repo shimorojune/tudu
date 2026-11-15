@@ -21,6 +21,8 @@ export interface EmptyStateProps {
   mark?: boolean;
   /** A line icon in a soft 56px accent well instead of the mark (empty panes that are not a day). */
   icon?: IconName;
+  /** Centred in the rest of its sheet's body (a SheetBody), over a `TaskList fillEmpty` that takes drops behind it. */
+  fill?: boolean;
   className?: string;
 }
 
@@ -36,11 +38,15 @@ export function EmptyState({
   plain,
   mark = true,
   icon,
+  fill,
   className,
 }: EmptyStateProps) {
   const error = tone === 'error';
   return (
-    <div className={cx('tp-root tp-empty', error && 'tp-empty-error', className)} data-tone={tone}>
+    <div
+      className={cx('tp-root tp-empty', error && 'tp-empty-error', fill && 'tp-empty-fill', className)}
+      data-tone={tone}
+    >
       {icon ? (
         <span className="tp-empty-mark tp-empty-icon" aria-hidden="true">
           <Icon name={icon} size={22} stroke={1.75} />

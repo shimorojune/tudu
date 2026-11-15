@@ -1,7 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { parseRules, readStylesheet } from '../test-utils/stylesheet';
 import { EmptyState } from './EmptyState';
+
+const rules = parseRules(readStylesheet('components.css'));
 
 describe('EmptyState', () => {
   it('C00-U31 shows the mark, the title, the body and one ink action', async () => {
@@ -56,5 +59,26 @@ describe('EmptyState', () => {
     rerender(<EmptyState title="Quiet." mark={false} />);
     expect(root.querySelector('.tp-empty-mark')).toBeNull();
     expect(root.querySelector('.tp-empty-b')).toBeNull();
+  });
+
+  it('C02-U58 fill: centred in the rest of its sheet’s body and over the list behind it; the button still works', async () => {
+    const user = userEvent.setup();
+    const onAction = vi.fn();
+    const { container, rerender } = render(
+      <EmptyState fill title="Nothing waiting." mark={false} action="New task" onAction={onAction}>
+        Drag a task here.
+      </EmptyState>,
+    );
+    expect(container.querySelector('.tp-empty')).toHaveClass('tp-empty-fill');
+    await user.click(screen.getByRole('button', { name: 'New task' }));
+    expect(onAction).toHaveBeenCalledTimes(1);
+    const rule = rules.find((r) => r.selector === '.tp-root.tp-empty.tp-empty-fill' && !r.context.length)!;
+    expect(rule.declarations).toMatchObject({
+      'justify-content': 'center',
+      position: 'relative',
+      'z-index': '1',
+    });
+    rerender(<EmptyState title="Nothing waiting." />);
+    expect(container.querySelector('.tp-empty')).not.toHaveClass('tp-empty-fill');
   });
 });

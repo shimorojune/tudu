@@ -12,7 +12,7 @@ import {
   type TaskItem,
 } from '@tudu/ui';
 import { useProjectGroups } from '../../app/grouped';
-import { useFlash, useLocate } from '../../app/dayView';
+import { openQuickAdd, useFlash, useLocate } from '../../app/dayView';
 import { rowLink } from '../../app/links';
 import { openInJira } from '../../app/jira';
 import { useRowMenu } from '../../app/rowMenu';
@@ -34,7 +34,8 @@ interface BacklogBesideProps {
 
 /**
  * The Backlog beside the day on the desk (#102): a lean sheet on the day's left. "No day", Backlog and the count,
- * then the open tasks in your own order and "Add to the Backlog…". No project filter and no Crossed off (those stay
+ * then the open tasks in your own order and "Add to the Backlog…". Empty, "Nothing waiting." sits in the middle with New task (Quick Add, no day),
+ * and the whole sheet takes a drop. No project filter and no Crossed off (those stay
  * on the Backlog page: a filtered list can't take drops). Tasks drag across both ways in the "days" group, or move
  * with the row's calendar button. Same cache as the Backlog page and the week's Backlog tile.
  */
@@ -57,7 +58,8 @@ export function BacklogBeside({
   const tasks = q.data?.tasks ?? [];
   const { open } = splitBacklog(tasks);
   const items = open.map((t) => toItem(t, today, projects));
-  const count = q.data ? backlogCount(open.length, 'open') : '';
+  // Nothing waiting: the words in the body say so, the title line stays quiet (not said twice).
+  const count = q.data && open.length ? backlogCount(open.length, 'open') : '';
   const spaceIdOf = (key: string) => tasks.find((t) => t.id === key)?.spaceId ?? spaceId;
   // By project: the same choice and folds as the day beside it. Grouped, rows move inside their project only, so
   // dragging to and from the day comes back in My order; the row's calendar button moves a task either way.
@@ -70,6 +72,7 @@ export function BacklogBeside({
   else if (q.isError && !q.data)
     body = (
       <EmptyState
+        fill
         tone="error"
         title="The Backlog didn’t load."
         action="Try again"
@@ -93,7 +96,8 @@ export function BacklogBeside({
       calendar: { today, marks },
       flashKey: flash && flash.day === null ? flash.id : undefined,
       locateKey: locate && locate.day === null ? `${locate.id}:${locate.nonce}` : undefined,
-      addLabel: 'Add to the Backlog…',
+      // Empty, the words' New task is the way in: no writing line under them.
+      addLabel: open.length ? 'Add to the Backlog…' : undefined,
       onLeave: (t: TaskItem) => taskStore.cross(t.key, true),
       onUnleave: (t: TaskItem) => taskStore.cross(t.key, false),
       onMoveTask: (t: TaskItem, to: IsoDate | null, _from: IsoDate | null, at?: number) =>
@@ -131,9 +135,15 @@ export function BacklogBeside({
     };
     body = (
       <>
-        <FoldAway show={!open.length}>
-          <EmptyState title="Nothing waiting." mark={false}>
-            Drag a task here to take its day away. It waits without a day until you plan it again.
+        <FoldAway show={!open.length} fill>
+          <EmptyState
+            fill
+            title="Nothing waiting."
+            mark={false}
+            action="New task"
+            onAction={() => openQuickAdd({ day: null })}
+          >
+            Drag a task here to take its day away, or write a new one.
           </EmptyState>
         </FoldAway>
         {g.on ? (
@@ -165,6 +175,7 @@ export function BacklogBeside({
             label="Tasks in the Backlog"
             resetKey="beside"
             group="days"
+            fillEmpty
             onAdd={(text, before) => {
               const at = before ? open.findIndex((t) => t.id === before) : undefined;
               return taskStore.create(spaceId, null, text, at === -1 ? undefined : at);

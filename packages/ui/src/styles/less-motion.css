@@ -153,6 +153,10 @@
 :root[data-motion='less'] .tp-wd-peek {
   transition: none;
 }
+:root[data-motion='less'] .tp-fold-fill.tp-fold-fade {
+  animation: none;
+  opacity: 0;
+}
 :root[data-motion='less'] .tp-fold.tp-fold-in {
   animation-delay: 0ms;
 }

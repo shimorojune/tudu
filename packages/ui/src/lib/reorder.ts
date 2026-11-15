@@ -329,6 +329,8 @@ export function useReorder(
       ln.setAttribute('aria-hidden', 'true');
       el.appendChild(ln);
     }
+    // An empty list filling its sheet shows only its wash: there is nothing to go between. Kept through the landing.
+    ln.classList.toggle('tp-drop-line-off', el.classList.contains('tp-list-fill'));
     ln.style.transform = `translateY(${top - 1}px)`;
     s.dropAt = idx;
   }
