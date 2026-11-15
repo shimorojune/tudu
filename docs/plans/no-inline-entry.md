@@ -34,7 +34,8 @@ lines do and more (day, due, time, project, note, files, sending). One way in me
    | A project group's "+" (By project)           | That list's day / no day and that project                                       |
    | The "No project" group                       | That list's day / no day, no project                                            |
 
-   Everything in Quick Add can still be changed before Add. Esc or a click outside closes it and nothing is made.
+   Everything in Quick Add can still be changed before Add. Esc or a click outside closes it and nothing is made,
+   and focus goes back to the line when it had it (NI-U07).
 
 3. **Where the task lands.** Last in the list it was opened from (last in its group with By project), with the usual
    arrival wash, as Quick Add's own Add does today. Quick Add closes after Add, as now. Focus goes back to the line,

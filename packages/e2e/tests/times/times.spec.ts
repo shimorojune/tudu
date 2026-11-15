@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
-import { dayList, fixClock, idle, row } from '../../fixtures/today';
+import { dayList, fixClock, idle, row, writeTasks } from '../../fixtures/today';
 
 /** Times on Planned and Due, and Planned over several days (docs/plans/task-times.md). */
 
@@ -16,14 +16,7 @@ async function openTask(page: Page, title: string): Promise<Locator> {
 }
 
 async function firstTask(page: Page, title: string): Promise<void> {
-  const field = page.getByRole('textbox', { name: 'New task' });
-  const empty = page.getByRole('button', { name: 'Add a task' });
-  await expect(field.or(empty).first()).toBeVisible();
-  if (await empty.isVisible()) await empty.click();
-  await field.fill(title);
-  await field.press('Enter');
-  await expect(page.getByText(title, { exact: true })).toBeVisible();
-  await field.press('Escape');
+  await writeTasks(page, [title]);
 }
 
 async function serverTask(page: Page, ref: string) {

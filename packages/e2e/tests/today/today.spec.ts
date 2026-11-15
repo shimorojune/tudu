@@ -14,6 +14,10 @@ import {
   titlesOf,
   twoDays,
   writeTasks,
+  quickAdd,
+  addInQuickAdd,
+  backlogBeside,
+  besideList,
   SECOND_DAY_PAGE,
 } from '../../fixtures/today';
 
@@ -73,7 +77,6 @@ test.describe('today', () => {
   test('C02-E04 drag the third task to the top; the order survives a reload', async ({ page }) => {
     await signInFresh(page);
     await writeTasks(page, THREE);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const list = dayList(page);
     const first = (await rowsOf(list).first().boundingBox())!;
     await drag(page, row(list, 'Book car service'), { x: first.x + 120, y: first.y + 4 });
@@ -87,23 +90,88 @@ test.describe('today', () => {
       .toEqual(['Book car service', 'Pay the electricity bill', 'Call Sam at 3pm']);
   });
 
-  test('C02-E05 the "+" between two tasks writes one in that slot', async ({ page }) => {
-    test.skip(test.info().project.name !== 'desktop', 'the "+" is a desktop control (hover)');
+  test('NI-E03 nothing in a list is a field: no "+" between rows on hover, no "New task" textbox anywhere', async ({
+    page,
+  }) => {
     await signInFresh(page);
     await writeTasks(page, ['Pay the electricity bill', 'Book car service']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const list = dayList(page);
-    const second = row(list, 'Book car service');
-    await second.hover({ position: { x: 300, y: 2 } });
-    await second.getByRole('button', { name: 'Add a task here' }).click();
-    const here = page.getByPlaceholder('Write a task here…');
-    await here.fill('Call Sam at 3pm');
-    await here.press('Enter');
-    await expect.poll(() => titlesOf(list)).toEqual(THREE);
-    await here.press('Escape');
+    await row(list, 'Book car service').hover({ position: { x: 300, y: 2 } });
+    await page.waitForTimeout(300);
+    await expect(page.getByRole('button', { name: 'Add a task here' })).toHaveCount(0);
+    await expect(list.locator('.tp-ins, .tp-insrow')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Write the next thing…' }).click();
+    await expect(quickAdd(page)).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'New task' })).toHaveCount(0);
+  });
+
+  test('NI-E01 "Write the next thing…" opens Quick Add on today; Add puts the row last with the wash; a reload keeps it', async ({
+    page,
+  }) => {
+    await signInFresh(page);
+    await writeTasks(page, ['Pay the electricity bill']);
+    await page.getByRole('button', { name: 'Write the next thing…' }).click();
+    const qa = quickAdd(page);
+    await expect(qa.getByRole('button', { name: 'Planned for: Today' })).toBeVisible();
+    await addInQuickAdd(page, 'Call Sam at 3pm');
+    const list = dayList(page);
+    await expect.poll(() => titlesOf(list)).toEqual(['Pay the electricity bill', 'Call Sam at 3pm']);
+    await expect(row(list, 'Call Sam at 3pm')).toHaveClass(/tp-new/);
     await idle(page);
     await page.reload();
-    await expect.poll(() => titlesOf(dayList(page))).toEqual(THREE);
+    await expect.poll(() => titlesOf(dayList(page))).toEqual(['Pay the electricity bill', 'Call Sam at 3pm']);
+  });
+
+  test('NI-E04 two days: the second day’s line opens Quick Add on tomorrow; the Backlog beside the day opens on Backlog', async ({
+    page,
+  }) => {
+    test.skip(test.info().project.name !== 'desktop', 'two sheets side by side are the desk’s');
+    await signInFresh(page);
+    await writeTasks(page, ['Pay the electricity bill']);
+    const second = await twoDays(page);
+    await writeTasks(page, ['Monday’s task'], second);
+    await expect(dayList(page, 'Tasks for Monday 19 October').getByText('Monday’s task')).toBeVisible();
+    await expect
+      .poll(() => titlesOf(dayList(page, 'Tasks for Sunday 18 October')))
+      .toEqual(['Pay the electricity bill']);
+    const beside = await backlogBeside(page);
+    await writeTasks(page, ['Some day'], beside);
+    await writeTasks(page, ['Some other day'], beside);
+    await expect.poll(() => titlesOf(besideList(page))).toEqual(['Some day', 'Some other day']);
+  });
+
+  test('NI-E06 keyboard: Enter on the line opens Quick Add; Esc closes it with nothing made and focus back on the line', async ({
+    page,
+  }) => {
+    test.skip(test.info().project.name === 'phone', 'a keyboard on the desk and tablets');
+    await signInFresh(page);
+    await writeTasks(page, ['Pay the electricity bill']);
+    const line = page.getByRole('button', { name: 'Write the next thing…' });
+    await line.focus();
+    await page.keyboard.press('Enter');
+    const qa = quickAdd(page);
+    await expect(qa.getByRole('textbox', { name: 'Task title' })).toBeFocused();
+    await qa.getByRole('textbox', { name: 'Task title' }).fill('Not this one');
+    await page.keyboard.press('Escape');
+    await expect(qa).toHaveCount(0, { timeout: 5000 });
+    await expect(line).toBeFocused();
+    await expect.poll(() => titlesOf(dayList(page))).toEqual(['Pay the electricity bill']);
+    await page.keyboard.press('Enter');
+    await expect(qa.getByRole('textbox', { name: 'Task title' })).toBeFocused();
+  });
+
+  test('NI-E09 an empty day: New task opens Quick Add on that day, and no line sits under the empty state', async ({
+    page,
+  }) => {
+    await signInFresh(page);
+    await writeTasks(page, ['Sunday’s task']);
+    await page.getByRole('button', { name: 'Next day' }).first().click();
+    await expect(page.getByText('Nothing planned for Monday yet.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Write the next thing…' })).toHaveCount(0);
+    await page.locator('.tp-empty').getByRole('button', { name: 'New task' }).click();
+    await expect(quickAdd(page).getByRole('button', { name: 'Planned for: Tomorrow' })).toBeVisible();
+    await addInQuickAdd(page, 'Monday’s task');
+    await expect(dayList(page, 'Tasks for Monday 19 October').getByText('Monday’s task')).toBeVisible();
   });
 
   test('C02-E06 turn the day with the arrows and the calendar; tasks keep to their day', async ({ page }) => {
@@ -133,7 +201,6 @@ test.describe('today', () => {
     test.skip(test.info().project.name !== 'desktop', 'two days side by side is the desk');
     await signInFresh(page);
     await writeTasks(page, THREE);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     await page.getByRole('group', { name: 'Days to show' }).getByRole('button', { name: '2 days' }).click();
     const monday = page.getByRole('region', { name: 'The second day' });
     await expect(monday.getByRole('heading', { name: 'Monday' })).toBeVisible();
@@ -360,7 +427,6 @@ const MONDAY_TASKS = 'Tasks for Monday 19 October';
 async function holdOverMonday(page: Page) {
   await signInFresh(page);
   await writeTasks(page, THREE);
-  await page.getByRole('textbox', { name: 'New task' }).press('Escape');
   await idle(page);
   const monday = await twoDays(page);
   const sunday = dayList(page, SUNDAY_TASKS);

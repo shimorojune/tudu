@@ -496,6 +496,23 @@ export function QuickAdd(p: QuickAddProps) {
     );
     return () => clearTimeout(t);
   }, [mounted, open, overlay, p.initial?.noFocus]);
+  // Closing gives focus back to what opened it (the writing line, New task) when it was focused, so Enter opens it
+  // again; a click in Safari leaves nothing focused, and then nothing is moved.
+  const opener = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!overlay) return;
+    if (open) {
+      const was = document.activeElement;
+      opener.current =
+        was instanceof HTMLElement && was !== document.body && !sheet.current?.contains(was) ? was : null;
+      return;
+    }
+    const el = opener.current;
+    opener.current = null;
+    if (!el?.isConnected) return;
+    const now = document.activeElement;
+    if (!now || now === document.body || sheet.current?.contains(now)) el.focus({ preventScroll: true });
+  }, [open, overlay]);
   // Without a layer (the macOS app's floating window) Esc still closes the bar when there is somewhere to go.
   const escapes = overlay || !!p.onClose;
   useEffect(() => {

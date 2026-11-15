@@ -1,8 +1,8 @@
 import type { Locator, Page } from '@playwright/test';
 import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
 import { goBacklog } from '../../fixtures/backlog';
-import { expectFolds, expectNoInkShift, sampleHeights } from '../../fixtures/motion';
-import { fixClock, writeTasks } from '../../fixtures/today';
+import { expectFolds, sampleHeights } from '../../fixtures/motion';
+import { fixClock, quickAdd, writeTasks } from '../../fixtures/today';
 
 /**
  * The plan is docs/plans/focus-shift-and-sim-exit.md. These ids (`FX-…`) come from that plan, not a chunk.
@@ -16,24 +16,20 @@ async function inTheme(page: Page, theme: (typeof THEMES)[number]) {
   await page.addInitScript((t) => localStorage.setItem('tudu.theme', t), theme);
 }
 
-/** The writing line's label and, once clicked, its field: the same box. */
+/** The writing line never moves: its words keep their box before, while Quick Add is open, and after Esc. */
 async function expectLineStill(page: Page, sheet: Locator, label: string) {
-  const row = sheet.locator('.tp-addtask').first();
-  const text = row.locator('.tp-addtask-btn');
+  const text = sheet.locator('.tp-addtask .tp-addtask-btn').first();
   await expect(text).toHaveText(label);
-  await expectNoInkShift(
-    page,
-    row,
-    text,
-    async () => {
-      await text.click();
-      await expect(row.getByRole('textbox', { name: 'New task' })).toBeFocused();
-    },
-    async () => {
-      await row.getByRole('textbox', { name: 'New task' }).press('Escape');
-      await expect(text).toBeVisible();
-    },
-  );
+  const before = await text.boundingBox();
+  await text.click();
+  const qa = quickAdd(page);
+  await expect(qa.getByRole('textbox', { name: 'Task title' })).toBeFocused();
+  await expect(page.getByRole('textbox', { name: 'New task' })).toHaveCount(0);
+  expect(await text.boundingBox()).toEqual(before);
+  await page.keyboard.press('Escape');
+  await expect(qa).toHaveCount(0, { timeout: 5000 });
+  await expect(text).toHaveText(label);
+  expect(await text.boundingBox()).toEqual(before);
 }
 
 test.describe('motion', () => {
@@ -44,17 +40,16 @@ test.describe('motion', () => {
   });
 
   for (const theme of THEMES) {
-    test(`FX-E01 Today (${theme}): clicking "Write the next thing…" paints the placeholder exactly where the label was`, async ({
+    test(`NI-E07 Today (${theme}): "Write the next thing…" opens Quick Add and the line never moves`, async ({
       page,
     }) => {
       await inTheme(page, theme);
       await signInFresh(page);
       await writeTasks(page, ['Pay the electricity bill']);
-      await page.getByRole('textbox', { name: 'New task' }).press('Escape');
       await expectLineStill(page, page.locator('body'), 'Write the next thing…');
     });
 
-    test(`FX-E02 Backlog (${theme}): clicking "Add to the Backlog…" paints the placeholder exactly where the label was`, async ({
+    test(`NI-E07 Backlog (${theme}): "Add to the Backlog…" opens Quick Add and the line never moves`, async ({
       page,
     }) => {
       await inTheme(page, theme);
@@ -64,27 +59,6 @@ test.describe('motion', () => {
       await expectLineStill(page, page.locator('body'), 'Add to the Backlog…');
     });
   }
-
-  test('FX-E03 Esc back to the label: no shift that way either', async ({ page }) => {
-    await signInFresh(page);
-    await writeTasks(page, ['Pay the electricity bill']);
-    const row = page.locator('.tp-addtask').first();
-    const field = row.getByRole('textbox', { name: 'New task' });
-    await expect(field).toBeFocused();
-    await expectNoInkShift(
-      page,
-      row,
-      field,
-      async () => {
-        await field.press('Escape');
-        await expect(row.locator('.tp-addtask-btn')).toBeVisible();
-      },
-      async () => {
-        await row.locator('.tp-addtask-btn').click();
-        await expect(field).toBeFocused();
-      },
-    );
-  });
 });
 
 /** Two backlog tasks a Quick Add title can look like. Written through sync so search has them at once. */

@@ -20,9 +20,10 @@ import {
   idle,
   ring,
   row,
-  rowsOf,
   titlesOf,
   twoDays,
+  addInQuickAdd,
+  quickAdd,
 } from '../../fixtures/today';
 
 const SUN = '2026-10-18';
@@ -121,7 +122,7 @@ test.describe('today, by project', () => {
     await expect(row(group(page, 'Northwind'), 'Send the invoice')).toBeVisible();
   });
 
-  test('C02-E28 "+" on a header: the cursor is in the project’s own line; the task is saved in that project, last in its group', async ({
+  test('NI-E05 a header\'s "+" opens Quick Add on that project and today; the task lands last in its group; a folded group opens', async ({
     page,
   }) => {
     const made = await seeded(page);
@@ -129,44 +130,38 @@ test.describe('today, by project', () => {
     const plat = group(page, 'Platform');
     await plat.locator('.tp-gh').hover();
     await plat.getByRole('button', { name: 'Add a task to Platform' }).click();
-    const line = plat.getByRole('textbox', { name: 'New task' });
-    await expect(line).toBeFocused();
-    await expect(line).toHaveAttribute('placeholder', 'Add to Platform…');
-    await line.fill('Renew the certificate');
-    await line.press('Enter');
-    await expect(line).toBeFocused();
-    await line.press('Escape');
+    const qa = quickAdd(page);
+    await expect(qa.getByRole('button', { name: 'Project: Platform' })).toBeVisible();
+    await expect(qa.getByRole('button', { name: 'Planned for: Today' })).toBeVisible();
+    await addInQuickAdd(page, 'Renew the certificate');
     await expect
       .poll(() => groupTitles(page, 'Platform'))
       .toEqual(['Rotate the keys', 'Fix the flaky test', 'Renew the certificate']);
+    await expect(row(plat, 'Renew the certificate')).toHaveClass(/tp-new/);
     await idle(page);
     const server = await serverList(page, made.spaceId, SUN);
     expect(server.find((t) => t.title === 'Renew the certificate')!.projectId).toBe(made.projects.Platform);
-    // in My order it sits right after the project's last task
     expect(server.map((t) => t.title)).toEqual([...MINE, 'Renew the certificate']);
 
-    // a folded group opens for its "+"
+    // a folded group opens for its "+", and its task shows there
     await groupHeader(page, 'Northwind').click();
     await expect(groupHeader(page, 'Northwind')).toHaveAttribute('aria-expanded', 'false');
     await group(page, 'Northwind').locator('.tp-gh').hover();
     await group(page, 'Northwind').getByRole('button', { name: 'Add a task to Northwind' }).click();
     await expect(groupHeader(page, 'Northwind')).toHaveAttribute('aria-expanded', 'true');
-    const nline = group(page, 'Northwind').getByRole('textbox', { name: 'New task' });
-    await expect(nline).toBeFocused();
-    await nline.fill('Chase the PO');
-    await nline.press('Enter');
-    await nline.press('Escape');
-    await idle(page);
-    // after Book the room (Northwind's last), before Water the plants
-    expect((await serverList(page, made.spaceId, SUN)).map((t) => t.title)).toEqual([
-      'Send the invoice',
-      'Rotate the keys',
-      'Book the room',
-      'Chase the PO',
-      'Water the plants',
-      'Fix the flaky test',
-      'Renew the certificate',
-    ]);
+    await expect(quickAdd(page).getByRole('button', { name: 'Project: Northwind' })).toBeVisible();
+    await addInQuickAdd(page, 'Chase the PO');
+    await expect
+      .poll(() => groupTitles(page, 'Northwind'))
+      .toEqual(['Send the invoice', 'Book the room', 'Chase the PO']);
+
+    // the page's line (No project's) opens Quick Add with no project, even after a project's "+"
+    await page.getByRole('button', { name: 'Write the next thing…' }).click();
+    await expect(quickAdd(page).getByRole('button', { name: 'Choose a project' })).toBeVisible();
+    await addInQuickAdd(page, 'Buy stamps');
+    await expect.poll(() => groupTitles(page, 'No project')).toEqual(['Water the plants', 'Buy stamps']);
+    // never a field in a group
+    await expect(page.getByRole('textbox', { name: 'New task' })).toHaveCount(0);
   });
 
   test('C02-E29 reorder inside a group: only that task moves in My order, and the server agrees', async ({
@@ -206,10 +201,7 @@ test.describe('today, by project', () => {
     await expect(orderSwitch(page)).toHaveCount(0);
     // a task with no project is a second group
     await page.getByRole('button', { name: 'Write the next thing…' }).click();
-    const field = page.getByRole('textbox', { name: 'New task' });
-    await field.fill('Water the plants');
-    await field.press('Enter');
-    await field.press('Escape');
+    await addInQuickAdd(page, 'Water the plants');
     await expect(orderSwitch(page)).toBeVisible();
     await orderBy(page, 'By project');
     await expect.poll(() => groupNames(page)).toEqual(['Northwind', 'No project']);
@@ -360,44 +352,6 @@ test.describe('today, by project', () => {
     await expect(orderSwitch(page)).toHaveCount(0);
     release();
     await expect.poll(() => groupNames(page)).toHaveLength(3);
-  });
-
-  test('C02-E35 never two writing lines: the page’s line makes way while the last project’s own line is open, and No project’s "+" uses the page’s', async ({
-    page,
-  }) => {
-    const made = await seeded(
-      page,
-      DAY.filter((r) => r.project),
-    );
-    await orderBy(page, 'By project');
-    const pageLine = page.getByRole('button', { name: 'Write the next thing…' });
-    await expect(pageLine).toHaveCount(1);
-    const last = made.order[made.order.length - 1]!;
-    await group(page, last).locator('.tp-gh').hover();
-    await group(page, last)
-      .getByRole('button', { name: `Add a task to ${last}` })
-      .click();
-    await expect(group(page, last).getByRole('textbox', { name: 'New task' })).toBeFocused();
-    await expect(pageLine).toHaveCount(0);
-    await page.keyboard.press('Escape');
-    await expect(pageLine).toHaveCount(1);
-
-    // with a No project group, its "+" puts the cursor in the page's line
-    await pageLine.click();
-    const field = page.getByRole('textbox', { name: 'New task' });
-    await field.fill('Water the plants');
-    await field.press('Enter');
-    await field.press('Escape');
-    await expect.poll(() => groupNames(page)).toEqual([...made.order, 'No project']);
-    await group(page, 'No project').locator('.tp-gh').hover();
-    await group(page, 'No project').getByRole('button', { name: 'Add a task to No project' }).click();
-    await expect(page.getByRole('textbox', { name: 'New task' })).toBeFocused();
-    await expect(page.getByRole('textbox', { name: 'New task' })).toHaveAttribute(
-      'placeholder',
-      'Write the next thing…',
-    );
-    await expect(group(page, 'No project').getByRole('textbox')).toHaveCount(0);
-    void rowsOf;
   });
 
   test('C02-E36 the row menu in a group: Project moves the row to that project’s group, and the server agrees', async ({

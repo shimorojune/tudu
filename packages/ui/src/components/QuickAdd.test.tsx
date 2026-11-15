@@ -639,6 +639,27 @@ describe('QuickAdd', () => {
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ title: 'Chase the PO', projectId: null }));
   });
 
+  it('NI-U07 closing gives focus back to what opened it; nothing focused before, nothing moved', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const line = document.createElement('button');
+    line.textContent = 'Write the next thing…';
+    document.body.appendChild(line);
+    line.focus();
+    const { rerender } = render(<Bar open={false} planned={TODAY} />);
+    rerender(<Bar open planned={TODAY} />);
+    act(() => vi.advanceTimersByTime(60));
+    expect(screen.getByRole('textbox', { name: 'Task title' })).toHaveFocus();
+    rerender(<Bar open={false} planned={TODAY} />);
+    expect(line).toHaveFocus();
+    line.blur();
+    rerender(<Bar open planned={TODAY} />);
+    act(() => vi.advanceTimersByTime(60));
+    rerender(<Bar open={false} planned={TODAY} />);
+    expect(line).not.toHaveFocus();
+    line.remove();
+    vi.useRealTimers();
+  });
+
   it('NI-U06 a seed with only words keeps the day shown and the project the draft has', () => {
     const { rerender } = render(<Bar open planned={TODAY} />);
     rerender(<Bar open planned={TODAY} seed={{ projectId: 'nw', nonce: 1 }} />);

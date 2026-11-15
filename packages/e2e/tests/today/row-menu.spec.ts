@@ -39,7 +39,6 @@ test.describe('row menu', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, THREE);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const list = dayList(page, SUNDAY);
     await rightClick(list, 'Call Sam at 3pm');
     await expect(menu(page, 'Call Sam at 3pm')).toBeVisible();
@@ -76,7 +75,6 @@ test.describe('row menu', () => {
     });
     await page.reload();
     await writeTasks(page, THREE);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const list = dayList(page, SUNDAY);
     await rightClick(list, 'Pay the electricity bill');
     await pick(page, 'Mark as done');
@@ -107,7 +105,6 @@ test.describe('row menu', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, THREE);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const list = dayList(page, SUNDAY);
     await rightClick(list, 'Call Sam at 3pm');
     await pick(page, 'Delete task');
@@ -129,7 +126,6 @@ test.describe('row menu', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, THREE);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const list = dayList(page, SUNDAY);
     await rightClick(list, 'Pay the electricity bill');
     await expect(menu(page, 'Pay the electricity bill')).toBeVisible();
@@ -153,7 +149,6 @@ test.describe('row menu', () => {
     test.skip(phone(), 'a keyboard is the desk’s');
     await signInFresh(page);
     await writeTasks(page, THREE);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const list = dayList(page, SUNDAY);
     const title = row(list, 'Pay the electricity bill').locator('.tp-title > .tp-strike');
     await title.focus();
@@ -177,7 +172,6 @@ test.describe('row menu', () => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await signInFresh(page);
     await writeTasks(page, ['Pay the electricity bill']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     await idle(page);
     await rightClick(dayList(page, SUNDAY), 'Pay the electricity bill');
     await pick(page, 'Copy link');
@@ -192,7 +186,6 @@ test.describe('row menu', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, THREE);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     await idle(page);
     await context.setOffline(true);
     await expect(page.getByText('You’re offline.')).toBeVisible();
@@ -214,7 +207,6 @@ test.describe('row menu', () => {
     test.skip(!phone(), 'press and hold is touch');
     await signInFresh(page);
     await writeTasks(page, THREE);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const list = dayList(page, SUNDAY);
     const box = (await row(list, 'Call Sam at 3pm').locator('.tp-title > .tp-strike').boundingBox())!;
     const cdp = await page.context().newCDPSession(page);
@@ -240,7 +232,6 @@ test.describe('row menu', () => {
     await signInFresh(page);
     await expect(page.locator('html')).toHaveClass(/dark/);
     await writeTasks(page, ['Pay the electricity bill']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     await rightClick(dayList(page, SUNDAY), 'Pay the electricity bill');
     const m = menu(page, 'Pay the electricity bill');
     await expect(m).toBeVisible();

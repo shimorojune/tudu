@@ -124,7 +124,7 @@ test.describe('first run', () => {
     test.skip(!desktop(), 'tablet in E13, phone in E12');
     await newcomer(page);
     await expect(page.getByText('Welcome to Tudu.', { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Add a task' })).toBeVisible();
+    await expect(page.locator('.tp-empty').getByRole('button', { name: 'New task' })).toBeVisible();
     await seesNewCard(page);
     const box = (await card(page).boundingBox())!;
     expect(box.x + box.width).toBeGreaterThan(1440 - 40);

@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { API_URL } from './app';
+import { writeTasks } from './today';
 
 /** Go to the Backlog from wherever you are: the sidebar or the rail, or More then Backlog on phones. */
 export async function goBacklog(page: Page): Promise<void> {
@@ -41,17 +42,9 @@ export async function turnTo(page: Page, view: 'To do' | 'Crossed off'): Promise
   await sheet(page).getByRole('group', { name: 'View' }).getByRole('button', { name: view }).click();
 }
 
-/** Write tasks on the Backlog's writing line (opening it from the empty state goes through Quick Add). */
+/** Write tasks from the Backlog's writing line (or its empty state's New task): Quick Add on no day, once each. */
 export async function writeBacklog(page: Page, titles: string[]): Promise<void> {
-  const field = page.getByRole('textbox', { name: 'New task' });
-  const line = page.getByRole('button', { name: 'Add to the Backlog…' });
-  await expect(field.or(line).first()).toBeVisible();
-  if (!(await field.isVisible())) await line.click();
-  for (const t of titles) {
-    await field.fill(t);
-    await field.press('Enter');
-    await expect(page.getByText(t, { exact: true })).toBeVisible();
-  }
+  await writeTasks(page, titles, sheet(page), /^Add to .*Backlog…$/);
 }
 
 /** The titles the server has in the Backlog, in order, crossed-off ones marked. */

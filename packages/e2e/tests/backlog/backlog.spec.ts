@@ -55,7 +55,6 @@ async function backlogWithThree(page: Page): Promise<void> {
   await goBacklog(page);
   await quickAdd(page, THREE[0]!);
   await writeBacklog(page, THREE.slice(1));
-  await page.getByRole('textbox', { name: 'New task' }).press('Escape');
   await expect.poll(() => titlesOf(todoList(page))).toEqual(THREE);
 }
 
@@ -95,37 +94,24 @@ test.describe('backlog', () => {
     expect(await serverBacklog(page)).toEqual(THREE.map((t) => [t, false]));
   });
 
-  test('C06-E02 write on the last line and slot one in with the +; both have no day and survive a reload in order', async ({
+  test('NI-E02 "Add to the Backlog…" opens Quick Add on Backlog; the task lands last with no day and survives a reload', async ({
     page,
   }) => {
     await backlogWithThree(page);
     const last = row(todoList(page), 'Draft the Q4 hiring plan');
     await expect(last).toHaveClass(/tp-new/);
-    if (desktop()) {
-      await row(todoList(page), 'Clean up the old staging buckets').hover();
-      await row(todoList(page), 'Clean up the old staging buckets')
-        .getByRole('button', { name: 'Add a task here' })
-        .click();
-      const here = page.getByPlaceholder('Write a task here…');
-      await here.fill('Book car service');
-      await here.press('Enter');
-      await expect
-        .poll(() => titlesOf(todoList(page)))
-        .toEqual([
-          'Renew passport',
-          'Book car service',
-          'Clean up the old staging buckets',
-          'Draft the Q4 hiring plan',
-        ]);
-    }
+    await sheet(page).getByRole('button', { name: 'Add to the Backlog…' }).click();
+    const qa = bar(page);
+    await expect(qa.getByRole('button', { name: 'Planned for: Backlog' })).toBeVisible();
+    await qa.getByRole('textbox', { name: 'Task title' }).fill('Book car service');
+    await qa.getByRole('textbox', { name: 'Task title' }).press('Enter');
+    await expect(qa).toHaveCount(0, { timeout: 5000 });
+    await expect.poll(() => titlesOf(todoList(page))).toEqual([...THREE, 'Book car service']);
+    await expect(row(todoList(page), 'Book car service')).toHaveClass(/tp-new/);
+    await expect(page.getByRole('textbox', { name: 'New task' })).toHaveCount(0);
     await idle(page);
     await page.reload();
-    const want = desktop()
-      ? ['Renew passport', 'Book car service', 'Clean up the old staging buckets', 'Draft the Q4 hiring plan']
-      : THREE;
-    await expect.poll(() => titlesOf(todoList(page))).toEqual(want);
-    expect(await serverBacklog(page)).toEqual(want.map((t) => [t, false]));
-    expect(await serverTaskDay(page, 'ME-2')).toBeNull();
+    await expect.poll(() => titlesOf(todoList(page))).toEqual([...THREE, 'Book car service']);
   });
 
   test('C06-E03 give a task a day with its calendar button: Today first, then Tomorrow; the row folds away with Undo; Today has it', async ({
@@ -267,14 +253,18 @@ test.describe('backlog', () => {
     await expect(sheet(page).getByRole('button', { name: 'Add to the Backlog…' })).toHaveCount(0);
     await turnTo(page, 'To do');
 
-    // write into a project from its "+": saved without a day, in that project
+    // a project's "+" opens Quick Add on that project and no day: saved without a day, in that project
     await group(sheet(page), 'Platform').locator('.tp-gh').hover();
     await group(sheet(page), 'Platform').getByRole('button', { name: 'Add a task to Platform' }).click();
-    const line = group(sheet(page), 'Platform').getByRole('textbox', { name: 'New task' });
-    await expect(line).toBeFocused();
-    await line.fill('Rotate the deploy keys');
-    await line.press('Enter');
-    await line.press('Escape');
+    const qa = bar(page);
+    await expect(qa.getByRole('button', { name: 'Project: Platform' })).toBeVisible();
+    await expect(qa.getByRole('button', { name: 'Planned for: Backlog' })).toBeVisible();
+    await qa.getByRole('textbox', { name: 'Task title' }).fill('Rotate the deploy keys');
+    await qa.getByRole('textbox', { name: 'Task title' }).press('Enter');
+    await expect(qa).toHaveCount(0, { timeout: 5000 });
+    await expect(
+      group(sheet(page), 'Platform').getByText('Rotate the deploy keys', { exact: true }),
+    ).toBeVisible();
     await idle(page);
     const server = await serverList(page, made.spaceId, null);
     expect(server.find((t) => t.title === 'Rotate the deploy keys')!.projectId).toBe(made.projects.Platform);
@@ -439,7 +429,6 @@ test.describe('backlog', () => {
     await expect
       .poll(() => titlesOf(todoList(page)), { timeout: 10_000 })
       .toEqual([...THREE, 'From the second tab']);
-    await second.getByRole('textbox', { name: 'New task' }).press('Escape');
     await second.getByRole('checkbox', { name: 'Cross off: Renew passport' }).click();
     await expect
       .poll(() => titlesOf(todoList(page)), { timeout: 10_000 })
@@ -536,7 +525,7 @@ test.describe('backlog', () => {
     await expect(page.getByText('Nothing waiting.')).toBeVisible();
   });
 
-  test('C06-E14 empty: Nothing waiting with Add a task opening Quick Add; Nothing crossed off yet in the other view', async ({
+  test('C06-E14 empty: Nothing waiting with New task opening Quick Add; Nothing crossed off yet in the other view', async ({
     page,
   }) => {
     await signInFresh(page);
@@ -552,7 +541,7 @@ test.describe('backlog', () => {
     await expect(backlogCount(page)).toHaveText('Nothing crossed off');
     await expect(page.getByText('Nothing crossed off yet.')).toBeVisible();
     await turnTo(page, 'To do');
-    await page.getByRole('button', { name: 'Add a task' }).click();
+    await page.locator('.tp-empty').getByRole('button', { name: 'New task' }).click();
     const b = bar(page);
     await expect(b.getByRole('textbox', { name: 'Task title' })).toBeFocused();
     await expect(b.getByRole('button', { name: 'Planned for: Backlog' })).toBeVisible();

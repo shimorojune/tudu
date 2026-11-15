@@ -101,7 +101,6 @@ test.describe('quick-add', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, ['Pay the electricity bill']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const b = await openBar(page);
     if (test.info().project.name !== 'phone') {
       await expect(page.locator('.tp-qa-veil')).toBeVisible();
@@ -439,7 +438,6 @@ test.describe('quick-add', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, ['Written online']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     await idle(page);
     await context.setOffline(true);
     await expect(page.getByText('You’re offline.')).toBeVisible();
@@ -486,7 +484,6 @@ test.describe('quick-add', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, ['Review Quick Add PR']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     await row(dayList(page), 'Review Quick Add PR')
       .getByRole('button', { name: 'Review Quick Add PR' })
       .click();
@@ -539,7 +536,6 @@ test.describe('quick-add', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, ['Share the venue photos']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const panel = await openPanel(page, 'Share the venue photos');
     const notes = panel.getByRole('textbox', { name: 'Notes' });
     const input = panel.locator('.tp-rte-notes input[type=file]');
@@ -571,7 +567,6 @@ test.describe('quick-add', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, ['Fix the header']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const panel = await openPanel(page, 'Fix the header');
     const notes = panel.getByRole('textbox', { name: 'Notes' });
     await notes.click();
@@ -606,7 +601,6 @@ test.describe('quick-add', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, ['Fix the header']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const panel = await openPanel(page, 'Fix the header');
     const box = panel.getByRole('textbox', { name: 'Write a comment' });
     await box.click();
@@ -634,7 +628,6 @@ test.describe('quick-add', () => {
     test.skip(test.info().project.name === 'phone', 'dropping is a pointer thing');
     await signInFresh(page);
     await writeTasks(page, ['Expense the team lunch']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const panel = await openPanel(page, 'Expense the team lunch');
     const notes = panel.getByRole('textbox', { name: 'Notes' });
     await notes.click();
@@ -676,7 +669,6 @@ test.describe('quick-add', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, ['Fix the header']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const panel = await openPanel(page, 'Fix the header');
     const notes = panel.getByRole('textbox', { name: 'Notes' });
     await notes.click();
