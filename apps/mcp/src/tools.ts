@@ -1,5 +1,4 @@
 import type { McpServer } from 'skybridge/server';
-import { exactProject } from '@tudu/core';
 import { z } from 'zod';
 import { tuduFor, TuduError, type Access, type TaskRow, type Tudu } from './tudu';
 
@@ -156,7 +155,9 @@ const projectsIn = async (tudu: Tudu, spaceId: string) =>
 /** A project of the space by its name (any case). An unknown name fails with the space's names, so the model can retry. */
 async function projectNamed(tudu: Tudu, spaceId: string, name: string): Promise<ProjectRow> {
   const projects = await projectsIn(tudu, spaceId);
-  const p = exactProject(projects, name);
+  // The MCP image carries no workspace packages, so this matches the way core's exactProject does.
+  const q = name.trim().toLocaleLowerCase();
+  const p = projects.find((x) => x.name.trim().toLocaleLowerCase() === q);
   if (p) return p;
   throw new TuduError(
     400,
