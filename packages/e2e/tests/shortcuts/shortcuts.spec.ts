@@ -92,18 +92,19 @@ test.describe('SK shortcuts', () => {
     await ((await empty.isVisible()) ? empty : line.first()).click();
     const text = page.getByRole('textbox', { name: 'New task' });
     await text.fill('Buy stamps');
-    const typed = page.evaluate(
-      () =>
-        new Promise<string>((done) => {
-          const f = document.activeElement as HTMLInputElement | HTMLTextAreaElement;
-          window.addEventListener('keyup', () => done(f.value ?? f.textContent ?? ''), {
-            once: true,
-            capture: true,
-          });
-        }),
-    );
+    // Listen before the key goes down: an evaluate left running could attach after the keyup and wait forever.
+    await page.evaluate(() => {
+      const f = document.activeElement as HTMLInputElement | HTMLTextAreaElement;
+      const w = window as unknown as { __typed?: string };
+      window.addEventListener('keyup', () => (w.__typed = f.value ?? f.textContent ?? ''), {
+        once: true,
+        capture: true,
+      });
+    });
     await page.keyboard.press('Control+2');
-    expect(await typed).toBe('Buy stamps');
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { __typed?: string }).__typed))
+      .toBe('Buy stamps');
     await expect(page).toHaveURL(new RegExp(`/${nw.slug}$`));
   });
 
