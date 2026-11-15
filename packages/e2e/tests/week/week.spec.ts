@@ -680,9 +680,16 @@ test.describe('week, a drop on another day, with motion', () => {
     const body = tile(page, SUNDAY_TILE).locator('.tp-wd-body');
     // The week may still be arriving: wait for all twelve rows before asking whether the tile overflows.
     await expect(tileCount(page, SUNDAY_TILE)).toHaveText('12 tasks');
+    // Say the numbers when it fails: the tile's body overflows and starts at its top.
     await expect
-      .poll(() => body.evaluate((el) => el.scrollHeight > el.clientHeight && el.scrollTop === 0))
-      .toBe(true);
+      .poll(() =>
+        body.evaluate((el) => ({
+          overflows: el.scrollHeight > el.clientHeight,
+          top: el.scrollTop,
+          sizes: `${el.scrollHeight}/${el.clientHeight}`,
+        })),
+      )
+      .toMatchObject({ overflows: true, top: 0 });
     const edge = (await body.boundingBox())!;
     await carry(page, row(backlogList(page), 'Renew passport'), {
       x: edge.x + Math.min(120, edge.width / 2),

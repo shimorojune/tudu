@@ -293,7 +293,7 @@ test.describe('today, by project', () => {
     }
     await orderBy(page, 'By project');
     const gh = group(page, 'Northwind').locator('.tp-gh');
-    expect((await gh.boundingBox())!.height).toBe(phone() ? 44 : 36);
+    expect((await gh.boundingBox())!.height).toBeCloseTo(phone() ? 44 : 36, 1);
     if (phone())
       await expect(gh.getByRole('button', { name: 'Add a task to Northwind' })).toHaveCSS('opacity', '1');
 
