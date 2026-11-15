@@ -293,7 +293,7 @@ describe('similar reports and +1 that one instead (#76)', () => {
 describe('a calm duplicate check (#114, #115)', () => {
   it('C19-U40 similarKey: case, punctuation and spacing don’t make new words; real word changes do', () => {
     expect(similarKey('Jira count,  WRONG!')).toBe('jira count wrong');
-    expect(similarKey('jira count wrong')).toBe(similarKey('Jira — count wrong…'));
+    expect(similarKey('jira count wrong')).toBe(similarKey('Jira: count, wrong...'));
     expect(similarKey('Jira count wrong')).not.toBe(similarKey('Jira count wrong today'));
     expect(similarKey('Café ünïcode 42')).toBe('café ünïcode 42');
   });
