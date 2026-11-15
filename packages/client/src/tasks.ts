@@ -782,6 +782,7 @@ export class TaskStore {
       note?: string;
       askedDay: IsoDate | null;
       due?: IsoDate | null;
+      dueAt?: string | null;
       projectId?: string | null;
       attachments?: string[];
     },
@@ -796,6 +797,7 @@ export class TaskStore {
     };
     if (task.note?.trim()) payload.note = task.note.trim();
     if (task.due !== undefined) payload.due = task.due;
+    if (task.due && task.dueAt) payload.dueAt = task.dueAt;
     if (task.projectId !== undefined) payload.projectId = task.projectId;
     if (task.attachments?.length) payload.attachments = task.attachments;
     this.mutate({ type: 'request.send', payload });

@@ -11,6 +11,7 @@ import { taskStore } from '../../app/tasks';
 import { meQuery, refreshMe } from '../../app/session';
 import { lastSpace, spaceBySlug } from '../../app/space';
 import { WorkingDayProvider } from '../../app/workingDay';
+import { timeWords } from '../../app/times';
 import './quick-add.css';
 
 /**
@@ -84,6 +85,7 @@ export function QuickAddPage({ me }: { me: MeResponse }) {
     <Desk theme={theme} className="app-floating">
       <div className="app-floating-bar" onPointerDown={away}>
         <QuickAdd
+          timeWords={timeWords}
           open
           layer="none"
           today={a.today}
@@ -108,6 +110,7 @@ export function QuickAddPage({ me }: { me: MeResponse }) {
                 note: t.note,
                 askedDay: t.planned,
                 due: t.due,
+                dueAt: t.dueAt,
                 projectId: t.projectId,
                 attachments: t.attachments,
               });
@@ -137,7 +140,7 @@ export function QuickAddPage({ me }: { me: MeResponse }) {
 
 const DRAFT_KEY = 'tudu.floating.draft';
 
-type KeptDraft = Pick<QuickAddDraft, 'title' | 'planned' | 'due' | 'projectId' | 'note'>;
+type KeptDraft = Pick<QuickAddDraft, 'title' | 'planned' | 'due' | 'until' | 'time' | 'dueAt' | 'projectId' | 'note'>;
 
 /** The floating bar's draft as it was left (files are not kept: they live on the server only once added). */
 export function readDraft(today: string): Partial<KeptDraft> | undefined {
