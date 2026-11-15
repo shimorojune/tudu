@@ -826,17 +826,19 @@ test.describe('already reported? (#76)', () => {
     // Hold the next answer: the rows stay exactly as they are, nothing dims or shimmers.
     let release!: () => void;
     const held = new Promise<void>((r) => (release = r));
+    // Not unrouted: a handler still waiting when it is removed can't hand the request on.
     await page.route('**/api/feedback/similar**', async (route) => {
       await held;
-      await route.continue();
+      await route.fallback();
     });
     await words(f).fill(`Quick Add loses my project after a reload ${n} on the Mac`);
     await expect.poll(() => looks.length, { timeout: 5_000 }).toBe(asked + 1);
     await expect(plus).toBeVisible();
     await expect(f.getByRole('list', { name: 'Similar reports' })).not.toHaveClass(/tp-stale/);
     await expect(f.locator('.tp-sim-skel')).toHaveCount(0);
+    const answered = lookDone(page);
     release();
-    await page.unroute('**/api/feedback/similar**');
+    await answered;
     await words(f).fill(`quick add loses my project, after a reload ${n} on the mac!`);
     await page.waitForTimeout(1_500);
     expect(looks.length).toBe(asked + 1);
