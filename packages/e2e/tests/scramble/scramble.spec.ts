@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
+import { API_URL, expect, signInFresh, test, newTaskButton } from '../../fixtures/app';
 import { box, openSearch, panel } from '../../fixtures/search';
 import { createSpace, goPeople, me, switcher } from '../../fixtures/spaces';
 import { dayList, fixClock, idle, row, rowsOf } from '../../fixtures/today';
@@ -112,7 +112,7 @@ test.describe('Scramble my text', () => {
 
     await noSentinel(page, 'Today');
     // Tudu's own words stay readable.
-    await expect(page.getByRole('button', { name: 'New task' })).toBeVisible();
+    await expect(newTaskButton(page)).toBeVisible();
     await expect(pill(page)).toBeVisible();
 
     // The task panel: its title, project, comment and who wrote it.

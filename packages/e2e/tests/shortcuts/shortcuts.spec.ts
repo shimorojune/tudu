@@ -1,8 +1,7 @@
 import type { Page } from '@playwright/test';
-import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
+import { API_URL, expect, signInFresh, test, newTaskButton } from '../../fixtures/app';
 import { openSearch } from '../../fixtures/search';
 import { openSwitcher, switcher } from '../../fixtures/spaces';
-import { dayList, row, writeTasks } from '../../fixtures/today';
 
 /**
  * Settings › Shortcuts and the space keys (#60, #57; docs/plans/shortcuts.md, SK-E). The browser says it is a Mac,
@@ -82,16 +81,30 @@ test.describe('SK shortcuts', () => {
     await expect(page).toHaveURL(/\/me$/);
   });
 
-  test('SK-E03 typing in a text field (a task’s title in its panel), ⌃2 switches and leaves no character in the field', async ({
+  test('SK-E03 typing in a text field (a note’s title on the Notebook page), ⌃2 switches and leaves no character in the field', async ({
     page,
   }) => {
     test.skip(project() !== 'desktop', 'the desk’s keyboard');
     const { nw } = await threeSpaces(page);
-    await writeTasks(page, ['Buy milk']);
-    await row(dayList(page), 'Buy milk').getByRole('button', { name: 'Buy milk' }).click();
-    const text = page
-      .getByRole('dialog', { name: 'Task details' })
-      .getByRole('textbox', { name: 'Task title' });
+    // The writing line opens Quick Add now, and a task's panel is a layer the keys wait under: a note's title is the
+    // page's own text field.
+    const id = crypto.randomUUID();
+    const res = await page.request.post(`${API_URL}/api/sync`, {
+      data: {
+        clientId: 'seed',
+        mutations: [
+          {
+            id: crypto.randomUUID(),
+            at: new Date().toISOString(),
+            type: 'note.create',
+            payload: { id, folderId: null, title: 'Buy milk', html: '' },
+          },
+        ],
+      },
+    });
+    expect(res.status()).toBe(200);
+    await page.goto(`/notebook/${id}`);
+    const text = page.getByRole('textbox', { name: 'Note title' });
     await expect(text).toHaveValue('Buy milk');
     await text.fill('Buy stamps');
     // Listen before the key goes down: an evaluate left running could attach after the keyup and wait forever.
@@ -113,7 +126,7 @@ test.describe('SK shortcuts', () => {
   test('SK-E04 with Quick Add, Search or Settings open, ⌃2 does nothing', async ({ page }) => {
     test.skip(project() !== 'desktop', 'the desk’s keyboard');
     await threeSpaces(page);
-    await page.getByRole('button', { name: 'New task' }).first().click();
+    await newTaskButton(page).click();
     const qa = page.getByRole('dialog', { name: 'New task' });
     await expect(qa).toBeVisible();
     await page.keyboard.press('Control+2');

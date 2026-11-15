@@ -1,4 +1,4 @@
-import { expect, signInFresh, test } from '../../fixtures/app';
+import { expect, signInFresh, test, newTaskButton } from '../../fixtures/app';
 import { goBacklog } from '../../fixtures/backlog';
 import { expectSheetWidth } from '../../fixtures/layout';
 
@@ -15,7 +15,7 @@ test.describe('the shell', () => {
       await expect(page.locator('.tp-tb-inbox')).toBeVisible();
       await expect(nav.getByText('Personal')).toBeVisible();
       await expect(page.getByRole('button', { name: 'Collapse sidebar' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'New task' })).toBeVisible();
+      await expect(newTaskButton(page)).toBeVisible();
       await expect(page.getByRole('button', { name: 'Search tasks' })).toBeVisible();
       await page.getByRole('button', { name: 'Collapse sidebar' }).click();
       await expect(nav).toHaveClass(/tp-rail/);
@@ -24,13 +24,13 @@ test.describe('the shell', () => {
       await expect(page.getByRole('navigation', { name: 'Main' })).toHaveClass(/tp-rail/);
     } else if (vp === 'tablet') {
       await expect(page.getByRole('navigation', { name: 'Main' })).toHaveClass(/tp-rail/);
-      await expect(page.getByRole('button', { name: 'New task' })).toBeVisible();
+      await expect(newTaskButton(page)).toBeVisible();
       await expect(page.getByRole('button', { name: 'Collapse sidebar' })).toHaveCount(0);
     } else {
       const tabs = page.getByRole('navigation', { name: 'Main' });
       for (const item of ['Today', 'Week', 'Search', 'More'])
         await expect(tabs.getByRole('button', { name: item })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'New task' })).toBeVisible();
+      await expect(newTaskButton(page)).toBeVisible();
       await expect(page.locator('.tp-sidebar')).toHaveCount(0);
     }
     await expect(

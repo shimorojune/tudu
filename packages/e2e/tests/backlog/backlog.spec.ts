@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
+import { API_URL, expect, signInFresh, test, newTaskButton } from '../../fixtures/app';
 import {
   backlogCount,
   doneList,
@@ -39,7 +39,7 @@ function panel(page: Page): Locator {
 
 /** Open Quick Add, write a title, change what `more` says, add. */
 async function quickAdd(page: Page, title: string, more?: (b: Locator) => Promise<void>): Promise<void> {
-  await page.getByRole('button', { name: 'New task' }).first().click();
+  await newTaskButton(page).click();
   const b = bar(page);
   const field = b.getByRole('textbox', { name: 'Task title' });
   await expect(field).toBeFocused();
@@ -377,7 +377,7 @@ test.describe('backlog', () => {
     await expect(page).toHaveURL(/\/backlog$/);
     await expect(sheet(page).locator('.tp-dh')).toHaveClass(/tp-compact/);
     await expect(page.getByRole('button', { name: 'More' })).toHaveAttribute('aria-current', 'page');
-    await page.getByRole('button', { name: 'New task' }).click();
+    await newTaskButton(page).click();
     const b = bar(page);
     await b.getByRole('textbox', { name: 'Task title' }).fill('Renew passport');
     await expect(b.getByRole('button', { name: 'Planned for: Backlog' })).toBeVisible();

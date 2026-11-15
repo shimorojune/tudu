@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
+import { API_URL, expect, signInFresh, test, newTaskButton } from '../../fixtures/app';
 import { dayList, fixClock, idle, row, writeTasks } from '../../fixtures/today';
 
 /** Times on Planned and Due, and Planned over several days (docs/plans/task-times.md). */
@@ -137,7 +137,7 @@ test.describe('times', () => {
   test('TT-E07 Quick Add with a Planned time and a Due time makes the task with both', async ({ page }) => {
     await page.clock.setFixedTime(new Date(2026, 9, 18, 14, 10));
     await signInFresh(page);
-    await page.getByRole('button', { name: 'New task' }).first().click();
+    await newTaskButton(page).click();
     const b = page.getByRole('dialog', { name: 'Quick Add' });
     await b.getByRole('textbox', { name: 'Task title' }).fill('Book the room');
     await b.getByRole('button', { name: /^Planned for:/ }).click();

@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
+import { API_URL, expect, signInFresh, test, newTaskButton } from '../../fixtures/app';
 import {
   backlogBeside,
   besideList,
@@ -315,7 +315,7 @@ test.describe('today, the Backlog beside', () => {
     await idle(page);
     expect(await serverDay(page, 'ME-3')).toBeNull();
     // the top bar's New task still follows the day shown
-    await page.getByRole('button', { name: 'New task' }).first().click();
+    await newTaskButton(page).click();
     await expect(qa.getByRole('button', { name: 'Planned for: Today' })).toBeVisible();
   });
 

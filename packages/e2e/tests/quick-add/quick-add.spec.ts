@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
+import { API_URL, expect, signInFresh, test, newTaskButton } from '../../fixtures/app';
 import { goInbox, pane, rows, section } from '../../fixtures/inbox';
 import { createSpace, joinLink, secondPerson, switchTo } from '../../fixtures/spaces';
 import {
@@ -21,7 +21,7 @@ function bar(page: Page): Locator {
 
 /** Open Quick Add from New task (the round button on phones) and wait for the line. */
 async function openBar(page: Page): Promise<Locator> {
-  await page.getByRole('button', { name: 'New task' }).first().click();
+  await newTaskButton(page).click();
   const b = bar(page);
   await expect(b.getByRole('textbox', { name: 'Task title' })).toBeFocused();
   return b;
@@ -388,7 +388,7 @@ test.describe('quick-add', () => {
   test('C04-E10 phone: the round button opens the sheet; add a task; it is on today', async ({ page }) => {
     test.skip(test.info().project.name !== 'phone', 'the sheet is the phone’s');
     await signInFresh(page);
-    await page.getByRole('button', { name: 'New task' }).click();
+    await newTaskButton(page).click();
     const b = bar(page);
     await expect(b).toHaveClass(/tp-qa-phone/);
     await expect(page.locator('.tp-qa-layer')).toHaveClass(/tp-qa-layer-sheet/);
@@ -747,7 +747,7 @@ test.describe('quick-add', () => {
     await other.page.goto(await joinLink(page, other.email));
     await other.page.getByRole('button', { name: 'Join Northwind' }).click();
     await expect(other.page).toHaveURL(new RegExp(`/${slug}$`), { timeout: 10_000 });
-    await page.getByRole('button', { name: 'New task' }).first().click();
+    await newTaskButton(page).click();
     const qa = page.getByRole('dialog', { name: 'New task' });
     await qa.getByRole('textbox', { name: 'Task title' }).fill('Get the visitor pass');
     await qa.getByRole('button', { name: 'Who it’s for' }).click();
@@ -816,7 +816,7 @@ test.describe('quick-add', () => {
     await signInFresh(page);
     await createSpace(page, 'Northwind');
     await switchTo(page, 'Personal');
-    await page.getByRole('button', { name: 'New task' }).first().click();
+    await newTaskButton(page).click();
     const b = page.getByRole('dialog', { name: 'New task' });
     await expect(b.locator('.tp-qa-toline')).toHaveText(/^In.*Personal.*for.*Me$/);
     await b.getByRole('button', { name: 'Space: Personal' }).click();

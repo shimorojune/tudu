@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
+import { API_URL, expect, signInFresh, test, newTaskButton } from '../../fixtures/app';
 import { expectFoldsShut, expectGlides, expectLands, sampleBoxes } from '../../fixtures/motion';
 import { pick, rightClick } from '../../fixtures/rowMenu';
 import {
@@ -40,7 +40,7 @@ function bar(page: Page): Locator {
 
 /** Open Quick Add, write a title, change what `more` says, add. */
 async function quickAdd(page: Page, title: string, more?: (b: Locator) => Promise<void>): Promise<void> {
-  await page.getByRole('button', { name: 'New task' }).first().click();
+  await newTaskButton(page).click();
   const b = bar(page);
   const field = b.getByRole('textbox', { name: 'Task title' });
   await expect(field).toBeFocused();

@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
+import { API_URL, expect, signInFresh, test, newTaskButton } from '../../fixtures/app';
 import { doneList, todoList } from '../../fixtures/backlog';
 import { box, hit, hitTitles, openSearch, options, panel, search } from '../../fixtures/search';
 import { dayList, fixClock, idle, row, titlesOf } from '../../fixtures/today';
@@ -297,7 +297,7 @@ test.describe('search', () => {
     page,
   }) => {
     await start(page);
-    await page.getByRole('button', { name: 'New task' }).first().click();
+    await newTaskButton(page).click();
     const bar = page.getByRole('dialog', { name: 'Quick Add' });
     const line = bar.getByRole('textbox', { name: 'Task title' });
     await expect(line).toBeFocused();
@@ -331,7 +331,7 @@ test.describe('search', () => {
     await expect(bar).toHaveCount(0);
     await expect(heading(page)).toHaveText('Sunday');
     await expect(glowing(dayList(page))).toContainText('Sync with Meera on onboarding copy');
-    await page.getByRole('button', { name: 'New task' }).first().click();
+    await newTaskButton(page).click();
     await expect(line).toHaveValue('Sync with Meera about the onboarding copy');
   });
 

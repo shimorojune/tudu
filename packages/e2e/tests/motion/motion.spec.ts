@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
+import { API_URL, expect, signInFresh, test, newTaskButton } from '../../fixtures/app';
 import { goBacklog } from '../../fixtures/backlog';
 import { expectFolds, sampleHeights } from '../../fixtures/motion';
 import { fixClock, quickAdd, writeTasks } from '../../fixtures/today';
@@ -20,7 +20,17 @@ async function inTheme(page: Page, theme: (typeof THEMES)[number]) {
 async function expectLineStill(page: Page, sheet: Locator, label: string) {
   const text = sheet.locator('.tp-addtask .tp-addtask-btn').first();
   await expect(text).toHaveText(label);
-  const before = await text.boundingBox();
+  // The page may still be arriving (its turn-in): measure once the line has come to rest.
+  let before = await text.boundingBox();
+  await expect
+    .poll(async () => {
+      await page.waitForTimeout(150);
+      const now = await text.boundingBox();
+      const still = JSON.stringify(now) === JSON.stringify(before);
+      before = now;
+      return still;
+    })
+    .toBe(true);
   await text.click();
   const qa = quickAdd(page);
   await expect(qa.getByRole('textbox', { name: 'Task title' })).toBeFocused();
@@ -90,7 +100,7 @@ async function seedLookAlikes(page: Page) {
 async function lookAlikesShown(page: Page) {
   await signInFresh(page);
   await seedLookAlikes(page);
-  await page.getByRole('button', { name: 'New task' }).first().click();
+  await newTaskButton(page).click();
   const bar = page.getByRole('dialog', { name: 'Quick Add' });
   const line = bar.getByRole('textbox', { name: 'Task title' });
   await expect(line).toBeFocused();

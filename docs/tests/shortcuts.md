@@ -41,7 +41,7 @@ tests run on PR CI (and Actions › Flake check for repeats), not on Rohit's Mac
 | ------ | ------------------------------------------------------------------------------------------------------------ |
 | SK-E01 | Personal plus two team spaces: ⌃0 opens All spaces, ⌃2 the second team space, ⌃1 Personal, on Week each time |
 | SK-E02 | On People in a team space, ⌃1 (Personal) lands on Today                                                      |
-| SK-E03 | Typing in the writing line, ⌃2 switches and leaves no character in the field                                 |
+| SK-E03 | Typing in a note’s title on the Notebook page, ⌃2 switches and leaves no character in the field              |
 | SK-E04 | With Quick Add, Search or Settings open, ⌃2 does nothing                                                     |
 | SK-E05 | Settings › Shortcuts: set All spaces to ⌥⌘0, it works after a reload; the back arrow restores ⌃0             |
 | SK-E06 | Refusals: a bare letter, ⌘Q, a digit under the space keys; each shows its line and keeps listening           |

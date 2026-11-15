@@ -1,11 +1,11 @@
 import type { Locator, Page } from '@playwright/test';
-import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
+import { API_URL, expect, signInFresh, test, newTaskButton } from '../../fixtures/app';
 import { seedProjects } from '../../fixtures/groups';
 import { dayList, fixClock, idle, row, titlesOf } from '../../fixtures/today';
 
 /** The bar (or the sheet on phones), opened from New task with the cursor in the title. */
 async function openBar(page: Page): Promise<Locator> {
-  await page.getByRole('button', { name: 'New task' }).first().click();
+  await newTaskButton(page).click();
   const b = page.getByRole('dialog', { name: 'Quick Add' });
   await expect(b.getByRole('textbox', { name: 'Task title' })).toBeFocused();
   return b;

@@ -1,5 +1,14 @@
 import type { Browser, Page } from '@playwright/test';
-import { API_URL, codeFor, enterCode, expect, freshEmail, signInFresh, test } from '../../fixtures/app';
+import {
+  API_URL,
+  codeFor,
+  enterCode,
+  expect,
+  freshEmail,
+  signInFresh,
+  test,
+  newTaskButton,
+} from '../../fixtures/app';
 import { goodToken, JIRA_SITE } from '../../fixtures/jira';
 import { createSpace, joinLink, me } from '../../fixtures/spaces';
 import { dayList, fixClock, idle, writeTasks } from '../../fixtures/today';
@@ -361,7 +370,7 @@ test.describe('first run', () => {
     const title = card(page).getByRole('button', { name: /^Getting started/ });
     await expect(title).toHaveAttribute('aria-expanded', 'false');
     await expect(card(page)).toHaveClass(/tp-gs-phone/);
-    const fab = (await page.getByRole('button', { name: 'New task' }).boundingBox())!;
+    const fab = (await newTaskButton(page).boundingBox())!;
     const box = (await card(page).boundingBox())!;
     expect(box.x + box.width).toBeLessThan(fab.x);
     await title.click();

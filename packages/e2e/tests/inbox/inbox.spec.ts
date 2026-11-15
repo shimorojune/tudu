@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
+import { API_URL, expect, signInFresh, test, newTaskButton } from '../../fixtures/app';
 import {
   goInbox,
   inboxCount,
@@ -40,7 +40,7 @@ async function team(page: Page, browser: Parameters<typeof secondPerson>[0]) {
   return { slug, space, b, aId: mine.userId, bId: (await me(b.page)).userId };
 }
 
-const newTask = (page: Page) => page.getByRole('button', { name: 'New task' }).first();
+const newTask = (page: Page) => newTaskButton(page);
 const bar = (page: Page) => page.getByRole('dialog', { name: 'New task' });
 
 test.describe('inbox', () => {
