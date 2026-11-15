@@ -53,7 +53,6 @@ test.describe('detail', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, THREE);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const p = await openTask(page, 'Review Quick Add PR');
     await expect(page).toHaveURL(/\?task=ME-2$/);
     await expect(p.getByRole('button', { name: 'Copy link to ME-2' })).toBeVisible();
@@ -79,7 +78,6 @@ test.describe('detail', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, ['Reply to legal']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const p = await openTask(page, 'Reply to legal');
     await p.getByRole('button', { name: 'Due', exact: true }).click();
     const pop = p.locator('.tp-td-pop');
@@ -102,7 +100,6 @@ test.describe('detail', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, ['Pay the electricity bill', 'Dentist at 4pm']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const p = await openTask(page, 'Dentist at 4pm');
     await p.getByRole('button', { name: 'Planned', exact: true }).click();
     await p.locator('.tp-td-pop').getByRole('button', { name: 'Tomorrow' }).click();
@@ -128,7 +125,6 @@ test.describe('detail', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, ['Review Quick Add PR']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const p = await openTask(page, 'Review Quick Add PR');
     const notes = p.getByRole('textbox', { name: 'Notes' });
     await notes.click();
@@ -162,7 +158,6 @@ test.describe('detail', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, ['Plan the offsite']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const p = await openTask(page, 'Plan the offsite');
     const notes = p.getByRole('textbox', { name: 'Notes' });
     await notes.click();
@@ -203,7 +198,6 @@ test.describe('detail', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, ['Plan the offsite']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const p = await openTask(page, 'Plan the offsite');
     const box = p.getByRole('textbox', { name: 'Write a comment' });
     await box.click();
@@ -228,7 +222,6 @@ test.describe('detail', () => {
   test('C03-E05 subtasks in the panel and the fold on the row', async ({ page }) => {
     await signInFresh(page);
     await writeTasks(page, ['Review Quick Add PR']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const p = await openTask(page, 'Review Quick Add PR');
     await p.getByRole('button', { name: 'Add subtask' }).click();
     const field = p.getByRole('textbox', { name: 'New subtask' });
@@ -268,7 +261,6 @@ test.describe('detail', () => {
   test('C03-E06 add a comment; it appears with the wash; edit it; delete it and Undo', async ({ page }) => {
     await signInFresh(page);
     await writeTasks(page, ['Review Quick Add PR']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const p = await openTask(page, 'Review Quick Add PR');
     await p.getByRole('textbox', { name: 'Write a comment' }).click();
     await page.keyboard.type('Will review tomorrow morning.');
@@ -311,7 +303,6 @@ test.describe('detail', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, THREE);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const p = await openTask(page, 'Review Quick Add PR');
     await p.getByRole('button', { name: 'More', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Delete task' }).click();
@@ -344,7 +335,6 @@ test.describe('detail', () => {
     test.skip(test.info().project.name === 'phone', 'the phone page has its own back control');
     await signInFresh(page);
     await writeTasks(page, THREE);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const p = await openTask(page, 'Pay the electricity bill');
     await expect(p.getByRole('button', { name: 'Previous task' })).toHaveCount(0);
     await p.getByRole('button', { name: 'Next task' }).click();
@@ -368,7 +358,6 @@ test.describe('detail', () => {
   test('C03-E09 History lists Created, Due date set and Moved', async ({ page }) => {
     await signInFresh(page);
     await writeTasks(page, ['Dentist at 4pm']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const p = await openTask(page, 'Dentist at 4pm');
     await p.getByRole('button', { name: 'Due', exact: true }).click();
     await p
@@ -394,7 +383,6 @@ test.describe('detail', () => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
     await signInFresh(page);
     await writeTasks(page, ['Pay the electricity bill']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     await openTask(page, 'Pay the electricity bill');
     await idle(page);
     await page.reload();
@@ -426,7 +414,6 @@ test.describe('detail', () => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
     await signInFresh(page);
     await writeTasks(page, ['Pay the electricity bill']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     await openTask(page, 'Pay the electricity bill');
     const origin = new URL(page.url()).origin;
     const chip = panel(page).getByRole('button', { name: 'Copy link to ME-1' });
@@ -452,7 +439,6 @@ test.describe('detail', () => {
     });
     await signInFresh(page);
     await writeTasks(page, ['Pay the electricity bill']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     await openTask(page, 'Pay the electricity bill');
     const chip = panel(page).getByRole('button', { name: 'Copy link to ME-1' });
     await chip.click();
@@ -469,7 +455,6 @@ test.describe('detail', () => {
     test.skip(test.info().project.name !== 'phone', 'the phone page');
     await signInFresh(page);
     await writeTasks(page, ['Review Quick Add PR']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const p = await openTask(page, 'Review Quick Add PR');
     await expect(page.locator('.tp-drawer-wrap')).toHaveClass(/tp-full/);
     await expect(p.getByRole('button', { name: 'Close' })).toHaveCount(0);
@@ -493,7 +478,6 @@ test.describe('detail', () => {
     test.skip(test.info().project.name !== 'desktop', 'two days is the desk’s');
     await signInFresh(page);
     await writeTasks(page, ['Pay the electricity bill']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     await page.getByRole('button', { name: '2 days' }).click();
     // wait for the second page to finish sliding out before measuring
     await expect(page.locator(SECOND_DAY_PAGE)).toHaveClass(/tp-on/);
@@ -514,7 +498,6 @@ test.describe('detail', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, ['Reply to legal']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const p = await openTask(page, 'Reply to legal');
     await idle(page);
     await context.setOffline(true);
@@ -543,7 +526,6 @@ test.describe('detail', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, ['Reply to legal']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const p = await openTask(page, 'Reply to legal');
     await idle(page);
     const second = await context.newPage();
@@ -573,7 +555,6 @@ test.describe('detail', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, ['Pay the electricity bill', 'Call the bank']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     await idle(page);
     let release!: () => void;
     const held = new Promise<void>((r) => (release = r));
@@ -609,7 +590,6 @@ test.describe('detail', () => {
     await signInFresh(page);
     await expect(page.locator('html')).toHaveClass(/dark/);
     await writeTasks(page, ['Review Quick Add PR']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const p = await openTask(page, 'Review Quick Add PR');
     const title = p.getByRole('textbox', { name: 'Task title' });
     await title.fill('Review Quick Add PR tonight');
@@ -634,7 +614,6 @@ test.describe('detail', () => {
   }) => {
     await signInFresh(page);
     await writeTasks(page, ['Reply to legal']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const p = await openTask(page, 'Reply to legal');
     const due = row(dayList(page), 'Reply to legal').locator('.tp-sg-due');
     const pick = async (day: string) => {
@@ -675,7 +654,6 @@ test.describe('detail, the day turns', () => {
     await page.clock.install({ time: new Date(2026, 9, 18, 23, 59, 0) });
     await signInFresh(page);
     await writeTasks(page, ['Call the bank']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     const p = await openTask(page, 'Call the bank');
     await p.getByRole('button', { name: 'Due', exact: true }).click();
     await p

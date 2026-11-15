@@ -1,4 +1,3 @@
-import { NO_PROJECT } from '@tudu/core';
 import { useEffect, useRef, useState } from 'react';
 import { cx } from '../lib/cx';
 import { useTurn } from '../lib/hooks';
@@ -84,31 +83,17 @@ export interface TaskGroupItem {
 
 export interface TaskGroupsProps extends Omit<
   TaskListProps,
-  | 'tasks'
-  | 'label'
-  | 'onAdd'
-  | 'onReorder'
-  | 'filter'
-  | 'filterSpace'
-  | 'group'
-  | 'onReceive'
-  | 'locked'
-  | 'brief'
+  'tasks' | 'label' | 'onReorder' | 'filter' | 'filterSpace' | 'group' | 'onReceive' | 'locked' | 'brief'
 > {
   /** The page's tasks by project, in the order to show them (No project last). */
   groups: TaskGroupItem[];
   /** Keys of the folded groups. */
   folded?: string[];
   onFold?: (group: string, folded: boolean) => void;
-  /**
-   * A task written into a group: on its own line (the header's "+"), slotted in above `before`, or, for NO_PROJECT,
-   * on the page's last line. Return the new row's key so it opens its gap with the new-task wash.
-   */
-  onAdd?: (text: string, group: string, before?: string) => string | void;
+  /** A header's "+": open Quick Add set to that group's project (NO_PROJECT: none). The task arrives via `flashKey`. */
+  onGroupAdd?: (group: string, item: TaskGroupItem) => void;
   /** A row moved inside its group (drag, or Alt with an arrow key): `from` and `to` are places in that group. */
   onReorder?: (group: string, moved: TaskMove) => void;
-  /** The words on a project's own writing line. "Add to Platform…" by default. */
-  groupAddLabel?: (name: string) => string;
 }
 
 const EXIT_MS = 400;
@@ -117,37 +102,25 @@ const bare = (g: TaskGroupItem): TaskGroupItem => ({ key: g.key, name: g.name, c
 /**
  * A page's tasks under their projects ("By project"): a GroupHeader and a TaskList per group. Fold a group from its
  * header; rows reorder inside their group only (a task changes project in its panel, and day with its calendar
- * button). One writing line closes the page and writes to No project; a header's "+" opens a line of the project's
- * own with the cursor in it. There are never two lines together: No project's "+" puts the cursor in the page's
- * line, and that line makes way while the last project's own line is open. A group that loses its last task folds
- * away; one that gains its first fades in.
+ * button). One writing line closes the page and a header's "+" opens Quick Add on that project; nothing here is a
+ * text field. A group that loses its last task folds away; one that gains its first fades in.
  */
 export function TaskGroups({
   groups,
   folded = [],
   onFold,
-  onAdd,
+  onGroupAdd,
   onReorder,
-  groupAddLabel = (name) => `Add to ${name}…`,
   addLabel,
-  addKey,
-  onAddClose,
+  onAddOpen,
   resetKey,
   flashKey,
   compact,
   ...list
 }: TaskGroupsProps) {
   const mine = useMine();
-  // The project whose own writing line is open, and a counter that opens the page's line.
-  const [line, setLine] = useState<string | null>(null);
-  const [endBump, setEndBump] = useState(0);
-  const [endOpen, setEndOpen] = useState(false);
-  const [wrote, setWrote] = useState<string | undefined>(undefined);
   const [seenReset, setSeenReset] = useState(resetKey);
-  if (resetKey !== seenReset) {
-    setSeenReset(resetKey);
-    setLine(null);
-  }
+  if (resetKey !== seenReset) setSeenReset(resetKey);
 
   // Groups that just lost their last task stay a moment as a bare header and fold away; new ones fade in.
   const sig = groups.map((g) => g.key).join('|');
@@ -165,33 +138,12 @@ export function TaskGroups({
     const turned = resetKey !== seenReset;
     setGone(turned ? [] : [...gone.filter((g) => !now.has(g.item.key)), ...left]);
     setFresh(turned ? [] : groups.filter((g) => !before.has(g.key)).map((g) => g.key));
-    if (line && !now.has(line)) setLine(null);
   }
   useEffect(() => {
     if (!gone.length) return;
     const t = setTimeout(() => setGone([]), EXIT_MS);
     return () => clearTimeout(t);
   }, [gone]);
-
-  // A line opened on a folded group: the cursor goes in once the group has opened (a folded body is inert, so the
-  // field's own autofocus is lost).
-  const root = useRef<HTMLDivElement | null>(null);
-  const lineShut = !!line && folded.includes(line);
-  useEffect(() => {
-    if (!line || lineShut) return;
-    // The body may still read as hidden for a frame or two after the fold flips; keep trying until the field takes it.
-    let frame = 0;
-    let tries = 0;
-    const take = () => {
-      const field = root.current?.querySelector<HTMLElement>(
-        `section[data-group="${CSS.escape(line)}"] .tp-addtask-input`,
-      );
-      if (field && document.activeElement !== field) field.focus({ preventScroll: true });
-      if (document.activeElement !== field && tries++ < 12) frame = requestAnimationFrame(take);
-    };
-    take();
-    return () => cancelAnimationFrame(frame);
-  }, [line, lineShut]);
 
   // Showing a task that sits in a folded group opens the group first.
   const locate = list.locateKey;
@@ -205,27 +157,20 @@ export function TaskGroups({
     if (folded.includes(g.key)) onFold?.(g.key, false);
   }, [locate, groups, folded, onFold]);
 
-  const last = groups[groups.length - 1];
-  const lineIsLast = !!line && !!last && last.key === line && line !== NO_PROJECT;
   const all: { item: TaskGroupItem; out: boolean }[] = groups.map((item) => ({ item, out: false }));
   for (const g of gone) {
     const at = g.after ? all.findIndex((x) => x.item.key === g.after) + 1 : 0;
     all.splice(at, 0, { item: g.item, out: true });
   }
 
-  function openLine(key: string) {
-    if (key === NO_PROJECT) {
-      setLine(null);
-      setEndOpen(true);
-      setEndBump((n) => n + 1);
-      return;
-    }
-    if (folded.includes(key)) onFold?.(key, false);
-    setLine(key);
+  function addTo(g: TaskGroupItem) {
+    // The new task lands in this group: a folded one opens so its arrival shows.
+    if (folded.includes(g.key)) onFold?.(g.key, false);
+    onGroupAdd?.(g.key, g);
   }
 
   return (
-    <div ref={root} className={cx('tp-root tp-groups', compact && 'tp-compact')}>
+    <div className={cx('tp-root tp-groups', compact && 'tp-compact')}>
       {all.map(({ item: g, out }) => {
         const shut = folded.includes(g.key);
         const left = g.tasks.filter((t) => !t.done).length;
@@ -242,7 +187,7 @@ export function TaskGroups({
               folded={shut}
               compact={compact}
               onFold={out ? undefined : (v) => onFold?.(g.key, v)}
-              onAdd={onAdd && !out ? () => openLine(g.key) : undefined}
+              onAdd={onGroupAdd && !out ? () => addTo(g) : undefined}
             />
             <div className={cx('tp-g-body', shut && 'tp-g-shut')} inert={shut || out}>
               <div>
@@ -252,11 +197,7 @@ export function TaskGroups({
                   label={`${mine(g.name)} tasks`}
                   compact={compact}
                   resetKey={`${resetKey ?? ''}|${g.key}`}
-                  flashKey={wrote ?? flashKey}
-                  addLabel={line === g.key && onAdd ? groupAddLabel(mine(g.name)) : undefined}
-                  addKey={line === g.key ? g.key : undefined}
-                  onAddClose={() => setLine((l) => (l === g.key ? null : l))}
-                  onAdd={onAdd ? (text, before) => onAdd(text, g.key, before) : undefined}
+                  flashKey={flashKey}
                   onReorder={(_, moved) => onReorder?.(g.key, moved)}
                 />
               </div>
@@ -269,24 +210,7 @@ export function TaskGroups({
           </FoldAway>
         );
       })}
-      {addLabel && onAdd ? (
-        <FoldAway show={!lineIsLast}>
-          <AddTask
-            label={addLabel}
-            compact={compact}
-            openKey={endBump ? `${addKey ?? ''}|${endBump}` : addKey}
-            autoOpen={endOpen || (addKey !== undefined && addKey !== null)}
-            onAdd={(text) => {
-              const key = onAdd(text, NO_PROJECT);
-              if (key) setWrote(key);
-            }}
-            onClose={() => {
-              setEndOpen(false);
-              onAddClose?.();
-            }}
-          />
-        </FoldAway>
-      ) : null}
+      {addLabel && onAddOpen ? <AddTask label={addLabel} compact={compact} onOpen={onAddOpen} /> : null}
     </div>
   );
 }

@@ -98,6 +98,7 @@ export function BacklogBeside({
       locateKey: locate && locate.day === null ? `${locate.id}:${locate.nonce}` : undefined,
       // Empty, the words' New task is the way in: no writing line under them.
       addLabel: open.length ? 'Add to the Backlog…' : undefined,
+      onAddOpen: () => openQuickAdd({ day: null, projectId: g.on ? null : undefined }),
       onLeave: (t: TaskItem) => taskStore.cross(t.key, true),
       onUnleave: (t: TaskItem) => taskStore.cross(t.key, false),
       onMoveTask: (t: TaskItem, to: IsoDate | null, _from: IsoDate | null, at?: number) =>
@@ -153,17 +154,7 @@ export function BacklogBeside({
             folded={g.folded}
             onFold={g.fold}
             resetKey="beside"
-            onAdd={(text, group, before) => {
-              const to = g.target(group);
-              const at = before ? ids.indexOf(before) : to.projectId ? g.end(ids, group) : -1;
-              return taskStore.create(
-                spaceId,
-                null,
-                text,
-                at === -1 ? undefined : at,
-                to.projectId ? { projectId: to.projectId } : {},
-              );
-            }}
+            onGroupAdd={(group) => openQuickAdd({ day: null, projectId: g.target(group).projectId ?? null })}
             onReorder={(group, moved) =>
               taskStore.place(moved.key, null, g.place(ids, group, moved.key, moved.to))
             }
@@ -176,10 +167,6 @@ export function BacklogBeside({
             resetKey="beside"
             group="days"
             fillEmpty
-            onAdd={(text, before) => {
-              const at = before ? open.findIndex((t) => t.id === before) : undefined;
-              return taskStore.create(spaceId, null, text, at === -1 ? undefined : at);
-            }}
             onReorder={(_, moved) => taskStore.place(moved.key, null, moved.to)}
             onReceive={(key, at) => taskStore.place(key, null, at)}
           />

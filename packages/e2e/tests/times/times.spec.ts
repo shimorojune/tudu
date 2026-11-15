@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
-import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
-import { dayList, fixClock, idle, row } from '../../fixtures/today';
+import { API_URL, expect, signInFresh, test, newTaskButton } from '../../fixtures/app';
+import { dayList, fixClock, idle, row, writeTasks } from '../../fixtures/today';
 
 /** Times on Planned and Due, and Planned over several days (docs/plans/task-times.md). */
 
@@ -16,14 +16,7 @@ async function openTask(page: Page, title: string): Promise<Locator> {
 }
 
 async function firstTask(page: Page, title: string): Promise<void> {
-  const field = page.getByRole('textbox', { name: 'New task' });
-  const empty = page.getByRole('button', { name: 'Add a task' });
-  await expect(field.or(empty).first()).toBeVisible();
-  if (await empty.isVisible()) await empty.click();
-  await field.fill(title);
-  await field.press('Enter');
-  await expect(page.getByText(title, { exact: true })).toBeVisible();
-  await field.press('Escape');
+  await writeTasks(page, [title]);
 }
 
 async function serverTask(page: Page, ref: string) {
@@ -144,7 +137,7 @@ test.describe('times', () => {
   test('TT-E07 Quick Add with a Planned time and a Due time makes the task with both', async ({ page }) => {
     await page.clock.setFixedTime(new Date(2026, 9, 18, 14, 10));
     await signInFresh(page);
-    await page.getByRole('button', { name: 'New task' }).first().click();
+    await newTaskButton(page).click();
     const b = page.getByRole('dialog', { name: 'Quick Add' });
     await b.getByRole('textbox', { name: 'Task title' }).fill('Book the room');
     await b.getByRole('button', { name: /^Planned for:/ }).click();

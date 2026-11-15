@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { expect, signInFresh, test } from '../../fixtures/app';
+import { expect, signInFresh, test, newTaskButton } from '../../fixtures/app';
 import {
   badge,
   calls,
@@ -220,7 +220,7 @@ test.describe('desktop', () => {
     await page.keyboard.press('Escape');
 
     // An attachment chip in a task's notes.
-    await page.getByRole('button', { name: 'New task' }).first().click();
+    await newTaskButton(page).click();
     const qa = page.getByRole('dialog', { name: 'New task' });
     await qa.getByRole('textbox', { name: 'Task title' }).fill('Read the plan');
     await qa.locator('input[type=file]').setInputFiles({

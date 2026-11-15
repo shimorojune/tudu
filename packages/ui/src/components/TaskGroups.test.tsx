@@ -28,7 +28,8 @@ const GROUPS: TaskGroupItem[] = [
 function setup(props: Partial<TaskGroupsProps> = {}) {
   const p = {
     onFold: vi.fn(),
-    onAdd: vi.fn(),
+    onGroupAdd: vi.fn(),
+    onAddOpen: vi.fn(),
     onReorder: vi.fn(),
     ...props,
   };
@@ -130,55 +131,24 @@ describe('TaskGroups', () => {
     expect(p.onFold).toHaveBeenLastCalledWith('plat', false);
   });
 
-  it('C02-U51 "+" opens that project’s own line with the cursor in it; a folded group opens first; Enter writes into the group', async () => {
+  it('NI-U04 a header\'s "+" asks for Quick Add on that group (a folded one opens first); one end line, no group lines, no field', async () => {
     const { p, user } = setup({ folded: ['plat'] });
-    expect(screen.queryByPlaceholderText('Add to Northwind…')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Add a task to Northwind' }));
-    const line = screen.getByPlaceholderText('Add to Northwind…');
-    expect(line).toHaveFocus();
-    expect(section('Northwind')).toContainElement(line);
-    await user.keyboard('Chase the PO{Enter}');
-    expect(p.onAdd).toHaveBeenLastCalledWith('Chase the PO', 'north', undefined);
-    // the line stays open for the next one
-    expect(screen.getByPlaceholderText('Add to Northwind…')).toHaveFocus();
-    await user.keyboard('{Escape}');
-    expect(screen.queryByPlaceholderText('Add to Northwind…')).toBeNull();
-
+    expect(p.onGroupAdd).toHaveBeenLastCalledWith('north', expect.objectContaining({ key: 'north' }));
+    expect(p.onFold).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Add a task to Platform' }));
     expect(p.onFold).toHaveBeenLastCalledWith('plat', false);
-    expect(screen.getByPlaceholderText('Add to Platform…')).toBeInTheDocument();
-  });
-
-  it('C02-U52 never two writing lines: one at the foot for No project; its "+" puts the cursor there; it makes way for the last project’s line', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    const { p, rerender, ui } = setup();
-    // No project has no line of its own
-    expect(screen.getAllByRole('button', { name: 'Write the next thing…' })).toHaveLength(1);
+    expect(p.onGroupAdd).toHaveBeenLastCalledWith('plat', expect.objectContaining({ key: 'plat' }));
     await user.click(screen.getByRole('button', { name: 'Add a task to No project' }));
-    const end = screen.getByPlaceholderText('Write the next thing…');
-    expect(end).toHaveFocus();
-    expect(section('No project')).not.toContainElement(end);
-    await user.keyboard('Buy stamps{Enter}');
-    expect(p.onAdd).toHaveBeenLastCalledWith('Buy stamps', NO_PROJECT);
-    await user.keyboard('{Escape}');
-
-    // Northwind is not the last group: its line and the page's are apart, both stay
-    await user.click(screen.getByRole('button', { name: 'Add a task to Northwind' }));
-    expect(screen.getByRole('button', { name: 'Write the next thing…' })).toBeInTheDocument();
-    await user.keyboard('{Escape}');
-
-    // with no "No project" group, Platform is last: while its line is open the page's line is gone
-    const two = GROUPS.slice(0, 2);
-    rerender(ui({ groups: two }));
-    await user.click(screen.getByRole('button', { name: 'Add a task to Platform' }));
-    expect(screen.getByPlaceholderText('Add to Platform…')).toHaveFocus();
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
-    expect(screen.queryByRole('button', { name: 'Write the next thing…' })).toBeNull();
-    await user.keyboard('{Escape}');
-    expect(screen.getByRole('button', { name: 'Write the next thing…' })).toBeInTheDocument();
+    expect(p.onGroupAdd).toHaveBeenLastCalledWith(NO_PROJECT, expect.objectContaining({ key: NO_PROJECT }));
+    // one line, at the foot, outside every group; it asks for Quick Add too
+    const lines = screen.getAllByRole('button', { name: 'Write the next thing…' });
+    expect(lines).toHaveLength(1);
+    expect(section('No project')).not.toContainElement(lines[0]!);
+    await user.click(lines[0]!);
+    expect(p.onAddOpen).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Add to / })).toBeNull();
   });
 
   it('C02-U53 rows move inside their group only: Alt with an arrow reports the group and the places in it', async () => {
@@ -217,7 +187,7 @@ describe('TaskGroups', () => {
     expect(section('No project')).not.toHaveClass('tp-g-new');
   });
 
-  it('C02-U50 without onAdd (Crossed off) there is no "+" and no writing line; showing a task in a folded group opens it', () => {
+  it('C02-U50 without onGroupAdd (Crossed off) there is no "+" and no writing line; showing a task in a folded group opens it', () => {
     const onFold = vi.fn();
     const { rerender } = render(<TaskGroups groups={GROUPS} folded={['plat']} onFold={onFold} static />);
     expect(screen.queryByRole('button', { name: /Add a task to/ })).toBeNull();

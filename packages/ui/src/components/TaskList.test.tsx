@@ -55,26 +55,23 @@ function pointer(target: Element | Window, type: string, x: number, y: number, p
 /** A list that keeps its tasks in state, the way the day page does through the store. */
 function Day(props: Partial<TaskListProps> & { initial?: TaskItem[] }) {
   const [tasks, setTasks] = useState(props.initial ?? THREE);
-  let n = 0;
+  const [flash, setFlash] = useState<string | undefined>(undefined);
   return (
     <TaskList
       addLabel="Write the next thing…"
       {...props}
       tasks={tasks}
+      flashKey={flash}
       onReorder={(next, moved) => {
         setTasks(next);
         props.onReorder?.(next, moved);
       }}
-      onAdd={(text, before) => {
-        const key = `new-${text}-${n++}`;
-        setTasks((l) => {
-          const at = before ? l.findIndex((t) => t.key === before) : l.length;
-          const out = [...l];
-          out.splice(at, 0, { key, title: text });
-          return out;
-        });
-        props.onAdd?.(text, before);
-        return key;
+      // The page opens Quick Add here; its task comes back the way Quick Add's does: last, through flashKey.
+      onAddOpen={() => {
+        const key = `new-${tasks.length}`;
+        setTasks((l) => [...l, { key, title: 'Water the plants' }]);
+        setFlash(key);
+        props.onAddOpen?.();
       }}
     />
   );
@@ -206,58 +203,42 @@ describe('TaskList', () => {
     });
   });
 
-  it('C02-U10 a task written on the last line opens its gap with the wash, and the line stays open', async () => {
+  it('NI-U02 the last line opens Quick Add; the task it makes arrives last with the wash; no handler, no line', async () => {
     const user = userEvent.setup();
-    const onAdd = vi.fn();
-    render(<Day onAdd={onAdd} />);
+    const onAddOpen = vi.fn();
+    const { unmount } = render(<Day onAddOpen={onAddOpen} />);
     await user.click(screen.getByRole('button', { name: 'Write the next thing…' }));
-    await user.type(screen.getByRole('textbox', { name: 'New task' }), 'Water the plants{Enter}');
-    expect(onAdd).toHaveBeenCalledWith('Water the plants', undefined);
+    expect(onAddOpen).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('textbox')).toBeNull();
     expect(titles().at(-1)).toBe('Water the plants');
     expect(screen.getByText('Water the plants').closest('.tp-item')).toHaveClass('tp-new');
-    const line = screen.getByRole('textbox', { name: 'New task' });
-    expect(line).toHaveValue('');
-    expect(line).toHaveFocus();
     expect(rulesWhere(rules, (s) => s === '.tp-item.tp-new .tp-row')[0]!.declarations.animation).toContain(
       'tp-row-wash 1200ms',
     );
+    unmount();
+    render(<TaskList tasks={THREE} addLabel="Write the next thing…" />);
+    expect(screen.queryByRole('button', { name: 'Write the next thing…' })).toBeNull();
   });
 
-  it('C02-U11 the "+" between rows writes a task in that slot; it waits for a pause and hides while dragging', async () => {
+  it('NI-U03 no slot to write between rows, on any list; a list that ends without the line has no rule under its last row', async () => {
     const user = userEvent.setup();
-    const onAdd = vi.fn();
-    const { unmount } = render(<Day onAdd={onAdd} />);
-    const plus = screen.getAllByRole('button', { name: 'Add a task here' });
-    expect(plus).toHaveLength(2); // between the three rows, not above the first
-    await user.click(plus[1]!);
-    await user.type(screen.getByRole('textbox', { name: 'New task' }), 'Slot me in{Enter}');
-    expect(onAdd).toHaveBeenCalledWith('Slot me in', 'c');
-    expect(titles()).toEqual([
-      'Pay the electricity bill',
-      'Call Sam at 3pm',
-      'Slot me in',
-      'Book car service',
-    ]);
-    // the line stays open just below the new task
-    const ins = document.querySelector('.tp-insrow')!;
-    expect(ins.nextElementSibling).toHaveAttribute('data-key', 'c');
-    const hover = rulesWhere(rules, (s) => s === '.tp-ins:hover')[0]!;
-    expect(hover.declarations['transition-delay']).toBe('120ms');
-    expect(rulesWhere(rules, (s) => s.includes('.tp-is-dragging .tp-ins'))[0]!.declarations.display).toBe(
-      'none',
-    );
+    const { container, unmount } = render(<Day />);
+    await user.hover(screen.getByText('Call Sam at 3pm'));
+    expect(screen.queryByRole('button', { name: 'Add a task here' })).toBeNull();
+    expect(container.querySelector('.tp-ins, .tp-insrow')).toBeNull();
+    expect(rulesWhere(rules, (s) => s.includes('.tp-ins'))).toHaveLength(0);
     unmount();
-    // phones and filtered lists have no "+"
-    render(<Day compact />);
-    expect(screen.queryByRole('button', { name: 'Add a task here' })).toBeNull();
+    const last = rulesWhere(rules, (s) => s.includes(':not(:has(> .tp-addtask))'))[0]!;
+    expect(last.selector).toContain('.tp-item:last-child');
+    expect(last.declarations['border-bottom-color']).toBe('transparent');
+    // with the line the last row keeps its rule; without it the selector matches the last row
+    const { container: withLine } = render(<Day />);
+    expect(withLine.querySelector(':scope > .tp-root > .tp-addtask')).not.toBeNull();
     cleanup();
-    render(
-      <Day
-        filter="Home"
-        initial={THREE.map((t) => ({ ...t, project: { name: 'Home', color: '#8a5a00' } }))}
-      />,
-    );
-    expect(screen.queryByRole('button', { name: 'Add a task here' })).toBeNull();
+    const { container: bare } = render(<TaskList tasks={THREE} />);
+    expect(
+      bare.querySelector('.tp-root:not(:has(> .tp-addtask)) > .tp-list > .tp-item:last-child .tp-row'),
+    ).not.toBeNull();
   });
 
   it('C02-U12 two lists in a group accept each other’s rows and report the move', () => {
@@ -621,9 +602,9 @@ describe('TaskList', () => {
     expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
   });
 
-  it('C06-U04 filter: only the project’s rows show, the + is off, and the writing line adds to the Backlog', async () => {
+  it('C06-U04 filter: only the project’s rows show, and the writing line still opens Quick Add', async () => {
     const user = userEvent.setup();
-    const onAdd = vi.fn(() => 'n1');
+    const onAddOpen = vi.fn();
     const PF = { name: 'Platform', color: '#5b7553' };
     const tasks: TaskItem[] = [
       { key: 'a', id: 'ME-1', title: 'Pay the electricity bill', project: PF },
@@ -631,7 +612,13 @@ describe('TaskList', () => {
       { key: 'c', id: 'ME-3', title: 'Book car service', project: PF },
     ];
     const { container } = render(
-      <TaskList tasks={tasks} filter="Platform" addLabel="Add to the Backlog…" onAdd={onAdd} undated />,
+      <TaskList
+        tasks={tasks}
+        filter="Platform"
+        addLabel="Add to the Backlog…"
+        onAddOpen={onAddOpen}
+        undated
+      />,
     );
     expect(screen.getAllByRole('listitem').map((r) => r.textContent)).toEqual([
       expect.stringContaining('Pay the electricity bill'),
@@ -639,8 +626,7 @@ describe('TaskList', () => {
     ]);
     expect(container.querySelector('.tp-ins')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Add to the Backlog…' }));
-    await user.type(screen.getByRole('textbox', { name: 'New task' }), 'Renew passport{Enter}');
-    expect(onAdd).toHaveBeenCalledWith('Renew passport');
+    expect(onAddOpen).toHaveBeenCalledTimes(1);
   });
   it('C02-U27 linkFor gives each row its link: the ID chip copies that task’s page', () => {
     render(<TaskList tasks={THREE} linkFor={(t) => (t.id ? `https://tudu.test/t/${t.id}` : undefined)} />);
@@ -648,7 +634,7 @@ describe('TaskList', () => {
     expect(screen.queryByRole('button', { name: /Copy task ID/ })).toBeNull();
   });
 
-  it('C21-U10 filterSpace shows one space and turns off the "+" and trading rows; Chip and SpaceFilter wear the tiles', async () => {
+  it('C21-U10 filterSpace shows one space and turns off trading rows; Chip and SpaceFilter wear the tiles', async () => {
     const user = userEvent.setup();
     const NW = { id: 'nw', name: 'Northwind', color: '#3d5a80', initials: 'N' };
     const ME = { id: 'me', name: 'Personal', personal: true };
@@ -658,11 +644,11 @@ describe('TaskList', () => {
       { key: 'c', title: 'Review the deck', inSpace: NW },
     ];
     const onSignal = vi.fn();
-    const { rerender } = render(<TaskList tasks={tasks} onSignal={onSignal} onAdd={() => undefined} />);
+    const { rerender } = render(<TaskList tasks={tasks} onSignal={onSignal} onAddOpen={() => undefined} />);
     expect(screen.getAllByRole('button', { name: /^Space · / })).toHaveLength(3);
     await user.click(screen.getAllByRole('button', { name: 'Space · Northwind. Show only Northwind' })[0]!);
     expect(onSignal).toHaveBeenCalledWith(tasks[1], 'space');
-    rerender(<TaskList tasks={tasks} filterSpace="nw" onAdd={() => undefined} />);
+    rerender(<TaskList tasks={tasks} filterSpace="nw" onAddOpen={() => undefined} />);
     expect(screen.queryByText('Call the bank')).toBeNull();
     expect(screen.getByText('Ship the pilot')).toBeInTheDocument();
     expect(screen.getByText('Review the deck')).toBeInTheDocument();

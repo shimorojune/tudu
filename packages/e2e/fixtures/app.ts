@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { test as base, expect, type Page } from '@playwright/test';
+import { test as base, expect, type Locator, type Page } from '@playwright/test';
 
 export const API_URL = process.env.E2E_API_URL ?? `http://localhost:${process.env.E2E_API_PORT ?? '3456'}`;
 let n = 0;
@@ -82,3 +82,11 @@ export const test = base.extend<{ cleanConsole: string[] }>({
   ],
 });
 export { expect };
+
+/**
+ * The shell's New task: the top bar's button (an icon on tablets) or the phone's round one. An empty list's own
+ * "New task" (its empty state) is not this one.
+ */
+export function newTaskButton(page: Page): Locator {
+  return page.getByRole('button', { name: 'New task' }).and(page.locator('.tp-topbar *, .tp-fab'));
+}

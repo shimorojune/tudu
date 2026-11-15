@@ -21,7 +21,6 @@ function readView(): DayView {
 }
 
 let view: DayView = readView();
-let newTask = 0;
 let shown: IsoDate | null = null;
 /** Which page is up, so Quick Add knows where a new task is in view. */
 let page: AppPage | null = null;
@@ -46,6 +45,8 @@ export interface QuickAddSeed {
   from?: QuickAddFrom;
   /** Where it is planned: a day, or `null` for the Backlog (a list's own "New task"). Left out: the day shown. */
   day?: IsoDate | null;
+  /** The project it goes in (a group header's "+"), or `null` for none. Left out: whatever the draft has. */
+  projectId?: string | null;
 }
 
 let quickAddSeed: (QuickAddSeed & { nonce: number }) | null = null;
@@ -79,20 +80,6 @@ export function useDayView(): DayView {
   );
 }
 
-/** New task (top bar, the phone's round button): open the writing line on the day page. */
-export function askNewTask(): void {
-  newTask += 1;
-  notify();
-}
-
-export function useNewTaskAsk(): number {
-  return useSyncExternalStore(
-    subscribe,
-    () => newTask,
-    () => 0,
-  );
-}
-
 /** Show a day on the day page; null (or today itself) is today, which follows the working day. */
 export function showDay(day: IsoDate | null, today?: IsoDate): void {
   const next = day === today ? null : day;
@@ -116,13 +103,16 @@ export function openQuickAdd(seed?: QuickAddSeed): void {
   const toId = seed && typeof seed.toId === 'string' ? seed.toId : undefined;
   const spaceId = seed && typeof seed.spaceId === 'string' ? seed.spaceId : undefined;
   const day = seed && (seed.day === null || typeof seed.day === 'string') ? seed.day : undefined;
-  const seeded = words !== undefined || toId !== undefined || day !== undefined;
+  const projectId =
+    seed && (seed.projectId === null || typeof seed.projectId === 'string') ? seed.projectId : undefined;
+  const seeded = words !== undefined || toId !== undefined || day !== undefined || projectId !== undefined;
   if (seeded)
     quickAddSeed = {
       title: words,
       toId,
       spaceId,
       day,
+      projectId,
       note: typeof seed?.note === 'string' ? seed.note : undefined,
       from: seed?.from && typeof seed.from.noteId === 'string' ? seed.from : undefined,
       nonce: (quickAddSeed?.nonce ?? 0) + 1,

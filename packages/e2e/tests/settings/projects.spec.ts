@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
+import { API_URL, expect, signInFresh, test, newTaskButton } from '../../fixtures/app';
 import { createSpace, joinLink, me, secondPerson } from '../../fixtures/spaces';
 import { dayList, fixClock, idle, row } from '../../fixtures/today';
 
@@ -104,7 +104,7 @@ async function createFlow(page: Page) {
     await page.goto('/me');
   } else await page.keyboard.press('Escape');
   await expect(dialog(page)).toHaveCount(0);
-  await page.getByRole('button', { name: 'New task' }).first().click();
+  await newTaskButton(page).click();
   const b = page.getByRole('dialog', { name: 'Quick Add' });
   await b.getByRole('button', { name: 'Choose a project' }).click();
   await expect(b.locator('.tp-qa-pop').getByRole('menuitem', { name: 'Hiring' })).toBeVisible();
@@ -251,7 +251,7 @@ test.describe('settings › projects', () => {
     };
 
     // Quick Add: Settings opens on Projects; closing it brings the bar back with the draft.
-    await page.getByRole('button', { name: 'New task' }).first().click();
+    await newTaskButton(page).click();
     const b = page.getByRole('dialog', { name: 'Quick Add' });
     await b.getByRole('textbox', { name: 'Task title' }).fill('Order the paint');
     await b.getByRole('button', { name: 'Choose a project' }).click();

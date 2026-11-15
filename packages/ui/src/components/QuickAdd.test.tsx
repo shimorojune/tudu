@@ -624,6 +624,50 @@ describe('QuickAdd', () => {
     expect(chip('Planned for: Tomorrow')).toBeInTheDocument();
   });
 
+  it('NI-U05 a seed with a project picks it; null clears it; one the space does not have is never sent', async () => {
+    const onSave = vi.fn();
+    const { rerender } = render(<Bar open planned={TODAY} onSave={onSave} />);
+    rerender(<Bar open planned={TODAY} onSave={onSave} seed={{ day: TODAY, projectId: 'pf', nonce: 1 }} />);
+    expect(chip('Project: Platform')).toBeInTheDocument();
+    rerender(<Bar open planned={TODAY} onSave={onSave} seed={{ day: null, projectId: null, nonce: 2 }} />);
+    expect(chip('Choose a project')).toBeInTheDocument();
+    expect(chip('Planned for: Backlog')).toBeInTheDocument();
+    rerender(<Bar open planned={TODAY} onSave={onSave} seed={{ projectId: 'gone', nonce: 3 }} />);
+    expect(chip('Choose a project')).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.type(screen.getByRole('textbox', { name: 'Task title' }), 'Chase the PO{Enter}');
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ title: 'Chase the PO', projectId: null }));
+  });
+
+  it('NI-U07 closing gives focus back to what opened it; nothing focused before, nothing moved', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const line = document.createElement('button');
+    line.textContent = 'Write the next thing…';
+    document.body.appendChild(line);
+    line.focus();
+    const { rerender } = render(<Bar open={false} planned={TODAY} />);
+    rerender(<Bar open planned={TODAY} />);
+    act(() => vi.advanceTimersByTime(60));
+    expect(screen.getByRole('textbox', { name: 'Task title' })).toHaveFocus();
+    rerender(<Bar open={false} planned={TODAY} />);
+    expect(line).toHaveFocus();
+    line.blur();
+    rerender(<Bar open planned={TODAY} />);
+    act(() => vi.advanceTimersByTime(60));
+    rerender(<Bar open={false} planned={TODAY} />);
+    expect(line).not.toHaveFocus();
+    line.remove();
+    vi.useRealTimers();
+  });
+
+  it('NI-U06 a seed with only words keeps the day shown and the project the draft has', () => {
+    const { rerender } = render(<Bar open planned={TODAY} />);
+    rerender(<Bar open planned={TODAY} seed={{ projectId: 'nw', nonce: 1 }} />);
+    rerender(<Bar open planned={TODAY} seed={{ title: 'Roof', nonce: 2 }} />);
+    expect(chip('Project: Northwind')).toBeInTheDocument();
+    expect(chip('Planned for: Today')).toBeInTheDocument();
+  });
+
   it('C07-U07 words handed in become the title; the kit line opens already shown', () => {
     const { rerender, unmount } = render(<Bar seed={{ title: 'Gutters', nonce: 1 }} />);
     expect(screen.getByRole('textbox', { name: 'Task title' })).toHaveValue('Gutters');

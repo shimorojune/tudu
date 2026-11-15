@@ -358,7 +358,7 @@ export function Overlays() {
           title="EmptyState"
           render={() => (
             <Col gap={0}>
-              <EmptyState title="Nothing planned for today yet." action="Add a task">
+              <EmptyState title="Nothing planned for today yet." action="New task">
                 Write the first thing you want to get done.
               </EmptyState>
               <EmptyState tone="error" title="This day didn’t load." action="Try again">

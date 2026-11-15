@@ -61,22 +61,40 @@ export async function titlesOf(list: Locator): Promise<string[]> {
   return rowsOf(list).locator('.tp-strike').allTextContents();
 }
 
-/** Write tasks on the day's last line (opening it from the empty state when the day has none). */
+/** Quick Add over the page (the bar on the desk, the sheet on phones). */
+export function quickAdd(page: Page): Locator {
+  return page.getByRole('dialog', { name: /^(Quick Add|New task)$/ });
+}
+
+/** Quick Add is open: write the title, Enter, and wait for it to close. */
+export async function addInQuickAdd(page: Page, title: string): Promise<void> {
+  const qa = quickAdd(page);
+  const field = qa.getByRole('textbox', { name: 'Task title' });
+  await expect(field).toBeFocused();
+  await field.fill(title);
+  await field.press('Enter');
+  await expect(qa).toHaveCount(0, { timeout: 5000 });
+}
+
+/**
+ * Write tasks the way a person does now that lists have no field of their own: the sheet's last line ("Write the
+ * next thing…", "Add to the Backlog…", …) or its empty state's New task opens Quick Add set to that list; the title
+ * and Enter add it, and Quick Add closes. Once per title, each waiting for its row.
+ */
 export async function writeTasks(
   page: Page,
   titles: string[],
   sheet: Locator = page.locator('body'),
+  line: string | RegExp = /^(Write the next thing( in .+)?…|Add to .+…)$/,
 ): Promise<void> {
-  const field = sheet.getByRole('textbox', { name: 'New task' });
-  const empty = sheet.getByRole('button', { name: 'Add a task' });
-  const line = sheet.getByRole('button', { name: 'Write the next thing…' });
-  // the day may still be loading: wait for the empty state, the writing line, or the open field
-  await expect(field.or(empty).or(line).first()).toBeVisible();
-  if (await empty.isVisible()) await empty.click();
-  else if (!(await field.isVisible())) await line.first().click();
+  const empty = sheet.locator('.tp-empty').getByRole('button', { name: 'New task' });
+  const writing = sheet.getByRole('button', { name: line });
   for (const t of titles) {
-    await field.fill(t);
-    await field.press('Enter');
+    // the list may still be loading: wait for its empty state or its line
+    await expect(empty.or(writing).first()).toBeVisible();
+    if (await empty.isVisible()) await empty.click();
+    else await writing.first().click();
+    await addInQuickAdd(page, t);
     await expect(sheet.getByText(t, { exact: true })).toBeVisible();
   }
 }

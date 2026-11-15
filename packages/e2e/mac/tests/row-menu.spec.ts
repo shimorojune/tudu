@@ -78,20 +78,23 @@ test.describe('RM Mac row menu', () => {
       .toEqual(['Call Sam at 3pm']);
   });
 
-  test('RM-D02 a right-click in the writing line is left to the system’s text menu', async ({ app }) => {
+  test('RM-D02 NI-D01 the writing line opens Quick Add on today; a right-click in its title is left to the system’s text menu; Add lands the task', async ({
+    app,
+  }) => {
     await signIn(app);
     const space = await personalId(app);
     await writeTask(app, space, 'Call Sam at 3pm', day());
     await go(app, '/me');
     await app.until(`return !!${titleOf('Call Sam at 3pm')}`);
-    // The writing line may already be open as the field; otherwise open it, as writeTasks does on the web.
-    await app.until(
-      `return !!document.querySelector('[aria-label="New task"]') || T.all('button', /^(Write the next thing…|Add a task)$/).length > 0`,
-    );
-    await app.eval(`
-      if (!document.querySelector('[aria-label="New task"]')) T.click(T.get('button', /^(Write the next thing…|Add a task)$/));`);
-    await app.until(`return !!document.querySelector('[aria-label="New task"]')`);
-    expect(await rightClick(app, `document.querySelector('[aria-label="New task"]')`)).toBe(false);
+    await app.until(`return T.all('button', 'Write the next thing…').length > 0`);
+    expect(await app.eval<number>(`return document.querySelectorAll('.tp-addtask input').length`)).toBe(0);
+    await app.eval(`T.click(T.get('button', 'Write the next thing…'))`);
+    await app.until(`return document.activeElement === T.get('textbox', 'Task title')`);
+    expect(await rightClick(app, `T.get('textbox', 'Task title')`)).toBe(false);
     expect(await app.eval<number>(`return document.querySelectorAll('.tp-ctx').length`)).toBe(0);
+    await app.eval(
+      `T.fill(T.get('textbox', 'Task title'), 'Book car service'); T.click(T.get('button', 'Add task'));`,
+    );
+    await app.until(`return !!${titleOf('Book car service')}`);
   });
 });

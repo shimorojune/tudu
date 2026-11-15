@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
+import { API_URL, expect, signInFresh, test, newTaskButton } from '../../fixtures/app';
 import { expectFoldsShut, expectGlides, expectLands, sampleBoxes } from '../../fixtures/motion';
 import { pick, rightClick } from '../../fixtures/rowMenu';
 import {
@@ -40,7 +40,7 @@ function bar(page: Page): Locator {
 
 /** Open Quick Add, write a title, change what `more` says, add. */
 async function quickAdd(page: Page, title: string, more?: (b: Locator) => Promise<void>): Promise<void> {
-  await page.getByRole('button', { name: 'New task' }).first().click();
+  await newTaskButton(page).click();
   const b = bar(page);
   const field = b.getByRole('textbox', { name: 'Task title' });
   await expect(field).toBeFocused();
@@ -117,7 +117,6 @@ test.describe('week', () => {
     await fixClock(page, WEDNESDAY);
     await signInFresh(page);
     await writeTasks(page, THREE);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     await goWeek(page);
     const wed = 'Today, Wednesday 14 October';
     await expect(tileCount(page, wed)).toHaveText('3 tasks');
@@ -151,7 +150,6 @@ test.describe('week', () => {
     test.skip(!desktop(), 'dragging between tiles is the desk');
     await signInFresh(page);
     await writeTasks(page, ['Pay the electricity bill', 'Book car service']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     await quickAdd(page, 'Renew passport', async (b) => {
       await b.getByRole('button', { name: 'Planned for: Today' }).click();
       await b.locator('.tp-qa-pop').getByRole('button', { name: 'Backlog' }).click();
@@ -410,7 +408,6 @@ test.describe('week', () => {
       .toEqual(['From the first tab', 'From the second tab']);
     await expect(tileCount(page, SUNDAY_TILE)).toHaveText('2 tasks');
     // moved to the Backlog over there: both tiles here follow
-    await second.getByRole('textbox', { name: 'New task' }).press('Escape');
     await row(dayList(second, 'Tasks for Sunday 18 October'), 'From the first tab')
       .locator('.tp-strike')
       .click();
@@ -499,12 +496,10 @@ test.describe('week', () => {
     await signInFresh(page);
     const twelve = Array.from({ length: 12 }, (_, i) => `Task number ${i + 1}`);
     await writeTasks(page, twelve);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     // yesterday: one task, crossed off there
     await page.getByRole('button', { name: 'Previous day' }).first().click();
     await expect(page.getByText('Yesterday · Week 42')).toBeVisible();
     await writeTasks(page, ['Water the plants']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     await page.getByRole('checkbox', { name: 'Cross off: Water the plants' }).click();
     await idle(page);
     await goWeek(page);
@@ -541,7 +536,6 @@ test.describe('week', () => {
     await signInFresh(page);
     await expect(page.locator('html')).toHaveClass(/dark/);
     await writeTasks(page, THREE);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     await goWeek(page);
     await expect(weekEyebrow(page)).toHaveText(phone() ? 'This week' : 'This week · Week 42');
     await expect.poll(() => titlesOf(tileList(page, SUNDAY_LIST))).toEqual(THREE);
@@ -569,7 +563,6 @@ test.describe('week', () => {
     test.skip(!desktop(), 'tiles side by side are the desk');
     await signInFresh(page);
     await writeTasks(page, ['Book flights for the offsite']);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     await row(dayList(page), 'Book flights for the offsite')
       .getByRole('button', { name: 'Book flights for the offsite' })
       .click();
@@ -613,7 +606,6 @@ test.describe('week, a drop on another day, with motion', () => {
     await fixClock(page, WEDNESDAY);
     await signInFresh(page);
     await writeTasks(page, THREE);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     await idle(page);
     await goWeek(page);
     const wed = tileList(page, 'Wednesday 14 October');
@@ -678,7 +670,6 @@ test.describe('week, a drop on another day, with motion', () => {
     await signInFresh(page);
     const twelve = Array.from({ length: 12 }, (_, i) => `Task number ${i + 1}`);
     await writeTasks(page, twelve);
-    await page.getByRole('textbox', { name: 'New task' }).press('Escape');
     await quickAdd(page, 'Renew passport', async (b) => {
       await b.getByRole('button', { name: 'Planned for: Today' }).click();
       await b.locator('.tp-qa-pop').getByRole('button', { name: 'Backlog' }).click();
@@ -687,7 +678,18 @@ test.describe('week, a drop on another day, with motion', () => {
     await goWeek(page);
     const moved = await keyOf(backlogList(page), 'Renew passport');
     const body = tile(page, SUNDAY_TILE).locator('.tp-wd-body');
-    expect(await body.evaluate((el) => el.scrollHeight > el.clientHeight && el.scrollTop === 0)).toBe(true);
+    // The week may still be arriving: wait for all twelve rows before asking whether the tile overflows.
+    await expect(tileCount(page, SUNDAY_TILE)).toHaveText('12 tasks');
+    // Say the numbers when it fails: the tile's body overflows and starts at its top.
+    await expect
+      .poll(() =>
+        body.evaluate((el) => ({
+          overflows: el.scrollHeight > el.clientHeight,
+          top: el.scrollTop,
+          sizes: `${el.scrollHeight}/${el.clientHeight}`,
+        })),
+      )
+      .toMatchObject({ overflows: true, top: 0 });
     const edge = (await body.boundingBox())!;
     await carry(page, row(backlogList(page), 'Renew passport'), {
       x: edge.x + Math.min(120, edge.width / 2),

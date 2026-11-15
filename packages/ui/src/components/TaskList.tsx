@@ -18,7 +18,6 @@ import {
 } from 'react';
 import { copyText, COPY_FAILED_WORDS, COPY_ID_FAILED_WORDS } from '../lib/clipboard';
 import { cx } from '../lib/cx';
-import { Icon } from '../lib/icons';
 import { closeRow, openRow, scrollerOf, settleFrom } from '../lib/motion';
 import {
   itemByKey,
@@ -103,22 +102,15 @@ export interface TaskListProps {
   /** A task's own page: clicking a row's ID copies it. */
   linkFor?: (task: TaskItem) => string | undefined;
   onSignal?: (task: TaskItem, kind: TaskSignal) => void;
-  /**
-   * Write a new task: at the end, or slotted in above `before` (the "+" between rows). Return the new row's key so
-   * it opens its gap with the new-task wash.
-   */
-  onAdd?: (text: string, before?: string) => string | void;
-  /** Ends the list with the writing line: "Write the next thing…". */
+  /** Ends the list with the writing line: "Write the next thing…" (shown with `onAddOpen`). */
   addLabel?: string;
-  /** Change it to open the writing line; a list that mounts with one starts with the line open. */
-  addKey?: string | number | null;
-  /** The writing line closed (Esc, or clicking away). */
-  onAddClose?: () => void;
+  /** The writing line was clicked: open Quick Add set to this list. The new task arrives through `flashKey`. */
+  onAddOpen?: () => void;
   /** Change it when the list shows a different day, so the rows start fresh. */
   resetKey?: string | number;
-  /** A project name: only its tasks show, and the "+" and dragging between lists turn off. */
+  /** A project name: only its tasks show, and dragging between lists turns off. */
   filter?: string;
-  /** All spaces: a space's id; only its tasks show, and like `filter` the "+" and dragging between lists turn off. */
+  /** All spaces: a space's id; only its tasks show, and like `filter` dragging between lists turns off. */
   filterSpace?: string | null;
   /** A task added from outside the list (Quick Add): it opens its gap and gets the wash, on mount too. */
   flashKey?: string;
@@ -126,8 +118,6 @@ export interface TaskListProps {
   locateKey?: string;
   /** The open task's row keeps the selection wash. */
   selectedKey?: string;
-  /** The "+" between rows on desktop. On by default. */
-  insertable?: boolean;
   /** Lists with the same group trade rows by drag (the two days side by side). */
   group?: string;
   /**
@@ -197,8 +187,7 @@ export function TaskList(p: TaskListProps) {
   // Narrowed by a project or a space: a slice of the list, so slotting in and trading rows are off.
   const narrowed = !!filter || !!filterSpace;
   const ref = useRef<HTMLDivElement | null>(null);
-  const [fresh, setFresh] = useState<{ key: string; follow?: 'add' | 'out' } | null>(null);
-  const [insKey, setIns] = useState<string | null>(null);
+  const [fresh, setFresh] = useState<{ key: string; follow?: 'out' } | null>(null);
   const [said, setSaid] = useState('');
   const opened = useRef<string | null>(null);
   const stopOpen = useRef<(() => void) | null>(null);
@@ -217,7 +206,6 @@ export function TaskList(p: TaskListProps) {
   if (p.resetKey !== seenReset) {
     setSeenReset(p.resetKey);
     setFresh(null);
-    setIns(null);
   }
   if (p.flashKey !== seenFlash) {
     setSeenFlash(p.flashKey);
@@ -362,22 +350,6 @@ export function TaskList(p: TaskListProps) {
     reorder(from, to, key);
     setSaid(`Moved to place ${to + 1} of ${shown.length}`);
   }
-
-  function add(text: string) {
-    const key = p.onAdd?.(text);
-    if (key) {
-      opened.current = null;
-      setFresh({ key, follow: 'add' });
-    }
-  }
-  function insertBefore(before: string, text: string) {
-    const key = p.onAdd?.(text, before);
-    if (key) {
-      opened.current = null;
-      setFresh({ key });
-    }
-  }
-  const canInsert = !compact && p.insertable !== false && !narrowed && !!p.onAdd;
 
   // Crossing off (or unticking) a row that leaves this list: it waits a beat ticked, then folds away with Undo.
   const leaves = (done: boolean) => (done ? p.leaveDone : p.leaveUndone);
@@ -681,100 +653,64 @@ export function TaskList(p: TaskListProps) {
         role="list"
         aria-label={p.label ?? 'Tasks'}
       >
-        {shown.flatMap((t, i) => {
-          const out = [];
-          if (insKey === t.key)
-            out.push(
-              <div key={`ins-${t.key}`} className="tp-insrow" role="listitem">
-                <AddTask
-                  label="Write a task here…"
-                  autoOpen
-                  onAdd={(v) => insertBefore(t.key, v)}
-                  onClose={() => setIns(null)}
-                />
-              </div>,
-            );
-          out.push(
-            <div
-              key={t.key}
-              data-reorder=""
-              data-key={t.key}
-              className={cx(
-                'tp-item',
-                fresh?.key === t.key && 'tp-new',
-                p.selectedKey === t.key && 'tp-sel',
-                ctx?.key === t.key && 'tp-ctx-on',
-              )}
-              role="listitem"
-            >
-              {canInsert && i > 0 && insKey !== t.key ? (
-                <button
-                  type="button"
-                  className="tp-ins"
-                  aria-label="Add a task here"
-                  onClick={() => setIns(t.key)}
-                >
-                  <span className="tp-ins-plus" aria-hidden="true">
-                    <Icon name="plus" size={12} stroke={2.4} />
-                  </span>
-                </button>
-              ) : null}
-              <TaskRow
-                title={t.title}
-                id={t.id}
-                link={p.linkFor?.(t)}
-                done={leaving[t.key] ?? !!t.done}
-                due={t.due}
-                dueAt={t.dueAt}
-                time={t.time}
-                span={t.span}
-                timeWords={p.timeWords}
-                onTimeChange={cal && p.onTimeChange ? (v) => p.onTimeChange!(t, v) : undefined}
-                onSpanChange={cal && p.onSpanChange ? (a, b) => p.onSpanChange!(t, a, b) : undefined}
-                onDueTimeChange={cal && p.onDueTimeChange ? (v) => p.onDueTimeChange!(t, v) : undefined}
-                carried={t.carried}
-                comments={t.comments}
-                jira={t.jira}
-                project={t.project}
-                inSpace={t.inSpace}
-                reorderable={!p.static}
-                compact={compact}
-                brief={p.brief}
-                planButton={p.planButton}
-                calendar={cal}
-                planned={calDay}
-                onPlan={cal ? (v) => planTask(t, v) : undefined}
-                onDueChange={cal && p.onDueChange ? (v) => p.onDueChange!(t, v) : undefined}
-                pickRequest={asked?.key === t.key ? asked : null}
-                onOpen={p.onOpenTask ? () => p.onOpenTask!(t) : undefined}
-                onSignal={p.onSignal ? (k) => p.onSignal!(t, k) : undefined}
-                onToggle={(v) => toggleTask(t, v)}
-                subtasks={t.subtasks}
-                onAddSubtask={p.onAddSubtask ? (title) => p.onAddSubtask!(t, title) : undefined}
-                onRenameSubtask={
-                  p.onRenameSubtask ? (s, title) => p.onRenameSubtask!(t, s, title) : undefined
-                }
-                onToggleSubtask={p.onToggleSubtask ? (s, v) => p.onToggleSubtask!(t, s, v) : undefined}
-                onReorderSubtask={
-                  p.onReorderSubtask ? (s, from, to) => p.onReorderSubtask!(t, s, from, to) : undefined
-                }
-                onDeleteSubtask={p.onDeleteSubtask ? (s, i) => p.onDeleteSubtask!(t, s, i) : undefined}
-                onRestoreSubtask={p.onRestoreSubtask ? (s, i) => p.onRestoreSubtask!(t, s, i) : undefined}
-              />
-            </div>,
-          );
-          return out;
-        })}
+        {shown.map((t) => (
+          <div
+            key={t.key}
+            data-reorder=""
+            data-key={t.key}
+            className={cx(
+              'tp-item',
+              fresh?.key === t.key && 'tp-new',
+              p.selectedKey === t.key && 'tp-sel',
+              ctx?.key === t.key && 'tp-ctx-on',
+            )}
+            role="listitem"
+          >
+            <TaskRow
+              title={t.title}
+              id={t.id}
+              link={p.linkFor?.(t)}
+              done={leaving[t.key] ?? !!t.done}
+              due={t.due}
+              dueAt={t.dueAt}
+              time={t.time}
+              span={t.span}
+              timeWords={p.timeWords}
+              onTimeChange={cal && p.onTimeChange ? (v) => p.onTimeChange!(t, v) : undefined}
+              onSpanChange={cal && p.onSpanChange ? (a, b) => p.onSpanChange!(t, a, b) : undefined}
+              onDueTimeChange={cal && p.onDueTimeChange ? (v) => p.onDueTimeChange!(t, v) : undefined}
+              carried={t.carried}
+              comments={t.comments}
+              jira={t.jira}
+              project={t.project}
+              inSpace={t.inSpace}
+              reorderable={!p.static}
+              compact={compact}
+              brief={p.brief}
+              planButton={p.planButton}
+              calendar={cal}
+              planned={calDay}
+              onPlan={cal ? (v) => planTask(t, v) : undefined}
+              onDueChange={cal && p.onDueChange ? (v) => p.onDueChange!(t, v) : undefined}
+              pickRequest={asked?.key === t.key ? asked : null}
+              onOpen={p.onOpenTask ? () => p.onOpenTask!(t) : undefined}
+              onSignal={p.onSignal ? (k) => p.onSignal!(t, k) : undefined}
+              onToggle={(v) => toggleTask(t, v)}
+              subtasks={t.subtasks}
+              onAddSubtask={p.onAddSubtask ? (title) => p.onAddSubtask!(t, title) : undefined}
+              onRenameSubtask={p.onRenameSubtask ? (s, title) => p.onRenameSubtask!(t, s, title) : undefined}
+              onToggleSubtask={p.onToggleSubtask ? (s, v) => p.onToggleSubtask!(t, s, v) : undefined}
+              onReorderSubtask={
+                p.onReorderSubtask ? (s, from, to) => p.onReorderSubtask!(t, s, from, to) : undefined
+              }
+              onDeleteSubtask={p.onDeleteSubtask ? (s, i) => p.onDeleteSubtask!(t, s, i) : undefined}
+              onRestoreSubtask={p.onRestoreSubtask ? (s, i) => p.onRestoreSubtask!(t, s, i) : undefined}
+            />
+          </div>
+        ))}
       </div>
-      {p.addLabel ? (
-        <AddTask
-          label={p.addLabel}
-          compact={compact}
-          onAdd={add}
-          openKey={p.addKey}
-          autoOpen={p.addKey !== undefined && p.addKey !== null}
-          onClose={p.onAddClose}
-        />
+      {p.addLabel && p.onAddOpen ? (
+        <AddTask label={p.addLabel} compact={compact} onOpen={p.onAddOpen} />
       ) : null}
       <span className="sr-only" role="status" aria-live="polite">
         {said}

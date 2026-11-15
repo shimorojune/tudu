@@ -35,6 +35,8 @@ import {
   SUNDAY,
   titlesOf,
   twoDays,
+  addInQuickAdd,
+  quickAdd,
 } from '../../fixtures/today';
 
 const phone = () => test.info().project.name === 'phone';
@@ -360,17 +362,12 @@ test.describe('all spaces', () => {
     await page.reload();
     await goAll(page);
     await page.getByRole('button', { name: 'Write the next thing in Personal…' }).click();
-    const field = page.getByRole('textbox', { name: 'New task' });
-    await field.fill('Water the plants');
-    await field.press('Enter');
+    await addInQuickAdd(page, 'Water the plants');
     await expect(pill(allDay(page), 'Water the plants', 'Personal')).toBeVisible();
-    await field.press('Escape');
     await pill(allDay(page), 'Review the Northwind roadmap', 'Northwind').click();
     await page.getByRole('button', { name: 'Write the next thing in Northwind…' }).click();
-    await field.fill('Book the Northwind offsite');
-    await field.press('Enter');
+    await addInQuickAdd(page, 'Book the Northwind offsite');
     await expect(pill(allDay(page), 'Book the Northwind offsite', 'Northwind')).toBeVisible();
-    await field.press('Escape');
     await idle(page);
     expect((await dayOf(page, w.personal.id)).map((t) => t.title)).toContain('Water the plants');
     expect((await dayOf(page, w.nw.id)).map((t) => t.title)).toContain('Book the Northwind offsite');
@@ -921,10 +918,7 @@ test.describe('all spaces', () => {
       await page
         .getByRole('button', { name: `Write the next thing in ${filter?.name ?? 'Personal'}…` })
         .click();
-      const field = page.getByRole('textbox', { name: 'New task' });
-      await field.fill('Water the plants');
-      await field.press('Enter');
-      await field.press('Escape');
+      await addInQuickAdd(page, 'Water the plants');
       await row(list, 'Water the plants').getByRole('button', { name: 'Water the plants' }).click();
       const p = page.getByRole('dialog', { name: 'Task details' });
       await expect(p).toBeVisible();
@@ -975,10 +969,7 @@ test.describe('all spaces', () => {
     await expect(row(list, 'Pay the electricity bill')).toHaveCount(1);
     const release = await holdSync(page);
     await page.getByRole('button', { name: 'Write the next thing…' }).click();
-    const field = page.getByRole('textbox', { name: 'New task' });
-    await field.fill('Water the plants');
-    await field.press('Enter');
-    await field.press('Escape');
+    await addInQuickAdd(page, 'Water the plants');
     await row(list, 'Water the plants').getByRole('button', { name: 'Water the plants' }).click();
     const p = page.getByRole('dialog', { name: 'Task details' });
     await expect(p).toBeVisible();
@@ -1064,7 +1055,7 @@ test.describe('all spaces, by project', () => {
     await fixClock(page);
   });
 
-  test('C21-E30 By project in All spaces: projects of every space in switcher order, space pills stay, a project pill folds the others, "+" writes into the project’s space', async ({
+  test('C21-E30 By project in All spaces: projects of every space in switcher order, space pills stay, a project pill folds the others, "+" opens Quick Add in the project’s space', async ({
     page,
     browser,
   }) => {
@@ -1108,14 +1099,12 @@ test.describe('all spaces, by project', () => {
     // no project chip: nothing was filtered away
     await expect(page.locator('.tp-chip')).toHaveCount(0);
 
-    // "+" on Launch writes into Northwind, in Launch
+    // "+" on Launch opens Quick Add in Northwind, on Launch
     if (!phone()) await group(page, 'Launch').locator('.tp-gh').hover();
     await group(page, 'Launch').getByRole('button', { name: 'Add a task to Launch' }).click();
-    const line = group(page, 'Launch').getByRole('textbox', { name: 'New task' });
-    await expect(line).toBeFocused();
-    await line.fill('Send the invitations');
-    await line.press('Enter');
-    await line.press('Escape');
+    await expect(quickAdd(page).getByRole('button', { name: 'Project: Launch' })).toBeVisible();
+    await addInQuickAdd(page, 'Send the invitations');
+    await expect(group(page, 'Launch').getByText('Send the invitations', { exact: true })).toBeVisible();
     await idle(page);
     const saved = (await serverList(page, w.nw.id, SUN)).find((t) => t.title === 'Send the invitations')!;
     expect(saved.projectId).toBe(nw.projects.Launch);

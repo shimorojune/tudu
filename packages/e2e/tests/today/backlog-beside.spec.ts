@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
+import { API_URL, expect, signInFresh, test, newTaskButton } from '../../fixtures/app';
 import {
   backlogBeside,
   besideList,
@@ -22,7 +22,6 @@ const WAITING = ['Renew passport', 'Draft the Q4 hiring plan'];
 async function dayAndBacklog(page: Page, waiting: string[] = WAITING) {
   await signInFresh(page);
   await writeTasks(page, DAY);
-  await page.getByRole('textbox', { name: 'New task' }).press('Escape');
   const sheet = await backlogBeside(page);
   if (waiting.length) {
     // Empty, the sheet has no writing line: its New task opens Quick Add on the Backlog for the first one.
@@ -33,14 +32,8 @@ async function dayAndBacklog(page: Page, waiting: string[] = WAITING) {
     await qa.getByRole('textbox', { name: 'Task title' }).press('Enter');
     await expect(qa).toHaveCount(0, { timeout: 5000 });
     await expect(sheet.getByText(waiting[0]!, { exact: true })).toBeVisible();
-    await sheet.getByRole('button', { name: 'Add to the Backlog…' }).click();
-    const field = sheet.getByRole('textbox', { name: 'New task' });
-    for (const t of waiting.slice(1)) {
-      await field.fill(t);
-      await field.press('Enter');
-      await expect(sheet.getByText(t, { exact: true })).toBeVisible();
-    }
-    await field.press('Escape');
+    // then its writing line, Quick Add on the Backlog each time
+    await writeTasks(page, waiting.slice(1), sheet, 'Add to the Backlog…');
   }
   await expect.poll(() => titlesOf(besideList(page))).toEqual(waiting);
   await idle(page);
@@ -322,7 +315,7 @@ test.describe('today, the Backlog beside', () => {
     await idle(page);
     expect(await serverDay(page, 'ME-3')).toBeNull();
     // the top bar's New task still follows the day shown
-    await page.getByRole('button', { name: 'New task' }).first().click();
+    await newTaskButton(page).click();
     await expect(qa.getByRole('button', { name: 'Planned for: Today' })).toBeVisible();
   });
 

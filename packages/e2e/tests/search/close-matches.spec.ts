@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
+import { API_URL, expect, signInFresh, test, newTaskButton } from '../../fixtures/app';
 import { box, closeTitles, hit, hitTitles, openSearch, options, panel, search } from '../../fixtures/search';
 import { joinLink, me, secondPerson, seedTasks, switcher } from '../../fixtures/spaces';
 import { dayList, fixClock, idle } from '../../fixtures/today';
@@ -204,7 +204,7 @@ test.describe('close matches', () => {
     page,
   }) => {
     await start(page);
-    await page.getByRole('button', { name: 'New task' }).first().click();
+    await newTaskButton(page).click();
     const bar = page.getByRole('dialog', { name: 'Quick Add' });
     const line = bar.getByRole('textbox', { name: 'Task title' });
     await expect(line).toBeFocused();
@@ -220,7 +220,7 @@ test.describe('close matches', () => {
     await sim.getByRole('button', { name: 'Renew passport' }).click();
     await expect(bar).toHaveCount(0);
     await expect(page).toHaveURL(/\/backlog$/);
-    await page.getByRole('button', { name: 'New task' }).first().click();
+    await newTaskButton(page).click();
     await expect(line).toHaveValue('Renew my passport');
   });
 
