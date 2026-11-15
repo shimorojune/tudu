@@ -170,7 +170,14 @@ export interface QuickAddProps {
    * Words to start with (Create from Search, Make a task in a note): a new nonce writes them in. `note` fills the
    * note; `from` names the note the task links back to (any seed without it drops the pill).
    */
-  seed?: { title?: string; note?: string; from?: QuickAddFromNote | null; nonce: number } | null;
+  seed?: {
+    title?: string;
+    note?: string;
+    from?: QuickAddFromNote | null;
+    /** Where it is planned: a day, or `null` for the Backlog (a list's own "New task"). Left out: the day shown. */
+    day?: IsoDate | null;
+    nonce: number;
+  } | null;
   /**
    * Close matches while you write: tasks that read like the title, asked a moment after a pause. A quiet line under
    * the title names the closest; it never blocks adding.
@@ -366,8 +373,11 @@ export function QuickAdd(p: QuickAddProps) {
 
   // Words handed in (Create from Search, Make a task) become the title, the rest the note.
   const [seenSeed, setSeenSeed] = useState(p.seed?.nonce ?? 0);
+  // A seed that names the day wins over "Planned follows the day you are looking at" below, on the same open.
+  const seededDay = !!p.seed && p.seed.nonce !== seenSeed && p.seed.day !== undefined;
   if (p.seed && p.seed.nonce !== seenSeed) {
     setSeenSeed(p.seed.nonce);
+    if (p.seed.day !== undefined) set({ planned: p.seed.day });
     if (p.seed.title !== undefined) set({ title: p.seed.title });
     if (p.seed.note !== undefined) {
       set({ note: toHtml(p.seed.note) });
@@ -442,7 +452,7 @@ export function QuickAdd(p: QuickAddProps) {
       setPop(null);
       if (p.planned !== undefined && p.planned !== seenPlanned) {
         setSeenPlanned(p.planned);
-        set({ planned: p.planned });
+        if (!seededDay) set({ planned: p.planned });
       }
     } else if (overlay) setLeaving(true);
   }

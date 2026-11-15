@@ -44,6 +44,8 @@ export interface QuickAddSeed {
   toId?: string;
   spaceId?: string;
   from?: QuickAddFrom;
+  /** Where it is planned: a day, or `null` for the Backlog (a list's own "New task"). Left out: the day shown. */
+  day?: IsoDate | null;
 }
 
 let quickAddSeed: (QuickAddSeed & { nonce: number }) | null = null;
@@ -113,17 +115,20 @@ export function openQuickAdd(seed?: QuickAddSeed): void {
   const words = seed && typeof seed.title === 'string' ? seed.title : undefined;
   const toId = seed && typeof seed.toId === 'string' ? seed.toId : undefined;
   const spaceId = seed && typeof seed.spaceId === 'string' ? seed.spaceId : undefined;
-  if (words !== undefined || toId !== undefined)
+  const day = seed && (seed.day === null || typeof seed.day === 'string') ? seed.day : undefined;
+  const seeded = words !== undefined || toId !== undefined || day !== undefined;
+  if (seeded)
     quickAddSeed = {
       title: words,
       toId,
       spaceId,
+      day,
       note: typeof seed?.note === 'string' ? seed.note : undefined,
       from: seed?.from && typeof seed.from.noteId === 'string' ? seed.from : undefined,
       nonce: (quickAddSeed?.nonce ?? 0) + 1,
     };
   if (quickAdd) {
-    if (words !== undefined || toId !== undefined) notify();
+    if (seeded) notify();
     return;
   }
   quickAdd = true;

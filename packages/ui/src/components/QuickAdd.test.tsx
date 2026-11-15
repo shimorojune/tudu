@@ -612,6 +612,18 @@ describe('QuickAdd', () => {
     });
   });
 
+  it('C02-U61 a seed with a day opens on it: null is the Backlog, over the day shown; no day keeps the day shown', () => {
+    const { rerender } = render(<Bar open={false} planned={TODAY} />);
+    rerender(<Bar open planned={TODAY} seed={{ day: null, nonce: 1 }} />);
+    expect(chip('Planned for: Backlog')).toBeInTheDocument();
+    rerender(<Bar open planned={TODAY} seed={{ day: '2026-10-20', nonce: 2 }} />);
+    expect(chip('Planned for: Tue 20 Oct')).toBeInTheDocument();
+    // a new day shown on the next open, with no day in the seed: Planned follows the page again
+    rerender(<Bar open={false} planned={TODAY} seed={{ day: '2026-10-20', nonce: 2 }} />);
+    rerender(<Bar open planned="2026-10-19" seed={{ title: 'Roof', nonce: 3 }} />);
+    expect(chip('Planned for: Tomorrow')).toBeInTheDocument();
+  });
+
   it('C07-U07 words handed in become the title; the kit line opens already shown', () => {
     const { rerender, unmount } = render(<Bar seed={{ title: 'Gutters', nonce: 1 }} />);
     expect(screen.getByRole('textbox', { name: 'Task title' })).toHaveValue('Gutters');

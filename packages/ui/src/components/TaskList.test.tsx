@@ -679,3 +679,29 @@ describe('TaskList', () => {
     ).not.toBeNull();
   });
 });
+
+describe('TaskList fillEmpty', () => {
+  it('C02-U57 empty, the list fills its sheet’s body (whole-sheet drops, a wash that covers it); with tasks or without the prop it does not', () => {
+    const list = () => screen.getByRole('list', { name: 'Backlog' });
+    const { rerender } = render(<TaskList tasks={[]} label="Backlog" group="days" fillEmpty />);
+    expect(list()).toHaveClass('tp-list-fill');
+    rerender(<TaskList tasks={[{ key: 'a', title: 'Call Sam' }]} label="Backlog" group="days" fillEmpty />);
+    expect(list()).not.toHaveClass('tp-list-fill');
+    rerender(<TaskList tasks={[]} label="Backlog" group="days" />);
+    expect(list()).not.toHaveClass('tp-list-fill');
+    const css = parseRules(readStylesheet('components.css'));
+    const fill = css.find((r) => r.selector === '.tp-list.tp-list-fill' && !r.context.length)!;
+    expect(fill.declarations).toMatchObject({ position: 'absolute', inset: '0 12px' });
+    const body = css.find(
+      (r) => r.selector.startsWith('.tp-sheet-body:has(') && r.selector.includes('.tp-list-fill'),
+    )!;
+    expect(body.declarations).toMatchObject({
+      position: 'relative',
+      display: 'flex',
+      'flex-direction': 'column',
+    });
+    expect(css.find((r) => r.selector === '.tp-drop-line.tp-drop-line-off')!.declarations.display).toBe(
+      'none',
+    );
+  });
+});

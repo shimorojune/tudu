@@ -130,6 +130,11 @@ export interface TaskListProps {
   insertable?: boolean;
   /** Lists with the same group trade rows by drag (the two days side by side). */
   group?: string;
+  /**
+   * Empty, the list fills its SheetBody behind an `EmptyState fill`, so a drag from the group lands anywhere on the
+   * empty sheet and the drop wash covers it (the Backlog beside the day).
+   */
+  fillEmpty?: boolean;
   /** A row dragged in from another list of the group, and where it landed. */
   onReceive?: (key: string, at: number) => void;
   /** Takes no drops from the group (a day gone by): rows can still be dragged out of it. */
@@ -669,7 +674,7 @@ export function TaskList(p: TaskListProps) {
     <div className="tp-root">
       <div
         ref={ref}
-        className="tp-list"
+        className={cx('tp-list', p.fillEmpty && !shown.length && 'tp-list-fill')}
         onPointerDown={p.static ? (p.menu ? holdDown : undefined) : down}
         onKeyDown={p.static && !p.menu ? undefined : onKeyDown}
         onContextMenu={p.menu ? onContextMenu : undefined}

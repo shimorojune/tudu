@@ -1525,6 +1525,17 @@ p.tp-jp-none { margin: 0; font-size: 13.5px; }
    comes in only after the last row's gap has folded */
 .tp-wd-none.tp-wd-none-in { animation: tp-fade-in 160ms var(--ease-change) 240ms both; }
 .tp-fold.tp-fold-in { animation: tp-fade-in 160ms var(--ease-change) 240ms both; }
+/* An empty list that fills its sheet (the Backlog beside the day): the words sit in the middle of the body, and the
+   list lies behind them over the whole body, so a drag lands anywhere on it and the drop wash covers it. When the
+   first task lands the words can't fold by height; they stay put over the list and fade. */
+.tp-sheet-body:has(> .tp-empty-fill, > .tp-fold-fill, .tp-list-fill) { position: relative; display: flex; flex-direction: column; }
+.tp-fold-fill { flex: 1 0 auto; display: flex; flex-direction: column; }
+.tp-root.tp-empty.tp-empty-fill { flex: 1 0 auto; justify-content: center; padding: 40px 32px; position: relative; z-index: 1; }
+.tp-fold-fill.tp-fold-fade { position: absolute; inset: 0; z-index: 1; pointer-events: none; animation: tp-fold-fade 240ms var(--ease-leave) both; }
+@keyframes tp-fold-fade { to { opacity: 0; } }
+.tp-list.tp-list-fill { position: absolute; inset: 0 12px; z-index: 0; }
+.tp-drop-line.tp-drop-line-off { display: none; }
+@media (prefers-reduced-motion: reduce) { .tp-fold-fill.tp-fold-fade { animation: none; opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .tp-fold.tp-fold-in { animation-delay: 0ms; } }
 @media (prefers-reduced-motion: reduce) { .tp-item.tp-new { animation: tp-fade-in 120ms linear both; } .tp-wd-none.tp-wd-none-in { animation-delay: 0ms; } }
 

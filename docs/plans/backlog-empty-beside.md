@@ -1,6 +1,6 @@
 # The empty Backlog beside the day
 
-Status: proposal, awaiting Rohit's approval. Asked by Rohit on 15 Nov 2026 ("Backlog in side by side view empty state
+Status: approved by Rohit on 15 Nov 2026; built. Asked by Rohit on 15 Nov 2026 ("Backlog in side by side view empty state
 seems broken"). Design approved by Rohit on 15 Nov 2026: canvas page Today, the "Draft · fix the empty Backlog beside
 the day" row, boards `T-BacklogEmpty` and `T-BacklogEmpty-Dark` (canvas v272). Test cases use the `C02-` prefix of the
 Today chunk (`docs/tests/chunk-02.md`), from `C02-U57` and `C02-E37`.

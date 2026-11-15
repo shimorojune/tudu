@@ -4,6 +4,7 @@ import {
   backlogBeside,
   besideList,
   besideSheet,
+  carry,
   dayList,
   drag,
   fixClock,
@@ -24,9 +25,17 @@ async function dayAndBacklog(page: Page, waiting: string[] = WAITING) {
   await page.getByRole('textbox', { name: 'New task' }).press('Escape');
   const sheet = await backlogBeside(page);
   if (waiting.length) {
+    // Empty, the sheet has no writing line: its New task opens Quick Add on the Backlog for the first one.
+    await sheet.getByRole('button', { name: 'New task' }).click();
+    const qa = page.getByRole('dialog', { name: 'Quick Add' });
+    await expect(qa.getByRole('button', { name: 'Planned for: Backlog' })).toBeVisible();
+    await qa.getByRole('textbox', { name: 'Task title' }).fill(waiting[0]!);
+    await qa.getByRole('textbox', { name: 'Task title' }).press('Enter');
+    await expect(qa).toHaveCount(0, { timeout: 5000 });
+    await expect(sheet.getByText(waiting[0]!, { exact: true })).toBeVisible();
     await sheet.getByRole('button', { name: 'Add to the Backlog…' }).click();
     const field = sheet.getByRole('textbox', { name: 'New task' });
-    for (const t of waiting) {
+    for (const t of waiting.slice(1)) {
       await field.fill(t);
       await field.press('Enter');
       await expect(sheet.getByText(t, { exact: true })).toBeVisible();
@@ -65,7 +74,8 @@ test.describe('today, the Backlog beside', () => {
     const sheet = await backlogBeside(page);
     await expect(sheet.getByRole('heading', { name: 'Backlog' })).toBeVisible();
     await expect(sheet.getByText('No day', { exact: true })).toBeVisible();
-    await expect(count(page)).toHaveText('Nothing waiting');
+    // nothing waiting: the body says so, the title line has no count
+    await expect(count(page)).toHaveCount(0);
     const day = page.getByRole('region', { name: 'The day', exact: true });
     const b = (await sheet.boundingBox())!;
     const d = (await day.boundingBox())!;
@@ -189,10 +199,13 @@ test.describe('today, the Backlog beside', () => {
     page,
   }) => {
     const sheet = await dayAndBacklog(page, []);
-    await expect(count(page)).toHaveText('Nothing waiting');
+    await expect(count(page)).toHaveCount(0);
     await expect(sheet.getByText('Nothing waiting.', { exact: true })).toBeVisible();
-    const list = (await besideList(page).boundingBox())!;
-    await drag(page, row(dayList(page, SUNDAY_TASKS), 'Call Sam at 3pm'), { x: list.x + 120, y: list.y + 8 });
+    const words = (await sheet.getByText('Nothing waiting.', { exact: true }).boundingBox())!;
+    await drag(page, row(dayList(page, SUNDAY_TASKS), 'Call Sam at 3pm'), {
+      x: words.x + words.width / 2,
+      y: words.y + words.height / 2,
+    });
     await expect.poll(() => titlesOf(besideList(page))).toEqual(['Call Sam at 3pm']);
     await expect(count(page)).toHaveText('1 task');
     await expect(sheet.getByText('Nothing waiting.', { exact: true })).toHaveCount(0);
@@ -212,6 +225,126 @@ test.describe('today, the Backlog beside', () => {
     fail = false;
     await besideSheet(page).getByRole('button', { name: 'Try again' }).click();
     await expect.poll(() => titlesOf(besideList(page))).toEqual(['Call Sam at 3pm']);
+  });
+
+  test('C02-E37 an empty Backlog takes a drop anywhere on it: on the words, and at the foot of the sheet', async ({
+    page,
+  }) => {
+    const sheet = await dayAndBacklog(page, []);
+    const words = (await sheet.getByText('Nothing waiting.', { exact: true }).boundingBox())!;
+    await drag(page, row(dayList(page, SUNDAY_TASKS), 'Call Sam at 3pm'), {
+      x: words.x + words.width / 2,
+      y: words.y + words.height / 2,
+    });
+    await expect.poll(() => titlesOf(besideList(page))).toEqual(['Call Sam at 3pm']);
+    await idle(page);
+    expect(await serverDay(page, 'ME-2')).toBeNull();
+    // back to the day with its calendar button, then onto the bottom of the empty sheet
+    await page.getByRole('button', { name: 'Plan it for a day: Call Sam at 3pm' }).click();
+    await page
+      .getByRole('dialog', { name: 'Plan it for a day' })
+      .getByRole('button', { name: 'Today' })
+      .click();
+    await expect(sheet.getByText('Nothing waiting.', { exact: true })).toBeVisible();
+    const body = (await sheet.locator('.tp-sheet-body').boundingBox())!;
+    await drag(page, row(dayList(page, SUNDAY_TASKS), 'Pay the electricity bill'), {
+      x: body.x + body.width / 2,
+      y: body.y + body.height - 40,
+    });
+    await expect.poll(() => titlesOf(besideList(page))).toEqual(['Pay the electricity bill']);
+    await idle(page);
+    expect(await serverDay(page, 'ME-1')).toBeNull();
+  });
+
+  test('C02-E38 dragging over the empty Backlog washes the whole sheet below the title line, with no drop line', async ({
+    page,
+  }) => {
+    const sheet = await dayAndBacklog(page, []);
+    const list = besideList(page);
+    await expect(list).toHaveClass(/tp-list-fill/);
+    const body = (await sheet.locator('.tp-sheet-body').boundingBox())!;
+    await carry(page, row(dayList(page, SUNDAY_TASKS), 'Call Sam at 3pm'), {
+      x: body.x + body.width / 2,
+      y: body.y + body.height / 2,
+    });
+    await expect(list).toHaveClass(/tp-drop-on/);
+    const wash = (await list.boundingBox())!;
+    expect(wash.height).toBeGreaterThanOrEqual(body.height * 0.8);
+    await expect(list.locator('.tp-drop-line')).toHaveClass(/tp-drop-line-off/);
+    await expect(list.locator('.tp-drop-line')).toBeHidden();
+    // back over the day: the wash goes
+    const day = (await dayList(page, SUNDAY_TASKS).boundingBox())!;
+    await page.mouse.move(day.x + 120, day.y + 8, { steps: 8 });
+    await expect(list).not.toHaveClass(/tp-drop-on/);
+    await page.mouse.up();
+    await expect.poll(() => titlesOf(besideList(page))).toEqual([]);
+  });
+
+  test('C02-E39 empty, the words sit in the middle of the sheet and the title line has no count; one task, "1 task"', async ({
+    page,
+  }) => {
+    const sheet = await dayAndBacklog(page, []);
+    const body = (await sheet.locator('.tp-sheet-body').boundingBox())!;
+    const empty = (await sheet.locator('.tp-empty').boundingBox())!;
+    const pad = 32; // the body's own foot
+    expect(Math.abs(empty.y + empty.height / 2 - (body.y + (body.height - pad) / 2))).toBeLessThanOrEqual(24);
+    await expect(count(page)).toHaveCount(0);
+    await expect(sheet.getByRole('textbox')).toHaveCount(0);
+    await expect(sheet.getByRole('button', { name: 'Add to the Backlog…' })).toHaveCount(0);
+    const words = (await sheet.getByText('Nothing waiting.', { exact: true }).boundingBox())!;
+    await drag(page, row(dayList(page, SUNDAY_TASKS), 'Call Sam at 3pm'), {
+      x: words.x + words.width / 2,
+      y: words.y + words.height / 2,
+    });
+    await expect(count(page)).toHaveText('1 task');
+    await expect(sheet.getByText('Nothing waiting.', { exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Plan it for a day: Call Sam at 3pm' }).click();
+    await page
+      .getByRole('dialog', { name: 'Plan it for a day' })
+      .getByRole('button', { name: 'Today' })
+      .click();
+    await expect(sheet.getByText('Nothing waiting.', { exact: true })).toBeVisible();
+    await expect(count(page)).toHaveCount(0);
+  });
+
+  test('C02-E40 New task on the empty Backlog opens Quick Add on the Backlog; the task lands in the sheet, not the day', async ({
+    page,
+  }) => {
+    const sheet = await dayAndBacklog(page, []);
+    await sheet.getByRole('button', { name: 'New task' }).click();
+    const qa = page.getByRole('dialog', { name: 'Quick Add' });
+    await expect(qa.getByRole('button', { name: 'Planned for: Backlog' })).toBeVisible();
+    await qa.getByRole('textbox', { name: 'Task title' }).fill('Renew passport');
+    await qa.getByRole('button', { name: /^Add( task)?$/ }).click();
+    await expect(qa).toHaveCount(0, { timeout: 5000 });
+    await expect.poll(() => titlesOf(besideList(page))).toEqual(['Renew passport']);
+    await expect.poll(() => titlesOf(dayList(page, SUNDAY_TASKS))).toEqual(DAY);
+    await idle(page);
+    expect(await serverDay(page, 'ME-3')).toBeNull();
+    // the top bar's New task still follows the day shown
+    await page.getByRole('button', { name: 'New task' }).first().click();
+    await expect(qa.getByRole('button', { name: 'Planned for: Today' })).toBeVisible();
+  });
+
+  test.describe('dark', () => {
+    test.use({ colorScheme: 'dark' });
+    test('C02-E41 the empty Backlog in the dark: words and button show, the wash is the dark selection', async ({
+      page,
+    }) => {
+      const sheet = await dayAndBacklog(page, []);
+      await expect(sheet.getByText('Nothing waiting.', { exact: true })).toBeVisible();
+      await expect(sheet.getByRole('button', { name: 'New task' })).toBeVisible();
+      const body = (await sheet.locator('.tp-sheet-body').boundingBox())!;
+      await carry(page, row(dayList(page, SUNDAY_TASKS), 'Call Sam at 3pm'), {
+        x: body.x + body.width / 2,
+        y: body.y + body.height / 2,
+      });
+      const list = besideList(page);
+      await expect(list).toHaveClass(/tp-drop-on/);
+      const bg = await list.evaluate((el) => getComputedStyle(el).backgroundColor);
+      expect(bg).toBe('rgba(255, 106, 74, 0.09)');
+      await page.mouse.up();
+    });
   });
 
   test('C02-E23 offline: a task moved into the Backlog moves at once and reaches the server when back', async ({

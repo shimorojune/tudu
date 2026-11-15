@@ -1198,21 +1198,6 @@ async function addToday(app: App, spaceId: string, titles: string[]): Promise<st
   return ids;
 }
 
-/** Tasks in a space's Backlog (no day), written as the page's person would from another device. */
-async function addBacklog(app: App, spaceId: string, titles: string[]): Promise<string[]> {
-  const ids = titles.map(() => crypto.randomUUID());
-  await asPage(app, 'POST', '/api/sync', {
-    clientId: 'other-device',
-    mutations: titles.map((title, i) => ({
-      id: crypto.randomUUID(),
-      type: 'task.create',
-      payload: { id: ids[i], spaceId, title, day: null, position: 1024 * (i + 1) },
-      at: new Date(Date.now() + i).toISOString(),
-    })),
-  });
-  return ids;
-}
-
 /** Ticked off from another device (the phone). */
 async function crossElsewhere(app: App, ids: string[]): Promise<void> {
   await asPage(app, 'POST', '/api/sync', {
@@ -1706,13 +1691,12 @@ test.describe('a drop on the other day', () => {
     ).toEqual([['Pay the electricity bill', 'Book car service'], ['Call Sam at 3pm']]);
   });
 
-  test('C02-D02 the Backlog beside in the real app: a task dragged into it and another out; it is still beside after a relaunch', async ({
+  test('C02-D02 the Backlog beside in the real app: a task dropped on the middle of the empty sheet, one out, one in again; still beside after a relaunch', async ({
     app,
   }) => {
     await signIn(app);
     const space = await personal(app);
     await addToday(app, space.id, ['Pay the electricity bill', 'Call Sam at 3pm']);
-    await addBacklog(app, space.id, ['Renew passport']);
     await go(app, await app.eval<string>(`return location.pathname`));
     await app.until(`return T.all('button', 'Call Sam at 3pm').length > 0`, 'main', 15_000);
     // The day's rows can draw before the top bar has its switch (CI saw no switch yet), so wait for it too.
@@ -1727,11 +1711,12 @@ test.describe('a drop on the other day', () => {
     await app.until(
       `const s = document.querySelector('.tp-spread-start > .tp-spread-second');
        return !!s && s.classList.contains('tp-on') && !s.classList.contains('tp-moving') &&
-         !!${beside}?.querySelector('[data-reorder]')`,
+         !!${beside}?.querySelector('[role=list][aria-label="Tasks in the Backlog"]')`,
       'main',
       15_000,
     );
-    // Carry a row from one list onto the other's top with pointer events, as the mouse would.
+    // Carry a row from one list onto the other's top with pointer events, as the mouse would. An empty Backlog fills
+    // its sheet: aim at the middle of it (the words), where the drop used to miss (docs/plans/backlog-empty-beside.md).
     const carry = (from: string, title: string, to: string) =>
       app.eval(`
         const src = document.querySelector('[role=list][aria-label="${from}"]');
@@ -1746,7 +1731,7 @@ test.describe('a drop on the other day', () => {
         const from = moved.getBoundingClientRect();
         const box = dst.getBoundingClientRect();
         const x0 = from.left + 120, y0 = from.top + from.height / 2;
-        const x1 = box.left + 120, y1 = box.top + 8;
+        const x1 = box.left + 120, y1 = dst.classList.contains('tp-list-fill') ? box.top + box.height / 2 : box.top + 8;
         fire(moved.querySelector('.tp-strike'), 'pointerdown', x0, y0);
         fire(window, 'pointermove', x0, y0 + 6);
         for (let i = 1; i <= 12; i++) {
@@ -1764,15 +1749,25 @@ test.describe('a drop on the other day', () => {
     const dayList = await app.eval<string>(
       `return document.querySelector('[aria-label="The day"] [role=list]').getAttribute('aria-label')`,
     );
+    const filled = () =>
+      app.eval<boolean>(
+        `return !!document.querySelector('[role=list][aria-label="Tasks in the Backlog"].tp-list-fill')`,
+      );
+    expect(await filled()).toBe(true);
     await carry(dayList, 'Call Sam at 3pm', 'Tasks in the Backlog');
-    await carry('Tasks in the Backlog', 'Renew passport', dayList);
-    expect(await titles(dayList)).toEqual(['Renew passport', 'Pay the electricity bill']);
     expect(await titles('Tasks in the Backlog')).toEqual(['Call Sam at 3pm']);
+    await carry('Tasks in the Backlog', 'Call Sam at 3pm', dayList);
+    expect(await titles(dayList)).toEqual(['Call Sam at 3pm', 'Pay the electricity bill']);
+    await app.until(`return T.all('*', 'Nothing waiting.').length > 0`, 'main', 5_000);
+    expect(await filled()).toBe(true);
+    await carry(dayList, 'Pay the electricity bill', 'Tasks in the Backlog');
+    expect(await titles(dayList)).toEqual(['Call Sam at 3pm']);
+    expect(await titles('Tasks in the Backlog')).toEqual(['Pay the electricity bill']);
 
     await app.quit();
     await app.launch();
     await onToday(app);
     await app.until(`return !!${beside}?.querySelector('[data-reorder]')`, 'main', 15_000);
-    expect(await titles('Tasks in the Backlog')).toEqual(['Call Sam at 3pm']);
+    expect(await titles('Tasks in the Backlog')).toEqual(['Pay the electricity bill']);
   });
 });
