@@ -283,7 +283,12 @@ mod mac {
                 response: &UNNotificationResponse,
                 done: &block2::DynBlock<dyn Fn()>,
             ) {
-                super::answered(self.ivars(), &response.actionIdentifier().to_string());
+                let action = response.actionIdentifier().to_string();
+                let id = response.notification().request().identifier().to_string();
+                // A time notification (docs/plans/task-times.md) knows its task; anything else is a nudge.
+                if !crate::times::answered(self.ivars(), &id, &action) {
+                    super::answered(self.ivars(), &action);
+                }
                 done.call(());
             }
         }
@@ -315,7 +320,10 @@ mod mac {
                 &NSArray::new(),
                 UNNotificationCategoryOptions::empty(),
             );
-        c.setNotificationCategories(&NSSet::from_retained_slice(&[category]));
+        c.setNotificationCategories(&NSSet::from_retained_slice(&[
+            category,
+            crate::times::mac::category(),
+        ]));
     }
 
     pub fn ask() -> Permission {

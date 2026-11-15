@@ -140,7 +140,10 @@ export function QuickAddPage({ me }: { me: MeResponse }) {
 
 const DRAFT_KEY = 'tudu.floating.draft';
 
-type KeptDraft = Pick<QuickAddDraft, 'title' | 'planned' | 'due' | 'until' | 'time' | 'dueAt' | 'projectId' | 'note'>;
+type KeptDraft = Pick<
+  QuickAddDraft,
+  'title' | 'planned' | 'due' | 'until' | 'time' | 'dueAt' | 'projectId' | 'note'
+>;
 
 /** The floating bar's draft as it was left (files are not kept: they live on the server only once added). */
 export function readDraft(today: string): Partial<KeptDraft> | undefined {

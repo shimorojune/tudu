@@ -486,3 +486,53 @@ describe('C21-U22 a space tile shown alone is 16px', () => {
     expect(rule!.declarations['border-radius']).toMatch(/^5px/);
   });
 });
+
+describe('TaskRow times (docs/plans/task-times.md)', () => {
+  const sig = (k: string) => document.querySelector(`.tp-sg-${k}`) as HTMLElement;
+
+  it('TT-U12 pills: the block, the due time, span words full and brief; the tint from day 2, not when done', () => {
+    const { rerender } = render(
+      <Row time={{ start: '15:00', end: '16:00' }} due={dueLabel('2026-10-18', '2026-10-18')} />,
+    );
+    expect(sig('time')).toHaveTextContent('3 to 4 PM');
+    expect(document.querySelector('.tp-row')).not.toHaveClass('tp-span-on');
+    const span = { from: '2026-10-18', until: '2026-10-21', n: 1, of: 4 };
+    rerender(<Row time={{ start: '10:00', end: '17:00' }} span={span} />);
+    expect(sig('time')).toHaveTextContent('Day 1 of 4 · from 10 AM');
+    expect(document.querySelector('.tp-row')).not.toHaveClass('tp-span-on');
+    rerender(<Row time={{ start: '10:00', end: '17:00' }} span={{ ...span, n: 2 }} />);
+    expect(sig('time')).toHaveTextContent('Day 2 of 4');
+    expect(document.querySelector('.tp-row')).toHaveClass('tp-span-on');
+    rerender(<Row time={{ start: '10:00', end: '17:00' }} span={{ ...span, n: 4 }} />);
+    expect(sig('time')).toHaveTextContent('Day 4 of 4 · until 5 PM');
+    rerender(<Row brief time={{ start: '10:00', end: '17:00' }} span={{ ...span, n: 3 }} />);
+    expect(sig('time')).toHaveTextContent('3/4');
+    rerender(<Row brief time={{ start: '15:30', end: '16:00' }} />);
+    expect(sig('time')).toHaveTextContent('3:30 PM');
+  });
+
+  it('TT-U12 crossed off, a span row loses its tint', async () => {
+    const user = userEvent.setup();
+    render(<Row span={{ from: '2026-10-18', until: '2026-10-21', n: 2, of: 4 }} />);
+    expect(document.querySelector('.tp-row')).toHaveClass('tp-span-on');
+    await user.click(screen.getByRole('checkbox'));
+    expect(document.querySelector('.tp-row')).not.toHaveClass('tp-span-on');
+  });
+
+  it('TT-U16 every pill with an svg holds it inside its words, on the baseline', () => {
+    render(
+      <Row
+        time={{ start: '15:00', end: '16:00' }}
+        due={dueLabel('2026-10-20', '2026-10-18')}
+        comments={2}
+        subtasks={[{ key: 's', title: 'One', done: false }]}
+      />,
+    );
+    for (const k of ['time', 'due', 'comments']) {
+      const ic = sig(k).querySelector('.tp-bl-ic');
+      expect(ic, k).not.toBeNull();
+      expect(ic!.parentElement!.textContent).toMatch(/\S/);
+      expect(ic!.querySelector('svg'), k).not.toBeNull();
+    }
+  });
+});

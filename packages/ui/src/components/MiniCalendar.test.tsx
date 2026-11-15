@@ -197,3 +197,34 @@ describe('MiniCalendar', () => {
     expect(within(screen.getByRole('grid')).getByRole('button', { pressed: true })).toBe(day(20));
   });
 });
+
+describe('MiniCalendar times (docs/plans/task-times.md)', () => {
+  it('TT-U10 Due presets: Today, Tomorrow, No date; No date calls onClear; no Remove due date foot', async () => {
+    const user = userEvent.setup();
+    const onClear = vi.fn();
+    const onPick = vi.fn();
+    render(
+      <MiniCalendar
+        today={TODAY}
+        selected="2026-10-20"
+        presets={[
+          { label: 'Today', on: false, value: TODAY },
+          { label: 'Tomorrow', on: false, value: '2026-10-19' },
+          { label: 'No date', on: false, value: null },
+        ]}
+        onPick={onPick}
+        onClear={onClear}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Remove due date' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'No date' }));
+    expect(onClear).toHaveBeenCalledTimes(1);
+  });
+
+  it('TT-U09 a range marks its first, middle and last days', () => {
+    const { container } = render(<MiniCalendar today={TODAY} selected="2026-10-18" until="2026-10-21" />);
+    expect(container.querySelector('.tp-range-a')).toHaveAccessibleName(/^18 October/);
+    expect(container.querySelector('.tp-range-z')).toHaveAccessibleName(/^21 October/);
+    expect(container.querySelectorAll('.tp-range')).toHaveLength(4);
+  });
+});

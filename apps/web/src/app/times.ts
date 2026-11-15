@@ -39,6 +39,7 @@ export function useMinute(): Date {
 export const rowTimes = {
   timeWords,
   onTimeChange: (t: { key: string }, v: Parameters<typeof taskStore.time>[1]) => taskStore.time(t.key, v),
-  onSpanChange: (t: { key: string }, from: string, until: string | null) => taskStore.span(t.key, from, until),
+  onSpanChange: (t: { key: string }, from: string, until: string | null) =>
+    taskStore.span(t.key, from, until),
   onDueTimeChange: (t: { key: string }, at: string | null) => taskStore.dueTime(t.key, at),
 };

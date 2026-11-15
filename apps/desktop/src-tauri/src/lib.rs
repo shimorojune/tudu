@@ -13,6 +13,7 @@ mod nudges;
 mod place;
 mod shortcuts;
 mod track;
+mod times;
 mod updates;
 mod windows;
 
@@ -66,6 +67,8 @@ macro_rules! handlers {
             nudges::notify_status,
             nudges::notify_nudge,
             nudges::open_notification_settings,
+            times::schedule_times,
+            times::cancel_times,
             hotkeys::shortcuts_get,
             hotkeys::shortcuts_set,
             $($extra),*
