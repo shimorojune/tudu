@@ -69,7 +69,7 @@ lines do and more (day, due, time, project, note, files, sending). One way in me
 - `TaskGroups`: `onAdd(text, group, before?)`, `groupAddLabel`, `addKey`, `onAddClose` and the per-group line
   (`openLine`, `line`, `endBump`) go. New `onAddOpen?: () => void` (the end line) and `onGroupAdd?: (key, group) =>
 void` (the header "+"; `GroupHeader`'s `onAdd` keeps its name and calls it).
-- `QuickAdd`'s `seed` gains `planned?: IsoDate | null` and `projectId?: string | null`. A seed with `planned` sets the
+- `QuickAdd`'s `seed` gains `day?: IsoDate | null` (added by PR #111, Backlog empty state; this work reuses it) and `projectId?: string | null`. A seed with `day` sets the
   day (null = Backlog); with `projectId` sets the project (only one in `projects`, else none, as the project-hash
   work already requires).
 - CSS: `.tp-root:not(:has(> .tp-addtask)) > .tp-list > .tp-item:last-child .tp-row { border-bottom-color:
@@ -79,8 +79,8 @@ transparent; }`.
 
 ### Web app (`apps/web`)
 
-- `dayView.ts`: `QuickAddSeed` gains `day?: IsoDate | null` and `projectId?: string | null`; `QuickAddHost` passes
-  them to `QuickAdd`'s seed as `planned` / `projectId`. The unused `useNewTaskAsk` / `askNewTask` go.
+- `dayView.ts`: `QuickAddSeed` has `day` from PR #111 and gains `projectId?: string | null`; `QuickAddHost` passes
+  them to `QuickAdd`'s seed as `day` / `projectId`. The unused `useNewTaskAsk` / `askNewTask` go.
 - `TodayPage`: the `writing` state and every `onAdd` handler go. `onAddOpen = () => openQuickAdd({ day })` (in All
   spaces also `spaceId: all.target.id`); `onGroupAdd` adds the group's `projectId` (and its space in All spaces).
   The welcome and empty day buttons read New task and call the same `openQuickAdd`.
@@ -141,7 +141,7 @@ once per title. The specs that call them do not change. Tests whose subject was 
 | NI-U02 | `packages/ui/src/components/TaskList.test.tsx`   | `addLabel` + `onAddOpen` draws the line; click calls `onAddOpen`; no `onAddOpen`, no line; a new task gets the gap wash |
 | NI-U03 | `packages/ui/src/components/TaskList.test.tsx`   | No insert slot between rows at any pause, hover or drag; the last row has no bottom border when no line follows         |
 | NI-U04 | `packages/ui/src/components/TaskGroups.test.tsx` | The header "+" calls `onGroupAdd(key, group)`; a folded group stays folded; no group writing line; one end line         |
-| NI-U05 | `packages/ui/src/components/QuickAdd.test.tsx`   | A seed with `planned` sets the day (null shows Backlog), with `projectId` the project; an unknown project leaves none   |
+| NI-U05 | `packages/ui/src/components/QuickAdd.test.tsx`   | A seed with `day` sets the day (null shows Backlog), with `projectId` the project; an unknown project leaves none       |
 | NI-U06 | `packages/ui/src/components/QuickAdd.test.tsx`   | A seed with only a title keeps the page's day and no project (Search's Create, notes keep working)                      |
 
 ### End-to-end (Playwright, web)
