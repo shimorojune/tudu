@@ -806,7 +806,7 @@ describe('similar reports and +1 that one instead (#76)', () => {
     expect((await mirrorRow(sent.issue!.number))[0]!.embedding).not.toBeNull();
   });
 
-  it('C19-A22 similar: closest first, at most three, open and closed, locked and far ones left out; fixed and closed told apart; +1s counted', async () => {
+  it('C19-A22 C19-A37 similar: closest first, at most three, open and closed, locked and far ones left out; fixed and closed told apart; +1s counted', async () => {
     const { jar } = await signIn(server);
     const [fixed, open, far, locked, notPlanned] = await seed(
       {
@@ -840,6 +840,10 @@ describe('similar reports and +1 that one instead (#76)', () => {
       plusOnes: 0,
     });
     expect(issues.find((i) => i.number === open!.number)!.state).toBe('open');
+    // C19-A37 (#115): each row carries the report's own opening words.
+    expect(issues.find((i) => i.number === fixed!.number)!.summary).toBe(
+      'The Jira count in the sidebar shows 1 although two Jira tickets are assigned to me.',
+    );
     // Closest first: the near-copy before the looser one.
     expect(numbers.indexOf(fixed!.number)).toBeLessThan(numbers.indexOf(open!.number));
     // Not planned reads as closed, wherever it lands.

@@ -326,7 +326,9 @@ describe('C19-U06 the draft and the details switch', () => {
     act(() => openFeedback());
     await screen.findByRole('button', { name: 'Public on GitHub: what’s shared' });
     await user.type(box(), 'Jira count says 1');
-    await user.click(await screen.findByRole('button', { name: '+1 #64 instead of a new issue' }));
+    await user.click(
+      await screen.findByRole('button', { name: '+1 #64 instead of a new issue' }, { timeout: 2500 }),
+    );
     expect(screen.getByRole('button', { name: /\+1 on #64/ })).toBeInTheDocument();
     const sw = () => screen.getByRole('switch', { name: 'File it as a public issue' });
     expect(sw()).toBeChecked();
@@ -335,7 +337,7 @@ describe('C19-U06 the draft and the details switch', () => {
     expect(screen.getByRole('button', { name: /^Send$/ })).toBeInTheDocument();
     const looks = similar.looks.length;
     await user.type(box(), ' after a reload');
-    await new Promise((r) => setTimeout(r, 600));
+    await new Promise((r) => setTimeout(r, 1200));
     expect(similar.looks).toHaveLength(looks);
     // Closed and opened again: still off, words kept.
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -360,48 +362,69 @@ describe('C19-U06 the draft and the details switch', () => {
     expect(sw()).toBeChecked();
   });
 
-  it('C19-U32 similar looks: none under three words; one 450ms after the last key; a newer look aborts the older; rows stay dimmed while the next comes', async () => {
+  it('C19-U32 similar looks (#114): none under three words; one 800ms after the last key; nothing shows while a look is out; the same words are not asked twice; the newest answer wins; a failure says nothing', async () => {
     const user = userEvent.setup();
+    const slow = { timeout: 2500 };
     mine.answer = { filing: 'github', reports: [] };
     similar.answer = { issues: [JIRA] };
     mount();
     act(() => openFeedback());
     await screen.findByRole('button', { name: 'Public on GitHub: what’s shared' });
+    const fold = () => screen.getByTestId('similar-reports');
     await user.type(box(), 'Jira count');
-    await new Promise((r) => setTimeout(r, 600));
+    await new Promise((r) => setTimeout(r, 1000));
     expect(similar.looks).toHaveLength(0);
     await user.type(box(), ' wrong');
-    // Not while the keys are coming; then once.
+    // Not while the keys are coming, nor 500ms after; then once.
+    await new Promise((r) => setTimeout(r, 500));
     expect(similar.looks).toHaveLength(0);
-    await waitFor(() => expect(similar.looks).toHaveLength(1));
+    await waitFor(() => expect(similar.looks).toHaveLength(1), slow);
     expect(similar.looks[0]!.q).toBe('Jira count wrong');
     expect(await screen.findByText('Already reported?')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '+1 #64 instead of a new issue' })).toBeInTheDocument();
-    // The next look keeps the rows, dimmed, until it answers.
+
+    // A look that takes its time: the box stays exactly as it is, no dimming, no "Checking".
     let answer!: (v: SimilarIssues) => void;
     const { api } = await import('./session');
     (api.get as ReturnType<typeof vi.fn>).mockImplementationOnce(
-      (path: string, init?: RequestInit) =>
+      (path: string) =>
         new Promise((done) => {
-          similar.looks.push({
-            q: new URL(path, 'http://x').searchParams.get('q') ?? '',
-            signal: init?.signal ?? undefined,
-          });
+          similar.looks.push({ q: new URL(path, 'http://x').searchParams.get('q') ?? '', signal: undefined });
           answer = done;
         }),
     );
     await user.type(box(), ' in the sidebar');
-    await waitFor(() => expect(similar.looks).toHaveLength(2));
-    expect(screen.getByRole('list', { name: 'Similar reports' })).toHaveClass('tp-stale');
-    // A newer look before it answers aborts it.
+    await waitFor(() => expect(similar.looks).toHaveLength(2), slow);
+    expect(fold()).not.toHaveClass('tp-hide');
+    expect(screen.getByRole('list', { name: 'Similar reports' })).not.toHaveClass('tp-stale');
+    expect(screen.queryByText(/Checking/)).toBeNull();
+    // Only case and punctuation changed: not asked again.
+    await user.type(box(), '!');
+    await new Promise((r) => setTimeout(r, 1200));
+    expect(similar.looks).toHaveLength(2);
+
+    // A newer look answers first with nothing close: the box folds shut, and the older answer can't open it.
     similar.answer = { issues: [] };
     await user.type(box(), ' today');
-    await waitFor(() => expect(similar.looks).toHaveLength(3));
-    expect(similar.looks[1]!.signal?.aborted).toBe(true);
+    await waitFor(() => expect(similar.looks).toHaveLength(3), slow);
+    await waitFor(() => expect(fold()).toHaveClass('tp-hide'));
     act(() => answer({ issues: [JIRA] }));
-    // The newest answer (nothing close) wins: the box folds shut.
-    await waitFor(() => expect(screen.getByTestId('similar-reports')).toHaveClass('tp-hide'));
-  });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(fold()).toHaveClass('tp-hide');
+
+    // Back to words already answered: served from this open's answers, no new look.
+    await user.type(box(), '{Backspace>6/}');
+    await waitFor(() => expect(fold()).not.toHaveClass('tp-hide'), slow);
+    expect(similar.looks).toHaveLength(3);
+
+    // A look that fails: nothing is said, the box stays as it was.
+    similar.answer = new Error('down');
+    await user.type(box(), ' again');
+    await waitFor(() => expect(similar.looks).toHaveLength(4), slow);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(fold()).not.toHaveClass('tp-hide');
+    expect(screen.queryByText(/Couldn’t check/)).toBeNull();
+  }, 20_000);
 
   it('C19-U33 a +1 goes as plusOneOf and says it’s on #64; a 409 clears the pick and keeps the words; a queued +1 keeps it, and goes as new if refused', async () => {
     const user = userEvent.setup();
@@ -419,7 +442,9 @@ describe('C19-U06 the draft and the details switch', () => {
     act(() => openFeedback());
     await screen.findByRole('button', { name: 'Public on GitHub: what’s shared' });
     await user.type(box(), 'Jira count says 1');
-    await user.click(await screen.findByRole('button', { name: '+1 #64 instead of a new issue' }));
+    await user.click(
+      await screen.findByRole('button', { name: '+1 #64 instead of a new issue' }, { timeout: 2500 }),
+    );
     await user.click(screen.getByRole('button', { name: /\+1 on #64/ }));
     await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
     expect((send.mock.calls[0]![0] as QueuedReport).report.plusOneOf).toBe(64);

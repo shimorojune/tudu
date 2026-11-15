@@ -13,6 +13,9 @@ import {
   ISSUE_TEXT_MAX,
   PLUS_ONE_LINE,
   similarReady,
+  similarKey,
+  issueSummary,
+  SIMILAR_SUMMARY_MAX,
   issueTitle,
   noMentions,
   osOf,
@@ -284,5 +287,26 @@ describe('similar reports and +1 that one instead (#76)', () => {
     expect(similarReady('Jira count')).toBe(false);
     expect(similarReady('a b c')).toBe(false);
     expect(similarReady('   The Jira count   ')).toBe(true);
+  });
+});
+
+describe('a calm duplicate check (#114, #115)', () => {
+  it('C19-U40 similarKey: case, punctuation and spacing don’t make new words; real word changes do', () => {
+    expect(similarKey('Jira count,  WRONG!')).toBe('jira count wrong');
+    expect(similarKey('jira count wrong')).toBe(similarKey('Jira — count wrong…'));
+    expect(similarKey('Jira count wrong')).not.toBe(similarKey('Jira count wrong today'));
+    expect(similarKey('Café ünïcode 42')).toBe('café ünïcode 42');
+  });
+
+  it('C19-U41 issueSummary: the report’s words on one line, no “Similar to #N” lead, cut at a word under the cap', () => {
+    expect(issueSummary('First line.\n\nSecond   line.')).toBe('First line. Second line.');
+    expect(issueSummary('Similar to #64\n\nThe count is wrong')).toBe('The count is wrong');
+    expect(issueSummary('')).toBe('');
+    const long = Array.from({ length: 80 }, (_, i) => `word${i}`).join(' ');
+    const cut = issueSummary(long);
+    expect(cut.length).toBeLessThanOrEqual(SIMILAR_SUMMARY_MAX + 1);
+    expect(cut.endsWith('…')).toBe(true);
+    expect(long.startsWith(cut.slice(0, -1))).toBe(true);
+    expect(long.charAt(cut.length - 1)).toBe(' ');
   });
 });

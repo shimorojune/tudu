@@ -472,7 +472,6 @@
 :root[data-motion='less'] .tp-root .tp-sim ul,
 :root[data-motion='less'] .tp-root .tp-sim-row,
 :root[data-motion='less'] .tp-root .tp-sim-plus,
-:root[data-motion='less'] .tp-root .tp-sim-err,
 :root[data-motion='less'] .tp-root .tp-fb-inst {
   transition: none;
   animation: none;

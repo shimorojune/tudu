@@ -287,8 +287,8 @@ export const SIMILAR_LIMIT = 3;
 /** The form looks once the words have this many words, and this many characters. */
 export const SIMILAR_MIN_WORDS = 3;
 export const SIMILAR_MIN_CHARS = 12;
-/** How long after the last key the form looks. */
-export const SIMILAR_DEBOUNCE_MS = 450;
+/** How long after you stop typing the form looks (#114: a pause mid-thought is not a look). */
+export const SIMILAR_DEBOUNCE_MS = 800;
 /**
  * The closeness an issue needs. Issue bodies are longer and noisier than task titles, so stricter than
  * MEANING_FLOOR; tuned against the real issues (C19-A24).
@@ -296,6 +296,37 @@ export const SIMILAR_DEBOUNCE_MS = 450;
 export const SIMILAR_FLOOR = 0.5;
 /** The words searched with are cut to this. */
 export const SIMILAR_QUERY_MAX = 1000;
+
+/**
+ * The words as a look sees them (#114): case, punctuation and spacing don't count, so "Jira count, wrong" and
+ * "jira count wrong " are the same look and the second is never asked.
+ */
+export function similarKey(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .join(' ');
+}
+
+/** A similar issue's own words, as its row shows them: at most this many characters (the row clamps to 3 lines). */
+export const SIMILAR_SUMMARY_MAX = 280;
+
+/**
+ * The opening words of an issue's report for its row (#115): the matched words (issueBodyText) on one line, without
+ * a "Similar to #N" lead line, cut at a word. Empty for an issue with no words of its own (the row shows its title).
+ */
+export function issueSummary(bodyText: string): string {
+  const flat = bodyText
+    .replace(/^Similar to #\d+\s*/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (flat.length <= SIMILAR_SUMMARY_MAX) return flat;
+  const cut = flat.slice(0, SIMILAR_SUMMARY_MAX);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > SIMILAR_SUMMARY_MAX * 0.6 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
 
 /** Whether the words are enough to look for similar reports. */
 export function similarReady(text: string): boolean {
@@ -313,6 +344,8 @@ export interface SimilarIssue {
   closedAt: string | null;
   /** +1s from the app so far. */
   plusOnes: number;
+  /** The report's opening words (issueSummary); empty or missing from older servers, when the row shows `title`. */
+  summary?: string;
 }
 
 /** GET /api/feedback/similar. */

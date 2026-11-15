@@ -16,6 +16,8 @@ const SIMILAR: SimilarIssue[] = [
     createdAt: day(12),
     closedAt: day(5),
     plusOnes: 2,
+    summary:
+      'I have two Jira tickets assigned but the count in the sidebar still shows 1. A new ticket was assigned to me this morning and the number did not move until I reloaded the whole app.',
   },
   {
     number: 62,
@@ -205,13 +207,8 @@ export function FeedbackStates() {
         render={() => <Form filing="github" text={WORDS} scrambled />}
       />
       <Pair
-        title="Send feedback, checking for similar reports"
-        note="The first look, 450ms after typing stops with three words or more: two shimmer rows."
-        render={() => <Form filing="github" text={JIRA_WORDS} similar={{ state: 'loading', issues: [] }} />}
-      />
-      <Pair
         title="Send feedback, already reported?"
-        note="Up to three issues, open and closed, closest first. +1 picks one; the arrow opens it on GitHub."
+        note="Only when a look finds credible matches (nothing shows while looking, or if it fails). Up to three issues, closest first, each in its report’s own words, up to 3 lines. +1 picks one; the arrow opens it on GitHub."
         render={() => (
           <Form
             filing="github"
@@ -233,11 +230,6 @@ export function FeedbackStates() {
             onOpenIssue={() => {}}
           />
         )}
-      />
-      <Pair
-        title="Send feedback, couldn’t check for similar reports"
-        note="The model is off or the issues haven’t been read yet: one quiet line; sending works as usual."
-        render={() => <Form filing="github" text={JIRA_WORDS} similar={{ state: 'error', issues: [] }} />}
       />
       <Pair
         title="Send feedback, screenshot GitHub can’t show"

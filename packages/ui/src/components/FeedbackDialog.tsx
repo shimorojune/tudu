@@ -63,7 +63,7 @@ export interface FeedbackDialogProps {
   /** Open on GitHub: a new tab, or the browser from the Mac app. */
   onOpenIssue?: (url: string) => void;
   /** "Already reported?" (#76, GitHub filing only): issues that mean what is being typed. */
-  similar?: { state: SimilarReportsState; issues: SimilarIssue[]; stale?: boolean };
+  similar?: { state: SimilarReportsState; issues: SimilarIssue[] };
   /** The issue picked for "+1 that one instead": Send adds the report to it as a comment. */
   picked?: SimilarIssue | null;
   onPick?: (issue: SimilarIssue | null) => void;
@@ -416,7 +416,6 @@ export function FeedbackDialog({
                 // Off folds it shut: Already reported is about GitHub.
                 state={pub ? similar.state : 'hidden'}
                 issues={similar.issues}
-                stale={similar.stale}
                 picked={pub ? picked : null}
                 onPick={onPick}
                 onOpen={onOpenIssue}

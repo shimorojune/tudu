@@ -1787,18 +1787,15 @@
   list-style: none;
   display: grid;
   gap: 2px;
-  transition: opacity 160ms var(--ease-change);
 }
-.tp-root .tp-sim ul.tp-stale {
-  opacity: 0.55;
-}
+/* A row holds the report's opening words, up to 3 lines (#115): the icon and buttons sit on its first line. */
 .tp-root .tp-sim-row {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr) auto auto;
-  align-items: center;
+  align-items: start;
   gap: 4px 8px;
   min-height: 44px;
-  padding: 6px;
+  padding: 8px 6px;
   border-radius: 8px;
   animation: tp-sim-rise 240ms var(--ease-arrive) both;
   transition:
@@ -1831,6 +1828,7 @@
 }
 .tp-root .tp-sim-st {
   display: inline-flex;
+  padding-top: 2px;
   color: var(--success);
 }
 .tp-root .tp-sim-st.tp-closed {
@@ -1841,10 +1839,12 @@
   min-width: 0;
 }
 .tp-root .tp-sim-tt {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   font-size: 13.5px;
   line-height: 19px;
   color: var(--foreground);
@@ -1859,6 +1859,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  margin-top: 3px;
   font-size: 11.5px;
   line-height: 15px;
   color: var(--muted-foreground);
@@ -1880,6 +1881,7 @@
 }
 .tp-root .tp-sim-gh {
   display: inline-flex;
+  margin-top: -4px;
   align-items: center;
   justify-content: center;
   width: 28px;
@@ -1894,6 +1896,7 @@
 }
 .tp-root .tp-sim-plus {
   display: inline-flex;
+  margin-top: -4px;
   align-items: center;
   justify-content: center;
   min-width: 40px;
@@ -1919,27 +1922,6 @@
   background: var(--primary);
   color: var(--primary-foreground);
   box-shadow: none;
-}
-.tp-root .tp-sim-skel {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) 40px;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 0 6px;
-}
-.tp-root .tp-sim-skel .tp-skel {
-  border-radius: 5px;
-}
-.tp-root .tp-sim-err {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 2px 2px 4px;
-  font-size: 12.5px;
-  line-height: 17px;
-  color: var(--muted-foreground);
-  animation: tp-sim-rise 200ms var(--ease-arrive) both;
 }
 .tp-root .tp-fb-inst {
   display: flex;
@@ -1992,7 +1974,6 @@
   .tp-root .tp-sim ul,
   .tp-root .tp-sim-row,
   .tp-root .tp-sim-plus,
-  .tp-root .tp-sim-err,
   .tp-root .tp-fb-inst {
     transition: none;
     animation: none;

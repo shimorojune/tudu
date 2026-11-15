@@ -1,27 +1,23 @@
 import { dateShort, isoOfDate, type SimilarIssue } from '@tudu/core';
-import { useEffect, useRef, useState } from 'react';
 import { cx } from '../lib/cx';
 import { Icon } from '../lib/icons';
-import { Skeleton } from './Skeleton';
 
-/** `hidden`: folded shut (too few words, nothing similar, or nothing asked yet). */
-export type SimilarReportsState = 'hidden' | 'loading' | 'ready' | 'error';
+/**
+ * `hidden`: folded shut (too few words, nothing similar, nothing asked yet, a look on its way or one that failed).
+ * There is no loading or error state (#114): the box only ever shows real matches.
+ */
+export type SimilarReportsState = 'hidden' | 'ready';
 
 export interface SimilarReportsProps {
   state: SimilarReportsState;
   /** Closest first, as the server answers. */
   issues: SimilarIssue[];
-  /** A look is on its way while rows show: they dim, then the new ones crossfade in. */
-  stale?: boolean;
   /** The issue picked for "+1 that one instead"; kept (pinned first) if later words drop it from the list. */
   picked?: SimilarIssue | null;
   onPick?: (issue: SimilarIssue | null) => void;
   /** Open the issue: a new tab, or the browser from the Mac app. */
   onOpen?: (url: string) => void;
 }
-
-/** The shimmer shows at least this long, so a quick answer still reads as a look rather than a flash. */
-export const SIMILAR_SHIMMER_MS = 380;
 
 const RING = (
   <svg
@@ -53,24 +49,6 @@ const DONE = (
     <path d="m8.5 12 2.5 2.5 4.5-5" />
   </svg>
 );
-const CLOUD = (
-  <svg
-    width={13}
-    height={13}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={2}
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
-    <path d="M12 12v3" />
-    <path d="M12 18h.01" />
-  </svg>
-);
-
 /** "closed 5 Nov · 2 +1s", "opened 27 Oct". */
 export function similarMeta(i: SimilarIssue): string {
   const when =
@@ -86,32 +64,14 @@ function stateLabel(i: SimilarIssue): string {
 
 /**
  * "Already reported?" under the words of Send feedback (#76): up to three GitHub issues, open and closed, that mean
- * what is being typed, each with +1 to add the report to it instead of filing a new one. Folds open like the
- * screenshot slot; the first look shimmers, later ones dim the rows and crossfade; a picked issue stays pinned.
+ * what is being typed, each with +1 to add the report to it instead of filing a new one. It folds open only when
+ * there are matches (#114: nothing shows while a look is on its way, and a failed look shows nothing); a new answer
+ * swaps the rows in place; a picked issue stays pinned. Each row shows the report's own words, up to 3 lines (#115).
  */
-export function SimilarReports({ state, issues, stale, picked = null, onPick, onOpen }: SimilarReportsProps) {
-  // The shimmer holds for a moment at least: `held` is the look still shimmering after its answer came.
-  const [held, setHeld] = useState(false);
-  const since = useRef<number | null>(null);
-  const [wasState, setWasState] = useState(state);
-  if (state !== wasState) {
-    setWasState(state);
-    if (wasState === 'loading' && state !== 'loading') setHeld(true);
-  }
-  useEffect(() => {
-    if (state === 'loading') since.current = Date.now();
-  }, [state]);
-  useEffect(() => {
-    if (!held) return;
-    const left = SIMILAR_SHIMMER_MS - (Date.now() - (since.current ?? 0));
-    const t = setTimeout(() => setHeld(false), Math.max(0, left));
-    return () => clearTimeout(t);
-  }, [held]);
-
-  const shown = held ? 'loading' : state;
+export function SimilarReports({ state, issues, picked = null, onPick, onOpen }: SimilarReportsProps) {
   // The pick stays, first, even when the latest words no longer find it.
   const rows = picked && !issues.some((i) => i.number === picked.number) ? [picked, ...issues] : issues;
-  const open = shown === 'loading' || shown === 'error' || (shown === 'ready' && rows.length > 0) || !!picked;
+  const open = (state === 'ready' && rows.length > 0) || !!picked;
   // A new answer is a new set: the rows rise in again. Keyed by what they are, so the same set doesn't replay.
   const setKey = rows.map((i) => i.number).join(',');
 
@@ -123,27 +83,8 @@ export function SimilarReports({ state, issues, stale, picked = null, onPick, on
       data-testid="similar-reports"
     >
       <div>
-        <div className="tp-sim" aria-busy={shown === 'loading' ? 'true' : undefined}>
-          {shown === 'loading' ? (
-            <>
-              <div className="tp-sim-h">
-                <Icon name="search" size={13} />
-                <span>Checking for similar reports…</span>
-              </div>
-              {[78, 62].map((w) => (
-                <div className="tp-sim-skel" key={w}>
-                  <Skeleton width={14} height={14} />
-                  <Skeleton width={`${w}%`} height={11} />
-                  <Skeleton width={40} height={22} />
-                </div>
-              ))}
-            </>
-          ) : shown === 'error' && !picked ? (
-            <div className="tp-sim-err" role="status">
-              {CLOUD}
-              <span>Couldn’t check for similar reports. Sending works as usual.</span>
-            </div>
-          ) : rows.length ? (
+        <div className="tp-sim">
+          {rows.length ? (
             <>
               <div className="tp-sim-h" role="status">
                 <Icon name="search" size={13} />
@@ -151,7 +92,7 @@ export function SimilarReports({ state, issues, stale, picked = null, onPick, on
                   <b>Already reported?</b> +1 that one instead.
                 </span>
               </div>
-              <ul aria-label="Similar reports" className={cx(stale && 'tp-stale')} key={setKey}>
+              <ul aria-label="Similar reports" key={setKey}>
                 {rows.map((i) => {
                   const on = picked?.number === i.number;
                   return (
@@ -166,7 +107,7 @@ export function SimilarReports({ state, issues, stale, picked = null, onPick, on
                       <span className="tp-sim-t">
                         <span className="tp-sim-tt">
                           <span className="tp-sim-n">#{i.number}</span>
-                          {i.title}
+                          {i.summary || i.title}
                         </span>
                         <span className="tp-sim-meta">
                           {i.state === 'fixed' ? <span className="tp-sim-badge">Fixed</span> : null}

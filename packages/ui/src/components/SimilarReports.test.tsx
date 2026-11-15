@@ -1,8 +1,9 @@
-import { act, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { SimilarIssue } from '@tudu/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SimilarReports, SIMILAR_SHIMMER_MS, similarMeta } from './SimilarReports';
+import { parseRules, readStylesheet, rulesWhere } from '../test-utils/stylesheet';
+import { SimilarReports, similarMeta } from './SimilarReports';
 
 const ISSUES: SimilarIssue[] = [
   {
@@ -39,25 +40,17 @@ const fold = () => screen.getByTestId('similar-reports');
 describe('SimilarReports (#76)', () => {
   afterEach(() => vi.useRealTimers());
 
-  it('C19-U26 hidden folds shut; loading shimmers; error is one quiet line; ready lists rows with Fixed, Closed and +1 counts', () => {
-    const { rerender, unmount } = render(<SimilarReports state="hidden" issues={[]} />);
+  it('C19-U26 hidden folds shut with nothing in it (no loading, no error line); ready lists rows with Fixed, Closed and +1 counts', () => {
+    const { rerender } = render(<SimilarReports state="hidden" issues={[]} />);
     expect(fold()).toHaveClass('tp-hide');
     expect(fold()).toHaveAttribute('aria-hidden', 'true');
+    // #114: nothing ever says it is checking, nothing shimmers, a failed look says nothing.
+    expect(screen.queryByText(/Checking/)).toBeNull();
+    expect(document.querySelector('.tp-sim-skel')).toBeNull();
+    expect(screen.queryByText(/Couldn’t check/)).toBeNull();
 
-    rerender(<SimilarReports state="loading" issues={[]} />);
+    rerender(<SimilarReports state="ready" issues={ISSUES} />);
     expect(fold()).not.toHaveClass('tp-hide');
-    expect(screen.getByText('Checking for similar reports…')).toBeInTheDocument();
-    expect(document.querySelectorAll('.tp-sim-skel')).toHaveLength(2);
-    unmount();
-
-    // (A fresh one: after a look the shimmer holds a moment first, see C19-U26b.)
-    const err = render(<SimilarReports state="error" issues={[]} />);
-    expect(err.getByRole('status')).toHaveTextContent(
-      'Couldn’t check for similar reports. Sending works as usual.',
-    );
-    err.unmount();
-
-    const ready = render(<SimilarReports state="ready" issues={ISSUES} />);
     const rows = screen.getAllByRole('listitem');
     expect(rows).toHaveLength(3);
     expect(rows[0]).toHaveTextContent('#64Jira count stuck at 1 with 2 assigned');
@@ -70,22 +63,32 @@ describe('SimilarReports (#76)', () => {
     expect(screen.getByRole('img', { name: 'Closed, fixed' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Closed, not planned' })).toBeInTheDocument();
     expect(screen.getByText('Already reported?')).toBeInTheDocument();
-    // Ready with nothing: folded shut, the form as today.
-    ready.rerender(<SimilarReports state="ready" issues={[]} />);
+    // A later answer with nothing: folded shut again, the form as before.
+    rerender(<SimilarReports state="ready" issues={[]} />);
     expect(fold()).toHaveClass('tp-hide');
   });
 
-  it('C19-U26b the first answer waits out the shimmer; stale rows dim', () => {
-    vi.useFakeTimers();
-    const { rerender } = render(<SimilarReports state="loading" issues={[]} />);
-    rerender(<SimilarReports state="ready" issues={ISSUES} />);
-    expect(screen.getByText('Checking for similar reports…')).toBeInTheDocument();
-    act(() => {
-      vi.advanceTimersByTime(SIMILAR_SHIMMER_MS);
-    });
-    expect(screen.getAllByRole('listitem')).toHaveLength(3);
-    rerender(<SimilarReports state="ready" issues={ISSUES} stale />);
-    expect(screen.getByRole('list', { name: 'Similar reports' })).toHaveClass('tp-stale');
+  it('C19-U26b (#115) a row shows the report’s own words, falling back to the title; clamped to 3 lines, no hover growth', () => {
+    const summary =
+      'When I have two Jira tickets assigned the badge in the sidebar still says 1 until I reload the whole app';
+    render(<SimilarReports state="ready" issues={[{ ...ISSUES[0]!, summary }, ISSUES[1]!]} />);
+    const rows = screen.getAllByRole('listitem');
+    expect(rows[0]).toHaveTextContent(summary);
+    expect(rows[0]).not.toHaveTextContent('Jira count stuck at 1 with 2 assigned');
+    expect(rows[1]).toHaveTextContent('Jira pane should close on an outside click');
+
+    const rules = parseRules(readStylesheet('app.css'));
+    const tt = rulesWhere(rules, (x) => x === '.tp-root .tp-sim-tt')[0]!;
+    expect(tt.declarations['-webkit-line-clamp']).toBe('3');
+    expect(tt.declarations['overflow']).toBe('hidden');
+    // Nothing grows the text on hover or focus.
+    const grow = rules.filter(
+      (r) =>
+        r.selector.includes('tp-sim') &&
+        /:hover|:focus/.test(r.selector) &&
+        ('-webkit-line-clamp' in r.declarations || 'max-height' in r.declarations),
+    );
+    expect(grow).toEqual([]);
   });
 
   it('C19-U27 +1 picks; the pick is pressed with a tick; again unpicks; a pick the words dropped stays first', async () => {
@@ -107,7 +110,7 @@ describe('SimilarReports (#76)', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveTextContent('#62');
     // Even when nothing is found at all, or the look fails.
-    rerender(<SimilarReports state="error" issues={[]} picked={ISSUES[1]} onPick={onPick} />);
+    rerender(<SimilarReports state="hidden" issues={[]} picked={ISSUES[1]} onPick={onPick} />);
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
     expect(fold()).not.toHaveClass('tp-hide');
   });
