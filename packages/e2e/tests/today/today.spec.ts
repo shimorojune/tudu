@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
-import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
+import { API_URL, expect, newTaskButton, signInFresh, test } from '../../fixtures/app';
+import { createSpace, switchTo } from '../../fixtures/spaces';
 import { expectGlides, expectLands, sampleBoxes } from '../../fixtures/motion';
 import {
   SUNDAY,
@@ -172,6 +173,24 @@ test.describe('today', () => {
     await expect(quickAdd(page).getByRole('button', { name: 'Planned for: Tomorrow' })).toBeVisible();
     await addInQuickAdd(page, 'Monday’s task');
     await expect(dayList(page, 'Tasks for Monday 19 October').getByText('Monday’s task')).toBeVisible();
+  });
+
+  test('NI-E13 after Quick Add was open in another space, the line writes into the space you are in', async ({
+    page,
+  }) => {
+    test.skip(test.info().project.name !== 'desktop', 'the same Quick Add on every size');
+    await signInFresh(page);
+    await createSpace(page, 'Northwind');
+    // Open and close it once while Northwind is the space.
+    await newTaskButton(page).click();
+    await expect(quickAdd(page)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(quickAdd(page)).toHaveCount(0);
+    await switchTo(page, 'Personal');
+    await writeTasks(page, ['Tidy the buckets']);
+    await idle(page);
+    await page.reload();
+    await expect(dayList(page).getByText('Tidy the buckets', { exact: true })).toBeVisible();
   });
 
   test('C02-E06 turn the day with the arrows and the calendar; tasks keep to their day', async ({ page }) => {

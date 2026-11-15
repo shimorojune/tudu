@@ -32,6 +32,7 @@ tests run on PR CI (and Actions › Flake check for repeats), not on Rohit's Mac
 | NI-E10 | every spec above, `phone` project      | The same lines open the Quick Add sheet on phones                                               |
 | NI-E11 | `tests/today/today.spec.ts`            | C02-E10: a task written offline through the line shows at once and syncs when back              |
 | NI-E12 | `tests/today/today.spec.ts`            | C02-E14: writing through the line in the dark theme                                             |
+| NI-E13 | `tests/today/today.spec.ts`            | After Quick Add was open in another space, the line writes into the space you are in            |
 
 `writeTasks` (`fixtures/today.ts`) and `writeBacklog` (`fixtures/backlog.ts`) now go through Quick Add, so every spec
 that sets up tasks with them exercises the line too.

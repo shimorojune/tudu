@@ -191,7 +191,10 @@ export function QuickAddHost({ me, openPath }: { me: MeResponse; openPath?: (hre
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open && !(seed && seed.nonce !== seenSeed)) setSendTo({ spaceId: space.id, toId: null });
+    // Opening starts on this space for you, unless a fresh seed names the space or the person itself. A seed that
+    // only sets the day or the project (a list's writing line) must not keep a space picked on an earlier open.
+    const seeded = seed && seed.nonce !== seenSeed && (seed.toId !== undefined || seed.spaceId !== undefined);
+    if (open && !seeded) setSendTo({ spaceId: space.id, toId: null });
   }
   if (seed && seed.nonce !== seenSeed) {
     setSeenSeed(seed.nonce);
