@@ -45,7 +45,10 @@ test.describe('quick-add # project', () => {
     await title(b).pressSequentially('Review the notes #pla');
     await expect(hashMenu(b)).toBeVisible();
     await expect(b.getByText('Projects in Personal')).toBeVisible();
-    await expect(hashMenu(b).getByRole('option')).toHaveText(['Platform', 'Plants']);
+    // Both names start with the letters; they keep the space's own project order.
+    await expect(hashMenu(b).getByRole('option')).toHaveText(seeded.order.filter((n) => n.startsWith('Pla')));
+    await title(b).pressSequentially('t');
+    await expect(hashMenu(b).getByRole('option')).toHaveText(['Platform']);
     await title(b).press('Enter');
     await expect(title(b)).toHaveValue('Review the notes');
     await expect(b.getByRole('button', { name: 'Project: Platform' })).toBeVisible();
