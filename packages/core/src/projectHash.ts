@@ -54,7 +54,10 @@ export function exactProject<P extends { name: string }>(projects: readonly P[],
 }
 
 /** The title without the `#word`, spaces closed up, and where the caret goes. */
-export function dropHash(text: string, token: Pick<HashToken, 'start' | 'end'>): { text: string; caret: number } {
+export function dropHash(
+  text: string,
+  token: Pick<HashToken, 'start' | 'end'>,
+): { text: string; caret: number } {
   const before = text.slice(0, token.start).replace(/\s+$/, '');
   const after = text.slice(token.end).replace(/^\s+/, '');
   const gap = before && after ? ' ' : '';

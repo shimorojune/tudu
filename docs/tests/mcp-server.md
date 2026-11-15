@@ -16,6 +16,8 @@ Mac, not in the cloud container.
 | MCP-U06 | `apps/server/src/ai.test.ts`                   | Notebook off: notes neither read nor changed; search leaves them out                                                       |
 | MCP-U07 | `apps/server/src/ai.test.ts`                   | Client metadata documents: http, a mismatched `client_id` and an oversized document are refused                            |
 | MCP-U08 | `apps/mcp/test/tools.test.ts`                  | Every tool has a title and hints; reads go to the right path with the caller's bearer; writes are sync mutations           |
+| PH-U15  | `apps/mcp/test/tools.test.ts`                  | `create_task` and `update_task` take a `project` by name (`"none"` clears it); an unknown name lists the space's projects  |
+| PH-U16  | `apps/mcp/test/tools.test.ts`                  | `list_spaces` lists each space's projects (see [project-hash.md](project-hash.md))                                         |
 | MCP-U09 | `apps/mcp/src/verifier.test.ts`                | One `/api/access` check per 30 s per bearer; a refused bearer is `invalid_token`; an unreachable API is a server error     |
 | MCP-U10 | `packages/ui/src/components/AiAccess.test.tsx` | Rows and lines from data; verified icon, letter and Unverified; expired and Remove; loading skeletons; error banner        |
 | MCP-U11 | `packages/ui/src/components/AiAccess.test.tsx` | Key dialog: a taken name; Only some needs a space; Can delete only with write; the key once; Claude Code, then Cursor JSON |

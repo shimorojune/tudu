@@ -4,7 +4,7 @@ import { cx } from '../lib/cx';
 import { useTurn } from '../lib/hooks';
 import { Icon } from '../lib/icons';
 import { useMine } from '../lib/scramble';
-import { AddTask, type AddTaskHash } from './AddTask';
+import { AddTask } from './AddTask';
 import { FoldAway } from './FoldAway';
 import { TaskList, type TaskItem, type TaskListProps, type TaskMove } from './TaskList';
 
@@ -94,7 +94,6 @@ export interface TaskGroupsProps extends Omit<
   | 'onReceive'
   | 'locked'
   | 'brief'
-  | 'addProject'
 > {
   /** The page's tasks by project, in the order to show them (No project last). */
   groups: TaskGroupItem[];
@@ -105,13 +104,7 @@ export interface TaskGroupsProps extends Omit<
    * A task written into a group: on its own line (the header's "+"), slotted in above `before`, or, for NO_PROJECT,
    * on the page's last line. Return the new row's key so it opens its gap with the new-task wash.
    */
-  onAdd?: (text: string, group: string, before?: string, projectId?: string | null) => string | void;
-  /**
-   * `#` on a group's lines: the projects of the space a task written there goes to. Leave it out to use `hash` (the
-   * page's line uses `hash` always). With it, `onAdd` gets the picked project (null for none), and a project's own
-   * lines start with that project.
-   */
-  hashFor?: (group: string) => AddTaskHash | undefined;
+  onAdd?: (text: string, group: string, before?: string) => string | void;
   /** A row moved inside its group (drag, or Alt with an arrow key): `from` and `to` are places in that group. */
   onReorder?: (group: string, moved: TaskMove) => void;
   /** The words on a project's own writing line. "Add to Platform…" by default. */
@@ -134,7 +127,6 @@ export function TaskGroups({
   folded = [],
   onFold,
   onAdd,
-  hashFor,
   onReorder,
   groupAddLabel = (name) => `Add to ${name}…`,
   addLabel,
@@ -264,20 +256,7 @@ export function TaskGroups({
                   addLabel={line === g.key && onAdd ? groupAddLabel(mine(g.name)) : undefined}
                   addKey={line === g.key ? g.key : undefined}
                   onAddClose={() => setLine((l) => (l === g.key ? null : l))}
-                  hash={hashFor?.(g.key) ?? list.hash}
-                  addProject={
-                    g.key === NO_PROJECT
-                      ? null
-                      : { id: g.key, name: g.name, color: g.color ?? 'var(--muted-foreground)' }
-                  }
-                  onAdd={
-                    onAdd
-                      ? (text, before, projectId) =>
-                          projectId === undefined
-                            ? onAdd(text, g.key, before)
-                            : onAdd(text, g.key, before, projectId)
-                      : undefined
-                  }
+                  onAdd={onAdd ? (text, before) => onAdd(text, g.key, before) : undefined}
                   onReorder={(_, moved) => onReorder?.(g.key, moved)}
                 />
               </div>
@@ -297,12 +276,8 @@ export function TaskGroups({
             compact={compact}
             openKey={endBump ? `${addKey ?? ''}|${endBump}` : addKey}
             autoOpen={endOpen || (addKey !== undefined && addKey !== null)}
-            hash={list.hash}
-            onAdd={(text, projectId) => {
-              const key =
-                projectId === undefined
-                  ? onAdd(text, NO_PROJECT)
-                  : onAdd(text, NO_PROJECT, undefined, projectId);
+            onAdd={(text) => {
+              const key = onAdd(text, NO_PROJECT);
               if (key) setWrote(key);
             }}
             onClose={() => {

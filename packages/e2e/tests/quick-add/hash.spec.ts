@@ -123,4 +123,39 @@ test.describe('quick-add # project', () => {
     await expect(page.getByRole('dialog', { name: 'Quick Add' })).toHaveCount(0, { timeout: 5000 });
     await expect(row(dayList(page), 'Water').locator('.tp-sg-project')).toHaveText('Home');
   });
+
+  test('PH-E11 offline: a task with a project made by # shows at once, and both reach the server when back', async ({
+    page,
+    context,
+  }) => {
+    await signInFresh(page);
+    const seeded = await threeProjects(page);
+    await page.reload();
+    await idle(page);
+    await context.setOffline(true);
+    await expect(page.getByText('You’re offline.')).toBeVisible();
+    const b = await openBar(page);
+    await title(b).pressSequentially('Pack the tent #camping');
+    await title(b).press('Enter');
+    await expect(b.getByRole('button', { name: 'Project: Camping' })).toBeVisible();
+    await title(b).press('Enter');
+    await expect(page.getByRole('dialog', { name: 'Quick Add' })).toHaveCount(0, { timeout: 5000 });
+    await expect(row(dayList(page), 'Pack the tent').locator('.tp-sg-project')).toHaveText('Camping');
+    await context.setOffline(false);
+    await idle(page);
+    // The outbox replays in order: the project first, then the task in it.
+    await expect
+      .poll(async () => (await serverToday(page, seeded.spaceId, 'Pack the tent'))?.projectId ?? null, {
+        timeout: 15_000,
+      })
+      .not.toBeNull();
+    const listed = (await (
+      await page.request.get(`${API_URL}/api/spaces/${seeded.spaceId}/projects`)
+    ).json()) as {
+      projects: Array<{ id: string; name: string }>;
+    };
+    const camping = listed.projects.find((p) => p.name === 'Camping');
+    expect(camping).toBeTruthy();
+    expect((await serverToday(page, seeded.spaceId, 'Pack the tent'))?.projectId).toBe(camping!.id);
+  });
 });

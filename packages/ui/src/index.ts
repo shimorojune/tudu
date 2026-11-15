@@ -196,7 +196,7 @@ export {
   type RowMenuTask,
   type RowMenuContext,
 } from './lib/rowMenu';
-export { AddTask, ProjectPill, type AddTaskProps, type AddTaskHash } from './components/AddTask';
+export { AddTask, type AddTaskProps } from './components/AddTask';
 export { DatePop, DATEPOP_LEAVE_MS, type DatePopProps } from './components/DatePop';
 export { Spread, SpreadPage, SPREAD_MS, type SpreadProps, type SpreadPageProps } from './components/Spread';
 export {

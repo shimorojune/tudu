@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { dropHash, exactProject, hashAt, hashMark, hashMatches, hashProjectName } from './projectHash';
 
-const P = [{ name: 'Northwind' }, { name: 'Platform' }, { name: 'Home' }, { name: 'Offsite 2027' }, { name: 'Plants' }];
+const P = [
+  { name: 'Northwind' },
+  { name: 'Platform' },
+  { name: 'Home' },
+  { name: 'Offsite 2027' },
+  { name: 'Plants' },
+];
 
 describe('PH-U01 hashAt finds the #word the caret is in', () => {
   it('PH-U01 at the start, after a space, and with letters after the #', () => {
@@ -45,7 +51,10 @@ describe('PH-U02 hashMatches orders matches', () => {
 
 describe('PH-U03 dropHash takes the #word out', () => {
   it('PH-U03 at the end, the start and the middle, closing up spaces', () => {
-    expect(dropHash('Review the notes #pla', { start: 17, end: 21 })).toEqual({ text: 'Review the notes', caret: 16 });
+    expect(dropHash('Review the notes #pla', { start: 17, end: 21 })).toEqual({
+      text: 'Review the notes',
+      caret: 16,
+    });
     expect(dropHash('#pla Review', { start: 0, end: 4 })).toEqual({ text: 'Review', caret: 0 });
     expect(dropHash('Book #nor the room', { start: 5, end: 9 })).toEqual({ text: 'Book the room', caret: 5 });
   });

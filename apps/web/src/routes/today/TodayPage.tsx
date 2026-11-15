@@ -63,7 +63,6 @@ import { openQuickAdd } from '../../app/dayView';
 import { allPath, spacePath, useSpace } from '../../app/space';
 import { openInJira } from '../../app/jira';
 import { useProjectGroups } from '../../app/grouped';
-import { useLineHash } from '../../app/lineHash';
 import { useFirstRunOpen } from '../../app/firstRun';
 import { taskStore, useOnline } from '../../app/tasks';
 import { useViewport, type Viewport } from '../../app/viewport';
@@ -492,8 +491,6 @@ function DaySheet({
   const projectsQ = useQuery({ ...taskStore.projectsQuery(spaceId), enabled: !all });
   const spaceProjects = projectsQ.data ?? [];
   const projectsOf = useAllProjects(all);
-  // # on the writing lines: the projects of the space a task written there goes to.
-  const hashOf = useLineHash(all ? all.spaces.map((s) => s.id) : [spaceId]);
   const flash = useFlash();
   const locate = useLocate();
   const mine = useMine();
@@ -647,7 +644,6 @@ function DaySheet({
       addLabel: all ? writeWords({ name: mine(all.target.name) }) : 'Write the next thing…',
       addKey: writing,
       onAddClose: () => setWriting(null),
-      hash: hashOf(all ? all.target.id : spaceId),
       calendar,
       onToggleTask: (t: TaskItem, v: boolean) => taskStore.cross(t.key, v),
       onMoveTask: (t: TaskItem, to: IsoDate | null, _from: IsoDate | null, at?: number) =>
@@ -698,15 +694,12 @@ function DaySheet({
             if (p) g.only(p);
           } else if (all) filters.onSignal(t, k, false);
         }}
-        hashFor={(group) => hashOf(g.target(group).spaceId ?? (all ? all.target.id : spaceId))}
-        onAdd={(text, group, before, picked) => {
+        onAdd={(text, group, before) => {
           // On a project's own line it goes right after the project's last task, so My order keeps them together.
           const slot = before ? ids.indexOf(before) : group === NO_PROJECT ? -1 : g.end(ids, group);
           const at = slot === -1 ? undefined : slot;
           const to = g.target(group);
-          // The line's pill wins: # picked another project, or × left it with none.
-          const projectId = picked === undefined ? to.projectId : picked;
-          const extra = projectId ? { projectId } : {};
+          const extra = to.projectId ? { projectId: to.projectId } : {};
           if (!all) return taskStore.create(spaceId, day, text, at, extra);
           const id = taskStore.create(to.spaceId ?? all.target.id, day, text, undefined, extra);
           taskStore.placeInAll(id, day, at ?? order.length, order);
@@ -731,12 +724,11 @@ function DaySheet({
         group={group}
         filter={all ? (filters.lagProject ?? undefined) : undefined}
         filterSpace={all ? filters.lagSpace : undefined}
-        onAdd={(text, before, projectId) => {
+        onAdd={(text, before) => {
           const at = before ? tasks.findIndex((t) => t.id === before) : undefined;
-          const extra = projectId ? { projectId } : undefined;
-          if (!all) return taskStore.create(spaceId, day, text, at === -1 ? undefined : at, extra);
+          if (!all) return taskStore.create(spaceId, day, text, at === -1 ? undefined : at);
           // Written in All spaces: it goes to Personal (or the filtered space), and takes its place here.
-          const id = taskStore.create(all.target.id, day, text, undefined, extra);
+          const id = taskStore.create(all.target.id, day, text);
           taskStore.placeInAll(id, day, at === undefined || at === -1 ? order.length : at, order);
           return id;
         }}
