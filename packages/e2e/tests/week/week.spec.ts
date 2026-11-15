@@ -700,6 +700,10 @@ test.describe('week, a drop on another day, with motion', () => {
       await b.locator('.tp-qa-pop').getByRole('button', { name: 'Backlog' }).click();
     });
     await idle(page);
+    // Quick Add's wash of "Task number 12" (2.5s, set on Today) would still be live when the week opens: Sunday's
+    // tile is today, so it opens that row's gap with the scroller following and starts the tile at its bottom
+    // (scrollTop 366, red on master since #112). A fresh load starts the week without it.
+    await page.reload();
     await goWeek(page);
     const moved = await keyOf(backlogList(page), 'Renew passport');
     const body = tile(page, SUNDAY_TILE).locator('.tp-wd-body');
