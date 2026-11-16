@@ -1,3 +1,10 @@
+## [0.43.1](https://github.com/shimorojune/tudu/compare/tudu-0.43.0...tudu-0.43.1) (2026-11-16)
+
+### Bug Fixes
+
+* **reorder:** a dropped row settles, never snaps back ([#113](https://github.com/shimorojune/tudu/issues/113)) ([c9c6c43](https://github.com/shimorojune/tudu/commit/c9c6c43757c76cf39175051773cc077d59b7792d))
+* **times:** a span on today reads in full ([#116](https://github.com/shimorojune/tudu/issues/116)) ([93afe44](https://github.com/shimorojune/tudu/commit/93afe441be409c51439b65147553b4f39c9f482f))
+
 ## [0.43.0](https://github.com/shimorojune/tudu/compare/tudu-0.42.0...tudu-0.43.0) (2026-11-15)
 
 ### Features
