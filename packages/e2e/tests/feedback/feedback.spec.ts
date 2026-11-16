@@ -372,13 +372,6 @@ test.describe('send feedback', () => {
         (l: Locator) => expect(l.getByText('Your text is scrambled')).toBeVisible(),
       ],
       [
-        'Send feedback, checking for similar reports',
-        async (l: Locator) => {
-          await expect(l.getByText('Checking for similar reports…')).toBeVisible();
-          await expect(l.locator('.tp-sim-skel')).toHaveCount(2);
-        },
-      ],
-      [
         'Send feedback, already reported?',
         async (l: Locator) => {
           await expect(l.getByText('Already reported?')).toBeVisible();
@@ -397,11 +390,6 @@ test.describe('send feedback', () => {
           await expect(l.locator('.tp-fb-inst')).toContainText('Adds your words to #64');
           await expect(l.getByRole('button', { name: '+1 on #64' })).toBeVisible();
         },
-      ],
-      [
-        'Send feedback, couldn’t check for similar reports',
-        (l: Locator) =>
-          expect(l.getByText('Couldn’t check for similar reports. Sending works as usual.')).toBeVisible(),
       ],
       [
         'Send feedback, screenshot GitHub can’t show',
@@ -705,7 +693,7 @@ test.describe('already reported? (#76)', () => {
     test.skip(!desktop(), 'the same form on every size');
   });
 
-  test('C19-E18 words close to a closed issue: it shows with Fixed; +1 it and Send: a comment, no new issue; Your reports shows the +1', async ({
+  test('C19-E18 C19-E25 words close to a closed issue: it shows with Fixed; +1 it and Send: a comment, no new issue; Your reports shows the +1', async ({
     page,
   }) => {
     await signInFresh(page);
@@ -728,6 +716,10 @@ test.describe('already reported? (#76)', () => {
     const row = f.locator('.tp-sim-row').filter({ hasText: `#${n}` });
     await expect(row.getByRole('img', { name: 'Closed, fixed' })).toBeVisible();
     await expect(row.locator('.tp-sim-badge')).toHaveText('Fixed');
+    // C19-E25 (#115): the row reads the report's own words, not only its title.
+    await expect(row.locator('.tp-sim-tt')).toContainText(
+      'Exporting the week to an .ics file leaves out every recurring event.',
+    );
     await plus.click();
     await expect(f.getByRole('button', { name: `+1 #${n} instead of a new issue, picked` })).toHaveAttribute(
       'aria-pressed',
@@ -792,7 +784,9 @@ test.describe('already reported? (#76)', () => {
     await oneIssue(page, marker);
   });
 
-  test('C19-E21 the similar search down: one quiet line; Send still files', async ({ page }) => {
+  test('C19-E21 the similar search down: nothing shows, no line, no shimmer; Send still files', async ({
+    page,
+  }) => {
     await signInFresh(page);
     const { userId } = await me(page);
     expect(
@@ -801,15 +795,53 @@ test.describe('already reported? (#76)', () => {
     try {
       const marker = `e21-${crypto.randomUUID()}`;
       const f = await openByBug(page);
+      const look = lookDone(page);
       await words(f).fill('The menu bar count stays at three after I finish everything');
-      await expect(f.getByText('Couldn’t check for similar reports. Sending works as usual.')).toBeVisible({
-        timeout: 10_000,
-      });
+      expect((await look).status()).toBe(503);
+      await expect(similarBox(f)).toHaveClass(/tp-hide/);
+      await expect(f.getByText(/Couldn’t check|Checking/)).toHaveCount(0);
+      await expect(f.locator('.tp-sim-skel')).toHaveCount(0);
       await sendIt(page, f, `The menu bar count stays at three after I finish everything ${marker}`);
       await oneIssue(page, marker);
     } finally {
       await page.request.post(`${API_URL}/__test/embeddings/up`, { data: { userId } });
     }
+  });
+
+  test('C19-E26 while a look is out the box stays as it was; the same words with new punctuation don’t ask again', async ({
+    page,
+  }) => {
+    await signInFresh(page);
+    const n = seedNumber();
+    await seedIssues(page, [{ number: n, title: `Quick Add loses the project after a reload ${n}` }]);
+    const f = await openByBug(page);
+    const looks: string[] = [];
+    page.on('request', (r) => {
+      if (r.url().includes('/api/feedback/similar')) looks.push(r.url());
+    });
+    await words(f).fill(`Quick Add loses my project after a reload ${n}`);
+    const plus = f.getByRole('button', { name: `+1 #${n} instead of a new issue` });
+    await expect(plus).toBeVisible({ timeout: 10_000 });
+    const asked = looks.length;
+    // Hold the next answer: the rows stay exactly as they are, nothing dims or shimmers.
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    // Not unrouted: a handler still waiting when it is removed can't hand the request on.
+    await page.route('**/api/feedback/similar**', async (route) => {
+      await held;
+      await route.fallback();
+    });
+    await words(f).fill(`Quick Add loses my project after a reload ${n} on the Mac`);
+    await expect.poll(() => looks.length, { timeout: 5_000 }).toBe(asked + 1);
+    await expect(plus).toBeVisible();
+    await expect(f.getByRole('list', { name: 'Similar reports' })).not.toHaveClass(/tp-stale/);
+    await expect(f.locator('.tp-sim-skel')).toHaveCount(0);
+    const answered = lookDone(page);
+    release();
+    await answered;
+    await words(f).fill(`quick add loses my project, after a reload ${n} on the mac!`);
+    await page.waitForTimeout(1_500);
+    expect(looks.length).toBe(asked + 1);
   });
 
   test('C19-E22 C19-E24 a PNG on a public report: the as-it-is line shows before Send; the issue embeds it', async ({

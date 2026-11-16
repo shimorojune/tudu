@@ -50,6 +50,18 @@ describe('times (docs/plans/task-times.md)', () => {
     expect(isPast('2026-10-22', '01:00', at(23))).toBe(false);
   });
 
+  it('TT-U20 a span knows when the day shown is today (#116)', () => {
+    expect(spanOf('2026-10-17', '2026-10-20', '2026-10-18', '2026-10-18')).toEqual({
+      from: '2026-10-17',
+      until: '2026-10-20',
+      n: 2,
+      of: 4,
+      today: true,
+    });
+    expect(spanOf('2026-10-17', '2026-10-20', '2026-10-19', '2026-10-18')?.today).toBe(false);
+    expect(spanOf('2026-10-17', '2026-10-20', '2026-10-19')?.today).toBeUndefined();
+  });
+
   it('TT-U02 where a day falls in a span, its length across a month, and a move keeps the length', () => {
     expect(spanOf('2026-10-18', '2026-10-21', '2026-10-18')).toEqual({
       from: '2026-10-18',

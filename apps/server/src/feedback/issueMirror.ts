@@ -1,6 +1,7 @@
 import {
   embeddingText,
   issueBodyText,
+  issueSummary,
   SIMILAR_FLOOR,
   SIMILAR_LIMIT,
   SIMILAR_QUERY_MAX,
@@ -244,6 +245,7 @@ export async function searchSimilarIssues(
     .select({
       number: t.number,
       title: t.title,
+      bodyText: t.bodyText,
       url: t.url,
       state: t.state,
       stateReason: t.stateReason,
@@ -266,5 +268,6 @@ export async function searchSimilarIssues(
       createdAt: r.createdAt.toISOString(),
       closedAt: r.closedAt ? r.closedAt.toISOString() : null,
       plusOnes: Number(r.plusOnes),
+      summary: issueSummary(r.bodyText),
     }));
 }

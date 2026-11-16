@@ -70,6 +70,9 @@ empty) before reading the server.
 | C02-U59 | BacklogBeside empty               | Covered by C02-E39 (no count, the words once, a New task button, no writing line)                                                                                                                                                                          |
 | C02-U60 | New task from the empty Backlog   | `openQuickAdd({ day: null })` seeds Quick Add with the Backlog                                                                                                                                                                                             |
 | C02-U61 | Quick Add seed `day`              | `{ day: null }` opens on the Backlog; `{ day: '2026-10-19' }` opens on that day; no seed keeps today's behaviour                                                                                                                                           |
+| C02-U62 | A drop waits for the new order    | The page answers a task later: until then every row stays where the drag left it, a render with the old order changes nothing; the new order lets go in the same pass and the row settles (#113)                                                           |
+| C02-U63 | A move never rendered             | After 400ms the held rows let go and the row glides back to its old slot (#113)                                                                                                                                                                            |
+| C02-U64 | A drag during a hold              | Ends the hold at once: no transforms left, one row lifted (#113)                                                                                                                                                                                           |
 
 ## API (`apps/server`)
 
@@ -133,6 +136,7 @@ empty) before reading the server.
 | C02-E39 | Centred and counted                | Empty: the words sit in the middle of the body, no count in the title line; after a drop "1 task"; moved back, no count and the words return (desktop)                                                                              |
 | C02-E40 | New task to the Backlog            | New task opens Quick Add on the Backlog; saving lands the task in the Backlog sheet, read back from the server (desktop)                                                                                                            |
 | C02-E41 | Dark                               | The same empty sheet in the dark theme: words visible, the wash is the dark `--selection` (desktop)                                                                                                                                 |
+| C02-E42 | A drop never shows the old order   | With motion, every frame from the release has the row between where it was let go and its new slot, never back in its old one; it survives a reload (#113)                                                                          |
 
 ## Desktop (`packages/e2e/mac`, Tudu Test on the macOS runner)
 

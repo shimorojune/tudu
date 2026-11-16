@@ -597,7 +597,7 @@ export function TaskRow(p: TaskRowProps) {
       <div
         className={cx(
           'tp-row',
-          p.span && p.span.n > 1 && !done && 'tp-span-on',
+          p.span && p.span.n > 1 && !p.span.today && !done && 'tp-span-on',
           done && 'tp-done',
           compact && 'tp-compact',
           p.onOpen && 'tp-openable',

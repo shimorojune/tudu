@@ -39,6 +39,7 @@ empty) before reading the server.
 | C03-U27 | The link mark’s motion      | Slides 4px out and fades in on hover with dur-menu and the arrive ease; reduced motion keeps it still                                                                                  |
 | C03-U28 | Task links                  | `/t/<ID>` on whichever Tudu is running (production or staging); a row with no ID has none                                                                                              |
 | C03-U30 | Today, tomorrow, yesterday  | `dueLabel` gives today / tomorrow / yesterday (overdue) with tips equal to the row's words; two days either way is a weekday; across a month and a year (#58)                          |
+| C03-U31 | Subtasks: a drop waits      | The subtasks stay where the drag left them until the page renders the move, then the row settles (#113)                                                                                |
 
 ## API (`apps/server`)
 

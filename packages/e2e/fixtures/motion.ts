@@ -273,3 +273,45 @@ export function expectGlides(ys: number[], frames = 3): void {
     `never outside its start and end: ${trail}`,
   ).toBe(true);
 }
+
+/**
+ * #113: drags `title` in `list` down over the row `over` and lets go there, reading the dropped row's box every
+ * animation frame from just before the release until the settle is over. No frame may show it back in its starting
+ * slot (the old order), and it ends in the slot `over` had. Run it with motion on.
+ */
+export async function expectDropSettles(
+  page: Page,
+  list: Locator,
+  title: string,
+  over: string,
+): Promise<void> {
+  const rows = list.locator('[data-reorder]');
+  const moved = rows.filter({ has: page.getByText(title, { exact: true }) });
+  const target = rows.filter({ has: page.getByText(over, { exact: true }) });
+  const key = await moved.getAttribute('data-key');
+  expect(key, 'the row has a key').toBeTruthy();
+  const start = (await moved.boundingBox())!;
+  const slot = (await target.boundingBox())!;
+  // grab the row's middle, let go a third of a row below the target's top: the row's middle is then over the target
+  const x = start.x + Math.min(120, start.width / 2);
+  await page.mouse.move(x, start.y + start.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(x, start.y + start.height / 2 + 6, { steps: 2 });
+  await page.mouse.move(x, slot.y + start.height / 2 + slot.height / 3, { steps: 12 });
+  const frames = await sampleBoxes(
+    page,
+    { row: `[data-reorder][data-key="${key}"]` },
+    () => page.mouse.up(),
+    700,
+  );
+  // in lists that trade rows the row itself stays unpainted in its old slot while a copy travels: skip those frames
+  const ys = frames.filter((f) => f.row && !f.row.hidden).map((f) => f.row!.y);
+  const trail = ys.map(Math.round).join(' ');
+  expect(ys.length, 'frames read').toBeGreaterThan(5);
+  // never back near where it started, and never above its new slot
+  expect(
+    ys.every((y) => y > start.y + start.height / 2 && y > slot.y - 2),
+    `the row's top each frame from the release: ${trail} (started at ${Math.round(start.y)}, slot ${Math.round(slot.y)})`,
+  ).toBe(true);
+  expect(Math.abs(ys[ys.length - 1]! - slot.y), `it ends in its slot: ${trail}`).toBeLessThan(2);
+}

@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { API_URL, expect, newTaskButton, signInFresh, test } from '../../fixtures/app';
 import { createSpace, switchTo } from '../../fixtures/spaces';
-import { expectGlides, expectLands, sampleBoxes } from '../../fixtures/motion';
+import { expectDropSettles, expectGlides, expectLands, sampleBoxes } from '../../fixtures/motion';
 import {
   SUNDAY,
   carry,
@@ -89,6 +89,27 @@ test.describe('today', () => {
     await expect
       .poll(() => titlesOf(dayList(page)))
       .toEqual(['Book car service', 'Pay the electricity bill', 'Call Sam at 3pm']);
+  });
+
+  test.describe('with motion', () => {
+    test.use({ contextOptions: { reducedMotion: 'no-preference' } });
+
+    test('C02-E42 a dropped row never shows the old order: it settles from where it was let go into its new slot (#113)', async ({
+      page,
+    }) => {
+      await signInFresh(page);
+      await writeTasks(page, THREE);
+      const list = dayList(page);
+      await expectDropSettles(page, list, 'Pay the electricity bill', 'Book car service');
+      await expect
+        .poll(() => titlesOf(list))
+        .toEqual(['Call Sam at 3pm', 'Book car service', 'Pay the electricity bill']);
+      await idle(page);
+      await page.reload();
+      await expect
+        .poll(() => titlesOf(dayList(page)))
+        .toEqual(['Call Sam at 3pm', 'Book car service', 'Pay the electricity bill']);
+    });
   });
 
   test('NI-E03 nothing in a list is a field: no "+" between rows on hover, no "New task" textbox anywhere', async ({

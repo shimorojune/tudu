@@ -1,6 +1,12 @@
 import type { Locator, Page } from '@playwright/test';
 import { API_URL, expect, signInFresh, test, newTaskButton } from '../../fixtures/app';
-import { expectFoldsShut, expectGlides, expectLands, sampleBoxes } from '../../fixtures/motion';
+import {
+  expectDropSettles,
+  expectFoldsShut,
+  expectGlides,
+  expectLands,
+  sampleBoxes,
+} from '../../fixtures/motion';
 import { pick, rightClick } from '../../fixtures/rowMenu';
 import {
   carry,
@@ -108,6 +114,25 @@ test.describe('week', () => {
     await expect(tile(page, 'Backlog')).toHaveClass(/tp-wd-quiet/);
     await expect(nothing(page, 'Backlog', 'Nothing waiting')).toBeVisible();
     await expect(ring(page, '0 of 3 crossed off')).toBeVisible();
+  });
+
+  test.describe('with motion', () => {
+    test.use({ contextOptions: { reducedMotion: 'no-preference' } });
+
+    test('C05-E19 inside a tile, a dropped row never shows the old order and settles into its new slot (#113)', async ({
+      page,
+    }) => {
+      test.skip(!desktop(), 'tiles side by side are the desk');
+      await fixClock(page, WEDNESDAY);
+      await signInFresh(page);
+      await writeTasks(page, THREE);
+      await goWeek(page);
+      const list = tileList(page, 'Wednesday 14 October');
+      await expectDropSettles(page, list, 'Pay the electricity bill', 'Book car service');
+      await expect
+        .poll(() => titlesOf(list))
+        .toEqual(['Call Sam at 3pm', 'Book car service', 'Pay the electricity bill']);
+    });
   });
 
   test('C05-E02 drag a task from today to Thursday: it is in Thursday’s tile, both counts follow, and it stays there', async ({
@@ -675,6 +700,10 @@ test.describe('week, a drop on another day, with motion', () => {
       await b.locator('.tp-qa-pop').getByRole('button', { name: 'Backlog' }).click();
     });
     await idle(page);
+    // Quick Add's wash of "Task number 12" (2.5s, set on Today) would still be live when the week opens: Sunday's
+    // tile is today, so it opens that row's gap with the scroller following and starts the tile at its bottom
+    // (scrollTop 366, red on master since #112). A fresh load starts the week without it.
+    await page.reload();
     await goWeek(page);
     const moved = await keyOf(backlogList(page), 'Renew passport');
     const body = tile(page, SUNDAY_TILE).locator('.tp-wd-body');

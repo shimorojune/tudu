@@ -77,6 +77,28 @@ function Day(props: Partial<TaskListProps> & { initial?: TaskItem[] }) {
   );
 }
 
+/** A page whose store answers a task later, as React Query does (it batches with setTimeout); `refuse` never does. */
+function LateDay(props: { refuse?: boolean; tick?: number }) {
+  const [tasks, setTasks] = useState(THREE);
+  return (
+    <TaskList
+      tasks={tasks}
+      onReorder={(next) => {
+        if (!props.refuse) setTimeout(() => setTasks(next), 0);
+      }}
+    />
+  );
+}
+
+/** Drags "Pay the electricity bill" (first) down onto the third row and lets go there. */
+function dropFirstOnThird() {
+  pointer(screen.getByText('Pay the electricity bill'), 'pointerdown', 50, 120);
+  pointer(window, 'pointermove', 50, 125);
+  pointer(window, 'pointermove', 50, 120 + 2 * ROW + 10);
+  pointer(window, 'pointerup', 50, 120 + 2 * ROW + 10);
+}
+const itemOf = (key: string) => document.querySelector<HTMLElement>(`.tp-item[data-key="${key}"]`)!;
+
 const titles = () =>
   screen
     .getAllByRole('listitem')
@@ -406,6 +428,74 @@ describe('TaskList', () => {
     expect(rowOf(sunday, 'c')!.style.marginTop).toBe('');
     pointer(window, 'pointerup', 60, 135);
     fireEvent.click(document.body);
+  });
+
+  it('C02-U62 a drop holds every row where the drag left it until the page renders the new order, then settles', () => {
+    vi.useFakeTimers();
+    const { rerender } = render(<LateDay />);
+    layout();
+    dropFirstOnThird();
+    // released, but the store has not answered: no frame shows the old order
+    expect(titles()).toEqual(THREE.map((t) => t.title));
+    expect(itemOf('a').style.transform).toBe(`translateY(${2 * ROW + 10}px)`);
+    expect(itemOf('b').style.transform).toBe(`translateY(${-ROW}px)`);
+    expect(itemOf('c').style.transform).toBe(`translateY(${-ROW}px)`);
+    expect(itemOf('b')).toHaveClass('tp-shift');
+    // a render that still has the old order leaves the hold alone
+    rerender(<LateDay tick={1} />);
+    expect(itemOf('a').style.transform).toBe(`translateY(${2 * ROW + 10}px)`);
+    expect(itemOf('b').style.transform).toBe(`translateY(${-ROW}px)`);
+    // the new order lands: the held rows let go in the same pass and the row settles from where it was let go
+    act(() => {
+      vi.advanceTimersByTime(0);
+    });
+    expect(titles()).toEqual([THREE[1]!.title, THREE[2]!.title, THREE[0]!.title]);
+    expect(itemOf('b').style.transform).toBe('');
+    expect(itemOf('c').style.transform).toBe('');
+    expect(itemOf('b')).not.toHaveClass('tp-shift');
+    expect(itemOf('a')).not.toHaveClass('tp-dragging');
+    expect(itemOf('a')).toHaveClass('tp-settling');
+  });
+
+  it('C02-U63 a move the page never renders lets go after 400ms and the row glides back to its old slot', () => {
+    vi.useFakeTimers();
+    render(<LateDay refuse />);
+    layout();
+    dropFirstOnThird();
+    act(() => {
+      vi.advanceTimersByTime(399);
+    });
+    expect(itemOf('a').style.transform).toBe(`translateY(${2 * ROW + 10}px)`);
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(titles()).toEqual(THREE.map((t) => t.title));
+    expect(itemOf('a').style.transform).toBe('');
+    expect(itemOf('b').style.transform).toBe('');
+    expect(itemOf('a')).toHaveClass('tp-settling');
+  });
+
+  it('C02-U64 a drag started during a hold ends the hold at once, so it measures settled rows', () => {
+    vi.useFakeTimers();
+    render(<LateDay refuse />);
+    layout();
+    dropFirstOnThird();
+    expect(itemOf('a').style.transform).not.toBe('');
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    pointer(screen.getByText('Call Sam at 3pm'), 'pointerdown', 50, 120 + ROW + 10);
+    pointer(window, 'pointermove', 50, 120 + ROW + 16);
+    expect(itemOf('a').style.transform).toBe('');
+    expect(itemOf('a')).not.toHaveClass('tp-dragging');
+    expect(itemOf('a')).not.toHaveClass('tp-settling');
+    expect(itemOf('c')).toHaveClass('tp-shift');
+    expect(document.querySelectorAll('.tp-dragging')).toHaveLength(1);
+    pointer(window, 'pointerup', 50, 120 + ROW + 16);
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(document.querySelectorAll('.tp-dragging, .tp-shift')).toHaveLength(0);
   });
 
   it('C02-U36 a move that never lands, or a page that goes away mid-glide, still clears the copy', () => {

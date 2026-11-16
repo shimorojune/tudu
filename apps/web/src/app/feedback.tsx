@@ -6,6 +6,7 @@ import {
   shotCanBePublic,
   SIMILAR_DEBOUNCE_MS,
   SIMILAR_QUERY_MAX,
+  similarKey,
   similarReady,
   type SimilarIssue,
   type SimilarIssues,
@@ -321,53 +322,65 @@ export function toastThanks(): void {
 export interface SimilarLook {
   state: SimilarReportsState;
   issues: SimilarIssue[];
-  /** A later look is on its way: the rows dim until it answers. */
-  stale: boolean;
 }
 
-const NO_LOOK: SimilarLook = { state: 'hidden', issues: [], stale: false };
+const NO_LOOK: SimilarLook = { state: 'hidden', issues: [] };
 
 /**
- * Similar reports while typing (#76): 450ms after the last key, once there are three words, ask the server for
- * issues that mean the same. Each newer look cancels the older one. The first look shimmers; later ones keep the
- * rows, dimmed, until the answer swaps them. Nothing close folds the box; a failure says so in one quiet line
- * (rows already shown stay).
+ * Similar reports while typing (#76, calmed in #114): once there are three words, 800ms after you stop typing, ask
+ * the server for issues that mean the same, but only when the words differ from the last look (case, spacing and
+ * punctuation don't count). Answers are kept while the form is open, so words already looked at are never asked
+ * again. Nothing shows while a look is on its way: the box opens only on an answer with matches, a later answer
+ * swaps the rows, one with none folds it shut, and a failed look changes nothing. A look that was asked finishes
+ * even if typing goes on; only the newest answer is shown.
  */
 export function useSimilarIssues(text: string, on: boolean): SimilarLook {
   const [look, setLook] = useState<SimilarLook>(NO_LOOK);
   const ready = on && similarReady(text);
   const [wasReady, setWasReady] = useState(ready);
+  // `asked`: the words of the newest look, asked or answered from the cache.
+  const asked = useRef<string | null>(null);
+  const cache = useRef(new Map<string, SimilarIssue[]>());
+  const seq = useRef(0);
   if (ready !== wasReady) {
     setWasReady(ready);
     if (!ready) setLook(NO_LOOK);
   }
   useEffect(() => {
+    if (ready) return;
+    // Under three words: the next look starts fresh, and the answers are kept while the form is open.
+    asked.current = null;
+    seq.current++;
+  }, [ready]);
+  useEffect(() => {
+    if (!on) cache.current.clear();
+  }, [on]);
+  useEffect(() => {
     if (!ready) return;
-    const ctl = new AbortController();
+    const key = similarKey(text);
     const words = text.trim().slice(0, SIMILAR_QUERY_MAX);
     const t = setTimeout(() => {
-      setLook((l) =>
-        l.issues.length ? { ...l, stale: true } : { state: 'loading', issues: [], stale: false },
+      if (key === asked.current) return;
+      asked.current = key;
+      const n = ++seq.current;
+      const show = (issues: SimilarIssue[]) => setLook({ state: issues.length ? 'ready' : 'hidden', issues });
+      const kept = cache.current.get(key);
+      if (kept) {
+        show(kept);
+        return;
+      }
+      api.get<SimilarIssues>(`/api/feedback/similar?q=${encodeURIComponent(words)}`).then(
+        (r) => {
+          cache.current.set(key, r.issues);
+          if (n === seq.current) show(r.issues);
+        },
+        () => {
+          // Nothing to say: the box stays as it is, and the next change of words asks again.
+          if (n === seq.current) asked.current = null;
+        },
       );
-      api
-        .get<SimilarIssues>(`/api/feedback/similar?q=${encodeURIComponent(words)}`, { signal: ctl.signal })
-        .then(
-          (r) => {
-            if (ctl.signal.aborted) return;
-            setLook({ state: r.issues.length ? 'ready' : 'hidden', issues: r.issues, stale: false });
-          },
-          () => {
-            if (ctl.signal.aborted) return;
-            setLook((l) =>
-              l.issues.length ? { ...l, stale: false } : { state: 'error', issues: [], stale: false },
-            );
-          },
-        );
     }, SIMILAR_DEBOUNCE_MS);
-    return () => {
-      clearTimeout(t);
-      ctl.abort();
-    };
+    return () => clearTimeout(t);
   }, [text, ready]);
   return look;
 }
