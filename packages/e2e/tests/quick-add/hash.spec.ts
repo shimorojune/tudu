@@ -177,10 +177,18 @@ test.describe('quick-add # project', () => {
     await expect(title(b)).toBeFocused();
     const box = async () => (await hashMenu(b).boundingBox())!;
     const settled = async () => {
-      // The pop-in scales from 96%: read the box once it is at rest.
+      // The pop-in scales from 96%: read the box once it is at rest. It fills forwards, so a finished one stays listed.
       await expect(hashMenu(b)).toBeVisible();
       await expect
-        .poll(() => f.evaluate(() => document.querySelector('.tp-hm-pop')!.getAnimations().length))
+        .poll(() =>
+          f.evaluate(
+            () =>
+              document
+                .querySelector('.tp-hm-pop')!
+                .getAnimations()
+                .filter((a) => a.playState !== 'finished').length,
+          ),
+        )
         .toBe(0);
       return box();
     };
