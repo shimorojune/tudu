@@ -1490,11 +1490,26 @@
   min-width: 0;
 }
 .tp-mb .tp-mb-eb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--font-mono);
   font-size: 10.5px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--brand);
+  white-space: nowrap;
+}
+/* The Scrambled pill rides the eyebrow's line (#123): 20px tall with its height taken back by the margins, so the
+   line, the day, the date and the ring stay exactly where they are without it. */
+.tp-mb .tp-mb-eb > .tp-mb-scr {
+  height: 20px;
+  margin: -4px 0;
+  padding: 0 8px 0 6px;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  letter-spacing: 0;
+  text-transform: none;
 }
 .tp-mb .tp-mb-day {
   margin-top: 3px;
@@ -1503,14 +1518,21 @@
   gap: 8px;
 }
 .tp-mb .tp-mb-day h2 {
+  flex: none;
   margin: 0;
   font-family: var(--font-serif);
   font-size: 26px;
   font-weight: 400;
   line-height: 1;
   letter-spacing: -0.01em;
+  white-space: nowrap;
 }
+/* One line each: if a long date ever meets the ring, the date gives way first. */
 .tp-mb .tp-mb-day span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 13px;
   color: var(--muted-foreground);
 }
@@ -1613,6 +1635,38 @@
 }
 .tp-mb .tp-mb-r:hover {
   background: var(--accent);
+}
+/* Reordering (#122), as on Today: the grip lives in the row's left margin and shows on hover; the lifted row takes
+   the pop shadow; the dropped one washes once. */
+.tp-mb .tp-mb-r {
+  position: relative;
+}
+.tp-mb .tp-mb-r.tp-mb-mv {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.tp-mb .tp-mb-r > .tp-grip {
+  left: -8px;
+  top: 8px;
+  width: 14px;
+  height: 22px;
+  border-radius: 4px;
+}
+.tp-mb .tp-mb-r:hover > .tp-grip,
+.tp-mb .tp-mb-r:focus-within > .tp-grip {
+  opacity: 1;
+}
+.tp-mb .tp-mb-r.tp-dragging {
+  background: var(--card);
+  box-shadow: var(--shadow-pop);
+}
+.tp-mb .tp-mb-r.tp-dropped {
+  animation: tp-row-wash 1200ms var(--ease-change) both;
+}
+@media (hover: none) {
+  .tp-mb .tp-mb-r > .tp-grip {
+    display: none;
+  }
 }
 .tp-mb .tp-mb-r .tp-cbw {
   margin-top: 1px;

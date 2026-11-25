@@ -44,9 +44,19 @@ const days: Record<string, Task[]> = {
 };
 const cross = vi.fn();
 const refreshAll = vi.fn();
+const place = vi.fn<(id: string, day: string, index: number) => string[]>(() => []);
+const online = { on: true };
+type Answer = (results: Array<{ id: string; status: 'ok' | 'rejected' }>) => void;
+const answered = new Set<Answer>();
+const answer = (results: Parameters<Answer>[0]) => act(() => answered.forEach((fn) => fn(results)));
 vi.mock('../../app/tasks', () => ({
-  useOnline: () => true,
+  useOnline: () => online.on,
   taskStore: {
+    place: (id: string, day: string, index: number) => place(id, day, index),
+    onAnswered: (fn: Answer) => {
+      answered.add(fn);
+      return () => answered.delete(fn);
+    },
     dayQuery: (spaceId: string, day: string) => ({
       queryKey: ['day', spaceId, day],
       queryFn: async () => ({ day, tasks: day === '2026-10-23' ? (days[spaceId] ?? []) : [] }),
@@ -100,6 +110,10 @@ beforeEach(() => {
   resetDesktop();
   live.mockReset();
   cross.mockReset();
+  place.mockReset();
+  place.mockReturnValue([]);
+  online.on = true;
+  answered.clear();
   refreshAll.mockReset();
   refreshMe.mockReset();
   refreshMe.mockResolvedValue(ME);
@@ -273,5 +287,85 @@ describe('C20-U23 the sheet says today, tomorrow and yesterday', () => {
     expect(words('2026-10-24')).toEqual({ text: 'Due tomorrow', red: false });
     expect(words('2026-10-22')).toEqual({ text: 'Overdue', red: true });
     expect(words('2026-10-27')).toEqual({ text: 'Due Tue', red: false });
+  });
+});
+
+describe('C20-U28 a move in the sheet goes to the whole day (#122)', () => {
+  const team: Record<string, Task[]> = {
+    p: [],
+    n: [
+      task('o1', 'NW-1', 'Theirs, first', { ownerId: 'other' }),
+      task('m1', 'NW-2', 'Mine, first', { ownerId: 'u' }),
+      task('o2', 'NW-3', 'Theirs, second', { ownerId: 'other' }),
+      task('m2', 'NW-4', 'Mine, second', { ownerId: 'u' }),
+      task('m3', 'NW-5', 'Mine, third', { ownerId: 'u' }),
+    ],
+  };
+  let before: Record<string, Task[]>;
+  beforeEach(() => {
+    before = { ...days };
+    Object.assign(days, team);
+  });
+  afterEach(() => {
+    Object.assign(days, before);
+  });
+
+  it('C20-U28 a reorder in a team space places the task by its index in the whole day', async () => {
+    const user = userEvent.setup();
+    mount(ME);
+    const list = await screen.findByRole('list', { name: 'Today in Northwind' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(3);
+    // The third of mine up one: it lands just before "Mine, second", past nobody else's.
+    within(list).getByRole('button', { name: 'Open Mine, third in Tudu' }).focus();
+    await user.keyboard('{Alt>}{ArrowUp}{/Alt}');
+    expect(place).toHaveBeenCalledTimes(1);
+    expect(place).toHaveBeenCalledWith('m3', TODAY, 3);
+    // The first of mine down one: just before "Mine, third", past the other person's task between.
+    place.mockClear();
+    within(list).getByRole('button', { name: 'Open Mine, first in Tudu' }).focus();
+    await user.keyboard('{Alt>}{ArrowDown}{/Alt}');
+    expect(place).toHaveBeenCalledWith('m1', TODAY, 3);
+  });
+
+  it('C20-U28 a move turned down says so under the heading; the next move, or hiding the sheet, clears it', async () => {
+    const user = userEvent.setup();
+    mount(ME);
+    const list = await screen.findByRole('list', { name: 'Today in Northwind' });
+    const move = async () => {
+      within(list).getByRole('button', { name: 'Open Mine, third in Tudu' }).focus();
+      await user.keyboard('{Alt>}{ArrowUp}{/Alt}');
+    };
+    place.mockReturnValue(['c1']);
+    await move();
+    // Someone else's change turned down, and this one taken: no line.
+    answer([{ id: 'zz', status: 'rejected' }]);
+    expect(screen.queryByRole('alert')).toBeNull();
+    answer([{ id: 'c1', status: 'ok' }]);
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    place.mockReturnValue(['c2']);
+    await move();
+    answer([{ id: 'c2', status: 'rejected' }]);
+    expect(screen.getByRole('alert').textContent).toBe('It’s back where it was. Try again.');
+    // The next move clears it.
+    place.mockReturnValue(['c3']);
+    await move();
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    answer([{ id: 'c3', status: 'rejected' }]);
+    expect(screen.getByRole('alert')).toBeTruthy();
+    // So does hiding the sheet.
+    emit('menubar:hidden');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+describe('C20-U29 offline says moves wait too (#122)', () => {
+  it('C20-U29 the offline line reads "Ticks and moves save here and go when you’re back."', async () => {
+    online.on = false;
+    mount(ME);
+    await screen.findByRole('list', { name: 'Today in Personal' });
+    expect(screen.getByText('You’re offline.')).toBeTruthy();
+    expect(screen.getByText('Ticks and moves save here and go when you’re back.')).toBeTruthy();
   });
 });
