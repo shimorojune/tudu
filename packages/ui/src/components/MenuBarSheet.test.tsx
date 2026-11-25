@@ -372,6 +372,14 @@ describe('C20-U26 the Scrambled pill rides the eyebrow line (#123)', () => {
     }
   });
 
+  it('C20-U30 the list scrolls inside the sheet and holds what is placed in it, so the page never grows (#123)', () => {
+    const body = rulesWhere(parseRules(readStylesheet('app.css')), (sel) => sel === '.tp-mb .tp-mb-b')[0]!
+      .declarations;
+    expect(body['overflow-y']).toBe('auto');
+    expect(body['min-height']).toBe('0');
+    expect(body['position']).toBe('relative');
+  });
+
   it('C20-U26 the pill is 20px with its height taken back, and the day and the date never wrap', () => {
     const rules = parseRules(readStylesheet('app.css'));
     const pill = rulesWhere(rules, (sel) => sel === '.tp-mb .tp-mb-eb > .tp-mb-scr')[0]!;

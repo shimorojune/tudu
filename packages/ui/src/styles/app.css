@@ -1598,6 +1598,9 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* The list holds what is placed inside it (each group's hidden status line sits under its last row): left to the
+     page, a long day made the page as tall as the list and the whole window scrolled (#123). */
+  position: relative;
   scrollbar-width: thin;
   padding: 6px 8px 8px;
 }
