@@ -24,21 +24,27 @@ export interface DueLabel {
    */
   tip: string;
   overdue: boolean;
+  /**
+   * Due today and not yet late (#121): the row writes these words in amber, since it is the task that needs doing
+   * now. A time today that has passed is `overdue` instead, never both.
+   */
+  today: boolean;
   iso: IsoDate;
 }
 
 /** The "Due Fri" pill of a task due on `due`, seen on `today`. Overdue once today is past it. */
 export function dueLabel(due: IsoDate, today: IsoDate): DueLabel {
   const days = diffDays(today, due);
-  if (days === 0) return { label: 'today', tip: 'Due today', overdue: false, iso: due };
-  if (days === 1) return { label: 'tomorrow', tip: 'Due tomorrow', overdue: false, iso: due };
-  if (days === -1) return { label: 'yesterday', tip: 'Overdue since yesterday', overdue: true, iso: due };
+  if (days === 0) return { label: 'today', tip: 'Due today', overdue: false, today: true, iso: due };
+  if (days === 1) return { label: 'tomorrow', tip: 'Due tomorrow', overdue: false, today: false, iso: due };
+  if (days === -1)
+    return { label: 'yesterday', tip: 'Overdue since yesterday', overdue: true, today: false, iso: due };
   const near = Math.abs(days) < 7;
   const { month, day } = partsOf(due);
   const label = near ? WEEKDAYS_SHORT[weekdayOf(due)]! : `${day} ${MONTHS_SHORT[month - 1]}`;
   const when = near ? weekdayName(due) : formatLong(due);
   const overdue = days < 0;
-  return { label, tip: overdue ? `Was due ${when}` : `Due ${when}`, overdue, iso: due };
+  return { label, tip: overdue ? `Was due ${when}` : `Due ${when}`, overdue, today: false, iso: due };
 }
 
 /** The due fact in the panel: "Fri 16 Oct" and "2 days overdue" (red), "today" (brand), "in 4 days". */
@@ -63,8 +69,8 @@ export function dueLabelAt(
   if (due === today) {
     const late = isPast(due, at, now);
     return late
-      ? { label: t, tip: `Was due today at ${t}`, overdue: true, iso: due }
-      : { label: `today ${t}`, tip: `Due today at ${t}`, overdue: false, iso: due };
+      ? { label: t, tip: `Was due today at ${t}`, overdue: true, today: false, iso: due }
+      : { label: `today ${t}`, tip: `Due today at ${t}`, overdue: false, today: true, iso: due };
   }
   if (base.overdue) return base;
   return { ...base, label: `${base.label} ${t}`, tip: `${base.tip} at ${t}` };

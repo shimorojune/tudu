@@ -161,4 +161,104 @@ test.describe('quick-add # project', () => {
     expect(camping).toBeTruthy();
     expect((await serverToday(page, seeded.spaceId, 'Pack the tent'))?.projectId).toBe(camping!.id);
   });
+
+  test('PH-E12 the floating Quick Add at the Mac window’s size: a long title and # keeps the menu whole, 12px inside (#117)', async ({
+    page,
+    context,
+  }) => {
+    test.skip(test.info().project.name !== 'desktop', 'the Mac window is one size');
+    await signInFresh(page);
+    const seeded = await threeProjects(page);
+    const f = await context.newPage();
+    await fixClock(f);
+    await f.setViewportSize({ width: 640, height: 520 });
+    // What the menu's place went through, for the message when an edge is off: every change of its margins, with
+    // where it then was and how far anything around it had scrolled.
+    await f.addInitScript(() => {
+      const w = window as unknown as { __hm: string[] };
+      w.__hm = [];
+      const note = (why: string) => {
+        const pop = document.querySelector<HTMLElement>('.tp-hm-pop');
+        const menu = document.querySelector<HTMLElement>('.tp-hm');
+        if (!pop || !menu) return;
+        const scrolled: string[] = [];
+        for (let e = pop.parentElement; e; e = e.parentElement)
+          if (e.scrollLeft) scrolled.push(`${e.className.split(' ')[0]}=${e.scrollLeft}`);
+        const field = document.querySelector<HTMLInputElement>('.tp-qa-line input');
+        const r = menu.getBoundingClientRect();
+        w.__hm.push(
+          `${Math.round(performance.now())} ${why} pop[${pop.style.marginLeft}] menu[${menu.style.marginLeft}] ` +
+            `box ${Math.round(r.left)}..${Math.round(r.right)} field ${field?.scrollLeft} ${scrolled.join(' ')}`,
+        );
+      };
+      new MutationObserver((ms) => {
+        for (const m of ms) {
+          const e = m.target as HTMLElement;
+          if (m.type === 'attributes' && e.classList?.contains('tp-hm-pop')) note('pop');
+          else if (m.type === 'attributes' && e.classList?.contains('tp-hm')) note('menu');
+          else if (m.type === 'childList' && document.querySelector('.tp-hm-pop')) note('dom');
+        }
+      }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['style'] });
+      window.addEventListener('scroll', () => note('scroll'), true);
+    });
+    const trail = async () =>
+      (await f.evaluate(() => (window as unknown as { __hm: string[] }).__hm.slice(-40))).join('\n');
+    await f.goto('/quick-add');
+    const b = f.getByRole('dialog', { name: 'Quick Add' });
+    await expect(title(b)).toBeFocused();
+    const box = async () => (await hashMenu(b).boundingBox())!;
+    const settled = async () => {
+      // The pop-in scales from 96%: read the box once it is at rest. It fills forwards, so a finished one stays listed.
+      await expect(hashMenu(b)).toBeVisible();
+      await expect
+        .poll(() =>
+          f.evaluate(
+            () =>
+              document
+                .querySelector('.tp-hm-pop')!
+                .getAnimations()
+                .filter((a) => a.playState !== 'finished').length,
+          ),
+        )
+        .toBe(0);
+      return box();
+    };
+
+    // A short title: the menu opens at the caret, as before, and nothing slides it.
+    await title(b).pressSequentially('Call Sam #');
+    const short = await settled();
+    expect(short.x).toBeGreaterThanOrEqual(12);
+    expect(short.x + short.width).toBeLessThanOrEqual(628);
+    expect(await f.evaluate(() => document.querySelector<HTMLElement>('.tp-hm-pop')!.style.marginLeft)).toBe(
+      '',
+    );
+    // At the caret: the menu's own margin is the # mark's place in the field.
+    expect(
+      await f.evaluate(() => parseFloat(document.querySelector<HTMLElement>('.tp-hm')!.style.marginLeft)),
+    ).toBeGreaterThan(20);
+    await title(b).press('Escape');
+    await expect(hashMenu(b)).toHaveCount(0);
+
+    // A title that fills the field: the menu would run past the window's right edge; it sits 12px inside.
+    await title(b).fill('');
+    await title(b).pressSequentially(
+      'Send the signed renewal back to the landlord before Friday and ask about the deposit #',
+    );
+    const long = await settled();
+    expect(Math.abs(long.x + long.width - 628), await trail()).toBeLessThanOrEqual(1);
+    expect(long.x).toBeGreaterThanOrEqual(12);
+    // Whole: nothing of it is outside the window.
+    expect(long.x + long.width).toBeLessThanOrEqual(640);
+
+    // Typing on after the same # filters it where it is; it doesn't chase the caret.
+    await title(b).pressSequentially('pla');
+    await expect(hashMenu(b).getByRole('option')).toHaveText(seeded.order.filter((n) => n.startsWith('Pla')));
+    expect((await box()).x).toBe(long.x);
+    // Enter still picks the first project.
+    await title(b).press('Enter');
+    await expect(hashMenu(b)).toHaveCount(0);
+    await expect(
+      b.getByRole('button', { name: `Project: ${seeded.order.find((n) => n.startsWith('Pla'))}` }),
+    ).toBeVisible();
+  });
 });

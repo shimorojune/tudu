@@ -561,3 +561,77 @@ test.describe('today, a drop on the other day', () => {
     await expectMoved(page);
   });
 });
+
+test.describe('today, due today', () => {
+  test('C02-E43 "Due today" is amber and "Overdue" is red, in light and in dark (#121)', async ({ page }) => {
+    test.skip(test.info().project.name !== 'desktop', 'a colour is the same at every size');
+    await fixClock(page);
+    await signInFresh(page);
+    const me = (await (await page.request.get(`${API_URL}/api/me`)).json()) as {
+      spaces: Array<{ id: string; kind: string }>;
+    };
+    const space = me.spaces.find((s) => s.kind === 'personal')!.id;
+    const ids = { today: crypto.randomUUID(), late: crypto.randomUUID(), later: crypto.randomUUID() };
+    let at = Date.parse('2026-10-18T08:00:00.000Z');
+    const stamp = () => new Date((at += 1000)).toISOString();
+    const make = (id: string, title: string, due: string, position: number) => [
+      {
+        id: crypto.randomUUID(),
+        type: 'task.create',
+        payload: { id, spaceId: space, title, day: '2026-10-18', position },
+        at: stamp(),
+      },
+      { id: crypto.randomUUID(), type: 'task.due', payload: { id, due }, at: stamp() },
+    ];
+    const res = await page.request.post(`${API_URL}/api/sync`, {
+      data: {
+        clientId: 'seed',
+        mutations: [
+          ...make(ids.today, 'Call the bank', '2026-10-18', 1024),
+          ...make(ids.late, 'Renew the passport', '2026-10-16', 2048),
+          ...make(ids.later, 'Book the dentist', '2026-10-23', 3072),
+        ],
+      },
+    });
+    expect(res.status()).toBe(200);
+
+    const check = async () => {
+      const due = (title: string) => row(dayList(page), title).locator('.tp-sg-due');
+      await expect(due('Call the bank')).toHaveText('Due today');
+      await expect(due('Call the bank')).toHaveClass(/tp-dt/);
+      await expect(due('Call the bank')).not.toHaveClass(/tp-od/);
+      await expect(due('Renew the passport')).toHaveText('Overdue since Fri');
+      await expect(due('Renew the passport')).toHaveClass(/tp-od/);
+      await expect(due('Book the dentist')).toHaveText('Due Fri');
+      /** A theme colour as the browser computes it, from a probe inside the app's root. */
+      const ink = (name: string) =>
+        page.evaluate((v) => {
+          const probe = document.createElement('span');
+          probe.style.color = `var(${v})`;
+          document.querySelector('.tp-root')!.appendChild(probe);
+          const c = getComputedStyle(probe).color;
+          probe.remove();
+          return c;
+        }, name);
+      const color = (title: string) => due(title).evaluate((el) => getComputedStyle(el).color);
+      const [warning, destructive, muted] = [
+        await ink('--warning'),
+        await ink('--destructive'),
+        await ink('--muted-foreground'),
+      ];
+      expect(new Set([warning, destructive, muted]).size).toBe(3);
+      await expect.poll(() => color('Call the bank')).toBe(warning);
+      await expect.poll(() => color('Renew the passport')).toBe(destructive);
+      await expect.poll(() => color('Book the dentist')).toBe(muted);
+      return warning;
+    };
+    await page.reload();
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+    const light = await check();
+    await page.evaluate(() => localStorage.setItem('tudu.theme', 'dark'));
+    await page.reload();
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    const dark = await check();
+    expect(dark).not.toBe(light);
+  });
+});

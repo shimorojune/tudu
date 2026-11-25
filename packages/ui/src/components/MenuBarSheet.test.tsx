@@ -355,6 +355,35 @@ describe('SK-U14 MenuBarSheet', () => {
   });
 });
 
+describe('C20-U31 due today in the sheet (#121)', () => {
+  it('C20-U31 a row due today has the amber class on its due words; a late one is red; another day is neither', () => {
+    const group: MenuBarGroupItem = {
+      key: 'p',
+      name: 'Personal',
+      space: { name: 'Personal', personal: true },
+      rows: [
+        { key: 'a', title: 'Call the bank', due: { label: 'today', today: true } },
+        { key: 'b', title: 'Send the invoice', due: { label: 'yesterday', overdue: true } },
+        { key: 'c', title: 'Review the deck', due: { label: 'Fri' } },
+      ],
+    };
+    render(<MenuBarSheet state="day" heading={heading} groups={[group]} />);
+    const today = screen.getByText('Due today');
+    expect(today).toHaveClass('tp-dt');
+    expect(today).not.toHaveClass('tp-od');
+    expect(screen.getByText('Overdue')).toHaveClass('tp-od');
+    expect(screen.getByText('Overdue')).not.toHaveClass('tp-dt');
+    expect(screen.getByText('Due Fri').className).toBe('');
+    const rules = parseRules(readStylesheet('app.css'));
+    expect(rulesWhere(rules, (x) => x === '.tp-mb .tp-mb-by .tp-dt')[0]!.declarations.color).toBe(
+      'var(--warning)',
+    );
+    expect(
+      rulesWhere(rules, (x) => x === '.tp-mb .tp-mb-r.tp-done .tp-mb-by .tp-dt')[0]!.declarations.color,
+    ).toBe('var(--muted-foreground)');
+  });
+});
+
 describe('C20-U26 the Scrambled pill rides the eyebrow line (#123)', () => {
   it('C20-U26 Scrambled on: the pill is inside the eyebrow; the heading row holds the day block and the ring only', () => {
     setScramble(true);

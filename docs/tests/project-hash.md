@@ -47,3 +47,12 @@ plan (PH-U11, PH-U12, PH-E03..E06, PH-E08, PH-E09, MC-PH02) were dropped with in
 | ID      | Case                                                                                                       |
 | ------- | ---------------------------------------------------------------------------------------------------------- |
 | MC-PH01 | Mac Quick Add window: type `#` and pick with the keyboard; the menu is not clipped and reads right in dark |
+
+## The # menu stays in the window (#117) ([docs/plans/hash-edge-due-today.md](../plans/hash-edge-due-today.md))
+
+| ID     | Where                                    | Case                                                                                                                                                                                                                                                          |
+| ------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PH-U17 | ui `QuickAdd.test.tsx`                   | A title that fills the field, then `#`: the menu opens with its right edge 12px inside a 640px window. Typing on after the same `#` keeps it where it opened, and nothing measures it again                                                                   |
+| PH-E12 | e2e `quick-add/hash.spec.ts` (640 × 520) | The floating Quick Add page at the Mac window's size: a short title opens the menu at the caret, as before. A long title and `#` puts the menu fully inside, its right edge at 628 ± 1; typing on filters it where it is; Enter still picks the first project |
+
+Manual check for Rohit after release, MC-PH03: on the Mac, Quick Add with a long title and `#`: the menu is whole.

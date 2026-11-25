@@ -54,3 +54,14 @@ Status column is kept by `pnpm test:status` in [STATUS.md](STATUS.md). Run this 
 | C00-E04 | Menu flips            | A menu opened near the bottom of the window opens upward                                           |
 | C00-E05 | Theme is remembered   | Picking Dark paints dark, survives a reload                                                        |
 | C00-E06 | The suite runs in UTC | A local date in the test is the same instant in UTC, and the page's offset is 0 and its zone `UTC` |
+
+## Pops stay in the window, and whole-pixel calendar cells (#117, #120) ([docs/plans/hash-edge-due-today.md](../plans/hash-edge-due-today.md))
+
+| ID      | Where                      | Case                                                                                                                                                                                                                                                                                                                              |
+| ------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C00-U38 | ui `linger.test.tsx`       | In a 640px window a 248px pop measured at left 529 gets `margin-left: -149px` (right edge at 628); at left 200 no shift; at left 4, `+8px`. A box set in by its own margin is measured from where it shows. It is measured when it opens and when `fitKey` changes, not while it stays open; closing and reopening measures again |
+| C00-U39 | ui `linger.test.tsx`       | The pop's own box changes size while it is open (the # menu placed again once the title has scrolled): it is measured again and its right edge is back at 628; a callback with the size unchanged reads nothing                                                                                                                   |
+| C00-U39 | ui `MiniCalendar.test.tsx` | `.tp-cal-g` is seven 34px columns shared out across the 256px grid, so every cell starts on a whole pixel, 3px apart; the cells stay 34px square; today keeps `tp-today` and its 1.5px ring                                                                                                                                       |
+| C00-U40 | ui `linger.test.tsx`       | A Linger pop carries `tp-linger`, and `.tp-linger` (with the # menu's own box) has `transition-property: none`: under Less motion its margins never ease, so it is never measured halfway through its slide                                                                                                                       |
+
+Manual check for Rohit after release, MC-DT01: on a Retina and a non-Retina screen, today's ring in the date picker is even all round.

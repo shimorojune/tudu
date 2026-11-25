@@ -2,6 +2,7 @@ import { dueDistance, relativeDayLabel, type IsoDate } from '@tudu/core';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { parseRules, readStylesheet, rulesWhere } from '../test-utils/stylesheet';
 import { MiniCalendar, type MiniCalendarProps } from './MiniCalendar';
 
 const TODAY: IsoDate = '2026-10-18'; // a Sunday; 1 October 2026 is a Thursday
@@ -226,5 +227,34 @@ describe('MiniCalendar times (docs/plans/task-times.md)', () => {
     expect(container.querySelector('.tp-range-a')).toHaveAccessibleName(/^18 October/);
     expect(container.querySelector('.tp-range-z')).toHaveAccessibleName(/^21 October/);
     expect(container.querySelectorAll('.tp-range')).toHaveLength(4);
+  });
+});
+
+describe('C00-U39 the calendar’s cells sit on whole pixels (#120)', () => {
+  const rules = parseRules(readStylesheet('components.css'));
+  const decl = (sel: string) => rulesWhere(rules, (x) => x === sel)[0]!.declarations;
+
+  it('C00-U39 seven 34px columns in the 256px grid: every cell starts on a whole pixel, 3px apart', () => {
+    const grid = decl('.tp-cal-g');
+    expect(grid['grid-template-columns']).toBe('repeat(7, 34px)');
+    expect(grid['justify-content']).toBe('space-between');
+    expect(grid['gap']).toBe('2px');
+    // The picker is 280px with 12px each side.
+    const cal = decl('.tp-cal');
+    expect(cal.width).toBe('280px');
+    expect(cal.padding).toBe('12px 12px 10px');
+    const inner = 280 - 12 - 12;
+    const between = (inner - 7 * 34) / 6;
+    expect(between).toBe(3);
+    const lefts = Array.from({ length: 7 }, (_, i) => i * (34 + between));
+    expect(lefts.every(Number.isInteger)).toBe(true);
+    // The cells stay square.
+    expect(decl('.tp-cal-d').height).toBe('34px');
+  });
+
+  it('C00-U39 today keeps its class and its 1.5px ring', () => {
+    const { day } = setup();
+    expect(day(18)).toHaveClass('tp-today');
+    expect(decl('.tp-cal-d.tp-today')['box-shadow']).toBe('inset 0 0 0 1.5px var(--brand)');
   });
 });

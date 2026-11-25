@@ -44,6 +44,8 @@ export interface TaskDue {
   /** The exact date, in the tooltip. */
   tip?: string;
   overdue?: boolean;
+  /** Due today and not late: the words are amber (#121). Never with `overdue`. */
+  today?: boolean;
   /** The due day itself, so the picker can mark it. */
   iso?: IsoDate;
 }
@@ -140,6 +142,8 @@ export interface TaskRowProps {
 interface Sig {
   k: TaskSignal;
   od?: boolean;
+  /** Due today: amber. */
+  dt?: boolean;
   icon: ReactNode;
   long: string;
   label: string;
@@ -178,6 +182,7 @@ function signals(p: TaskRowProps, mine: (t: string) => string): Sig[] {
     out.push({
       k: 'due',
       od: p.due.overdue,
+      dt: !!p.due.today && !p.due.overdue,
       icon: <Icon name="clock" size={12} stroke={2.2} />,
       ic: 12,
       long,
@@ -370,6 +375,7 @@ export function TaskRow(p: TaskRowProps) {
           `tp-sg-${x.k}`,
           x.bare && 'tp-sg-bare',
           x.od && 'tp-od',
+          x.dt && 'tp-dt',
           x.mono && 'tp-mono',
           pop?.k === x.k && 'tp-on',
           isSubs && showSubs && 'tp-open',

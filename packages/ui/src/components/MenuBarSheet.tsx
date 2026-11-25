@@ -113,7 +113,7 @@ function Byline({ row }: { row: MenuBarRowItem }) {
     );
   if (row.due)
     bits.push(
-      <span key="d" className={cx(row.due.overdue && 'tp-od')}>
+      <span key="d" className={cx(row.due.overdue ? 'tp-od' : row.due.today && 'tp-dt')}>
         {row.due.overdue ? 'Overdue' : `Due ${row.due.label}`}
       </span>,
     );

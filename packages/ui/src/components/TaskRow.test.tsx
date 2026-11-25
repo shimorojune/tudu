@@ -329,6 +329,8 @@ describe('TaskRow near-day due words (#58)', () => {
       const due = container.querySelector('.tp-sg-due')!;
       expect(due.textContent).toBe(words);
       expect(due.classList.contains('tp-od')).toBe(late);
+      // "Due today" alone is amber (#121).
+      expect(due.classList.contains('tp-dt')).toBe(words === 'Due today');
       // A Tooltip trigger carries Radix's data-state; these buttons are bare.
       expect(due).not.toHaveAttribute('data-state');
       expect(due).toHaveAccessibleName(`${words}. Change the date`);
@@ -340,6 +342,54 @@ describe('TaskRow near-day due words (#58)', () => {
     );
     expect(container.querySelector('.tp-sg-due')!.textContent).toBe('Overdue since Fri');
     expect(container.querySelector('.tp-sg-due')).toHaveAttribute('data-state');
+  });
+
+  it('C02-U65 due today is amber, late is red, any other day is neither; a crossed-off row keeps it grey (#121)', () => {
+    const due = (iso: string, done = false) => {
+      const { container, unmount } = render(
+        <TaskRow title="Reply to legal" id="ME-81" done={done} due={dueLabel(iso, SUN)} />,
+      );
+      const el = container.querySelector('.tp-sg-due')!;
+      const out = {
+        dt: el.classList.contains('tp-dt'),
+        od: el.classList.contains('tp-od'),
+        done: !!el.closest('.tp-done'),
+      };
+      unmount();
+      return out;
+    };
+    expect(due(SUN)).toEqual({ dt: true, od: false, done: false });
+    expect(due('2026-10-17')).toEqual({ dt: false, od: true, done: false });
+    expect(due('2026-10-16')).toEqual({ dt: false, od: true, done: false });
+    expect(due('2026-10-19')).toEqual({ dt: false, od: false, done: false });
+    expect(due('2026-10-23')).toEqual({ dt: false, od: false, done: false });
+    // A time today that has passed is late, never amber.
+    const late = render(
+      <TaskRow
+        title="Reply to legal"
+        id="ME-81"
+        due={{ label: '5 PM', tip: 'Was due today at 5 PM', overdue: true, today: true, iso: SUN }}
+      />,
+    );
+    expect(late.container.querySelector('.tp-sg-due')).toHaveClass('tp-od');
+    expect(late.container.querySelector('.tp-sg-due')).not.toHaveClass('tp-dt');
+    late.unmount();
+    expect(due(SUN, true)).toEqual({ dt: true, od: false, done: true });
+
+    // The colours: amber is the warning ink, also on hover; red stays for late; a done row's words are grey.
+    const color = (sel: string) =>
+      rulesWhere(rules, (x) => x.split(',').some((p) => p.trim() === sel)).at(-1)!.declarations.color;
+    expect(color('.tp-sg.tp-dt')).toBe('var(--warning)');
+    expect(color('.tp-sg.tp-dt:hover')).toBe('var(--warning)');
+    expect(color('.tp-sg.tp-od')).toBe('var(--destructive)');
+    expect(color('.tp-done .tp-sg.tp-dt')).toBe('var(--muted-foreground)');
+    expect(color('.tp-done .tp-sg.tp-dt:hover')).toBe('var(--muted-foreground)');
+    // The done rule comes after the amber one, at the same weight or more, so it wins.
+    const at = (sel: string) => rules.findIndex((r) => r.selector.split(',').some((p) => p.trim() === sel));
+    expect(at('.tp-done .tp-sg.tp-dt')).toBeGreaterThan(at('.tp-sg.tp-dt'));
+    // Inbox rows and search lines use the same amber.
+    expect(color('.tp-ix-by .tp-dt')).toBe('var(--warning)');
+    expect(color('.tp-tl-by .tp-dt')).toBe('var(--warning)');
   });
 
   it('C02-U40 the words fade in only when they change in front of you', () => {

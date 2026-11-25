@@ -24,7 +24,7 @@ export interface InboxTaskFacts {
   /** "Tue 20 Oct": the day the sender asked for. */
   forLabel?: string | null;
   forIso?: IsoDate | null;
-  due?: { label: string; overdue?: boolean } | null;
+  due?: { label: string; overdue?: boolean; today?: boolean } | null;
   project?: { name: string; color: string } | null;
   /** The sender's note, plain words. */
   note?: string | null;
@@ -296,7 +296,7 @@ export function InboxItem(p: InboxItemProps) {
   if (sent) by.push(<span key="f">{t.forLabel ? `Asked for ${t.forLabel}` : 'No day asked'}</span>);
   if (t.due)
     by.push(
-      <span key="d" className={t.due.overdue ? 'tp-od' : undefined}>
+      <span key="d" className={t.due.overdue ? 'tp-od' : t.due.today ? 'tp-dt' : undefined}>
         Due {t.due.label}
       </span>,
     );

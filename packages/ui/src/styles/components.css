@@ -115,6 +115,10 @@
   transition: background var(--dur-menu) var(--ease-change), color var(--dur-menu) var(--ease-change), opacity var(--dur-menu) var(--ease-change); }
 .tp-sg:hover { background: var(--accent); color: var(--foreground); }
 .tp-sg.tp-od, .tp-sg.tp-od:hover { color: var(--destructive); }
+/* Due today (#121): amber, the warning ink, so it stands apart from any other date; red stays for late only. A crossed-off row keeps its words grey. */
+.tp-dt { color: var(--warning); }
+.tp-sg.tp-dt, .tp-sg.tp-dt:hover { color: var(--warning); }
+.tp-done .tp-dt, .tp-done .tp-sg.tp-dt, .tp-done .tp-sg.tp-dt:hover { color: var(--muted-foreground); }
 /* New due words fade in when they change in front of you (midnight, a date picked); words a row is born with stay still. */
 .tp-sg-turn > span { animation: tp-label-in var(--dur-menu) var(--ease-arrive) both; }
 .tp-dh-date-turn { animation: tp-label-in var(--dur-menu) var(--ease-arrive) both; }
@@ -473,6 +477,10 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 .tp-dh-date:hover, .tp-dh-date[aria-expanded="true"] { color: var(--foreground); text-decoration-color: var(--border-strong); }
 .tp-dh-pop { position: absolute; left: 0; top: calc(100% + 10px); z-index: 30; animation: tp-pop-in var(--dur-menu) var(--ease-arrive) both; transform-origin: top left; }
 @keyframes tp-pop-in { from { opacity: 0; transform: scale(.96) translateY(-4px); } to { opacity: 1; transform: none; } }
+/* A Linger pop is placed by its margins and measured where it stands (#117). Less motion gives every element
+   `transition: all 120ms`: the margins would ease, each measure would read a pop halfway through its slide, and it
+   would stop halfway to the edge. The same for the # menu's own place at the caret. Their animations are enough. */
+.tp-linger, .tp-root .tp-menu.tp-hm { transition-property: none; }
 .tp-pop-leaving { animation: tp-pop-out 130ms var(--ease-leave) both !important; pointer-events: none; }
 .tp-pop-leaving:is(.tp-qa-pop-up, .tp-up) { animation-name: tp-pop-out-up !important; }
 @keyframes tp-pop-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(.97) translateY(-3px); } }
@@ -504,7 +512,8 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 .tp-cal-h { display: flex; align-items: center; gap: 2px; padding: 0 0 6px 8px; }
 .tp-cal-h > span:first-child { flex: 1; font-size: 13.5px; font-weight: 600; }
 .tp-cal-h .tp-ib { width: 30px; height: 30px; }
-.tp-cal-g { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+/* Whole-pixel cells (#120): seven 34px columns in the 256px grid, the rest shared out between them (3px), so every cell and today's ring start on a whole pixel. Sevenths of 256 gave 34.857px cells and a ring smeared over two pixels on one side. */
+.tp-cal-g { display: grid; grid-template-columns: repeat(7, 34px); justify-content: space-between; gap: 2px; }
 .tp-cal-dow { height: 26px; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); }
 .tp-cal-d { position: relative; height: 34px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--foreground-2); text-align: center !important;
   transition: background var(--dur-menu) var(--ease-change); }
@@ -722,7 +731,7 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 .tp-td-val .tp-mono { font-family: var(--font-mono); font-size: 12.5px; }
 .tp-td-note { font-size: 13px; color: var(--muted-foreground); }
 .tp-td-note.tp-od { color: var(--destructive); }
-.tp-td-note.tp-td-now { color: var(--brand-text); }
+.tp-td-note.tp-td-now { color: var(--warning); }
 .tp-td-status { height: 20px; padding: 0 8px; border-radius: var(--radius-full); display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 500; background: var(--jira-soft); color: var(--jira); }
 .tp-td-pop { position: absolute; left: -10px; top: calc(100% + 6px); z-index: 20; animation: tp-pop-in var(--dur-menu) var(--ease-arrive) both; transform-origin: top left; }
 .tp-td-mi { display: inline-flex; align-items: center; gap: 9px; }
@@ -783,7 +792,7 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 .tp-cal-f.tp-cal-f2 { justify-content: space-between; align-items: center; }
 .tp-cal-hint { height: 20px; margin-top: 8px; padding: 0 4px; font-size: 12.5px; line-height: 20px; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color var(--dur-menu) var(--ease-change); }
 .tp-cal-hint.tp-od { color: var(--destructive); }
-.tp-cal-hint.tp-now { color: var(--brand-text); }
+.tp-cal-hint.tp-now { color: var(--warning); }
 .tp-cal-clear { height: 30px; padding: 0 8px; margin-left: -4px; border-radius: var(--radius-sm); font-size: 12.5px; font-weight: 600; color: var(--destructive); transition: background-color var(--dur-menu) var(--ease-change); }
 .tp-cal-clear:hover { background: var(--destructive-soft); }
 
@@ -1701,6 +1710,7 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 .tp-ix-by > span { display: inline-flex; align-items: center; gap: 5px; }
 .tp-ix-by > span + span::before { content: '·'; margin: 0 2px 0 7px; color: var(--ghost); }
 .tp-ix-by .tp-od { color: var(--destructive); }
+.tp-ix-by .tp-dt { color: var(--warning); }
 .tp-ix-dot { flex: none; width: 7px; height: 7px; margin-top: 7px; border-radius: 50%; background: var(--foreground); }
 /* New vs read (one Inbox): a new row sits on a faint ink wash with full ink, an ink dot and a bold name; a read row
    goes quiet. Never the brand red, and hover is an ink wash too, never --selection. */
@@ -1857,6 +1867,7 @@ button.tp-ix-head:hover { background: color-mix(in srgb, var(--foreground) 4%, v
 .tp-tl-by > span { display: inline-flex; align-items: center; gap: 5px; }
 .tp-tl-by > span + span::before { content: '·'; margin: 0 2px 0 7px; color: var(--ghost); }
 .tp-tl-by .tp-od { color: var(--destructive); }
+.tp-tl-by .tp-dt { color: var(--warning); }
 .tp-tl-who { color: var(--foreground-2); }
 .tp-tl.tp-glow { animation: tp-locate 1.8s var(--ease-change) both; }
 

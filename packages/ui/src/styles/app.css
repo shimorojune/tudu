@@ -1727,6 +1727,12 @@
 .tp-mb .tp-mb-by .tp-od {
   color: var(--destructive);
 }
+.tp-mb .tp-mb-by .tp-dt {
+  color: var(--warning);
+}
+.tp-mb .tp-mb-r.tp-done .tp-mb-by .tp-dt {
+  color: var(--muted-foreground);
+}
 .tp-mb .tp-mb-by i {
   width: 7px;
   height: 7px;
