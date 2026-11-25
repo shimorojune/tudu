@@ -172,6 +172,37 @@ test.describe('quick-add # project', () => {
     const f = await context.newPage();
     await fixClock(f);
     await f.setViewportSize({ width: 640, height: 520 });
+    // What the menu's place went through, for the message when an edge is off: every change of its margins, with
+    // where it then was and how far anything around it had scrolled.
+    await f.addInitScript(() => {
+      const w = window as unknown as { __hm: string[] };
+      w.__hm = [];
+      const note = (why: string) => {
+        const pop = document.querySelector<HTMLElement>('.tp-hm-pop');
+        const menu = document.querySelector<HTMLElement>('.tp-hm');
+        if (!pop || !menu) return;
+        const scrolled: string[] = [];
+        for (let e = pop.parentElement; e; e = e.parentElement)
+          if (e.scrollLeft) scrolled.push(`${e.className.split(' ')[0]}=${e.scrollLeft}`);
+        const field = document.querySelector<HTMLInputElement>('.tp-qa-line input');
+        const r = menu.getBoundingClientRect();
+        w.__hm.push(
+          `${Math.round(performance.now())} ${why} pop[${pop.style.marginLeft}] menu[${menu.style.marginLeft}] ` +
+            `box ${Math.round(r.left)}..${Math.round(r.right)} field ${field?.scrollLeft} ${scrolled.join(' ')}`,
+        );
+      };
+      new MutationObserver((ms) => {
+        for (const m of ms) {
+          const e = m.target as HTMLElement;
+          if (m.type === 'attributes' && e.classList?.contains('tp-hm-pop')) note('pop');
+          else if (m.type === 'attributes' && e.classList?.contains('tp-hm')) note('menu');
+          else if (m.type === 'childList' && document.querySelector('.tp-hm-pop')) note('dom');
+        }
+      }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['style'] });
+      window.addEventListener('scroll', () => note('scroll'), true);
+    });
+    const trail = async () =>
+      (await f.evaluate(() => (window as unknown as { __hm: string[] }).__hm.slice(-40))).join('\n');
     await f.goto('/quick-add');
     const b = f.getByRole('dialog', { name: 'Quick Add' });
     await expect(title(b)).toBeFocused();
@@ -214,7 +245,7 @@ test.describe('quick-add # project', () => {
       'Send the signed renewal back to the landlord before Friday and ask about the deposit #',
     );
     const long = await settled();
-    expect(Math.abs(long.x + long.width - 628)).toBeLessThanOrEqual(1);
+    expect(Math.abs(long.x + long.width - 628), await trail()).toBeLessThanOrEqual(1);
     expect(long.x).toBeGreaterThanOrEqual(12);
     // Whole: nothing of it is outside the window.
     expect(long.x + long.width).toBeLessThanOrEqual(640);
