@@ -245,6 +245,8 @@ describe('Scramble my text (chunk 23)', () => {
     fireEvent.mouseDown(veil);
     await vi.waitFor(() => expect(document.querySelector('.tp-rte-veil')).toBeNull());
     expect(document.querySelector('.tp-rte-host:not([hidden]) .ProseMirror')).toHaveTextContent(`About ${Z}`);
+    // The editor takes the keyboard a frame after it shows. A click elsewhere before that never blurs it.
+    await vi.waitFor(() => expect(document.querySelector('.tp-rte-host .ProseMirror')).toHaveFocus());
     await user.click(screen.getByRole('button', { name: 'elsewhere' }));
     await vi.waitFor(() => expect(document.querySelector('.tp-rte-veil')).not.toBeNull());
     for (const h of blurs) expect(h).toContain(Z);
