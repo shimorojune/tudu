@@ -7,7 +7,7 @@ export interface SharedTask {
   key: string;
   title: string;
   done?: boolean;
-  due?: { label: string; overdue?: boolean } | null;
+  due?: { label: string; overdue?: boolean; today?: boolean } | null;
   project?: { name: string; color: string } | null;
   /** "From you" when you sent it. */
   from?: string | null;
@@ -41,7 +41,7 @@ export function TaskLine({ task: t, who, onOpen, glow, className }: TaskLineProp
   const by = [];
   if (t.due)
     by.push(
-      <span key="d" className={t.due.overdue ? 'tp-od' : undefined}>
+      <span key="d" className={t.due.overdue ? 'tp-od' : t.due.today ? 'tp-dt' : undefined}>
         {t.due.label}
       </span>,
     );

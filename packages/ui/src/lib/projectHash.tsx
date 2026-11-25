@@ -115,6 +115,7 @@ export function useProjectHash(o: ProjectHashOptions): ProjectHash {
   const [flip, setFlip] = useState(false);
   const kept = useRef(-1);
   const caret = useRef<{ text: string; at: number } | null>(null);
+  const placed = useRef<{ start: number; query: string } | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const projects = o.projects ?? [];
   const on = !!o.projects && !o.off;
@@ -123,6 +124,7 @@ export function useProjectHash(o: ProjectHashOptions): ProjectHash {
     const t = on ? hashAt(el.value, el.selectionStart ?? el.value.length) : null;
     if (!t) kept.current = -1;
     if (!t || t.start === kept.current) {
+      placed.current = null;
       if (tok) setTok(null);
       return;
     }
@@ -131,7 +133,14 @@ export function useProjectHash(o: ProjectHashOptions): ProjectHash {
       setErr(null);
     }
     if (!tok || tok.start !== t.start || tok.query !== t.query || tok.end !== t.end) setTok(t);
-    setLeft(Math.max(0, el.offsetLeft + textWidth(el, el.value.slice(0, t.start)) - el.scrollLeft - 10));
+    // Placed at the # mark when the menu opens, and it stays there while you type on after the same # (#117): in a
+    // title that fills the field every letter scrolls the words, and the menu must not follow. The field may still
+    // be scrolling to the new # on the first look, so later looks at the same words place it again.
+    const p = placed.current;
+    if (!p || p.start !== t.start || p.query === t.query) {
+      if (!p || p.start !== t.start) placed.current = { start: t.start, query: t.query };
+      setLeft(Math.max(0, el.offsetLeft + textWidth(el, el.value.slice(0, t.start)) - el.scrollLeft - 10));
+    }
   }
 
   const list = tok ? hashMatches(projects, tok.query) : [];
@@ -319,7 +328,11 @@ export function useProjectHash(o: ProjectHashOptions): ProjectHash {
   }
   const menuId = `${id}-menu`;
   const menu = (
-    <Linger open={!!tok} className={cx('tp-hm-pop', (o.up || flip) && 'tp-up')}>
+    <Linger
+      open={!!tok}
+      fitKey={tok ? `${tok.start}:${left}` : null}
+      className={cx('tp-hm-pop', (o.up || flip) && 'tp-up')}
+    >
       <div
         ref={box}
         id={menuId}

@@ -768,6 +768,56 @@ describe('QuickAdd', () => {
     expect(onSave.mock.calls[0]![0]).toMatchObject({ title: 'Review the notes', projectId: 'pf' });
   });
 
+  it('PH-U17 a long title then #: the menu opens 12px inside a 640px window and stays put while you type on (#117)', async () => {
+    const user = userEvent.setup();
+    const width = window.innerWidth;
+    window.innerWidth = 640;
+    // The 248px menu, measured where a title that fills the field leaves it: from 529, past the edge at 640.
+    let measures = 0;
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const pop = this.classList.contains('tp-hm-pop');
+      if (pop) measures += 1;
+      const left = pop ? 529 + (parseFloat(this.style.marginLeft) || 0) : 0;
+      const w = pop ? 248 : 0;
+      return {
+        left,
+        right: left + w,
+        top: 0,
+        bottom: 0,
+        width: w,
+        height: 0,
+        x: left,
+        y: 0,
+        toJSON: () => ({}),
+      };
+    });
+    try {
+      render(<Bar spaceName="Northwind" />);
+      const line = screen.getByRole('textbox', { name: 'Task title' });
+      await waitFor(() => expect(line).toHaveFocus());
+      await user.type(line, 'Send the signed renewal back to the landlord before Friday #');
+      expect(screen.getByRole('listbox', { name: 'Projects' })).toBeInTheDocument();
+      const pop = document.querySelector<HTMLElement>('.tp-hm-pop')!;
+      expect(pop.style.marginLeft).toBe('-149px');
+      const r = pop.getBoundingClientRect();
+      expect(r.right).toBe(628);
+      const seen = measures;
+      // Typing on after the same #: it filters, and stays where it opened.
+      await user.type(line, 'p');
+      await user.type(line, 'l');
+      expect(screen.getByRole('option', { name: /Platform/ })).toBeInTheDocument();
+      expect(document.querySelector<HTMLElement>('.tp-hm-pop')).toBe(pop);
+      expect(pop.style.marginLeft).toBe('-149px');
+      // Nothing measured it again but this test's own read above.
+      expect(measures).toBe(seen);
+    } finally {
+      spy.mockRestore();
+      window.innerWidth = width;
+    }
+  });
+
   it('PH-U13 the # menu stays shut while the task is saving', async () => {
     const user = userEvent.setup();
     render(<Bar initial={{ saving: true, title: 'Ship it ' }} />);

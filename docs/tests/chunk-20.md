@@ -62,3 +62,10 @@ Status column is kept by `pnpm test:status` in [STATUS.md](STATUS.md). Run this 
 | MC-T01  | Manual, Mac build          | Dark → open sheet → Light → open sheet → Dark → open sheet: the sheet matches every time                                                                     |
 | MC-T02  | Manual, Mac build          | System, flip macOS appearance with the sheet closed, open it: it matches macOS                                                                               |
 | MC-T03  | Manual, Mac build          | Less motion on, open the sheet: no drop-in motion                                                                                                            |
+
+## "Due today" in the sheet (#121) ([docs/plans/hash-edge-due-today.md](../plans/hash-edge-due-today.md))
+
+| ID      | Where                                | Case                                                                                                                                               |
+| ------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C20-U30 | ui `MenuBarSheet.test.tsx`           | A row due today: its byline's due span has `tp-dt` (`--warning`); a late one has `tp-od`; another day has neither; a crossed-off row keeps it grey |
+| C20-U23 | web `MenuBarPage.test.tsx` (updated) | The sheet's "Due today" row is amber; tomorrow, yesterday and further are not                                                                      |

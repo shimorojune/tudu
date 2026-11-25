@@ -752,3 +752,23 @@ describe('TaskDetail times (docs/plans/task-times.md)', () => {
     expect(onDueTime).toHaveBeenCalled();
   });
 });
+
+describe('C03-U32 the Due fact for today (#121)', () => {
+  it('C03-U32 "today" in the panel is amber, as on the row; overdue stays red', () => {
+    render(<Panel initial={{ ...FULL, due: TODAY }} />);
+    const note = screen.getByRole('button', { name: 'Due' }).querySelector('.tp-td-note')!;
+    expect(note).toHaveTextContent('today');
+    expect(note).toHaveClass('tp-td-now');
+    expect(note).not.toHaveClass('tp-od');
+    expect(rulesWhere(rules, (x) => x === '.tp-td-note.tp-td-now')[0]!.declarations.color).toBe(
+      'var(--warning)',
+    );
+    expect(rulesWhere(rules, (x) => x === '.tp-td-note.tp-od')[0]!.declarations.color).toBe(
+      'var(--destructive)',
+    );
+    // The date picker's "· due today" hint agrees.
+    expect(rulesWhere(rules, (x) => x === '.tp-cal-hint.tp-now')[0]!.declarations.color).toBe(
+      'var(--warning)',
+    );
+  });
+});

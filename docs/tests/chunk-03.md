@@ -86,3 +86,9 @@ empty) before reading the server.
 
 Not automated: the feel of the slide and the veil, the comment wash, the subtask fold and the pop easing out. Judge those on
 staging and on the kit page's Task detail section.
+
+## The Due fact for today (#121) ([docs/plans/hash-edge-due-today.md](../plans/hash-edge-due-today.md))
+
+| ID      | Where                    | Case                                                                                                                                                 |
+| ------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C03-U32 | ui `TaskDetail.test.tsx` | The Due fact for today has `tp-td-now`, which is `--warning`; overdue stays `--destructive`; the date picker's "· due today" hint is `--warning` too |

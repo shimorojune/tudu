@@ -154,3 +154,12 @@ Not automated: the feel of the drag, the sparkle and the reward. Judge those on 
 | MC-G01  | Mac app, Today with 3 projects in By project: the header's caret, dot, name and count sit on one line, and the writing line's box lines up with its words |
 | MC-G02  | Fold all but one project on Today, open the Backlog page: the same folds. Quit and relaunch: still there                                                  |
 | MC-BE01 | Empty the Backlog, pick Backlog beside, drag a task onto the middle of the words: the wash shows and it lands; New task opens Quick Add on the Backlog    |
+
+## "Due today" in amber (#121) ([docs/plans/hash-edge-due-today.md](../plans/hash-edge-due-today.md))
+
+| ID      | Where                           | Case                                                                                                                                                                                                                                                          |
+| ------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C02-U65 | ui `TaskRow.test.tsx`           | Due today: the due words have `tp-dt`, not `tp-od`. Overdue: `tp-od` only, also for a time today that has passed. Any other day: neither. A crossed-off row keeps the words grey. Amber is `--warning`, also on hover; Inbox rows and search lines use it too |
+| C02-U66 | core `due.test.ts`              | `dueLabel(today, today).today` is true; tomorrow, yesterday and further are false. `dueLabelAt` with today at 5 PM: true before 5 PM, and false with `overdue` after                                                                                          |
+| C02-U39 | ui `TaskRow.test.tsx` (updated) | "The near words" (#58) also checks that only "Due today" carries `tp-dt`                                                                                                                                                                                      |
+| C02-E43 | e2e `today`                     | A task due today: its due words compute to `--warning`, in light and in dark, and the two ambers differ. An overdue one is `--destructive`, another day is muted; the three colours differ                                                                    |

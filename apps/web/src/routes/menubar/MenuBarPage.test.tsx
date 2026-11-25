@@ -265,13 +265,18 @@ describe('C20-U23 the sheet says today, tomorrow and yesterday', () => {
       render(<MenuBarRow row={menuBarRow(task('d', 'ME-9', 'Call the bank', { due }), TODAY, [])} />);
       const item = screen.getByRole('listitem');
       const text = within(item).getByText(/Due|Overdue/);
-      const out = { text: text.textContent, red: text.classList.contains('tp-od') };
+      const out = {
+        text: text.textContent,
+        red: text.classList.contains('tp-od'),
+        amber: text.classList.contains('tp-dt'),
+      };
       cleanup();
       return out;
     };
-    expect(words('2026-10-23')).toEqual({ text: 'Due today', red: false });
-    expect(words('2026-10-24')).toEqual({ text: 'Due tomorrow', red: false });
-    expect(words('2026-10-22')).toEqual({ text: 'Overdue', red: true });
-    expect(words('2026-10-27')).toEqual({ text: 'Due Tue', red: false });
+    // "Due today" is amber (#121); red stays for late.
+    expect(words('2026-10-23')).toEqual({ text: 'Due today', red: false, amber: true });
+    expect(words('2026-10-24')).toEqual({ text: 'Due tomorrow', red: false, amber: false });
+    expect(words('2026-10-22')).toEqual({ text: 'Overdue', red: true, amber: false });
+    expect(words('2026-10-27')).toEqual({ text: 'Due Tue', red: false, amber: false });
   });
 });

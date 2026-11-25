@@ -401,10 +401,13 @@ describe('C22-A11 the sweep', () => {
     const old = await note(you, 'Old');
     const young = await note(you, 'Young');
     const f = await folder(you, 'Old folder');
+    // Deleted now, by the wall clock: the file's mutation clock starts on 26 Oct 2026, so from 25 Nov its times are
+    // already past the 30 days themselves.
+    const now = Date.now();
     await sync(you, [
-      m('note.delete', { id: old }),
-      m('note.delete', { id: young }),
-      m('folder.delete', { id: f }),
+      m('note.delete', { id: old }, now),
+      m('note.delete', { id: young }, now + 1),
+      m('folder.delete', { id: f }, now + 2),
     ]);
     const long = new Date(Date.now() - 31 * 86_400_000);
     await server.db.update(schema.notes).set({ deletedAt: long }).where(eq(schema.notes.id, old));
