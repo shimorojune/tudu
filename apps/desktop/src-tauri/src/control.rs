@@ -353,7 +353,8 @@ fn act(app: &AppHandle, input: &Value) -> (u16, Value) {
     let a = app.clone();
     let input = input.clone();
     match what {
-        "summon" | "notes-shortcut" | "press" | "tray" | "reopen" | "close" | "outside-click" => {
+        "summon" | "notes-shortcut" | "press" | "tray" | "reopen" | "close" | "outside-click"
+        | "edit-key" => {
             // On the main thread, as a key press, a click in the menu or the Dock would be.
             let w = what.to_string();
             let _ = app.run_on_main_thread(move || {
@@ -381,6 +382,19 @@ fn act(app: &AppHandle, input: &Value) -> (u16, Value) {
                     "reopen" => windows::show_main(&a, None),
                     // A click in another app, as the global mouse monitor hears it (CI cannot post one).
                     "outside-click" => windows::outside(&a, "click", None, false),
+                    // A ⌘ key (`key`: v, c, x, a, z or enter; `shift`) pressed in a window, through NSApp as a real
+                    // key-down is, so it takes the path a press from the keyboard takes (#119).
+                    "edit-key" => {
+                        let label = input
+                            .get("window")
+                            .and_then(Value::as_str)
+                            .unwrap_or(windows::NOTE);
+                        let key = input.get("key").and_then(Value::as_str).unwrap_or("");
+                        let shift = input.get("shift").and_then(Value::as_bool).unwrap_or(false);
+                        if let Some(win) = a.get_webview_window(label) {
+                            windows::send_command_key(&win, key, shift);
+                        }
+                    }
                     "close" => {
                         let label = input
                             .get("window")

@@ -497,6 +497,20 @@ fn focus_floating(w: &WebviewWindow) {
     let _ = w.set_focus();
 }
 
+/// Tudu Test only: a ⌘ key press (`v`, `c`, `x`, `a`, `z`, or `enter`; ⇧ with `shift`) for this window, sent through
+/// the app as a real key-down is (`NSApp.sendEvent`), so it takes the same path a press from the keyboard takes. Call
+/// it on the main thread.
+#[cfg(feature = "control")]
+pub(crate) fn send_command_key(w: &WebviewWindow, key: &str, shift: bool) -> bool {
+    #[cfg(target_os = "macos")]
+    return panel::send_command_key(w, key, shift);
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (w, key, shift);
+        false
+    }
+}
+
 /// Tudu Test only: Reduce motion as a test sets it (0: as macOS says, 1: off, 2: on), since CI's Macs have it on.
 #[cfg(feature = "control")]
 pub(crate) static REDUCE_MOTION_OVERRIDE: std::sync::atomic::AtomicU8 =
@@ -778,6 +792,50 @@ mod panel {
         rx.recv_timeout(std::time::Duration::from_secs(2))
             .ok()
             .flatten()
+    }
+
+    #[cfg(feature = "control")]
+    pub fn send_command_key(w: &WebviewWindow, key: &str, shift: bool) -> bool {
+        use objc2_app_kit::{NSApplication, NSEventModifierFlags, NSEventType};
+        use objc2_foundation::NSString;
+        let Some(mtm) = MainThreadMarker::new() else {
+            return false;
+        };
+        let Some(win) = ns_window(w) else {
+            return false;
+        };
+        // macOS's virtual key codes (kVK_ANSI_*, kVK_Return).
+        let (code, chars): (u16, &str) = match (key, shift) {
+            ("a", _) => (0, "a"),
+            ("z", false) => (6, "z"),
+            ("z", true) => (6, "Z"),
+            ("x", _) => (7, "x"),
+            ("c", _) => (8, "c"),
+            ("v", _) => (9, "v"),
+            ("enter", _) => (36, "\r"),
+            _ => return false,
+        };
+        let mut flags = NSEventModifierFlags::Command;
+        if shift {
+            flags |= NSEventModifierFlags::Shift;
+        }
+        let s = NSString::from_str(chars);
+        let Some(ev) = NSEvent::keyEventWithType_location_modifierFlags_timestamp_windowNumber_context_characters_charactersIgnoringModifiers_isARepeat_keyCode(
+            NSEventType::KeyDown,
+            NSPoint::new(0.0, 0.0),
+            flags,
+            0.0,
+            win.windowNumber(),
+            None,
+            &s,
+            &s,
+            false,
+            code,
+        ) else {
+            return false;
+        };
+        NSApplication::sharedApplication(mtm).sendEvent(&ev);
+        true
     }
 
     pub fn make_key(w: &WebviewWindow) {
