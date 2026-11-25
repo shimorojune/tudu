@@ -460,18 +460,28 @@ test.describe('menubar', () => {
     );
     const m = await inWindow(await sheet(page));
     await expect(list(m, 'Personal').getByRole('listitem')).toHaveCount(30);
+    // At rest: while the app rises into place (220ms) it sits a few pixels low and the page is held from scrolling.
+    await expect(m.locator('#root')).not.toHaveClass(/tl-arrive/);
     const sizes = await m.evaluate(() => {
       const page = document.scrollingElement!;
       const body = document.querySelector('.tp-mb-b')!;
+      // For the message when the page is too tall: what reaches below the window.
+      const low = [...document.querySelectorAll<HTMLElement>('body *')]
+        .filter((e) => !e.closest('.tp-mb-b') && e.getBoundingClientRect().bottom > window.innerHeight + 0.5)
+        .map((e) => {
+          const r = e.getBoundingClientRect();
+          return `${e.tagName}.${String(e.className).slice(0, 40)} ${Math.round(r.top)}..${Math.round(r.bottom)} ${getComputedStyle(e).position}`;
+        });
       return {
         page: page.scrollHeight,
         window: window.innerHeight,
         list: body.scrollHeight - body.clientHeight,
         sheet: document.querySelector('.tp-root.tp-mb')!.getBoundingClientRect().height,
+        low: low.slice(0, 12).join('\n'),
       };
     });
     expect(sizes.window).toBe(600);
-    expect(sizes.page).toBeLessThanOrEqual(sizes.window);
+    expect(sizes.page, sizes.low).toBeLessThanOrEqual(sizes.window);
     expect(sizes.list).toBeGreaterThan(0);
     expect(sizes.sheet).toBeLessThanOrEqual(584);
     // A wheel over the heading moves nothing: there is no second bar.
