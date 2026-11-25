@@ -455,10 +455,11 @@ test.describe('menubar', () => {
     await seedTasks(
       page,
       id,
-      Array.from({ length: 12 }, (_, i) => ({ title: `Task number ${i + 1}`, day: SUN })),
+      // Twelve rows fit the window with room to spare; thirty do not.
+      Array.from({ length: 30 }, (_, i) => ({ title: `Task number ${i + 1}`, day: SUN })),
     );
     const m = await inWindow(await sheet(page));
-    await expect(list(m, 'Personal').getByRole('listitem')).toHaveCount(12);
+    await expect(list(m, 'Personal').getByRole('listitem')).toHaveCount(30);
     const sizes = await m.evaluate(() => {
       const page = document.scrollingElement!;
       const body = document.querySelector('.tp-mb-b')!;
@@ -582,7 +583,7 @@ test.describe('menubar', () => {
     expect(await calls(m, 'openTask')).toHaveLength(1);
   });
 
-  test('C20-E27 Northwind, someone else’s task among yours: your move lands among yours and theirs stays put', async ({
+  test('C20-E27 Northwind, someone else’s task on the same day: your moves stay among yours and theirs is untouched', async ({
     page,
     browser,
   }) => {
@@ -592,7 +593,8 @@ test.describe('menubar', () => {
       { title: 'Mine two', day: SUN },
       { title: 'Mine three', day: SUN },
     ]);
-    // Theirs sits between my first and my second (positions 1024, 1536, 2048, 3072).
+    // Theirs sits between my first and my second in the space's numbers (1024, 1536, 2048, 3072). The server
+    // gives each person their own tasks of a day, so it is on their day and never on mine.
     const theirs = crypto.randomUUID();
     const res = await b.page.request.post(`${API_URL}/api/sync`, {
       data: {
@@ -608,38 +610,31 @@ test.describe('menubar', () => {
       },
     });
     expect(res.status()).toBe(200);
-    expect(await serverTitles(page, space.id)).toEqual([
-      'Mine one',
-      'Their own thing',
-      'Mine two',
-      'Mine three',
-    ]);
+    expect(await serverTitles(page, space.id)).toEqual(['Mine one', 'Mine two', 'Mine three']);
+    expect(await serverTitles(b.page, space.id)).toEqual(['Their own thing']);
     await page.goto(`/${slug}`);
     await expect(dayList(page)).toBeVisible();
     const m = await sheet(page);
     const l = list(m, 'Northwind');
     await expect.poll(() => sheetTitles(m, 'Northwind')).toEqual(['Mine one', 'Mine two', 'Mine three']);
-    // My third goes above my first: on the sheet it is first of mine.
+    // My third goes above my first.
     const first = (await item(l, 'Mine one').boundingBox())!;
     await drag(m, item(l, 'Mine three'), { x: first.x + 120, y: first.y + 2 });
-    await expect.poll(() => sheetTitles(m, 'Northwind')).toEqual(['Mine three', 'Mine one', 'Mine two']);
+    const moved = ['Mine three', 'Mine one', 'Mine two'];
+    await expect.poll(() => sheetTitles(m, 'Northwind')).toEqual(moved);
     await idle(m);
-    // In the whole day it landed just before the row of mine it was dropped above; theirs didn't move.
-    const day = ['Mine three', 'Mine one', 'Their own thing', 'Mine two'];
-    expect(await serverTitles(m, space.id)).toEqual(day);
-    await expect.poll(() => titlesOf(dayList(page))).toEqual(day);
-    // My first goes to the end of mine: past theirs and my second, just after my last.
+    expect(await serverTitles(m, space.id)).toEqual(moved);
+    await expect.poll(() => titlesOf(dayList(page))).toEqual(moved);
+    // It goes back to the end of mine, past the place theirs holds.
     await m.getByRole('button', { name: 'Open Mine three in Tudu' }).focus();
     await m.keyboard.press('Alt+ArrowDown');
     await m.keyboard.press('Alt+ArrowDown');
-    await expect.poll(() => sheetTitles(m, 'Northwind')).toEqual(['Mine one', 'Mine two', 'Mine three']);
+    const back = ['Mine one', 'Mine two', 'Mine three'];
+    await expect.poll(() => sheetTitles(m, 'Northwind')).toEqual(back);
     await idle(m);
-    expect(await serverTitles(m, space.id)).toEqual([
-      'Mine one',
-      'Their own thing',
-      'Mine two',
-      'Mine three',
-    ]);
+    expect(await serverTitles(m, space.id)).toEqual(back);
+    // Their day never changed.
+    expect(await serverTitles(b.page, space.id)).toEqual(['Their own thing']);
     await b.context.close();
   });
 
