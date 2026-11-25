@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { parseRules, readStylesheet, rulesWhere } from '../test-utils/stylesheet';
 import { edgeShift, Linger } from './linger';
 
 /** jsdom has no layout: the pop's box is whatever the test says it measured. */
@@ -155,5 +156,19 @@ describe('C00-U38 a pop stays 12px inside the window (#117)', () => {
     expect(pop(container).style.marginLeft).toBe('-149px');
     expect(pop(container).style.marginRight).toBe('149px');
     vi.unstubAllGlobals();
+  });
+
+  it('C00-U40 a pop’s margins never ease: under Less motion it would be measured halfway and stop there', () => {
+    const { container } = render(
+      <Linger open className="pop">
+        <div>menu</div>
+      </Linger>,
+    );
+    expect(pop(container).classList.contains('tp-linger')).toBe(true);
+    const still = rulesWhere(parseRules(readStylesheet('components.css')), (sel) =>
+      sel.split(',').some((one) => one.trim() === '.tp-linger'),
+    )[0]!;
+    expect(still.selector).toContain('.tp-root .tp-menu.tp-hm');
+    expect(still.declarations['transition-property']).toBe('none');
   });
 });

@@ -477,6 +477,10 @@ button.tp-addsub:hover .tp-addbox, .tp-adding .tp-addbox { opacity: 1; }
 .tp-dh-date:hover, .tp-dh-date[aria-expanded="true"] { color: var(--foreground); text-decoration-color: var(--border-strong); }
 .tp-dh-pop { position: absolute; left: 0; top: calc(100% + 10px); z-index: 30; animation: tp-pop-in var(--dur-menu) var(--ease-arrive) both; transform-origin: top left; }
 @keyframes tp-pop-in { from { opacity: 0; transform: scale(.96) translateY(-4px); } to { opacity: 1; transform: none; } }
+/* A Linger pop is placed by its margins and measured where it stands (#117). Less motion gives every element
+   `transition: all 120ms`: the margins would ease, each measure would read a pop halfway through its slide, and it
+   would stop halfway to the edge. The same for the # menu's own place at the caret. Their animations are enough. */
+.tp-linger, .tp-root .tp-menu.tp-hm { transition-property: none; }
 .tp-pop-leaving { animation: tp-pop-out 130ms var(--ease-leave) both !important; pointer-events: none; }
 .tp-pop-leaving:is(.tp-qa-pop-up, .tp-up) { animation-name: tp-pop-out-up !important; }
 @keyframes tp-pop-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(.97) translateY(-3px); } }

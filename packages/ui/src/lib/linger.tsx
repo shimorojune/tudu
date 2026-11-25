@@ -22,7 +22,8 @@ export function edgeShift(left: number, right: number, width: number): number {
  * A pop that eases out instead of vanishing: once closed it keeps its last content for a beat, then unmounts. It
  * opens in place and stays inside the window (#117): when it opens (and again when `fitKey` changes, the # menu's
  * token, or when its own box changes size) it is measured, and slid back in with its margins if it runs off a side.
- * It doesn't chase anything else while it stays open.
+ * It doesn't chase anything else while it stays open. Its `tp-linger` class keeps its margins from easing: under
+ * Less motion every element eases every change, and a pop measured halfway through its own slide stops halfway.
  */
 export function Linger({
   open,
@@ -100,7 +101,7 @@ export function Linger({
 
   if (kept.gone) return null;
   return (
-    <div ref={ref} className={cx(className, !kept.open && 'tp-pop-leaving')}>
+    <div ref={ref} className={cx('tp-linger', className, !kept.open && 'tp-pop-leaving')}>
       {kept.node}
     </div>
   );
