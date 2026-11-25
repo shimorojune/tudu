@@ -13,11 +13,11 @@ async function openSheet(app: App): Promise<void> {
   await app.until(`return !!document.querySelector('[role=dialog][aria-label="Today"]')`, 'menubar');
 }
 
-/** Twelve tasks today in Personal, in this order. */
+/** Thirty tasks today in Personal, in this order: twelve fit the 600px window with room to spare. */
 async function fullDay(app: App): Promise<{ spaceId: string; titles: string[] }> {
   const me = await asPage<{ spaces: Array<{ id: string; kind: string }> }>(app, 'GET', '/api/me');
   const spaceId = me.spaces.find((s) => s.kind === 'personal')!.id;
-  const titles = Array.from({ length: 12 }, (_, i) => `Task number ${i + 1}`);
+  const titles = Array.from({ length: 30 }, (_, i) => `Task number ${i + 1}`);
   const at = Date.now();
   await asPage(app, 'POST', '/api/sync', {
     clientId: 'mac-seed',
@@ -44,7 +44,7 @@ test.describe('#123 #122 the menu bar sheet on a full day', () => {
     await signIn(app);
     const { spaceId, titles } = await fullDay(app);
     await openSheet(app);
-    await app.until(`return document.querySelectorAll('.tp-mb-r').length === 12`, 'menubar', 15_000);
+    await app.until(`return document.querySelectorAll('.tp-mb-r').length === 30`, 'menubar', 15_000);
     expect(await sheetTitles(app)).toEqual(titles);
 
     // One bar: the page is exactly the window, and only the list scrolls.
