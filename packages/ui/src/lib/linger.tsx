@@ -21,8 +21,8 @@ export function edgeShift(left: number, right: number, width: number): number {
 /**
  * A pop that eases out instead of vanishing: once closed it keeps its last content for a beat, then unmounts. It
  * opens in place and stays inside the window (#117): when it opens (and again when `fitKey` changes, the # menu's
- * token) it is measured, and slid back in with its margins if it runs off a side. It doesn't chase anything while
- * it stays open.
+ * token, or when its own box changes size) it is measured, and slid back in with its margins if it runs off a side.
+ * It doesn't chase anything else while it stays open.
  */
 export function Linger({
   open,
@@ -54,30 +54,49 @@ export function Linger({
   const ref = useRef<HTMLDivElement>(null);
   const was = useRef(false);
   const shown = kept.open && !kept.gone;
-  useLayoutEffect(() => {
-    const el = ref.current;
-    const fresh = shown && !was.current;
-    was.current = shown;
-    if (!el || !shown) return;
+  // The pop's own size when it was last measured: a change means what is inside moved or grew.
+  const sized = useRef('');
+  const fit = (el: HTMLDivElement, fresh: boolean) => {
     el.style.marginLeft = '';
     el.style.marginRight = '';
     // While the pop-in runs the box is scaled down, so it is measured at rest: the animation comes off and goes
     // back on before the next paint, which starts it again from its first frame (where it still is, or nearly). A
     // pop at rest is left alone, so it never pops in twice.
-    const moving = fresh || (typeof el.getAnimations === 'function' && el.getAnimations().length > 0);
+    const moving =
+      fresh ||
+      (typeof el.getAnimations === 'function' && el.getAnimations().some((a) => a.playState !== 'finished'));
     if (moving) el.style.animation = 'none';
     const r = el.getBoundingClientRect();
     // A single box inside may start further right than the pop itself (the # menu sits at the caret by its margin).
     const only = el.children.length === 1 ? el.firstElementChild : null;
     const inset = only ? parseFloat(getComputedStyle(only).marginLeft) || 0 : 0;
     if (moving) el.style.animation = '';
+    sized.current = `${el.offsetWidth}x${el.offsetHeight}`;
     if (r.width === 0) return;
     const shift = edgeShift(r.left + Math.max(0, inset), r.right, window.innerWidth);
     if (!shift) return;
     // Both margins: the left one slides a pop held by its left edge, the right one a pop held by its right.
     el.style.marginLeft = `${shift}px`;
     el.style.marginRight = `${-shift}px`;
+  };
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const fresh = shown && !was.current;
+    was.current = shown;
+    if (!el || !shown) return;
+    fit(el, fresh);
   }, [shown, fitKey]);
+  // The same again when the pop's own box changes size while it is open: the # menu is placed a second time once
+  // the title has scrolled to the new #, and that move must never be left measured from the first place (#117).
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !shown || typeof ResizeObserver !== 'function') return;
+    const seen = new ResizeObserver(() => {
+      if (sized.current !== `${el.offsetWidth}x${el.offsetHeight}`) fit(el, false);
+    });
+    seen.observe(el);
+    return () => seen.disconnect();
+  }, [shown]);
 
   if (kept.gone) return null;
   return (

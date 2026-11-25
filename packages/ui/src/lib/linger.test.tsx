@@ -120,4 +120,40 @@ describe('C00-U38 a pop stays 12px inside the window (#117)', () => {
     rerender(ui(true, 2, 'x'));
     expect(pop(container).style.marginLeft).toBe('-149px');
   });
+
+  it('C00-U39 when the pop’s own box changes size while it is open, it is measured again from where it now is', () => {
+    // No layout in jsdom: the test hands the pop a size and fires the observer itself.
+    let fire: () => void = () => {};
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(cb: () => void) {
+          fire = cb;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const size = (el: HTMLElement, w: number) =>
+      Object.defineProperty(el, 'offsetWidth', { configurable: true, value: w });
+    // The # menu, placed before the title scrolled: 10px too far right, so slid 10px too far left.
+    measured(539);
+    const { container } = render(
+      <Linger open fitKey="a" className="pop">
+        <div>menu</div>
+      </Linger>,
+    );
+    expect(pop(container).style.marginLeft).toBe('-159px');
+    // The same size as measured: nothing is read again.
+    fire();
+    expect(pop(container).style.marginLeft).toBe('-159px');
+    // The menu moved to its real place and the pop shrank with it: measured again, right edge back at 628.
+    vi.restoreAllMocks();
+    measured(529);
+    size(pop(container), 813);
+    fire();
+    expect(pop(container).style.marginLeft).toBe('-149px');
+    expect(pop(container).style.marginRight).toBe('149px');
+    vi.unstubAllGlobals();
+  });
 });
