@@ -1077,10 +1077,11 @@ export class TaskStore {
   /**
    * Put a task on `day` at `index` (counted without the task itself; the end when left out). Reordering is a place
    * on the same day; moving is a place on another. When the neighbours are too close the whole day is renumbered.
+   * Returns the ids of the changes it queued (none when there was nothing to do), which `onAnswered` reports on.
    */
-  place(id: string, day: IsoDate | null, index?: number): void {
+  place(id: string, day: IsoDate | null, index?: number): string[] {
     const t = this.known.get(id);
-    if (!t) return;
+    if (!t) return [];
     const list = this.cached(t.spaceId, day);
     if (list && index !== undefined) {
       const others = list.filter((x) => x.id !== id);
@@ -1091,22 +1092,25 @@ export class TaskStore {
       if (placed.renumbered) {
         const order = [...others];
         order.splice(Math.min(index, order.length), 0, t);
-        order.forEach((x, i) => this.placeOnDay(x, day, placed.renumbered![i]!));
-        return;
+        return order.map((x, i) => this.placeOnDay(x, day, placed.renumbered![i]!));
       }
-      this.placeOnDay(t, day, placed.position);
-      return;
+      return [this.placeOnDay(t, day, placed.position)];
     }
     // Dropped on a later day of its own span with no place given: the span stays where it is.
-    if (day !== null && t.day !== day && onDay(t.day, t.until, day)) return;
-    this.mutate({ type: 'task.place', payload: { id, day, position: this.positionFor(t.spaceId, day, id) } });
+    if (day !== null && t.day !== day && onDay(t.day, t.until, day)) return [];
+    return [
+      this.mutate({
+        type: 'task.place',
+        payload: { id, day, position: this.positionFor(t.spaceId, day, id) },
+      }),
+    ];
   }
 
   /** A reorder on `day`: a span's later day takes its own place there; any other is the task's place. */
-  private placeOnDay(t: Task, day: IsoDate | null, position: number): void {
+  private placeOnDay(t: Task, day: IsoDate | null, position: number): string {
     if (day !== null && t.day !== day && onDay(t.day, t.until, day))
-      this.mutate({ type: 'task.dayPlace', payload: { id: t.id, day, position } });
-    else this.mutate({ type: 'task.place', payload: { id: t.id, day, position } });
+      return this.mutate({ type: 'task.dayPlace', payload: { id: t.id, day, position } });
+    return this.mutate({ type: 'task.place', payload: { id: t.id, day, position } });
   }
 
   /** The time on the due day; null clears it (due by the day's end). */

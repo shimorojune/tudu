@@ -2,6 +2,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { parseRules, readStylesheet, rulesWhere } from '../test-utils/stylesheet';
+import { resetScrambleForTests, setScramble } from '../lib/scramble';
 import { MenuBarSheet, type MenuBarGroupItem } from './MenuBarSheet';
 
 const heading = { eyebrow: 'Today · Week 43', day: 'Friday', date: '23 October' };
@@ -125,10 +126,10 @@ describe('C20-U03 MenuBarSheet', () => {
 
   it('C20-U03 offline adds the line under the head', () => {
     const { rerender } = render(<MenuBarSheet state="day" heading={heading} groups={[personal]} />);
-    expect(screen.queryByText('Ticks save here and go when you’re back.')).toBeNull();
+    expect(screen.queryByText('Ticks and moves save here and go when you’re back.')).toBeNull();
     rerender(<MenuBarSheet state="day" heading={heading} groups={[personal]} offline />);
     expect(screen.getByText('You’re offline.')).toBeTruthy();
-    expect(screen.getByText('Ticks save here and go when you’re back.')).toBeTruthy();
+    expect(screen.getByText('Ticks and moves save here and go when you’re back.')).toBeTruthy();
   });
 
   it('C20-U03 a row: the byline as Today writes it; a tick and a title click each say which row', async () => {
@@ -351,5 +352,120 @@ describe('SK-U14 MenuBarSheet', () => {
       'aria-keyshortcuts',
       'Control+F5',
     );
+  });
+});
+
+describe('C20-U26 the Scrambled pill rides the eyebrow line (#123)', () => {
+  it('C20-U26 Scrambled on: the pill is inside the eyebrow; the heading row holds the day block and the ring only', () => {
+    setScramble(true);
+    try {
+      const { container } = render(<MenuBarSheet state="day" heading={heading} groups={[personal]} />);
+      const pill = screen.getByRole('button', { name: /^Scrambled/ });
+      expect(pill.parentElement).toBe(container.querySelector('.tp-mb-eb'));
+      const head = container.querySelector('.tp-mb-h')!;
+      expect(head.children).toHaveLength(2);
+      expect(head.children[0]!.querySelector('.tp-mb-day')).toBeTruthy();
+      expect(head.children[1]).toBe(screen.getByRole('img', { name: /of 3/ }).closest('.tp-mb-h > *'));
+      expect(head.querySelector(':scope > .tp-scr-pill')).toBeNull();
+    } finally {
+      resetScrambleForTests();
+    }
+  });
+
+  it('C20-U30 the list scrolls inside the sheet and holds what is placed in it, so the page never grows (#123)', () => {
+    const body = rulesWhere(parseRules(readStylesheet('app.css')), (sel) => sel === '.tp-mb .tp-mb-b')[0]!
+      .declarations;
+    expect(body['overflow-y']).toBe('auto');
+    expect(body['min-height']).toBe('0');
+    expect(body['position']).toBe('relative');
+  });
+
+  it('C20-U26 the pill is 20px with its height taken back, and the day and the date never wrap', () => {
+    const rules = parseRules(readStylesheet('app.css'));
+    const pill = rulesWhere(rules, (sel) => sel === '.tp-mb .tp-mb-eb > .tp-mb-scr')[0]!;
+    expect(pill.declarations.height).toBe('20px');
+    expect(pill.declarations.margin).toBe('-4px 0');
+    expect(rulesWhere(rules, (sel) => sel === '.tp-mb .tp-mb-day h2')[0]!.declarations['white-space']).toBe(
+      'nowrap',
+    );
+    const date = rulesWhere(rules, (sel) => sel === '.tp-mb .tp-mb-day span')[0]!.declarations;
+    expect(date['white-space']).toBe('nowrap');
+    expect(date['text-overflow']).toBe('ellipsis');
+    expect(date['min-width']).toBe('0');
+  });
+});
+
+describe('C20-U27 reordering in the sheet (#122)', () => {
+  const second: MenuBarGroupItem = {
+    key: 'n',
+    name: 'Northwind',
+    space: { name: 'Northwind', initials: 'NW', color: '#2f6f5e' },
+    rows: [
+      { key: 'd', title: 'Ship the brief' },
+      { key: 'e', title: 'Call the printer' },
+      { key: 'f', title: 'Book the room' },
+    ],
+  };
+
+  it('C20-U27 ⌥↓ on a title moves its row one place in its own group; ⌥↑ on a first row does nothing', async () => {
+    const user = userEvent.setup();
+    const onReorder = vi.fn();
+    render(<MenuBarSheet state="day" heading={heading} groups={[personal, second]} onReorder={onReorder} />);
+    screen.getByRole('button', { name: 'Open Book the dentist in Tudu' }).focus();
+    await user.keyboard('{Alt>}{ArrowDown}{/Alt}');
+    expect(onReorder).toHaveBeenCalledTimes(1);
+    expect(onReorder).toHaveBeenCalledWith('p', 'a', 1);
+    expect(screen.getByText('Moved to place 2 of 3')).toBeTruthy();
+    onReorder.mockClear();
+    screen.getByRole('button', { name: 'Open Ship the brief in Tudu' }).focus();
+    await user.keyboard('{Alt>}{ArrowUp}{/Alt}');
+    expect(onReorder).not.toHaveBeenCalled();
+    screen.getByRole('button', { name: 'Open Book the room in Tudu' }).focus();
+    await user.keyboard('{Alt>}{ArrowUp}{/Alt}');
+    expect(onReorder).toHaveBeenCalledWith('n', 'f', 1);
+  });
+
+  it('C20-U27 a one-task group has no grip and nothing to move; without onReorder nothing moves at all', async () => {
+    const user = userEvent.setup();
+    const onReorder = vi.fn();
+    const { container, rerender } = render(
+      <MenuBarSheet state="day" heading={heading} groups={[personal, northwind]} onReorder={onReorder} />,
+    );
+    const lone = within(screen.getByRole('list', { name: 'Today in Northwind' }));
+    expect(lone.getByRole('listitem')).not.toHaveAttribute('data-reorder');
+    expect(lone.getByRole('listitem').querySelector('.tp-grip')).toBeNull();
+    screen.getByRole('button', { name: 'Open Ship the brief in Tudu' }).focus();
+    await user.keyboard('{Alt>}{ArrowDown}{/Alt}');
+    expect(onReorder).not.toHaveBeenCalled();
+    expect(container.querySelectorAll('[data-reorder] > .tp-grip')).toHaveLength(3);
+    rerender(<MenuBarSheet state="day" heading={heading} groups={[personal, northwind]} />);
+    expect(container.querySelectorAll('[data-reorder]')).toHaveLength(0);
+    expect(container.querySelectorAll('.tp-grip')).toHaveLength(0);
+  });
+
+  it('C20-U27 a plain click on a title still opens the task', async () => {
+    const user = userEvent.setup();
+    const onOpen = vi.fn();
+    const onReorder = vi.fn();
+    render(
+      <MenuBarSheet
+        state="day"
+        heading={heading}
+        groups={[personal]}
+        onOpen={onOpen}
+        onReorder={onReorder}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Open Send the invoice in Tudu' }));
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(onOpen.mock.calls[0]![0]).toMatchObject({ key: 'b' });
+    expect(onReorder).not.toHaveBeenCalled();
+  });
+
+  it('C20-U27 a move the server turned down says so under the heading, as an alert', () => {
+    const { rerender } = render(<MenuBarSheet state="day" heading={heading} groups={[personal]} />);
+    expect(screen.queryByRole('alert')).toBeNull();
+    rerender(<MenuBarSheet state="day" heading={heading} groups={[personal]} moveError />);
+    expect(screen.getByRole('alert').textContent).toBe('It’s back where it was. Try again.');
   });
 });

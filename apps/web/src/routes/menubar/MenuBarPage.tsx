@@ -5,6 +5,7 @@ import {
   dayHeading,
   gatherToday,
   menuBarEmptyLines,
+  placeAmongMine,
   spaceInitials,
   type IsoDate,
   type SpaceSummary,
@@ -18,7 +19,7 @@ import {
   type MenuBarRowItem,
   type MenuBarSheetProps,
 } from '@tudu/ui';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppInfo } from '../../app/DesktopHost';
 import { desktop, UPDATES_GO, type DesktopBridge } from '../../app/desktop';
 import { useLiveEvents } from '../../app/live';
@@ -195,6 +196,37 @@ function Today({
     else go(path);
   };
 
+  // A move the server turned down (#122): the store reads the day again, so the row glides back, and a red line
+  // says so until the next move or until the sheet hides. This window has no toast host.
+  const moves = useRef(new Set<string>());
+  const [moveError, setMoveError] = useState(false);
+  useEffect(
+    () =>
+      taskStore.onAnswered((results) => {
+        let refused = false;
+        for (const r of results) {
+          if (moves.current.delete(r.id) && r.status === 'rejected') refused = true;
+        }
+        if (refused) setMoveError(true);
+      }),
+    [],
+  );
+  useEffect(() => app?.on('menubar:hidden', () => setMoveError(false)), [app]);
+  const reorder = (groupKey: string, key: string, to: number) => {
+    const g = gathered.find((x) => x.space.id === groupKey);
+    const day = read[groupKey];
+    if (!g || !day) return;
+    const at = placeAmongMine(
+      day,
+      g.tasks.map((t) => t.id),
+      key,
+      to,
+    );
+    if (at === null) return;
+    setMoveError(false);
+    for (const id of taskStore.place(key, today, at)) moves.current.add(id);
+  };
+
   if (!ready) return null;
   return (
     <MenuBarSheet
@@ -211,6 +243,8 @@ function Today({
       appName={appName}
       onToggle={(row, done) => taskStore.cross(row.key, done)}
       onOpen={open}
+      onReorder={reorder}
+      moveError={moveError}
       onNew={() => app?.summon()}
       // The note window on a blank note, over whatever app you are in; the sheet hides first, the desk stays put.
       // An app too old to have the window: the Notebook on the desk.

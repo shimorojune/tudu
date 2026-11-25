@@ -263,6 +263,15 @@ describe('first run', () => {
       expect(out.rows).toEqual([{ first_run: null }]);
     } finally {
       await c.close();
+      // The pool is closed, but its backend can take a moment to go. Dropping WITH (FORCE) while it is still there
+      // sends that closing client a FATAL it has no one left to hand to, which Vitest counts as an error of the run.
+      for (let i = 0; i < 50; i++) {
+        const left = await admin.db.execute(
+          sql.raw(`SELECT 1 FROM pg_stat_activity WHERE datname = '${name}' LIMIT 1`),
+        );
+        if (!left.rows.length) break;
+        await new Promise((r) => setTimeout(r, 20));
+      }
       await admin.db.execute(sql.raw(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`));
       await admin.close();
     }

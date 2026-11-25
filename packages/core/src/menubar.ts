@@ -51,3 +51,25 @@ export function menuBarEmptyLines(tomorrow: number, backlog: number): string[] {
   if (backlog > 0) lines.push(`The Backlog has ${backlog} waiting for a day.`);
   return lines;
 }
+
+/**
+ * Where a move in the menu bar's list lands in the space's whole day (#122). The sheet shows only your tasks, so
+ * `to` is an index among those (counted after the move); the answer is an index in `dayTasks`, counted without the
+ * task itself, as the task store's `place` takes it. The task lands just before the row of yours it was dropped
+ * above, or just after your last one, wherever the others' tasks sit. Null when the task isn't one of yours on that
+ * day, or there is nothing of yours to move it past.
+ */
+export function placeAmongMine<T extends { id: string }>(
+  dayTasks: T[],
+  mineIds: string[],
+  key: string,
+  to: number,
+): number | null {
+  const mine = new Set(mineIds);
+  if (!mine.has(key) || !dayTasks.some((t) => t.id === key)) return null;
+  const others = dayTasks.filter((t) => t.id !== key);
+  const rest = others.filter((t) => mine.has(t.id));
+  if (!rest.length) return null;
+  const at = Math.max(0, Math.min(rest.length, Math.trunc(to)));
+  return at < rest.length ? others.indexOf(rest[at]!) : others.indexOf(rest[rest.length - 1]!) + 1;
+}
