@@ -19,3 +19,14 @@ html[data-app='menubar'] .app-menubar {
   padding: 0 8px 16px;
   overflow: hidden;
 }
+/* In the app the window is 360 x 600 and the page keeps 16px clear under the sheet: the sheet stops 16px short of
+   the window, so the page never scrolls and only the list has a bar (#123). */
+html[data-app='menubar'] .tp-root.tp-mb {
+  max-height: calc(100vh - 16px);
+  /* The clear edge is 8px each side and 16px below: the note window's short shadow fits inside it, where the pop
+     shadow was cut off in straight lines (#123, as #88). */
+  box-shadow:
+    0 0 0 1px var(--hair),
+    0 1px 2px var(--hair),
+    0 4px 10px -4px var(--shadow-color);
+}

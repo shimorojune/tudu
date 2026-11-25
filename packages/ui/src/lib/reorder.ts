@@ -177,6 +177,11 @@ export interface ReorderOptions {
   onHoldRelease?: (key: string) => void;
   /** Lists with the same group trade rows. */
   group?: string | null;
+  /**
+   * A selector for buttons that drag the row all the same (the menu bar sheet's title, which is the whole row):
+   * a press that moves drags, and one that doesn't is still the button's click.
+   */
+  grab?: string;
 }
 
 interface DragState {
@@ -437,7 +442,13 @@ export function useReorder(
     const item = target.closest<HTMLElement>('[data-reorder]');
     if (!item || item.parentNode !== c) return;
     const onGrip = !!target.closest('.tp-grip');
-    if (!onGrip && target.closest('button, input, textarea, select, a, [contenteditable="true"]')) return;
+    const grab = opts.current.grab;
+    if (
+      !onGrip &&
+      !(grab && target.closest(grab)) &&
+      target.closest('button, input, textarea, select, a, [contenteditable="true"]')
+    )
+      return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.stopPropagation();
     if (onGrip) e.preventDefault();

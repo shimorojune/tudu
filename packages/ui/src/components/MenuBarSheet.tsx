@@ -1,3 +1,6 @@
+import { useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { settleFrom } from '../lib/motion';
+import { itemByKey, useReorder } from '../lib/reorder';
 import { useMine } from '../lib/scramble';
 import { ScrambledPill } from './ScrambledPill';
 import { cx } from '../lib/cx';
@@ -46,6 +49,13 @@ export interface MenuBarSheetProps {
   shortcut?: string;
   onToggle?: (row: MenuBarRowItem, done: boolean) => void;
   onOpen?: (row: MenuBarRowItem) => void;
+  /**
+   * A row dragged (or moved with ⌥↑ / ⌥↓) to place `to` among its own space's rows (#122). Rows move only inside
+   * their group: each space keeps its own day. Without it nothing drags and no grip shows.
+   */
+  onReorder?: (groupKey: string, key: string, to: number) => void;
+  /** A move the server turned down: a red line under the heading, "It’s back where it was. Try again." */
+  moveError?: boolean;
   onNew?: () => void;
   /** New note (chunk 22): the note window on a blank note, over whatever app you are in. */
   onNewNote?: () => void;
@@ -118,30 +128,129 @@ function Byline({ row }: { row: MenuBarRowItem }) {
   return bits.length ? <span className="tp-mb-by">{bits}</span> : null;
 }
 
-/** One task: the real checkbox (the ink tick and its sparkle), and the title that opens it on the desk. */
+function Grip() {
+  return (
+    <span className="tp-grip" aria-hidden="true" title="Drag to reorder">
+      <svg width={8} height={14} viewBox="0 0 8 14" aria-hidden="true">
+        {[1.5, 7, 12.5].map((y) => (
+          <g key={y}>
+            <circle cx={1.5} cy={y} r={1.3} fill="currentColor" />
+            <circle cx={6.5} cy={y} r={1.3} fill="currentColor" />
+          </g>
+        ))}
+      </svg>
+    </span>
+  );
+}
+
+/**
+ * One task: the real checkbox (the ink tick and its sparkle), and the title that opens it on the desk. `movable`
+ * rows carry the grip in the left margin and drag from anywhere but the checkbox (#122).
+ */
 export function MenuBarRow({
   row,
+  movable,
   onToggle,
   onOpen,
 }: {
   row: MenuBarRowItem;
+  movable?: boolean;
   onToggle?: (row: MenuBarRowItem, done: boolean) => void;
   onOpen?: (row: MenuBarRowItem) => void;
 }) {
   const mine = useMine();
   return (
-    <div className={cx('tp-mb-r', row.done && 'tp-done')} role="listitem">
+    <div
+      className={cx('tp-mb-r', row.done && 'tp-done', movable && 'tp-mb-mv')}
+      role="listitem"
+      data-key={row.key}
+      {...(movable ? { 'data-reorder': '' } : null)}
+    >
+      {movable ? <Grip /> : null}
       <Checkbox size="sm" label={row.title} checked={!!row.done} onChange={(v) => onToggle?.(row, v)} />
       <button
         type="button"
         className="tp-mb-m"
         aria-label={`Open ${row.title} in Tudu`}
+        aria-keyshortcuts={movable ? 'Alt+ArrowUp Alt+ArrowDown' : undefined}
         onClick={() => onOpen?.(row)}
       >
         <span className="tp-mb-t">{mine(row.title)}</span>
         <Byline row={row} />
       </button>
     </div>
+  );
+}
+
+/**
+ * One space's rows. With `onReorder` and more than one row they reorder as Today's do: drag a row (or its grip), or
+ * ⌥↑ / ⌥↓ on a focused title; the row glides into its slot and washes once.
+ */
+function GroupRows({
+  group,
+  onToggle,
+  onOpen,
+  onReorder,
+}: {
+  group: MenuBarGroupItem;
+  onToggle?: MenuBarSheetProps['onToggle'];
+  onOpen?: MenuBarSheetProps['onOpen'];
+  onReorder?: MenuBarSheetProps['onReorder'];
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const rows = group.rows;
+  const movable = !!onReorder && rows.length > 1;
+  const [said, setSaid] = useState('');
+  const keyFlip = useRef<{ key: string; top: number; focus: HTMLElement } | null>(null);
+  const down = useReorder(
+    ref,
+    (from, to, key) => {
+      if (from !== to) onReorder?.(group.key, key, to);
+    },
+    { grab: '.tp-mb-m' },
+  );
+  // A keyboard move glides the row into its new slot and keeps the keyboard on its title.
+  useLayoutEffect(() => {
+    const f = keyFlip.current;
+    if (!f || !ref.current) return;
+    keyFlip.current = null;
+    const el = itemByKey(ref.current, f.key);
+    if (el) settleFrom(el, f.top);
+    if (f.focus.isConnected && document.activeElement !== f.focus) f.focus.focus({ preventScroll: true });
+  });
+
+  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (!movable || !e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    const target = e.target as HTMLElement;
+    const item = target.closest<HTMLElement>('[data-reorder]');
+    if (!item || item.parentNode !== ref.current) return;
+    const key = item.getAttribute('data-key')!;
+    const from = rows.findIndex((r) => r.key === key);
+    const to = Math.max(0, Math.min(rows.length - 1, from + (e.key === 'ArrowUp' ? -1 : 1)));
+    e.preventDefault();
+    if (from < 0 || to === from) return;
+    keyFlip.current = { key, top: item.getBoundingClientRect().top, focus: target };
+    onReorder?.(group.key, key, to);
+    setSaid(`Moved to place ${to + 1} of ${rows.length}`);
+  }
+
+  return (
+    <>
+      <div
+        ref={ref}
+        role="list"
+        aria-label={`Today in ${group.name}`}
+        onPointerDown={movable ? down : undefined}
+        onKeyDown={onKeyDown}
+      >
+        {rows.map((r) => (
+          <MenuBarRow key={r.key} row={r} movable={movable} onToggle={onToggle} onOpen={onOpen} />
+        ))}
+      </div>
+      <span className="sr-only" role="status" aria-live="polite">
+        {said}
+      </span>
+    </>
   );
 }
 
@@ -171,6 +280,8 @@ export function MenuBarSheet({
   noteShortcut,
   onToggle,
   onOpen,
+  onReorder,
+  moveError,
   onNew,
   onNewNote,
   onOpenApp,
@@ -228,21 +339,29 @@ export function MenuBarSheet({
       {heading ? (
         <div className="tp-mb-h">
           <div>
-            <div className="tp-mb-eb">{heading.eyebrow}</div>
+            {/* The menu bar sheet is a window of its own: it carries the Scrambled pill too, on the eyebrow's line
+                (#123), so the day and the date never wrap or move for it. */}
+            <div className="tp-mb-eb">
+              <span>{heading.eyebrow}</span>
+              <ScrambledPill className="tp-mb-scr" />
+            </div>
             <div className="tp-mb-day">
               <h2>{heading.day}</h2>
               <span>{heading.date}</span>
             </div>
           </div>
-          {/* The menu bar sheet is a window of its own: it carries the Scrambled pill too. */}
-          <ScrambledPill className="tp-mb-scr" />
           {state === 'day' ? <DayProgress done={done} total={total} compact size={30} /> : null}
         </div>
       ) : null}
       {heading ? <InboxLine inbox={inbox} /> : null}
       {offline ? (
         <Banner tone="warning" title="You’re offline.">
-          Ticks save here and go when you’re back.
+          Ticks and moves save here and go when you’re back.
+        </Banner>
+      ) : null}
+      {moveError && state === 'day' ? (
+        <Banner tone="error" title="It’s back where it was.">
+          Try again.
         </Banner>
       ) : null}
       {state === 'empty' ? (
@@ -264,11 +383,7 @@ export function MenuBarSheet({
                   {`${g.rows.filter((r) => r.done).length} of ${g.rows.length}`}
                 </div>
               ) : null}
-              <div role="list" aria-label={`Today in ${g.name}`}>
-                {g.rows.map((r) => (
-                  <MenuBarRow key={r.key} row={r} onToggle={onToggle} onOpen={onOpen} />
-                ))}
-              </div>
+              <GroupRows group={g} onToggle={onToggle} onOpen={onOpen} onReorder={onReorder} />
             </section>
           ))}
         </div>

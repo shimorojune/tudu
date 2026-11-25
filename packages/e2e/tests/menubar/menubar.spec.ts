@@ -3,7 +3,7 @@ import { API_URL, expect, signInFresh, test } from '../../fixtures/app';
 import { calls, emit, installFake, READY, teamOfTwo, updaterSays } from '../../fixtures/desktop';
 import { sendRequest } from '../../fixtures/inbox';
 import { createSpace, me, seedTasks } from '../../fixtures/spaces';
-import { dayList, fixClock, idle, row, SUNDAY } from '../../fixtures/today';
+import { dayList, drag, fixClock, idle, row, SUNDAY, titlesOf } from '../../fixtures/today';
 
 /**
  * Today from the menu bar: the page the macOS app's sheet holds (/menubar), against a fake of the app that records
@@ -212,11 +212,11 @@ test.describe('menubar', () => {
     const { m, id } = await threeToday(page);
     await expect(ring(m, '0 of 3')).toBeVisible();
     await page.context().setOffline(true);
-    await expect(m.getByText('Ticks save here and go when you’re back.')).toBeVisible();
+    await expect(m.getByText('Ticks and moves save here and go when you’re back.')).toBeVisible();
     await item(list(m, 'Personal'), 'Water the plants').getByRole('checkbox').click();
     await expect(ring(m, '1 of 3')).toBeVisible();
     await page.context().setOffline(false);
-    await expect(m.getByText('Ticks save here and go when you’re back.')).toHaveCount(0);
+    await expect(m.getByText('Ticks and moves save here and go when you’re back.')).toHaveCount(0);
     await idle(m);
     expect((await dayOf(m, id, SUN)).find((t) => t.title === 'Water the plants')?.done).toBe(true);
   });
@@ -432,5 +432,243 @@ test.describe('menubar', () => {
     await lessMotion();
     await expect(m.locator('html')).not.toHaveAttribute('data-motion', 'less');
     await expect(f.locator('html')).not.toHaveAttribute('data-motion', 'less');
+  });
+
+  // ---- The sheet's height, heading, shadow and order (#123, #122) -------------------------------------------
+
+  /** The sheet at the Mac window's size: 360 x 600, with `data-app='menubar'` set as the app sets it. */
+  async function inWindow(m: Page): Promise<Page> {
+    await m.setViewportSize({ width: 360, height: 600 });
+    await expect(m.locator('html')).toHaveAttribute('data-app', 'menubar');
+    return m;
+  }
+  const sheetTitles = (m: Page, space: string) => list(m, space).locator('.tp-mb-t').allTextContents();
+  const serverTitles = async (m: Page, spaceId: string) => (await dayOf(m, spaceId, SUN)).map((t) => t.title);
+
+  test('C20-E23 a full day in the app’s window: the page never scrolls, the list does, the sheet stops 16px short', async ({
+    page,
+  }) => {
+    await fixClock(page);
+    await installFake(page);
+    await signInFresh(page);
+    const id = await personalId(page);
+    await seedTasks(
+      page,
+      id,
+      // Twelve rows fit the window with room to spare; thirty do not.
+      Array.from({ length: 30 }, (_, i) => ({ title: `Task number ${i + 1}`, day: SUN })),
+    );
+    const m = await inWindow(await sheet(page));
+    await expect(list(m, 'Personal').getByRole('listitem')).toHaveCount(30);
+    // At rest: while the app rises into place (220ms) it sits a few pixels low and the page is held from scrolling.
+    await expect(m.locator('#root')).not.toHaveClass(/tl-arrive/);
+    const sizes = await m.evaluate(() => {
+      const page = document.scrollingElement!;
+      const body = document.querySelector('.tp-mb-b')!;
+      // For the message when the page is too tall: what reaches below the window.
+      const low = [...document.querySelectorAll<HTMLElement>('body *')]
+        .filter((e) => !e.closest('.tp-mb-b') && e.getBoundingClientRect().bottom > window.innerHeight + 0.5)
+        .map((e) => {
+          const r = e.getBoundingClientRect();
+          return `${e.tagName}.${String(e.className).slice(0, 40)} ${Math.round(r.top)}..${Math.round(r.bottom)} ${getComputedStyle(e).position}`;
+        });
+      return {
+        page: page.scrollHeight,
+        window: window.innerHeight,
+        list: body.scrollHeight - body.clientHeight,
+        sheet: document.querySelector('.tp-root.tp-mb')!.getBoundingClientRect().height,
+        low: low.slice(0, 12).join('\n'),
+      };
+    });
+    expect(sizes.window).toBe(600);
+    expect(sizes.page, sizes.low).toBeLessThanOrEqual(sizes.window);
+    expect(sizes.list).toBeGreaterThan(0);
+    expect(sizes.sheet).toBeLessThanOrEqual(584);
+    // A wheel over the heading moves nothing: there is no second bar.
+    await m.getByRole('heading', { name: 'Sunday' }).hover();
+    await m.mouse.wheel(0, 400);
+    expect(await m.evaluate(() => document.scrollingElement!.scrollTop)).toBe(0);
+  });
+
+  test('C20-E24 Scrambled on at 360px: the eyebrow, the day and the date stay one line and the heading keeps its height', async ({
+    page,
+  }) => {
+    const { m } = await threeToday(page);
+    await inWindow(m);
+    const measure = () =>
+      m.evaluate(() => {
+        const h = (sel: string) => document.querySelector(sel)!.getBoundingClientRect().height;
+        const top = (sel: string) => document.querySelector(sel)!.getBoundingClientRect().top;
+        return {
+          head: h('.tp-mb-h'),
+          eyebrow: h('.tp-mb-eb'),
+          day: h('.tp-mb-day h2'),
+          date: h('.tp-mb-day span'),
+          dayTop: top('.tp-mb-day h2'),
+          ringTop: top('.tp-mb-h > :last-child'),
+        };
+      });
+    await expect(m.getByRole('button', { name: /^Scrambled/ })).toHaveCount(0);
+    const off = await measure();
+    expect(off.day).toBe(26);
+    await m.evaluate(() => localStorage.setItem('tudu.scramble', '0123456789abcdef0123456789abcdef'));
+    await m.reload();
+    const pill = m.getByRole('button', { name: /^Scrambled/ });
+    await expect(pill).toBeVisible();
+    // On the eyebrow's line, never in the heading row beside the ring.
+    await expect(m.locator('.tp-mb-eb > .tp-scr-pill')).toHaveCount(1);
+    await expect(m.locator('.tp-mb-h > .tp-scr-pill')).toHaveCount(0);
+    expect((await pill.boundingBox())!.height).toBe(20);
+    expect(await measure()).toEqual(off);
+    await m.evaluate(() => localStorage.removeItem('tudu.scramble'));
+  });
+
+  test('C20-E25 in the app the sheet’s shadow stays inside the window’s clear edge; in a plain tab it keeps the pop shadow', async ({
+    page,
+  }) => {
+    const { m } = await threeToday(page);
+    await inWindow(m);
+    /** How far each layer of a computed box-shadow reaches past the box: offset + spread + half the blur. */
+    const reach = (p: Page) =>
+      p.evaluate(() => {
+        const card = document.querySelector('.tp-root.tp-mb')!;
+        const probe = document.createElement('div');
+        probe.style.boxShadow = 'var(--shadow-pop), 0 0 0 1px var(--line)';
+        card.appendChild(probe);
+        const pop = getComputedStyle(probe).boxShadow;
+        probe.remove();
+        const shadow = getComputedStyle(card).boxShadow;
+        const layers = shadow.split(/,(?![^(]*\))/).map((layer) => {
+          const [x = 0, y = 0, blur = 0, spread = 0] = (layer.match(/-?[\d.]+px/g) ?? []).map(parseFloat);
+          return Math.max(Math.abs(x), Math.abs(y)) + spread + blur / 2;
+        });
+        return { shadow, pop, layers: layers.length, far: Math.max(...layers) };
+      });
+    const app = await reach(m);
+    expect(app.layers).toBe(3);
+    expect(app.far).toBeLessThanOrEqual(8);
+    expect(app.shadow).not.toBe(app.pop);
+    // A plain tab (no app around the page): nothing cuts the shadow, so it stays the deep one.
+    const tab = await page.context().newPage();
+    await tab.clock.setFixedTime(SUNDAY);
+    await tab.goto('/menubar');
+    await expect(list(tab, 'Personal')).toBeVisible();
+    await expect(tab.locator('html')).not.toHaveAttribute('data-app', /./);
+    const plain = await reach(tab);
+    expect(plain.shadow).toBe(plain.pop);
+    expect(plain.far).toBeGreaterThan(8);
+  });
+
+  test('C20-E26 drag the third row above the first, then ⌥↑: the sheet, the server and the desk show the new order', async ({
+    page,
+  }) => {
+    const { m, id } = await threeToday(page);
+    const l = list(m, 'Personal');
+    await expect(l.getByRole('listitem')).toHaveCount(3);
+    const [a, b, c] = (await sheetTitles(m, 'Personal')) as [string, string, string];
+    // Every row carries the grip; a plain click on a title still opens the task.
+    await expect(l.locator('[data-reorder] > .tp-grip')).toHaveCount(3);
+    const first = (await item(l, a).boundingBox())!;
+    // Pressed on the title itself (the whole row drags, not only the grip) and carried above the first row.
+    await drag(m, item(l, c), { x: first.x + 120, y: first.y + 2 });
+    await expect.poll(() => sheetTitles(m, 'Personal')).toEqual([c, a, b]);
+    // The drop opened nothing and ticked nothing.
+    expect(await calls(m, 'openTask')).toHaveLength(0);
+    await expect(ring(m, '0 of 3')).toBeVisible();
+    await idle(m);
+    expect(await serverTitles(m, id)).toEqual([c, a, b]);
+    await expect.poll(() => titlesOf(dayList(page))).toEqual([c, a, b]);
+
+    // ⌥↑ on a focused title moves its row one place and keeps the keyboard on it.
+    const title = m.getByRole('button', { name: `Open ${b} in Tudu` });
+    await title.focus();
+    await m.keyboard.press('Alt+ArrowUp');
+    await expect.poll(() => sheetTitles(m, 'Personal')).toEqual([c, b, a]);
+    await expect(title).toBeFocused();
+    await idle(m);
+    expect(await serverTitles(m, id)).toEqual([c, b, a]);
+    await expect.poll(() => titlesOf(dayList(page))).toEqual([c, b, a]);
+    // A click that doesn't move is still a click.
+    await title.click();
+    expect(await calls(m, 'openTask')).toHaveLength(1);
+  });
+
+  test('C20-E27 Northwind, someone else’s task on the same day: your moves stay among yours and theirs is untouched', async ({
+    page,
+    browser,
+  }) => {
+    const { slug, space, b } = await teamOfTwo(page, browser);
+    await seedTasks(page, space.id, [
+      { title: 'Mine one', day: SUN },
+      { title: 'Mine two', day: SUN },
+      { title: 'Mine three', day: SUN },
+    ]);
+    // Theirs sits between my first and my second in the space's numbers (1024, 1536, 2048, 3072). The server
+    // gives each person their own tasks of a day, so it is on their day and never on mine.
+    const theirs = crypto.randomUUID();
+    const res = await b.page.request.post(`${API_URL}/api/sync`, {
+      data: {
+        clientId: 'seed',
+        mutations: [
+          {
+            id: crypto.randomUUID(),
+            type: 'task.create',
+            payload: { id: theirs, spaceId: space.id, title: 'Their own thing', day: SUN, position: 1536 },
+            at: '2026-10-18T09:00:30.000Z',
+          },
+        ],
+      },
+    });
+    expect(res.status()).toBe(200);
+    expect(await serverTitles(page, space.id)).toEqual(['Mine one', 'Mine two', 'Mine three']);
+    expect(await serverTitles(b.page, space.id)).toEqual(['Their own thing']);
+    await page.goto(`/${slug}`);
+    await expect(dayList(page)).toBeVisible();
+    const m = await sheet(page);
+    const l = list(m, 'Northwind');
+    await expect.poll(() => sheetTitles(m, 'Northwind')).toEqual(['Mine one', 'Mine two', 'Mine three']);
+    // My third goes above my first.
+    const first = (await item(l, 'Mine one').boundingBox())!;
+    await drag(m, item(l, 'Mine three'), { x: first.x + 120, y: first.y + 2 });
+    const moved = ['Mine three', 'Mine one', 'Mine two'];
+    await expect.poll(() => sheetTitles(m, 'Northwind')).toEqual(moved);
+    await idle(m);
+    expect(await serverTitles(m, space.id)).toEqual(moved);
+    await expect.poll(() => titlesOf(dayList(page))).toEqual(moved);
+    // It goes back to the end of mine, past the place theirs holds.
+    await m.getByRole('button', { name: 'Open Mine three in Tudu' }).focus();
+    await m.keyboard.press('Alt+ArrowDown');
+    await m.keyboard.press('Alt+ArrowDown');
+    const back = ['Mine one', 'Mine two', 'Mine three'];
+    await expect.poll(() => sheetTitles(m, 'Northwind')).toEqual(back);
+    await idle(m);
+    expect(await serverTitles(m, space.id)).toEqual(back);
+    // Their day never changed.
+    expect(await serverTitles(b.page, space.id)).toEqual(['Their own thing']);
+    await b.context.close();
+  });
+
+  test('C20-E28 offline, a moved row stays moved; back online the server has the new order', async ({
+    page,
+  }) => {
+    const { m, id } = await threeToday(page);
+    const l = list(m, 'Personal');
+    await expect(l.getByRole('listitem')).toHaveCount(3);
+    const [a, b, c] = (await sheetTitles(m, 'Personal')) as [string, string, string];
+    await idle(m);
+    await page.context().setOffline(true);
+    await expect(m.getByText('Ticks and moves save here and go when you’re back.')).toBeVisible();
+    await m.getByRole('button', { name: `Open ${a} in Tudu` }).focus();
+    await m.keyboard.press('Alt+ArrowDown');
+    await expect.poll(() => sheetTitles(m, 'Personal')).toEqual([b, a, c]);
+    // It stays where it was put while offline, and nothing says it failed.
+    await m.waitForTimeout(600);
+    expect(await sheetTitles(m, 'Personal')).toEqual([b, a, c]);
+    await expect(m.getByRole('alert')).toHaveCount(0);
+    await page.context().setOffline(false);
+    await expect(m.getByText('Ticks and moves save here and go when you’re back.')).toHaveCount(0);
+    await idle(m);
+    expect(await serverTitles(m, id)).toEqual([b, a, c]);
+    expect(await sheetTitles(m, 'Personal')).toEqual([b, a, c]);
   });
 });

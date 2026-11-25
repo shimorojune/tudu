@@ -107,7 +107,7 @@ and C20 (menu bar).
 | C02-U66 | core `due.test.ts`                       | `dueLabel(today, today).today` is true; tomorrow and yesterday are false. `dueLabelAt` with today at 5 PM: true before 5 PM, and false with `overdue` after.                                                           |
 | C02-E43 | e2e `today`                              | A task due today: its due words are computed `--warning` in light and dark. An overdue one is `--destructive`. The two colours differ.                                                                                 |
 | C03-U32 | ui `TaskDetail.test.tsx`                 | The Due fact for today has `tp-td-now` and computes to `--warning`.                                                                                                                                                    |
-| C20-U30 | ui `MenuBarSheet.test.tsx`               | A row due today: its byline's due span has `tp-dt`.                                                                                                                                                                    |
+| C20-U31 | ui `MenuBarSheet.test.tsx`               | A row due today: its byline's due span has `tp-dt`.                                                                                                                                                                    |
 | C00-U39 | ui `MiniCalendar.test.tsx`               | `.tp-cal-g` columns compute to `34px` × 7, and every `.tp-cal-d`'s left offset within the grid is a whole number. Today keeps `tp-today` and its ring.                                                                 |
 
 ### Updated

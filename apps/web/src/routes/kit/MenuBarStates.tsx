@@ -28,25 +28,52 @@ const NORTHWIND: MenuBarGroupItem = {
   ],
 };
 
-/** A day whose ticks work in the kit, as they do under the tick. */
-function Day({ groups, offline }: { groups: MenuBarGroupItem[]; offline?: boolean }) {
+/** A day whose ticks and moves work in the kit, as they do under the tick. */
+function Day({
+  groups,
+  offline,
+  moveError,
+}: {
+  groups: MenuBarGroupItem[];
+  offline?: boolean;
+  moveError?: boolean;
+}) {
   const [done, setDone] = useState<Record<string, boolean>>({});
-  const live = groups.map((g) => ({
-    ...g,
-    rows: g.rows.map((r) => ({ ...r, done: done[r.key] ?? r.done })),
-  }));
+  const [order, setOrder] = useState<Record<string, string[]>>({});
+  const live = groups.map((g) => {
+    const keys = order[g.key] ?? g.rows.map((r) => r.key);
+    return {
+      ...g,
+      rows: keys
+        .map((k) => g.rows.find((r) => r.key === k)!)
+        .map((r) => ({ ...r, done: done[r.key] ?? r.done })),
+    };
+  });
   return (
     <MenuBarSheet
       state="day"
       heading={HEADING}
       groups={live}
       offline={offline}
+      moveError={moveError}
       onToggle={(r, v) => setDone((d) => ({ ...d, [r.key]: v }))}
+      onReorder={(group, key, to) =>
+        setOrder((o) => {
+          const keys = (o[group] ?? groups.find((g) => g.key === group)!.rows.map((r) => r.key)).filter(
+            (k) => k !== key,
+          );
+          keys.splice(to, 0, key);
+          return { ...o, [group]: keys };
+        })
+      }
     />
   );
 }
 
-/** Today from the menu bar: one space, two spaces, offline, nothing today and signed out, light and dark. */
+/**
+ * Today from the menu bar: one space, two spaces, offline, a move turned down, nothing today and signed out, light
+ * and dark.
+ */
 export function MenuBarStates() {
   return (
     <Section
@@ -57,6 +84,7 @@ export function MenuBarStates() {
       <Pair title="Menu bar, one space" render={() => <Day groups={[PERSONAL]} />} />
       <Pair title="Menu bar, two spaces" render={() => <Day groups={[PERSONAL, NORTHWIND]} />} />
       <Pair title="Menu bar, offline" render={() => <Day groups={[PERSONAL]} offline />} />
+      <Pair title="Menu bar, a move turned down" render={() => <Day groups={[PERSONAL]} moveError />} />
       <Pair
         title="Menu bar, nothing today"
         render={() => (
